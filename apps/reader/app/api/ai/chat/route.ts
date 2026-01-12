@@ -9,6 +9,7 @@ import { type ChatMessage, buildChatMessages } from "@/lib/ai/contextBuilder";
 import type { ModelCapability } from "@/lib/ai/models";
 import { type WorkflowType, getWorkflowSystemPrompt } from "@/lib/ai/workflowPrompts";
 import type { Message } from "@keepup/ai-core";
+import { normalizeMessages } from "@keepup/ai-core";
 import { computeOptimisticHash } from "@keepup/core";
 import { completeWithProvider, streamProviderContent } from "../llmGateway";
 import { getDefaultChatModelId } from "../modelResolver";
@@ -104,7 +105,7 @@ function prepareProviderMessages(
   ];
 
   // Drop empty messages to avoid provider "invalid argument" errors
-  return allMessages.filter((m) => m.content && m.content.trim().length > 0);
+  return normalizeMessages(allMessages);
 }
 
 function providerErrorResponse(error: ProviderResolutionError, requestId: string): Response {

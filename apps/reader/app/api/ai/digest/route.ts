@@ -7,7 +7,7 @@
  * Track 2: Intelligence & Logic (AI) - P1
  */
 
-import type { Message } from "@keepup/ai-core";
+import { type Message, normalizeMessages } from "@keepup/ai-core";
 import { NextResponse } from "next/server";
 import { completeWithProvider } from "../llmGateway";
 import { getDefaultChatModelId } from "../modelResolver";
@@ -129,10 +129,10 @@ interface LLMResponse {
 }
 
 function buildDigestMessages(userPrompt: string): Message[] {
-  return [
+  return normalizeMessages([
     { role: "system", content: SYNTHESIS_SYSTEM_PROMPT },
     { role: "user", content: userPrompt },
-  ];
+  ]);
 }
 
 async function generateCardsWithLLM(
