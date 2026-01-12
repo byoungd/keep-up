@@ -1,4 +1,8 @@
 import type { ModelCapability } from "@keepup/ai-core";
+import {
+  getDefaultModelId as getDefaultModelIdFromCatalog,
+  getModelCapability as getModelCapabilityFromCatalog,
+} from "@keepup/ai-core";
 
 export const MODEL_CAPABILITIES: ModelCapability[] = [
   // --- Google Gemini (Current) ---
@@ -443,10 +447,14 @@ export const MODEL_CAPABILITIES: ModelCapability[] = [
   },
 ];
 
-export function getModelCapability(modelId: string): ModelCapability | undefined {
-  return MODEL_CAPABILITIES.find((entry) => entry.id === modelId);
+export function getModelCapability(modelId: string | undefined): ModelCapability | undefined {
+  return getModelCapabilityFromCatalog(modelId);
 }
 
 export function getDefaultModel(): ModelCapability {
-  return MODEL_CAPABILITIES.find((entry) => entry.default) ?? MODEL_CAPABILITIES[0];
+  return (
+    MODEL_CAPABILITIES.find((entry) => entry.default) ??
+    MODEL_CAPABILITIES.find((entry) => entry.id === getDefaultModelIdFromCatalog()) ??
+    MODEL_CAPABILITIES[0]
+  );
 }

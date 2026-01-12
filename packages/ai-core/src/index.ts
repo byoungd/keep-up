@@ -290,6 +290,7 @@ export {
   getDefaultModelId,
   getModelCapability,
 } from "./catalog/models";
+export { normalizeMessages, withSystemPrompt } from "./catalog/messages";
 
 // ============================================================================
 // Observability - Enhanced Telemetry & Profiling
