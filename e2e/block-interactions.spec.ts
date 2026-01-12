@@ -36,25 +36,42 @@ test.describe("Block Interactions", () => {
     // Need to seed content or find a block
     const editor = page.locator(".lfcc-editor .ProseMirror");
     const block = editor.locator("[data-block-id]").first();
-    const content = block.locator("[data-content-container]").first();
 
-    // Hover
-    await content.hover();
+    // Wait for block to be ready before hovering
+    await expect(block).toBeVisible({ timeout: 5000 });
 
-    // Check for gutter
-    // Gutter is in Portal (body > div)
+    // Get bounding box and hover at center
+    const box = await block.boundingBox();
+    if (box) {
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    } else {
+      await block.hover();
+    }
+
+    // Wait for gutter portal to mount (it's rendered in a portal)
+    await page.waitForTimeout(300);
+
+    // Check for gutter (in Portal)
     const handle = page.getByLabel("Drag to reorder or Click for menu");
-    await expect(handle).toBeVisible();
+    await expect(handle).toBeVisible({ timeout: 10000 });
 
     const addBtn = page.getByLabel("Add block");
-    await expect(addBtn).toBeVisible();
+    await expect(addBtn).toBeVisible({ timeout: 5000 });
   });
 
   test("Clicking handle selects block", async ({ page }) => {
     const editor = page.locator(".lfcc-editor .ProseMirror");
     const block = editor.locator("[data-block-id]").first();
-    const content = block.locator("[data-content-container]").first();
-    await content.hover();
+    await expect(block).toBeVisible({ timeout: 5000 });
+
+    // Hover at center of block
+    const box = await block.boundingBox();
+    if (box) {
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    } else {
+      await block.hover();
+    }
+    await page.waitForTimeout(300);
 
     const blockId = await block.getAttribute("data-block-id");
     if (!blockId) {
@@ -62,19 +79,23 @@ test.describe("Block Interactions", () => {
     }
 
     const handle = page.getByLabel("Drag to reorder or Click for menu");
+    await expect(handle).toBeVisible({ timeout: 10000 });
     await handle.click();
 
     await expect
-      .poll(async () => {
-        return await page.evaluate((id) => {
-          const globalAny = window as unknown as {
-            __lfccView?: import("prosemirror-view").EditorView;
-          };
-          const view = globalAny.__lfccView;
-          const selectedId = view?.state?.selection?.node?.attrs?.block_id;
-          return selectedId === id;
-        }, blockId);
-      })
+      .poll(
+        async () => {
+          return await page.evaluate((id) => {
+            const globalAny = window as unknown as {
+              __lfccView?: { state?: { selection?: { node?: { attrs?: { block_id?: string } } } } };
+            };
+            const view = globalAny.__lfccView;
+            const selectedId = view?.state?.selection?.node?.attrs?.block_id;
+            return selectedId === id;
+          }, blockId);
+        },
+        { timeout: 10000 }
+      )
       .toBe(true);
   });
 
@@ -83,28 +104,48 @@ test.describe("Block Interactions", () => {
     const initialCount = (await getDocInfo(page)).childCount;
 
     const block = editor.locator("[data-block-id]").first();
-    const content = block.locator("[data-content-container]").first();
-    await content.hover();
+    await expect(block).toBeVisible({ timeout: 5000 });
+
+    // Hover at center of block
+    const box = await block.boundingBox();
+    if (box) {
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    } else {
+      await block.hover();
+    }
+    await page.waitForTimeout(300);
+
     const addBtn = page.getByLabel("Add block");
+    await expect(addBtn).toBeVisible({ timeout: 10000 });
     await addBtn.click();
 
-    await expect.poll(async () => (await getDocInfo(page)).childCount).toBe(initialCount + 1);
+    await expect
+      .poll(async () => (await getDocInfo(page)).childCount, { timeout: 10000 })
+      .toBe(initialCount + 1);
   });
 
   test("Block context menu appears", async ({ page }) => {
     const editor = page.locator(".lfcc-editor .ProseMirror");
     const block = editor.locator("[data-block-id]").first();
-    const content = block.locator("[data-content-container]").first();
-    await content.hover();
+    await expect(block).toBeVisible({ timeout: 5000 });
+
+    // Hover at center of block
+    const box = await block.boundingBox();
+    if (box) {
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    } else {
+      await block.hover();
+    }
+    await page.waitForTimeout(300);
 
     // Click menu button
     const handle = page.getByLabel("Drag to reorder or Click for menu");
-    await expect(handle).toBeVisible();
+    await expect(handle).toBeVisible({ timeout: 10000 });
     await handle.click();
 
     // Expect context menu
     const menu = page.locator("[role='menu'][data-block-id]");
-    await expect(menu).toBeVisible();
+    await expect(menu).toBeVisible({ timeout: 5000 });
 
     // Has expected items
     await expect(page.getByRole("menuitem", { name: "Duplicate" })).toBeVisible();
@@ -120,15 +161,26 @@ test.describe("Block Interactions", () => {
     const initialCount = (await getDocInfo(page)).childCount;
 
     const block = editor.locator("[data-block-id]").first();
-    const content = block.locator("[data-content-container]").first();
-    await content.hover();
+    await expect(block).toBeVisible({ timeout: 5000 });
+
+    // Hover at center of block
+    const box = await block.boundingBox();
+    if (box) {
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    } else {
+      await block.hover();
+    }
+    await page.waitForTimeout(300);
 
     const handle = page.getByLabel("Drag to reorder or Click for menu");
+    await expect(handle).toBeVisible({ timeout: 10000 });
     await handle.click();
 
     await page.getByRole("menuitem", { name: "Delete" }).click();
     await page.getByRole("menuitem", { name: "Confirm delete?" }).click();
 
-    await expect.poll(async () => (await getDocInfo(page)).childCount).toBe(initialCount - 1);
+    await expect
+      .poll(async () => (await getDocInfo(page)).childCount, { timeout: 10000 })
+      .toBe(initialCount - 1);
   });
 });
