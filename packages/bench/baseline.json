@@ -1,0 +1,54 @@
+{
+  "timestamp": "2025-12-31T22:34:00+08:00",
+  "version": "0.9.0-rc",
+  "results": [
+    {
+      "name": "create-10k-blocks",
+      "iterations": 10,
+      "avgMs": 168.778,
+      "p50Ms": 168.239,
+      "p95Ms": 230.991,
+      "p99Ms": 230.991,
+      "opsPerSec": 5.92,
+      "memoryDelta": 4227072
+    },
+    {
+      "name": "edit-10k-operations",
+      "iterations": 10,
+      "avgMs": 358.978,
+      "p50Ms": 374.141,
+      "p95Ms": 647.043,
+      "p99Ms": 647.043,
+      "opsPerSec": 2.79
+    },
+    {
+      "name": "verify-1k-annotations",
+      "iterations": 100,
+      "avgMs": 0.046,
+      "p50Ms": 0.035,
+      "p95Ms": 0.191,
+      "p99Ms": 0.221,
+      "opsPerSec": 21528.32
+    },
+    {
+      "name": "reorder-500-ops",
+      "iterations": 20,
+      "avgMs": 20.187,
+      "p50Ms": 17.501,
+      "p95Ms": 120.677,
+      "p99Ms": 120.677,
+      "opsPerSec": 49.54,
+      "memoryDelta": -4068864
+    },
+    {
+      "name": "split-200-ops",
+      "iterations": 20,
+      "avgMs": 25.836,
+      "p50Ms": 20.721,
+      "p95Ms": 35.392,
+      "p99Ms": 35.392,
+      "opsPerSec": 38.71,
+      "memoryDelta": 492544
+    }
+  ]
+}
