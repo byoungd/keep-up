@@ -191,8 +191,9 @@ test.describe("Annotation Edge Cases", () => {
     const joined = allText.join(" ");
     expect(joined).toContain("Paragraph One");
 
-    // Check that we actually merged the paragraphs (should be 2 paragraphs total now, not 3)
-    await expect(page.locator(".ProseMirror p")).toHaveCount(2);
+    // Check that we actually merged the paragraphs (should be 2 blocks total now, not 3)
+    // LFCC uses [data-block-id] divs, not <p> elements
+    await expect(page.locator(".ProseMirror [data-block-id]")).toHaveCount(2);
   });
 });
 

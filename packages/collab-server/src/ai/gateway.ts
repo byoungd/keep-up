@@ -32,6 +32,7 @@ import {
   createResiliencePipeline,
   createResilientProvider,
   isRetryableError,
+  normalizeMessages,
 } from "@keepup/ai-core";
 import type { AuditLogger } from "../audit/auditLogger";
 
@@ -283,7 +284,7 @@ export class AIGateway {
 
     const request: CompletionRequest = {
       model: options.model ?? this.config.defaultModel ?? "gpt-4o-mini",
-      messages,
+      messages: normalizeMessages(messages),
       temperature: options.temperature,
       maxTokens: options.maxTokens,
       timeoutMs: options.timeoutMs,
@@ -327,7 +328,7 @@ export class AIGateway {
 
     const request: CompletionRequest = {
       model: options.model ?? this.config.defaultModel ?? "gpt-4o-mini",
-      messages,
+      messages: normalizeMessages(messages),
       temperature: options.temperature,
       maxTokens: options.maxTokens,
       timeoutMs: options.timeoutMs,

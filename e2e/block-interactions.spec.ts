@@ -1,9 +1,15 @@
 import { expect, test } from "@playwright/test";
-import { getDocInfo, openFreshEditor } from "./helpers/editor";
+import { focusEditor, getDocInfo, openFreshEditor, typeInEditor } from "./helpers/editor";
 
 test.describe("Block Interactions", () => {
   test.beforeEach(async ({ page }, testInfo) => {
-    await openFreshEditor(page, `block-interactions-${testInfo.title}`, { clearContent: false });
+    await openFreshEditor(page, `block-interactions-${testInfo.title}`, { clearContent: true });
+    // Seed initial content to ensure blocks exist for testing
+    await focusEditor(page);
+    await typeInEditor(page, "Test content for block interactions");
+    await page.keyboard.press("Enter");
+    await typeInEditor(page, "Second paragraph for testing");
+    await page.waitForTimeout(200);
   });
 
   test("Slash menu insertion", async ({ page }) => {
