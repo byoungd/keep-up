@@ -2,37 +2,32 @@
 
 import type { Message } from "@/components/layout/MessageItem";
 import {
-  type EnhancedDocument,
-  applyOperation,
-  createEnhancedDocument,
-  createMessageBlock,
-  getBlockText,
+  type AIContext,
+  type DocumentFacade,
+  type LoroRuntime,
+  type MessageBlock,
+  createDocumentFacade,
+  createLoroRuntime,
 } from "@keepup/lfcc-bridge";
 import * as React from "react";
 
-const STORAGE_KEY = "ai-companion-conversation-v3";
+const STORAGE_KEY = "ai-chat-loro-v1";
 const KEY_STORAGE = "ai-companion-key-v1";
-const STORAGE_VERSION = 3;
+const STORAGE_VERSION = 4;
 const MAX_MESSAGES = 200;
 const ALLOW_PLAINTEXT = process.env.NODE_ENV !== "production";
 
 interface PersistenceState {
-  doc: EnhancedDocument;
+  snapshot: string; // Base64 encoded Loro snapshot
   model: string;
 }
 
 type StoredEncryptedPayload = {
-  version: 3;
+  version: 4;
   encrypted: {
     iv: string;
     data: string;
   };
-};
-
-// Legacy payload type for migration
-type LegacyPayload = {
-  messages?: Message[];
-  model?: string;
 };
 
 function toBase64(bytes: ArrayBuffer): string {
@@ -106,7 +101,7 @@ async function decryptState(payload: StoredEncryptedPayload): Promise<Persistenc
     const decoded = await window.crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, data);
     const text = new TextDecoder().decode(decoded);
     const parsed = JSON.parse(text) as PersistenceState;
-    if (parsed?.doc?.blocks) {
+    if (parsed?.snapshot && parsed?.model !== undefined) {
       return parsed;
     }
     return null;
@@ -120,54 +115,11 @@ function isEncryptedPayload(value: unknown): value is StoredEncryptedPayload {
     return false;
   }
   const payload = value as StoredEncryptedPayload;
-  const version = payload.version as number;
   return (
-    (version === 2 || version === STORAGE_VERSION) &&
+    payload.version === STORAGE_VERSION &&
     typeof payload.encrypted?.iv === "string" &&
     typeof payload.encrypted?.data === "string"
   );
-}
-
-function migrateLegacyToEnhanced(legacy: LegacyPayload): PersistenceState {
-  const messages = Array.isArray(legacy.messages) ? legacy.messages : [];
-  const model = typeof legacy.model === "string" ? legacy.model : "";
-
-  let doc = createEnhancedDocument("chat", { title: "Migrated Chat" });
-
-  // Convert legacy messages to enhanced blocks
-  for (const msg of messages) {
-    const block = createMessageBlock(msg.role as "user" | "assistant", msg.content);
-    doc = applyOperation(doc, { type: "INSERT_BLOCK", blockId: block.id, block });
-  }
-
-  return { doc, model };
-}
-
-function normalizeLegacyPayload(value: unknown): PersistenceState | null {
-  if (!value || typeof value !== "object") {
-    return null;
-  }
-  const potential = value as Record<string, unknown>;
-  if (potential.doc && typeof potential.doc === "object") {
-    return potential as unknown as PersistenceState;
-  }
-  const legacy = value as LegacyPayload;
-  if (legacy.messages) {
-    return migrateLegacyToEnhanced(legacy);
-  }
-  return null;
-}
-
-export function applyRetention(state: PersistenceState): PersistenceState {
-  const blocks = state.doc.blocks;
-  if (blocks.length <= MAX_MESSAGES) {
-    return state;
-  }
-  const retainedBlocks = blocks.slice(-MAX_MESSAGES);
-  return {
-    ...state,
-    doc: { ...state.doc, blocks: retainedBlocks },
-  };
 }
 
 function sanitizeUrl(url: string): string {
@@ -197,13 +149,47 @@ export function sanitizeMarkdown(content: string): string {
   return sanitized;
 }
 
+/** Convert MessageBlock to legacy Message format for UI compatibility */
+function messageBlockToMessage(block: MessageBlock): Message {
+  return {
+    id: block.id,
+    role: block.role as "user" | "assistant",
+    content: block.text,
+    createdAt: block.createdAt,
+  };
+}
+
 export function useChatPersistence(defaultModel: string) {
-  const [doc, setDoc] = React.useState<EnhancedDocument>(() => createEnhancedDocument("chat"));
+  const [runtime, setRuntime] = React.useState<LoroRuntime | null>(null);
+  const [facade, setFacade] = React.useState<DocumentFacade | null>(null);
+  const [messages, setMessages] = React.useState<MessageBlock[]>([]);
   const [model, setModel] = React.useState<string>(defaultModel);
   const [hydrated, setHydrated] = React.useState(false);
 
+  // Initialize runtime and facade
   React.useEffect(() => {
-    if (typeof window === "undefined") {
+    const rt = createLoroRuntime({ peerId: "chat" as `${number}` });
+    const fc = createDocumentFacade(rt);
+    setRuntime(rt);
+    setFacade(fc);
+
+    // Subscribe to changes
+    const unsubscribe = fc.subscribe((event) => {
+      if (
+        event.type === "message_inserted" ||
+        event.type === "message_updated" ||
+        event.type === "message_streaming"
+      ) {
+        setMessages(fc.getMessages());
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Load from storage
+  React.useEffect(() => {
+    if (!runtime || !facade || typeof window === "undefined") {
       return;
     }
     let cancelled = false;
@@ -213,29 +199,37 @@ export function useChatPersistence(defaultModel: string) {
       if (!stored) {
         return null;
       }
-      const parsed = JSON.parse(stored) as unknown;
-      if (isEncryptedPayload(parsed)) {
-        return decryptState(parsed);
+      try {
+        const parsed = JSON.parse(stored) as unknown;
+        if (isEncryptedPayload(parsed)) {
+          return decryptState(parsed);
+        }
+      } catch {
+        return null;
       }
-      return normalizeLegacyPayload(parsed);
+      return null;
     };
 
-    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: hook bootstraps persistence, migrations, and defaults
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Legacy hydration logic with multiple fallback paths
     void (async () => {
       try {
         const state = await loadFromStorage();
         if (!state) {
-          window.localStorage.removeItem(STORAGE_KEY);
           if (!cancelled) {
+            setMessages(facade.getMessages());
             setHydrated(true);
           }
           return;
         }
-        const retained = applyRetention(state);
+
+        // Import Loro snapshot
+        const snapshotBytes = new Uint8Array(fromBase64(state.snapshot));
+        runtime.doc.import(snapshotBytes);
+
         if (!cancelled) {
-          setDoc(retained.doc);
-          if (retained.model) {
-            setModel(retained.model);
+          setMessages(facade.getMessages());
+          if (state.model) {
+            setModel(state.model);
           }
           setHydrated(true);
         }
@@ -251,17 +245,32 @@ export function useChatPersistence(defaultModel: string) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [runtime, facade]);
 
+  // Save to storage
   React.useEffect(() => {
-    if (!hydrated || typeof window === "undefined") {
+    if (!hydrated || !runtime || typeof window === "undefined") {
       return;
     }
 
-    const state = applyRetention({ doc, model });
+    // Apply retention: delete oldest messages if over limit
+    if (facade && messages.length > MAX_MESSAGES) {
+      const sorted = [...messages].sort((a, b) => a.createdAt - b.createdAt);
+      const cutoffIndex = messages.length - MAX_MESSAGES;
+      const cutoffTimestamp = sorted[cutoffIndex]?.createdAt ?? 0;
+      if (cutoffTimestamp > 0) {
+        facade.deleteMessagesOlderThan(cutoffTimestamp);
+      }
+    }
 
     void (async () => {
       try {
+        const snapshot = runtime.doc.export({ mode: "snapshot" });
+        const state: PersistenceState = {
+          snapshot: toBase64(snapshot.buffer as ArrayBuffer),
+          model,
+        };
+
         const encrypted = await encryptState(state);
         if (encrypted) {
           window.localStorage.setItem(STORAGE_KEY, JSON.stringify(encrypted));
@@ -274,18 +283,56 @@ export function useChatPersistence(defaultModel: string) {
         console.warn("Failed to save AI chat history:", error);
       }
     })();
-  }, [hydrated, doc, model]);
+  }, [hydrated, runtime, messages, model, facade]);
+
+  const addMessage = React.useCallback(
+    (role: "user" | "assistant", content: string, aiContext?: AIContext) => {
+      if (!facade) {
+        return "";
+      }
+      return facade.insertMessage({ role, content, aiContext });
+    },
+    [facade]
+  );
+
+  const createStreamingMessage = React.useCallback(
+    (aiContext?: AIContext) => {
+      if (!facade) {
+        return "";
+      }
+      return facade.createStreamingMessage("assistant", aiContext);
+    },
+    [facade]
+  );
+
+  const appendStreamChunk = React.useCallback(
+    (messageId: string, chunk: string, isFinal?: boolean, aiContext?: AIContext) => {
+      if (!facade) {
+        return;
+      }
+      facade.appendStreamChunk({ messageId, chunk, isFinal, aiContext });
+    },
+    [facade]
+  );
 
   const clearHistory = React.useCallback(() => {
-    setDoc(createEnhancedDocument("chat"));
+    if (!runtime) {
+      return;
+    }
+    // Create new runtime (clears all data)
+    const rt = createLoroRuntime({ peerId: "chat" as `${number}` });
+    const fc = createDocumentFacade(rt);
+    setRuntime(rt);
+    setFacade(fc);
+    setMessages([]);
     setModel(defaultModel);
     if (typeof window !== "undefined") {
       window.localStorage.removeItem(STORAGE_KEY);
     }
-  }, [defaultModel]);
+  }, [runtime, defaultModel]);
 
   const exportHistory = React.useCallback(() => {
-    if (doc.blocks.length === 0) {
+    if (messages.length === 0) {
       return;
     }
 
@@ -294,13 +341,9 @@ export function useChatPersistence(defaultModel: string) {
 
     let content = `# AI Companion Chat History\nDate: ${new Date().toLocaleString()}\n\n`;
 
-    const messages = doc.blocks
-      .filter((b) => b.type === "message" || b.message)
-      .map((b) => ({ role: b.message?.role ?? "user", content: getBlockText(b) }));
-
     for (const msg of messages) {
       const role = msg.role === "user" ? "User" : "AI";
-      const safeContent = sanitizeMarkdown(msg.content);
+      const safeContent = sanitizeMarkdown(msg.text);
       content += `## ${role}\n\n${safeContent}\n\n---\n\n`;
     }
 
@@ -313,15 +356,24 @@ export function useChatPersistence(defaultModel: string) {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, [doc]);
+  }, [messages]);
+
+  // Legacy compatibility: convert MessageBlock[] to Message[] for existing UI
+  const legacyMessages = React.useMemo(() => messages.map(messageBlockToMessage), [messages]);
 
   return {
-    doc,
-    setDoc,
+    // New Facade-based API
+    facade,
+    messages,
+    addMessage,
+    createStreamingMessage,
+    appendStreamChunk,
+    // Legacy compatibility
+    legacyMessages,
     model,
     setModel,
     clearHistory,
     exportHistory,
-    getBlockText,
+    hydrated,
   };
 }

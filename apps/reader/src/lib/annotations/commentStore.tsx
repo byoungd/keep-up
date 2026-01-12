@@ -1,6 +1,11 @@
 "use client";
 
-import { LoroList, type LoroRuntime } from "@keepup/lfcc-bridge";
+import {
+  type Comment,
+  type DocumentFacade,
+  type LoroRuntime,
+  createDocumentFacade,
+} from "@keepup/lfcc-bridge";
 import * as React from "react";
 import { create, createStore, useStore } from "zustand";
 
@@ -8,18 +13,14 @@ import { create, createStore, useStore } from "zustand";
 // Types
 // ============================================================================
 
-export interface Comment {
-  id: string;
-  annotationId: string;
-  text: string;
-  author: string;
-  createdAt: number;
+/** Extended Comment type with UI-specific fields */
+export interface UIComment extends Comment {
   pending?: boolean; // Optimistic UI: true while syncing
 }
 
 interface CommentState {
-  comments: Record<string, Comment[]>;
-  runtime: LoroRuntime | null;
+  comments: Record<string, UIComment[]>;
+  facade: DocumentFacade | null;
 }
 
 interface CommentActions {
@@ -27,7 +28,7 @@ interface CommentActions {
   disconnect: () => void;
   addComment: (annotationId: string, text: string, author?: string) => void;
   deleteComment: (annotationId: string, commentId: string) => void;
-  getComments: (annotationId: string) => Comment[];
+  getComments: (annotationId: string) => UIComment[];
   clearComments: (annotationId: string) => void;
 }
 
@@ -37,52 +38,21 @@ type CommentStore = CommentState & CommentActions;
 // Store Factory
 // ============================================================================
 
-function generateId(): string {
-  return `comment_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-}
+function syncStateFromFacade(facade: DocumentFacade): Record<string, UIComment[]> {
+  // Get all annotation IDs from annotations
+  const annotations = facade.getAnnotations();
+  const result: Record<string, UIComment[]> = {};
 
-function findCommentIndex(list: LoroList, commentId: string): number {
-  for (let i = 0; i < list.length; i++) {
-    const comment = list.get(i) as Comment;
-    if (comment.id === commentId) {
-      return i;
-    }
-  }
-  return -1;
-}
-
-function deleteCommentFromRuntime(
-  runtime: LoroRuntime,
-  annotationId: string,
-  commentId: string
-): void {
-  const docComments = runtime.doc.getMap("comments");
-  const list = docComments.get(annotationId) as LoroList | undefined;
-  if (!list) {
-    return;
-  }
-  const index = findCommentIndex(list, commentId);
-  if (index !== -1) {
-    list.delete(index, 1);
-  }
-}
-
-function syncStateFromRuntime(runtime: LoroRuntime): Record<string, Comment[]> {
-  const docComments = runtime.doc.getMap("comments");
-  const nextState: Record<string, Comment[]> = {};
-
-  for (const [key, value] of docComments.entries()) {
-    if (typeof key === "string" && value instanceof Object) {
-      const list = value as LoroList;
-      const comments: Comment[] = [];
-      for (let i = 0; i < list.length; i++) {
-        comments.push(list.get(i) as Comment);
-      }
-      nextState[key] = comments;
+  for (const annotation of annotations) {
+    const comments = facade.getComments(annotation.id);
+    if (comments.length > 0) {
+      result[annotation.id] = comments.map((c) => ({ ...c, pending: false }));
     }
   }
 
-  return nextState;
+  // Also check for comments on annotations we might not have in getAnnotations()
+  // This handles the case where comments exist but annotation list is stale
+  return result;
 }
 
 export function createCommentStore() {
@@ -90,7 +60,7 @@ export function createCommentStore() {
 
   return createStore<CommentStore>((set, get) => ({
     comments: {},
-    runtime: null,
+    facade: null,
 
     init: (runtime: LoroRuntime) => {
       // Clean up previous subscription
@@ -99,11 +69,14 @@ export function createCommentStore() {
         unsubscribe = undefined;
       }
 
-      set({ runtime, comments: syncStateFromRuntime(runtime) });
+      const facade = createDocumentFacade(runtime);
+      set({ facade, comments: syncStateFromFacade(facade) });
 
-      // Subscribe to changes
-      unsubscribe = runtime.doc.subscribe(() => {
-        set({ comments: syncStateFromRuntime(runtime) });
+      // Subscribe to changes via Facade
+      unsubscribe = facade.subscribe((event) => {
+        if (event.type === "comment_changed" || event.type === "remote_update") {
+          set({ comments: syncStateFromFacade(facade) });
+        }
       });
     },
 
@@ -112,30 +85,33 @@ export function createCommentStore() {
         unsubscribe();
         unsubscribe = undefined;
       }
-      set({ runtime: null, comments: {} });
+      set({ facade: null, comments: {} });
     },
 
     addComment: (annotationId: string, text: string, author = "Local user") => {
-      const runtime = get().runtime;
-      const newComment: Comment = {
-        id: generateId(),
-        annotationId,
-        text: text.trim(),
-        author,
-        createdAt: Date.now(),
-      };
+      const facade = get().facade;
 
-      if (runtime) {
-        const docComments = runtime.doc.getMap("comments");
-        let list = docComments.get(annotationId) as LoroList | undefined;
-        if (!list) {
-          list = docComments.getOrCreateContainer(annotationId, new LoroList());
-        }
-        list.push(newComment);
-        runtime.commit("comments");
+      if (facade) {
+        const commentId = facade.addComment({
+          annotationId,
+          text: text.trim(),
+          author,
+          origin: "comment-store:add",
+        });
+
+        // Optimistic update
+        const newComment: UIComment = {
+          id: commentId,
+          annotationId,
+          text: text.trim(),
+          author,
+          createdAt: Date.now(),
+          pending: false,
+        };
+
         set((state) => {
           const existing = state.comments[annotationId] ?? [];
-          if (existing.some((comment) => comment.id === newComment.id)) {
+          if (existing.some((c) => c.id === commentId)) {
             return state;
           }
           return {
@@ -146,6 +122,17 @@ export function createCommentStore() {
           };
         });
       } else {
+        // Offline mode - local only
+        const commentId = `comment_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+        const newComment: UIComment = {
+          id: commentId,
+          annotationId,
+          text: text.trim(),
+          author,
+          createdAt: Date.now(),
+          pending: true,
+        };
+
         set((state) => ({
           comments: {
             ...state.comments,
@@ -156,12 +143,17 @@ export function createCommentStore() {
     },
 
     deleteComment: (annotationId: string, commentId: string) => {
-      const runtime = get().runtime;
-      if (runtime) {
-        deleteCommentFromRuntime(runtime, annotationId, commentId);
-        runtime.commit("comments");
-        return;
+      const facade = get().facade;
+
+      if (facade) {
+        facade.deleteComment({
+          annotationId,
+          commentId,
+          origin: "comment-store:delete",
+        });
       }
+
+      // Optimistic update
       set((state) => ({
         comments: {
           ...state.comments,
@@ -175,17 +167,24 @@ export function createCommentStore() {
     },
 
     clearComments: (annotationId: string) => {
-      const runtime = get().runtime;
-      if (runtime) {
-        const docComments = runtime.doc.getMap("comments");
-        docComments.delete(annotationId);
-        runtime.commit("comments");
-      } else {
-        set((state) => {
-          const { [annotationId]: _, ...rest } = state.comments;
-          return { comments: rest };
-        });
+      const facade = get().facade;
+
+      if (facade) {
+        // Delete all comments for this annotation
+        const comments = get().comments[annotationId] ?? [];
+        for (const comment of comments) {
+          facade.deleteComment({
+            annotationId,
+            commentId: comment.id,
+            origin: "comment-store:clear",
+          });
+        }
       }
+
+      set((state) => {
+        const { [annotationId]: _, ...rest } = state.comments;
+        return { comments: rest };
+      });
     },
   }));
 }
@@ -223,10 +222,11 @@ export function useCommentStoreContext<T>(selector: (state: CommentStore) => T):
 /** @deprecated Use CommentStoreProvider + useCommentStoreContext instead */
 export const useCommentStore = create<CommentStore>((set, get) => {
   let unsubscribeGlobal: (() => void) | undefined;
+  let globalFacade: DocumentFacade | null = null;
 
   return {
     comments: {},
-    runtime: null,
+    facade: null,
 
     init: (runtime: LoroRuntime) => {
       if (unsubscribeGlobal) {
@@ -234,10 +234,13 @@ export const useCommentStore = create<CommentStore>((set, get) => {
         unsubscribeGlobal = undefined;
       }
 
-      set({ runtime, comments: syncStateFromRuntime(runtime) });
+      globalFacade = createDocumentFacade(runtime);
+      set({ facade: globalFacade, comments: syncStateFromFacade(globalFacade) });
 
-      unsubscribeGlobal = runtime.doc.subscribe(() => {
-        set({ comments: syncStateFromRuntime(runtime) });
+      unsubscribeGlobal = globalFacade.subscribe((event) => {
+        if ((event.type === "comment_changed" || event.type === "remote_update") && globalFacade) {
+          set({ comments: syncStateFromFacade(globalFacade) });
+        }
       });
     },
 
@@ -246,30 +249,33 @@ export const useCommentStore = create<CommentStore>((set, get) => {
         unsubscribeGlobal();
         unsubscribeGlobal = undefined;
       }
-      set({ runtime: null, comments: {} });
+      globalFacade = null;
+      set({ facade: null, comments: {} });
     },
 
     addComment: (annotationId: string, text: string, author = "You") => {
-      const runtime = get().runtime;
-      const newComment: Comment = {
-        id: generateId(),
-        annotationId,
-        text: text.trim(),
-        author,
-        createdAt: Date.now(),
-      };
+      const facade = globalFacade;
 
-      if (runtime) {
-        const docComments = runtime.doc.getMap("comments");
-        let list = docComments.get(annotationId) as LoroList | undefined;
-        if (!list) {
-          list = docComments.getOrCreateContainer(annotationId, new LoroList());
-        }
-        list.push(newComment);
-        runtime.commit("comments");
+      if (facade) {
+        const commentId = facade.addComment({
+          annotationId,
+          text: text.trim(),
+          author,
+          origin: "comment-store:add",
+        });
+
+        const newComment: UIComment = {
+          id: commentId,
+          annotationId,
+          text: text.trim(),
+          author,
+          createdAt: Date.now(),
+          pending: false,
+        };
+
         set((state) => {
           const existing = state.comments[annotationId] ?? [];
-          if (existing.some((comment) => comment.id === newComment.id)) {
+          if (existing.some((c) => c.id === commentId)) {
             return state;
           }
           return {
@@ -280,6 +286,16 @@ export const useCommentStore = create<CommentStore>((set, get) => {
           };
         });
       } else {
+        const commentId = `comment_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+        const newComment: UIComment = {
+          id: commentId,
+          annotationId,
+          text: text.trim(),
+          author,
+          createdAt: Date.now(),
+          pending: true,
+        };
+
         set((state) => ({
           comments: {
             ...state.comments,
@@ -290,12 +306,14 @@ export const useCommentStore = create<CommentStore>((set, get) => {
     },
 
     deleteComment: (annotationId: string, commentId: string) => {
-      const runtime = get().runtime;
-      if (runtime) {
-        deleteCommentFromRuntime(runtime, annotationId, commentId);
-        runtime.commit("comments");
-        return;
+      if (globalFacade) {
+        globalFacade.deleteComment({
+          annotationId,
+          commentId,
+          origin: "comment-store:delete",
+        });
       }
+
       set((state) => ({
         comments: {
           ...state.comments,
@@ -309,17 +327,21 @@ export const useCommentStore = create<CommentStore>((set, get) => {
     },
 
     clearComments: (annotationId: string) => {
-      const runtime = get().runtime;
-      if (runtime) {
-        const docComments = runtime.doc.getMap("comments");
-        docComments.delete(annotationId);
-        runtime.commit("comments");
-      } else {
-        set((state) => {
-          const { [annotationId]: _, ...rest } = state.comments;
-          return { comments: rest };
-        });
+      if (globalFacade) {
+        const comments = get().comments[annotationId] ?? [];
+        for (const comment of comments) {
+          globalFacade.deleteComment({
+            annotationId,
+            commentId: comment.id,
+            origin: "comment-store:clear",
+          });
+        }
       }
+
+      set((state) => {
+        const { [annotationId]: _, ...rest } = state.comments;
+        return { comments: rest };
+      });
     },
   };
 });

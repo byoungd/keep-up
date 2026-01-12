@@ -1,7 +1,7 @@
 /**
  * Unified Streaming Controller
  *
- * Bridges the enhanced document model with the optimized streaming parser.
+ * Bridges the document facade with the optimized streaming parser.
  * Features:
  * - Zero-copy buffer management
  * - Adaptive batching based on token rate
@@ -19,7 +19,7 @@ import {
   createStreamingParser,
 } from "@keepup/lfcc-bridge";
 
-import { type AIContext, type EnhancedDocument, updateMessageContent } from "@keepup/lfcc-bridge";
+import type { AIContext, DocumentFacade } from "@keepup/lfcc-bridge";
 
 // ============================================================================
 // Types
@@ -28,8 +28,8 @@ import { type AIContext, type EnhancedDocument, updateMessageContent } from "@ke
 export interface StreamingControllerOptions {
   /** Editor view */
   view: EditorView;
-  /** Document being updated */
-  document: EnhancedDocument;
+  /** Document facade */
+  facade: DocumentFacade;
   /** Message ID to stream into */
   messageId: string;
   /** AI context for the message */
@@ -40,8 +40,6 @@ export interface StreamingControllerOptions {
   onComplete?: (stats: StreamingStats) => void;
   /** Callback on error */
   onError?: (error: Error) => void;
-  /** Callback to update document */
-  onDocumentUpdate?: (doc: EnhancedDocument) => void;
   /** Target batch size in ms (default: 16ms for 60fps) */
   batchIntervalMs?: number;
   /** Adaptive batching based on token rate */
@@ -84,7 +82,7 @@ export class StreamingController {
   private parser: StreamingMarkdownParser;
   private options: Required<StreamingControllerOptions>;
   private state: StreamingState;
-  private document: EnhancedDocument;
+  private facade: DocumentFacade;
 
   // Batching
   private pendingNodes: ASTNode[] = [];
@@ -97,18 +95,17 @@ export class StreamingController {
 
   constructor(options: StreamingControllerOptions) {
     this.parser = createStreamingParser({ gfm: true });
-    this.document = options.document;
+    this.facade = options.facade;
     // biome-ignore lint/suspicious/noEmptyBlockStatements: default no-op callbacks are intentional
     const noop = () => {};
     this.options = {
       view: options.view,
-      document: options.document,
+      facade: options.facade,
       messageId: options.messageId,
       aiContext: options.aiContext ?? {},
       onChunk: options.onChunk ?? noop,
       onComplete: options.onComplete ?? noop,
       onError: options.onError ?? noop,
-      onDocumentUpdate: options.onDocumentUpdate ?? noop,
       batchIntervalMs: options.batchIntervalMs ?? 16,
       adaptiveBatching: options.adaptiveBatching ?? true,
     };
@@ -228,10 +225,10 @@ export class StreamingController {
   }
 
   /**
-   * Get current document.
+   * Get current facade.
    */
-  getDocument(): EnhancedDocument {
-    return this.document;
+  getFacade(): DocumentFacade {
+    return this.facade;
   }
 
   // ============================================================================
@@ -507,26 +504,21 @@ export class StreamingController {
   }
 
   private updateMessageStatus(status: "complete" | "error"): void {
-    this.document = updateMessageContent(
-      this.document,
-      this.options.messageId,
-      this.state.totalContent,
-      {
-        status,
-        aiContext: {
-          ...this.options.aiContext,
-          request_id: this.options.aiContext?.request_id,
-          tokens: {
-            input: 0,
-            output: Math.ceil(this.state.totalContent.length / 4),
-          },
-          latencyMs: Date.now() - this.state.startTime,
-          stopReason: status === "complete" ? "end" : "error",
+    this.facade.updateMessage({
+      messageId: this.options.messageId,
+      content: this.state.totalContent,
+      status,
+      aiContext: {
+        ...this.options.aiContext,
+        requestId: this.options.aiContext?.requestId,
+        tokens: {
+          input: 0,
+          output: Math.ceil(this.state.totalContent.length / 4),
         },
-      }
-    );
-
-    this.options.onDocumentUpdate(this.document);
+        latencyMs: Date.now() - this.state.startTime,
+        stopReason: status === "complete" ? "end" : "error",
+      },
+    });
   }
 
   private calculateStats(): StreamingStats {

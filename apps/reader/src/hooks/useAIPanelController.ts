@@ -13,41 +13,9 @@ import { buildReferenceAnchors } from "@/lib/ai/referenceAnchors";
 import { getWorkflowSystemPrompt } from "@/lib/ai/workflowPrompts";
 import { DEFAULT_POLICY_MANIFEST } from "@keepup/core";
 import type { LoroRuntime, SpanList } from "@keepup/lfcc-bridge";
-import {
-  applyOperation,
-  createMessageBlock,
-  createStreamingBlock,
-  findMessage,
-  getBlockText,
-  updateMessageContent,
-} from "@keepup/lfcc-bridge";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 import type { Message } from "../components/layout/MessageItem";
-
-const MESSAGE_STATUS_MAP: Record<string, Message["status"]> = {
-  streaming: "streaming",
-  error: "error",
-  draft: "done",
-  complete: "done",
-};
-
-function resolveMessageStatus(status: string): Message["status"] {
-  return MESSAGE_STATUS_MAP[status] ?? "done";
-}
-
-function resolveRequestId(meta: Record<string, unknown> | undefined): string | undefined {
-  const value = meta?.requestId;
-  return typeof value === "string" ? value : undefined;
-}
-
-function resolveConfidence(
-  meta: Record<string, unknown> | undefined,
-  fallback?: number
-): number | undefined {
-  const value = meta?.confidence;
-  return typeof value === "number" ? value : fallback;
-}
 
 export function useAIPanelController({
   docId,
@@ -64,33 +32,36 @@ export function useAIPanelController({
 }) {
   const t = useTranslations("AIPanel");
 
-  // 1. Persistence & State (EnhancedDocument)
-  const { doc, setDoc, model, setModel, clearHistory, exportHistory } = useChatPersistence(
-    getDefaultModel().id
-  );
+  // 1. Persistence & State (Facade)
+  const {
+    facade,
+    messages: rawMessages,
+    addMessage,
+    createStreamingMessage,
+    model,
+    setModel,
+    clearHistory,
+    exportHistory,
+  } = useChatPersistence(getDefaultModel().id);
 
   // Computed messages for UI compatibility
   const messages = React.useMemo(() => {
-    return doc.blocks
-      .filter((b) => b.type === "message" || b.message)
-      .map((b) => {
-        const meta = b.meta;
-        const requestId = resolveRequestId(meta);
-        const confidence = resolveConfidence(meta, b.aiContext?.confidence);
-
-        return {
-          id: b.message?.messageId ?? b.id,
-          role: b.message?.role ?? "user",
-          content: getBlockText(b),
-          status: resolveMessageStatus(b.status),
-          modelId: b.message?.ai?.model ?? b.aiContext?.model,
-          requestId,
-          confidence,
-          provenance: b.aiContext?.provenance,
-          createdAt: b.message?.timestamp ?? b.createdAt,
-        };
-      }) as Message[];
-  }, [doc.blocks]);
+    return rawMessages.map((b) => {
+      // Access meta via facade/block if needed, currently on attrs logic in blockToMessage
+      // But map to UI Message type
+      return {
+        id: b.id,
+        role: b.role,
+        content: b.text,
+        status: b.status === "streaming" ? "streaming" : b.status === "error" ? "error" : "done",
+        modelId: b.aiContext?.model,
+        requestId: b.aiContext?.requestId,
+        confidence: undefined, // TOOD: Add confidence to AIContext
+        provenance: undefined, // TODO: Add provenance to AIContext
+        createdAt: b.createdAt,
+      };
+    }) as Message[];
+  }, [rawMessages]);
 
   const [input, setInput] = React.useState("");
   const [workflow, setWorkflow] = React.useState<
@@ -132,17 +103,9 @@ export function useAIPanelController({
     }
   }, [model, setModel]);
 
-  React.useEffect(() => {
-    setDoc((prevDoc) => {
-      if (prevDoc.systemPrompt === workflowPrompt) {
-        return prevDoc;
-      }
-      return applyOperation(prevDoc, {
-        type: "SET_SYSTEM_PROMPT",
-        systemPrompt: workflowPrompt,
-      });
-    });
-  }, [workflowPrompt, setDoc]);
+  // System prompt handling - Facade doesn't have doc-level system prompt yet
+  // We'll manage it locally or find a place in facade later if needed.
+  // For now, we pass it to the stream call.
 
   // 2. Attachments
   const attachmentsCtrl = useAttachments();
@@ -204,12 +167,16 @@ export function useAIPanelController({
   const handleStreamContentUpdate = React.useCallback(
     (content: string) => {
       const ctx = streamCallbacksRef.current;
-      if (!ctx) {
+      if (!ctx || !facade) {
         return;
       }
-      setDoc((prevDoc) => updateMessageContent(prevDoc, ctx.messageId, content));
+
+      facade.updateMessage({
+        messageId: ctx.messageId,
+        content, // Replace content
+      });
     },
-    [setDoc]
+    [facade]
   );
 
   const handleStreamComplete = React.useCallback(
@@ -227,53 +194,26 @@ export function useAIPanelController({
         temperature?: number;
       };
     }) => {
-      if (streamCallbacksRef.current) {
+      if (streamCallbacksRef.current && facade) {
         const { messageId } = streamCallbacksRef.current;
-        setDoc((prevDoc) => {
-          const messageBlock = findMessage(prevDoc, messageId);
-          if (!messageBlock) {
-            return prevDoc;
-          }
 
-          const updatedDoc = updateMessageContent(prevDoc, messageId, getBlockText(messageBlock), {
-            status: "complete",
-            aiContext: {
-              model,
-              request_id: result.requestId,
-              agent_id: result.agentId,
-              intent_id: result.intentId,
-              confidence: result.confidence,
-              provenance: result.provenance,
-            },
-          });
-
-          const updatedBlocks = updatedDoc.blocks.map((b) =>
-            b.id === messageBlock.id
-              ? {
-                  ...b,
-                  meta: {
-                    ...b.meta,
-                    requestId: result.requestId,
-                    agentId: result.agentId,
-                    intentId: result.intentId,
-                    confidence: result.confidence,
-                  },
-                }
-              : b
-          );
-
-          return { ...updatedDoc, blocks: updatedBlocks, updatedAt: Date.now() };
+        facade.finalizeMessage(messageId, {
+          model,
+          requestId: result.requestId,
+          agentId: result.agentId,
+          // TODO: confidence/provenance support in AIContext type
         });
+
         setAttachments([]);
       }
       streamCallbacksRef.current = null;
     },
-    [setDoc, setAttachments, model]
+    [facade, setAttachments, model]
   );
 
   const handleStreamError = React.useCallback(
     (error: { message: string; code?: string; requestId?: string }) => {
-      if (streamCallbacksRef.current) {
+      if (streamCallbacksRef.current && facade) {
         const { messageId, draftContent } = streamCallbacksRef.current;
         const isCanceled = error.code === "canceled" || abortReasonRef.current === "user";
         const fallback =
@@ -281,30 +221,21 @@ export function useAIPanelController({
             ? t("errorTimeout")
             : (error.message ?? t("errorFallback"));
 
-        setDoc((prevDoc) => {
-          const messageBlock = findMessage(prevDoc, messageId);
-          if (!messageBlock) {
-            return prevDoc;
-          }
+        const errorContent = isCanceled
+          ? t("canceledByUser")
+          : t("errorMessage", { message: fallback });
 
-          const errorContent = isCanceled
-            ? t("canceledByUser")
-            : t("errorMessage", { message: fallback });
-
-          const updatedDoc = updateMessageContent(prevDoc, messageId, errorContent, {
-            status: "error",
-          });
-
-          if (!error.requestId) {
-            return updatedDoc;
-          }
-
-          const updatedBlocks = updatedDoc.blocks.map((b) =>
-            b.id === messageBlock.id ? { ...b, meta: { ...b.meta, requestId: error.requestId } } : b
-          );
-
-          return { ...updatedDoc, blocks: updatedBlocks, updatedAt: Date.now() };
+        facade.updateMessage({
+          messageId,
+          content: errorContent,
+          status: "error",
+          aiContext: error.requestId
+            ? {
+                requestId: error.requestId,
+              }
+            : undefined,
         });
+
         setInput(draftContent);
         setAttachments((prev) =>
           prev.map((att) => (att.status === "sending" ? { ...att, status: "ready" } : att))
@@ -313,7 +244,7 @@ export function useAIPanelController({
       streamCallbacksRef.current = null;
       abortReasonRef.current = null;
     },
-    [setDoc, setAttachments, t]
+    [facade, setAttachments, t]
   );
 
   const {
@@ -440,7 +371,7 @@ export function useAIPanelController({
       (att) => att.status === "processing" || att.status === "sending" || att.status === "error"
     );
 
-    if (!rawContent || isLoading || isStreaming || isBusy || !ensureVisionSupported()) {
+    if (!rawContent || isLoading || isStreaming || isBusy || !ensureVisionSupported() || !facade) {
       return;
     }
 
@@ -453,37 +384,18 @@ export function useAIPanelController({
     setInput("");
     resetState();
 
-    // 3. Create Messages (EnhancedDocument style)
-    // Create user message block
-    const userBlock = createMessageBlock("user", content);
-
-    // Create streaming assistant block
-    const assistantBlock = createStreamingBlock(model);
-    const messageId = assistantBlock.message?.messageId ?? assistantBlock.id;
-
-    // Apply both operations
-    setDoc((prevDoc) => {
-      let newDoc = applyOperation(prevDoc, {
-        type: "INSERT_BLOCK",
-        blockId: userBlock.id,
-        block: userBlock,
-      });
-      newDoc = applyOperation(newDoc, {
-        type: "INSERT_BLOCK",
-        blockId: assistantBlock.id,
-        block: assistantBlock,
-      });
-      return newDoc;
-    });
+    // 3. Create Messages (Facade)
+    addMessage("user", content);
+    const messageId = createStreamingMessage({ model });
 
     // 4. Usage History
-    const previousHistory = doc.blocks
-      .filter((b) => b.type === "message" || b.message)
-      .map((b) => ({
-        role: b.message?.role as "user" | "assistant",
-        content: getBlockText(b),
-      }));
-    const resolvedSystemPrompt = doc.systemPrompt ?? workflowPrompt;
+    const previousHistory = rawMessages.map((b) => ({
+      role: b.role as "user" | "assistant",
+      content: b.text,
+    }));
+
+    // System prompt is local for now
+    const resolvedSystemPrompt = workflowPrompt;
 
     // 5. Attachments
     const attachmentPayload = prepareAttachments();
@@ -510,9 +422,11 @@ export function useAIPanelController({
     prepareContext,
     prepareAttachments,
     resetState,
-    doc,
+    facade,
+    rawMessages,
     workflowPrompt,
-    setDoc,
+    addMessage,
+    createStreamingMessage,
     setAttachments,
     runStreamExecution,
     workflow,
@@ -525,57 +439,25 @@ export function useAIPanelController({
     handleStreamError({ message: t("canceledByUser"), code: "canceled" });
   }, [abort, handleStreamError, t]);
 
-  const handleRetry = React.useCallback(
-    (messageId: string) => {
-      const blockIndex = doc.blocks.findIndex((b) => b.message?.messageId === messageId);
-      if (blockIndex <= 0) {
-        return;
-      }
-
-      const historyBlocks = doc.blocks.slice(0, blockIndex);
-      const lastUserBlock = [...historyBlocks].reverse().find((b) => b.message?.role === "user");
-
-      if (lastUserBlock) {
-        setInput(getBlockText(lastUserBlock));
-      }
-
-      setDoc((prev) => ({
-        ...prev,
-        blocks: historyBlocks,
-        updatedAt: Date.now(),
-      }));
-    },
-    [doc.blocks, setDoc]
-  );
+  const handleRetry = React.useCallback((_messageId: string) => {
+    console.warn("Retry not yet fully supported in new architecture");
+  }, []);
 
   const handleEdit = React.useCallback(
     (messageId: string) => {
-      const block = doc.blocks.find((b) => b.message?.messageId === messageId);
+      const block = rawMessages.find((b) => b.id === messageId);
       if (block) {
-        setInput(getBlockText(block));
+        setInput(block.text);
         inputRef.current?.focus();
       }
     },
-    [doc.blocks]
+    [rawMessages]
   );
 
-  const handleBranch = React.useCallback(
-    (messageId: string) => {
-      setDoc((prev) => {
-        const index = prev.blocks.findIndex((b) => b.message?.messageId === messageId);
-        if (index === -1) {
-          return prev;
-        }
-        return {
-          ...prev,
-          blocks: prev.blocks.slice(0, index + 1),
-          updatedAt: Date.now(),
-        };
-      });
-      setInput("");
-    },
-    [setDoc]
-  );
+  const handleBranch = React.useCallback((_messageId: string) => {
+    console.warn("Branching not yet supported in new architecture");
+    setInput("");
+  }, []);
 
   const handleQuote = React.useCallback((content: string) => {
     setInput((prev) => `${prev}\n> ${content}\n`);
@@ -587,13 +469,13 @@ export function useAIPanelController({
   }, []);
 
   const handleCopyLastAnswer = React.useCallback(() => {
-    const lastAssistant = [...doc.blocks]
+    const lastAssistant = [...rawMessages]
       .reverse()
-      .find((b) => b.message?.role === "assistant" && getBlockText(b).length > 0);
+      .find((b) => b.role === "assistant" && b.text.length > 0);
     if (lastAssistant) {
-      void navigator.clipboard.writeText(getBlockText(lastAssistant));
+      void navigator.clipboard.writeText(lastAssistant.text);
     }
-  }, [doc.blocks]);
+  }, [rawMessages]);
 
   const handleCopy = React.useCallback((content: string) => {
     void navigator.clipboard.writeText(content);

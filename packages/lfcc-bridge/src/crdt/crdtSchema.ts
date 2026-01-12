@@ -100,6 +100,32 @@ export function nextBlockId(doc: LoroDoc): string {
   return `b_${doc.peerIdStr}_${next}`;
 }
 
+// ============================================================================
+// Schema Versioning
+// ============================================================================
+
+const SCHEMA_VERSION_KEY = "schema_version";
+/** Current schema version. V2 uses LoroList for RichText. */
+export const CURRENT_SCHEMA_VERSION = 2;
+
+/**
+ * Get the schema version from document meta.
+ * Returns 1 (V1) if not set (legacy docs).
+ */
+export function getSchemaVersion(doc: LoroDoc): number {
+  const meta = getMetaMap(doc);
+  const version = meta.get(SCHEMA_VERSION_KEY);
+  return typeof version === "number" ? version : 1;
+}
+
+/**
+ * Set the schema version in document meta.
+ */
+export function setSchemaVersion(doc: LoroDoc, version: number): void {
+  const meta = getMetaMap(doc);
+  meta.set(SCHEMA_VERSION_KEY, version);
+}
+
 export function serializeAttrs(value: Record<string, unknown>): string {
   return JSON.stringify(sortObject(value));
 }
@@ -346,11 +372,11 @@ export function updateRichTextV2(map: LoroMap, richText: RichText | undefined): 
 }
 
 /**
- * P3: Read richText from V2 LoroList format, with fallback to V1 JSON.
+ * Read richText from V2 LoroList format.
+ * V1 fallback removed - migration handles upgrade.
  */
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: handles backward-compatible decoding paths
-export function readRichTextV2(map: LoroMap): RichText | undefined {
-  // Try V2 first
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Rich text parsing requires nested validation
+export function readRichText(map: LoroMap): RichText | undefined {
   const v2Container = map.get(RICH_TEXT_V2_KEY);
   if (v2Container && typeof v2Container === "object" && "toArray" in v2Container) {
     const loroList = v2Container as LoroList;
@@ -372,20 +398,66 @@ export function readRichTextV2(map: LoroMap): RichText | undefined {
     }
   }
 
-  // Fallback to V1 JSON
+  return undefined;
+}
+
+/** @deprecated Use readRichText instead */
+export const readRichTextV2 = readRichText;
+
+// ============================================================================
+// Schema Migration
+// ============================================================================
+
+/**
+ * Migrate a document from schema V1 to V2.
+ * Upgrades all RichText from V1 JSON format to V2 LoroList format.
+ */
+export function migrateToSchemaV2(doc: LoroDoc): void {
+  const version = getSchemaVersion(doc);
+  if (version >= CURRENT_SCHEMA_VERSION) {
+    return; // Already migrated
+  }
+
+  const root = getRootBlocks(doc);
+  const blockIds = root.toArray().filter((id): id is string => typeof id === "string");
+  const seen = new Set<string>();
+
+  for (const blockId of blockIds) {
+    migrateBlockRichText(doc, blockId, seen);
+  }
+
+  setSchemaVersion(doc, CURRENT_SCHEMA_VERSION);
+}
+
+function migrateBlockRichText(doc: LoroDoc, blockId: string, seen: Set<string>): void {
+  if (seen.has(blockId)) {
+    return;
+  }
+  seen.add(blockId);
+
+  const map = ensureBlockMap(doc, blockId);
+
+  // Check for V1 data
   const v1Json = map.get(RICH_TEXT_V1_KEY);
   if (typeof v1Json === "string") {
     try {
       const parsed = JSON.parse(v1Json);
       if (Array.isArray(parsed)) {
-        return parsed as RichText;
+        // Write to V2 format (this also deletes V1)
+        writeRichTextV2(map, parsed as RichText);
       }
     } catch {
-      // Ignore invalid JSON
+      // Invalid V1 data, just delete it
+      map.delete(RICH_TEXT_V1_KEY);
     }
   }
 
-  return undefined;
+  // Recurse into children
+  const childrenContainer = map.getOrCreateContainer("children", new LoroMovableList());
+  const childIds = childrenContainer.toArray().filter((id): id is string => typeof id === "string");
+  for (const childId of childIds) {
+    migrateBlockRichText(doc, childId, seen);
+  }
 }
 
 export function readBlockTree(doc: LoroDoc): BlockNode[] {

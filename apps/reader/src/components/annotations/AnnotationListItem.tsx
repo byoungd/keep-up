@@ -11,7 +11,7 @@ import {
 } from "@/components/issues/IssueActionButtons";
 
 import { Tooltip } from "@/components/ui/Tooltip";
-import { type Comment, useCommentStore } from "@/lib/annotations/commentStore";
+import { type UIComment, useCommentStore } from "@/lib/annotations/commentStore";
 import { formatDisplayState } from "@/lib/annotations/verification";
 import { getIssueDefinitionForAnnotationState } from "@/lib/issues/issues";
 import type { Annotation } from "@/lib/kernel/types";
@@ -248,7 +248,7 @@ function AnnotationCommentsSection({
   issueActions?: IssueActionHandlers;
   isReadOnly?: boolean;
   isIssueDismissed?: boolean;
-  comments: Comment[];
+  comments: UIComment[];
   replyText: string;
   onReplyChange: (value: string) => void;
   onReplyKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;

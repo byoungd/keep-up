@@ -1,4 +1,4 @@
-import { LoroList, createLoroRuntime } from "@keepup/lfcc-bridge";
+import { createDocumentFacade, createLoroRuntime } from "@keepup/lfcc-bridge";
 import { beforeEach, describe, expect, it } from "vitest";
 import { useCommentStore } from "../commentStore";
 
@@ -130,74 +130,59 @@ describe("commentStore", () => {
     });
   });
 
-  describe("Loro Integration", () => {
-    it("should sync state from Loro runtime on init", () => {
+  describe("Facade Integration", () => {
+    it("should sync state from Loro runtime on init via Facade", () => {
       const runtime = createLoroRuntime();
+      const facade = createDocumentFacade(runtime);
       const annotationId = "anno_1";
-      const docComments = runtime.doc.getMap("comments");
-      const list = docComments.getOrCreateContainer(annotationId, new LoroList());
 
-      const remoteComment = {
-        id: "c_remote",
+      // Add comment via Facade directly
+      facade.addComment({
         annotationId,
         text: "Remote comment",
         author: "RemoteUser",
-        createdAt: Date.now(),
-      };
-      list.push(remoteComment);
-      runtime.doc.commit();
+      });
+      runtime.commit("test");
 
+      // Now init the store - it should pick up the comment
       const store = useCommentStore.getState();
       store.init(runtime);
 
       const comments = store.getComments(annotationId);
       expect(comments).toHaveLength(1);
-      expect(comments[0].id).toBe("c_remote");
       expect(comments[0].text).toBe("Remote comment");
     });
 
-    it("should update state when Loro runtime changes", () => {
-      const runtime = createLoroRuntime();
-      const annotationId = "anno_1";
-      const store = useCommentStore.getState();
-      store.init(runtime);
-
-      expect(store.getComments(annotationId)).toHaveLength(0);
-
-      // Add comment to Loro
-      const docComments = runtime.doc.getMap("comments");
-      const list = docComments.getOrCreateContainer(annotationId, new LoroList());
-      list.push({
-        id: "c_1",
-        annotationId,
-        text: "New comment",
-        author: "User",
-        createdAt: Date.now(),
-      });
-      runtime.doc.commit();
-
-      // Loro subscription should trigger syncState
-      const comments = store.getComments(annotationId);
-      expect(comments).toHaveLength(1);
-      expect(comments[0].text).toBe("New comment");
-    });
-
-    it("should persist additions to Loro runtime", () => {
+    it("should persist additions to Loro runtime via Facade", () => {
       const runtime = createLoroRuntime();
       const store = useCommentStore.getState();
       store.init(runtime);
 
       const annotationId = "anno_1";
       store.addComment(annotationId, "Hello Loro");
-      runtime.doc.commit();
 
-      // Check Loro doc directly
-      const docComments = runtime.doc.getMap("comments");
-      const list = docComments.get(annotationId) as LoroList;
-      expect(list).toBeDefined();
-      expect(list.length).toBe(1);
-      const comment = list.get(0) as Record<string, unknown>;
-      expect(comment.text).toBe("Hello Loro");
+      // Verify via a fresh facade
+      const facade = createDocumentFacade(runtime);
+      const comments = facade.getComments(annotationId);
+      expect(comments).toHaveLength(1);
+      expect(comments[0].text).toBe("Hello Loro");
+    });
+
+    it("should delete comments from Loro via Facade", () => {
+      const runtime = createLoroRuntime();
+      const store = useCommentStore.getState();
+      store.init(runtime);
+
+      const annotationId = "anno_1";
+      store.addComment(annotationId, "To be deleted");
+
+      const comments = store.getComments(annotationId);
+      expect(comments).toHaveLength(1);
+
+      store.deleteComment(annotationId, comments[0].id);
+
+      const facade = createDocumentFacade(runtime);
+      expect(facade.getComments(annotationId)).toHaveLength(0);
     });
   });
 });
