@@ -21,6 +21,8 @@ export type SpanPrecondition = {
 /** AI request envelope */
 export type AIRequestEnvelope = {
   doc_frontier: DocFrontier;
+  /** Legacy alias for doc_frontier (kept for backward compatibility) */
+  doc_frontier_tag?: DocFrontier;
   /** Idempotency key for this request */
   request_id: string;
   /** Agent identifier for audit and policy */
@@ -31,11 +33,14 @@ export type AIRequestEnvelope = {
   client_request_id?: string;
   options?: {
     return_canonical_tree?: boolean;
+    /** Validate without applying */
+    dry_run?: boolean;
   };
   /** Optional policy context for redaction and governance */
   policy_context?: {
     policy_id?: string;
     redaction_profile?: string;
+    data_access_profile?: string;
   };
 
   // ============================================================================
@@ -77,12 +82,15 @@ export type DataAccessPolicy = {
 
 /** 409 Conflict response */
 export type AI409Conflict = {
+  /** HTTP status code for conflict responses */
+  status?: 409;
   code: "CONFLICT";
   current_frontier: DocFrontier;
   failed_preconditions: Array<{
     span_id: string;
     reason: "hash_mismatch" | "span_missing" | "unverified";
   }>;
+  request_id?: string;
 };
 
 /** Sanitization policy */

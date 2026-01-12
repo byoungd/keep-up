@@ -6,20 +6,14 @@ import { Label } from "@/components/ui/Label";
 import {
   DEFAULT_PROVIDER_NAMES,
   type ProviderId,
+  SUPPORTED_PROVIDER_IDS,
   useProviderConfig,
 } from "@/context/ProviderConfigContext";
 import { Check, Eye, EyeOff, RotateCcw } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
-const PROVIDER_IDS: ProviderId[] = [
-  "openai",
-  "anthropic",
-  "google",
-  "deepseek",
-  "moonshot",
-  "custom",
-];
+const PROVIDER_IDS: ProviderId[] = SUPPORTED_PROVIDER_IDS;
 
 interface ProviderRowProps {
   providerId: ProviderId;
@@ -145,14 +139,9 @@ function ProviderRow({ providerId, showKey, onToggleShowKey }: ProviderRowProps)
 
 export function ProviderSettings() {
   const t = useTranslations("AIPanel");
-  const [showKeys, setShowKeys] = React.useState<Record<ProviderId, boolean>>({
-    openai: false,
-    anthropic: false,
-    google: false,
-    deepseek: false,
-    moonshot: false,
-    custom: false,
-  });
+  const [showKeys, setShowKeys] = React.useState<Record<ProviderId, boolean>>(
+    () => Object.fromEntries(PROVIDER_IDS.map((id) => [id, false])) as Record<ProviderId, boolean>
+  );
 
   const toggleShowKey = (providerId: ProviderId) => {
     setShowKeys((prev) => ({ ...prev, [providerId]: !prev[providerId] }));

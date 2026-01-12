@@ -65,8 +65,24 @@ export {
 export {
   create409Conflict,
   createAIRequestEnvelope,
+  DEFAULT_AI_ENVELOPE_RETRY_POLICY,
+  generateRequestId,
   is409Conflict,
+  isSuccessResponse,
+  isUnprocessableResponse,
+  normalizeAIRequestEnvelope,
+  normalizeDocFrontier,
+  normalizeRequestIdentifiers,
   validatePreconditions,
+  type AIEnvelopeConflict,
+  type AIEnvelopeDiagnostic,
+  type AIEnvelopeError,
+  type AIEnvelopeOptions,
+  type AIEnvelopePolicyContext,
+  type AIEnvelopeResponse,
+  type AIEnvelopeRetryPolicy,
+  type AIEnvelopeSuccess,
+  type AIEnvelopeUnprocessable,
 } from "./envelope";
 export { createSanitizer } from "./sanitizer";
 export * from "./types";

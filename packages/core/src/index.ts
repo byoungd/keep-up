@@ -30,6 +30,7 @@ export * from "./kernel";
 
 // LFCC v0.9 RC Gateway
 export * as gateway from "./gateway";
+export type { GatewayTelemetryEvent } from "./gateway/types";
 
 // Text Normalization
 export * from "./text/normalization";

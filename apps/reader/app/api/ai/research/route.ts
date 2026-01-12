@@ -8,6 +8,7 @@
  */
 
 import type { Message } from "@keepup/ai-core";
+import { DEFAULT_POLICY_MANIFEST, normalizeRequestIdentifiers } from "@keepup/core";
 import { generateText } from "ai";
 import { NextResponse } from "next/server";
 import { toModelMessages } from "../messageUtils";
@@ -21,6 +22,14 @@ import { type ProviderTarget, resolveProviderTarget } from "../providerResolver"
 
 export const runtime = "nodejs";
 
+const IDEMPOTENCY_WINDOW_MS = 60_000;
+const RESEARCH_CACHE_KEY = "__research_cache";
+
+type ResearchCache = Map<
+  string,
+  { body: string; storedAt: number; headers: Record<string, string> }
+>;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
@@ -33,6 +42,8 @@ interface ResearchRequest {
   request_id?: string;
   client_request_id?: string;
   policy_context?: { policy_id?: string; redaction_profile?: string; data_access_profile?: string };
+  agent_id?: string;
+  intent_id?: string;
 }
 
 interface Citation {
@@ -51,6 +62,8 @@ interface ResearchResponse {
   citations: Citation[];
   processingTimeMs: number;
   request_id?: string;
+  agent_id?: string;
+  intent_id?: string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -187,33 +200,113 @@ async function generateAnswer(
   return completeWithProvider(resolved.target, messages);
 }
 
+const getResearchCache = (): ResearchCache => {
+  const globalCache = globalThis as unknown as {
+    [RESEARCH_CACHE_KEY]?: ResearchCache;
+  };
+  if (!globalCache[RESEARCH_CACHE_KEY]) {
+    globalCache[RESEARCH_CACHE_KEY] = new Map();
+  }
+  return globalCache[RESEARCH_CACHE_KEY] as ResearchCache;
+};
+
+const buildResponseHeaders = (
+  requestId: string,
+  policyContext: ResearchRequest["policy_context"],
+  agentId?: string,
+  intentId?: string
+): Record<string, string> => ({
+  "Content-Type": "application/json",
+  "x-request-id": requestId,
+  ...(policyContext?.policy_id ? { "x-policy-id": policyContext.policy_id } : {}),
+  ...(agentId ? { "x-agent-id": agentId } : {}),
+  ...(intentId ? { "x-intent-id": intentId } : {}),
+});
+
+const createCachedResponse = (
+  cache: ResearchCache,
+  requestId: string,
+  responseBody: ResearchResponse,
+  headers: Record<string, string>
+): Response => {
+  const serialized = JSON.stringify(responseBody);
+  cache.set(requestId, { body: serialized, storedAt: Date.now(), headers });
+  return new Response(serialized, { status: 200, headers });
+};
+
+const getCachedResponse = (cache: ResearchCache, requestId: string): Response | null => {
+  const cached = cache.get(requestId);
+  if (!cached) {
+    return null;
+  }
+  if (Date.now() - cached.storedAt > IDEMPOTENCY_WINDOW_MS) {
+    cache.delete(requestId);
+    return null;
+  }
+  return new Response(cached.body, { status: 200, headers: cached.headers });
+};
+
+const validateResearchRequest = (
+  body: ResearchRequest,
+  requestId: string,
+  policyContext: ResearchRequest["policy_context"]
+): Response | null => {
+  if (policyContext?.policy_id !== DEFAULT_POLICY_MANIFEST.policy_id) {
+    return NextResponse.json(
+      {
+        error: {
+          code: "INVALID_REQUEST",
+          message: "policy_context.policy_id is not supported",
+          request_id: requestId,
+        },
+      },
+      { status: 400, headers: { "x-request-id": requestId } }
+    );
+  }
+
+  if (!body.query?.trim()) {
+    return NextResponse.json(
+      { error: { code: "INVALID_REQUEST", message: "query is required", request_id: requestId } },
+      { status: 400 }
+    );
+  }
+
+  if (!body.userId?.trim()) {
+    return NextResponse.json(
+      { error: { code: "INVALID_REQUEST", message: "userId is required", request_id: requestId } },
+      { status: 400 }
+    );
+  }
+
+  return null;
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Route Handler
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function POST(req: Request): Promise<Response> {
   const startTime = Date.now();
+  const cache = getResearchCache();
 
   try {
     const body = (await req.json()) as ResearchRequest;
-    const requestId = body.request_id ?? body.client_request_id ?? crypto.randomUUID();
-    const policyContext = body.policy_context;
+    const { request_id: requestId } = normalizeRequestIdentifiers({
+      request_id: body.request_id,
+      client_request_id: body.client_request_id,
+    });
+    const policyContext = body.policy_context ?? { policy_id: DEFAULT_POLICY_MANIFEST.policy_id };
+    const agentId = body.agent_id;
+    const intentId = body.intent_id;
 
-    // Validate request
-    if (!body.query?.trim()) {
-      return NextResponse.json(
-        { error: { code: "INVALID_REQUEST", message: "query is required", request_id: requestId } },
-        { status: 400 }
-      );
+    const validationError = validateResearchRequest(body, requestId, policyContext);
+    if (validationError) {
+      return validationError;
     }
 
-    if (!body.userId?.trim()) {
-      return NextResponse.json(
-        {
-          error: { code: "INVALID_REQUEST", message: "userId is required", request_id: requestId },
-        },
-        { status: 400 }
-      );
+    const cachedResponse = getCachedResponse(cache, requestId);
+    if (cachedResponse) {
+      return cachedResponse;
     }
 
     // Get content for RAG
@@ -221,16 +314,17 @@ export async function POST(req: Request): Promise<Response> {
 
     // Handle empty content case
     if (contentItems.length === 0) {
-      return NextResponse.json(
-        {
-          answer:
-            "I couldn't find any imported content to search. Please add some content to your library first, then ask me questions about it.",
-          citations: [],
-          processingTimeMs: Date.now() - startTime,
-          request_id: requestId,
-        } satisfies ResearchResponse,
-        { headers: { "x-request-id": requestId } }
-      );
+      const responseBody: ResearchResponse = {
+        answer:
+          "I couldn't find any imported content to search. Please add some content to your library first, then ask me questions about it.",
+        citations: [],
+        processingTimeMs: Date.now() - startTime,
+        request_id: requestId,
+        agent_id: agentId,
+        intent_id: intentId,
+      };
+      const headers = buildResponseHeaders(requestId, policyContext, agentId, intentId);
+      return createCachedResponse(cache, requestId, responseBody, headers);
     }
 
     // Build context with citations
@@ -249,14 +343,12 @@ export async function POST(req: Request): Promise<Response> {
       citations: usedCitations.length > 0 ? usedCitations : citations.slice(0, 3),
       processingTimeMs: Date.now() - startTime,
       request_id: requestId,
+      agent_id: agentId,
+      intent_id: intentId,
     };
 
-    const headers: Record<string, string> = { "x-request-id": requestId };
-    if (policyContext?.policy_id) {
-      headers["x-policy-id"] = policyContext.policy_id;
-    }
-
-    return NextResponse.json(response, { headers });
+    const headers = buildResponseHeaders(requestId, policyContext, agentId, intentId);
+    return createCachedResponse(cache, requestId, response, headers);
   } catch (error) {
     console.error("[Research API] Error:", error);
 

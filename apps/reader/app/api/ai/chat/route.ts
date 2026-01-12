@@ -6,11 +6,15 @@
  */
 
 import { type ChatMessage, buildChatMessages } from "@/lib/ai/contextBuilder";
-import type { ModelCapability } from "@/lib/ai/models";
 import { type WorkflowType, getWorkflowSystemPrompt } from "@/lib/ai/workflowPrompts";
 import type { Message } from "@keepup/ai-core";
 import { normalizeMessages } from "@keepup/ai-core";
-import { computeOptimisticHash } from "@keepup/core";
+import {
+  DEFAULT_POLICY_MANIFEST,
+  computeOptimisticHash,
+  normalizeRequestIdentifiers,
+} from "@keepup/core";
+import { validateChatRequest } from "../chatValidation";
 import { completeWithProvider, streamProviderContent } from "../llmGateway";
 import { getDefaultChatModelId } from "../modelResolver";
 import { type ProviderResolutionError, resolveProviderTarget } from "../providerResolver";
@@ -29,11 +33,14 @@ type RequestBody = {
   request_id?: string;
   client_request_id?: string;
   policy_context?: { policy_id?: string; redaction_profile?: string; data_access_profile?: string };
+  agent_id?: string;
+  intent_id?: string;
 };
 
 type ErrorCode =
   | "missing_prompt"
   | "invalid_model"
+  | "invalid_request"
   | "unsupported_capability"
   | "config_error"
   | "provider_error";
@@ -45,32 +52,6 @@ function errorResponse(code: ErrorCode, message: string, requestId: string, stat
     status,
     headers: { "Content-Type": "application/json" },
   });
-}
-
-function validateRequest(
-  prompt: string | undefined,
-  capability: ModelCapability | undefined,
-  attachments: RequestBody["attachments"] | undefined,
-  requestId: string
-): Response | null {
-  if (!prompt) {
-    return errorResponse("missing_prompt", "prompt is required", requestId, 400);
-  }
-
-  if (!capability) {
-    return errorResponse("invalid_model", "model not allowed", requestId, 400);
-  }
-
-  if (attachments && attachments.length > 0 && !capability.supports.vision) {
-    return errorResponse(
-      "unsupported_capability",
-      "selected model does not support image attachments",
-      requestId,
-      422
-    );
-  }
-
-  return null;
 }
 
 function prepareProviderMessages(
@@ -120,6 +101,32 @@ function providerErrorResponse(error: ProviderResolutionError, requestId: string
   return errorResponse(code, error.message, requestId, status);
 }
 
+// Simple idempotency cache for non-stream responses (best effort, in-memory)
+const IDEMPOTENCY_WINDOW_MS = 60_000;
+const responseCache = new Map<
+  string,
+  { body: string; storedAt: number; headers: Record<string, string> }
+>();
+
+function getCachedResponse(requestId: string): Response | null {
+  const cached = responseCache.get(requestId);
+  if (!cached) {
+    return null;
+  }
+  if (Date.now() - cached.storedAt > IDEMPOTENCY_WINDOW_MS) {
+    responseCache.delete(requestId);
+    return null;
+  }
+  return new Response(cached.body, {
+    status: 200,
+    headers: cached.headers,
+  });
+}
+
+function cacheResponse(requestId: string, body: string, headers: Record<string, string>): void {
+  responseCache.set(requestId, { body, storedAt: Date.now(), headers });
+}
+
 async function handleStreamResponse(
   stream: AsyncIterable<string>,
   messages: Message[],
@@ -133,6 +140,8 @@ async function handleStreamResponse(
       redaction_profile?: string;
       data_access_profile?: string;
     };
+    agentId?: string;
+    intentId?: string;
   }
 ): Promise<Response> {
   const textEncoder = new TextEncoder();
@@ -167,6 +176,8 @@ async function handleStreamResponse(
               temperature: 0.7,
               request_id: requestId,
             },
+            agent_id: options?.agentId,
+            intent_id: options?.intentId,
           },
         });
         controller.enqueue(textEncoder.encode(`data: ${metadataPayload}\n\n`));
@@ -186,6 +197,8 @@ async function handleStreamResponse(
       ...(options?.policyContext?.policy_id
         ? { "x-policy-id": options.policyContext.policy_id }
         : {}),
+      ...(options?.agentId ? { "x-agent-id": options.agentId } : {}),
+      ...(options?.intentId ? { "x-intent-id": options.intentId } : {}),
     },
   });
 }
@@ -211,8 +224,21 @@ export async function POST(req: Request) {
       request_id,
       client_request_id,
       policy_context,
+      agent_id,
+      intent_id,
     } = body ?? {};
-    const requestId = request_id ?? client_request_id ?? fallbackRequestId;
+    const identifiers = normalizeRequestIdentifiers({
+      request_id: request_id ?? fallbackRequestId,
+      client_request_id,
+    });
+    const requestId = identifiers.request_id;
+
+    if (!stream) {
+      const cached = getCachedResponse(requestId);
+      if (cached) {
+        return cached;
+      }
+    }
 
     if (!prompt) {
       return errorResponse("missing_prompt", "prompt is required", requestId, 400);
@@ -235,9 +261,18 @@ export async function POST(req: Request) {
       );
     }
 
-    const error = validateRequest(prompt, resolved.target.capability, attachments, requestId);
-    if (error) {
-      return error;
+    const validationError = validateChatRequest({
+      prompt,
+      capability: resolved.target.capability,
+      attachments,
+    });
+    if (validationError) {
+      return errorResponse(
+        validationError.code,
+        validationError.message,
+        requestId,
+        validationError.status
+      );
     }
 
     const providerMessages = prepareProviderMessages(
@@ -254,6 +289,22 @@ export async function POST(req: Request) {
         ? "ai-chat:default"
         : `ai-chat:${workflow}`;
 
+    const resolvedPolicyContext = policy_context ?? {
+      policy_id: DEFAULT_POLICY_MANIFEST.policy_id,
+    };
+
+    if (
+      resolvedPolicyContext?.policy_id &&
+      resolvedPolicyContext.policy_id !== DEFAULT_POLICY_MANIFEST.policy_id
+    ) {
+      return errorResponse(
+        "invalid_request",
+        "policy_context.policy_id is not supported",
+        requestId,
+        400
+      );
+    }
+
     if (stream) {
       const contextHash = context ? await computeOptimisticHash(context) : undefined;
       const contentStream = streamProviderContent(resolved.target, providerMessages);
@@ -265,7 +316,9 @@ export async function POST(req: Request) {
         {
           promptTemplateId,
           contextHash,
-          policyContext: policy_context,
+          policyContext: resolvedPolicyContext,
+          agentId: agent_id,
+          intentId: intent_id,
         }
       );
     }
@@ -276,8 +329,17 @@ export async function POST(req: Request) {
       "Content-Type": "text/plain; charset=utf-8",
       "x-request-id": requestId,
     };
-    if (policy_context?.policy_id) {
-      headers["x-policy-id"] = policy_context.policy_id;
+    if (resolvedPolicyContext?.policy_id) {
+      headers["x-policy-id"] = resolvedPolicyContext.policy_id;
+    }
+    if (agent_id) {
+      headers["x-agent-id"] = agent_id;
+    }
+    if (intent_id) {
+      headers["x-intent-id"] = intent_id;
+    }
+    if (!stream) {
+      cacheResponse(requestId, content, headers);
     }
     return new Response(content, {
       status: 200,

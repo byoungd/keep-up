@@ -7,6 +7,7 @@
 
 import type { Message } from "@keepup/ai-core";
 import { estimateTokens, truncateToTokens } from "@keepup/ai-core";
+import { type DataAccessPolicy, applyDataAccessPolicyToChunks } from "@keepup/core";
 import type { DocumentChunk } from "../extraction";
 import { EmbeddingService } from "../extraction";
 import type { AIGateway } from "../gateway";
@@ -158,17 +159,20 @@ export class RAGPipeline {
       });
     }
 
-    // 4. Build context from results
-    const { context, citations } = this.buildContext(results, options.maxContextTokens);
+    // 4. Apply data access policy if provided
+    const filteredResults = this.applyDataAccessPolicy(results, options.dataAccessPolicy);
 
-    // 5. Generate answer
+    // 5. Build context from results
+    const { context, citations } = this.buildContext(filteredResults, options.maxContextTokens);
+
+    // 6. Generate answer
     const answer = await this.generateAnswer(queryText, context, citations, userId);
 
     const processingTimeMs = performance.now() - startTime;
 
     return {
       query: queryText,
-      results,
+      results: filteredResults,
       totalSearched: await this.vectorStore.count(),
       answer,
       citations,
@@ -221,7 +225,7 @@ export class RAGPipeline {
       });
     }
 
-    return results;
+    return this.applyDataAccessPolicy(results, options.dataAccessPolicy);
   }
 
   /**
@@ -284,6 +288,48 @@ export class RAGPipeline {
       context: contextParts.join("\n\n---\n\n"),
       citations,
     };
+  }
+
+  /**
+   * Apply data access policy redaction/limits to search results.
+   */
+  private applyDataAccessPolicy(
+    results: SearchResult[],
+    policy?: DataAccessPolicy
+  ): SearchResult[] {
+    if (!policy) {
+      return results;
+    }
+    const chunks = results.map((result) => ({
+      block_id: result.chunk.id,
+      content: result.chunk.content,
+      relevance: result.similarity,
+    }));
+    const filtered = applyDataAccessPolicyToChunks(chunks, policy);
+    const allowedIds = new Set(filtered.map((chunk) => chunk.block_id));
+    if (allowedIds.size !== chunks.length) {
+      const omitted = chunks
+        .filter((chunk) => !allowedIds.has(chunk.block_id))
+        .map((c) => c.block_id);
+      if (omitted.length > 0) {
+        console.info("[RAG][data-access] Omitted chunks from context", {
+          omitted,
+          total: chunks.length,
+          kept: allowedIds.size,
+        });
+      }
+    }
+    return results
+      .filter((result) => allowedIds.has(result.chunk.id))
+      .map((result) => {
+        const filteredChunk = filtered.find((chunk) => chunk.block_id === result.chunk.id);
+        return filteredChunk
+          ? {
+              ...result,
+              chunk: { ...result.chunk, content: filteredChunk.content },
+            }
+          : result;
+      });
   }
 
   /**

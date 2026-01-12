@@ -31,9 +31,13 @@ import {
   createObservability,
   createResiliencePipeline,
   createResilientProvider,
+  // Catalog imports for centralized configuration
+  getDefaultModelId,
   isRetryableError,
   normalizeMessages,
+  resolveProviderFromEnv,
 } from "@keepup/ai-core";
+import { type GatewayTelemetryEvent, generateRequestId } from "@keepup/core";
 import type { AuditLogger } from "../audit/auditLogger";
 
 /** AI Gateway configuration */
@@ -78,6 +82,8 @@ export interface AIGatewayConfig {
   providerSelector?: ProviderSelector;
   /** Optional router logger override */
   routerLogger?: ProviderLogger;
+  /** Optional telemetry hook */
+  telemetryHook?: (event: GatewayTelemetryEvent) => void;
 }
 
 /** AI request options */
@@ -86,6 +92,8 @@ export interface AIRequestOptions {
   userId: string;
   /** Document ID for context */
   docId?: string;
+  /** Request idempotency/trace id */
+  requestId?: string;
   /** Override model */
   model?: string;
   /** Temperature (0-2) */
@@ -274,6 +282,7 @@ export class AIGateway {
    * Generate a completion (non-streaming).
    */
   async complete(messages: Message[], options: AIRequestOptions): Promise<CompletionResponse> {
+    const requestId = options.requestId ?? generateRequestId();
     // Check rate limits
     if (this.config.enableRateLimiting) {
       const check = this.tokenTracker.checkRateLimit(options.userId);
@@ -283,7 +292,7 @@ export class AIGateway {
     }
 
     const request: CompletionRequest = {
-      model: options.model ?? this.config.defaultModel ?? "gpt-4o-mini",
+      model: options.model ?? this.config.defaultModel ?? getDefaultModelId(),
       messages: normalizeMessages(messages),
       temperature: options.temperature,
       maxTokens: options.maxTokens,
@@ -294,7 +303,7 @@ export class AIGateway {
 
     // Track usage
     this.tokenTracker.record({
-      requestId: crypto.randomUUID(),
+      requestId,
       userId: options.userId,
       model: response.model,
       provider: this.getPrimaryProviderName(),
@@ -308,6 +317,15 @@ export class AIGateway {
       inputTokens: response.usage.inputTokens,
       outputTokens: response.usage.outputTokens,
       latencyMs: response.latencyMs,
+      requestId,
+    });
+    this.config.telemetryHook?.({
+      kind: "success",
+      request_id: requestId,
+      agent_id: options.userId,
+      doc_id: options.docId,
+      reason: "completion",
+      duration_ms: response.latencyMs,
     });
 
     return response;
@@ -317,6 +335,7 @@ export class AIGateway {
    * Generate a streaming completion.
    */
   async *stream(messages: Message[], options: AIRequestOptions): AsyncIterable<StreamChunk> {
+    const requestId = options.requestId ?? generateRequestId();
     // Check rate limits
     if (this.config.enableRateLimiting) {
       const check = this.tokenTracker.checkRateLimit(options.userId);
@@ -327,7 +346,7 @@ export class AIGateway {
     }
 
     const request: CompletionRequest = {
-      model: options.model ?? this.config.defaultModel ?? "gpt-4o-mini",
+      model: options.model ?? this.config.defaultModel ?? getDefaultModelId(),
       messages: normalizeMessages(messages),
       temperature: options.temperature,
       maxTokens: options.maxTokens,
@@ -350,7 +369,7 @@ export class AIGateway {
 
     // Track usage
     this.tokenTracker.record({
-      requestId: crypto.randomUUID(),
+      requestId,
       userId: options.userId,
       model: request.model,
       provider: this.getPrimaryProviderName(),
@@ -368,6 +387,15 @@ export class AIGateway {
       inputTokens: totalInputTokens,
       outputTokens: totalOutputTokens,
       latencyMs,
+      requestId,
+    });
+    this.config.telemetryHook?.({
+      kind: "success",
+      request_id: requestId,
+      agent_id: options.userId,
+      doc_id: options.docId,
+      reason: "streaming",
+      duration_ms: latencyMs,
     });
   }
 
@@ -378,6 +406,7 @@ export class AIGateway {
     texts: string[],
     options: AIRequestOptions & { model?: string; dimensions?: number }
   ): Promise<EmbeddingResponse> {
+    const requestId = options.requestId ?? generateRequestId();
     const request: EmbeddingRequest = {
       model: options.model ?? "text-embedding-3-small",
       texts,
@@ -388,12 +417,19 @@ export class AIGateway {
 
     // Track usage
     this.tokenTracker.record({
-      requestId: crypto.randomUUID(),
+      requestId,
       userId: options.userId,
       model: response.model,
       provider: "openai", // Embeddings are OpenAI-only for now
       usage: response.usage,
       requestType: "embedding",
+    });
+    this.config.telemetryHook?.({
+      kind: "success",
+      request_id: requestId,
+      agent_id: options.userId,
+      doc_id: options.docId,
+      reason: "embedding",
     });
 
     return response;
@@ -513,31 +549,37 @@ export class AIGateway {
 
 /**
  * Create an AI Gateway with environment-based configuration.
+ * Uses the centralized provider catalog for environment resolution.
  */
 export function createAIGateway(overrides: Partial<AIGatewayConfig> = {}): AIGateway {
   const config: AIGatewayConfig = {
     ...overrides,
   };
 
-  const defaultModel = process.env.AI_GATEWAY_MODEL?.trim() ?? process.env.AI_DEFAULT_MODEL?.trim();
+  // Use centralized default model from catalog
+  const defaultModel = process.env.AI_GATEWAY_MODEL?.trim() || process.env.AI_DEFAULT_MODEL?.trim();
   if (defaultModel && !config.defaultModel) {
     config.defaultModel = defaultModel;
+  } else if (!config.defaultModel) {
+    config.defaultModel = getDefaultModelId();
   }
 
-  // Try to get API keys from environment
-  const openaiKey = process.env.OPENAI_API_KEY;
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  // Use centralized provider resolution from catalog
+  const openaiResolved = resolveProviderFromEnv("openai");
+  const claudeResolved = resolveProviderFromEnv("claude");
 
-  if (openaiKey && !config.openai) {
+  if (openaiResolved && !config.openai) {
     config.openai = {
-      apiKey: openaiKey,
+      apiKey: openaiResolved.apiKeys[0],
+      baseUrl: openaiResolved.baseUrl,
       organizationId: process.env.OPENAI_ORG_ID,
     };
   }
 
-  if (anthropicKey && !config.anthropic) {
+  if (claudeResolved && !config.anthropic) {
     config.anthropic = {
-      apiKey: anthropicKey,
+      apiKey: claudeResolved.apiKeys[0],
+      baseUrl: claudeResolved.baseUrl,
     };
   }
 

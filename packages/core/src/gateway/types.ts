@@ -3,6 +3,7 @@
  * @see docs/product/LFCC_v0.9_RC_Parallel_Workstreams/05_AI_Gateway_Envelope_and_Dry_Run.md
  */
 
+import { DEFAULT_AI_ENVELOPE_RETRY_POLICY } from "../kernel/ai/envelope";
 import type { AISanitizationPolicyV1 } from "../kernel/ai/types";
 import type { CanonNode } from "../kernel/canonicalizer/types";
 
@@ -103,6 +104,12 @@ export type AIGatewayResponse = {
   request_id?: string;
   /** Request ID echo */
   client_request_id?: string;
+  /** Policy context echo */
+  policy_context?: {
+    policy_id?: string;
+    redaction_profile?: string;
+    data_access_profile?: string;
+  };
   /** Processing diagnostics */
   diagnostics: GatewayDiagnostic[];
 };
@@ -174,6 +181,12 @@ export type AIGateway409Response = {
   request_id?: string;
   /** Request ID echo */
   client_request_id?: string;
+  /** Policy context echo */
+  policy_context?: {
+    policy_id?: string;
+    redaction_profile?: string;
+    data_access_profile?: string;
+  };
 };
 
 /** Gateway error response (4xx/5xx) */
@@ -188,6 +201,12 @@ export type AIGatewayErrorResponse = {
   request_id?: string;
   /** Request ID echo */
   client_request_id?: string;
+  /** Policy context echo */
+  policy_context?: {
+    policy_id?: string;
+    redaction_profile?: string;
+    data_access_profile?: string;
+  };
 };
 
 /** Union of all gateway responses */
@@ -210,6 +229,26 @@ export type GatewayDiagnostic = {
   detail: string;
   /** Source location (if applicable) */
   source?: string;
+};
+
+// ============================================================================
+// Gateway Telemetry
+// ============================================================================
+
+export type GatewayTelemetryEvent = {
+  kind:
+    | "idempotency_hit"
+    | "conflict"
+    | "sanitization_reject"
+    | "schema_reject"
+    | "success"
+    | "invalid_request";
+  request_id?: string;
+  agent_id?: string;
+  intent_id?: string;
+  doc_id?: string;
+  reason?: string;
+  duration_ms?: number;
 };
 
 // ============================================================================
@@ -266,11 +305,7 @@ export type RetryPolicy = {
 
 /** Default retry policy */
 export const DEFAULT_RETRY_POLICY: RetryPolicy = {
-  max_retries: 3,
-  relocation_level: 1,
-  backoff_base_ms: 100,
-  backoff_multiplier: 2,
-  max_backoff_ms: 5000,
+  ...DEFAULT_AI_ENVELOPE_RETRY_POLICY,
 };
 
 /** Retry state */

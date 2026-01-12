@@ -47,7 +47,7 @@ export const PROVIDER_META: ProviderMeta[] = [
   {
     id: "openai",
     icon: OpenAIIcon,
-    description: "GPT-4o, GPT-4 Turbo, GPT-3.5",
+    description: "GPT-5.2, GPT-5.0, o3",
     docsUrl: "https://platform.openai.com/docs",
     apiKeyUrl: "https://platform.openai.com/api-keys",
     supportsCustomUrl: true,
@@ -58,9 +58,9 @@ export const PROVIDER_META: ProviderMeta[] = [
     },
   },
   {
-    id: "anthropic",
+    id: "claude",
     icon: AnthropicIcon,
-    description: "Claude 3.5, Claude 3 Opus",
+    description: "Claude 4.5 Sonnet, Claude 4.5 Opus",
     docsUrl: "https://docs.anthropic.com",
     apiKeyUrl: "https://console.anthropic.com/settings/keys",
     supportsCustomUrl: true,
@@ -71,9 +71,9 @@ export const PROVIDER_META: ProviderMeta[] = [
     },
   },
   {
-    id: "google",
+    id: "gemini",
     icon: GoogleIcon,
-    description: "Gemini 2.5, Gemini 2.0 Flash",
+    description: "Gemini 3, Gemini 2.5",
     docsUrl: "https://ai.google.dev/docs",
     apiKeyUrl: "https://aistudio.google.com/apikey",
     supportsCustomUrl: false,

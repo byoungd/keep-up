@@ -167,6 +167,17 @@ function applyDataAccessPolicyToBlocks(
   };
   const chunks = collectContentChunks(blocks);
   const filteredChunks = applyDataAccessPolicyToChunks(chunks, effectivePolicy);
+  if (filteredChunks.length !== chunks.length) {
+    const keptIds = new Set(filteredChunks.map((chunk) => chunk.block_id));
+    const omitted = chunks.filter((chunk) => !keptIds.has(chunk.block_id)).map((c) => c.block_id);
+    if (omitted.length > 0) {
+      console.info("[LFCC][data-access] Omitted blocks from context", {
+        omitted,
+        total: chunks.length,
+        kept: filteredChunks.length,
+      });
+    }
+  }
   const contentMap = new Map(filteredChunks.map((chunk) => [chunk.block_id, chunk.content]));
   const content = filteredChunks.map((chunk) => chunk.content).join("\n\n");
   const filteredBlocks = filterBlocksByPolicy(blocks, contentMap);

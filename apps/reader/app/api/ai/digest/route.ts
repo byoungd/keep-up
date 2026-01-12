@@ -7,7 +7,7 @@
  * Track 2: Intelligence & Logic (AI) - P1
  */
 
-import { type Message, normalizeMessages } from "@keepup/ai-core";
+import { type Message, type ProviderKind, normalizeMessages } from "@keepup/ai-core";
 import { NextResponse } from "next/server";
 import { completeWithProvider } from "../llmGateway";
 import { getDefaultChatModelId } from "../modelResolver";
@@ -33,7 +33,7 @@ interface ContentItemInput {
 /** Provider configuration passed from client */
 interface ProviderConfig {
   /** Provider ID */
-  providerId: "openai" | "anthropic" | "google" | "deepseek" | "moonshot" | "custom";
+  providerId: ProviderKind | "custom";
   /** API key */
   apiKey: string;
   /** Base URL for the API */
@@ -151,7 +151,7 @@ async function generateCardsWithLLM(
   const userPrompt = `Create up to ${maxCards} digest cards from these ${items.length} content items:\n\n${itemsContext}`;
 
   const content =
-    provider.providerId === "anthropic"
+    provider.providerId === "claude"
       ? await callAnthropicAPI(provider, userPrompt)
       : await callOpenAICompatibleAPI(provider, userPrompt);
 

@@ -4,6 +4,7 @@
  * Type definitions for the RAG query pipeline.
  */
 
+import type { DataAccessPolicy } from "@keepup/core";
 import type { ChunkEmbedding, DocumentChunk } from "../extraction";
 
 /** Search result with relevance */
@@ -32,6 +33,8 @@ export interface RAGQueryOptions {
   maxContextTokens?: number;
   /** Whether to rerank results */
   rerank?: boolean;
+  /** Optional data access policy for redaction/limits */
+  dataAccessPolicy?: DataAccessPolicy;
 }
 
 /** RAG query result */

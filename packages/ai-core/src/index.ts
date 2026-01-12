@@ -281,7 +281,7 @@ export {
 } from "./types";
 
 // ============================================================================
-// Catalog - Shared model capabilities
+// Catalog - Shared model capabilities & provider configuration
 // ============================================================================
 export {
   MODEL_CATALOG,
@@ -290,8 +290,41 @@ export {
   getDefaultModelId,
   getModelCapability,
   normalizeModelId,
+  // Capability validation
+  type RequiredCapabilities,
+  type CapabilityError,
+  validateModelCapabilities,
+  modelSupportsVision,
+  modelSupportsTools,
+  modelSupportsThinking,
+  getModelsWithCapabilities,
+  getSuggestedModel,
 } from "./catalog/models";
 export { normalizeMessages, withSystemPrompt } from "./catalog/messages";
+export {
+  // Types
+  type ProviderProtocol,
+  type ProviderEnvConfig,
+  type ProviderDisplayInfo,
+  type ProviderMetadata,
+  // Catalog
+  PROVIDER_CATALOG,
+  // Lookup functions
+  getProviderMetadata,
+  getProviderEnvConfig,
+  getProviderDisplayInfo,
+  getAllProviderIds,
+  getProvidersByProtocol,
+  // Environment utilities
+  getFirstEnvValue,
+  parseApiKeys,
+  normalizeBaseUrl,
+  normalizeAnthropicBaseUrl,
+  isGoogleBaseUrl,
+  resolveProviderFromEnv,
+  isProviderConfigured,
+  getConfiguredProviders,
+} from "./catalog/providers";
 
 // ============================================================================
 // Observability - Enhanced Telemetry & Profiling

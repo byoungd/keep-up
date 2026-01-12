@@ -21,6 +21,7 @@ import {
   SimpleTracer,
   createRetryPolicy,
 } from "@keepup/ai-core";
+import { DEFAULT_POLICY_MANIFEST, generateRequestId } from "@keepup/core";
 
 import { REQUEST_TIMEOUT_MS, SSE_DONE_MARKER } from "./constants";
 import { parseSseText } from "./streamUtils";
@@ -47,6 +48,11 @@ export interface AIStreamRequest {
   attachments?: Array<{ type: "image"; url: string }>;
   workflow?: "tdd" | "refactoring" | "debugging" | "research" | "none";
   systemPrompt?: string;
+  requestId?: string;
+  clientRequestId?: string;
+  policyContext?: { policy_id?: string; redaction_profile?: string; data_access_profile?: string };
+  agentId?: string;
+  intentId?: string;
   signal?: AbortSignal;
 }
 
@@ -63,6 +69,8 @@ export interface AIStreamResult {
   ttft: number | null;
   totalMs: number;
   attempts: number;
+  agentId?: string;
+  intentId?: string;
   /** AI confidence score (0-1), available when backend provides it */
   confidence?: number;
   /** AI provenance metadata, available when backend provides it */
@@ -155,6 +163,8 @@ export class AIClientError extends Error {
 
 // AI chat API endpoint
 const API_ENDPOINT = "/api/ai/chat";
+const DEFAULT_POLICY_CONTEXT = { policy_id: DEFAULT_POLICY_MANIFEST.policy_id };
+const DEFAULT_AGENT_ID = "reader-panel";
 
 const CIRCUIT_CONFIG = {
   failureThreshold: 3,
@@ -195,6 +205,8 @@ type AIMetadata = {
     rationale_summary?: string;
     temperature?: number;
   };
+  agent_id?: string;
+  intent_id?: string;
 };
 
 function createStreamState(): StreamState {
@@ -373,7 +385,12 @@ async function readStream(
   body: ReadableStream<Uint8Array>,
   startedAt: number,
   onChunk: (delta: string, accumulated: string) => void
-): Promise<Pick<AIStreamResult, "content" | "chunkCount" | "ttft" | "confidence" | "provenance">> {
+): Promise<
+  Pick<
+    AIStreamResult,
+    "content" | "chunkCount" | "ttft" | "confidence" | "provenance" | "agentId" | "intentId"
+  >
+> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
   const state = createStreamState();
@@ -406,6 +423,8 @@ async function readStream(
     ttft: state.ttft,
     confidence: state.metadata?.confidence,
     provenance: state.metadata?.provenance,
+    agentId: state.metadata?.agent_id,
+    intentId: state.metadata?.intent_id,
   };
 }
 
@@ -510,12 +529,21 @@ class AIClientService {
     request: AIStreamRequest,
     callbacks: AIStreamCallbacks
   ): Promise<AIStreamResult> {
+    const requestId = request.requestId ?? generateRequestId();
+    const normalizedRequest: AIStreamRequest = {
+      ...request,
+      requestId,
+      clientRequestId: request.clientRequestId ?? requestId,
+      policyContext: request.policyContext ?? DEFAULT_POLICY_CONTEXT,
+      agentId: request.agentId ?? DEFAULT_AGENT_ID,
+    };
+
     return this.circuitBreaker.execute(async () => {
       const retryResult = await this.retryPolicy.execute(
         async (_attempt: number, signal: AbortSignal) => {
           const combined = combineSignals(signal, request.signal);
           try {
-            return await this.performStream(request, callbacks, combined.signal);
+            return await this.performStream(normalizedRequest, callbacks, combined.signal);
           } finally {
             combined.cleanup();
           }
@@ -553,12 +581,19 @@ class AIClientService {
         attachments: request.attachments,
         workflow: request.workflow,
         systemPrompt: request.systemPrompt,
+        request_id: request.requestId,
+        client_request_id: request.clientRequestId,
+        policy_context: request.policyContext,
+        agent_id: request.agentId,
+        intent_id: request.intentId,
       }),
       signal,
     });
 
     const fallbackId = fallbackRequestId();
     const headerRequestId = response.headers.get("x-request-id") ?? fallbackId;
+    const headerAgentId = response.headers.get("x-agent-id") ?? undefined;
+    const headerIntentId = response.headers.get("x-intent-id") ?? undefined;
 
     if (!response.ok || !response.body) {
       const errorInfo = parseErrorPayload(await response.text());
@@ -577,6 +612,8 @@ class AIClientService {
       chunkCount: streamData.chunkCount,
       ttft: streamData.ttft,
       totalMs: performance.now() - startedAt,
+      agentId: streamData.agentId ?? headerAgentId,
+      intentId: streamData.intentId ?? headerIntentId,
     };
   }
 

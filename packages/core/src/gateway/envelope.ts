@@ -3,6 +3,7 @@
  * @see docs/product/LFCC_v0.9_RC_Parallel_Workstreams/05_AI_Gateway_Envelope_and_Dry_Run.md Section A
  */
 
+import { normalizeDocFrontier, normalizeRequestIdentifiers } from "../kernel/ai/envelope";
 import type { AISanitizationPolicyV1 } from "../kernel/ai/types";
 import type { CanonNode } from "../kernel/canonicalizer/types";
 import type {
@@ -46,15 +47,21 @@ export function createGatewayRequest(params: {
   returnCanonicalTree?: boolean;
   sanitizationPolicy?: AISanitizationPolicyV1;
 }): AIGatewayRequest {
-  const frontier = params.docFrontier ?? params.docFrontierTag;
-  if (!frontier) {
+  const frontier = normalizeDocFrontier({
+    doc_frontier: params.docFrontier,
+    doc_frontier_tag: params.docFrontierTag,
+  });
+  if (!frontier.doc_frontier) {
     throw new Error("docFrontier is required to build a gateway request");
   }
-  const requestId = params.requestId ?? params.clientRequestId;
+  const identifiers = normalizeRequestIdentifiers({
+    request_id: params.requestId,
+    client_request_id: params.clientRequestId,
+  });
   return {
     doc_id: params.docId,
-    doc_frontier_tag: frontier,
-    doc_frontier: frontier,
+    doc_frontier_tag: frontier.doc_frontier_tag ?? frontier.doc_frontier,
+    doc_frontier: frontier.doc_frontier,
     agent_id: params.agentId,
     intent_id: params.intentId,
     intent: params.intent,
@@ -62,8 +69,8 @@ export function createGatewayRequest(params: {
     target_spans: params.targetSpans,
     instructions: params.instructions,
     format: params.format,
-    request_id: requestId,
-    client_request_id: params.clientRequestId,
+    request_id: identifiers.request_id,
+    client_request_id: identifiers.client_request_id,
     model: params.model,
     payload: params.payload,
     options: {
@@ -104,15 +111,21 @@ export function createGatewayResponse(params: {
   requestId?: string;
   clientRequestId?: string;
   diagnostics?: GatewayDiagnostic[];
+  policyContext?: AIGatewayRequest["policy_context"];
 }): AIGatewayResponse {
+  const identifiers = normalizeRequestIdentifiers({
+    request_id: params.requestId,
+    client_request_id: params.clientRequestId,
+  });
   return {
     status: 200,
     server_frontier_tag: params.serverFrontierTag,
     server_doc_frontier: params.serverDocFrontier ?? params.serverFrontierTag,
     canon_fragment: params.canonFragment,
     apply_plan: params.applyPlan,
-    request_id: params.requestId,
-    client_request_id: params.clientRequestId,
+    request_id: identifiers.request_id,
+    client_request_id: identifiers.client_request_id,
+    policy_context: params.policyContext,
     diagnostics: params.diagnostics ?? [],
   };
 }
@@ -128,7 +141,12 @@ export function createGateway409(params: {
   message: string;
   requestId?: string;
   clientRequestId?: string;
+  policyContext?: AIGatewayRequest["policy_context"];
 }): AIGateway409Response {
+  const identifiers = normalizeRequestIdentifiers({
+    request_id: params.requestId,
+    client_request_id: params.clientRequestId,
+  });
   return {
     status: 409,
     reason: params.reason,
@@ -136,8 +154,9 @@ export function createGateway409(params: {
     server_doc_frontier: params.serverDocFrontier ?? params.serverFrontierTag,
     failed_preconditions: params.failedPreconditions,
     message: params.message,
-    request_id: params.requestId,
-    client_request_id: params.clientRequestId,
+    request_id: identifiers.request_id,
+    client_request_id: identifiers.client_request_id,
+    policy_context: params.policyContext,
   };
 }
 
@@ -150,6 +169,7 @@ export function createGatewayError(params: {
   message: string;
   requestId?: string;
   clientRequestId?: string;
+  policyContext?: AIGatewayRequest["policy_context"];
 }): AIGatewayErrorResponse {
   return {
     status: params.status,
@@ -157,6 +177,7 @@ export function createGatewayError(params: {
     message: params.message,
     request_id: params.requestId,
     client_request_id: params.clientRequestId,
+    policy_context: params.policyContext,
   };
 }
 
@@ -338,6 +359,11 @@ function validateOptionalFields(req: Record<string, unknown>, errors: Validation
           field: "policy_context.policy_id",
           message: "policy_id must be a string if provided",
         });
+      } else if (typeof ctx.policy_id === "string" && ctx.policy_id.trim().length === 0) {
+        errors.push({
+          field: "policy_context.policy_id",
+          message: "policy_id cannot be empty",
+        });
       }
       if (ctx.redaction_profile !== undefined && typeof ctx.redaction_profile !== "string") {
         errors.push({
@@ -372,13 +398,6 @@ export function parseGatewayRequest(request: unknown): AIGatewayRequest | null {
  * - Ensures `request_id` mirrors `client_request_id` when missing
  */
 export function normalizeGatewayRequest(request: AIGatewayRequest): AIGatewayRequest {
-  const frontier = request.doc_frontier ?? request.doc_frontier_tag;
-  const requestId = request.request_id ?? request.client_request_id;
-
-  return {
-    ...request,
-    doc_frontier: frontier,
-    doc_frontier_tag: frontier ?? request.doc_frontier_tag,
-    request_id: requestId,
-  };
+  const withFrontier = normalizeDocFrontier(request);
+  return normalizeRequestIdentifiers(withFrontier);
 }

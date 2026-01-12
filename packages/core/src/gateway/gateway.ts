@@ -10,6 +10,7 @@
  * - Response generation
  */
 
+import { normalizeRequestIdentifiers } from "../kernel/ai/envelope";
 import type { AISanitizationPolicyV1 } from "../kernel/ai/types";
 import { DEFAULT_AI_SANITIZATION_POLICY } from "../kernel/ai/types";
 import type { CanonNode } from "../kernel/canonicalizer/types";
@@ -38,6 +39,7 @@ import type {
   ApplyPlan,
   GatewayDiagnostic,
   GatewayDocumentProvider,
+  GatewayTelemetryEvent,
 } from "./types";
 
 // ============================================================================
@@ -64,6 +66,8 @@ export type GatewayConfig = {
   securityValidatorConfig?: Partial<AIValidatorConfig>;
   /** Custom pipeline config */
   pipelineConfig?: Partial<PipelineConfig>;
+  /** Optional telemetry hook for gateway events */
+  onTelemetry?: (event: GatewayTelemetryEvent) => void;
 };
 
 /** Default gateway configuration (requires provider) */
@@ -103,11 +107,17 @@ export class AIGateway {
    * Process an AI Gateway request
    */
   async processRequest(rawRequest: unknown): Promise<AIGatewayResult> {
+    const startedAt = performance.now();
     const diagnostics: GatewayDiagnostic[] = [];
 
     // Step 1: Validate request structure
     const validationError = this.checkRequestStructure(rawRequest);
     if (validationError) {
+      this.emitTelemetry({
+        kind: "invalid_request",
+        request_id: this.extractRequestIds(rawRequest).requestId,
+        duration_ms: performance.now() - startedAt,
+      });
       return validationError;
     }
 
@@ -115,6 +125,14 @@ export class AIGateway {
     const requestId = this.resolveRequestId(request);
     const cachedResponse = this.getIdempotentResponse(requestId);
     if (cachedResponse) {
+      this.emitTelemetry({
+        kind: "idempotency_hit",
+        request_id: requestId,
+        agent_id: request.agent_id,
+        intent_id: request.intent_id,
+        doc_id: request.doc_id,
+        duration_ms: performance.now() - startedAt,
+      });
       return cachedResponse;
     }
 
@@ -122,6 +140,14 @@ export class AIGateway {
     const checkResult = this.performChecks(request, diagnostics);
     if (checkResult) {
       this.storeIdempotentResponse(requestId, checkResult);
+      this.emitTelemetry({
+        kind: checkResult.status === 400 ? "sanitization_reject" : "invalid_request",
+        request_id: requestId,
+        agent_id: request.agent_id,
+        intent_id: request.intent_id,
+        doc_id: request.doc_id,
+        duration_ms: performance.now() - startedAt,
+      });
       return checkResult;
     }
 
@@ -129,13 +155,34 @@ export class AIGateway {
     const conflictResult = checkConflicts(request, this.config.documentProvider);
     if (!conflictResult.ok) {
       this.storeIdempotentResponse(requestId, conflictResult.response);
+      this.emitTelemetry({
+        kind: "conflict",
+        request_id: requestId,
+        agent_id: request.agent_id,
+        intent_id: request.intent_id,
+        doc_id: request.doc_id,
+        reason: conflictResult.response.reason,
+        duration_ms: performance.now() - startedAt,
+      });
       return conflictResult.response;
     }
 
     // Step 6: Execute dry-run pipeline or return empty response
     const result = await this.executePipelineOrReturn(request, diagnostics);
     this.storeIdempotentResponse(requestId, result);
+    this.emitTelemetry({
+      kind: result.status === 200 ? "success" : "sanitization_reject",
+      request_id: requestId,
+      agent_id: request.agent_id,
+      intent_id: request.intent_id,
+      doc_id: request.doc_id,
+      duration_ms: performance.now() - startedAt,
+    });
     return result;
+  }
+
+  private emitTelemetry(event: GatewayTelemetryEvent): void {
+    this.config.onTelemetry?.(event);
   }
 
   private checkRequestStructure(rawRequest: unknown): AIGatewayResult | null {
@@ -290,6 +337,7 @@ export class AIGateway {
             message: `Schema validation failed: ${pipelineResult.reason}`,
             requestId,
             clientRequestId: request.client_request_id,
+            policyContext: request.policy_context,
           });
         }
 
@@ -300,6 +348,7 @@ export class AIGateway {
           message: `Pipeline failed at ${pipelineResult.stage}: ${pipelineResult.reason}`,
           requestId,
           clientRequestId: request.client_request_id,
+          policyContext: request.policy_context,
         });
       }
 
@@ -313,6 +362,7 @@ export class AIGateway {
         applyPlan,
         requestId,
         clientRequestId: request.client_request_id,
+        policyContext: request.policy_context,
         diagnostics,
       });
     }
@@ -321,6 +371,7 @@ export class AIGateway {
       serverFrontierTag: this.config.documentProvider.getFrontierTag(),
       requestId,
       clientRequestId: request.client_request_id,
+      policyContext: request.policy_context,
       diagnostics,
     });
   }
@@ -375,8 +426,9 @@ export class AIGateway {
     };
   }
 
-  private resolveRequestId(request: AIGatewayRequest): string | undefined {
-    return request.request_id ?? request.client_request_id;
+  private resolveRequestId(request: AIGatewayRequest): string {
+    const normalized = normalizeRequestIdentifiers(request);
+    return normalized.request_id;
   }
 
   private extractRequestIds(rawRequest: unknown): {

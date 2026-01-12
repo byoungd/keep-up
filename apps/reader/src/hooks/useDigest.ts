@@ -7,6 +7,7 @@
  * Track 3: Experience & Collaboration (Product)
  */
 
+import type { ProviderId } from "@/context/ProviderConfigContext";
 import { getDbClient } from "@/lib/db";
 import { useCallback, useEffect, useState } from "react";
 
@@ -57,7 +58,7 @@ interface ContentItemInput {
 
 /** Provider configuration for API request */
 export interface DigestProviderConfig {
-  providerId: "openai" | "anthropic" | "google" | "deepseek" | "moonshot" | "custom";
+  providerId: ProviderId;
   apiKey: string;
   baseUrl: string;
   model: string;

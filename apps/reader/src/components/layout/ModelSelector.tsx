@@ -66,8 +66,8 @@ type ProviderFilter =
   | "all"
   | "favorites"
   | "openai"
-  | "anthropic"
-  | "google"
+  | "claude"
+  | "gemini"
   | "alibaba"
   | "deepseek"
   | "meta"
@@ -151,8 +151,8 @@ const PROVIDER_TO_MODEL_PROVIDER: Record<ProviderFilter, ModelCapability["provid
   all: null,
   favorites: null,
   openai: "openai",
-  anthropic: "claude",
-  google: "gemini",
+  claude: "claude",
+  gemini: "gemini",
   alibaba: "alibaba",
   deepseek: "deepseek",
   meta: "meta",
@@ -356,8 +356,8 @@ export function ModelSelector({
       all: true,
       favorites: true,
       openai: true,
-      anthropic: true,
-      google: true,
+      claude: true,
+      gemini: true,
       alibaba: true,
       deepseek: true,
       meta: true,
@@ -399,20 +399,20 @@ export function ModelSelector({
         disabled: !providerAvailability.openai,
       },
       {
-        id: "anthropic",
+        id: "claude",
         label: t("modelProviderAnthropic"),
         icon: AnthropicIcon,
         tone: "text-foreground",
         iconTone: "text-muted-foreground",
-        disabled: !providerAvailability.anthropic,
+        disabled: !providerAvailability.claude,
       },
       {
-        id: "google",
+        id: "gemini",
         label: t("modelProviderGoogle"),
         icon: GoogleIcon,
         tone: "text-foreground",
         iconTone: "text-muted-foreground",
-        disabled: !providerAvailability.google,
+        disabled: !providerAvailability.gemini,
       },
       {
         id: "alibaba",

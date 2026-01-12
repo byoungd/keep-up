@@ -11,6 +11,7 @@ import { composePromptWithContext, createContextPayload } from "@/lib/ai/context
 import { MODEL_CAPABILITIES, getDefaultModel, normalizeModelId } from "@/lib/ai/models";
 import { buildReferenceAnchors } from "@/lib/ai/referenceAnchors";
 import { getWorkflowSystemPrompt } from "@/lib/ai/workflowPrompts";
+import { DEFAULT_POLICY_MANIFEST } from "@keepup/core";
 import type { LoroRuntime, SpanList } from "@keepup/lfcc-bridge";
 import {
   applyOperation,
@@ -165,14 +166,28 @@ export function useAIPanelController({
 
   // 5. Context & Privacy
   const { content: docContent } = useDocumentContent(docId ?? null);
+  const dataAccessPolicy = React.useMemo(() => {
+    const policy = DEFAULT_POLICY_MANIFEST.ai_native_policy?.data_access;
+    if (!policy) {
+      return undefined;
+    }
+    return {
+      max_context_chars: policy.max_context_chars,
+      allow_blocks: policy.allow_blocks,
+      deny_blocks: policy.deny_blocks,
+      redaction_strategy: policy.redaction_strategy,
+      pii_handling: policy.pii_handling,
+    };
+  }, []);
 
   const contextPayload = React.useMemo(
     () =>
       createContextPayload({
         selectedText,
         pageContext: pageContext || docContent || undefined,
+        policy: dataAccessPolicy,
       }),
-    [pageContext, selectedText, docContent]
+    [pageContext, selectedText, docContent, dataAccessPolicy]
   );
 
   const consentCtrl = useAiContextConsent(docId);
@@ -200,6 +215,8 @@ export function useAIPanelController({
   const handleStreamComplete = React.useCallback(
     (result: {
       requestId: string;
+      agentId?: string;
+      intentId?: string;
       confidence?: number;
       provenance?: {
         model_id: string;
@@ -223,6 +240,8 @@ export function useAIPanelController({
             aiContext: {
               model,
               request_id: result.requestId,
+              agent_id: result.agentId,
+              intent_id: result.intentId,
               confidence: result.confidence,
               provenance: result.provenance,
             },
@@ -232,7 +251,13 @@ export function useAIPanelController({
             b.id === messageBlock.id
               ? {
                   ...b,
-                  meta: { ...b.meta, requestId: result.requestId, confidence: result.confidence },
+                  meta: {
+                    ...b.meta,
+                    requestId: result.requestId,
+                    agentId: result.agentId,
+                    intentId: result.intentId,
+                    confidence: result.confidence,
+                  },
                 }
               : b
           );

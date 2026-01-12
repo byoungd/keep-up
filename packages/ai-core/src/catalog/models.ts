@@ -513,3 +513,137 @@ export function getModelCapability(modelId: string | undefined): ModelCapability
 export function getDefaultModelId(): string {
   return MODEL_CATALOG.find((entry) => entry.default)?.id ?? MODEL_CATALOG[0]?.id ?? "";
 }
+
+// ============================================================================
+// Capability Validation
+// ============================================================================
+
+/** Required capabilities for a request */
+export type RequiredCapabilities = {
+  vision?: boolean;
+  tools?: boolean;
+  thinking?: boolean;
+};
+
+/** Capability validation error */
+export type CapabilityError = {
+  code: "model_not_found" | "capability_not_supported";
+  message: string;
+  modelId: string;
+  missingCapabilities?: (keyof RequiredCapabilities)[];
+};
+
+/**
+ * Validate that a model supports the required capabilities.
+ * Returns null if valid, or an error describing what's missing.
+ */
+export function validateModelCapabilities(
+  modelId: string,
+  required: RequiredCapabilities
+): CapabilityError | null {
+  const capability = getModelCapability(modelId);
+
+  if (!capability) {
+    return {
+      code: "model_not_found",
+      message: `Model not found: ${modelId}`,
+      modelId,
+    };
+  }
+
+  const missing: (keyof RequiredCapabilities)[] = [];
+
+  if (required.vision && !capability.supports.vision) {
+    missing.push("vision");
+  }
+  if (required.tools && !capability.supports.tools) {
+    missing.push("tools");
+  }
+  if (required.thinking && !capability.supports.thinking) {
+    missing.push("thinking");
+  }
+
+  if (missing.length > 0) {
+    return {
+      code: "capability_not_supported",
+      message: `Model ${modelId} does not support: ${missing.join(", ")}`,
+      modelId,
+      missingCapabilities: missing,
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Check if a model supports vision (image/attachment analysis).
+ */
+export function modelSupportsVision(modelId: string): boolean {
+  return getModelCapability(modelId)?.supports.vision ?? false;
+}
+
+/**
+ * Check if a model supports tool/function calling.
+ */
+export function modelSupportsTools(modelId: string): boolean {
+  return getModelCapability(modelId)?.supports.tools ?? false;
+}
+
+/**
+ * Check if a model supports extended thinking/reasoning.
+ */
+export function modelSupportsThinking(modelId: string): boolean {
+  return getModelCapability(modelId)?.supports.thinking ?? false;
+}
+
+/**
+ * Get models that support specific capabilities.
+ */
+export function getModelsWithCapabilities(required: RequiredCapabilities): ModelCapability[] {
+  return MODEL_CATALOG.filter((model) => {
+    if (required.vision && !model.supports.vision) {
+      return false;
+    }
+    if (required.tools && !model.supports.tools) {
+      return false;
+    }
+    if (required.thinking && !model.supports.thinking) {
+      return false;
+    }
+    return true;
+  });
+}
+
+/**
+ * Get a suggested alternative model when the requested one lacks capabilities.
+ */
+export function getSuggestedModel(
+  currentModelId: string,
+  required: RequiredCapabilities
+): ModelCapability | undefined {
+  const current = getModelCapability(currentModelId);
+  if (!current) {
+    // Return first model with required capabilities
+    return getModelsWithCapabilities(required)[0];
+  }
+
+  // Prefer same provider, same group
+  const alternatives = getModelsWithCapabilities(required);
+
+  // Same provider, same group
+  const sameProviderGroup = alternatives.find(
+    (m) => m.provider === current.provider && m.group === current.group && !m.legacy
+  );
+  if (sameProviderGroup) {
+    return sameProviderGroup;
+  }
+
+  // Same provider
+  const sameProvider = alternatives.find((m) => m.provider === current.provider && !m.legacy);
+  if (sameProvider) {
+    return sameProvider;
+  }
+
+  // Any non-legacy
+  return alternatives.find((m) => !m.legacy);
+}

@@ -23,7 +23,12 @@ import { assignMissingBlockIds } from "../pm/validateBlockIds";
 import { projectLoroToPm } from "../projection/projection";
 import type { LoroRuntime } from "../runtime/loroRuntime";
 import {
+  AI_GATEWAY_AGENT_ID,
+  AI_GATEWAY_INTENT_ID,
+  AI_GATEWAY_REQUEST_ID,
+  AI_GATEWAY_SOURCE,
   AI_INTENT_META,
+  buildAICommitOriginWithMeta,
   detectUnvalidatedAIWrite,
   hasGatewayMetadata,
 } from "../security/aiGatewayWrite";
@@ -701,7 +706,16 @@ export class BridgeController {
           `[LFCC Bridge] Syncing transaction to Loro. docChanged: ${tr.docChanged}, steps: ${tr.steps.length}`
         );
       }
-      const applyResult = applyPmTransactionToLoro(tr, this.runtime, this.originTag);
+      const gatewayOrigin = hasGatewayMetadata(tr)
+        ? buildAICommitOriginWithMeta({
+            source: tr.getMeta(AI_GATEWAY_SOURCE) as string | undefined,
+            requestId: tr.getMeta(AI_GATEWAY_REQUEST_ID) as string | undefined,
+            agentId: tr.getMeta(AI_GATEWAY_AGENT_ID) as string | undefined,
+            intentId: tr.getMeta(AI_GATEWAY_INTENT_ID) as string | undefined,
+          })
+        : undefined;
+      const originTag = gatewayOrigin ?? this.originTag;
+      const applyResult = applyPmTransactionToLoro(tr, this.runtime, originTag);
       this.recordLocalApply(applyResult);
     } catch (err) {
       this.runtime.setDegraded(true);

@@ -295,6 +295,20 @@ describe("AI Gateway Envelope", () => {
 
       expect(errors).toHaveLength(0);
     });
+
+    it("rejects empty policy_context.policy_id", () => {
+      const errors = validateGatewayRequest({
+        doc_id: "doc123",
+        doc_frontier: "f:1",
+        target_spans: [],
+        instructions: "Test",
+        format: "html",
+        request_id: "req-123",
+        policy_context: { policy_id: "" },
+      });
+
+      expect(errors.some((e) => e.field === "policy_context.policy_id")).toBe(true);
+    });
   });
 
   describe("parseGatewayRequest", () => {

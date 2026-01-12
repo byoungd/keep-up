@@ -3,7 +3,12 @@ import type { AIMenuState } from "@/lib/editor/aiMenuPlugin";
 import { useLfccDebugStore } from "@/lib/lfcc/debugStore";
 import { createEditorSchemaValidator } from "@/lib/lfcc/editorSchemaValidator";
 import { useCompletion } from "@ai-sdk/react";
-import { type EditorSchemaValidator, computeOptimisticHash, gateway } from "@keepup/core";
+import {
+  DEFAULT_POLICY_MANIFEST,
+  type EditorSchemaValidator,
+  computeOptimisticHash,
+  gateway,
+} from "@keepup/core";
 import { type LoroRuntime, pmSelectionToSpanList } from "@keepup/lfcc-bridge";
 import { cn } from "@keepup/shared/utils";
 import { AnimatePresence, motion } from "framer-motion";
@@ -284,6 +289,7 @@ export function AIContextMenu({ state, onClose, onReplace, onInsertBelow }: AICo
             request_id: envelopeResult.envelope.request_id,
             client_request_id: envelopeResult.envelope.client_request_id,
             agent_id: envelopeResult.envelope.agent_id,
+            policy_context: { policy_id: DEFAULT_POLICY_MANIFEST.policy_id },
           },
         });
       } catch (e) {

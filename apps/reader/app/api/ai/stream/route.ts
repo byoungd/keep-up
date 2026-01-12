@@ -1,5 +1,9 @@
 import type { Message } from "@keepup/ai-core";
-import { computeOptimisticHash } from "@keepup/core";
+import {
+  DEFAULT_POLICY_MANIFEST,
+  computeOptimisticHash,
+  normalizeRequestIdentifiers,
+} from "@keepup/core";
 import { streamText } from "ai";
 import { toModelMessages } from "../messageUtils";
 import { getDefaultStreamModelId } from "../modelResolver";
@@ -114,6 +118,8 @@ type ParsedPayload = {
   requestId: string;
   clientRequestId: string | null;
   policyContext?: { policy_id?: string; redaction_profile?: string; data_access_profile?: string };
+  agentId?: string;
+  intentId?: string;
 };
 
 type ParseResult = { payload: ParsedPayload } | { error: Response };
@@ -183,8 +189,18 @@ async function parseRequestPayload(req: Request): Promise<ParseResult> {
   }
 
   const payload = body as Record<string, unknown>;
-  const clientRequestId = getPayloadString(payload, "client_request_id");
-  const requestId = getPayloadString(payload, "request_id") ?? clientRequestId;
+  const rawClientRequestId = getPayloadString(payload, "client_request_id");
+  const rawRequestId = getPayloadString(payload, "request_id") ?? rawClientRequestId;
+  if (!rawRequestId) {
+    return { error: invalidRequest("request_id is required", null, null) };
+  }
+
+  const { request_id: requestId, client_request_id: normalizedClientRequestId } =
+    normalizeRequestIdentifiers({
+      request_id: rawRequestId,
+      client_request_id: rawClientRequestId ?? undefined,
+    });
+  const clientRequestId = normalizedClientRequestId ?? null;
   const prompt = getPayloadString(payload, "prompt");
   const context = getPayloadString(payload, "context");
   const model = getPayloadString(payload, "model");
@@ -192,13 +208,11 @@ async function parseRequestPayload(req: Request): Promise<ParseResult> {
     typeof payload.policy_context === "object" && payload.policy_context !== null
       ? (payload.policy_context as ParsedPayload["policyContext"])
       : undefined;
+  const agentId = getPayloadString(payload, "agent_id") ?? undefined;
+  const intentId = getPayloadString(payload, "intent_id") ?? undefined;
 
   if (!prompt || !context) {
     return { error: invalidRequest("prompt and context are required", requestId, clientRequestId) };
-  }
-
-  if (!requestId) {
-    return { error: invalidRequest("request_id is required", requestId, clientRequestId) };
   }
 
   const docFrontier = getPayloadString(payload, "doc_frontier");
@@ -240,7 +254,9 @@ async function parseRequestPayload(req: Request): Promise<ParseResult> {
       hashes,
       requestId,
       clientRequestId,
-      policyContext,
+      policyContext: policyContext ?? { policy_id: DEFAULT_POLICY_MANIFEST.policy_id },
+      agentId,
+      intentId,
     },
   };
 }
@@ -248,11 +264,19 @@ async function parseRequestPayload(req: Request): Promise<ParseResult> {
 function providerErrorResponse(
   error: ProviderResolutionError,
   requestId: string | null,
-  clientRequestId: string | null
+  clientRequestId: string | null,
+  extra: {
+    policyContext?: ParsedPayload["policyContext"];
+    agentId?: string;
+    intentId?: string;
+  } = {}
 ): Response {
   if (error.code === "provider_not_configured" || error.code === "no_provider_configured") {
     return jsonErrorResponse(500, "CONFIG_ERROR", error.message, {
       ...buildRequestIdFields(requestId, clientRequestId),
+      ...(extra.policyContext ? { policy_context: extra.policyContext } : {}),
+      ...(extra.agentId ? { agent_id: extra.agentId } : {}),
+      ...(extra.intentId ? { intent_id: extra.intentId } : {}),
     });
   }
 
@@ -274,8 +298,19 @@ export async function POST(req: Request) {
     clientRequestId,
     model,
     policyContext,
+    agentId,
+    intentId,
   } = parsed.payload;
   const contextHash = await computeOptimisticHash(context);
+
+  if (policyContext?.policy_id && policyContext.policy_id !== DEFAULT_POLICY_MANIFEST.policy_id) {
+    return jsonErrorResponse(400, "INVALID_REQUEST", "policy_context.policy_id is not supported", {
+      ...buildRequestIdFields(requestId, clientRequestId),
+      policy_context: policyContext,
+      agent_id: agentId,
+      intent_id: intentId,
+    });
+  }
 
   if (hashes.some((hash) => hash !== contextHash)) {
     console.warn("[AI API] Context hash mismatch", {
@@ -285,6 +320,9 @@ export async function POST(req: Request) {
     });
     return jsonErrorResponse(409, "CONFLICT", "Context hash mismatch", {
       ...buildRequestIdFields(requestId, clientRequestId),
+      policy_context: policyContext,
+      agent_id: agentId,
+      intent_id: intentId,
       current_frontier: parsedFrontier,
       current_hash: contextHash,
     });
@@ -296,14 +334,23 @@ export async function POST(req: Request) {
   });
 
   if (resolved.error) {
-    return providerErrorResponse(resolved.error, requestId, clientRequestId);
+    return providerErrorResponse(resolved.error, requestId, clientRequestId, {
+      policyContext,
+      agentId,
+      intentId,
+    });
   }
 
   if (!resolved.target) {
     return providerErrorResponse(
       { code: "no_provider_configured", message: "No AI provider configured" },
       requestId,
-      clientRequestId
+      clientRequestId,
+      {
+        policyContext,
+        agentId,
+        intentId,
+      }
     );
   }
 
@@ -317,6 +364,12 @@ export async function POST(req: Request) {
     }
     if (policyContext?.policy_id) {
       headers.set("x-policy-id", policyContext.policy_id);
+    }
+    if (agentId) {
+      headers.set("x-agent-id", agentId);
+    }
+    if (intentId) {
+      headers.set("x-intent-id", intentId);
     }
     return new Response(response.body, { status: response.status, headers });
   } catch (error) {

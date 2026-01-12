@@ -92,6 +92,8 @@ function ModelBadge({
 }) {
   const providerColors: Record<string, string> = {
     openai: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30",
+    claude: "bg-orange-500/10 text-orange-600 border-orange-500/30",
+    gemini: "bg-blue-500/10 text-blue-600 border-blue-500/30",
     anthropic: "bg-orange-500/10 text-orange-600 border-orange-500/30",
     google: "bg-blue-500/10 text-blue-600 border-blue-500/30",
     deepseek: "bg-indigo-500/10 text-indigo-600 border-indigo-500/30",

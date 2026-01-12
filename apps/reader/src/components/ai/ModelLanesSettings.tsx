@@ -6,21 +6,21 @@ import { type LaneId, type ProviderId, useProviderConfig } from "@/context/Provi
 
 /** Available models for each lane type */
 const FAST_LANE_MODELS = [
-  { id: "gpt-4o-mini", label: "GPT-4o Mini", provider: "openai" as ProviderId },
-  { id: "claude-3-haiku-20240307", label: "Claude 3 Haiku", provider: "anthropic" as ProviderId },
-  { id: "gemini-1.5-flash", label: "Gemini Flash 1.5", provider: "google" as ProviderId },
-  { id: "deepseek-chat", label: "DeepSeek Chat", provider: "deepseek" as ProviderId },
+  { id: "gpt-5.2-instant", label: "GPT-5.2 Instant", provider: "openai" as ProviderId },
+  { id: "claude-sonnet-4-5", label: "Claude 4.5 Sonnet", provider: "claude" as ProviderId },
+  { id: "gemini-3-flash", label: "Gemini 3 Flash", provider: "gemini" as ProviderId },
+  { id: "deepseek-v3", label: "DeepSeek V3", provider: "deepseek" as ProviderId },
 ];
 
 const DEEP_LANE_MODELS = [
-  { id: "gpt-4o", label: "GPT-4o", provider: "openai" as ProviderId },
+  { id: "gpt-5.2-pro", label: "GPT-5.2 Pro", provider: "openai" as ProviderId },
   {
-    id: "claude-3-5-sonnet-20241022",
-    label: "Claude 3.5 Sonnet",
-    provider: "anthropic" as ProviderId,
+    id: "claude-opus-4-5",
+    label: "Claude 4.5 Opus",
+    provider: "claude" as ProviderId,
   },
-  { id: "gemini-1.5-pro", label: "Gemini Pro 1.5", provider: "google" as ProviderId },
-  { id: "deepseek-reasoner", label: "DeepSeek Reasoner", provider: "deepseek" as ProviderId },
+  { id: "gemini-3-pro-high", label: "Gemini 3 Pro High", provider: "gemini" as ProviderId },
+  { id: "deepseek-r1", label: "DeepSeek R1", provider: "deepseek" as ProviderId },
 ];
 
 export function ModelLanesSettings() {

@@ -10,6 +10,7 @@ describe("AI envelope helpers", () => {
   it("creates a request envelope with generated request_id and legacy alias preserved", () => {
     const envelope = createAIRequestEnvelope({
       docFrontier: "f:1",
+      docFrontierTag: "f:1-legacy",
       opsXml: "<replace_spans></replace_spans>",
       preconditions: [],
       agentId: "agent-1",
@@ -19,6 +20,7 @@ describe("AI envelope helpers", () => {
     expect(envelope.request_id).toBe("legacy-req");
     expect(envelope.client_request_id).toBe("legacy-req");
     expect(envelope.doc_frontier).toBe("f:1");
+    expect(envelope.doc_frontier_tag).toBe("f:1-legacy");
     expect(envelope.agent_id).toBe("agent-1");
   });
 
@@ -30,11 +32,13 @@ describe("AI envelope helpers", () => {
       agent_id: "agent-2",
       ops_xml: "<op/>",
       preconditions: [],
+      doc_frontier_tag: "f:2-legacy",
     };
 
     const normalized = normalizeAIRequestEnvelope(envelope);
     expect(normalized.request_id).toBe("client-only");
     expect(normalized.client_request_id).toBe("client-only");
+    expect(normalized.doc_frontier_tag).toBe("f:2-legacy");
   });
 
   it("generates request_id when none provided", () => {

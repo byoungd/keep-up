@@ -173,6 +173,36 @@ export function buildAICommitOrigin(source?: string): string {
 }
 
 /**
+ * Build a commit origin string including AI request metadata.
+ * Keeps the payload small and sanitized for logs.
+ */
+export function buildAICommitOriginWithMeta(options: {
+  source?: string;
+  requestId?: string;
+  agentId?: string;
+  intentId?: string;
+}): string {
+  const base = buildAICommitOrigin(options.source);
+  const parts: string[] = [];
+  const sanitize = (value: string) => value.replace(/[^a-zA-Z0-9_-]/g, "_");
+
+  if (options.requestId) {
+    parts.push(`req_${sanitize(options.requestId)}`);
+  }
+  if (options.agentId) {
+    parts.push(`agent_${sanitize(options.agentId)}`);
+  }
+  if (options.intentId) {
+    parts.push(`intent_${sanitize(options.intentId)}`);
+  }
+
+  if (parts.length === 0) {
+    return base;
+  }
+  return `${base}:${parts.join(":")}`;
+}
+
+/**
  * Detect if a transaction appears to be an AI write without gateway metadata.
  * Used for runtime bypass detection in D3.
  *
