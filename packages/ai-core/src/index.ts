@@ -281,6 +281,17 @@ export {
 } from "./types";
 
 // ============================================================================
+// Catalog - Shared model capabilities
+// ============================================================================
+export {
+  MODEL_CATALOG,
+  type ModelCapability,
+  type ProviderKind,
+  getDefaultModelId,
+  getModelCapability,
+} from "./catalog/models";
+
+// ============================================================================
 // Observability - Enhanced Telemetry & Profiling
 // ============================================================================
 export {

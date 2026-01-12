@@ -1,45 +1,4 @@
-export type ModelCapability = {
-  id: string;
-  label: string;
-  shortLabel?: string;
-  description?: string;
-  provider:
-    | "gemini"
-    | "claude"
-    | "openai"
-    | "deepseek"
-    | "meta"
-    | "alibaba"
-    | "minimax"
-    | "moonshot"
-    | "xai"
-    | "zai"
-    | "stealth";
-  group:
-    | "Gemini"
-    | "Claude"
-    | "GPT-5"
-    | "GPT-4"
-    | "O3"
-    | "DeepSeek"
-    | "Llama 4"
-    | "Llama 3"
-    | "Qwen"
-    | "MiniMax"
-    | "Moonshot"
-    | "Grok"
-    | "Zhipu"
-    | "Stealth";
-  contextWindow: number;
-  supports: {
-    vision: boolean;
-    tools: boolean;
-    thinking: boolean;
-  };
-  tags: string[];
-  default?: boolean;
-  legacy?: boolean;
-};
+import type { ModelCapability } from "@keepup/ai-core";
 
 export const MODEL_CAPABILITIES: ModelCapability[] = [
   // --- Google Gemini (Current) ---
