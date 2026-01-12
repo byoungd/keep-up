@@ -110,6 +110,7 @@ apps/web/drizzle/*.db
 .playwright-mcp
 .claude
 *.bak
+coverage/.tmp
 
 # Playwright
 /test-results/
@@ -122,6 +123,8 @@ apps/web/drizzle/*.db
 e2e/test-results/
 e2e/playwright-report/
 e2e/artifacts/
+e2e/__snapshots__/
+e2e/.temp/
 
 perf-artifacts/
 *.heapsnapshot
@@ -133,16 +136,49 @@ packages/mdvp-wasm/pkg/*
 !packages/mdvp-wasm/pkg/mdvp_wasm.d.ts
 !packages/mdvp-wasm/pkg/package.json
 
+implementation_plan.md
+walkthrough.md
+task.md
 
-# Agent
- .agent
- .kiro
- .claude
+# lfcc
+.lfcc
+
+# Agent (keep .agent, it contains project documentation)
+# Ignore only runtime/generated agent files
+.kiro/
+.claude/
 
 # Turbo
-.turbo
+.turbo/
 
 # Storybook
 storybook-static/
 
+# IDE and Editor caches
+.vscode/settings.json
+.vscode/.history/
+.vscode/launch.json
+.vscode/extensions.json
+.cursor/
+.cursorignore
+.idea/
+.DS_Store
+
+# Node debugging
+.node-debug.log*
+.node-inspector/
+
+# System and temporary files
+*.swp
+*.swo
+*~
+.cache/
+.tmp/
+
+# Build and dist
+dist/
+build/
+*.tsbuildinfo
+
 *.txt
+*.log

@@ -1,0 +1,72 @@
+{
+  "name": "keep-up",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.28.0",
+  "scripts": {
+    "dev": "turbo run dev --filter=@keepup/reader",
+    "dev:reader": "turbo run dev --filter=@keepup/reader",
+    "dev:desktop": "concurrently -k -n web,desktop \"pnpm dev:reader\" \"pnpm --filter @keepup/desktop dev\"",
+    "build": "turbo run build",
+    "start:reader": "pnpm --filter @keepup/reader start",
+    "test": "pnpm test:unit",
+    "test:unit": "vitest run",
+    "test:unit:ci": "vitest run --coverage",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:core": "playwright test e2e/editor-*.spec.ts e2e/editing-kernel.spec.ts e2e/real-editor.spec.ts e2e/selection-*.spec.ts e2e/verify-cursors.spec.ts",
+    "test:e2e:blocks": "playwright test e2e/block-*.spec.ts",
+    "test:e2e:collab": "playwright test e2e/collab-*.spec.ts e2e/multi-client.spec.ts e2e/structural-ordering-*.spec.ts e2e/lfcc-collab.spec.ts",
+    "test:e2e:annotations": "playwright test e2e/annotation-*.spec.ts e2e/annotations.spec.ts",
+    "test:e2e:features": "playwright test e2e/import.spec.ts e2e/slash-menu.spec.ts e2e/notes-and-share.spec.ts e2e/persistence.spec.ts e2e/ai-gateway*.spec.ts e2e/offline-resume.spec.ts",
+    "test:e2e:smoke": "playwright test e2e/smoke.spec.ts",
+    "test:e2e:a11y": "playwright test e2e/a11y-smoke.spec.ts",
+    "test:e2e:full": "NEXT_DISABLE_DEV_OVERLAY=1 PLAYWRIGHT_REUSE_EXISTING_SERVER=1 PLAYWRIGHT_WORKERS=1 playwright test",
+    "test:pr": "pnpm test:unit",
+    "test:ci": "pnpm test:unit:ci && pnpm test:e2e",
+    "test:nightly": "pnpm test:unit:ci && pnpm test:e2e",
+    "perf:gate": "node scripts/perf-gate.mjs --baseline artifacts/perf-baseline.json --metrics artifacts/perf-metrics.json",
+    "test:visual": "playwright test visual-regression.spec.ts",
+    "test:visual:update": "playwright test visual-regression.spec.ts --update-snapshots",
+    "perf:baseline": "node scripts/lfcc-perf-baseline.mjs",
+    "lint": "turbo run lint && biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "typecheck": "turbo run typecheck",
+    "prepare": "husky",
+    "release": "turbo run build && changeset publish"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.11.0",
+    "@biomejs/biome": "^1.9.4",
+    "@changesets/cli": "^2.29.8",
+    "@playwright/test": "^1.45.0",
+    "@types/node": "^20.12.12",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitest/coverage-v8": "^4.0.0",
+    "concurrently": "^9.2.1",
+    "eslint": "^9.14.0",
+    "fast-check": "^4.5.3",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
+    "tsx": "^4.21.0",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2",
+    "vitest": "^4.0.0"
+  },
+  "dependencies": {
+    "framer-motion": "^12.23.26",
+    "prosemirror-dropcursor": "^1.8.2",
+    "prosemirror-inputrules": "^1.5.1",
+    "prosemirror-schema-list": "^1.5.1"
+  },
+  "pnpm": {
+    "overrides": {
+      "prosemirror-model": "1.25.4",
+      "prosemirror-state": "1.4.4",
+      "prosemirror-view": "1.41.4"
+    }
+  }
+}

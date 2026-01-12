@@ -1,0 +1,41 @@
+name: Core Stress
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * *"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  stress:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run core stress scripts
+        run: |
+          mkdir -p test-results
+          bash scripts/lfcc-stress.sh | tee test-results/core-stress.log
+
+      - name: Upload stress log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-stress-log
+          path: test-results/core-stress.log

@@ -1,0 +1,63 @@
+name: Fuzz Gate
+
+on:
+  schedule:
+    # Run nightly at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: 'Fuzz seed (blank for commit-based)'
+        required: false
+        type: string
+      iterations:
+        description: 'Number of iterations'
+        required: false
+        default: '50'
+        type: string
+
+concurrency:
+  group: fuzz-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build core packages
+        run: pnpm build --filter @keepup/core
+
+      - name: Run Fuzz Gate
+        env:
+          FUZZ_GATE_ARTIFACTS: '1'
+          FUZZ_GATE_SEED: ${{ github.event.inputs.seed || '' }}
+          FUZZ_GATE_ITERATIONS: ${{ github.event.inputs.iterations || '50' }}
+          FUZZ_GATE_OPS: '200'
+          FUZZ_GATE_TIME_CAP_MS: '300000'
+        run: bash scripts/fuzz-gate.sh
+
+      - name: Upload fuzz artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-artifacts-${{ github.run_id }}
+          path: |
+            artifacts/fuzz/
+            .fuzz-artifacts/
+          retention-days: 30
