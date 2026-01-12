@@ -1,0 +1,35 @@
+{
+  "name": "@keepup/db",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./web": {
+      "types": "./src/web/index.ts",
+      "default": "./src/web/index.ts"
+    },
+    "./worker": {
+      "types": "./src/worker/index.ts",
+      "default": "./src/worker/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@packages/ingest-rss": "workspace:^",
+    "@packages/ingest-youtube": "workspace:^",
+    "@keepup/lfcc-bridge": "workspace:*",
+    "@sqlite.org/sqlite-wasm": "^3.49.0-build1",
+    "dexie": "^4.0.10"
+  },
+  "devDependencies": {
+    "marked": "^17.0.1",
+    "typescript": "5.6.3"
+  }
+}
