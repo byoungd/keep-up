@@ -443,6 +443,15 @@ export class LoroDocumentFacade implements DocumentFacade {
   // Comment API
   // ============================================================================
 
+  getCommentAnnotationIds(): string[] {
+    const doc = this.runtime.doc;
+    const commentsMap = doc.getMap(COMMENTS_KEY);
+    const keys = commentsMap.keys();
+    const annotationIds = keys.filter((key): key is string => typeof key === "string");
+    annotationIds.sort();
+    return annotationIds;
+  }
+
   getComments(annotationId: string): Comment[] {
     const doc = this.runtime.doc;
     const commentsMap = doc.getMap(COMMENTS_KEY);

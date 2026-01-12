@@ -41,17 +41,26 @@ type CommentStore = CommentState & CommentActions;
 function syncStateFromFacade(facade: DocumentFacade): Record<string, UIComment[]> {
   // Get all annotation IDs from annotations
   const annotations = facade.getAnnotations();
+  const annotationIds = new Set<string>();
   const result: Record<string, UIComment[]> = {};
 
   for (const annotation of annotations) {
-    const comments = facade.getComments(annotation.id);
-    if (comments.length > 0) {
-      result[annotation.id] = comments.map((c) => ({ ...c, pending: false }));
-    }
+    annotationIds.add(annotation.id);
   }
 
   // Also check for comments on annotations we might not have in getAnnotations()
   // This handles the case where comments exist but annotation list is stale
+  for (const annotationId of facade.getCommentAnnotationIds()) {
+    annotationIds.add(annotationId);
+  }
+
+  for (const annotationId of annotationIds) {
+    const comments = facade.getComments(annotationId);
+    if (comments.length > 0) {
+      result[annotationId] = comments.map((comment) => ({ ...comment, pending: false }));
+    }
+  }
+
   return result;
 }
 

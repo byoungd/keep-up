@@ -466,6 +466,9 @@ export interface DocumentFacade {
 
   // === Comment API (Parallel Container) ===
 
+  /** Get annotation IDs that have comment threads */
+  getCommentAnnotationIds(): string[];
+
   /** Get comments for an annotation */
   getComments(annotationId: string): Comment[];
 
