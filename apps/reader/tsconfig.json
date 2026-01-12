@@ -6,7 +6,9 @@
     "paths": {
       "@/*": ["./src/*"],
       "@keepup/agent-runtime": ["../../packages/agent-runtime/src"],
-      "@keepup/agent-runtime/*": ["../../packages/agent-runtime/src/*"]
+      "@keepup/agent-runtime/*": ["../../packages/agent-runtime/src/*"],
+      "@keepup/lfcc-bridge": ["../../packages/lfcc-bridge/src/index.ts"],
+      "@keepup/lfcc-bridge/facade": ["../../packages/lfcc-bridge/src/facade/index.ts"]
     },
     "noEmit": true,
     "types": ["node"]

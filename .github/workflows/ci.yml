@@ -35,6 +35,9 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      - name: UI Contract
+        run: pnpm ui:contract
+
   typecheck:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -166,4 +169,3 @@ jobs:
 
       - name: UI Integration Gate
         run: bash scripts/ui-gate.sh
-
