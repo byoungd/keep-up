@@ -113,108 +113,23 @@ export class RolloutPolicyEngine {
       policyVersion: this.config.version,
     };
 
-    // Evaluate AI collab status
     const aiCollabEnabled = this.evaluateAiCollab(input);
-
-    // 1. Kill switch (highest priority)
-    if (this.config.killSwitch) {
-      return {
-        ...baseResult,
-        collabEnabled: false,
-        aiCollabEnabled: false,
-        reason: "kill_switch_active",
-      };
+    const blockingReason = this.getBlockingReason(input);
+    if (blockingReason) {
+      return this.disableResult(baseResult, blockingReason);
     }
 
-    // 2. User denylist
-    if (input.userId && this.config.userDenylist?.includes(input.userId)) {
-      return {
-        ...baseResult,
-        collabEnabled: false,
-        aiCollabEnabled: false,
-        reason: "user_denylisted",
-      };
+    const allowResult = this.getAllowResult(input, baseResult, aiCollabEnabled);
+    if (allowResult) {
+      return allowResult;
     }
 
-    // 3. Doc denylist
-    if (this.config.docDenylist?.includes(input.docId)) {
-      return {
-        ...baseResult,
-        collabEnabled: false,
-        aiCollabEnabled: false,
-        reason: "doc_denylisted",
-      };
+    const percentageResult = this.evaluatePercentageRollout(input, baseResult, aiCollabEnabled);
+    if (percentageResult) {
+      return percentageResult;
     }
 
-    // 4. Version gating
-    if (this.config.minClientVersion && input.clientVersion) {
-      if (!this.isVersionSatisfied(input.clientVersion, this.config.minClientVersion)) {
-        return {
-          ...baseResult,
-          collabEnabled: false,
-          aiCollabEnabled: false,
-          reason: "client_version_too_old",
-        };
-      }
-    }
-
-    // 5. User allowlist
-    if (input.userId && this.config.userAllowlist?.includes(input.userId)) {
-      return {
-        ...baseResult,
-        collabEnabled: true,
-        aiCollabEnabled,
-        reason: "user_allowlisted",
-      };
-    }
-
-    // 6. Doc allowlist
-    if (this.config.docAllowlist?.includes(input.docId)) {
-      return {
-        ...baseResult,
-        collabEnabled: true,
-        aiCollabEnabled,
-        reason: "doc_allowlisted",
-      };
-    }
-
-    // 7. Team allowlist
-    if (input.teamId && this.config.teamAllowlist?.includes(input.teamId)) {
-      return {
-        ...baseResult,
-        collabEnabled: true,
-        aiCollabEnabled,
-        reason: "team_allowlisted",
-      };
-    }
-
-    // 8. Percentage rollout (by user ID hash)
-    if (
-      this.config.rolloutPercentage !== undefined &&
-      this.config.rolloutPercentage > 0 &&
-      input.userId
-    ) {
-      const bucket = this.getUserBucket(input.userId);
-      if (bucket < this.config.rolloutPercentage) {
-        return {
-          ...baseResult,
-          collabEnabled: true,
-          aiCollabEnabled,
-          reason: `percentage_rollout_bucket_${bucket}`,
-        };
-      }
-    }
-
-    // 9. Environment defaults
-    const envEnabled = this.config.environmentDefaults?.[input.environment] ?? false;
-    return {
-      ...baseResult,
-      collabEnabled: envEnabled,
-      aiCollabEnabled: envEnabled && aiCollabEnabled,
-      reason: envEnabled
-        ? `environment_${input.environment}_enabled`
-        : `environment_${input.environment}_disabled`,
-    };
+    return this.environmentResult(input, baseResult, aiCollabEnabled);
   }
 
   /**
@@ -301,5 +216,95 @@ export class RolloutPolicyEngine {
       }
     }
     return true; // Equal versions
+  }
+
+  private getBlockingReason(input: RolloutPolicyInput): string | null {
+    if (this.config.killSwitch) {
+      return "kill_switch_active";
+    }
+    if (input.userId && this.config.userDenylist?.includes(input.userId)) {
+      return "user_denylisted";
+    }
+    if (this.config.docDenylist?.includes(input.docId)) {
+      return "doc_denylisted";
+    }
+    if (
+      this.config.minClientVersion &&
+      input.clientVersion &&
+      !this.isVersionSatisfied(input.clientVersion, this.config.minClientVersion)
+    ) {
+      return "client_version_too_old";
+    }
+    return null;
+  }
+
+  private getAllowResult(
+    input: RolloutPolicyInput,
+    baseResult: Omit<RolloutPolicyResult, "collabEnabled" | "aiCollabEnabled" | "reason">,
+    aiCollabEnabled: boolean
+  ): RolloutPolicyResult | null {
+    if (input.userId && this.config.userAllowlist?.includes(input.userId)) {
+      return { ...baseResult, collabEnabled: true, aiCollabEnabled, reason: "user_allowlisted" };
+    }
+    if (this.config.docAllowlist?.includes(input.docId)) {
+      return { ...baseResult, collabEnabled: true, aiCollabEnabled, reason: "doc_allowlisted" };
+    }
+    if (input.teamId && this.config.teamAllowlist?.includes(input.teamId)) {
+      return { ...baseResult, collabEnabled: true, aiCollabEnabled, reason: "team_allowlisted" };
+    }
+    return null;
+  }
+
+  private evaluatePercentageRollout(
+    input: RolloutPolicyInput,
+    baseResult: Omit<RolloutPolicyResult, "collabEnabled" | "aiCollabEnabled" | "reason">,
+    aiCollabEnabled: boolean
+  ): RolloutPolicyResult | null {
+    if (
+      this.config.rolloutPercentage === undefined ||
+      this.config.rolloutPercentage <= 0 ||
+      !input.userId
+    ) {
+      return null;
+    }
+
+    const bucket = this.getUserBucket(input.userId);
+    if (bucket < this.config.rolloutPercentage) {
+      return {
+        ...baseResult,
+        collabEnabled: true,
+        aiCollabEnabled,
+        reason: `percentage_rollout_bucket_${bucket}`,
+      };
+    }
+    return null;
+  }
+
+  private environmentResult(
+    input: RolloutPolicyInput,
+    baseResult: Omit<RolloutPolicyResult, "collabEnabled" | "aiCollabEnabled" | "reason">,
+    aiCollabEnabled: boolean
+  ): RolloutPolicyResult {
+    const envEnabled = this.config.environmentDefaults?.[input.environment] ?? false;
+    return {
+      ...baseResult,
+      collabEnabled: envEnabled,
+      aiCollabEnabled: envEnabled && aiCollabEnabled,
+      reason: envEnabled
+        ? `environment_${input.environment}_enabled`
+        : `environment_${input.environment}_disabled`,
+    };
+  }
+
+  private disableResult(
+    baseResult: Omit<RolloutPolicyResult, "collabEnabled" | "aiCollabEnabled" | "reason">,
+    reason: string
+  ): RolloutPolicyResult {
+    return {
+      ...baseResult,
+      collabEnabled: false,
+      aiCollabEnabled: false,
+      reason,
+    };
   }
 }

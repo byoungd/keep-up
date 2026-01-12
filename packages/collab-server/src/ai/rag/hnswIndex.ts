@@ -453,41 +453,51 @@ export class HNSWIndex {
     }
 
     const queryVector = new Float32Array(query);
-    const { topK, filter } = options;
+    const allowedIds = this.buildAllowedIds(options.filter);
+    if (allowedIds !== null && allowedIds.size === 0) {
+      return [];
+    }
 
-    // Get allowed node IDs if filtering by docIds
-    let allowedIds: Set<string> | null = null;
-    if (filter?.docIds && filter.docIds.length > 0) {
-      allowedIds = new Set();
-      for (const docId of filter.docIds) {
-        const chunkIds = this.docIndex.get(docId);
-        if (chunkIds) {
-          for (const id of chunkIds) {
-            allowedIds.add(id);
-          }
-        }
+    const entryPoint = this.findEntryPoint(queryVector);
+    const candidates = this.searchLayer(queryVector, entryPoint, this.config.efSearch, 0);
+
+    return this.buildSearchResults(candidates, allowedIds, options.topK);
+  }
+
+  private buildAllowedIds(filter?: { docIds?: string[] }): Set<string> | null {
+    if (!filter?.docIds || filter.docIds.length === 0) {
+      return null;
+    }
+
+    const allowed = new Set<string>();
+    for (const docId of filter.docIds) {
+      const chunkIds = this.docIndex.get(docId);
+      if (!chunkIds) {
+        continue;
       }
-
-      if (allowedIds.size === 0) {
-        return [];
+      for (const id of chunkIds) {
+        allowed.add(id);
       }
     }
 
-    // Start from entry point
-    let currentId = this.entryPointId;
+    return allowed;
+  }
 
-    // Traverse from top level down to level 1
+  private findEntryPoint(queryVector: Float32Array): string {
+    let currentId = this.entryPointId as string;
     for (let level = this.maxLevel; level >= 1; level--) {
       currentId = this.greedyClosest(queryVector, currentId, level);
     }
+    return currentId;
+  }
 
-    // Search at level 0 with ef candidates
-    const candidates = this.searchLayer(queryVector, currentId, this.config.efSearch, 0);
-
-    // Filter and convert to results
+  private buildSearchResults(
+    candidates: Candidate[],
+    allowedIds: Set<string> | null,
+    topK: number
+  ): HNSWSearchResult[] {
     const results: HNSWSearchResult[] = [];
     for (const candidate of candidates) {
-      // Apply doc filter
       if (allowedIds && !allowedIds.has(candidate.id)) {
         continue;
       }
@@ -502,7 +512,6 @@ export class HNSWIndex {
         break;
       }
     }
-
     return results;
   }
 

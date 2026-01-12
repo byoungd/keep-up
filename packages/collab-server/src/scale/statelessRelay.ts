@@ -463,32 +463,49 @@ export class StatelessCollabRelay {
       return;
     }
 
-    // Handle snapshot responses specially
-    if (message.type === "SNAPSHOT_RESPONSE") {
-      const pending = this.pendingSnapshotRequests.get(docId);
-      if (pending) {
-        const payload = message.payload as { snapshot?: string; isBase64?: boolean };
-        if (payload.snapshot) {
-          clearTimeout(pending.timeout);
-          this.pendingSnapshotRequests.delete(docId);
-
-          const data = payload.isBase64
-            ? Buffer.from(payload.snapshot, "base64")
-            : new TextEncoder().encode(payload.snapshot);
-
-          pending.resolve(new Uint8Array(data));
-        }
-      }
+    if (this.handleSnapshotResponseMessage(docId, message)) {
       return;
     }
 
-    // Handle snapshot requests - respond if we have clients with snapshots
     if (message.type === "SNAPSHOT_REQUEST") {
       void this.handleRemoteSnapshotRequest(docId);
       return;
     }
 
-    // Convert to CollabMessage format for local broadcast
+    this.broadcastToRoom(room, docId, message);
+  }
+
+  private handleSnapshotResponseMessage(docId: string, message: RoutedMessage): boolean {
+    if (message.type !== "SNAPSHOT_RESPONSE") {
+      return false;
+    }
+
+    const pending = this.pendingSnapshotRequests.get(docId);
+    if (!pending) {
+      return true;
+    }
+
+    const payload = message.payload as { snapshot?: string; isBase64?: boolean };
+    if (!payload.snapshot) {
+      return true;
+    }
+
+    clearTimeout(pending.timeout);
+    this.pendingSnapshotRequests.delete(docId);
+
+    const data = payload.isBase64
+      ? Buffer.from(payload.snapshot, "base64")
+      : new TextEncoder().encode(payload.snapshot);
+
+    pending.resolve(new Uint8Array(data));
+    return true;
+  }
+
+  private broadcastToRoom(
+    room: Set<StatelessConnection>,
+    docId: string,
+    message: RoutedMessage
+  ): void {
     const collabMessage: CollabMessage = {
       type: message.type as CollabMessage["type"],
       docId,
@@ -496,7 +513,6 @@ export class StatelessCollabRelay {
       payload: message.payload,
     };
 
-    // Broadcast to all local connections
     for (const conn of room) {
       if (this.config.enableBatching) {
         this.batcher.add(conn.ws, collabMessage);

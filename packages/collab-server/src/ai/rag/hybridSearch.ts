@@ -89,30 +89,40 @@ export class KeywordIndex {
    * Remove chunks by document ID.
    */
   removeByDocId(docId: string): void {
-    const toRemove: string[] = [];
-
-    for (const [chunkId, entry] of this.index) {
-      if (entry.docId === docId) {
-        toRemove.push(chunkId);
-
-        // Remove from inverted index
-        for (const term of entry.terms.keys()) {
-          const chunkIds = this.invertedIndex.get(term);
-          if (chunkIds) {
-            chunkIds.delete(chunkId);
-            if (chunkIds.size === 0) {
-              this.invertedIndex.delete(term);
-            }
-          }
-        }
-      }
+    const entriesToRemove = this.getEntriesForDoc(docId);
+    if (entriesToRemove.length === 0) {
+      return;
     }
 
-    for (const chunkId of toRemove) {
+    for (const { chunkId, entry } of entriesToRemove) {
+      this.removeFromInvertedIndex(chunkId, entry.terms.keys());
       this.index.delete(chunkId);
     }
 
     this.updateStats();
+  }
+
+  private getEntriesForDoc(docId: string): Array<{ chunkId: string; entry: IndexEntry }> {
+    const entries: Array<{ chunkId: string; entry: IndexEntry }> = [];
+    for (const [chunkId, entry] of this.index) {
+      if (entry.docId === docId) {
+        entries.push({ chunkId, entry });
+      }
+    }
+    return entries;
+  }
+
+  private removeFromInvertedIndex(chunkId: string, terms: Iterable<string>): void {
+    for (const term of terms) {
+      const chunkIds = this.invertedIndex.get(term);
+      if (!chunkIds) {
+        continue;
+      }
+      chunkIds.delete(chunkId);
+      if (chunkIds.size === 0) {
+        this.invertedIndex.delete(term);
+      }
+    }
   }
 
   /**

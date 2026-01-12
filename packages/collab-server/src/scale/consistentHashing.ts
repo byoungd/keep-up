@@ -260,32 +260,43 @@ export class ConsistentHashRing {
       return null;
     }
 
-    // Find replicas if replication is enabled
+    const replicas = this.selectReplicas(primaryVNode, primary);
+
+    return { primary, replicas, hash };
+  }
+
+  private selectReplicas(
+    primaryVNode: (typeof this.ring)[number],
+    primary: ServerNode
+  ): ServerNode[] {
+    if (this.config.replicationFactor <= 1) {
+      return [];
+    }
+
     const replicas: ServerNode[] = [];
-    if (this.config.replicationFactor > 1) {
-      const seenNodes = new Set([primary.id]);
-      let pos = this.ring.indexOf(primaryVNode);
+    const seenNodes = new Set([primary.id]);
+    const startIndex = this.ring.indexOf(primaryVNode);
+    let pos = startIndex;
 
-      while (replicas.length < this.config.replicationFactor - 1) {
-        pos = (pos + 1) % this.ring.length;
-        const vnode = this.ring[pos];
+    while (replicas.length < this.config.replicationFactor - 1) {
+      pos = (pos + 1) % this.ring.length;
+      if (pos === startIndex) {
+        break;
+      }
 
-        if (!seenNodes.has(vnode.nodeId)) {
-          const node = this.nodes.get(vnode.nodeId);
-          if (node?.healthy) {
-            replicas.push(node);
-            seenNodes.add(vnode.nodeId);
-          }
-        }
+      const vnode = this.ring[pos];
+      if (seenNodes.has(vnode.nodeId)) {
+        continue;
+      }
 
-        // Prevent infinite loop
-        if (pos === this.ring.indexOf(primaryVNode)) {
-          break;
-        }
+      const node = this.nodes.get(vnode.nodeId);
+      if (node?.healthy) {
+        replicas.push(node);
+        seenNodes.add(vnode.nodeId);
       }
     }
 
-    return { primary, replicas, hash };
+    return replicas;
   }
 
   /**

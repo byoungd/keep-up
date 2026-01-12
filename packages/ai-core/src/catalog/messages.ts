@@ -7,6 +7,8 @@ export function normalizeMessages(messages: Message[]): Message[] {
 }
 
 export function withSystemPrompt(systemPrompt: string | undefined, messages: Message[]): Message[] {
-  if (!systemPrompt) return normalizeMessages(messages);
+  if (!systemPrompt) {
+    return normalizeMessages(messages);
+  }
   return normalizeMessages([{ role: "system", content: systemPrompt }, ...messages]);
 }

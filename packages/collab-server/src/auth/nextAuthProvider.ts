@@ -85,72 +85,91 @@ export class NextAuthProvider implements SessionAuthProvider {
   }
 
   async validate(token: string): Promise<SessionAuthResult> {
-    // Handle empty token
-    if (!token || token.length === 0) {
-      if (this.config.allowAnonymous) {
-        return this.createAnonymousSession();
-      }
-      throw createAuthFailure("MISSING_TOKEN", "Authentication token required", true);
+    const missingResult = this.handleMissingToken(token);
+    if (missingResult) {
+      return missingResult;
     }
 
     try {
-      // Verify JWT signature and decode payload
-      const payload = jwt.verify(token, this.config.secret, {
-        algorithms: ["HS256", "HS384", "HS512"],
-        clockTolerance: this.config.clockTolerance,
-        maxAge: `${this.config.maxAge}s`,
-      }) as NextAuthJwtPayload;
-
-      // Extract user ID
-      const userId = payload.sub ?? payload.email;
-      if (!userId) {
-        throw createAuthFailure("INVALID_TOKEN", "Token missing user identifier", false);
-      }
-
-      // Extract role
-      let role: AuthRole;
-      if (this.config.extractRole) {
-        role = this.config.extractRole(payload);
-      } else {
-        role = payload.role ?? this.config.defaultRole;
-      }
-
-      return {
-        userId,
-        role,
-        allowedDocIds: payload.docIds,
-        teamId: payload.teamId,
-        exp: payload.exp ? payload.exp * 1000 : undefined,
-        metadata: {
-          name: payload.name,
-          email: payload.email,
-          picture: payload.picture,
-        },
-      };
+      const payload = this.verifyToken(token);
+      const userId = this.resolveUserId(payload);
+      const role = this.resolveRole(payload);
+      return this.buildSessionResult(payload, userId, role);
     } catch (error) {
-      // Handle JWT-specific errors
-      if (error instanceof jwt.TokenExpiredError) {
-        throw createAuthFailure("TOKEN_EXPIRED", "Session has expired", true);
-      }
-      if (error instanceof jwt.NotBeforeError) {
-        throw createAuthFailure("INVALID_TOKEN", "Token not yet valid", true);
-      }
-      if (error instanceof jwt.JsonWebTokenError) {
-        throw createAuthFailure("INVALID_TOKEN", "Invalid session token", false);
-      }
-
-      // Re-throw auth failures
-      if (typeof error === "object" && error !== null && "code" in error) {
-        throw error;
-      }
-
-      // Wrap unknown errors
-      throw createAuthFailure(
-        "UNKNOWN",
-        error instanceof Error ? error.message : "Token validation failed",
-        false
-      );
+      throw this.normalizeError(error);
     }
+  }
+
+  private handleMissingToken(token: string | undefined): SessionAuthResult | null {
+    if (token && token.length > 0) {
+      return null;
+    }
+    if (this.config.allowAnonymous) {
+      return this.createAnonymousSession();
+    }
+    throw createAuthFailure("MISSING_TOKEN", "Authentication token required", true);
+  }
+
+  private verifyToken(token: string): NextAuthJwtPayload {
+    return jwt.verify(token, this.config.secret, {
+      algorithms: ["HS256", "HS384", "HS512"],
+      clockTolerance: this.config.clockTolerance,
+      maxAge: `${this.config.maxAge}s`,
+    }) as NextAuthJwtPayload;
+  }
+
+  private resolveUserId(payload: NextAuthJwtPayload): string {
+    const userId = payload.sub ?? payload.email;
+    if (!userId) {
+      throw createAuthFailure("INVALID_TOKEN", "Token missing user identifier", false);
+    }
+    return userId;
+  }
+
+  private resolveRole(payload: NextAuthJwtPayload): AuthRole {
+    if (this.config.extractRole) {
+      return this.config.extractRole(payload);
+    }
+    return payload.role ?? this.config.defaultRole;
+  }
+
+  private buildSessionResult(
+    payload: NextAuthJwtPayload,
+    userId: string,
+    role: AuthRole
+  ): SessionAuthResult {
+    return {
+      userId,
+      role,
+      allowedDocIds: payload.docIds,
+      teamId: payload.teamId,
+      exp: payload.exp ? payload.exp * 1000 : undefined,
+      metadata: {
+        name: payload.name,
+        email: payload.email,
+        picture: payload.picture,
+      },
+    };
+  }
+
+  private normalizeError(error: unknown): never {
+    if (error instanceof jwt.TokenExpiredError) {
+      throw createAuthFailure("TOKEN_EXPIRED", "Session has expired", true);
+    }
+    if (error instanceof jwt.NotBeforeError) {
+      throw createAuthFailure("INVALID_TOKEN", "Token not yet valid", true);
+    }
+    if (error instanceof jwt.JsonWebTokenError) {
+      throw createAuthFailure("INVALID_TOKEN", "Invalid session token", false);
+    }
+    if (typeof error === "object" && error !== null && "code" in error) {
+      throw error;
+    }
+    throw createAuthFailure(
+      "UNKNOWN",
+      error instanceof Error ? error.message : "Token validation failed",
+      false
+    );
   }
 
   /**

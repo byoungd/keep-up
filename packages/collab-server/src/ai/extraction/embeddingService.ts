@@ -78,78 +78,18 @@ export class EmbeddingService {
     options: { model?: string; skipCache?: boolean } = {}
   ): Promise<ChunkEmbedding[]> {
     const model = options.model ?? this.config.model;
-    const results: ChunkEmbedding[] = [];
-    const toEmbed: { chunk: DocumentChunk; index: number }[] = [];
-
-    // Check cache first
-    if (!options.skipCache) {
-      for (let i = 0; i < chunks.length; i++) {
-        const chunk = chunks[i];
-        const cached = this.getFromCache(chunk.id, model);
-        if (cached) {
-          results.push({
-            chunkId: chunk.id,
-            docId: chunk.docId,
-            embedding: cached.embedding,
-            model: cached.model,
-            dimensions: cached.embedding.length,
-            createdAt: Date.now(),
-          });
-        } else {
-          toEmbed.push({ chunk, index: i });
-        }
-      }
-    } else {
-      for (let i = 0; i < chunks.length; i++) {
-        toEmbed.push({ chunk: chunks[i], index: i });
-      }
-    }
-
-    // Embed uncached chunks in batches
-    for (let i = 0; i < toEmbed.length; i += this.config.batchSize) {
-      const batch = toEmbed.slice(i, i + this.config.batchSize);
-      const texts = batch.map((item) => item.chunk.content);
-
-      const response = await this.gateway.embed(texts, {
-        userId,
-        model,
-        dimensions: this.config.dimensions,
-      });
-
-      // Process results
-      for (let j = 0; j < batch.length; j++) {
-        const item = batch[j];
-        const embedding = response.embeddings[j];
-
-        if (embedding) {
-          const result: ChunkEmbedding = {
-            chunkId: item.chunk.id,
-            docId: item.chunk.docId,
-            embedding,
-            model: response.model,
-            dimensions: embedding.length,
-            createdAt: Date.now(),
-          };
-
-          results.push(result);
-
-          // Cache the result
-          if (!options.skipCache) {
-            this.addToCache(item.chunk.id, model, embedding);
-          }
-        }
-      }
-    }
-
-    // Sort results to match input order
-    const chunkIdOrder = new Map(chunks.map((c, i) => [c.id, i]));
-    results.sort((a, b) => {
-      const orderA = chunkIdOrder.get(a.chunkId) ?? 0;
-      const orderB = chunkIdOrder.get(b.chunkId) ?? 0;
-      return orderA - orderB;
-    });
-
-    return results;
+    const { cachedResults, toEmbed } = this.collectCachedEmbeddings(
+      chunks,
+      model,
+      options.skipCache === true
+    );
+    const embedded = await this.embedUncachedChunks(
+      toEmbed,
+      userId,
+      model,
+      options.skipCache === true
+    );
+    return this.sortResultsByInput([...cachedResults, ...embedded], chunks);
   }
 
   /**
@@ -182,6 +122,104 @@ export class EmbeddingService {
     }
 
     return embedding || [];
+  }
+
+  private collectCachedEmbeddings(
+    chunks: DocumentChunk[],
+    model: string,
+    skipCache: boolean
+  ): {
+    cachedResults: ChunkEmbedding[];
+    toEmbed: Array<{ chunk: DocumentChunk; index: number }>;
+  } {
+    const cachedResults: ChunkEmbedding[] = [];
+    const toEmbed: Array<{ chunk: DocumentChunk; index: number }> = [];
+
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      if (skipCache) {
+        toEmbed.push({ chunk, index: i });
+        continue;
+      }
+
+      const cached = this.getFromCache(chunk.id, model);
+      if (cached) {
+        cachedResults.push(this.toChunkEmbedding(chunk, cached.embedding, cached.model));
+      } else {
+        toEmbed.push({ chunk, index: i });
+      }
+    }
+
+    return { cachedResults, toEmbed };
+  }
+
+  private async embedUncachedChunks(
+    toEmbed: Array<{ chunk: DocumentChunk; index: number }>,
+    userId: string,
+    model: string,
+    skipCache: boolean
+  ): Promise<ChunkEmbedding[]> {
+    const results: ChunkEmbedding[] = [];
+
+    for (let i = 0; i < toEmbed.length; i += this.config.batchSize) {
+      const batch = toEmbed.slice(i, i + this.config.batchSize);
+      const response = await this.gateway.embed(
+        batch.map((item) => item.chunk.content),
+        {
+          userId,
+          model,
+          dimensions: this.config.dimensions,
+        }
+      );
+
+      this.collectBatchResults(batch, response.embeddings, response.model, skipCache, results);
+    }
+
+    return results;
+  }
+
+  private collectBatchResults(
+    batch: Array<{ chunk: DocumentChunk; index: number }>,
+    embeddings: Array<number[] | undefined>,
+    model: string,
+    skipCache: boolean,
+    results: ChunkEmbedding[]
+  ): void {
+    for (let j = 0; j < batch.length; j++) {
+      const embedding = embeddings[j];
+      if (!embedding) {
+        continue;
+      }
+
+      const result = this.toChunkEmbedding(batch[j].chunk, embedding, model);
+      results.push(result);
+
+      if (!skipCache) {
+        this.addToCache(batch[j].chunk.id, model, embedding);
+      }
+    }
+  }
+
+  private sortResultsByInput(results: ChunkEmbedding[], chunks: DocumentChunk[]): ChunkEmbedding[] {
+    const chunkIdOrder = new Map(chunks.map((c, i) => [c.id, i]));
+    return results
+      .slice()
+      .sort((a, b) => (chunkIdOrder.get(a.chunkId) ?? 0) - (chunkIdOrder.get(b.chunkId) ?? 0));
+  }
+
+  private toChunkEmbedding(
+    chunk: DocumentChunk,
+    embedding: number[],
+    model: string
+  ): ChunkEmbedding {
+    return {
+      chunkId: chunk.id,
+      docId: chunk.docId,
+      embedding,
+      model,
+      dimensions: embedding.length,
+      createdAt: Date.now(),
+    };
   }
 
   /**

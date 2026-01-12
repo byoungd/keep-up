@@ -448,27 +448,8 @@ export class HTMLExtractor extends BaseExtractor {
 
     let index = 0;
     for (const table of tableElements) {
-      const headers: string[] = [];
-      const rows: string[][] = [];
-
-      // Extract headers
-      const headerCells = table.querySelectorAll("thead th, tr:first-child th");
-      for (const cell of headerCells) {
-        headers.push(cell.textContent?.trim() || "");
-      }
-
-      // Extract rows
-      const bodyRows = table.querySelectorAll("tbody tr, tr");
-      for (const row of bodyRows) {
-        const cells = row.querySelectorAll("td");
-        if (cells.length > 0) {
-          const rowData: string[] = [];
-          for (const cell of cells) {
-            rowData.push(cell.textContent?.trim() || "");
-          }
-          rows.push(rowData);
-        }
-      }
+      const headers = this.extractTableHeaders(table);
+      const rows = this.extractTableRows(table);
 
       if (headers.length > 0 || rows.length > 0) {
         const caption = table.querySelector("caption")?.textContent?.trim();
@@ -477,5 +458,31 @@ export class HTMLExtractor extends BaseExtractor {
     }
 
     return tables;
+  }
+
+  private extractTableHeaders(table: Element): string[] {
+    const headers: string[] = [];
+    const headerCells = table.querySelectorAll("thead th, tr:first-child th");
+    for (const cell of headerCells) {
+      headers.push(cell.textContent?.trim() || "");
+    }
+    return headers;
+  }
+
+  private extractTableRows(table: Element): string[][] {
+    const rows: string[][] = [];
+    const bodyRows = table.querySelectorAll("tbody tr, tr");
+    for (const row of bodyRows) {
+      const cells = row.querySelectorAll("td");
+      if (cells.length === 0) {
+        continue;
+      }
+      const rowData: string[] = [];
+      for (const cell of cells) {
+        rowData.push(cell.textContent?.trim() || "");
+      }
+      rows.push(rowData);
+    }
+    return rows;
   }
 }

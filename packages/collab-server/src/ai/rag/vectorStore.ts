@@ -49,36 +49,43 @@ export class InMemoryVectorStore implements VectorStore {
     query: number[],
     options: { topK: number; filter?: { docIds?: string[] } }
   ): Promise<Array<{ id: string; similarity: number }>> {
-    const results: Array<{ id: string; similarity: number }> = [];
+    const candidates = this.getCandidates(options.filter);
+    const results = this.rankCandidates(query, candidates);
+    return results.slice(0, options.topK);
+  }
 
-    // Filter embeddings if docIds specified
-    let candidates: ChunkEmbedding[];
-    if (options.filter?.docIds && options.filter.docIds.length > 0) {
-      candidates = [];
-      for (const docId of options.filter.docIds) {
-        const chunkIds = this.docIndex.get(docId);
-        if (chunkIds) {
-          for (const chunkId of chunkIds) {
-            const emb = this.embeddings.get(chunkId);
-            if (emb) {
-              candidates.push(emb);
-            }
-          }
-        }
-      }
-    } else {
-      candidates = Array.from(this.embeddings.values());
+  private getCandidates(filter?: { docIds?: string[] }): ChunkEmbedding[] {
+    if (!filter?.docIds || filter.docIds.length === 0) {
+      return Array.from(this.embeddings.values());
     }
 
-    // Calculate similarities
+    const candidates: ChunkEmbedding[] = [];
+    for (const docId of filter.docIds) {
+      const chunkIds = this.docIndex.get(docId);
+      if (!chunkIds) {
+        continue;
+      }
+      for (const chunkId of chunkIds) {
+        const emb = this.embeddings.get(chunkId);
+        if (emb) {
+          candidates.push(emb);
+        }
+      }
+    }
+    return candidates;
+  }
+
+  private rankCandidates(
+    query: number[],
+    candidates: ChunkEmbedding[]
+  ): Array<{ id: string; similarity: number }> {
+    const results: Array<{ id: string; similarity: number }> = [];
     for (const emb of candidates) {
       const similarity = cosineSimilarity(query, emb.embedding);
       results.push({ id: emb.chunkId, similarity });
     }
-
-    // Sort by similarity (descending) and take top-k
     results.sort((a, b) => b.similarity - a.similarity);
-    return results.slice(0, options.topK);
+    return results;
   }
 
   /**
