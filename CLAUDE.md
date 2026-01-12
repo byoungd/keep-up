@@ -80,6 +80,7 @@ docs/                    # Product specs & documentation
 - [Agents.md](./Agents.md) - AI collaboration protocol
 - [.agent/](./.agent/) - Agent specs, quality gates, workflows
 - [docs/product/](./docs/product/) - Product specs & LFCC protocol
+- [docs/architecture/UI_CONTRACT.md](./docs/architecture/UI_CONTRACT.md) - UI ↔ LFCC Bridge contract
 
 ## LFCC Rules (Non-Negotiable)
 
@@ -88,6 +89,7 @@ docs/                    # Product specs & documentation
 3. **UTF-16 indices**: All text offsets use UTF-16 code units
 4. **Block ID rules**: Split=left keeps ID, Join=left keeps ID
 5. **Loro only**: Single CRDT source of truth, no Yjs
+6. **UI Contract**: UI depends on PM schema/Bridge API only, never direct Loro access
 
 ## E2E Testing Strategy
 

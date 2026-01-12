@@ -34,6 +34,15 @@ type ResearchCache = Map<
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Content item from client-side DB for RAG context */
+interface ContentItemInput {
+  id: string;
+  title: string;
+  content: string;
+  sourceUrl?: string;
+  sourceName?: string;
+}
+
 interface ResearchRequest {
   query: string;
   userId: string;
@@ -44,6 +53,8 @@ interface ResearchRequest {
   policy_context?: { policy_id?: string; redaction_profile?: string; data_access_profile?: string };
   agent_id?: string;
   intent_id?: string;
+  /** Content items from client-side DB (primary data source) */
+  contentItems?: ContentItemInput[];
 }
 
 interface Citation {
@@ -83,7 +94,7 @@ STRICT RULES:
 Format your response clearly with inline citations.`;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Mock Content Store (TODO: Replace with real implementation)
+// Content Processing
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface StoredContent {
@@ -94,11 +105,16 @@ interface StoredContent {
 }
 
 /**
- * Get content items for RAG context.
- * TODO: Replace with real database query to IndexedDB/SQLite.
+ * Transform client-provided content items to internal format.
+ * Content is provided by the client from their local DB (IndexedDB/SQLite).
  */
-async function getContentForQuery(_userId: string, _docIds?: string[]): Promise<StoredContent[]> {
-  return [];
+function transformContentItems(items: ContentItemInput[]): StoredContent[] {
+  return items.map((item) => ({
+    id: item.id,
+    title: item.title,
+    content: item.content,
+    source: item.sourceName ?? item.sourceUrl ?? "Imported content",
+  }));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -309,8 +325,9 @@ export async function POST(req: Request): Promise<Response> {
       return cachedResponse;
     }
 
-    // Get content for RAG
-    const contentItems = await getContentForQuery(body.userId, body.docIds);
+    // Transform client-provided content items for RAG
+    // Content is provided by the client from their local DB (IndexedDB/SQLite)
+    const contentItems = body.contentItems ? transformContentItems(body.contentItems) : [];
 
     // Handle empty content case
     if (contentItems.length === 0) {

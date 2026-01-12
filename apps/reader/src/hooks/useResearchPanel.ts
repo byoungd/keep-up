@@ -3,10 +3,12 @@
  *
  * Manages research panel state and RAG queries.
  * Handles search, results display, and citation tracking.
+ * Fetches content from local DB for RAG context.
  */
 
 "use client";
 
+import { getDbClient } from "@/lib/db";
 import { useCallback, useState } from "react";
 
 /** Citation for display */
@@ -55,6 +57,15 @@ export interface ResearchPanelState {
   history: ResearchResult[];
   /** Panel visibility */
   isOpen: boolean;
+}
+
+/** Content item for API request */
+interface ContentItemInput {
+  id: string;
+  title: string;
+  content: string;
+  sourceUrl?: string;
+  sourceName?: string;
 }
 
 /** Hook options */
@@ -119,6 +130,7 @@ export function useResearchPanel(options: UseResearchPanelOptions): UseResearchP
 
   /**
    * Execute search.
+   * Fetches content from local DB and sends to Research API for RAG.
    */
   const search = useCallback(async () => {
     if (!state.query.trim()) {
@@ -128,6 +140,19 @@ export function useResearchPanel(options: UseResearchPanelOptions): UseResearchP
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
     try {
+      // Fetch content items from local DB for RAG context
+      const db = await getDbClient();
+      const contentItems = await db.listContentItems({ limit: 50 });
+
+      // Transform to API format
+      const apiItems: ContentItemInput[] = contentItems.map((item) => ({
+        id: item.itemId,
+        title: item.title,
+        content: item.content,
+        sourceUrl: item.sourceUrl ?? undefined,
+        sourceName: item.source,
+      }));
+
       const response = await fetch(`${apiBaseUrl}/research`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -135,6 +160,7 @@ export function useResearchPanel(options: UseResearchPanelOptions): UseResearchP
           query: state.query,
           userId,
           docIds,
+          contentItems: apiItems,
         }),
       });
 
