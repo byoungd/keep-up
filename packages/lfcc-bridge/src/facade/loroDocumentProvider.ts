@@ -6,7 +6,7 @@
  */
 
 import { createHash } from "node:crypto";
-import type { gateway } from "@keepup/core";
+import { gateway } from "@keepup/core";
 import { readAllAnnotations } from "../annotations/annotationSchema";
 import { verifyAnnotationSpans } from "../annotations/verificationSync";
 import type { BlockNode } from "../crdt/crdtSchema";
@@ -284,4 +284,15 @@ export function createLoroDocumentProvider(
       return facade.docId === docId;
     },
   };
+}
+
+/**
+ * Create an AI Gateway instance wired to the Loro document provider.
+ */
+export function createLoroAIGateway(
+  facade: DocumentFacade,
+  runtime: LoroRuntime
+): gateway.AIGateway {
+  const provider = createLoroDocumentProvider(facade, runtime);
+  return gateway.createAIGatewayWithDefaults(provider);
 }

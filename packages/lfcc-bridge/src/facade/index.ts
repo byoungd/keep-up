@@ -40,4 +40,4 @@ export { FACADE_STRICT_MODE } from "./types";
 export { LoroDocumentFacade, createDocumentFacade } from "./documentFacade";
 
 // AI Gateway Integration
-export { createLoroDocumentProvider } from "./loroDocumentProvider";
+export { createLoroAIGateway, createLoroDocumentProvider } from "./loroDocumentProvider";
