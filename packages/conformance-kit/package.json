@@ -1,0 +1,25 @@
+{
+  "name": "@keepup/conformance-kit",
+  "version": "0.9.0",
+  "description": "LFCC v0.9 RC QA Conformance Kit - Fuzz + Semantic Double-Blind",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run --config vitest.config.ts",
+    "test:unit": "vitest run --config vitest.config.ts",
+    "conformance:run": "tsx src/cli/run.ts",
+    "conformance:replay": "tsx src/cli/replay.ts",
+    "conformance:ci-fast": "tsx src/cli/run.ts --seeds 50 --steps 200 --checkpoint-every 10",
+    "conformance:ci-nightly": "tsx src/cli/run.ts --seeds 500 --steps 2000 --checkpoint-every 1 --stress"
+  },
+  "dependencies": {
+    "@keepup/core": "workspace:*",
+    "@keepup/lfcc-bridge": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^1.6.0",
+    "tsx": "^4.0.0"
+  }
+}
