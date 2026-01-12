@@ -1,7 +1,7 @@
 # Collaborative Document UI Contract
 
 > **Status**: Frozen (v1.0)
-> **Last Updated**: 2025-01-12
+> **Last Updated**: 2026-01-13
 > **Scope**: UI ↔ LFCC Bridge architectural boundary
 
 ## Overview
@@ -204,10 +204,7 @@ UI_ROOTS=(
 )
 
 EXCEPTION_FILES=(
-  "apps/reader/src/components/lfcc/VirtualizedDocView.tsx"
   "apps/reader/src/components/lfcc/useLfccBridge.ts"
-  "apps/reader/src/components/editor/AIContextMenu.tsx"
-  "apps/reader/src/components/lfcc/DebugOverlay/LfccDebugOverlay.tsx"
 )
 
 report_violations "Direct loro-crdt imports found" "from ['\"]loro-crdt['\"]"
@@ -267,14 +264,14 @@ During PR review, check:
 
 ## Migration Path for Existing Violations
 
-### Current Violations (To Be Migrated)
+### Completed Migrations
 
-| File | Violation | Migration Target |
-|------|-----------|------------------|
-| `VirtualizedDocView.tsx` | `readBlockTree(runtime.doc)` | `facade.getBlocks()` |
+| File | Former Violation | Migration Applied |
+|------|------------------|-------------------|
+| `VirtualizedDocView.tsx` | `readBlockTree(runtime.doc)` | `createDocumentFacade(runtime).getBlocks()` |
 | `VirtualizedDocView.tsx` | `runtime.doc.subscribe()` | `facade.subscribe()` |
-| `AIContextMenu.tsx` | `runtime.doc.peerIdStr` | Bridge-provided peer ID accessor |
-| `LfccDebugOverlay.tsx` | `runtime.doc.peerIdStr` | Bridge diagnostics facade |
+| `AIContextMenu.tsx` | `runtime.doc.peerIdStr` | `runtime.peerId` accessor |
+| `LfccDebugOverlay.tsx` | `runtime.doc.peerIdStr` | `runtime.peerId` accessor |
 
 ### Migration Example
 
@@ -304,15 +301,13 @@ If a UI component genuinely needs direct Loro access (e.g., for debugging or ben
 
 | Component | Reason | Planned Migration |
 |-----------|--------|-------------------|
-| `VirtualizedDocView` | Legacy virtualization | Q1 2025 |
 | `useLfccBridge` | Bootstrap/initialization | N/A (bridge layer) |
-| `AIContextMenu` | Agent ID derives from peer ID | Expose peer ID via Bridge |
-| `LfccDebugOverlay` | Debug-only telemetry | Route through Bridge diagnostics |
 
 ## Version History
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.1 | 2026-01-13 | Migrated VirtualizedDocView, AIContextMenu, LfccDebugOverlay to contract-compliant APIs; added `runtime.peerId` accessor; reduced exceptions from 4 to 1 |
 | 1.0 | 2025-01-12 | Initial frozen contract |
 
 ---

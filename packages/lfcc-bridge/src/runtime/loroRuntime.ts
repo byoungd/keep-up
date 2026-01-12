@@ -65,6 +65,14 @@ export class LoroRuntime {
     this._isDegraded = value;
   }
 
+  /**
+   * Get the peer ID string for this runtime.
+   * Use this instead of doc.peerIdStr for UI contract compliance.
+   */
+  get peerId(): string {
+    return this.doc.peerIdStr;
+  }
+
   get frontiers(): LoroFrontiers {
     return this.doc.frontiers();
   }

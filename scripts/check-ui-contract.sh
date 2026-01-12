@@ -11,10 +11,7 @@ UI_ROOTS=(
 )
 
 EXCEPTION_FILES=(
-  "apps/reader/src/components/lfcc/VirtualizedDocView.tsx"
   "apps/reader/src/components/lfcc/useLfccBridge.ts"
-  "apps/reader/src/components/editor/AIContextMenu.tsx"
-  "apps/reader/src/components/lfcc/DebugOverlay/LfccDebugOverlay.tsx"
 )
 
 EXCLUDE_DIRS=(

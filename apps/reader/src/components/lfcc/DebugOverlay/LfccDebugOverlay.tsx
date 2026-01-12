@@ -211,7 +211,7 @@ function buildOverlaySnapshot(params: {
   const blockIndex = buildBlockIndex(view.state);
 
   next.document = {
-    docId: runtime.doc.peerIdStr,
+    docId: runtime.peerId,
     frontier: JSON.stringify(runtime.frontiers),
     blockCount: blockIndex.blockOrder.length,
     lastTxType: lastDirtyInfo?.opCodes?.[0] ?? null,

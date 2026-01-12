@@ -1,4 +1,4 @@
-import { type LoroRuntime, readBlockTree } from "@keepup/lfcc-bridge";
+import { type LoroRuntime, createDocumentFacade } from "@keepup/lfcc-bridge";
 import * as React from "react";
 
 type VirtualizedDocViewProps = {
@@ -22,20 +22,23 @@ export function VirtualizedDocView({ runtime, height = 480 }: VirtualizedDocView
   const [scrollTop, setScrollTop] = React.useState(0);
   const [heights, setHeights] = React.useState<HeightMap>({});
 
+  // Create facade once for the runtime
+  const facade = React.useMemo(() => createDocumentFacade(runtime), [runtime]);
+
   const computeRows = React.useCallback(() => {
-    const blocks = readBlockTree(runtime.doc);
+    const blocks = facade.getBlocks();
     return blocks.map((block) => ({
       id: block.id,
       text: flattenBlockText(block),
     }));
-  }, [runtime.doc]);
+  }, [facade]);
 
   React.useEffect(() => {
     const updateRows = () => setRows(computeRows());
-    const unsub = runtime.doc.subscribe(updateRows);
+    const unsub = facade.subscribe(updateRows);
     updateRows();
     return () => unsub();
-  }, [computeRows, runtime.doc]);
+  }, [computeRows, facade]);
 
   React.useEffect(() => {
     if (process.env.NODE_ENV === "production") {

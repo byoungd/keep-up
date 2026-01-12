@@ -241,9 +241,7 @@ export function AIContextMenu({ state, onClose, onReplace, onInsertBelow }: AICo
     const contextHash = await computeOptimisticHash(selectionText);
     setContextHash(contextHash);
     const requestId = crypto.randomUUID();
-    const agentId = lfcc?.runtime?.doc.peerIdStr
-      ? `ai-menu:${lfcc.runtime.doc.peerIdStr}`
-      : "ai-menu:local";
+    const agentId = lfcc?.runtime?.peerId ? `ai-menu:${lfcc.runtime.peerId}` : "ai-menu:local";
 
     return {
       ok: true,
