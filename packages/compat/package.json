@@ -1,0 +1,17 @@
+{
+  "name": "@keepup/compat",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@keepup/core": "workspace:*",
+    "@keepup/lfcc-bridge": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^1.2.0"
+  }
+}
