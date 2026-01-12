@@ -1,0 +1,12 @@
+{
+  "name": "@keepup/crypto",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    "./web": {
+      "types": "./src/web/index.ts",
+      "default": "./src/web/index.ts"
+    }
+  }
+}
