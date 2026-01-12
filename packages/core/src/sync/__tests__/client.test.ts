@@ -3,7 +3,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { computePolicyManifestHash } from "../../kernel/policy";
+import * as policyModule from "../../kernel/policy";
 import { SyncClient, type SyncClientConfig } from "../client";
 import { createDefaultSyncManifest, negotiateManifests } from "../negotiate";
 import { type HandshakeAckPayload, createMessage, serializeMessage } from "../protocol";
@@ -53,8 +53,8 @@ describe("Sync Client", () => {
   let config: SyncClientConfig;
   let _mockWs: MockWebSocket;
   const manifest = createDefaultSyncManifest();
-  const policyHash = "test-manifest-hash";
-  const hashSpy = vi.spyOn({ computePolicyManifestHash }, "computePolicyManifestHash");
+  const policyHash = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+  const hashSpy = vi.spyOn(policyModule, "computePolicyManifestHash");
 
   async function buildHandshakeAckPayload(): Promise<HandshakeAckPayload> {
     const negotiation = negotiateManifests(manifest, manifest);
@@ -62,7 +62,9 @@ describe("Sync Client", () => {
       throw new Error("Negotiation failed in test setup");
     }
 
-    const manifestHash = await computePolicyManifestHash(negotiation.effectiveManifest);
+    const manifestHash = await policyModule.computePolicyManifestHash(
+      negotiation.effectiveManifest
+    );
     return {
       server_manifest_v09: manifest,
       chosen_manifest_hash: manifestHash,
