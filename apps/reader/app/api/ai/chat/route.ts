@@ -10,19 +10,9 @@ import type { ModelCapability } from "@/lib/ai/models";
 import { type WorkflowType, getWorkflowSystemPrompt } from "@/lib/ai/workflowPrompts";
 import type { Message } from "@keepup/ai-core";
 import { computeOptimisticHash } from "@keepup/core";
-import { generateText, streamText } from "ai";
-import { toModelMessages } from "../messageUtils";
+import { completeWithProvider, streamProviderContent } from "../llmGateway";
 import { getDefaultChatModelId } from "../modelResolver";
-import {
-  createAnthropicClient,
-  createGoogleClient,
-  createOpenAIProvider,
-} from "../providerClients";
-import {
-  type ProviderResolutionError,
-  type ProviderTarget,
-  resolveProviderTarget,
-} from "../providerResolver";
+import { type ProviderResolutionError, resolveProviderTarget } from "../providerResolver";
 
 export const runtime = "nodejs";
 
@@ -124,80 +114,6 @@ function providerErrorResponse(error: ProviderResolutionError, requestId: string
       : "invalid_model";
   const status = code === "config_error" ? 500 : 400;
   return errorResponse(code, error.message, requestId, status);
-}
-
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: keeps provider-specific streaming branches
-async function* streamProviderContent(
-  target: ProviderTarget,
-  messages: Message[]
-): AsyncIterable<string> {
-  if (target.config.kind === "anthropic") {
-    const provider = createAnthropicClient(target.config);
-    for await (const chunk of provider.stream({ messages, model: target.modelId })) {
-      if (chunk.type === "content" && chunk.content) {
-        yield chunk.content;
-      }
-      if (chunk.type === "error") {
-        throw new Error(chunk.error);
-      }
-    }
-    return;
-  }
-
-  const modelMessages = toModelMessages(messages);
-
-  if (target.config.kind === "gemini") {
-    const google = createGoogleClient(target.config);
-    const result = await streamText({
-      model: google(target.modelId),
-      messages: modelMessages,
-    });
-    for await (const delta of result.textStream) {
-      if (delta) {
-        yield delta;
-      }
-    }
-    return;
-  }
-
-  const openai = createOpenAIProvider(target.config);
-  for await (const chunk of openai.stream({ messages, model: target.modelId })) {
-    if (chunk.type === "content" && chunk.content) {
-      yield chunk.content;
-    }
-    if (chunk.type === "error") {
-      throw new Error(chunk.error);
-    }
-  }
-}
-
-async function completeWithProvider(target: ProviderTarget, messages: Message[]): Promise<string> {
-  if (target.config.kind === "anthropic") {
-    const provider = createAnthropicClient(target.config);
-    const completion = await provider.complete({
-      messages,
-      model: target.modelId,
-    });
-    return completion.content;
-  }
-
-  const modelMessages = toModelMessages(messages);
-
-  if (target.config.kind === "gemini") {
-    const google = createGoogleClient(target.config);
-    const result = await generateText({
-      model: google(target.modelId),
-      messages: modelMessages,
-    });
-    return result.text;
-  }
-
-  const openai = createOpenAIProvider(target.config);
-  const completion = await openai.complete({
-    messages,
-    model: target.modelId,
-  });
-  return completion.content;
 }
 
 async function handleStreamResponse(

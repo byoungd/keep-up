@@ -9,13 +9,8 @@
 
 import type { Message } from "@keepup/ai-core";
 import { NextResponse } from "next/server";
-import { toModelMessages } from "../messageUtils";
+import { completeWithProvider } from "../llmGateway";
 import { getDefaultChatModelId } from "../modelResolver";
-import {
-  createAnthropicClient,
-  createGoogleClient,
-  createOpenAIProvider,
-} from "../providerClients";
 import { type ProviderTarget, resolveProviderTarget } from "../providerResolver";
 
 export const runtime = "edge";
@@ -178,38 +173,8 @@ async function generateCardsWithProviderTarget(
   const userPrompt = `Create up to ${maxCards} digest cards from these ${items.length} content items:\n\n${itemsContext}`;
   const messages = buildDigestMessages(userPrompt);
 
-  if (target.config.kind === "anthropic") {
-    const provider = createAnthropicClient(target.config);
-    const completion = await provider.complete({
-      messages,
-      model: target.modelId,
-      maxTokens: 2000,
-    });
-    const parsed = JSON.parse(completion.content || "{}");
-    return parsed.cards || [];
-  }
-
-  const modelMessages = toModelMessages(messages);
-
-  if (target.config.kind === "gemini") {
-    const google = createGoogleClient(target.config);
-    const result = await generateText({
-      model: google(target.modelId),
-      messages: modelMessages,
-      maxTokens: 2000,
-      temperature: 0.7,
-      response_format: { type: "json_object" },
-    } as Parameters<typeof generateText>[0]);
-    return JSON.parse(result.text || "{}").cards || [];
-  }
-
-  const openai = createOpenAIProvider(target.config);
-  const completion = await openai.complete({
-    messages,
-    model: target.modelId,
-    maxTokens: 2000,
-  });
-  const parsed = JSON.parse(completion.content || "{}");
+  const completion = await completeWithProvider(target, messages);
+  const parsed = JSON.parse(completion || "{}");
   return parsed.cards || [];
 }
 
