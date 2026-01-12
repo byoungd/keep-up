@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { openFreshEditor, selectTextBySubstring } from "./helpers/editor";
+import { openFreshEditor, selectTextBySubstring, waitForEditorReady } from "./helpers/editor";
 
 /**
  * Baseline test: verify Playwright mouse drag works on this page at all.
