@@ -1,6 +1,8 @@
 import {
   type BlockNode,
   type LoroRuntime,
+  type SpanList,
+  createAnnotationRepo,
   serializeAttrs,
   writeBlockTree,
 } from "@keepup/lfcc-bridge";
@@ -55,6 +57,10 @@ function buildSeedBlockId(prefix: string, index: number): string {
   return `seed-${prefix}-${String(index + 1).padStart(4, "0")}`;
 }
 
+function buildSeedAnnotationId(prefix: string, index: number): string {
+  return `seed-${prefix}-anno-${String(index + 1).padStart(4, "0")}`;
+}
+
 function buildSeedBlocks(texts: readonly string[], prefix: string): BlockNode[] {
   const attrs = serializeAttrs({});
   return texts.map((text, index) => ({
@@ -64,6 +70,51 @@ function buildSeedBlocks(texts: readonly string[], prefix: string): BlockNode[] 
     text,
     children: [],
   }));
+}
+
+function buildLiquidRefactorSpanList(seed: LiquidRefactorSeedAnnotation): SpanList | null {
+  const spans: SpanList = [];
+  for (const span of seed.spans) {
+    const blockText = LIQUID_REFACTOR_SEED.blocks[span.blockIndex];
+    if (!blockText) {
+      continue;
+    }
+    const start = blockText.indexOf(span.text);
+    if (start < 0) {
+      continue;
+    }
+    spans.push({
+      blockId: buildSeedBlockId("liquid", span.blockIndex),
+      start,
+      end: start + span.text.length,
+    });
+  }
+
+  return spans.length > 0 ? spans : null;
+}
+
+function seedLiquidRefactorAnnotations(runtime: LoroRuntime): void {
+  const repo = createAnnotationRepo(runtime, { originTag: "lfcc:seed" });
+  const now = Date.now();
+
+  LIQUID_REFACTOR_SEED.annotations.forEach((seed, index) => {
+    const spanList = buildLiquidRefactorSpanList(seed);
+    if (!spanList) {
+      return;
+    }
+
+    repo.create({
+      annotationId: buildSeedAnnotationId("liquid", index),
+      kind: "highlight",
+      createdAtMs: now,
+      updatedAtMs: now,
+      spanList,
+      chainPolicy: { mode: "required_order", gap: 0 },
+      verificationState: "active",
+      content: seed.comments?.[0] ?? "",
+      color: seed.color,
+    });
+  });
 }
 
 type SeederOptions = {
@@ -132,6 +183,7 @@ export function createLfccSeeder(seed?: number | "liquid-refactor", options?: Se
       const blocks = buildSeedBlocks(LIQUID_REFACTOR_SEED.blocks, "liquid");
 
       writeBlockTree(runtime.doc, blocks);
+      seedLiquidRefactorAnnotations(runtime);
       return;
     }
 

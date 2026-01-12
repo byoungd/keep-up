@@ -3,13 +3,19 @@
 import { reactKeys } from "@handlewithcare/react-prosemirror";
 import type { DirtyInfo } from "@keepup/core";
 import {
+  type AIGatewayWriteOptions,
+  type AIGatewayWriteResult,
+  AI_INTENT_META,
   BridgeController,
   type DivergenceResult,
   EditorAdapterPM,
   type LoroRuntime,
+  applyAIGatewayWrite,
   assignMissingBlockIds,
   createEmptyDoc,
   createLoroRuntime,
+  getRootBlocks,
+  hasGatewayMetadata,
   nextBlockId,
   pmSchema,
   projectLoroToPm,
@@ -280,6 +286,12 @@ export function useLfccBridge(docId: string, peerId = "1", options: LfccBridgeOp
         return;
       }
 
+      if (tr.getMeta(AI_INTENT_META) === true && !hasGatewayMetadata(tr)) {
+        const error = new Error("AI write rejected: missing gateway metadata");
+        console.error("[LFCC][ai-gateway] rejected AI write without gateway metadata");
+        throw error;
+      }
+
       // Apply original tr to get intermediate state
       const intermediateState = baseState.apply(tr);
 
@@ -395,6 +407,14 @@ export function useLfccBridge(docId: string, peerId = "1", options: LfccBridgeOp
           value: undefined,
           configurable: true,
         });
+        Object.defineProperty(globalAny, "__applyAIGatewayWrite", {
+          value: undefined,
+          configurable: true,
+        });
+        Object.defineProperty(globalAny, "__AI_INTENT_META", {
+          value: undefined,
+          configurable: true,
+        });
         Object.defineProperty(globalAny, "pmTextSelection", {
           value: undefined,
           configurable: true,
@@ -431,6 +451,8 @@ function registerE2EHarness(
     __lfccSetContent: (text: string) => boolean;
     __lfccClearContent: () => boolean;
     __lfccForceCommit: () => void;
+    __applyAIGatewayWrite?: (payload: AIGatewayWriteOptions) => AIGatewayWriteResult;
+    __AI_INTENT_META?: string;
     pmTextSelection?: typeof TextSelection;
   };
   globalAny.__lfccView = view;
@@ -523,9 +545,16 @@ function registerE2EHarness(
         const emptyParagraph = paragraph.create(null, []);
         const emptyDoc = docNode.create(null, [emptyParagraph]);
         const tr = state.tr.replaceWith(0, state.doc.content.size, emptyDoc);
+        // Reset selection into the empty paragraph so keyboard input works immediately.
+        try {
+          tr.setSelection(TextSelection.create(tr.doc, 1, 1));
+        } catch {
+          // Fallback to default selection mapping if position is invalid.
+        }
 
         // Use the controlled dispatch path
         handleDispatchRef.current(tr);
+        view.focus();
         return true;
       } catch (e) {
         console.error("[E2E Harness] __lfccClearContent failed:", e);
@@ -547,6 +576,19 @@ function registerE2EHarness(
         // For E2E, we just ensure any pending changes are committed.
       }
     },
+    configurable: true,
+  });
+
+  Object.defineProperty(globalAny, "__applyAIGatewayWrite", {
+    get:
+      () =>
+      (payload: AIGatewayWriteOptions): AIGatewayWriteResult =>
+        applyAIGatewayWrite(view, payload),
+    configurable: true,
+  });
+
+  Object.defineProperty(globalAny, "__AI_INTENT_META", {
+    value: AI_INTENT_META,
     configurable: true,
   });
 }
@@ -613,7 +655,7 @@ async function initRuntime(
     if (syncMode !== "websocket") {
       options.seed?.(runtime);
     }
-    if (!options.seed && syncMode !== "websocket" && !runtime.doc.getMap("blocks").size) {
+    if (!options.seed && syncMode !== "websocket" && getRootBlocks(runtime.doc).length === 0) {
       createEmptyDoc(runtime.doc);
     }
   }

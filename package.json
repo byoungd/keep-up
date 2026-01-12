@@ -18,7 +18,7 @@
     "test:e2e:blocks": "playwright test e2e/block-*.spec.ts",
     "test:e2e:collab": "playwright test e2e/collab-*.spec.ts e2e/multi-client.spec.ts e2e/structural-ordering-*.spec.ts e2e/lfcc-collab.spec.ts",
     "test:e2e:annotations": "playwright test e2e/annotation-*.spec.ts e2e/annotations.spec.ts",
-    "test:e2e:features": "playwright test e2e/import.spec.ts e2e/slash-menu.spec.ts e2e/notes-and-share.spec.ts e2e/persistence.spec.ts e2e/ai-gateway*.spec.ts e2e/offline-resume.spec.ts",
+    "test:e2e:features": "playwright test e2e/import.spec.ts e2e/slash-menu.spec.ts e2e/notes-and-share.spec.ts e2e/persistence-content.spec.ts e2e/persistence-annotations.spec.ts e2e/persistence-comments.spec.ts e2e/ai-gateway*.spec.ts e2e/offline-resume.spec.ts",
     "test:e2e:smoke": "playwright test e2e/smoke.spec.ts",
     "test:e2e:a11y": "playwright test e2e/a11y-smoke.spec.ts",
     "test:e2e:full": "NEXT_DISABLE_DEV_OVERLAY=1 PLAYWRIGHT_REUSE_EXISTING_SERVER=1 PLAYWRIGHT_WORKERS=1 playwright test",

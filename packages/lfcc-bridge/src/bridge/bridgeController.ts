@@ -674,6 +674,8 @@ export class BridgeController {
    * Handles security, dirty info, and CRDT application.
    */
   private syncTransactionInternal(tr: Transaction): void {
+    this.enforceAIGateway(tr);
+
     // Filter out history-only transactions if somehow reached here
     if (!tr.docChanged && tr.getMeta("addToHistory") !== false && !tr.getMeta("history")) {
       tr.setMeta("addToHistory", false);

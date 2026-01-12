@@ -5,31 +5,21 @@
  */
 
 import { expect, test } from "@playwright/test";
-import { waitForEditorReady } from "./helpers/editor";
-
-const modKey = process.platform === "darwin" ? "Meta" : "Control";
+import { openFreshEditor, selectAllText, typeInEditor, waitForEditorReady } from "./helpers/editor";
 
 test.describe("AI Gateway Write Enforcement", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/editor");
+    await openFreshEditor(page, "ai-gateway", { clearContent: true });
     await waitForEditorReady(page, { timeout: 15_000 });
   });
 
   test("valid AI gateway write succeeds and document is updated", async ({ page }) => {
-    // Select some text first
-    const editor = page.locator(".ProseMirror").first();
-    await editor.click();
-
     // Type some initial text
-    await editor.pressSequentially("Test content for AI");
-    await page.waitForTimeout(200);
+    const editor = page.locator(".lfcc-editor .ProseMirror").first();
+    await typeInEditor(page, "Test content for AI");
 
-    // Select the text
-    await page.keyboard.down("Shift");
-    for (let i = 0; i < 10; i++) {
-      await page.keyboard.press("ArrowLeft");
-    }
-    await page.keyboard.up("Shift");
+    // Select all text to assert selection is available for AI actions
+    await selectAllText(page);
 
     // Get the selection text
     const selectedText = await page.evaluate(() => {
@@ -49,7 +39,7 @@ test.describe("AI Gateway Write Enforcement", () => {
     page,
   }) => {
     // This test verifies that the gateway write function is properly integrated
-    const editor = page.locator(".ProseMirror").first();
+    const editor = page.locator(".lfcc-editor .ProseMirror").first();
     await editor.click();
 
     // Listen for console logs
@@ -61,7 +51,7 @@ test.describe("AI Gateway Write Enforcement", () => {
     });
 
     // Type some content
-    await editor.pressSequentially("Hello World");
+    await typeInEditor(page, "Hello World");
     await page.waitForTimeout(300);
 
     // Verify no gateway bypass errors
@@ -70,7 +60,7 @@ test.describe("AI Gateway Write Enforcement", () => {
   });
 
   test("large unauthenticated text paste is detected as potential bypass", async ({ page }) => {
-    const editor = page.locator(".ProseMirror").first();
+    const editor = page.locator(".lfcc-editor .ProseMirror").first();
     await editor.click();
 
     // Listen for console logs
@@ -80,7 +70,7 @@ test.describe("AI Gateway Write Enforcement", () => {
     });
 
     // Type normal content (should not trigger bypass detection)
-    await editor.pressSequentially("Normal typing is fine");
+    await typeInEditor(page, "Normal typing is fine");
     await page.waitForTimeout(200);
 
     // Verify no bypass detection for normal typing
@@ -89,14 +79,12 @@ test.describe("AI Gateway Write Enforcement", () => {
   });
 
   test("AI context menu validation runs pipeline check", async ({ page }) => {
-    const editor = page.locator(".ProseMirror").first();
+    const editor = page.locator(".lfcc-editor .ProseMirror").first();
     await editor.click();
 
     // Type and select text
-    await editor.pressSequentially("This text will be processed by AI");
-    await page.keyboard.down(modKey);
-    await page.keyboard.press("a");
-    await page.keyboard.up(modKey);
+    await typeInEditor(page, "This text will be processed by AI");
+    await selectAllText(page);
 
     // Check that pipeline validation is available
     // (Full AI menu testing would require mocking the AI API)
@@ -116,11 +104,11 @@ test.describe("AI Gateway Security", () => {
     await page.goto("/editor?debug=1");
     await waitForEditorReady(page, { timeout: 15_000 });
 
-    const editor = page.locator(".ProseMirror").first();
+    const editor = page.locator(".lfcc-editor .ProseMirror").first();
     await editor.click();
 
     // Type a single character (should not trigger detection)
-    await editor.pressSequentially("A");
+    await typeInEditor(page, "A");
     await page.waitForTimeout(100);
 
     // The document should be updated

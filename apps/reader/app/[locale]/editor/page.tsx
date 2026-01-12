@@ -397,7 +397,7 @@ function EditorPageContent() {
           className={`h-full overflow-auto px-6 py-6 lg:pr-[320px] ${boldStableMode === "grad" ? "lfcc-bold-stable-grad" : ""}`}
         >
           {editorState && (
-            <div className="lfcc-editor relative" data-lfcc-editor>
+            <div className="lfcc-editor relative" data-lfcc-editor data-testid="lfcc-editor">
               {/* Highlight Overlay (z-0) renders behind ProseMirror content (z-1) */}
               <HighlightOverlay />
               <ProseMirror
