@@ -1,18 +1,26 @@
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import path from "node:path";
+
 import { defineConfig } from "vitest/config";
 
-const rootDir = dirname(fileURLToPath(import.meta.url));
-
+// 根配置 - 被 vitest.workspace.ts 使用
+// 各包的具体配置在各自的 vitest.config.ts 中
 export default defineConfig({
   resolve: {
     alias: {
-      "@": resolve(rootDir, "apps/reader/src"),
+      "@": path.resolve(__dirname, "apps/reader/src"),
     },
   },
   test: {
-    include: ["packages/**/__tests__/**/*.test.ts", "apps/**/__tests__/**/*.test.ts"],
     environment: "node",
+    include: ["**/*.test.ts", "**/*.test.tsx"],
+    exclude: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/coverage/**",
+      "**/.turbo/**",
+      "**/.next/**",
+      "**/.out/**",
+    ],
     server: {
       deps: {
         inline: ["rss-parser"],
