@@ -173,7 +173,7 @@ export type AiNativePolicyV1 = {
   semantic_merge: {
     enabled: boolean;
     ai_autonomy: "disabled" | "suggest_only" | "full";
-    auto_merge_threshold: number;
+    auto_merge_threshold: number; // 0..1
   };
   transactions: {
     enabled: boolean;
@@ -193,7 +193,7 @@ export type PolicyManifestV091 = PolicyManifestV09 & {
 };
 ```
 
-See `23_AI_Native_Extension.md` for negotiation rules and normative requirements.
+See `23_AI_Native_Extension.md` for negotiation rules and normative requirements, including the audit requirement when `ai_autonomy` is `full`.
 
 ## 2. JSON Schema (Draft 2020-12) — Reference
 

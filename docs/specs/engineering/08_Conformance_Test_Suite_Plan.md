@@ -157,6 +157,7 @@ Run only when AI-native is negotiated:
 - agent auth: invalid or expired agent token rejected
 - data access: redaction policy enforced before model call
 - audit: accepted and rejected requests emit audit records
+- policy validation: `auto_merge_threshold` within 0..1, `ai_autonomy=full` requires audit retention
 
 ## 8. Property-Based Testing Requirements
 

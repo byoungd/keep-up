@@ -295,14 +295,12 @@ type AIOperation = Operation & {
 ### 3.2 Edit Intent System
 
 ```typescript
-// Intent Category Hierarchy
+// Intent Categories
 type EditIntentCategory =
-  | "content_creation"    // Creating new content
-  | "content_modification"// Modifying existing content
-  | "structure_change"    // Structural adjustments
-  | "quality_improvement" // Quality enhancement
-  | "review_feedback"     // Review and feedback
-  | "collaboration"       // Collaboration-related
+  | "generate" | "expand" | "summarize" | "rewrite" | "translate" | "refine" | "correct"
+  | "review" | "suggest" | "validate"
+  | "restructure" | "format" | "split_merge"
+  | `custom:${string}`;   // vendor-prefixed
 
 interface EditIntent {
   id: string;
@@ -360,6 +358,7 @@ interface IntentRegistry {
 **INTENT-001:** Every AI operation MUST be associated with an `EditIntent`.
 **INTENT-002:** Intent description MUST provide at least the `short` field.
 **INTENT-003:** Multi-step edits MUST use the `chain` field to establish relationships.
+**INTENT-004:** Non-standard intent categories MUST use a vendor prefix (`custom:<vendor>.<name>`).
 
 ### 3.3 Content Provenance Tracking
 
@@ -571,6 +570,7 @@ interface HandoffContext {
 **AGENT-001:** Multi-agent scenarios MUST use the Agent Coordination Protocol.
 **AGENT-002:** Block editing rights MUST be acquired via `claimBlocks` before modification.
 **AGENT-003:** Inter-agent handoffs MUST use `handoff` with complete context transfer.
+**AGENT-004:** Overlapping claims MUST be resolved deterministically using a stable ordering (e.g., by `agent_id`, then `request_id`), and losers MUST receive a denial reason.
 
 ### 3.5 Semantic Conflict Resolution (Semantic Merge)
 
@@ -956,6 +956,9 @@ When negotiated, `ai_native_policy` is available at the top level for v0.9.1 pee
 - `ai_autonomy` = most restrictive (`disabled` > `suggest_only` > `full`)
 
 **NEG-AI-002:** If `ai_native` capability mismatches, degrade to v0.9 behavior.
+
+**POL-AI-001:** `auto_merge_threshold` MUST be within 0..1 (inclusive).
+**POL-AI-002:** If `ai_autonomy` is `full`, audit MUST be enabled and retained (`ai_audit=true`, `audit_retention_days > 0`).
 
 ---
 

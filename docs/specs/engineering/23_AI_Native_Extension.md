@@ -1,7 +1,7 @@
 # AI-Native Extension (v0.9.1) - Engineering Addendum
 
 **Applies to:** LFCC v0.9.1 (optional extension)  
-**Last updated:** 2026-01-12  
+**Last updated:** 2026-01-16  
 **Audience:** AI platform engineers, gateway maintainers, security, client integrators.  
 **Source of truth:** LFCC v0.9 RC Section 11 (AI Gateway) + AI-native proposal.
 
@@ -74,6 +74,17 @@ Recommended capability flags:
 
 ---
 
+### 2.3 Intent Categories (Normative)
+
+**INT-001:** `intent.category` MUST be one of:
+- `generate`, `expand`, `summarize`, `rewrite`, `translate`, `refine`, `correct`
+- `review`, `suggest`, `validate`
+- `restructure`, `format`, `split_merge`
+
+**INT-002:** Non-standard categories MUST use a vendor prefix: `custom:<vendor>.<name>`.
+
+---
+
 ## 3. Deterministic Execution Model
 
 **DET-AI-001:** AI-generated changes MUST be expressed as explicit LFCC operations.  
@@ -113,6 +124,7 @@ Recommended provenance fields:
 ## 6. Multi-Agent Coordination (Optional)
 
 **COORD-001:** Coordination claims MUST be advisory and MUST NOT override LFCC conflict rules.
+**COORD-002:** Overlapping claims MUST be resolved deterministically using a stable ordering (e.g., by `agent_id`, then `request_id`), and losers MUST receive a denial reason.
 
 Recommended coordination primitives:
 - `claim` blocks or ranges with timeout
@@ -125,6 +137,8 @@ Recommended coordination primitives:
 
 **MERGE-001:** AI-proposed merges MUST be persisted as explicit LFCC operations.  
 **MERGE-002:** Automatic merges MUST respect a policy-defined confidence threshold.
+**MERGE-003:** `auto_merge_threshold` MUST be in the range 0..1 (inclusive).
+**MERGE-004:** If `ai_autonomy` is `full`, audit MUST be enabled and retained (set `ai_audit=true` and `security.audit_retention_days > 0`).
 
 ---
 
@@ -173,7 +187,7 @@ export type AiNativePolicyV1 = {
   semantic_merge: {
     enabled: boolean;
     ai_autonomy: "disabled" | "suggest_only" | "full";
-    auto_merge_threshold: number;
+    auto_merge_threshold: number; // 0..1
   };
   transactions: {
     enabled: boolean;

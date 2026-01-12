@@ -294,11 +294,17 @@ AI-native integrations extend the v0.9 envelope with idempotency and agent ident
 See `23_AI_Native_Extension.md` for normative requirements.
 
 ```ts
+export type AIIntentCategory =
+  | "generate" | "expand" | "summarize" | "rewrite" | "translate" | "refine" | "correct"
+  | "review" | "suggest" | "validate"
+  | "restructure" | "format" | "split_merge"
+  | `custom:${string}`; // vendor-prefixed
+
 export type AIRequestEnvelopeV2 = AIRequestEnvelope & {
   request_id: string;
   agent_id: string;
   intent_id?: string;
-  intent?: { id?: string; category: string; summary: string };
+  intent?: { id?: string; category: AIIntentCategory; summary: string };
   policy_context?: { policy_id?: string; redaction_profile?: string };
 };
 ```

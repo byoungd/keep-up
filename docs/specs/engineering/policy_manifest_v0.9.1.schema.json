@@ -387,5 +387,45 @@
     },
     "v": { "type": "integer", "minimum": 1 }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "ai_native_policy": {
+            "required": ["semantic_merge"],
+            "properties": {
+              "semantic_merge": {
+                "required": ["ai_autonomy"],
+                "properties": {
+                  "ai_autonomy": { "const": "full" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "capabilities": {
+            "required": ["ai_audit"],
+            "properties": {
+              "ai_audit": { "const": true }
+            }
+          },
+          "ai_native_policy": {
+            "required": ["security"],
+            "properties": {
+              "security": {
+                "required": ["audit_retention_days"],
+                "properties": {
+                  "audit_retention_days": { "minimum": 1 }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
   "additionalProperties": false
 }
