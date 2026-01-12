@@ -3,6 +3,7 @@ import {
   type ModelCapability,
   getDefaultModel,
   getModelCapability,
+  normalizeModelId,
 } from "@/lib/ai/models";
 
 export type ModelProvider = ModelCapability["provider"];
@@ -13,20 +14,6 @@ export type ModelResolution = {
   provider?: ModelProvider;
   error?: { code: "unknown_model" | "unsupported_provider"; message: string };
 };
-
-const MODEL_ALIASES: Record<string, string> = {
-  "gemini-3.0-flash": "gemini-3-flash",
-  "gemini-3.0-pro": "gemini-3-pro-high",
-  "gemini-3-pro": "gemini-3-pro-high",
-};
-
-function normalizeModelId(value?: string | null): string | undefined {
-  const trimmed = value?.trim();
-  if (!trimmed || trimmed.length === 0) {
-    return undefined;
-  }
-  return MODEL_ALIASES[trimmed] ?? trimmed;
-}
 
 export function getFirstModelByProvider(providers: ModelProvider[]): string {
   return (

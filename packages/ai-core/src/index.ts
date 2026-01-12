@@ -289,6 +289,7 @@ export {
   type ProviderKind,
   getDefaultModelId,
   getModelCapability,
+  normalizeModelId,
 } from "./catalog/models";
 export { normalizeMessages, withSystemPrompt } from "./catalog/messages";
 

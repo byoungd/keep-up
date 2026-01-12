@@ -65,6 +65,53 @@ function buildModifiedTransforms(deltas: SimpleDelta[]): BlockTransform[] {
   ];
 }
 
+// Upper bound for shift distance implied by a transform.
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: test helper logic
+function computeLocalityBound(transform: BlockTransform, oldId: string): number {
+  if (transform.kind === "modified") {
+    const shiftDeltas = new Map<number, number>();
+    for (const delta of transform.deltas) {
+      if (delta.delta === 0) {
+        continue;
+      }
+      if (delta.delta > 0) {
+        shiftDeltas.set(delta.offset, (shiftDeltas.get(delta.offset) ?? 0) + delta.delta);
+        continue;
+      }
+      const deleteEnd = delta.offset + Math.abs(delta.delta);
+      shiftDeltas.set(deleteEnd, (shiftDeltas.get(deleteEnd) ?? 0) + delta.delta);
+    }
+
+    let cumulativeShift = 0;
+    let maxAbsShift = 0;
+    const sorted = [...shiftDeltas.entries()].sort((a, b) => a[0] - b[0]);
+    for (const [, delta] of sorted) {
+      cumulativeShift += delta;
+      maxAbsShift = Math.max(maxAbsShift, Math.abs(cumulativeShift));
+    }
+
+    return maxAbsShift;
+  }
+
+  if (transform.kind === "split") {
+    return transform.splitAt;
+  }
+
+  if (transform.kind === "merged") {
+    const index = transform.oldIds.indexOf(oldId);
+    if (index <= 0) {
+      return 0;
+    }
+    let offset = 0;
+    for (let i = 0; i < index; i++) {
+      offset += transform.oldLengths[i] ?? 0;
+    }
+    return Math.abs(offset);
+  }
+
+  return 0;
+}
+
 function mergeDeleteRanges(deltas: SimpleDelta[]): Array<{ start: number; end: number }> {
   const ranges = deltas
     .filter((delta) => delta.delta < 0)
@@ -158,7 +205,7 @@ describe("BlockMapping Verification Suite (RISK-002)", () => {
 
           const oldId = t.kind === "merged" ? t.oldIds[0] : t.oldId;
 
-          const maxDist = 200;
+          const maxDist = computeLocalityBound(t, oldId);
           return verifyLocality(mapping, oldId, [0, 10, 50], maxDist);
         });
       })

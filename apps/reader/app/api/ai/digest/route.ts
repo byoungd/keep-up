@@ -46,6 +46,7 @@ interface DigestRequest {
   userId: string;
   date?: string;
   regenerate?: boolean;
+  model?: string;
   /** Content items to synthesize (from client-side DB) */
   contentItems?: ContentItemInput[];
   /** Maximum number of cards to generate */

@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/DropdownMenu";
 import { List } from "@/components/ui/List";
 import { Tooltip } from "@/components/ui/Tooltip";
-import type { ModelCapability } from "@/lib/ai/models";
+import { type ModelCapability, normalizeModelId } from "@/lib/ai/models";
 import { cn } from "@keepup/shared/utils";
 import {
   Archive,
@@ -634,17 +634,9 @@ export function ModelSelector({
                         return selectedModel.shortLabel || selectedModel.label;
                       }
 
-                      // Legacy ID migration map
-                      const LEGACY_MAP: Record<string, string> = {
-                        "gemini-3-flash": "gemini-3-flash",
-                        "gemini-3-pro": "gemini-3-pro-high",
-                        "gpt-5": "gpt-5.2-auto", // Upgrade default
-                        "gpt-5.1": "gpt-5.1-pro",
-                      };
-
-                      const migratedId = LEGACY_MAP[model];
+                      const migratedId = normalizeModelId(model);
                       if (migratedId) {
-                        const migratedModel = models.find((m) => m.id === migratedId);
+                        const migratedModel = models.find((entry) => entry.id === migratedId);
                         if (migratedModel) {
                           return migratedModel.shortLabel || migratedModel.label;
                         }

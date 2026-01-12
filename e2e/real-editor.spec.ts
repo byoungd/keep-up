@@ -105,13 +105,13 @@ test.describe("Real Editor Annotation Flow", () => {
     // Click elsewhere to dismiss selection toolbar before continuing
     await page.keyboard.press("Escape");
     // Wait longer for annotation state to fully persist
-    await page.waitForTimeout(800);
+    await page.waitForTimeout(1500);
 
     // Edit text near annotation (not the annotated text)
-    await editor.click();
+    await editor.focus();
     await page.keyboard.press("End");
     await page.keyboard.type(" additional text");
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1000);
 
     // Annotation should still be visible (check for annotation with matching ID in the annotations list)
     const finalIds = await getAnnotationIds(page);

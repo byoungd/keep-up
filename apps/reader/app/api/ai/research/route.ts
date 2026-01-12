@@ -147,7 +147,7 @@ async function completeWithProvider(target: ProviderTarget, messages: Message[])
     const result = await generateText({
       model: google(target.modelId),
       messages: modelMessages,
-      maxTokens: 1024,
+      maxOutputTokens: 1024,
     });
     return result.text;
   }

@@ -2,7 +2,7 @@
  * Performance Metrics Tests
  */
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PerfMetrics, getPerfMetrics, resetPerfMetrics } from "../perfMetrics";
 
 describe("PerfMetrics", () => {
@@ -73,15 +73,20 @@ describe("PerfMetrics", () => {
     });
 
     it("should measure async function", async () => {
-      const result = await metrics.measureAsync("render", async () => {
-        await new Promise((resolve) => setTimeout(resolve, 10));
-        return "done";
-      });
+      const nowSpy = vi.spyOn(performance, "now").mockReturnValueOnce(100).mockReturnValueOnce(115);
 
-      expect(result).toBe("done");
-      const data = metrics.getMetrics();
-      expect(data.renderTime.count).toBe(1);
-      expect(data.renderTime.avg).toBeGreaterThanOrEqual(10);
+      try {
+        const result = await metrics.measureAsync("render", async () => {
+          return Promise.resolve("done");
+        });
+
+        expect(result).toBe("done");
+        const data = metrics.getMetrics();
+        expect(data.renderTime.count).toBe(1);
+        expect(data.renderTime.avg).toBeGreaterThanOrEqual(10);
+      } finally {
+        nowSpy.mockRestore();
+      }
     });
   });
 

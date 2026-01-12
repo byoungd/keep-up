@@ -8,7 +8,7 @@ import { useAutoScroll } from "@/hooks/useAutoScroll";
 import { useChatPersistence } from "@/hooks/useChatPersistence";
 import { useDocumentContent } from "@/hooks/useDocumentContent";
 import { composePromptWithContext, createContextPayload } from "@/lib/ai/contextPrivacy";
-import { MODEL_CAPABILITIES, getDefaultModel } from "@/lib/ai/models";
+import { MODEL_CAPABILITIES, getDefaultModel, normalizeModelId } from "@/lib/ai/models";
 import { buildReferenceAnchors } from "@/lib/ai/referenceAnchors";
 import { getWorkflowSystemPrompt } from "@/lib/ai/workflowPrompts";
 import type { LoroRuntime, SpanList } from "@keepup/lfcc-bridge";
@@ -116,21 +116,16 @@ export function useAIPanelController({
 
   // 1.6 Legacy Model Migration
   React.useEffect(() => {
-    const LEGACY_MAP: Record<string, string> = {
-      "gemini-3.0-flash": "gemini-3-flash",
-      "gemini-3.0-pro": "gemini-3-pro-high",
-      "gemini-3-pro": "gemini-3-pro-high",
-      "gemini-3-flash": "gemini-3-flash",
-      "gpt-5": "gpt-5.2-auto",
-      "gpt-5.1": "gpt-5.1-pro",
-    };
+    const normalizedId = normalizeModelId(model);
+    const candidateId = normalizedId ?? model;
+    const activeModel = MODEL_CAPABILITIES.find((entry) => entry.id === candidateId);
 
-    const activeModel = MODEL_CAPABILITIES.find((m) => m.id === model);
-    const targetId = LEGACY_MAP[model];
+    if (normalizedId && normalizedId !== model) {
+      setModel(normalizedId);
+      return;
+    }
 
-    if (targetId) {
-      setModel(targetId);
-    } else if (!activeModel) {
+    if (!activeModel) {
       const defaultModel = getDefaultModel();
       setModel(defaultModel.id);
     }
