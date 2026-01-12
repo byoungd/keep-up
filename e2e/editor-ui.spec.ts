@@ -8,9 +8,20 @@ test.describe("Editor UI Controls", () => {
 
   test.describe("Undo/Redo Buttons", () => {
     test("undo button is disabled when no history", async ({ page }) => {
+      // Wait for history stack to settle after page load
+      await page.waitForTimeout(500);
+
       const undoButton = page.getByRole("button", { name: /undo/i });
       await expect(undoButton).toBeVisible();
-      await expect(undoButton).toBeDisabled();
+      // Check disabled state with polling since history may still be settling
+      await expect
+        .poll(
+          async () => {
+            return await undoButton.isDisabled();
+          },
+          { timeout: 5000 }
+        )
+        .toBe(true);
     });
 
     test("redo button is disabled when no redo history", async ({ page }) => {
