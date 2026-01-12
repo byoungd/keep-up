@@ -10,6 +10,7 @@ import { HighlightOverlay } from "@/components/annotations/HighlightOverlay";
 import { SelectionToolbar } from "@/components/annotations/SelectionToolbar";
 import { useFailClosedBanner } from "@/components/annotations/useFailClosedBanner";
 import { useSelectionToolbarActions } from "@/components/annotations/useSelectionToolbarActions";
+import { AIContextMenu } from "@/components/editor/AIContextMenu";
 import { BlockHandlePortal } from "@/components/editor/BlockHandlePortal";
 import { SlashMenuPortal } from "@/components/editor/SlashMenuPortal";
 import { ExportDialog } from "@/components/export/ExportDialog";
@@ -42,6 +43,7 @@ import { useFocusMode } from "@/hooks/useFocusMode";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useQuickAnnotation } from "@/hooks/useQuickAnnotation";
 import { useSelectionContext } from "@/hooks/useSelectionContext";
+import type { AIMenuState } from "@/lib/editor/aiMenuPlugin";
 import type { BlockHandleState } from "@/lib/editor/blockHandlePlugin";
 import { useReactNodeViews } from "@/lib/editor/useReactNodeViews";
 import { useAnnotationStore } from "@/lib/kernel/store";
@@ -147,6 +149,8 @@ function EditorPageContent() {
   const [reproStatus, setReproStatus] = React.useState<"idle" | "exported" | "error">("idle");
   const [isReadOnly, setIsReadOnly] = React.useState(false);
   const [blockHandleState, setBlockHandleState] = React.useState<BlockHandleState | null>(null);
+  const [aiMenuState, setAiMenuState] = React.useState<AIMenuState | null>(null);
+  const closeAIMenu = React.useCallback(() => setAiMenuState(null), []);
 
   const addDirtyInfo = useLfccDebugStore((state) => state.addDirtyInfo);
   const addError = useLfccDebugStore((state) => state.addError);
@@ -185,6 +189,7 @@ function EditorPageContent() {
     editorState,
     handleDispatchTransaction,
     handleCreatedView,
+    bridge,
     reactNodeViews,
   } = useLfccBridge(docId, peerId, {
     seed: React.useMemo(() => createLfccSeeder(seedValue), [seedValue]),
@@ -196,6 +201,7 @@ function EditorPageContent() {
     onDirtyInfo: addDirtyInfo,
     onDivergence: handleDivergence,
     onBlockHandleStateChange: setBlockHandleState,
+    onAIMenuStateChange: setAiMenuState,
     reactNodeViews: nodeViews,
     syncMode:
       syncModeParam === "websocket" || syncModeParam === "broadcast" || syncModeParam === "polling"
@@ -509,6 +515,7 @@ function EditorPageContent() {
           </AppShell>
           <SlashMenuPortal />
           <BlockHandlePortal state={blockHandleState} />
+          <AIContextMenu state={aiMenuState} onClose={closeAIMenu} bridge={bridge} />
         </LfccDragLayer>
         <LfccDebugOverlay />
         <KeyboardShortcutsModal isOpen={isShortcutsModalOpen} onClose={closeShortcutsModal} />

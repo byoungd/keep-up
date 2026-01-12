@@ -38,7 +38,7 @@ import type { PerfSample } from "@/lib/annotations/annotationPlugin";
 import { createAnnotationPlugin } from "@/lib/annotations/annotationPlugin";
 import { attachAnnotationRepo, detachAnnotationRepo } from "@/lib/annotations/annotationRepoBridge";
 import { useCommentStore } from "@/lib/annotations/commentStore";
-import type { AIMenuState } from "@/lib/editor/aiMenuPlugin";
+import { type AIMenuState, createAIMenuPlugin } from "@/lib/editor/aiMenuPlugin";
 import { createAutoLinkPlugin } from "@/lib/editor/autoLinkPlugin";
 import { createBlockBehaviorsPlugin } from "@/lib/editor/blockBehaviors";
 import { type BlockHandleState, createBlockHandlePlugin } from "@/lib/editor/blockHandlePlugin";
@@ -661,6 +661,9 @@ function createPlugins(
       enablePerf: options.enablePerf ?? false,
       onPerfSample: options.onPerfSample,
     }),
+    ...((options.enableAI ?? true)
+      ? [createAIMenuPlugin({ onStateChange: options.onAIMenuStateChange })]
+      : []),
     ...((options.enableSlashMenu ?? true)
       ? [createSlashMenuPlugin({ onStateChange: setSlashMenuState })]
       : []),

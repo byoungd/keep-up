@@ -6,10 +6,23 @@ import { useCompletion } from "@ai-sdk/react";
 import {
   DEFAULT_POLICY_MANIFEST,
   type EditorSchemaValidator,
+  computeContextHash,
   computeOptimisticHash,
   gateway,
 } from "@keepup/core";
-import { type LoroRuntime, pmSelectionToSpanList } from "@keepup/lfcc-bridge";
+import {
+  type BridgeController,
+  type DocumentFacade,
+  type LoroRuntime,
+  type SpanRange,
+  buildSelectionAnnotationId,
+  buildSelectionSpanId,
+  createDocumentFacade,
+  createLoroAIGateway,
+  createLoroDocumentProvider,
+  createLoroGatewayRetryProviders,
+  pmSelectionToSpanList,
+} from "@keepup/lfcc-bridge";
 import { cn } from "@keepup/shared/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -30,8 +43,7 @@ import { StructuralDiff } from "./StructuralDiff";
 type AIContextMenuProps = {
   state: AIMenuState | null;
   onClose: () => void;
-  onReplace: (text: string) => void;
-  onInsertBelow: (text: string) => void;
+  bridge: BridgeController | null;
 };
 
 type Mode = "menu" | "streaming" | "result" | "conflict" | "structural_preview";
@@ -75,6 +87,30 @@ type AIEnvelopePayload = {
 
 type EnvelopeBuildResult = { ok: true; envelope: AIEnvelopePayload } | { ok: false; error: string };
 
+type GatewayAction = "replace" | "insert_below";
+
+type GatewayTargetBuildResult =
+  | {
+      ok: true;
+      targetSpans: gateway.TargetSpan[];
+      originalTexts: Map<string, string>;
+    }
+  | { ok: false; error: string };
+
+type GatewayRequestBuildResult =
+  | { ok: true; request: gateway.AIGatewayRequest }
+  | { ok: false; error: string };
+
+const VERIFICATION_ERROR = "Document state cannot be verified";
+
+type SelectionSpanResult = { ok: true; spans: SpanRange[] } | { ok: false; error: string };
+
+type BuiltTargetSpan = {
+  target: gateway.TargetSpan;
+  spanId: string;
+  spanText: string;
+};
+
 function normalizeAnchor(anchor: string): string {
   return anchor.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
@@ -93,7 +129,7 @@ function buildSelectionAnchors(
 ): { ok: true; anchors: SelectionAnchor[] } | { ok: false; error: string } {
   const mapping = pmSelectionToSpanList(view.state.selection, view.state, runtime);
   if (!mapping.verified || mapping.spanList.length === 0) {
-    return { ok: false, error: "Document state cannot be verified" };
+    return { ok: false, error: VERIFICATION_ERROR };
   }
 
   const anchors = mapping.spanList.flatMap((span) => {
@@ -115,10 +151,121 @@ function buildSelectionAnchors(
   });
 
   if (anchors.length === 0) {
-    return { ok: false, error: "Document state cannot be verified" };
+    return { ok: false, error: VERIFICATION_ERROR };
   }
 
   return { ok: true, anchors };
+}
+
+function getSelectionSpans(
+  view: EditorView,
+  runtime: LoroRuntime,
+  action: GatewayAction
+): SelectionSpanResult {
+  const mapping = pmSelectionToSpanList(view.state.selection, view.state, runtime, {
+    strict: false,
+  });
+  if (!mapping.verified || mapping.spanList.length === 0) {
+    return { ok: false, error: VERIFICATION_ERROR };
+  }
+  if (action !== "insert_below") {
+    return { ok: true, spans: mapping.spanList };
+  }
+  const lastSpan = mapping.spanList[mapping.spanList.length - 1];
+  if (!lastSpan) {
+    return { ok: false, error: VERIFICATION_ERROR };
+  }
+  return {
+    ok: true,
+    spans: [{ ...lastSpan, start: lastSpan.end, end: lastSpan.end }],
+  };
+}
+
+async function buildTargetSpan(
+  facade: DocumentFacade,
+  span: SpanRange,
+  requestId: string,
+  annotationId: string
+): Promise<BuiltTargetSpan | null> {
+  const block = facade.getBlock(span.blockId);
+  if (!block) {
+    return null;
+  }
+  const blockText = block.text ?? "";
+  if (span.start < 0 || span.end < span.start || span.end > blockText.length) {
+    return null;
+  }
+  const spanText = blockText.slice(span.start, span.end);
+  const spanId = buildSelectionSpanId(requestId, span.blockId, span.start, span.end);
+  const { hash } = await computeContextHash({
+    span_id: spanId,
+    block_id: span.blockId,
+    text: spanText,
+  });
+
+  return {
+    spanId,
+    spanText,
+    target: {
+      annotation_id: annotationId,
+      span_id: spanId,
+      if_match_context_hash: hash,
+    },
+  };
+}
+
+async function buildTargetSpans(
+  facade: DocumentFacade,
+  spans: SpanRange[],
+  requestId: string
+): Promise<GatewayTargetBuildResult> {
+  const annotationId = buildSelectionAnnotationId(requestId);
+  const targetSpans: gateway.TargetSpan[] = [];
+  const originalTexts = new Map<string, string>();
+
+  for (const span of spans) {
+    const built = await buildTargetSpan(facade, span, requestId, annotationId);
+    if (!built) {
+      return { ok: false, error: VERIFICATION_ERROR };
+    }
+    targetSpans.push(built.target);
+    originalTexts.set(built.spanId, built.spanText);
+  }
+
+  if (targetSpans.length === 0) {
+    return { ok: false, error: VERIFICATION_ERROR };
+  }
+
+  return { ok: true, targetSpans, originalTexts };
+}
+
+function buildGatewayRequest(params: {
+  docId: string;
+  docFrontierTag: string;
+  targetSpans: gateway.TargetSpan[];
+  instructions: string;
+  payload: string;
+  requestId: string;
+  agentId: string;
+}): GatewayRequestBuildResult {
+  try {
+    const request = gateway.createGatewayRequest({
+      docId: params.docId,
+      docFrontierTag: params.docFrontierTag,
+      targetSpans: params.targetSpans,
+      instructions: params.instructions,
+      format: "html",
+      payload: params.payload,
+      requestId: params.requestId,
+      clientRequestId: params.requestId,
+      agentId: params.agentId,
+      policyContext: { policy_id: DEFAULT_POLICY_MANIFEST.policy_id },
+    });
+    return { ok: true, request };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to build gateway request";
+    return { ok: false, error: message };
+  }
 }
 
 function parseConflictError(err: Error): ConflictInfo | null {
@@ -159,6 +306,19 @@ function parseConflictError(err: Error): ConflictInfo | null {
   return null;
 }
 
+function toGatewayConflictInfo(conflict: gateway.AIGateway409Response): ConflictInfo {
+  const hashFailure = conflict.failed_preconditions.find(
+    (failure) => typeof failure.actual_hash === "string"
+  );
+  return {
+    message: conflict.message ?? "Document changed. Refresh and retry.",
+    currentHash: hashFailure?.actual_hash,
+    currentFrontier: conflict.server_doc_frontier ?? conflict.server_frontier_tag,
+    requestId: conflict.request_id,
+    clientRequestId: conflict.client_request_id,
+  };
+}
+
 /**
  * AI-001: Validate AI output through dry-run pipeline before insertion
  * Returns sanitized text if valid, null if rejected
@@ -185,7 +345,7 @@ async function validateAIOutput(
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: AI menu has inherently complex mode handling
-export function AIContextMenu({ state, onClose, onReplace, onInsertBelow }: AIContextMenuProps) {
+export function AIContextMenu({ state, onClose, bridge }: AIContextMenuProps) {
   const lfcc = useLfccEditorContext();
   const setContextHash = useLfccDebugStore((store) => store.setContextHash);
   const [mode, setMode] = useState<Mode>("menu");
@@ -195,6 +355,33 @@ export function AIContextMenu({ state, onClose, onReplace, onInsertBelow }: AICo
 
   const containerRef = useRef<HTMLDivElement>(null);
   const lastPromptRef = useRef<string | null>(null);
+  const lastRequestIdRef = useRef<string | null>(null);
+  const lastGatewayRequestRef = useRef<gateway.AIGatewayRequest | null>(null);
+  const lastGatewayConflictRef = useRef<gateway.AIGateway409Response | null>(null);
+  const lastGatewayOriginalTextsRef = useRef<Map<string, string>>(new Map());
+  const gatewayFacade = useMemo(
+    () => (lfcc?.runtime ? createDocumentFacade(lfcc.runtime) : null),
+    [lfcc?.runtime]
+  );
+  const documentProvider = useMemo(
+    () =>
+      gatewayFacade && lfcc?.runtime
+        ? createLoroDocumentProvider(gatewayFacade, lfcc.runtime)
+        : null,
+    [gatewayFacade, lfcc?.runtime]
+  );
+  const gatewayInstance = useMemo(
+    () =>
+      gatewayFacade && lfcc?.runtime ? createLoroAIGateway(gatewayFacade, lfcc.runtime) : null,
+    [gatewayFacade, lfcc?.runtime]
+  );
+  const retryProviders = useMemo(
+    () =>
+      gatewayFacade && lfcc?.runtime
+        ? createLoroGatewayRetryProviders(gatewayFacade, lfcc.runtime)
+        : null,
+    [gatewayFacade, lfcc?.runtime]
+  );
   const schemaValidator = useMemo(
     () => (lfcc?.view ? createEditorSchemaValidator(lfcc.view.state.schema) : undefined),
     [lfcc?.view]
@@ -210,6 +397,8 @@ export function AIContextMenu({ state, onClose, onReplace, onInsertBelow }: AICo
     onError: (err) => {
       const conflict = parseConflictError(err);
       if (conflict) {
+        lastGatewayConflictRef.current = null;
+        lastGatewayRequestRef.current = null;
         setConflictInfo(conflict);
         setMode("conflict");
         return;
@@ -218,19 +407,76 @@ export function AIContextMenu({ state, onClose, onReplace, onInsertBelow }: AICo
     },
   });
 
+  const showGatewayError = (message: string) => {
+    setCompletion(message);
+    setMode("result");
+  };
+
+  const resolveAgentId = () =>
+    lfcc?.runtime?.peerId ? `ai-menu:${lfcc.runtime.peerId}` : "ai-menu:local";
+
+  const processGatewayResult = async (
+    result: gateway.AIGatewayResult,
+    request: gateway.AIGatewayRequest,
+    agentId: string,
+    requestIdFallback: string
+  ) => {
+    if (!bridge) {
+      showGatewayError("AI gateway is not available");
+      return;
+    }
+
+    if (gateway.isGateway409(result)) {
+      lastGatewayConflictRef.current = result;
+      setConflictInfo(toGatewayConflictInfo(result));
+      setMode("conflict");
+      return;
+    }
+
+    if (gateway.isGatewayError(result)) {
+      showGatewayError(result.message ?? "AI gateway rejected the request");
+      return;
+    }
+
+    if (!result.apply_plan) {
+      showGatewayError("AI gateway did not return an apply plan");
+      return;
+    }
+
+    const applyResult = await bridge.applyAIGatewayPlan({
+      plan: result.apply_plan,
+      metadata: {
+        source: "ai-context-menu",
+        requestId: request.request_id ?? requestIdFallback,
+        agentId,
+        intentId: request.intent_id,
+        aiMeta: request.ai_meta,
+      },
+    });
+
+    if (!applyResult.success) {
+      showGatewayError(applyResult.error ?? "Failed to apply AI result");
+      return;
+    }
+
+    setConflictInfo(null);
+    setMode("menu");
+    onClose();
+  };
+
   const buildEnvelope = useCallback(async (): Promise<EnvelopeBuildResult> => {
     if (!lfcc?.runtime || !lfcc.view) {
-      return { ok: false, error: "Document state cannot be verified" };
+      return { ok: false, error: VERIFICATION_ERROR };
     }
 
     const selectionText = state?.selectionText ?? "";
     if (!selectionText.trim()) {
-      return { ok: false, error: "Document state cannot be verified" };
+      return { ok: false, error: VERIFICATION_ERROR };
     }
 
     const docFrontier = serializeFrontier(lfcc.runtime.frontiers);
     if (!docFrontier) {
-      return { ok: false, error: "Document state cannot be verified" };
+      return { ok: false, error: VERIFICATION_ERROR };
     }
 
     const anchorsResult = buildSelectionAnchors(lfcc.view, lfcc.runtime);
@@ -241,6 +487,7 @@ export function AIContextMenu({ state, onClose, onReplace, onInsertBelow }: AICo
     const contextHash = await computeOptimisticHash(selectionText);
     setContextHash(contextHash);
     const requestId = crypto.randomUUID();
+    lastRequestIdRef.current = requestId;
     const agentId = lfcc?.runtime?.peerId ? `ai-menu:${lfcc.runtime.peerId}` : "ai-menu:local";
 
     return {
@@ -261,6 +508,61 @@ export function AIContextMenu({ state, onClose, onReplace, onInsertBelow }: AICo
     };
   }, [lfcc, setContextHash, state?.selectionText]);
 
+  const buildGatewayTargets = async (
+    requestId: string,
+    action: GatewayAction
+  ): Promise<GatewayTargetBuildResult> => {
+    if (!lfcc?.runtime || !lfcc.view || !gatewayFacade) {
+      return { ok: false, error: VERIFICATION_ERROR };
+    }
+
+    const selectionResult = getSelectionSpans(lfcc.view, lfcc.runtime, action);
+    if (!selectionResult.ok) {
+      return selectionResult;
+    }
+
+    return buildTargetSpans(gatewayFacade, selectionResult.spans, requestId);
+  };
+
+  const applyGatewayOutput = async (action: GatewayAction, text: string) => {
+    if (!gatewayFacade || !gatewayInstance || !documentProvider || !bridge) {
+      showGatewayError("AI gateway is not available");
+      return;
+    }
+
+    const requestId = lastRequestIdRef.current ?? crypto.randomUUID();
+    lastRequestIdRef.current = requestId;
+    const agentId = resolveAgentId();
+    const targetsResult = await buildGatewayTargets(requestId, action);
+    if (!targetsResult.ok) {
+      showGatewayError(targetsResult.error);
+      return;
+    }
+
+    const instructions = lastPromptRef.current ?? "AI edit";
+    const requestResult = buildGatewayRequest({
+      docId: gatewayFacade.docId,
+      docFrontierTag: documentProvider.getFrontierTag(),
+      targetSpans: targetsResult.targetSpans,
+      instructions,
+      payload: text,
+      requestId,
+      agentId,
+    });
+    if (!requestResult.ok) {
+      showGatewayError(requestResult.error);
+      return;
+    }
+
+    const request = requestResult.request;
+    lastGatewayRequestRef.current = request;
+    lastGatewayOriginalTextsRef.current = targetsResult.originalTexts;
+    lastGatewayConflictRef.current = null;
+
+    const result = await gatewayInstance.processRequest(request);
+    await processGatewayResult(result, request, agentId, requestId);
+  };
+
   const handleAction = useCallback(
     async (prompt: string) => {
       if (!state) {
@@ -268,6 +570,9 @@ export function AIContextMenu({ state, onClose, onReplace, onInsertBelow }: AICo
       }
 
       setConflictInfo(null);
+      lastGatewayConflictRef.current = null;
+      lastGatewayRequestRef.current = null;
+      lastGatewayOriginalTextsRef.current = new Map();
       lastPromptRef.current = prompt;
       const envelopeResult = await buildEnvelope();
       if (!envelopeResult.ok) {
@@ -335,7 +640,43 @@ export function AIContextMenu({ state, onClose, onReplace, onInsertBelow }: AICo
     }
   }, [isLoading]);
 
-  const handleConflictRetry = async () => {
+  const retryGatewayRequest = async (
+    request: gateway.AIGatewayRequest,
+    conflict: gateway.AIGateway409Response
+  ) => {
+    if (!retryProviders || !gatewayInstance || !bridge) {
+      showGatewayError("AI gateway is not available");
+      return;
+    }
+
+    setCompletion("");
+    setConflictInfo(null);
+    const retryResult = await gateway.executeRetryLoop(
+      request,
+      conflict,
+      gateway.DEFAULT_RETRY_POLICY,
+      retryProviders.rebaseProvider,
+      retryProviders.relocationProvider,
+      lastGatewayOriginalTextsRef.current
+    );
+
+    if (!retryResult.success) {
+      showGatewayError("AI retry failed after conflict");
+      return;
+    }
+
+    lastGatewayRequestRef.current = retryResult.request;
+    lastGatewayConflictRef.current = null;
+    const result = await gatewayInstance.processRequest(retryResult.request);
+    await processGatewayResult(
+      result,
+      retryResult.request,
+      resolveAgentId(),
+      request.request_id ?? "unknown"
+    );
+  };
+
+  const retryPromptFallback = async () => {
     const prompt = lastPromptRef.current;
     if (!prompt) {
       setMode("menu");
@@ -344,6 +685,16 @@ export function AIContextMenu({ state, onClose, onReplace, onInsertBelow }: AICo
     setCompletion("");
     setConflictInfo(null);
     await handleAction(prompt);
+  };
+
+  const handleConflictRetry = async () => {
+    const request = lastGatewayRequestRef.current;
+    const conflict = lastGatewayConflictRef.current;
+    if (request && conflict) {
+      await retryGatewayRequest(request, conflict);
+      return;
+    }
+    await retryPromptFallback();
   };
 
   const handleTranslate = async () => {
@@ -676,7 +1027,7 @@ export function AIContextMenu({ state, onClose, onReplace, onInsertBelow }: AICo
                         console.error("AI content rejected:", error);
                         return;
                       }
-                      onReplace(sanitized ?? completion);
+                      await applyGatewayOutput("replace", sanitized ?? completion);
                     }}
                     className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md hover:translate-y-px transition-all bg-foreground text-background shadow-sm"
                   >
@@ -693,7 +1044,7 @@ export function AIContextMenu({ state, onClose, onReplace, onInsertBelow }: AICo
                         console.error("AI content rejected:", error);
                         return;
                       }
-                      onInsertBelow(sanitized ?? completion);
+                      await applyGatewayOutput("insert_below", sanitized ?? completion);
                     }}
                     className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-foreground/80 text-xs font-medium rounded-md transition-colors bg-surface-0 border border-border/50 hover:bg-surface-2"
                   >

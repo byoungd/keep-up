@@ -1471,6 +1471,19 @@ export class BridgeController {
 }
 
 function parseSpanId(spanId: string): { blockId: string; start: number; end: number } | null {
+  if (spanId.startsWith("selection:")) {
+    const parts = spanId.split(":");
+    if (parts.length !== 5) {
+      return null;
+    }
+    const blockId = parts[2];
+    const start = Number.parseInt(parts[3], 10);
+    const end = Number.parseInt(parts[4], 10);
+    if (!blockId || !Number.isFinite(start) || !Number.isFinite(end)) {
+      return null;
+    }
+    return { blockId, start, end };
+  }
   if (!spanId.startsWith("s")) {
     return null;
   }

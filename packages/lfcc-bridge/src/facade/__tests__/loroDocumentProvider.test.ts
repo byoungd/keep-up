@@ -4,7 +4,12 @@ import { createAnnotation } from "../../annotations/annotationSchema";
 import { createEmptyDoc } from "../../crdt/crdtSchema";
 import { createLoroRuntime } from "../../runtime/loroRuntime";
 import { LoroDocumentFacade } from "../documentFacade";
-import { createLoroDocumentProvider } from "../loroDocumentProvider";
+import {
+  buildSelectionAnnotationId,
+  buildSelectionSpanId,
+  createLoroDocumentProvider,
+  createLoroGatewayRetryProviders,
+} from "../loroDocumentProvider";
 
 describe("LoroDocumentProvider", () => {
   let runtime: ReturnType<typeof createLoroRuntime>;
@@ -54,6 +59,25 @@ describe("LoroDocumentProvider", () => {
     expect(states.has("missing")).toBe(false);
   });
 
+  it("supports selection span ids without annotations", async () => {
+    const provider = createLoroDocumentProvider(facade, runtime);
+    const requestId = "req-selection";
+    const spanId = buildSelectionSpanId(requestId, blockId, 0, 5);
+    const state = provider.getSpanState(spanId);
+
+    expect(state?.annotation_id).toBe(buildSelectionAnnotationId(requestId));
+    expect(state?.block_id).toBe(blockId);
+    expect(state?.text).toBe("Hello");
+    expect(state?.is_verified).toBe(true);
+
+    const expected = await computeContextHash({
+      span_id: spanId,
+      block_id: blockId,
+      text: "Hello",
+    });
+    expect(state?.context_hash).toBe(expected.hash);
+  });
+
   it("marks span as unverified when annotation is not active", () => {
     const annotationId = "anno-2";
     createAnnotation(runtime.doc, {
@@ -74,6 +98,33 @@ describe("LoroDocumentProvider", () => {
 
     expect(state?.annotation_id).toBe(annotationId);
     expect(state?.is_verified).toBe(false);
+  });
+
+  it("exposes retry providers for exact-hash relocation", async () => {
+    const annotationId = "anno-relocate";
+    createAnnotation(runtime.doc, {
+      id: annotationId,
+      spanList: [{ blockId, start: 0, end: 5 }],
+      chain: {
+        policy: { kind: "required_order", maxInterveningBlocks: 0 },
+        order: [blockId],
+      },
+      content: "note",
+      storedState: "active",
+    });
+    runtime.commit("test:relocate");
+
+    const { relocationProvider } = createLoroGatewayRetryProviders(facade, runtime);
+    const spanId = `s0-${blockId}-0-5`;
+    const expected = await computeContextHash({
+      span_id: spanId,
+      block_id: blockId,
+      text: "Hello",
+    });
+
+    const relocated = relocationProvider.findByContextHash(facade.docId, expected.hash);
+    expect(relocated?.context_hash).toBe(expected.hash);
+    expect(relocated?.block_id).toBe(blockId);
   });
 
   it("compares frontiers correctly", () => {
