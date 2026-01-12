@@ -1,0 +1,460 @@
+/**
+ * Agent Runtime Core Types
+ *
+ * MCP-compatible tool protocol types and agent runtime interfaces.
+ */
+
+// ============================================================================
+// MCP Tool Protocol Types
+// ============================================================================
+
+/** MCP Tool definition */
+export interface MCPTool {
+  name: string;
+  description: string;
+  inputSchema: JSONSchema;
+  /** Optional annotations for UI/security hints */
+  annotations?: {
+    /** Tool category for grouping */
+    category?: "core" | "knowledge" | "external";
+    /** Whether tool requires confirmation */
+    requiresConfirmation?: boolean;
+    /** Whether tool can modify state */
+    readOnly?: boolean;
+    /** Estimated execution time hint */
+    estimatedDuration?: "fast" | "medium" | "slow";
+  };
+}
+
+/** JSON Schema subset for tool parameters */
+export interface JSONSchema {
+  type: "object" | "string" | "number" | "boolean" | "array";
+  properties?: Record<string, JSONSchemaProperty>;
+  required?: string[];
+  description?: string;
+}
+
+export interface JSONSchemaProperty {
+  type?: "string" | "number" | "boolean" | "array" | "object";
+  description?: string;
+  enum?: string[];
+  items?: JSONSchemaProperty;
+  oneOf?: JSONSchemaProperty[];
+  default?: unknown;
+  /** Properties for nested objects */
+  properties?: Record<string, JSONSchemaProperty>;
+  /** Required fields for nested objects */
+  required?: string[];
+}
+
+/** MCP Tool call request */
+export interface MCPToolCall {
+  name: string;
+  arguments: Record<string, unknown>;
+}
+
+/** MCP Tool call result */
+export interface MCPToolResult {
+  success: boolean;
+  content: ToolContent[];
+  error?: ToolError;
+  /** Execution metadata */
+  meta?: {
+    durationMs: number;
+    toolName: string;
+    sandboxed: boolean;
+  };
+}
+
+/** Tool content types */
+export type ToolContent =
+  | { type: "text"; text: string }
+  | { type: "image"; data: string; mimeType: string }
+  | { type: "resource"; uri: string; mimeType?: string };
+
+/** Tool error structure */
+export interface ToolError {
+  code: ToolErrorCode;
+  message: string;
+  details?: unknown;
+}
+
+export type ToolErrorCode =
+  | "EXECUTION_FAILED"
+  | "TIMEOUT"
+  | "PERMISSION_DENIED"
+  | "INVALID_ARGUMENTS"
+  | "SANDBOX_VIOLATION"
+  | "RESOURCE_NOT_FOUND"
+  | "RATE_LIMITED"
+  | "CONFLICT"
+  | "DRYRUN_REJECTED";
+
+// ============================================================================
+// Tool Server Interface (MCP Server)
+// ============================================================================
+
+/** MCP Tool Server interface */
+export interface MCPToolServer {
+  /** Server name */
+  readonly name: string;
+  /** Server description */
+  readonly description: string;
+  /** List available tools */
+  listTools(): MCPTool[];
+  /** Execute a tool */
+  callTool(call: MCPToolCall, context: ToolContext): Promise<MCPToolResult>;
+  /** Optional: Initialize server */
+  initialize?(): Promise<void>;
+  /** Optional: Cleanup */
+  dispose?(): Promise<void>;
+}
+
+/** Context passed to tool execution */
+export interface ToolContext {
+  /** Current user ID */
+  userId?: string;
+  /** Current document ID (for LFCC tools) */
+  docId?: string;
+  /** Correlation ID for tracing */
+  correlationId?: string;
+  /** Security policy in effect */
+  security: SecurityPolicy;
+  /** Abort signal for cancellation */
+  signal?: AbortSignal;
+  /** Audit logger */
+  audit?: AuditLogger;
+}
+
+// ============================================================================
+// Security Types
+// ============================================================================
+
+import type { DataAccessPolicy, PolicyEngine } from "@keepup/core";
+
+/** Security policy for agent execution */
+export interface SecurityPolicy {
+  /** Sandbox configuration */
+  sandbox: SandboxConfig;
+  /** Tool permissions */
+  permissions: ToolPermissions;
+  /** Resource limits */
+  limits: ResourceLimits;
+  /** Optional AI-native policy engine for fine-grained AI operation control */
+  aiPolicyEngine?: PolicyEngine;
+  /** Optional data access policy for AI read operations */
+  dataAccessPolicy?: DataAccessPolicy;
+}
+
+export interface SandboxConfig {
+  /** Sandbox type */
+  type: "none" | "process" | "docker" | "wasm";
+  /** Network access */
+  networkAccess: "none" | "allowlist" | "full";
+  /** Allowed hosts for network access */
+  allowedHosts?: string[];
+  /** Filesystem isolation */
+  fsIsolation: "none" | "workspace" | "temp" | "full";
+  /** Working directory for sandboxed execution */
+  workingDirectory?: string;
+}
+
+export interface ToolPermissions {
+  /** Bash execution permission */
+  bash: "disabled" | "confirm" | "sandbox" | "full";
+  /** File access permission */
+  file: "none" | "read" | "workspace" | "home" | "full";
+  /** Code execution permission */
+  code: "disabled" | "sandbox" | "full";
+  /** Network access permission */
+  network: "none" | "allowlist" | "full";
+  /** LFCC document permission */
+  lfcc: "none" | "read" | "write" | "admin";
+}
+
+export interface ResourceLimits {
+  /** Max execution time in ms */
+  maxExecutionTimeMs: number;
+  /** Max memory in bytes */
+  maxMemoryBytes: number;
+  /** Max output size in bytes */
+  maxOutputBytes: number;
+  /** Max concurrent tool calls */
+  maxConcurrentCalls: number;
+}
+
+/** Security policy presets */
+export const SECURITY_PRESETS = {
+  safe: {
+    sandbox: {
+      type: "process" as const,
+      networkAccess: "none" as const,
+      fsIsolation: "workspace" as const,
+    },
+    permissions: {
+      bash: "disabled" as const,
+      file: "read" as const,
+      code: "disabled" as const,
+      network: "none" as const,
+      lfcc: "read" as const,
+    },
+    limits: {
+      maxExecutionTimeMs: 30_000,
+      maxMemoryBytes: 256 * 1024 * 1024, // 256MB
+      maxOutputBytes: 1024 * 1024, // 1MB
+      maxConcurrentCalls: 3,
+    },
+  },
+  balanced: {
+    sandbox: {
+      type: "process" as const,
+      networkAccess: "allowlist" as const,
+      fsIsolation: "workspace" as const,
+    },
+    permissions: {
+      bash: "sandbox" as const,
+      file: "workspace" as const,
+      code: "sandbox" as const,
+      network: "allowlist" as const,
+      lfcc: "write" as const,
+    },
+    limits: {
+      maxExecutionTimeMs: 120_000,
+      maxMemoryBytes: 512 * 1024 * 1024, // 512MB
+      maxOutputBytes: 10 * 1024 * 1024, // 10MB
+      maxConcurrentCalls: 5,
+    },
+  },
+  power: {
+    sandbox: {
+      type: "none" as const,
+      networkAccess: "full" as const,
+      fsIsolation: "none" as const,
+    },
+    permissions: {
+      bash: "confirm" as const,
+      file: "home" as const,
+      code: "full" as const,
+      network: "full" as const,
+      lfcc: "write" as const,
+    },
+    limits: {
+      maxExecutionTimeMs: 300_000,
+      maxMemoryBytes: 1024 * 1024 * 1024, // 1GB
+      maxOutputBytes: 50 * 1024 * 1024, // 50MB
+      maxConcurrentCalls: 10,
+    },
+  },
+  developer: {
+    sandbox: {
+      type: "none" as const,
+      networkAccess: "full" as const,
+      fsIsolation: "none" as const,
+    },
+    permissions: {
+      bash: "full" as const,
+      file: "full" as const,
+      code: "full" as const,
+      network: "full" as const,
+      lfcc: "admin" as const,
+    },
+    limits: {
+      maxExecutionTimeMs: 600_000,
+      maxMemoryBytes: 2 * 1024 * 1024 * 1024, // 2GB
+      maxOutputBytes: 100 * 1024 * 1024, // 100MB
+      maxConcurrentCalls: 20,
+    },
+  },
+} as const;
+
+export type SecurityPreset = keyof typeof SECURITY_PRESETS;
+
+// ============================================================================
+// Audit Types
+// ============================================================================
+
+/** Audit log entry */
+export interface AuditEntry {
+  timestamp: number;
+  toolName: string;
+  action: "call" | "result" | "error";
+  userId?: string;
+  input?: Record<string, unknown>;
+  output?: unknown;
+  error?: string;
+  durationMs?: number;
+  sandboxed: boolean;
+}
+
+/** Audit logger interface */
+export interface AuditLogger {
+  log(entry: AuditEntry): void;
+  getEntries(filter?: AuditFilter): AuditEntry[];
+}
+
+export interface AuditFilter {
+  toolName?: string;
+  userId?: string;
+  since?: number;
+  until?: number;
+  action?: AuditEntry["action"];
+}
+
+// ============================================================================
+// Agent Orchestrator Types
+// ============================================================================
+
+/** Configuration for parallel tool execution */
+export interface ParallelExecutionConfig {
+  /** Enable parallel execution of independent tools (default: true) */
+  enabled: boolean;
+  /** Maximum concurrent tool calls (default: 5) */
+  maxConcurrent: number;
+}
+
+/** Agent configuration */
+export interface AgentConfig {
+  /** Agent name */
+  name: string;
+  /** System prompt */
+  systemPrompt: string;
+  /** Security policy */
+  security: SecurityPolicy;
+  /** Available tool servers */
+  toolServers: MCPToolServer[];
+  /** Max turns before stopping */
+  maxTurns?: number;
+  /** Whether to require confirmation for dangerous operations */
+  requireConfirmation?: boolean;
+  /** Parallel tool execution configuration */
+  parallelExecution?: ParallelExecutionConfig;
+  /** Planning configuration (plan-then-execute pattern) */
+  planning?: {
+    enabled: boolean;
+    requireApproval?: boolean;
+    maxRefinements?: number;
+    planningTimeoutMs?: number;
+    autoExecuteLowRisk?: boolean;
+  };
+  /** Error recovery configuration */
+  recovery?: {
+    enabled?: boolean;
+  };
+  /** Tool discovery configuration */
+  toolDiscovery?: {
+    enabled?: boolean;
+    maxResults?: number;
+    minScore?: number;
+  };
+}
+
+/** Agent execution state */
+export interface AgentState {
+  /** Current turn number */
+  turn: number;
+  /** Conversation messages */
+  messages: AgentMessage[];
+  /** Pending tool calls */
+  pendingToolCalls: MCPToolCall[];
+  /** Execution status */
+  status: "idle" | "thinking" | "executing" | "waiting_confirmation" | "complete" | "error";
+  /** Error if any */
+  error?: string;
+}
+
+/** Agent message types */
+export type AgentMessage =
+  | { role: "system"; content: string }
+  | { role: "user"; content: string }
+  | { role: "assistant"; content: string; toolCalls?: MCPToolCall[] }
+  | { role: "tool"; toolName: string; result: MCPToolResult };
+
+/** Confirmation request for dangerous operations */
+export interface ConfirmationRequest {
+  toolName: string;
+  description: string;
+  arguments: Record<string, unknown>;
+  risk: "low" | "medium" | "high";
+}
+
+/** Confirmation handler callback */
+export type ConfirmationHandler = (request: ConfirmationRequest) => Promise<boolean>;
+
+// ============================================================================
+// Execution Metadata Types (for visualization)
+// ============================================================================
+
+/** Detailed token usage statistics */
+export interface TokenUsageStats {
+  /** Input tokens consumed */
+  inputTokens: number;
+  /** Output tokens generated */
+  outputTokens: number;
+  /** Total tokens */
+  totalTokens: number;
+  /** Context window size */
+  contextWindow?: number;
+  /** Percentage of context window used (0-100) */
+  utilization?: number;
+  /** Breakdown by message type */
+  breakdown?: {
+    system?: number;
+    user?: number;
+    assistant?: number;
+    tool?: number;
+  };
+}
+
+/** Execution step for tool call visualization */
+export interface ExecutionStep {
+  /** Step ID */
+  id: string;
+  /** Tool name */
+  toolName: string;
+  /** Tool arguments */
+  arguments: Record<string, unknown>;
+  /** Execution status */
+  status: "pending" | "executing" | "success" | "error";
+  /** Tool result (when complete) */
+  result?: MCPToolResult;
+  /** Execution start time */
+  startTime: number;
+  /** Execution end time */
+  endTime?: number;
+  /** Duration in milliseconds */
+  durationMs?: number;
+  /** Whether this step was executed in parallel with others */
+  parallel?: boolean;
+}
+
+/** Thinking/reasoning block for display */
+export interface ThinkingBlock {
+  /** Thinking content */
+  content: string;
+  /** Type of thinking */
+  type: "reasoning" | "planning" | "reflection";
+  /** Timestamp */
+  timestamp: number;
+  /** Whether thinking is complete */
+  complete: boolean;
+}
+
+/** Context compaction event */
+export interface CompressionEvent {
+  /** When compression occurred */
+  timestamp: number;
+  /** Number of messages before compression */
+  messagesBefore: number;
+  /** Number of messages after compression */
+  messagesAfter: number;
+  /** Tokens before compression */
+  tokensBefore: number;
+  /** Tokens after compression */
+  tokensAfter: number;
+  /** Compression ratio (0-1) */
+  compressionRatio: number;
+  /** Strategy used */
+  strategy: "sliding_window" | "summarize" | "truncate" | "hybrid";
+  /** Summary of what was compressed */
+  summary?: string;
+}

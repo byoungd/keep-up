@@ -1,0 +1,398 @@
+/**
+ * Security Module
+ *
+ * Provides security policies, permission checking, and audit logging
+ * for the agent runtime.
+ */
+
+import type {
+  AuditEntry,
+  AuditFilter,
+  AuditLogger,
+  ResourceLimits,
+  SandboxConfig,
+  SecurityPolicy,
+  ToolPermissions,
+} from "../types";
+import { SECURITY_PRESETS, type SecurityPreset } from "../types";
+
+// ============================================================================
+// Permission Checker
+// ============================================================================
+
+export interface IPermissionChecker {
+  /** Check if an operation is allowed */
+  check(operation: PermissionCheck): PermissionResult;
+  /** Get current policy */
+  getPolicy(): SecurityPolicy;
+}
+
+export interface PermissionCheck {
+  tool: string;
+  operation: string;
+  resource?: string;
+}
+
+export interface PermissionResult {
+  allowed: boolean;
+  reason?: string;
+  requiresConfirmation?: boolean;
+}
+
+/**
+ * Default permission checker implementation.
+ */
+export class PermissionChecker implements IPermissionChecker {
+  private policy: SecurityPolicy;
+
+  constructor(policy: SecurityPolicy) {
+    this.policy = policy;
+  }
+
+  check(check: PermissionCheck): PermissionResult {
+    const { tool, operation } = check;
+
+    // Check tool-specific permissions
+    switch (tool) {
+      case "bash":
+        return this.checkBashPermission(operation);
+      case "file":
+        return this.checkFilePermission(operation, check.resource);
+      case "code":
+        return this.checkCodePermission(operation);
+      case "lfcc":
+        return this.checkLFCCPermission(operation);
+      default:
+        // Unknown tools default to checking network permission
+        return this.checkNetworkPermission();
+    }
+  }
+
+  getPolicy(): SecurityPolicy {
+    return this.policy;
+  }
+
+  updatePolicy(policy: Partial<SecurityPolicy>): void {
+    this.policy = { ...this.policy, ...policy };
+  }
+
+  private checkBashPermission(_operation: string): PermissionResult {
+    const permission = this.policy.permissions.bash;
+
+    switch (permission) {
+      case "disabled":
+        return { allowed: false, reason: "Bash execution is disabled" };
+      case "confirm":
+        return { allowed: true, requiresConfirmation: true };
+      case "sandbox":
+        return { allowed: true, requiresConfirmation: false };
+      case "full":
+        return { allowed: true };
+      default:
+        return { allowed: false, reason: "Unknown permission level" };
+    }
+  }
+
+  private checkFilePermission(operation: string, _resource?: string): PermissionResult {
+    const permission = this.policy.permissions.file;
+    const isWrite = ["write", "delete", "create"].includes(operation);
+
+    switch (permission) {
+      case "none":
+        return { allowed: false, reason: "File access is disabled" };
+      case "read":
+        if (isWrite) {
+          return { allowed: false, reason: "File write access is disabled" };
+        }
+        return { allowed: true };
+      case "workspace":
+      case "home":
+      case "full":
+        return { allowed: true, requiresConfirmation: isWrite };
+      default:
+        return { allowed: false, reason: "Unknown permission level" };
+    }
+  }
+
+  private checkCodePermission(_operation: string): PermissionResult {
+    const permission = this.policy.permissions.code;
+
+    switch (permission) {
+      case "disabled":
+        return { allowed: false, reason: "Code execution is disabled" };
+      case "sandbox":
+        return { allowed: true, requiresConfirmation: true };
+      case "full":
+        return { allowed: true };
+      default:
+        return { allowed: false, reason: "Unknown permission level" };
+    }
+  }
+
+  private checkLFCCPermission(operation: string): PermissionResult {
+    const permission = this.policy.permissions.lfcc;
+    const isWrite = ["write", "insert", "update", "delete"].some((op) => operation.includes(op));
+
+    switch (permission) {
+      case "none":
+        return { allowed: false, reason: "Document access is disabled" };
+      case "read":
+        if (isWrite) {
+          return { allowed: false, reason: "Document write access is disabled" };
+        }
+        return { allowed: true };
+      case "write":
+      case "admin":
+        return { allowed: true };
+      default:
+        return { allowed: false, reason: "Unknown permission level" };
+    }
+  }
+
+  private checkNetworkPermission(): PermissionResult {
+    const permission = this.policy.permissions.network;
+
+    switch (permission) {
+      case "none":
+        return { allowed: false, reason: "Network access is disabled" };
+      case "allowlist":
+        return { allowed: true, requiresConfirmation: true };
+      case "full":
+        return { allowed: true };
+      default:
+        return { allowed: false, reason: "Unknown permission level" };
+    }
+  }
+}
+
+// ============================================================================
+// Audit Logger Implementation
+// ============================================================================
+
+/**
+ * In-memory audit logger.
+ * For production, replace with persistent storage.
+ */
+export class InMemoryAuditLogger implements AuditLogger {
+  private entries: AuditEntry[] = [];
+  private readonly maxEntries: number;
+
+  constructor(maxEntries = 10000) {
+    this.maxEntries = maxEntries;
+  }
+
+  log(entry: AuditEntry): void {
+    this.entries.push(entry);
+
+    // Trim if over limit
+    if (this.entries.length > this.maxEntries) {
+      this.entries = this.entries.slice(-this.maxEntries);
+    }
+  }
+
+  getEntries(filter?: AuditFilter): AuditEntry[] {
+    let result = [...this.entries];
+
+    if (filter) {
+      if (filter.toolName) {
+        result = result.filter((e) => e.toolName === filter.toolName);
+      }
+      if (filter.userId) {
+        result = result.filter((e) => e.userId === filter.userId);
+      }
+      if (filter.since) {
+        const since = filter.since;
+        result = result.filter((e) => e.timestamp >= since);
+      }
+      if (filter.until) {
+        const until = filter.until;
+        result = result.filter((e) => e.timestamp <= until);
+      }
+      if (filter.action) {
+        result = result.filter((e) => e.action === filter.action);
+      }
+    }
+
+    return result;
+  }
+
+  clear(): void {
+    this.entries = [];
+  }
+
+  getStats(): { total: number; byTool: Record<string, number>; byAction: Record<string, number> } {
+    const byTool: Record<string, number> = {};
+    const byAction: Record<string, number> = {};
+
+    for (const entry of this.entries) {
+      byTool[entry.toolName] = (byTool[entry.toolName] ?? 0) + 1;
+      byAction[entry.action] = (byAction[entry.action] ?? 0) + 1;
+    }
+
+    return { total: this.entries.length, byTool, byAction };
+  }
+}
+
+// ============================================================================
+// Security Policy Builder
+// ============================================================================
+
+/**
+ * Fluent builder for creating security policies.
+ */
+export class SecurityPolicyBuilder {
+  private sandbox: SandboxConfig = {
+    type: "process",
+    networkAccess: "none",
+    fsIsolation: "workspace",
+  };
+
+  private permissions: ToolPermissions = {
+    bash: "disabled",
+    file: "read",
+    code: "disabled",
+    network: "none",
+    lfcc: "read",
+  };
+
+  private limits: ResourceLimits = {
+    maxExecutionTimeMs: 30_000,
+    maxMemoryBytes: 256 * 1024 * 1024,
+    maxOutputBytes: 1024 * 1024,
+    maxConcurrentCalls: 3,
+  };
+
+  /** Start from a preset */
+  static fromPreset(preset: SecurityPreset): SecurityPolicyBuilder {
+    const builder = new SecurityPolicyBuilder();
+    const presetConfig = SECURITY_PRESETS[preset];
+
+    builder.sandbox = { ...presetConfig.sandbox };
+    builder.permissions = { ...presetConfig.permissions };
+    builder.limits = { ...presetConfig.limits };
+
+    return builder;
+  }
+
+  /** Set sandbox type */
+  withSandbox(type: SandboxConfig["type"]): this {
+    this.sandbox.type = type;
+    return this;
+  }
+
+  /** Set network access */
+  withNetworkAccess(access: SandboxConfig["networkAccess"], hosts?: string[]): this {
+    this.sandbox.networkAccess = access;
+    if (hosts) {
+      this.sandbox.allowedHosts = hosts;
+    }
+    return this;
+  }
+
+  /** Set filesystem isolation */
+  withFsIsolation(isolation: SandboxConfig["fsIsolation"]): this {
+    this.sandbox.fsIsolation = isolation;
+    return this;
+  }
+
+  /** Set working directory */
+  withWorkingDirectory(dir: string): this {
+    this.sandbox.workingDirectory = dir;
+    return this;
+  }
+
+  /** Set bash permission */
+  withBashPermission(permission: ToolPermissions["bash"]): this {
+    this.permissions.bash = permission;
+    return this;
+  }
+
+  /** Set file permission */
+  withFilePermission(permission: ToolPermissions["file"]): this {
+    this.permissions.file = permission;
+    return this;
+  }
+
+  /** Set code permission */
+  withCodePermission(permission: ToolPermissions["code"]): this {
+    this.permissions.code = permission;
+    return this;
+  }
+
+  /** Set network permission */
+  withNetworkPermission(permission: ToolPermissions["network"]): this {
+    this.permissions.network = permission;
+    return this;
+  }
+
+  /** Set LFCC permission */
+  withLFCCPermission(permission: ToolPermissions["lfcc"]): this {
+    this.permissions.lfcc = permission;
+    return this;
+  }
+
+  /** Set execution time limit */
+  withTimeLimit(ms: number): this {
+    this.limits.maxExecutionTimeMs = ms;
+    return this;
+  }
+
+  /** Set memory limit */
+  withMemoryLimit(bytes: number): this {
+    this.limits.maxMemoryBytes = bytes;
+    return this;
+  }
+
+  /** Set output size limit */
+  withOutputLimit(bytes: number): this {
+    this.limits.maxOutputBytes = bytes;
+    return this;
+  }
+
+  /** Set concurrent calls limit */
+  withConcurrencyLimit(max: number): this {
+    this.limits.maxConcurrentCalls = max;
+    return this;
+  }
+
+  /** Build the security policy */
+  build(): SecurityPolicy {
+    return {
+      sandbox: { ...this.sandbox },
+      permissions: { ...this.permissions },
+      limits: { ...this.limits },
+    };
+  }
+}
+
+// ============================================================================
+// Factory Functions
+// ============================================================================
+
+/**
+ * Create a permission checker with the given policy.
+ */
+export function createPermissionChecker(policy: SecurityPolicy): PermissionChecker {
+  return new PermissionChecker(policy);
+}
+
+/**
+ * Create an in-memory audit logger.
+ */
+export function createAuditLogger(maxEntries?: number): InMemoryAuditLogger {
+  return new InMemoryAuditLogger(maxEntries);
+}
+
+/**
+ * Create a security policy from a preset.
+ */
+export function createSecurityPolicy(preset: SecurityPreset): SecurityPolicy {
+  return { ...SECURITY_PRESETS[preset] };
+}
+
+/**
+ * Create a security policy builder.
+ */
+export function securityPolicy(): SecurityPolicyBuilder {
+  return new SecurityPolicyBuilder();
+}
