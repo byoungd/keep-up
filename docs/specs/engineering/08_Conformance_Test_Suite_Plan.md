@@ -151,6 +151,13 @@ Intentionally inject a bug (skip neighbor expansion) and assert harness detects 
 
 ---
 
+### 7.4 AI-native Extension (Optional)
+Run only when AI-native is negotiated:
+- idempotency: duplicate `request_id` does not double-apply
+- agent auth: invalid or expired agent token rejected
+- data access: redaction policy enforced before model call
+- audit: accepted and rejected requests emit audit records
+
 ## 8. Property-Based Testing Requirements
 
 ### 8.1 Framework Requirements

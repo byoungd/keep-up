@@ -1,4 +1,4 @@
-\
+﻿\
 # LFCC v0.9 RC — Engineering Documentation Pack
 
 **Generated:** 2025-12-31  
@@ -9,6 +9,7 @@ This bundle contains implementation-ready documents for different teams:
 ## 1) Architecture & Interfaces
 - `01_Kernel_API_Specification.md` — lfcc-kernel APIs and module layout
 - `02_Policy_Manifest_Schema.md` — JSON Schema + TS interfaces + negotiation pseudocode
+- `policy_manifest_v0.9.1.schema.json` - JSON Schema with ai_native_policy (optional extension)
 - `03_Shadow_Model_and_Bridge_Architecture.md` — Mode B shadow model and bridge flows
 
 ## 2) Frontend Implementation Guides
@@ -39,6 +40,7 @@ This bundle contains implementation-ready documents for different teams:
 - `20_Platform_Requirements_and_Conformance.md` — UTF-16 encoding, timestamp precision, cross-platform testing
 - `21_Fuzzing_Strategy_and_Bug_Reproduction.md` — Seed management, bug reproduction, CI integration
 - `22_Anchor_Upgrade_Path.md` — Design for anchor checksum upgrade (CRC32 -> HMAC-SHA256)
+- 23_AI_Native_Extension.md - Optional v0.9.1 AI-native extension (gateway v2, policy, governance)
 
 ## 7) Governance & Traceability
 - `99_Normative_Index.md` — Indexed list of all MUST/REQUIRED clauses with source links

@@ -5,6 +5,8 @@
 **Audience:** Backend engineers, AI platform engineers.  
 **Source of truth:** LFCC v0.9 RC §11.2 (Dry-Run), §8 (Canonicalizer).
 
+**See also:** `23_AI_Native_Extension.md` (optional v0.9.1 AI-native addendum).
+
 ---
 
 ## 0. Objective
@@ -29,6 +31,14 @@ flowchart LR
   P -->|ok| OK[Apply to Document]
   P -->|fail| R[Reject Fail-Closed]
 ```
+
+### 1.1 AI-Native Preflight (Optional)
+If AI-native is negotiated, perform envelope validation before sanitize/normalize:
+- verify request idempotency window
+- verify agent identity and policy context
+- enforce explicit ops requirement for deterministic replay
+
+See `23_AI_Native_Extension.md` for normative requirements.
 
 ---
 

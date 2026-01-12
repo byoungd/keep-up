@@ -1,9 +1,11 @@
-# Policy Manifest Schema (JSON Schema + TypeScript) — v0.9 RC
+﻿# Policy Manifest Schema (JSON Schema + TypeScript) — v0.9 RC
 
 **Applies to:** LFCC v0.9 RC  
 **Last updated:** 2025-12-31  
 **Audience:** Web/iOS/Android leads, platform architects, integration owners.  
 **Source of truth:** LFCC v0.9 RC §2.
+
+**See also:** `23_AI_Native_Extension.md` (AI-native policy extension details).
 
 ---
 
@@ -120,9 +122,83 @@ export type PolicyManifestV09 = {
 
 ---
 
+### 1.2 AI-native Extension (v0.9.1 optional)
+
+AI-native fields are optional and only used when negotiated. For v0.9 peers, place AI-native fields under `extensions.ai_native` to avoid unknown top-level fields.
+
+```ts
+export type AiNativeCapabilities = {
+  ai_gateway_v2?: boolean;
+  ai_native?: boolean;
+  ai_provenance?: boolean;
+  ai_data_access?: boolean;
+  ai_audit?: boolean;
+  ai_transactions?: boolean;
+  semantic_merge?: boolean;
+  multi_agent?: boolean;
+};
+
+export type AiNativePolicyV1 = {
+  version: "v1";
+  gateway: {
+    max_ops_per_request: number;
+    max_payload_bytes: number;
+    idempotency_window_ms: number;
+  };
+  security: {
+    require_signed_requests: boolean;
+    agent_token_ttl_ms: number;
+    audit_retention_days: number;
+    allow_external_models: boolean;
+  };
+  data_access: {
+    max_context_chars: number;
+    redaction_strategy: "mask" | "omit";
+    pii_handling: "block" | "mask" | "allow";
+    allow_external_fetch: boolean;
+  };
+  determinism: {
+    require_explicit_ops: boolean;
+  };
+  intent_tracking: {
+    enabled: boolean;
+    require_intent: boolean;
+    intent_retention_days: number;
+  };
+  provenance: {
+    enabled: boolean;
+    track_inline: boolean;
+    require_model_id: boolean;
+  };
+  semantic_merge: {
+    enabled: boolean;
+    ai_autonomy: "disabled" | "suggest_only" | "full";
+    auto_merge_threshold: number;
+  };
+  transactions: {
+    enabled: boolean;
+    default_timeout_ms: number;
+    max_operations_per_txn: number;
+  };
+  ai_opcodes: {
+    allowed: string[];
+    require_approval: string[];
+  };
+};
+
+export type PolicyManifestV091 = PolicyManifestV09 & {
+  lfcc_version: "0.9.1";
+  ai_native_policy?: AiNativePolicyV1;
+  capabilities: PolicyManifestV09["capabilities"] & AiNativeCapabilities;
+};
+```
+
+See `23_AI_Native_Extension.md` for negotiation rules and normative requirements.
+
 ## 2. JSON Schema (Draft 2020-12) — Reference
 
 > This schema is intended to be copied into a repo as `policy_manifest.schema.json`.
+> For v0.9.1 with AI-native, see `policy_manifest_v0.9.1.schema.json` in this directory.
 
 ```json
 {
@@ -410,3 +486,5 @@ Rules:
 - If `bounded_gap=false` in effective caps → chain kind MUST degrade to `strict_adjacency`.
 - For dev tooling fields: may differ per replica; ignore or treat as non-blocking.
 - Unknown top-level fields MUST be rejected unless under `extensions`.
+### 3.1 AI-native Negotiation (Optional)
+If AI-native fields are present and supported by all participants, negotiate them using the restriction rules in `23_AI_Native_Extension.md`. If any participant lacks AI-native support, treat AI-native as disabled and fall back to v0.9 behavior.

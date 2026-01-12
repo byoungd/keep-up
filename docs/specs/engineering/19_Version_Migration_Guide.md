@@ -39,6 +39,12 @@ This guide specifies version compatibility and migration procedures for LFCC pro
 - Bug fixes only
 - No migration required
 
+### 1.2.1 v0.9.1 AI-native Extension (Optional)
+
+- v0.9.1 remains patch-compatible; AI-native fields are optional and negotiated.
+- For mixed peers, place AI-native fields under `extensions.ai_native` to avoid unknown top-level field rejection.
+- If any participant lacks AI-native support, fall back to v0.9 AI behavior.
+
 ### 1.3 Breaking Changes for v0.9
 
 The following items are considered breaking for pre-0.9 implementations:
