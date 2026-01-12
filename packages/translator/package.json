@@ -1,0 +1,13 @@
+{
+  "name": "@keepup/translator",
+  "version": "1.0.0",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "vitest": "^4.0.15"
+  }
+}
