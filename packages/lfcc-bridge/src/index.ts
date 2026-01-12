@@ -15,6 +15,7 @@ export * from "./crdt/crdtSchema";
 export * from "./dirty/dirtyInfo";
 export * from "./dirty/assertDirtyInfo";
 export * from "./integrity/divergence";
+export * from "./pm/canonicalToPm";
 export * from "./pm/pmSchema";
 export * from "./pm/validateBlockIds";
 export * from "./policy/degradationManager";
@@ -36,5 +37,7 @@ export * from "./sync/webSocketCollabAdapter";
 export * from "./undo/undoIntegration";
 export * from "./utils/unicode";
 export * from "./streaming";
-// Canonical document model
-export * from "./crdt/enhancedDocument";
+// DocumentFacade - Single authority document access layer (preferred)
+export * from "./facade";
+// Canonical document model (deprecated, removed in favor of Facade)
+// Use DocumentFacade for all document operations

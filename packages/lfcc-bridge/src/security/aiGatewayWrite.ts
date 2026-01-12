@@ -47,10 +47,52 @@ export interface AIGatewayWriteOptions {
   aiMeta?: unknown;
 }
 
+export interface AIGatewayWriteMetadata {
+  /** Source identifier for diagnostics */
+  source?: string;
+  /** Gateway request id (idempotency/audit) */
+  requestId?: string;
+  /** Agent id for audit attribution */
+  agentId?: string;
+  /** Intent id for traceability */
+  intentId?: string;
+  /** Provenance metadata blob */
+  aiMeta?: unknown;
+}
+
 export interface AIGatewayWriteResult {
   success: boolean;
   transaction?: Transaction;
   error?: string;
+}
+
+/**
+ * Apply AI gateway metadata to an existing transaction.
+ */
+export function markAIGatewayTransaction(
+  tr: Transaction,
+  metadata: AIGatewayWriteMetadata
+): Transaction {
+  const source = metadata.source ?? "ai-gateway";
+  let next = tr
+    .setMeta(AI_GATEWAY_META, true)
+    .setMeta(AI_GATEWAY_SOURCE, source)
+    .setMeta(AI_INTENT_META, true);
+
+  if (metadata.requestId) {
+    next = next.setMeta(AI_GATEWAY_REQUEST_ID, metadata.requestId);
+  }
+  if (metadata.agentId) {
+    next = next.setMeta(AI_GATEWAY_AGENT_ID, metadata.agentId);
+  }
+  if (metadata.intentId) {
+    next = next.setMeta(AI_GATEWAY_INTENT_ID, metadata.intentId);
+  }
+  if (metadata.aiMeta !== undefined) {
+    next = next.setMeta(AI_GATEWAY_META_DATA, metadata.aiMeta);
+  }
+
+  return next;
 }
 
 /**
@@ -114,22 +156,13 @@ export function applyAIGatewayWrite(
     }
 
     // Mark transaction with gateway metadata - CRITICAL for D3 validation
-    tr = tr
-      .setMeta(AI_GATEWAY_META, true)
-      .setMeta(AI_GATEWAY_SOURCE, source)
-      .setMeta(AI_INTENT_META, true);
-    if (requestId) {
-      tr = tr.setMeta(AI_GATEWAY_REQUEST_ID, requestId);
-    }
-    if (agentId) {
-      tr = tr.setMeta(AI_GATEWAY_AGENT_ID, agentId);
-    }
-    if (intentId) {
-      tr = tr.setMeta(AI_GATEWAY_INTENT_ID, intentId);
-    }
-    if (aiMeta) {
-      tr = tr.setMeta(AI_GATEWAY_META_DATA, aiMeta);
-    }
+    tr = markAIGatewayTransaction(tr, {
+      source,
+      requestId,
+      agentId,
+      intentId,
+      aiMeta,
+    });
 
     // Dispatch the transaction
     view.dispatch(tr);
