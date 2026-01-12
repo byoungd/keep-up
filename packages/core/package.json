@@ -1,0 +1,39 @@
+{
+  "name": "@keepup/core",
+  "version": "0.0.0",
+  "description": "LFCC v0.9 RC core kernel",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./sync": {
+      "types": "./dist/sync/index.d.ts",
+      "default": "./dist/sync/index.js"
+    },
+    "./sync/server": {
+      "types": "./dist/sync/server.d.ts",
+      "default": "./dist/sync/server.js"
+    },
+    "./security": {
+      "types": "./dist/security/index.d.ts",
+      "default": "./dist/security/index.js"
+    }
+  },
+  "files": ["dist", "README.md", "!dist/**/__tests__/**"],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc -w",
+    "test": "vitest run --config vitest.config.ts",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write ."
+  },
+  "devDependencies": {
+    "fast-check": "^3.23.2"
+  }
+}
