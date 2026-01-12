@@ -1,16 +1,22 @@
 # LFCC v0.9.1 - AI-Native Enhancement Proposal
 
-**Status:** Draft Proposal
+**Status:** Draft Proposal (Extension-only)
 **Author:** Keep-Up Team
 **Created:** 2026-01-11
-**Target Version:** LFCC v0.9.1
+**Target Version:** LFCC v0.9.1 (Optional Extension)
 **Goal:** Evolve LFCC from "AI-Compatible" to "AI-Native", positioning it as the foundational infrastructure for AI-assisted document editing.
 
 ---
 
+## Integration Decision (2026-01-12)
+
+This proposal is not merged into the LFCC v0.9 core spec. The agreed path is to ship it as an optional v0.9.1 extension, negotiated via capabilities and policy. The authoritative requirements live in `docs/specs/engineering/23_AI_Native_Extension.md`.
+
 ## Executive Summary
 
 LFCC v0.9 treats AI as an "external writer" — a controlled entity that submits document modifications through a Gateway interface. While this design ensures safety, it fails to unlock the full potential of AI in collaborative editing.
+
+Decision: this proposal remains a negotiated extension for v0.9.1. Core LFCC v0.9 RC remains unchanged, and the extension requirements are captured in `docs/specs/engineering/23_AI_Native_Extension.md`.
 
 This proposal upgrades LFCC to be AI-Native by introducing:
 
@@ -289,14 +295,12 @@ type AIOperation = Operation & {
 ### 3.2 Edit Intent System
 
 ```typescript
-// Intent Category Hierarchy
+// Intent Categories
 type EditIntentCategory =
-  | "content_creation"    // Creating new content
-  | "content_modification"// Modifying existing content
-  | "structure_change"    // Structural adjustments
-  | "quality_improvement" // Quality enhancement
-  | "review_feedback"     // Review and feedback
-  | "collaboration"       // Collaboration-related
+  | "generate" | "expand" | "summarize" | "rewrite" | "translate" | "refine" | "correct"
+  | "review" | "suggest" | "validate"
+  | "restructure" | "format" | "split_merge"
+  | `custom:${string}`;   // vendor-prefixed
 
 interface EditIntent {
   id: string;
@@ -354,6 +358,7 @@ interface IntentRegistry {
 **INTENT-001:** Every AI operation MUST be associated with an `EditIntent`.
 **INTENT-002:** Intent description MUST provide at least the `short` field.
 **INTENT-003:** Multi-step edits MUST use the `chain` field to establish relationships.
+**INTENT-004:** Non-standard intent categories MUST use a vendor prefix (`custom:<vendor>.<name>`).
 
 ### 3.3 Content Provenance Tracking
 
@@ -565,6 +570,7 @@ interface HandoffContext {
 **AGENT-001:** Multi-agent scenarios MUST use the Agent Coordination Protocol.
 **AGENT-002:** Block editing rights MUST be acquired via `claimBlocks` before modification.
 **AGENT-003:** Inter-agent handoffs MUST use `handoff` with complete context transfer.
+**AGENT-004:** Overlapping claims MUST be resolved deterministically using a stable ordering (e.g., by `agent_id`, then `request_id`), and losers MUST receive a denial reason.
 
 ### 3.5 Semantic Conflict Resolution (Semantic Merge)
 
@@ -839,6 +845,8 @@ interface AgentSession {
 
 ### 4.1 New Policy Fields
 
+When negotiated, `ai_native_policy` is available at the top level for v0.9.1 peers. For mixed peers or v0.9 clients, place the same payload under `extensions.ai_native` to avoid unknown top-level field rejection.
+
 ```json
 {
   "lfcc_version": "0.9.1",
@@ -870,13 +878,6 @@ interface AgentSession {
       "require_explicit_ops": true
     },
 
-    "agent_coordination": {
-      "enabled": true,
-      "max_concurrent_agents": 10,
-      "require_agent_registration": true,
-      "claim_timeout_ms": 30000
-    },
-
     "intent_tracking": {
       "enabled": true,
       "require_intent": true,
@@ -886,21 +887,17 @@ interface AgentSession {
     "provenance": {
       "enabled": true,
       "track_inline": true,
-      "require_model_id": true,
-      "store_rationale_summary": false
+      "require_model_id": true
     },
 
     "semantic_merge": {
       "enabled": true,
       "ai_autonomy": "suggest_only",
-      "auto_merge_threshold": 0.85,
-      "prefer_human_edits": true,
-      "max_auto_merge_complexity": "simple"
+      "auto_merge_threshold": 0.85
     },
 
     "transactions": {
       "enabled": true,
-      "default_atomicity": "all_or_nothing",
       "default_timeout_ms": 60000,
       "max_operations_per_txn": 100
     },
@@ -935,7 +932,6 @@ interface AgentSession {
     "ai_gateway_v2": true,
     "ai_data_access": true,
     "ai_audit": true,
-    "ai_deterministic": true,
     "ai_native": true,
     "multi_agent": true,
     "ai_provenance": true,
@@ -948,9 +944,9 @@ interface AgentSession {
 ### 4.2 Negotiation Rules Extension
 
 **NEG-AI-001:** `ai_native_policy` negotiation uses intersection + min strategy:
-- `max_concurrent_agents = min(...)`
 - `max_ops_per_request = min(...)`
 - `max_payload_bytes = min(...)`
+- `idempotency_window_ms = min(...)`
 - `max_context_chars = min(...)`
 - `allow_blocks = intersection(...)` (if specified)
 - `deny_blocks = union(...)` (if specified)
@@ -960,6 +956,9 @@ interface AgentSession {
 - `ai_autonomy` = most restrictive (`disabled` > `suggest_only` > `full`)
 
 **NEG-AI-002:** If `ai_native` capability mismatches, degrade to v0.9 behavior.
+
+**POL-AI-001:** `auto_merge_threshold` MUST be within 0..1 (inclusive).
+**POL-AI-002:** If `ai_autonomy` is `full`, audit MUST be enabled and retained (`ai_audit=true`, `audit_retention_days > 0`).
 
 ---
 
@@ -1047,6 +1046,8 @@ export const aiFuzzTargets = {
 ---
 
 ## Part 6: Migration Path
+
+AI-native is an optional extension. If capability negotiation fails or a peer is v0.9-only, fall back to v0.9 behavior and store any AI-native fields under `extensions.ai_native`.
 
 ### 6.1 Version Compatibility Matrix
 
@@ -1292,3 +1293,4 @@ class AgentCoordinatorImpl implements AgentCoordinationProtocol {
 |---------|------|---------|
 | 0.1 | 2026-01-11 | Initial draft |
 | 0.2 | 2026-01-15 | Add deterministic envelope, gateway policy, and security controls |
+| 0.3 | 2026-01-16 | Marked as optional v0.9.1 extension; moved requirements to engineering addendum |

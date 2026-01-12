@@ -70,6 +70,18 @@ function validateURL(url: string): boolean {
 
 ---
 
+### 1.4 AI-native Governance (Optional)
+
+When AI-native is negotiated, apply additional security controls:
+- Authenticate `agent_id` and enforce signed request requirements.
+- Enforce request idempotency windows to prevent replay.
+- Apply data access policies (context limits, redaction) before model invocation.
+- Emit append-only audit records for accepted and rejected requests.
+
+See `23_AI_Native_Extension.md` for normative requirements.
+
+---
+
 ## 2. Hash Collision Handling
 
 ### 2.1 Collision Detection

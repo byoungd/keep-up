@@ -5,6 +5,8 @@
 **Audience:** Backend engineers, AI engineers, client integrators.  
 **Source of truth:** LFCC v0.9 RC §11 (AI Gateway), §8 (Canonicalizer), §10 (Integrity).
 
+**See also:** `23_AI_Native_Extension.md` (optional v0.9.1 AI-native addendum).
+
 ---
 
 ## 0. Principles
@@ -57,6 +59,27 @@
 
 ---
 
+### 2.3 AI-Native Request (v0.9.1 optional)
+AI-native implementations use the v2 envelope defined in `23_AI_Native_Extension.md`. Minimal example:
+
+```json
+{
+  "request_id": "uuid",
+  "agent_id": "agent_uuid",
+  "doc_frontier": "FRONTIER_ENCODED",
+  "intent_id": "intent_uuid",
+  "preconditions": [
+    { "span_id": "span_uuid", "if_match_context_hash": "sha256_hex" }
+  ],
+  "ops_xml": "<replace_spans annotation=\"anno_uuid\">...</replace_spans>",
+  "policy_context": { "policy_id": "policy_uuid" }
+}
+```
+
+Notes:
+- v2 adds request idempotency, agent identity, and intent tracking.
+- v2 retains v0.9 preconditions and dry-run requirements.
+
 ## 3. Success Response (200)
 
 When `return_canonical_tree=true`, gateway SHOULD return canonicalized representation of the applied edit (or of the payload after dry-run).
@@ -85,6 +108,8 @@ Notes:
 
 ---
 
+AI-native responses may include `applied_ops` and `audit_id` (see addendum).
+
 ## 4. Conflict Response (409)
 
 ```json
@@ -96,6 +121,8 @@ Notes:
   ]
 }
 ```
+
+AI-native error codes and diagnostics are defined in the addendum.
 
 Allowed reasons:
 - `hash_mismatch`
