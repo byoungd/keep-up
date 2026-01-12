@@ -1,0 +1,155 @@
+{
+  "timestamp": "2025-12-25T13:17:33.946Z",
+  "environment": {
+    "nodeVersion": "v22.21.1",
+    "platform": "darwin"
+  },
+  "thresholds": {
+    "minContentExtractionRate": 0.8,
+    "minTitleExtractionRate": 0.9,
+    "maxSnippetRatio": 0.8,
+    "maxHtmlResidueRatio": 0.1,
+    "minAvgContentLength": 30,
+    "minItemCount": 1
+  },
+  "summary": {
+    "total": 5,
+    "passed": 5,
+    "failed": 0,
+    "gatedFailures": 0,
+    "withWarnings": 4,
+    "quickMode": true
+  },
+  "results": [
+    {
+      "fixture": "minimal-rss",
+      "description": "Minimal valid RSS feed (local mock)",
+      "success": true,
+      "regression": true,
+      "stats": {
+        "totalItems": 2,
+        "itemsWithContent": 2,
+        "itemsWithTitle": 2,
+        "itemsWithSourceId": 2,
+        "avgContentLength": 185,
+        "minContentLength": 183,
+        "maxContentLength": 186,
+        "snippetItems": 0,
+        "snippetRatio": 0,
+        "contentExtractionRate": 1,
+        "titleExtractionRate": 1,
+        "sourceIdRate": 1,
+        "itemsWithHtmlResidue": 0,
+        "htmlResidueRatio": 0,
+        "itemsWithEncodingIssues": 0
+      },
+      "warnings": ["few_items"],
+      "durationMs": 7,
+      "sampleTitles": ["Test Article 1", "Test Article 2"]
+    },
+    {
+      "fixture": "html-content",
+      "description": "RSS with HTML content (local mock)",
+      "success": true,
+      "regression": true,
+      "stats": {
+        "totalItems": 1,
+        "itemsWithContent": 1,
+        "itemsWithTitle": 1,
+        "itemsWithSourceId": 1,
+        "avgContentLength": 209,
+        "minContentLength": 209,
+        "maxContentLength": 209,
+        "snippetItems": 0,
+        "snippetRatio": 0,
+        "contentExtractionRate": 1,
+        "titleExtractionRate": 1,
+        "sourceIdRate": 1,
+        "itemsWithHtmlResidue": 0,
+        "htmlResidueRatio": 0,
+        "itemsWithEncodingIssues": 0
+      },
+      "warnings": ["few_items"],
+      "durationMs": 155,
+      "sampleTitles": ["HTML Article"]
+    },
+    {
+      "fixture": "snippet-feed",
+      "description": "RSS with short snippets (local mock)",
+      "success": true,
+      "stats": {
+        "totalItems": 3,
+        "itemsWithContent": 3,
+        "itemsWithTitle": 3,
+        "itemsWithSourceId": 3,
+        "avgContentLength": 41,
+        "minContentLength": 6,
+        "maxContentLength": 107,
+        "snippetItems": 2,
+        "snippetRatio": 0.6667,
+        "contentExtractionRate": 1,
+        "titleExtractionRate": 1,
+        "sourceIdRate": 1,
+        "itemsWithHtmlResidue": 0,
+        "htmlResidueRatio": 0,
+        "itemsWithEncodingIssues": 0
+      },
+      "warnings": ["high_snippet_ratio", "low_avg_content", "few_items"],
+      "durationMs": 4,
+      "sampleTitles": ["Short 1", "Short 2", "Long Article"]
+    },
+    {
+      "fixture": "missing-content",
+      "description": "RSS with missing content fields (local mock)",
+      "success": true,
+      "stats": {
+        "totalItems": 2,
+        "itemsWithContent": 1,
+        "itemsWithTitle": 2,
+        "itemsWithSourceId": 2,
+        "avgContentLength": 155,
+        "minContentLength": 155,
+        "maxContentLength": 155,
+        "snippetItems": 0,
+        "snippetRatio": 0,
+        "contentExtractionRate": 0.5,
+        "titleExtractionRate": 1,
+        "sourceIdRate": 1,
+        "itemsWithHtmlResidue": 0,
+        "htmlResidueRatio": 0,
+        "itemsWithEncodingIssues": 0
+      },
+      "warnings": ["low_content_rate", "few_items"],
+      "durationMs": 3,
+      "sampleTitles": ["Title Only", "Has Content"]
+    },
+    {
+      "fixture": "bbc-news",
+      "description": "BBC News RSS feed",
+      "success": true,
+      "stats": {
+        "totalItems": 35,
+        "itemsWithContent": 35,
+        "itemsWithTitle": 35,
+        "itemsWithSourceId": 35,
+        "avgContentLength": 112,
+        "minContentLength": 60,
+        "maxContentLength": 202,
+        "snippetItems": 18,
+        "snippetRatio": 0.5143,
+        "contentExtractionRate": 1,
+        "titleExtractionRate": 1,
+        "sourceIdRate": 1,
+        "itemsWithHtmlResidue": 0,
+        "htmlResidueRatio": 0,
+        "itemsWithEncodingIssues": 0
+      },
+      "durationMs": 1902,
+      "sampleTitles": [
+        "Royal Family greet crowds after Christma",
+        "Pope Leo urges 'courage' to end Ukraine ",
+        "We invited a man into our home at Christ"
+      ]
+    }
+  ]
+}

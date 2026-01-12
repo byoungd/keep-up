@@ -1,0 +1,31 @@
+{
+  "name": "@packages/ingest-file",
+  "version": "1.0.0",
+  "description": "File import plugin for Markdown, PDF, EPUB, and TXT files",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc -w",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:import": "npx tsx scripts/test-import.ts",
+    "test:url": "npx tsx scripts/test-url-import.ts",
+    "ingest-file:pdf:test": "tsx scripts/test-pdf-ingest.ts --quick",
+    "ingest-file:pdf:test:full": "tsx scripts/test-pdf-ingest.ts",
+    "ingest-file:pdf:report": "tsx scripts/test-pdf-ingest.ts --json"
+  },
+  "dependencies": {
+    "@keepup/core": "workspace:*",
+    "epub2": "^3.0.2",
+    "pdf-parse": "^1.1.4",
+    "unpdf": "^1.4.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "fast-check": "^3.15.0",
+
+    "vitest": "^1.0.0"
+  }
+}

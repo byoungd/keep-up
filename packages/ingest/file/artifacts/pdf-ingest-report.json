@@ -1,0 +1,98 @@
+{
+  "timestamp": "2025-12-25T13:02:50.100Z",
+  "environment": {
+    "nodeVersion": "v22.21.1",
+    "platform": "darwin",
+    "unpdfVersion": "0.12.1"
+  },
+  "thresholds": {
+    "maxFragmentationRatio": 0.15,
+    "maxNonAsciiRatio": 0.1,
+    "minAvgParagraphLength": 50,
+    "maxShortParagraphRatio": 0.6,
+    "minContentLength": 100
+  },
+  "summary": {
+    "total": 3,
+    "passed": 3,
+    "failed": 0,
+    "gatedFailures": 0,
+    "withWarnings": 2,
+    "quickMode": true
+  },
+  "results": [
+    {
+      "fixture": "minimal-text",
+      "description": "Minimal text content (local buffer)",
+      "success": true,
+      "regression": true,
+      "title": "Synthetic Test",
+      "stats": {
+        "totalChars": 77,
+        "totalWords": 13,
+        "totalParagraphs": 1,
+        "totalBlocks": 1,
+        "singleCharWords": 1,
+        "fragmentationRatio": 0.0769,
+        "nonAsciiChars": 0,
+        "nonAsciiRatio": 0,
+        "shortParagraphs": 0,
+        "shortParagraphRatio": 0,
+        "avgParagraphLength": 77,
+        "minParagraphLength": 77,
+        "maxParagraphLength": 77,
+        "emptyParagraphs": 0
+      },
+      "warnings": ["minimal_content"],
+      "durationMs": 0
+    },
+    {
+      "fixture": "multi-paragraph",
+      "description": "Multiple paragraphs (local buffer)",
+      "success": true,
+      "regression": true,
+      "title": "Synthetic Test",
+      "stats": {
+        "totalChars": 175,
+        "totalWords": 22,
+        "totalParagraphs": 3,
+        "totalBlocks": 3,
+        "singleCharWords": 0,
+        "fragmentationRatio": 0,
+        "nonAsciiChars": 0,
+        "nonAsciiRatio": 0,
+        "shortParagraphs": 0,
+        "shortParagraphRatio": 0,
+        "avgParagraphLength": 57,
+        "minParagraphLength": 54,
+        "maxParagraphLength": 62,
+        "emptyParagraphs": 0
+      },
+      "warnings": ["low_avg_paragraph_len", "minimal_content"],
+      "durationMs": 1
+    },
+    {
+      "fixture": "tracemonkey-paper",
+      "description": "Mozilla pdf.js test PDF (academic paper)",
+      "success": true,
+      "title": "Trace-based Just-in-Time Type Specialization for Dynamic Languages",
+      "stats": {
+        "totalChars": 82946,
+        "totalWords": 13565,
+        "totalParagraphs": 165,
+        "totalBlocks": 165,
+        "singleCharWords": 543,
+        "fragmentationRatio": 0.04,
+        "nonAsciiChars": 101,
+        "nonAsciiRatio": 0.0012,
+        "shortParagraphs": 74,
+        "shortParagraphRatio": 0.4485,
+        "avgParagraphLength": 501,
+        "minParagraphLength": 3,
+        "maxParagraphLength": 4167,
+        "emptyParagraphs": 0
+      },
+      "durationMs": 4096
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "name": "@packages/ingest-rss",
+  "version": "1.1.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc -w",
+    "test:feeds": "npx tsx scripts/test-default-feeds.ts",
+    "test:quality": "npx tsx scripts/test-rss-ingest.ts --quick",
+    "test:quality:full": "npx tsx scripts/test-rss-ingest.ts",
+    "test:quality:report": "npx tsx scripts/test-rss-ingest.ts --json"
+  },
+  "dependencies": {
+    "@mozilla/readability": "^0.5.0",
+    "@keepup/core": "workspace:*",
+    "jsdom": "^26.0.0",
+    "rss-parser": "^3.13.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/jsdom": "^21.1.7",
+    "@types/node": "^20.0.0"
+  }
+}
