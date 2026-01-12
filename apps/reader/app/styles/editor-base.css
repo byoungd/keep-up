@@ -1,0 +1,326 @@
+/* ============================================
+   LFCC Editor Surface - Core Styles
+   ============================================ */
+
+@layer base {
+  .lfcc-editor .ProseMirror {
+    min-height: 280px;
+    padding-left: 4.5rem; /* Reserve space for block hover gutter tools */
+    padding-right: 2rem;
+    font-family: var(--reader-font-family, var(--font-sans));
+    font-size: var(--reader-font-size);
+    line-height: var(--reader-line-height);
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    color: var(--color-foreground);
+    background-color: transparent;
+    outline: none;
+    caret-color: var(--color-primary);
+    /* Ensure editor content sits above highlights (z-0) */
+    position: relative;
+    z-index: 1;
+  }
+
+  .lfcc-editor .ProseMirror ::selection {
+    background-color: hsl(214 100% 92%);
+    color: var(--color-foreground);
+  }
+
+  .dark .lfcc-editor .ProseMirror ::selection {
+    background-color: hsl(214 60% 30% / 0.8);
+  }
+
+  .lfcc-editor .ProseMirror > * {
+    margin: 0;
+  }
+
+  .lfcc-editor .ProseMirror > * + * {
+    margin-top: 0.375em; /* Notion-like paragraph spacing (6px) */
+  }
+
+  /* Lists - Tighter density for checklists/bullets */
+  .lfcc-editor .ProseMirror ul,
+  .lfcc-editor .ProseMirror ol {
+    margin-top: 0.25em;
+  }
+
+  /* Performance: Skip rendering off-screen blocks for large documents */
+  .lfcc-editor .ProseMirror > * {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 80px;
+  }
+
+  .lfcc-editor .ProseMirror > [data-block-id] {
+    position: relative;
+    padding: 0.125rem 0.75rem; /* Slight vertical padding for hover target */
+    border-radius: 0.25rem; /* Professional micro-rounded corners */
+    transition: background-color var(--duration-fast) var(--ease-smooth);
+  }
+
+  /* Ultra-subtle hover: minimal visual distraction during reading/editing */
+  .lfcc-editor .ProseMirror > [data-block-id]:hover {
+    background-color: hsl(var(--color-foreground) / 0.02);
+  }
+
+  .dark .lfcc-editor .ProseMirror > [data-block-id]:hover {
+    background-color: hsl(0 0% 100% / 0.02);
+  }
+
+  /* Block movement flash animation - draws attention to moved block */
+
+  @media (prefers-reduced-motion: reduce) {
+    .lfcc-editor .ProseMirror > [data-block-id].block-just-moved {
+      animation: none;
+    }
+  }
+
+  .lfcc-editor .ProseMirror :where(p, h1, h2, h3, pre, blockquote, li) {
+    margin: 0;
+  }
+
+  /* Headings - Notion style: Spacious top, closer bottom */
+  .lfcc-editor .ProseMirror h1,
+  .lfcc-editor .ProseMirror h2,
+  .lfcc-editor .ProseMirror h3 {
+    margin-top: 1.5em;
+    margin-bottom: 0.25em;
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: -0.015em;
+  }
+
+  /* First element shouldn't have top margin */
+  .lfcc-editor .ProseMirror > *:first-child {
+    margin-top: 0;
+  }
+  .lfcc-editor .ProseMirror h1 {
+    font-size: 1.875rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.2;
+    margin-top: 2rem;
+    color: var(--color-foreground);
+  }
+
+  .lfcc-editor .ProseMirror h2 {
+    font-size: 1.5rem;
+    font-weight: 650;
+    letter-spacing: -0.02em;
+    line-height: 1.3;
+    margin-top: 1.75rem;
+    color: var(--color-foreground);
+  }
+
+  .lfcc-editor .ProseMirror h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.4;
+    margin-top: 1.5rem;
+    color: var(--color-foreground);
+  }
+
+  /* First child headings don't need top margin */
+  .lfcc-editor .ProseMirror > [data-block-id]:first-child h1,
+  .lfcc-editor .ProseMirror > [data-block-id]:first-child h2,
+  .lfcc-editor .ProseMirror > [data-block-id]:first-child h3,
+  .lfcc-editor .ProseMirror > h1:first-child,
+  .lfcc-editor .ProseMirror > h2:first-child,
+  .lfcc-editor .ProseMirror > h3:first-child {
+    margin-top: 0;
+  }
+
+  /* Paragraphs - Optimal reading measure */
+  .lfcc-editor .ProseMirror p {
+    font-size: var(--reader-font-size, 1.05rem);
+    line-height: var(--reader-line-height, 1.75);
+    color: var(--color-foreground);
+  }
+
+  /* Links - Subtle but discoverable */
+  .lfcc-editor .ProseMirror a {
+    color: hsl(214 84% 56%);
+    text-decoration: underline;
+    text-decoration-color: hsl(214 84% 56% / 0.4);
+    text-underline-offset: 2px;
+    transition: text-decoration-color var(--duration-fast) var(--ease-smooth);
+  }
+
+  .lfcc-editor .ProseMirror a:hover {
+    text-decoration-color: hsl(214 84% 56%);
+  }
+
+  .dark .lfcc-editor .ProseMirror a {
+    color: hsl(214 84% 70%);
+    text-decoration-color: hsl(214 84% 70% / 0.4);
+  }
+
+  .dark .lfcc-editor .ProseMirror a:hover {
+    text-decoration-color: hsl(214 84% 70%);
+  }
+
+  /* Inline code - Refined styling */
+  .lfcc-editor .ProseMirror code:not(pre code) {
+    font-family: var(--font-mono);
+    font-size: 0.875em;
+    padding: 0.15em 0.4em;
+    border-radius: 4px;
+    background: var(--color-surface-2);
+    color: hsl(340 65% 47%);
+  }
+
+  .dark .lfcc-editor .ProseMirror code:not(pre code) {
+    background: var(--color-surface-3);
+    color: hsl(340 65% 65%);
+  }
+
+  /* Lists - Better spacing and visual rhythm */
+  .lfcc-editor .ProseMirror ul,
+  .lfcc-editor .ProseMirror ol {
+    padding-left: 1.5rem;
+    list-style-position: outside;
+  }
+
+  .lfcc-editor .ProseMirror ul {
+    list-style-type: disc;
+  }
+
+  .lfcc-editor .ProseMirror ol {
+    list-style-type: decimal;
+  }
+
+  .lfcc-editor .ProseMirror li {
+    padding-left: 0.25rem;
+  }
+
+  .lfcc-editor .ProseMirror li::marker {
+    color: var(--color-muted-foreground);
+  }
+
+  /* Nested lists spacing */
+  .lfcc-editor .ProseMirror li > ul,
+  .lfcc-editor .ProseMirror li > ol {
+    margin-top: 0.5rem;
+  }
+
+  .lfcc-editor .ProseMirror li[data-block-id] {
+    position: relative;
+    padding: 0.1rem 0.5rem;
+    border-radius: 0.25rem;
+  }
+
+  .lfcc-editor .ProseMirror li[data-block-id]:hover {
+    background-color: hsl(var(--color-foreground) / 0.02);
+  }
+
+  .dark .lfcc-editor .ProseMirror li[data-block-id]:hover {
+    background-color: hsl(0 0% 100% / 0.02);
+  }
+
+  /* Code blocks - Professional syntax highlighting ready */
+  .lfcc-editor .ProseMirror pre[data-block-id] {
+    background: var(--color-surface-1);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    font-size: 0.875rem;
+    font-family: var(--font-mono);
+    line-height: 1.6;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .lfcc-editor .ProseMirror pre[data-block-id] code {
+    background: transparent;
+    padding: 0;
+    color: inherit;
+    font-size: inherit;
+  }
+
+  .dark .lfcc-editor .ProseMirror pre[data-block-id] {
+    background: hsl(222 47% 8%);
+    border-color: hsl(217.2 32.6% 20%);
+  }
+
+  /* Blockquote - Notion-style professional design */
+  .lfcc-editor .ProseMirror blockquote[data-block-id] {
+    position: relative;
+    margin: 0;
+    padding: 0.25rem 0 0.25rem 1rem;
+    /* Notion-style: thick left border, neutral gray */
+    border-left: 3px solid hsl(220 10% 80%);
+    /* No background, no shadow, no roundness - pure content focus */
+    background: transparent;
+    /* Text slightly muted but readable */
+    color: var(--color-foreground);
+  }
+
+  .dark .lfcc-editor .ProseMirror blockquote[data-block-id] {
+    border-left-color: hsl(220 10% 35%);
+  }
+
+  .lfcc-editor .ProseMirror table {
+    border-collapse: collapse;
+    table-layout: fixed;
+    width: 100%;
+    background: var(--color-surface-0);
+    border: 1px solid var(--color-border);
+    border-radius: 0.75rem;
+    overflow: hidden;
+  }
+
+  .lfcc-editor .ProseMirror td,
+  .lfcc-editor .ProseMirror th {
+    border: 1px solid var(--color-border);
+    padding: 0.5rem 0.75rem;
+    vertical-align: top;
+    box-sizing: border-box;
+    position: relative;
+    min-width: 1em;
+  }
+
+  .lfcc-editor .ProseMirror .selectedCell:after {
+    z-index: 2;
+    position: absolute;
+    content: "";
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    background: rgba(200, 200, 255, 0.4);
+    pointer-events: none;
+  }
+
+  .lfcc-editor .ProseMirror .column-resize-handle {
+    position: absolute;
+    right: -2px;
+    top: 0;
+    bottom: -2px;
+    width: 4px;
+    background-color: var(--color-accent-indigo);
+    pointer-events: none;
+    z-index: 20;
+  }
+
+  .lfcc-editor .ProseMirror.resize-cursor {
+    cursor: col-resize;
+  }
+}
+
+/* ============================================
+   Selection Toolbar Active States
+   ============================================ */
+
+@layer base {
+  .lfcc-toolbar-active-bold [data-testid="selection-toolbar"] button[title="Bold"],
+  .lfcc-toolbar-active-italic [data-testid="selection-toolbar"] button[title="Italic"],
+  .lfcc-toolbar-active-code [data-testid="selection-toolbar"] button[title="Code"],
+  .lfcc-toolbar-active-link [data-testid="selection-toolbar"] button[title="Link"],
+  .lfcc-toolbar-active-h1 [data-testid="selection-toolbar"] button[title="Heading 1"],
+  .lfcc-toolbar-active-h2 [data-testid="selection-toolbar"] button[title="Heading 2"],
+  .lfcc-toolbar-active-list [data-testid="selection-toolbar"] button[title="List"],
+  .lfcc-toolbar-active-quote [data-testid="selection-toolbar"] button[title="Quote"] {
+    background-color: var(--color-primary);
+    color: var(--color-primary-foreground);
+  }
+}

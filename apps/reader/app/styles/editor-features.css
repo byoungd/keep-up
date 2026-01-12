@@ -1,0 +1,100 @@
+/* ============================================
+   Bold Stable Mode: GRAD-Axis Variable Font
+   ============================================ */
+
+/* Apply EditorFlex to editor surface when feature is enabled */
+.lfcc-bold-stable-grad .lfcc-editor .ProseMirror {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-synthesis: none;
+  /* font-variation-settings: "opsz" 14, "wdth" 100, "wght" 400, "GRAD" 0; */
+}
+
+/* Render bold via GRAD axis - no width change, visible under selection */
+.lfcc-bold-stable-grad .lfcc-editor .ProseMirror strong {
+  font-weight: 400 !important;
+  letter-spacing: 0;
+  -webkit-text-stroke: 0;
+  text-shadow: 0.6px 0 0 currentColor;
+  /* font-variation-settings: "opsz" 14, "wdth" 100, "wght" 400, "GRAD" 90; */
+}
+
+/* Preserve stable bold text-shadow during native selection */
+.lfcc-bold-stable-grad .lfcc-editor .ProseMirror strong::selection {
+  text-shadow: 0.6px 0 0 currentColor;
+}
+
+.dark .lfcc-bold-stable-grad .lfcc-editor .ProseMirror strong::selection {
+  text-shadow: 0.6px 0 0 currentColor;
+}
+
+/* ============================================
+   Focus Mode (Cmd+Shift+F)
+   Distraction-free writing mode
+   ============================================ */
+
+@layer base {
+  /* Hide chrome in focus mode */
+  [data-focus-mode="true"] header,
+  [data-focus-mode="true"] [data-sidebar],
+  [data-focus-mode="true"] [data-panel="left"],
+  [data-focus-mode="true"] [data-panel="right"],
+  [data-focus-mode="true"] .sidebar-nav,
+  [data-focus-mode="true"] .documents-panel,
+  [data-focus-mode="true"] .ai-panel {
+    display: none !important;
+  }
+
+  /* Center and expand the editor in focus mode */
+  [data-focus-mode="true"] [data-editor-container],
+  [data-focus-mode="true"] .editor-pane {
+    max-width: 720px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    width: 100% !important;
+    flex: 1 !important;
+  }
+
+  /* Remove resize handles in focus mode */
+  [data-focus-mode="true"] [data-resize-handle] {
+    display: none !important;
+  }
+
+  /* Subtle vignette effect on edges */
+  [data-focus-mode="true"]::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 50;
+    background: radial-gradient(
+      ellipse at center,
+      transparent 60%,
+      hsl(var(--background) / 0.3) 100%
+    );
+  }
+
+  /* Focus mode indicator */
+  [data-focus-mode="true"]::after {
+    content: "Focus Mode";
+    position: fixed;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 4px 12px;
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--color-muted-foreground);
+    background: var(--color-surface-1);
+    border: 1px solid var(--color-border);
+    border-radius: 9999px;
+    z-index: 51;
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
+  }
+
+  [data-focus-mode="true"]:hover::after {
+    opacity: 1;
+  }
+}

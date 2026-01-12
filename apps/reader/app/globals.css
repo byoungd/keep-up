@@ -1,0 +1,9 @@
+@import "tailwindcss";
+
+@import "./styles/theme.css";
+@import "./styles/base.css";
+@import "./styles/animations.css";
+@import "./styles/editor-base.css";
+@import "./styles/editor-annotations.css";
+@import "./styles/editor-debug.css";
+@import "./styles/editor-features.css";

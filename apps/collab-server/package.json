@@ -1,0 +1,22 @@
+{
+  "name": "@keepup/collab-server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js",
+    "build": "tsc",
+    "lint": "biome check src"
+  },
+  "dependencies": {
+    "@keepup/core": "workspace:*",
+    "loro-crdt": "^1.10.3",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.5.10",
+    "tsx": "^4.7.0"
+  }
+}

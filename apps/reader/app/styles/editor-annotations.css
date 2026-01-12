@@ -1,0 +1,435 @@
+/* ============================================
+   LFCC Annotation Highlighting
+   ============================================ */
+
+@layer base {
+  /* ============================================
+     Overlay Mode: Interaction-Only Decorations
+     Visual rendering handled by HighlightOverlay component
+     ============================================ */
+
+  .lfcc-annotation-target {
+    /* Transparent background - visuals rendered by overlay */
+    background: transparent !important;
+    box-shadow: none !important;
+    /* Cursor to indicate interactivity */
+    cursor: pointer;
+    /* Ensure proper selection behavior */
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+  }
+
+  .lfcc-annotation-target--active,
+  .lfcc-annotation-target--partial,
+  .lfcc-annotation-target--unverified,
+  .lfcc-annotation-target--grace {
+    /* All states transparent in overlay mode */
+    background: transparent !important;
+  }
+
+  /* Hover effect for interaction targets */
+  .lfcc-annotation-target:hover {
+    /* Subtle underline on hover for feedback */
+    text-decoration: underline;
+    text-decoration-color: rgba(0, 0, 0, 0.2);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
+  }
+
+  /* ============================================
+     Highlight Overlay Layer Styles
+     ============================================ */
+
+  .highlight-overlay {
+    pointer-events: none;
+  }
+
+  .highlight-rect {
+    /* Base styles for overlay highlight rectangles */
+    pointer-events: none;
+    mix-blend-mode: multiply;
+  }
+
+  .dark .highlight-rect {
+    /* In dark mode, use screen blend for better visibility */
+    mix-blend-mode: screen;
+    opacity: 0.25 !important;
+  }
+
+  .highlight-rect--focused {
+    /* Focus ring is applied via inline styles for dynamic color support */
+    outline: none;
+  }
+
+  /* Multi-layer segment indicator (shown at overlap points) */
+  .highlight-segment-indicator {
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    right: 0;
+    height: 3px;
+    border-radius: 1px;
+    pointer-events: none;
+  }
+
+  /* ============================================
+     Legacy Mode: Full Visual Decorations
+     ============================================ */
+
+  .lfcc-annotation {
+    --anno-bg: var(--color-highlight-yellow);
+    --anno-shadow: hsl(48 98% 78%);
+    /* Zero-layout approach: no margin, no padding, no border-radius change */
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+    background-color: var(--anno-bg);
+    box-shadow: none;
+    transition: background-color var(--duration-fast) var(--ease-smooth), box-shadow
+      var(--duration-fast) var(--ease-smooth);
+  }
+
+  .lfcc-annotation--active {
+    background-color: var(--anno-bg);
+  }
+
+  .lfcc-annotation--partial {
+    background-image: repeating-linear-gradient(
+      135deg,
+      var(--anno-bg),
+      var(--anno-bg) 6px,
+      transparent 6px,
+      transparent 10px
+    );
+    box-shadow: none;
+  }
+
+  .lfcc-annotation--unverified {
+    background-color: var(--anno-bg);
+    box-shadow: none;
+  }
+
+  .lfcc-annotation--grace {
+    background-color: hsl(0 100% 96%);
+    box-shadow: none;
+  }
+
+  .lfcc-annotation--orphan {
+    background-color: hsl(220 10% 92%);
+    box-shadow: none;
+    opacity: 0.7;
+  }
+
+  /* Ghosted: faded source annotation during drag to avoid overlap with preview */
+  /* Use transparent background instead of opacity to keep text fully visible */
+  .lfcc-annotation--ghosted {
+    background-color: transparent !important;
+    box-shadow: none !important;
+    transition: background-color 0.15s ease-out, box-shadow 0.15s ease-out;
+  }
+
+  .lfcc-annotation--yellow {
+    --anno-bg: var(--color-highlight-yellow);
+    --anno-shadow: hsl(46 90% 72%);
+  }
+
+  .lfcc-annotation--green {
+    --anno-bg: var(--color-highlight-green);
+    --anno-shadow: hsl(142 50% 60%);
+  }
+
+  .lfcc-annotation--red {
+    --anno-bg: var(--color-highlight-red);
+    --anno-shadow: hsl(0 75% 68%);
+  }
+
+  .lfcc-annotation--purple {
+    --anno-bg: var(--color-highlight-purple);
+    --anno-shadow: hsl(268 65% 72%);
+  }
+
+  .lfcc-annotation--panel-hover,
+  .lfcc-annotation:hover {
+    box-shadow: inset 0 -2px 0 var(--anno-shadow), 0 0 0 1px
+      color-mix(in oklch, var(--anno-shadow) 60%, transparent);
+  }
+
+  /* In overlay mode, focus decoration is invisible - HighlightOverlay handles focus styling */
+  .lfcc-annotation--focus {
+    /* Transparent - overlay renders focus ring */
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+
+  /* ============================================
+     Drag Preview Overlay (External Portal)
+     Renders outside ProseMirror to avoid text jank
+     ============================================ */
+
+  .annotation-drag-overlay {
+    /* Styles set inline via React */
+    pointer-events: none;
+  }
+
+  .annotation-preview {
+    /* Lower opacity for better text readability during drag */
+    background: hsl(46 100% 55% / 0.25);
+    border-radius: 2px;
+    /* Add subtle border to maintain visual definition */
+    box-shadow: inset 0 0 0 1px hsl(46 90% 50% / 0.5);
+  }
+
+  .annotation-preview--yellow {
+    background: hsl(46 100% 55% / 0.25);
+    box-shadow: inset 0 0 0 1px hsl(46 90% 50% / 0.5);
+  }
+
+  .annotation-preview--green {
+    background: hsl(142 50% 50% / 0.25);
+    box-shadow: inset 0 0 0 1px hsl(142 50% 45% / 0.5);
+  }
+
+  .annotation-preview--red {
+    background: hsl(0 75% 55% / 0.25);
+    box-shadow: inset 0 0 0 1px hsl(0 75% 50% / 0.5);
+  }
+
+  .annotation-preview--purple {
+    background: hsl(268 65% 55% / 0.25);
+    box-shadow: inset 0 0 0 1px hsl(268 65% 50% / 0.5);
+  }
+
+  .annotation-preview-handle {
+    background: hsl(46 90% 55%);
+    border-radius: 3px;
+    /* Height set by inline style to match actual line height */
+  }
+
+  .annotation-preview-handle--start {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+
+  .annotation-preview-handle--end {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+  }
+
+  /* Active handle during drag - subtle enhancement matching hover state */
+  .annotation-preview-handle--active {
+    transform: scaleX(1.2);
+    opacity: 0.9;
+  }
+
+  .annotation-preview-handle--yellow {
+    background: hsl(46 90% 55%);
+  }
+
+  .annotation-preview-handle--green {
+    background: hsl(142 50% 50%);
+  }
+
+  .annotation-preview-handle--red {
+    background: hsl(0 75% 55%);
+  }
+
+  .annotation-preview-handle--purple {
+    background: hsl(268 65% 55%);
+  }
+
+  /* 
+   * Handle Design Philosophy:
+   * 1. Minimal by default - don't distract from reading
+   * 2. Color-matched - blend with highlight, not fight it
+   * 3. Show on interaction - appear when user needs them
+   * 4. Mobile-friendly - larger touch targets on touch devices
+   */
+  .lfcc-annotation-handle {
+    /* CRITICAL: Must be completely zero-size in text flow */
+    position: relative;
+    display: inline;
+    width: 0;
+    height: 0;
+    margin: 0;
+    padding: 0;
+    font-size: 0;
+    line-height: 0;
+    vertical-align: baseline;
+    /* Visual pill is rendered via ::before with absolute position */
+    cursor: ew-resize;
+    z-index: 10;
+    /* Hidden by default - show on hover/focus */
+    opacity: 0;
+    transition: opacity var(--duration-fast) var(--ease-smooth);
+    /* Avoid hover thrash: only enable pointer events when handles are visible */
+    pointer-events: none;
+  }
+
+  /* Show handles when annotation is focused, hovered, or being dragged */
+  .lfcc-annotation-dragging .lfcc-annotation-handle {
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+
+  .lfcc-annotation-dragging .lfcc-annotation-handle--dragging {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+
+  /* Show handles via adjacency, direct hover, or JS-managed hover class */
+  .lfcc-annotation--focus + .lfcc-annotation-handle,
+  .lfcc-annotation:hover + .lfcc-annotation-handle,
+  .lfcc-annotation-handle:hover,
+  .lfcc-annotation-handle.lfcc-annotation--panel-hover {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* Handle visual - refined proportions for professional appearance */
+  .lfcc-annotation-handle::before {
+    content: "";
+    position: absolute;
+    /*
+     * Position from baseline: the handle span sits at baseline (vertical-align: baseline).
+     * We offset upward to align with the line's visual bounds.
+     * Fine-tuned to match highlight rectangle exactly.
+     */
+    top: -1.15rem;
+    /* Default centering */
+    left: -3px;
+    width: 6px;
+    /* Default height for body text */
+    height: 1.4rem;
+    /* Default rounded */
+    border-radius: 3px;
+    /* Clean solid color matching annotation highlight */
+    background: color-mix(in oklch, var(--anno-shadow, hsl(46 90% 55%)) 85%, hsl(30 40% 35%));
+    opacity: 0.75;
+    transition: transform var(--duration-fast) var(--ease-spring), opacity var(--duration-fast)
+      var(--ease-smooth);
+    /* Enable pointer events on the visual element */
+    pointer-events: auto;
+  }
+
+  /* Start handle specific styling */
+  .lfcc-annotation-handle--start::before {
+    /* Align to left of character */
+    left: -6px;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+
+  /* End handle specific styling */
+  .lfcc-annotation-handle--end::before {
+    /* Align to right of character */
+    left: 0;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+  }
+
+  /* Heading-specific handle sizing - scale with text size */
+  /* Fine-tuned top offsets for perfect alignment */
+  h1 .lfcc-annotation-handle::before {
+    height: 2.25rem;
+    top: -1.8rem;
+  }
+  h2 .lfcc-annotation-handle::before {
+    height: 1.95rem;
+    top: -1.57rem;
+  }
+  h3 .lfcc-annotation-handle::before {
+    height: 1.75rem;
+    top: -1.41rem;
+  }
+
+  /* Hover effect - subtle grow */
+  .lfcc-annotation-handle:hover::before {
+    transform: scale(1.2);
+    background: color-mix(in oklch, var(--anno-shadow, hsl(46 90% 55%)) 100%, hsl(30 40% 30%));
+    opacity: 0.9;
+  }
+
+  /* Dark mode adjustments */
+  .dark .lfcc-annotation-handle::before {
+    background: color-mix(in oklch, var(--anno-shadow, hsl(46 90% 55%)) 80%, hsl(0 0% 60%));
+  }
+
+  .dark .lfcc-annotation-handle:hover::before {
+    opacity: 1;
+  }
+
+  /* Mobile: larger touch targets */
+  @media (pointer: coarse) {
+    .lfcc-annotation-handle::before {
+      width: 12px;
+      /* Match desktop proportions */
+      height: 1.4rem;
+      top: -1.15rem;
+      border-radius: 5px;
+    }
+
+    /* Heading-specific handle sizing on mobile */
+    h1 .lfcc-annotation-handle::before {
+      height: 2.25rem;
+      top: -1.8rem;
+    }
+    h2 .lfcc-annotation-handle::before {
+      height: 1.95rem;
+      top: -1.57rem;
+    }
+    h3 .lfcc-annotation-handle::before {
+      height: 1.75rem;
+      top: -1.41rem;
+    }
+
+    /* Always show handles on touch devices for discoverability */
+    .lfcc-annotation--focus .lfcc-annotation-handle,
+    .lfcc-annotation:active .lfcc-annotation-handle {
+      opacity: 1;
+      pointer-events: auto;
+    }
+  }
+
+  .lfcc-annotation-dragging {
+    cursor: ew-resize;
+    user-select: none;
+  }
+
+  /* Hide ALL ProseMirror handles during drag - overlay renders preview handles instead */
+  .lfcc-annotation-dragging .lfcc-annotation-handle {
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+
+  /* Suppress focus ring during drag */
+  .lfcc-annotation-dragging .lfcc-annotation--focus {
+    box-shadow: none;
+  }
+
+  .lfcc-annotation-dragging .lfcc-annotation {
+    box-shadow: none;
+  }
+
+  .lfcc-annotation-dragging *:focus {
+    outline: none;
+  }
+
+  .lfcc-gap {
+    display: inline-block;
+    margin: 0 0.25rem;
+    padding: 0.05rem 0.4rem;
+    border-radius: 999px;
+    background: var(--color-surface-2);
+    color: var(--color-muted-foreground);
+    font-size: 0.75rem;
+    line-height: 1;
+  }
+
+  .lfcc-gap--prominent {
+    background: var(--color-surface-1);
+    color: var(--color-foreground);
+  }
+
+  .lfcc-gap--required-order {
+    border: 1px dashed var(--color-border);
+  }
+}
