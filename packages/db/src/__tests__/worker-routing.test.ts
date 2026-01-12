@@ -76,12 +76,17 @@ function createStubDriver(): { driver: DbDriver; initResult: DbInitResult; jobRo
       enqueueOutbox,
     });
   // RSS stub methods
+  const createRssSubscription = vi.fn().mockResolvedValue(undefined);
   const listRssSubscriptions = vi.fn().mockResolvedValue([]);
   const getRssSubscription = vi.fn().mockResolvedValue(null);
+  const getRssSubscriptionByUrl = vi.fn().mockResolvedValue(null);
   const updateRssSubscription = vi.fn().mockResolvedValue(undefined);
+  const deleteRssSubscription = vi.fn().mockResolvedValue(undefined);
   const getFeedItemByGuid = vi.fn().mockResolvedValue(null);
   const createFeedItem = vi.fn().mockResolvedValue(undefined);
   const updateFeedItem = vi.fn().mockResolvedValue(undefined);
+  const listFeedItems = vi.fn().mockResolvedValue([]);
+  const countUnreadFeedItems = vi.fn().mockResolvedValue(0);
   // Content Item stub methods
   const upsertContentItem = vi.fn().mockResolvedValue(undefined);
   const getContentItem = vi.fn().mockResolvedValue(null);
@@ -155,12 +160,17 @@ function createStubDriver(): { driver: DbDriver; initResult: DbInitResult; jobRo
     batch,
     transaction,
     // RSS methods
+    createRssSubscription,
     listRssSubscriptions,
     getRssSubscription,
+    getRssSubscriptionByUrl,
     updateRssSubscription,
+    deleteRssSubscription,
     getFeedItemByGuid,
     createFeedItem,
     updateFeedItem,
+    listFeedItems,
+    countUnreadFeedItems,
     // Content Item methods
     upsertContentItem,
     getContentItem,

@@ -107,12 +107,17 @@ const { acquireLeadershipMock, MockIndexedDbDriver } = vi.hoisted(() => {
       });
 
     // RSS stub methods
+    createRssSubscription = vi.fn(async () => undefined);
     listRssSubscriptions = vi.fn(async () => []);
     getRssSubscription = vi.fn(async () => null);
+    getRssSubscriptionByUrl = vi.fn(async () => null);
     updateRssSubscription = vi.fn(async () => undefined);
+    deleteRssSubscription = vi.fn(async () => undefined);
     getFeedItemByGuid = vi.fn(async () => null);
     createFeedItem = vi.fn(async () => undefined);
     updateFeedItem = vi.fn(async () => undefined);
+    listFeedItems = vi.fn(async () => []);
+    countUnreadFeedItems = vi.fn(async () => 0);
 
     // Content Item stub methods
     upsertContentItem = vi.fn(async () => undefined);

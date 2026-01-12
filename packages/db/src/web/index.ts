@@ -408,6 +408,7 @@ export class ReaderDb {
 
   async getDocument(docId: string): Promise<DocumentRow | null> {
     this.ensureInitialized();
+    const driver = this.getDriver();
 
     // Check cache first
     const cached = this.cache?.get(`doc:${docId}`);
@@ -415,7 +416,7 @@ export class ReaderDb {
       return cached;
     }
 
-    const doc = await this.driver?.getDocument(docId);
+    const doc = await driver.getDocument(docId);
     if (doc && this.cache) {
       this.cache.set(`doc:${docId}`, doc);
     }
@@ -424,7 +425,7 @@ export class ReaderDb {
 
   async listDocuments(options?: ListDocumentsOptions): Promise<DocumentRow[]> {
     this.ensureInitialized();
-    return this.driver?.listDocuments(options);
+    return this.getDriver().listDocuments(options);
   }
 
   async upsertDocument(
@@ -432,13 +433,14 @@ export class ReaderDb {
       Partial<Pick<DocumentRow, "createdAt" | "updatedAt">>
   ): Promise<void> {
     this.ensureInitialized();
+    const driver = this.getDriver();
 
-    const isNew = !(await this.driver?.getDocument(doc.docId));
+    const isNew = !(await driver.getDocument(doc.docId));
 
     if (this.batcher) {
-      await this.batcher.enqueue("document", () => this.driver?.upsertDocument(doc));
+      await this.batcher.enqueue("document", () => driver.upsertDocument(doc));
     } else {
-      await this.driver?.upsertDocument(doc);
+      await driver.upsertDocument(doc);
     }
 
     // Invalidate cache
@@ -453,7 +455,7 @@ export class ReaderDb {
 
   async deleteDocument(docId: string): Promise<void> {
     this.ensureInitialized();
-    await this.driver?.deleteDocument(docId);
+    await this.getDriver().deleteDocument(docId);
 
     // Invalidate cache
     this.cache?.delete(`doc:${docId}`);
@@ -464,7 +466,7 @@ export class ReaderDb {
 
   async updateDocumentTitle(docId: string, title: string): Promise<void> {
     this.ensureInitialized();
-    await this.driver?.updateDocumentTitle(docId, title);
+    await this.getDriver().updateDocumentTitle(docId, title);
 
     // Invalidate cache
     this.cache?.delete(`doc:${docId}`);
@@ -475,7 +477,7 @@ export class ReaderDb {
 
   async updateDocumentSavedAt(docId: string, savedAt: number | null): Promise<void> {
     this.ensureInitialized();
-    await this.driver?.updateDocumentSavedAt(docId, savedAt);
+    await this.getDriver().updateDocumentSavedAt(docId, savedAt);
 
     // Invalidate cache
     this.cache?.delete(`doc:${docId}`);
@@ -490,7 +492,7 @@ export class ReaderDb {
 
   async createTopic(topic: Omit<TopicRow, "createdAt" | "updatedAt">): Promise<void> {
     this.ensureInitialized();
-    await this.driver?.createTopic(topic);
+    await this.getDriver().createTopic(topic);
     this.emitter.emit("topic:changed", { action: "created", topicId: topic.topicId });
   }
 
@@ -499,35 +501,35 @@ export class ReaderDb {
     updates: Partial<Pick<TopicRow, "name" | "description" | "color">>
   ): Promise<void> {
     this.ensureInitialized();
-    await this.driver?.updateTopic(topicId, updates);
+    await this.getDriver().updateTopic(topicId, updates);
     this.emitter.emit("topic:changed", { action: "updated", topicId });
   }
 
   async deleteTopic(topicId: string): Promise<void> {
     this.ensureInitialized();
-    await this.driver?.deleteTopic(topicId);
+    await this.getDriver().deleteTopic(topicId);
     this.emitter.emit("topic:changed", { action: "deleted", topicId });
   }
 
   async getTopic(topicId: string): Promise<TopicRow | null> {
     this.ensureInitialized();
-    return this.driver?.getTopic(topicId);
+    return this.getDriver().getTopic(topicId);
   }
 
   async listTopics(options?: ListTopicsOptions): Promise<TopicRow[]> {
     this.ensureInitialized();
-    return this.driver?.listTopics(options);
+    return this.getDriver().listTopics(options);
   }
 
   async addDocumentToTopic(documentId: string, topicId: string): Promise<void> {
     this.ensureInitialized();
-    await this.driver?.addDocumentToTopic(documentId, topicId);
+    await this.getDriver().addDocumentToTopic(documentId, topicId);
     this.emitter.emit("topic:changed", { action: "document_added", topicId, documentId });
   }
 
   async removeDocumentFromTopic(documentId: string, topicId: string): Promise<void> {
     this.ensureInitialized();
-    await this.driver?.removeDocumentFromTopic(documentId, topicId);
+    await this.getDriver().removeDocumentFromTopic(documentId, topicId);
     this.emitter.emit("topic:changed", { action: "document_removed", topicId, documentId });
   }
 
@@ -536,12 +538,12 @@ export class ReaderDb {
     options?: ListDocumentsOptions
   ): Promise<DocumentRow[]> {
     this.ensureInitialized();
-    return this.driver?.listDocumentsByTopic(topicId, options);
+    return this.getDriver().listDocumentsByTopic(topicId, options);
   }
 
   async listTopicsByDocument(documentId: string): Promise<TopicRow[]> {
     this.ensureInitialized();
-    return this.driver?.listTopicsByDocument(documentId);
+    return this.getDriver().listTopicsByDocument(documentId);
   }
 
   // ===========================================================================
@@ -550,11 +552,12 @@ export class ReaderDb {
 
   async appendUpdate(update: CrdtUpdateRow): Promise<void> {
     this.ensureInitialized();
+    const driver = this.getDriver();
 
     if (this.batcher) {
-      await this.batcher.enqueue("update", () => this.driver?.appendUpdate(update));
+      await this.batcher.enqueue("update", () => driver.appendUpdate(update));
     } else {
-      await this.driver?.appendUpdate(update);
+      await driver.appendUpdate(update);
     }
 
     // Invalidate document cache
@@ -565,7 +568,7 @@ export class ReaderDb {
 
   async listUpdates(options: ListUpdatesOptions): Promise<CrdtUpdateRow[]> {
     this.ensureInitialized();
-    return this.driver?.listUpdates(options);
+    return this.getDriver().listUpdates(options);
   }
 
   // ===========================================================================
@@ -574,16 +577,17 @@ export class ReaderDb {
 
   async getAnnotation(annotationId: string): Promise<AnnotationRow | null> {
     this.ensureInitialized();
-    return this.driver?.getAnnotation(annotationId);
+    return this.getDriver().getAnnotation(annotationId);
   }
 
   async upsertAnnotation(annotation: AnnotationRow): Promise<void> {
     this.ensureInitialized();
+    const driver = this.getDriver();
 
     if (this.batcher) {
-      await this.batcher.enqueue("annotation", () => this.driver?.upsertAnnotation(annotation));
+      await this.batcher.enqueue("annotation", () => driver.upsertAnnotation(annotation));
     } else {
-      await this.driver?.upsertAnnotation(annotation);
+      await driver.upsertAnnotation(annotation);
     }
 
     this.emitter.emit("annotation:changed", {
@@ -595,7 +599,7 @@ export class ReaderDb {
 
   async listAnnotations(options: ListAnnotationsOptions): Promise<AnnotationRow[]> {
     this.ensureInitialized();
-    return this.driver?.listAnnotations(options);
+    return this.getDriver().listAnnotations(options);
   }
 
   // ===========================================================================
@@ -606,28 +610,29 @@ export class ReaderDb {
     item: Omit<OutboxRow, "attempts" | "nextRetryAt" | "status" | "createdAt">
   ): Promise<void> {
     this.ensureInitialized();
+    const driver = this.getDriver();
 
     if (this.batcher) {
-      await this.batcher.enqueue("outbox", () => this.driver?.enqueueOutbox(item));
+      await this.batcher.enqueue("outbox", () => driver.enqueueOutbox(item));
     } else {
-      await this.driver?.enqueueOutbox(item);
+      await driver.enqueueOutbox(item);
     }
   }
 
   async claimOutboxItems(limit: number): Promise<OutboxRow[]> {
     this.ensureInitialized();
-    return this.driver?.claimOutboxItems(limit);
+    return this.getDriver().claimOutboxItems(limit);
   }
 
   async ackOutboxItem(outboxId: string): Promise<void> {
     this.ensureInitialized();
-    await this.driver?.ackOutboxItem(outboxId);
+    await this.getDriver().ackOutboxItem(outboxId);
     this.emitter.emit("sync:complete", { outboxId });
   }
 
   async failOutboxItem(outboxId: string, nextRetryAt: number): Promise<void> {
     this.ensureInitialized();
-    await this.driver?.failOutboxItem(outboxId, nextRetryAt);
+    await this.getDriver().failOutboxItem(outboxId, nextRetryAt);
   }
 
   // ===========================================================================
@@ -636,7 +641,7 @@ export class ReaderDb {
 
   async createImportJob(job: Omit<ImportJobRow, "createdAt" | "updatedAt">): Promise<void> {
     this.ensureInitialized();
-    await this.driver?.createImportJob(job);
+    await this.getDriver().createImportJob(job);
   }
 
   async updateImportJob(
@@ -644,24 +649,24 @@ export class ReaderDb {
     updates: Parameters<DbDriver["updateImportJob"]>[1]
   ): Promise<void> {
     this.ensureInitialized();
-    await this.driver?.updateImportJob(jobId, updates);
+    await this.getDriver().updateImportJob(jobId, updates);
   }
 
   async getImportJob(jobId: string): Promise<ImportJobRow | null> {
     this.ensureInitialized();
-    return this.driver?.getImportJob(jobId);
+    return this.getDriver().getImportJob(jobId);
   }
 
   async listImportJobs(
     options?: Parameters<DbDriver["listImportJobs"]>[0]
   ): Promise<ImportJobRow[]> {
     this.ensureInitialized();
-    return this.driver?.listImportJobs(options);
+    return this.getDriver().listImportJobs(options);
   }
 
   async deleteImportJob(jobId: string): Promise<void> {
     this.ensureInitialized();
-    await this.driver?.deleteImportJob(jobId);
+    await this.getDriver().deleteImportJob(jobId);
   }
 
   // ===========================================================================
@@ -687,7 +692,7 @@ export class ReaderDb {
    */
   async healthCheck(): Promise<DbHealthInfo> {
     this.ensureInitialized();
-    return this.driver?.healthCheck();
+    return this.getDriver().healthCheck();
   }
 
   /**
@@ -696,7 +701,7 @@ export class ReaderDb {
    */
   async reset(): Promise<void> {
     this.ensureInitialized();
-    await this.driver?.reset();
+    await this.getDriver().reset();
     this.cache?.clear();
   }
 
