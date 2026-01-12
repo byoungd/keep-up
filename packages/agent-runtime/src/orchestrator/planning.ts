@@ -6,6 +6,7 @@
  */
 
 import type { MCPToolCall } from "../types";
+import { type PlanPersistence, createPlanPersistence } from "./planPersistence";
 
 // ============================================================================
 // Planning Types
@@ -100,6 +101,10 @@ export interface PlanningConfig {
   planningTimeoutMs: number;
   /** Automatically execute low-risk plans */
   autoExecuteLowRisk: boolean;
+  /** Enable file-based persistence */
+  persistToFile: boolean;
+  /** Working directory for persistence */
+  workingDirectory?: string;
 }
 
 export const DEFAULT_PLANNING_CONFIG: PlanningConfig = {
@@ -108,6 +113,8 @@ export const DEFAULT_PLANNING_CONFIG: PlanningConfig = {
   maxRefinements: 3,
   planningTimeoutMs: 30000,
   autoExecuteLowRisk: true,
+  persistToFile: true,
+  workingDirectory: undefined,
 };
 
 // ============================================================================
@@ -121,15 +128,24 @@ export type PlanApprovalHandler = (plan: ExecutionPlan) => Promise<PlanApproval>
 
 /**
  * Planning engine that creates and refines execution plans.
+ * Supports optional file-based persistence for session recovery.
  */
 export class PlanningEngine {
   private readonly config: PlanningConfig;
   private plans = new Map<string, ExecutionPlan>();
   private refinements = new Map<string, PlanRefinement[]>();
   private approvalHandler?: PlanApprovalHandler;
+  private readonly persistence?: PlanPersistence;
 
   constructor(config: Partial<PlanningConfig> = {}) {
     this.config = { ...DEFAULT_PLANNING_CONFIG, ...config };
+
+    // Initialize persistence if enabled
+    if (this.config.persistToFile) {
+      this.persistence = createPlanPersistence({
+        workingDirectory: this.config.workingDirectory,
+      });
+    }
   }
 
   /**
@@ -153,6 +169,13 @@ export class PlanningEngine {
 
     this.plans.set(fullPlan.id, fullPlan);
     this.refinements.set(fullPlan.id, []);
+
+    // Persist to file if enabled
+    if (this.persistence) {
+      this.persistence.saveCurrent(fullPlan).catch(() => {
+        // Ignore persistence errors - memory is source of truth
+      });
+    }
 
     return fullPlan;
   }
@@ -231,7 +254,73 @@ export class PlanningEngine {
     const plan = this.plans.get(planId);
     if (plan) {
       plan.status = "executed";
+
+      // Archive to history if persistence enabled
+      if (this.persistence) {
+        this.persistence.archiveCurrent().catch(() => {
+          // Ignore persistence errors
+        });
+      }
     }
+  }
+
+  /**
+   * Update a step's status.
+   */
+  updateStepStatus(planId: string, stepId: string, status: PlanStep["status"]): void {
+    const plan = this.plans.get(planId);
+    if (!plan) {
+      return;
+    }
+
+    const step = plan.steps.find((s) => s.id === stepId);
+    if (step) {
+      step.status = status;
+
+      // Persist update
+      if (this.persistence) {
+        this.persistence.saveCurrent(plan).catch(() => {
+          // Ignore persistence errors
+        });
+      }
+    }
+  }
+
+  /**
+   * Load persisted plan from previous session.
+   * Returns the plan if one exists, null otherwise.
+   */
+  async loadPersistedPlan(): Promise<ExecutionPlan | null> {
+    if (!this.persistence) {
+      return null;
+    }
+
+    const plan = await this.persistence.loadCurrent();
+    if (plan) {
+      this.plans.set(plan.id, plan);
+      this.refinements.set(plan.id, []);
+    }
+    return plan;
+  }
+
+  /**
+   * Check if there's a persisted plan that can be resumed.
+   */
+  async hasPersistedPlan(): Promise<boolean> {
+    if (!this.persistence) {
+      return false;
+    }
+    return this.persistence.hasActivePlan();
+  }
+
+  /**
+   * Get plan history metadata.
+   */
+  async getPlanHistory(): Promise<Array<{ id: string; goal: string; createdAt: number }>> {
+    if (!this.persistence) {
+      return [];
+    }
+    return this.persistence.listHistory();
   }
 
   /**

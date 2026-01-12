@@ -57,6 +57,33 @@ export interface AgentProfile {
 
   /** Whether confirmation is required for dangerous operations */
   requireConfirmation: boolean;
+
+  /**
+   * Edit restrictions for file operations.
+   * Used to constrain agents like "plan" to only write to specific paths.
+   * Pattern matching uses glob syntax.
+   */
+  editRestrictions?: EditRestrictions;
+}
+
+/**
+ * Edit restrictions for constraining file write operations.
+ * Inspired by OpenCode's plan agent pattern.
+ */
+export interface EditRestrictions {
+  /**
+   * Glob patterns for allowed write paths.
+   * If specified, ONLY these paths can be written to.
+   * Example: [".agent/plans/\*.md", ".agent/TODO.md"]
+   */
+  allow?: string[];
+
+  /**
+   * Glob patterns for denied write paths.
+   * These paths are blocked even if they match allow patterns.
+   * Example: ["\*\*\/\*.env", "\*\*\/secrets/\*\*"]
+   */
+  deny?: string[];
 }
 
 /**

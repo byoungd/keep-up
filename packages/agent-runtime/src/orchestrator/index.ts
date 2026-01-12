@@ -63,3 +63,29 @@ export {
   type ModelResponse,
   type VotingStrategy,
 } from "./consensusOrchestrator";
+
+// Planning with File Persistence
+export {
+  PlanningEngine,
+  createPlanningEngine,
+  type ExecutionPlan,
+  type PlanStep,
+  type PlanRefinement,
+  type PlanApproval,
+  type PlanningConfig,
+  type PlanApprovalHandler,
+} from "./planning";
+
+export {
+  PlanPersistence,
+  createPlanPersistence,
+  type PlanPersistenceConfig,
+  type PersistedPlanMetadata,
+} from "./planPersistence";
+
+export {
+  IntegratedPlanningService,
+  createIntegratedPlanningService,
+  type IntegratedPlanningConfig,
+  type PlanTodoLink,
+} from "./integratedPlanning";

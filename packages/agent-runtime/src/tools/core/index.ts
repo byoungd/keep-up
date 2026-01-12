@@ -27,6 +27,12 @@ export {
   type CodeExecuteResult,
 } from "./code";
 export { TodoToolServer, createTodoToolServer, type TodoItem } from "./todo";
+export { PlanToolServer, createPlanToolServer } from "./plan";
+export {
+  ScratchToolServer,
+  createScratchToolServer,
+  type ScratchFileMetadata,
+} from "./scratch";
 export {
   TaskToolServer,
   createTaskToolServer,

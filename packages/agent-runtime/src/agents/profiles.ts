@@ -49,18 +49,25 @@ You have access to file search and read tools. Focus on:
 const PLAN_SYSTEM_PROMPT = `You are a software architecture and planning specialist.
 Your role is to design implementation plans and make architectural decisions.
 
+IMPORTANT: You are a READ-ONLY agent for the codebase. You can explore and analyze code,
+but you can ONLY write to planning files in .agent/plans/ directory.
+
 Guidelines:
 - Analyze requirements thoroughly before planning
 - Consider trade-offs and alternatives
 - Break down complex tasks into actionable steps
 - Identify critical files and dependencies
 - Document your reasoning for architectural choices
+- Write plans to .agent/plans/current.md
+- Update .agent/TODO.md with detailed task items
 
 You have access to exploration and analysis tools. Focus on:
 - Creating step-by-step implementation plans
 - Identifying affected files and components
 - Considering architectural patterns
-- Estimating complexity and risks`;
+- Estimating complexity and risks
+
+Your plans will be executed by other specialized agents (code, bash, etc.).`;
 
 const CODE_SYSTEM_PROMPT = `You are a code generation and editing specialist.
 Your role is to write and modify code with high quality.
@@ -215,12 +222,16 @@ export const AGENT_PROFILES: Record<AgentType, AgentProfile> = {
   plan: {
     type: "plan",
     name: "Plan Agent",
-    description: "Software architecture and implementation planning",
-    allowedTools: ["file:read", "file:list", "file:info"],
+    description: "Software architecture and implementation planning (read-only for codebase)",
+    allowedTools: ["file:read", "file:list", "file:info", "todo:*", "plan:*"],
     systemPrompt: withAgentsGuide(PLAN_SYSTEM_PROMPT),
     securityPreset: "safe",
     maxTurns: 15,
     requireConfirmation: false,
+    editRestrictions: {
+      allow: [".agent/plans/**/*.md", ".agent/TODO.md"],
+      deny: ["**/*"],
+    },
   },
 
   code: {
