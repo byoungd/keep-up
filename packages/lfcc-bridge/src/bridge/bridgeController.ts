@@ -1180,6 +1180,13 @@ export class BridgeController {
 
     // Early exit if no changes
     if (currentDoc.eq(pmDoc)) {
+      // Content matches, but Loro changed (Metadata/Annotations?).
+      // Dispatch empty transaction to allow plugins to update.
+      const tr = this.view.state.tr
+        .setMeta(BRIDGE_ORIGIN_META, "loro")
+        .setMeta("addToHistory", false);
+      this.view.dispatch(tr);
+
       this.lastSyncedVersion = currentVersion;
       this.recordRemoteSync("eq_skip");
       return;
@@ -1210,19 +1217,22 @@ export class BridgeController {
     tr = tr.setMeta(BRIDGE_ORIGIN_META, "loro");
     tr = tr.setMeta("addToHistory", false);
 
-    // P1 FIX: Use SpanList-based selection preservation for structural changes
-    // This captures selection as blockId + offset, which is more stable across block insertions/deletions
+    // P0-2 FIX: Multi-tier selection restoration with better fallback strategies
+    // Tier 1: SpanList-based (blockId + offset) - most stable for structural changes
+    // Tier 2: Position mapping - works for text-only changes
+    // Tier 3: Nearest valid position - handles deleted blocks
+    // Tier 4: Document start - last resort fallback
     const oldSelection = state.selection;
     let selectionRestored = false;
+    let selectionRestorationTier: 1 | 2 | 3 | 4 = 1;
 
     if (!oldSelection.empty) {
+      // Tier 1: Try SpanList-based restoration (blockId + offset)
       try {
-        // Capture selection as SpanList (blockId + offset)
         const spanListResult = pmSelectionToSpanList(oldSelection, state, this.runtime, {
           includeCursor: true,
         });
         if (spanListResult.spanList.length > 0 && spanListResult.verified) {
-          // Try to restore from SpanList in the new document
           const restoredState = state.apply(tr);
           const restoredRanges = spanListToPmRanges(
             spanListResult.spanList,
@@ -1231,26 +1241,98 @@ export class BridgeController {
           );
           if (restoredRanges.length > 0) {
             const { TextSelection } = require("prosemirror-state");
-            const newSelection = TextSelection.create(
-              tr.doc,
-              restoredRanges[0].from,
-              restoredRanges[restoredRanges.length - 1].to
-            );
-            tr = tr.setSelection(newSelection);
-            selectionRestored = true;
+            const from = Math.min(restoredRanges[0].from, tr.doc.content.size);
+            const to = Math.min(restoredRanges[restoredRanges.length - 1].to, tr.doc.content.size);
+            if (from >= 0 && to >= from) {
+              const newSelection = TextSelection.create(tr.doc, from, to);
+              tr = tr.setSelection(newSelection);
+              selectionRestored = true;
+              selectionRestorationTier = 1;
+            }
           }
         }
       } catch {
-        // Fall through to position-based mapping
+        // Fall through to Tier 2
       }
     }
 
-    // Fallback: Use position-based mapping if SpanList restoration failed
-    if (!selectionRestored) {
-      const mappedSelection = oldSelection.map(tr.doc, tr.mapping);
-      if (mappedSelection.$from.pos >= 0 && mappedSelection.$to.pos <= tr.doc.content.size) {
-        tr = tr.setSelection(mappedSelection);
+    // Tier 2: Position-based mapping (works for text changes within same block)
+    if (!selectionRestored && !oldSelection.empty) {
+      try {
+        const mappedSelection = oldSelection.map(tr.doc, tr.mapping);
+        const from = mappedSelection.$from.pos;
+        const to = mappedSelection.$to.pos;
+        if (from >= 0 && to <= tr.doc.content.size && from <= to) {
+          tr = tr.setSelection(mappedSelection);
+          selectionRestored = true;
+          selectionRestorationTier = 2;
+        }
+      } catch {
+        // Fall through to Tier 3
       }
+    }
+
+    // Tier 3: Find nearest valid position (handles deleted blocks)
+    if (!selectionRestored && !oldSelection.empty) {
+      try {
+        const { TextSelection } = require("prosemirror-state");
+        // Try to find a valid position near the original anchor
+        const targetPos = Math.min(oldSelection.anchor, tr.doc.content.size);
+        const $pos = tr.doc.resolve(Math.max(0, targetPos));
+        // Find the nearest textblock
+        let foundPos: number | null = null;
+        for (let d = $pos.depth; d >= 0; d--) {
+          const node = $pos.node(d);
+          if (node.isTextblock) {
+            foundPos = $pos.before(d) + 1;
+            break;
+          }
+        }
+        if (foundPos === null && tr.doc.firstChild) {
+          // No textblock at position, find first one in document
+          tr.doc.descendants((node, pos) => {
+            if (foundPos === null && node.isTextblock) {
+              foundPos = pos + 1;
+              return false;
+            }
+            return true;
+          });
+        }
+        if (foundPos !== null && foundPos >= 0 && foundPos <= tr.doc.content.size) {
+          tr = tr.setSelection(TextSelection.create(tr.doc, foundPos));
+          selectionRestored = true;
+          selectionRestorationTier = 3;
+        }
+      } catch {
+        // Fall through to Tier 4
+      }
+    }
+
+    // Tier 4: Document start (last resort)
+    if (!selectionRestored) {
+      try {
+        const { TextSelection } = require("prosemirror-state");
+        // Position at start of first textblock
+        let firstTextPos = 1;
+        tr.doc.descendants((node, pos) => {
+          if (node.isTextblock) {
+            firstTextPos = pos + 1;
+            return false;
+          }
+          return true;
+        });
+        tr = tr.setSelection(
+          TextSelection.create(tr.doc, Math.min(firstTextPos, tr.doc.content.size))
+        );
+        selectionRestorationTier = 4;
+      } catch {
+        // Selection will remain as default
+      }
+    }
+
+    // P0-2: Log selection restoration tier for debugging/telemetry
+    if (process.env.NODE_ENV !== "production" && !oldSelection.empty) {
+      console.info(`[LFCC Bridge] Selection restored via Tier ${selectionRestorationTier}`);
     }
 
     // Apply the transaction (this will not trigger handleTransaction

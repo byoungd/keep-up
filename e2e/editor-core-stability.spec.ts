@@ -86,44 +86,50 @@ test.describe("Multi-step Undo/Redo History", () => {
 
   // NOTE: This test depends on Loro's mergeInterval (500ms) to create separate undo steps.
   // May be flaky if the dev server timing varies. Uses 700ms waits > mergeInterval.
-  test.fixme("3-step undo restores each state correctly", async ({ page }) => {
-    // Type "First" - wait for mergeInterval to expire
+  test("3-step undo restores each state correctly", async ({ page }) => {
+    // Helper to commit and wait for Loro to register the undo checkpoint
+    const commitAndWait = async () => {
+      await page.evaluate(() => {
+        const w = window as unknown as { __lfccForceCommit?: () => void };
+        w.__lfccForceCommit?.();
+      });
+      await page.waitForTimeout(100); // Brief settle time after commit
+    };
+
+    // Type "First" and commit
     await typeInEditor(page, "First");
-    await page.evaluate(() => {
-      (window as unknown as { __lfccForceCommit?: () => void }).__lfccForceCommit?.();
-    });
-    await page.waitForTimeout(700); // > mergeInterval (500ms)
+    await commitAndWait();
+    await page.waitForTimeout(600); // Exceed mergeInterval to create separate undo step
 
-    // Type Enter + "Second" - wait for mergeInterval to expire
+    // Type Enter + "Second" and commit
     await page.keyboard.press("Enter");
-    await page.keyboard.type("Second", { delay: 30 });
-    await page.evaluate(() => {
-      (window as unknown as { __lfccForceCommit?: () => void }).__lfccForceCommit?.();
-    });
-    await page.waitForTimeout(700);
+    await page.keyboard.type("Second", { delay: 20 });
+    await commitAndWait();
+    await page.waitForTimeout(600);
 
-    // Type Enter + "Third" - wait for mergeInterval to expire
+    // Type Enter + "Third" and commit
     await page.keyboard.press("Enter");
-    await page.keyboard.type("Third", { delay: 30 });
-    await page.evaluate(() => {
-      (window as unknown as { __lfccForceCommit?: () => void }).__lfccForceCommit?.();
-    });
-    await page.waitForTimeout(700);
+    await page.keyboard.type("Third", { delay: 20 });
+    await commitAndWait();
+    await page.waitForTimeout(600);
 
     // Verify initial state
-    await expect.poll(() => getEditorText(page), { timeout: 3000 }).toContain("Third");
+    await expect.poll(() => getEditorText(page), { timeout: 5000 }).toContain("Third");
 
     // Undo step 1: Remove "Third" + Enter
     await pressUndo(page);
-    await expect.poll(() => getEditorText(page), { timeout: 3000 }).not.toContain("Third");
+    await page.waitForTimeout(200);
+    await expect.poll(() => getEditorText(page), { timeout: 5000 }).not.toContain("Third");
 
     // Undo step 2: Remove "Second" + Enter
     await pressUndo(page);
-    await expect.poll(() => getEditorText(page), { timeout: 3000 }).not.toContain("Second");
+    await page.waitForTimeout(200);
+    await expect.poll(() => getEditorText(page), { timeout: 5000 }).not.toContain("Second");
 
     // Undo step 3: Remove "First"
     await pressUndo(page);
-    await expect.poll(() => getEditorText(page), { timeout: 3000 }).not.toContain("First");
+    await page.waitForTimeout(200);
+    await expect.poll(() => getEditorText(page), { timeout: 5000 }).not.toContain("First");
   });
 
   test("redo after undo restores content", async ({ page }) => {
@@ -415,41 +421,44 @@ test.describe("Block Operations", () => {
     expect(text).toContain("Line oneLine two");
   });
 
-  // NOTE: This test depends on Loro's mergeInterval (500ms). May be flaky.
-  test.fixme("block split preserves undo stack", async ({ page }) => {
-    // Type content and commit - wait for mergeInterval
+  test("block split preserves undo stack", async ({ page }) => {
+    const commitAndWait = async () => {
+      await page.evaluate(() => {
+        const w = window as unknown as { __lfccForceCommit?: () => void };
+        w.__lfccForceCommit?.();
+      });
+      await page.waitForTimeout(100);
+    };
+
+    // Type content and commit
     await typeInEditor(page, "BeforeAfter");
-    await page.evaluate(() => {
-      (window as unknown as { __lfccForceCommit?: () => void }).__lfccForceCommit?.();
-    });
-    await page.waitForTimeout(700); // > mergeInterval (500ms)
+    await commitAndWait();
+    await page.waitForTimeout(600); // Exceed mergeInterval
 
     // Verify initial state
     const initialBlocks = await getBlockCount(page);
     expect(initialBlocks).toBe(1);
 
-    // Move cursor to middle and split
+    // Move cursor to middle (after "Before") and split
     await page.keyboard.press(`${modKey}+a`);
     await page.keyboard.press("ArrowLeft");
     for (let i = 0; i < 6; i++) {
-      // Move to after "Before"
       await page.keyboard.press("ArrowRight");
     }
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(50);
 
-    // Split block with Enter - commit and wait
+    // Split block with Enter
     await page.keyboard.press("Enter");
-    await page.evaluate(() => {
-      (window as unknown as { __lfccForceCommit?: () => void }).__lfccForceCommit?.();
-    });
-    await page.waitForTimeout(700);
+    await commitAndWait();
+    await page.waitForTimeout(600);
 
     // Verify split occurred
-    await expect.poll(() => getBlockCount(page), { timeout: 3000 }).toBe(2);
+    await expect.poll(() => getBlockCount(page), { timeout: 5000 }).toBe(2);
 
     // Undo should restore single block
     await pressUndo(page);
-    await expect.poll(() => getBlockCount(page), { timeout: 3000 }).toBe(1);
+    await page.waitForTimeout(200);
+    await expect.poll(() => getBlockCount(page), { timeout: 5000 }).toBe(1);
 
     // Content should be restored
     const restoredText = await getEditorText(page);
@@ -548,5 +557,139 @@ test.describe("Rapid Edit Stress", () => {
     await typeInEditor(page, "Z");
     const after = await waitForTextChange(page, before, 3000);
     expect(after).toContain("Z");
+  });
+});
+
+// ============================================================================
+// P1: Large Document Stress Tests
+// ============================================================================
+
+test.describe("Large Document Stress", () => {
+  test.setTimeout(120000); // Extended timeout for stress tests
+
+  test("50+ blocks rapid creation does not crash", async ({ page }) => {
+    await openFreshEditor(page, "large-doc-stress", { clearContent: true });
+
+    const editor = page.locator(".lfcc-editor .ProseMirror");
+    await editor.click();
+
+    // Create 50 blocks rapidly
+    for (let i = 0; i < 50; i++) {
+      await page.keyboard.type(`Block ${i + 1}`, { delay: 5 });
+      await page.keyboard.press("Enter");
+    }
+
+    // Verify blocks were created
+    const blockCount = await getBlockCount(page);
+    expect(blockCount).toBeGreaterThanOrEqual(50);
+
+    // Verify editor is still responsive
+    await page.keyboard.type("Final block");
+    const text = await getEditorText(page);
+    expect(text).toContain("Final block");
+    expect(text).toContain("Block 1");
+    expect(text).toContain("Block 50");
+  });
+
+  test("large document undo/redo performance", async ({ page }) => {
+    await openFreshEditor(page, "large-doc-undo", { clearContent: true });
+
+    const editor = page.locator(".lfcc-editor .ProseMirror");
+    await editor.click();
+
+    // Create content
+    for (let i = 0; i < 20; i++) {
+      await page.keyboard.type(`Line ${i + 1} `, { delay: 5 });
+      await page.keyboard.press("Enter");
+    }
+
+    // Force commit
+    await page.evaluate(() => {
+      const w = window as unknown as { __lfccForceCommit?: () => void };
+      w.__lfccForceCommit?.();
+    });
+    await page.waitForTimeout(700);
+
+    // Perform multiple undos
+    const startTime = Date.now();
+    for (let i = 0; i < 10; i++) {
+      await pressUndo(page);
+      await page.waitForTimeout(50);
+    }
+    const undoTime = Date.now() - startTime;
+
+    // Undo should complete within reasonable time (< 5 seconds for 10 undos)
+    expect(undoTime).toBeLessThan(5000);
+
+    // Editor should still be functional
+    await typeInEditor(page, "After many undos");
+    const text = await getEditorText(page);
+    expect(text).toContain("After many undos");
+  });
+});
+
+// ============================================================================
+// P2: Edge Case Tests
+// ============================================================================
+
+test.describe("Edge Cases", () => {
+  test("Unicode and Emoji input works correctly", async ({ page }) => {
+    await openFreshEditor(page, "unicode-test", { clearContent: true });
+
+    const editor = page.locator(".lfcc-editor .ProseMirror");
+    await editor.click();
+
+    // Type various Unicode characters
+    await page.keyboard.type("Hello 你好 مرحبا שלום 🎉🚀💡");
+
+    const text = await getEditorText(page);
+    expect(text).toContain("你好");
+    expect(text).toContain("🎉");
+    expect(text).toContain("🚀");
+  });
+
+  test("empty document operations do not crash", async ({ page }) => {
+    await openFreshEditor(page, "empty-doc", { clearContent: true });
+
+    // Undo on empty doc
+    await pressUndo(page);
+    await page.waitForTimeout(100);
+
+    // Redo on empty doc
+    await pressRedo(page);
+    await page.waitForTimeout(100);
+
+    // Select all on empty doc
+    await selectAllText(page);
+    await page.waitForTimeout(100);
+
+    // Bold on empty selection
+    await page.keyboard.press(`${modKey}+b`);
+    await page.waitForTimeout(100);
+
+    // Verify editor is still functional
+    await typeInEditor(page, "Works fine");
+    const text = await getEditorText(page);
+    expect(text).toContain("Works fine");
+  });
+
+  test("very long single line does not break layout", async ({ page }) => {
+    await openFreshEditor(page, "long-line", { clearContent: true });
+
+    const editor = page.locator(".lfcc-editor .ProseMirror");
+    await editor.click();
+
+    // Type a very long line (500+ characters)
+    const longText = "A".repeat(500);
+    await page.keyboard.type(longText, { delay: 1 });
+
+    const text = await getEditorText(page);
+    expect(text.length).toBeGreaterThanOrEqual(500);
+
+    // Editor should still be functional
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("New line after long text");
+    const finalText = await getEditorText(page);
+    expect(finalText).toContain("New line after long text");
   });
 });

@@ -498,3 +498,155 @@ export function pmDocToBlockTree(doc: PMNode): BlockNode[] {
 
   return blocks;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// P1-1: Incremental Projection Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * P1-1: Incrementally update a PM document by replacing only specified blocks.
+ * This is much faster than full re-projection for large documents.
+ *
+ * @param currentDoc - The current PM document
+ * @param updatedBlocks - Map of blockId -> updated BlockNode
+ * @param schema - PM schema to use
+ * @returns New PM document with updated blocks, or null if incremental update not possible
+ */
+export function projectIncrementalUpdate(
+  currentDoc: PMNode,
+  updatedBlocks: Map<string, BlockNode>,
+  schema: Schema = pmSchema
+): PMNode | null {
+  if (updatedBlocks.size === 0) {
+    return currentDoc;
+  }
+
+  // Fast path: check if all updated blocks exist in current doc
+  const children: PMNode[] = [];
+  let hasChanges = false;
+
+  for (let i = 0; i < currentDoc.childCount; i++) {
+    const child = currentDoc.child(i);
+    const blockId = child.attrs.block_id;
+
+    if (typeof blockId === "string" && updatedBlocks.has(blockId)) {
+      // Replace with updated block
+      const updatedBlock = updatedBlocks.get(blockId);
+      if (updatedBlock) {
+        children.push(blockToPmNode(updatedBlock, schema));
+        hasChanges = true;
+      } else {
+        children.push(child);
+      }
+    } else {
+      children.push(child);
+    }
+  }
+
+  if (!hasChanges) {
+    return null; // No blocks were updated
+  }
+
+  return schema.nodes.doc.create(null, children);
+}
+
+/**
+ * P1-1: Compute which blocks have changed between two Loro snapshots.
+ * Uses block checksums for fast comparison.
+ *
+ * @param oldBlocks - Previous block tree
+ * @param newBlocks - Current block tree
+ * @returns Set of block IDs that have changed
+ */
+export function computeChangedBlockIds(
+  oldBlocks: BlockNode[],
+  newBlocks: BlockNode[]
+): Set<string> {
+  const changed = new Set<string>();
+
+  // Build lookup maps
+  const oldMap = new Map<string, BlockNode>();
+  const collectBlocks = (blocks: BlockNode[], map: Map<string, BlockNode>) => {
+    for (const block of blocks) {
+      map.set(block.id, block);
+      if (block.children.length > 0) {
+        collectBlocks(block.children, map);
+      }
+    }
+  };
+  collectBlocks(oldBlocks, oldMap);
+
+  // Compare new blocks against old
+  const compareBlocks = (blocks: BlockNode[]) => {
+    for (const block of blocks) {
+      const oldBlock = oldMap.get(block.id);
+      if (!oldBlock) {
+        // New block
+        changed.add(block.id);
+      } else if (!blockEquals(oldBlock, block)) {
+        // Changed block
+        changed.add(block.id);
+      }
+      if (block.children.length > 0) {
+        compareBlocks(block.children);
+      }
+    }
+  };
+  compareBlocks(newBlocks);
+
+  // Check for deleted blocks
+  const newMap = new Map<string, BlockNode>();
+  collectBlocks(newBlocks, newMap);
+  for (const [id] of oldMap) {
+    if (!newMap.has(id)) {
+      changed.add(id);
+    }
+  }
+
+  return changed;
+}
+
+/**
+ * P1-1: Fast equality check for two BlockNodes.
+ * Compares type, text, attrs, and child count (not deep children equality).
+ */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: P1-1 comparison logic requires multiple field checks
+function blockEquals(a: BlockNode, b: BlockNode): boolean {
+  if (a.type !== b.type) {
+    return false;
+  }
+  if (a.text !== b.text) {
+    return false;
+  }
+  if (a.attrs !== b.attrs) {
+    return false;
+  }
+  if (a.children.length !== b.children.length) {
+    return false;
+  }
+  // Compare richText if present
+  if (a.richText && b.richText) {
+    if (a.richText.length !== b.richText.length) {
+      return false;
+    }
+    for (let i = 0; i < a.richText.length; i++) {
+      const spanA = a.richText[i];
+      const spanB = b.richText[i];
+      if (spanA.text !== spanB.text) {
+        return false;
+      }
+      if (JSON.stringify(spanA.marks) !== JSON.stringify(spanB.marks)) {
+        return false;
+      }
+    }
+  } else if (a.richText || b.richText) {
+    return false;
+  }
+  // Compare child IDs only (not deep equality for performance)
+  for (let i = 0; i < a.children.length; i++) {
+    if (a.children[i].id !== b.children[i].id) {
+      return false;
+    }
+  }
+  return true;
+}

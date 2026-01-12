@@ -315,7 +315,182 @@ export class DivergenceDetector {
       };
     }
   }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // P2-1: Enhanced Divergence Detection
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * P2-1: Analyze divergence to identify root cause
+   * Returns structured information about what diverged
+   */
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: P2-1 divergence analysis requires complex branching
+  analyzeDivergence(
+    editorState: EditorState,
+    loroDoc: LoroDoc,
+    schema: Schema
+  ): DivergenceAnalysis {
+    const analysis: DivergenceAnalysis = {
+      diverged: false,
+      blockCountMismatch: false,
+      textContentMismatch: false,
+      attributeMismatch: false,
+      orderMismatch: false,
+      divergedBlockIds: [],
+      missingInEditor: [],
+      missingInLoro: [],
+    };
+
+    try {
+      const editorBlocks = this.collectBlockInfo(editorState.doc);
+      const loroDoc_ = projectLoroToPm(loroDoc, schema);
+      const loroBlocks = this.collectBlockInfo(loroDoc_);
+
+      // Check block count
+      if (editorBlocks.size !== loroBlocks.size) {
+        analysis.diverged = true;
+        analysis.blockCountMismatch = true;
+      }
+
+      // Find missing blocks
+      for (const [id, editorBlock] of editorBlocks) {
+        const loroBlock = loroBlocks.get(id);
+        if (!loroBlock) {
+          analysis.diverged = true;
+          analysis.missingInLoro.push(id);
+        } else {
+          // Compare block content
+          if (editorBlock.text !== loroBlock.text) {
+            analysis.diverged = true;
+            analysis.textContentMismatch = true;
+            analysis.divergedBlockIds.push(id);
+          }
+          if (editorBlock.attrs !== loroBlock.attrs) {
+            analysis.diverged = true;
+            analysis.attributeMismatch = true;
+            if (!analysis.divergedBlockIds.includes(id)) {
+              analysis.divergedBlockIds.push(id);
+            }
+          }
+          if (editorBlock.order !== loroBlock.order) {
+            analysis.diverged = true;
+            analysis.orderMismatch = true;
+          }
+        }
+      }
+
+      // Find blocks in Loro but not in Editor
+      for (const [id] of loroBlocks) {
+        if (!editorBlocks.has(id)) {
+          analysis.diverged = true;
+          analysis.missingInEditor.push(id);
+        }
+      }
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      this.onError?.(err);
+    }
+
+    return analysis;
+  }
+
+  /**
+   * P2-1: Collect block information for comparison
+   */
+  private collectBlockInfo(
+    doc: EditorState["doc"]
+  ): Map<string, { text: string; attrs: string; order: number }> {
+    const blocks = new Map<string, { text: string; attrs: string; order: number }>();
+    let order = 0;
+
+    doc.descendants((node) => {
+      const blockId = node.attrs.block_id;
+      if (typeof blockId === "string" && blockId.trim() !== "") {
+        blocks.set(blockId, {
+          text: node.textContent,
+          attrs: this.serializeAttrs(node.attrs),
+          order: order++,
+        });
+      }
+    });
+
+    return blocks;
+  }
+
+  /**
+   * P2-1: Attempt soft reset - only replace diverged blocks
+   * Preserves decorations and editor state where possible
+   */
+  triggerSoftReset(
+    divergedBlockIds: string[],
+    loroDoc: LoroDoc,
+    schema: Schema,
+    currentEditorState: EditorState
+  ): {
+    transaction: import("prosemirror-state").Transaction | null;
+    resetBlockCount: number;
+  } {
+    if (divergedBlockIds.length === 0) {
+      return { transaction: null, resetBlockCount: 0 };
+    }
+
+    try {
+      const loroDocPm = projectLoroToPm(loroDoc, schema);
+      const loroBlocks = new Map<string, import("prosemirror-model").Node>();
+
+      // Collect Loro blocks by ID
+      loroDocPm.descendants((node, _pos) => {
+        const blockId = node.attrs.block_id;
+        if (typeof blockId === "string" && divergedBlockIds.includes(blockId)) {
+          loroBlocks.set(blockId, node);
+        }
+      });
+
+      // Build transaction to replace only diverged blocks
+      let tr = currentEditorState.tr;
+      let resetCount = 0;
+
+      currentEditorState.doc.descendants((node, pos) => {
+        const blockId = node.attrs.block_id;
+        if (typeof blockId === "string" && loroBlocks.has(blockId)) {
+          const replacement = loroBlocks.get(blockId);
+          if (replacement) {
+            tr = tr.replaceWith(pos, pos + node.nodeSize, replacement);
+            resetCount++;
+          }
+        }
+      });
+
+      if (resetCount === 0) {
+        return { transaction: null, resetBlockCount: 0 };
+      }
+
+      // Mark as coming from Loro
+      tr = tr.setMeta("lfcc-bridge-origin", "loro");
+      tr = tr.setMeta("addToHistory", false);
+
+      return { transaction: tr, resetBlockCount: resetCount };
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      this.onError?.(err);
+      return { transaction: null, resetBlockCount: 0 };
+    }
+  }
 }
+
+/**
+ * P2-1: Divergence analysis result type
+ */
+export type DivergenceAnalysis = {
+  diverged: boolean;
+  blockCountMismatch: boolean;
+  textContentMismatch: boolean;
+  attributeMismatch: boolean;
+  orderMismatch: boolean;
+  divergedBlockIds: string[];
+  missingInEditor: string[];
+  missingInLoro: string[];
+};
 
 /**
  * Create a divergence detector

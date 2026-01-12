@@ -10,10 +10,12 @@ import {
   type DivergenceResult,
   EditorAdapterPM,
   type LoroRuntime,
+  type UndoController,
   applyAIGatewayWrite,
   assignMissingBlockIds,
   createEmptyDoc,
   createLoroRuntime,
+  createUndoController,
   getRootBlocks,
   hasGatewayMetadata,
   nextBlockId,
@@ -21,6 +23,7 @@ import {
   projectLoroToPm,
 } from "@keepup/lfcc-bridge";
 import { history } from "prosemirror-history";
+import { keymap } from "prosemirror-keymap";
 import { type EditorState, TextSelection } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";
 import * as React from "react";
@@ -98,6 +101,8 @@ export function useLfccBridge(docId: string, peerId = "1", options: LfccBridgeOp
   const [slashMenuState, setSlashMenuState] = React.useState<SlashMenuState | null>(null);
   const [editorState, setEditorState] = React.useState<EditorState | null>(null);
   const [bridge, setBridge] = React.useState<BridgeController | null>(null);
+  // P0-1: Track undo controller for sync-aware undo/redo
+  const [undoController, setUndoController] = React.useState<UndoController | null>(null);
   const editorStateRef = React.useRef<EditorState | null>(null);
 
   // Determine sync mode
@@ -161,7 +166,8 @@ export function useLfccBridge(docId: string, peerId = "1", options: LfccBridgeOp
 
   const activeSync = pollingEnabled ? pollingSync : websocketSync;
 
-  const syncSummary = React.useMemo<DiagnosticsSyncSummary>(
+  // P1-2: Compute sync summary with stable dependencies
+  const syncSummaryBase = React.useMemo<DiagnosticsSyncSummary>(
     () => ({
       state: activeSync.connectionState,
       error: activeSync.error,
@@ -192,6 +198,9 @@ export function useLfccBridge(docId: string, peerId = "1", options: LfccBridgeOp
     ]
   );
 
+  // P1-2: Defer non-critical sync summary updates to reduce render priority
+  const syncSummary = React.useDeferredValue(syncSummaryBase);
+
   const optionsRef = React.useRef(options);
   React.useEffect(() => {
     optionsRef.current = options;
@@ -213,6 +222,8 @@ export function useLfccBridge(docId: string, peerId = "1", options: LfccBridgeOp
     setSlashMenuState,
     setEditorState,
     setBridge,
+    // P0-1: Pass setUndoController for sync-aware undo/redo
+    setUndoController,
   });
 
   React.useEffect(() => {
@@ -265,8 +276,8 @@ export function useLfccBridge(docId: string, peerId = "1", options: LfccBridgeOp
   // Interface for ProseMirror component
   // In uncontrolled mode (defaultState), the library manages EditorState internally.
   // We only need to sync document changes to Loro.
-  // PERF-010: Track processed transactions to avoid double-sync in Strict Mode
-  // and ensure deterministic Block ID generation across render cycles
+  // WeakSet only prevents same object reuse, which is sufficient for preventing infinite loops
+  // with the bridge's syncToLoro -> setEditorState cycle.
   const processedTrs = React.useRef(new WeakSet<import("prosemirror-state").Transaction>());
   const idTrCache = React.useRef(
     new WeakMap<
@@ -286,12 +297,19 @@ export function useLfccBridge(docId: string, peerId = "1", options: LfccBridgeOp
         return;
       }
 
+      // P0-3: Fast path - check WeakSet first (most common case)
+      if (processedTrs.current.has(tr)) {
+        return;
+      }
+
+      // Mark as processed
+      processedTrs.current.add(tr);
+
       if (tr.getMeta(AI_INTENT_META) === true && !hasGatewayMetadata(tr)) {
         const error = new Error("AI write rejected: missing gateway metadata");
         console.error("[LFCC][ai-gateway] rejected AI write without gateway metadata");
         throw error;
       }
-
       // Apply original tr to get intermediate state
       const intermediateState = baseState.apply(tr);
 
@@ -335,18 +353,16 @@ export function useLfccBridge(docId: string, peerId = "1", options: LfccBridgeOp
 
       // SIDE EFFECT: Sync to Loro
       // Safe to do here because we guard against double-execution with WeakSet
-      if (!processedTrs.current.has(tr)) {
-        processedTrs.current.add(tr);
-
-        if (bridge && runtime) {
-          try {
-            // Sync to Loro
-            if (tr.docChanged) {
-              bridge.syncTransactionToLoro(tr);
-            }
-          } catch (err) {
-            console.error("[LFCC] Loro sync failed:", err);
+      // SIDE EFFECT: Sync to Loro
+      // Safe to do here because we guard against double-execution with WeakSet at function start
+      if (bridge && runtime) {
+        try {
+          // Sync to Loro
+          if (tr.docChanged) {
+            bridge.syncTransactionToLoro(tr);
           }
+        } catch (err) {
+          console.error("[LFCC] Loro sync failed:", err);
         }
       }
     },
@@ -367,7 +383,8 @@ export function useLfccBridge(docId: string, peerId = "1", options: LfccBridgeOp
       viewRef.current = view;
       // Register global harness for E2E FIRST - this must happen regardless of bridge state
       // Pass the controlled dispatch handler so E2E tests use the correct path
-      registerE2EHarness(view, handleDispatchRef, runtime);
+      // P0-1: Pass undoController for sync-aware undo/redo
+      registerE2EHarness(view, handleDispatchRef, runtime, undoController);
 
       // Only update bridge if available
       if (bridge) {
@@ -384,7 +401,7 @@ export function useLfccBridge(docId: string, peerId = "1", options: LfccBridgeOp
         return { ...prev, view };
       });
     },
-    [bridge, runtime]
+    [bridge, runtime, undoController]
   );
 
   // Clean up harness on unmount
@@ -438,7 +455,8 @@ export function useLfccBridge(docId: string, peerId = "1", options: LfccBridgeOp
 function registerE2EHarness(
   view: EditorView,
   handleDispatchRef: React.MutableRefObject<(tr: import("prosemirror-state").Transaction) => void>,
-  runtime: LoroRuntime | null
+  runtime: LoroRuntime | null,
+  undoController: UndoController | null
 ): void {
   if (typeof window === "undefined" || process.env.NEXT_PUBLIC_ENABLE_E2E_HOOKS === "false") {
     return;
@@ -446,13 +464,14 @@ function registerE2EHarness(
 
   const globalAny = window as unknown as {
     __lfccView: EditorView;
-    __lfccUndo: () => void;
-    __lfccRedo: () => void;
+    __lfccUndo: () => boolean;
+    __lfccRedo: () => boolean;
     __lfccSetContent: (text: string) => boolean;
     __lfccClearContent: () => boolean;
     __lfccForceCommit: () => void;
     __applyAIGatewayWrite?: (payload: AIGatewayWriteOptions) => AIGatewayWriteResult;
     __AI_INTENT_META?: string;
+    __lfccUndoState: () => string;
     pmTextSelection?: typeof TextSelection;
   };
   globalAny.__lfccView = view;
@@ -461,25 +480,38 @@ function registerE2EHarness(
   // Use configurable getters to ensure we always use the latest state from the view
   // and allow re-definition or clearing
 
-  // P0 FIX: Use Loro UndoManager for E2E hooks as PM history is disabled
+  // P0-1 FIX: Use enhanced UndoController with sync-awareness
   Object.defineProperty(globalAny, "__lfccUndo", {
     get: () => () => {
+      if (undoController) {
+        return undoController.undo();
+      }
       if (runtime && !runtime.isDegraded()) {
         runtime.undoManager.undo();
-      } else {
-        console.warn("[E2E Harness] Undo skipped: runtime not available or degraded");
+        return true;
       }
+      console.warn("[E2E Harness] Undo skipped: runtime not available or degraded");
+      return false;
     },
     configurable: true,
   });
   Object.defineProperty(globalAny, "__lfccRedo", {
     get: () => () => {
+      if (undoController) {
+        return undoController.redo();
+      }
       if (runtime && !runtime.isDegraded()) {
         runtime.undoManager.redo();
-      } else {
-        console.warn("[E2E Harness] Redo skipped: runtime not available or degraded");
+        return true;
       }
+      console.warn("[E2E Harness] Redo skipped: runtime not available or degraded");
+      return false;
     },
+    configurable: true,
+  });
+  // P0-1: Expose undo state for E2E diagnostics
+  Object.defineProperty(globalAny, "__lfccUndoState", {
+    get: () => () => undoController?.getState() ?? "unknown",
     configurable: true,
   });
   Object.defineProperty(globalAny, "__lfccSetContent", {
@@ -604,7 +636,24 @@ function createPlugins(
       ? [createBlockBehaviorsPlugin({ runtime: runtime as unknown as LoroRuntime })]
       : []),
     // P0 FIX: PM history is disabled by default; Loro undoManager handles undo/redo
-    ...((options.enableHistory ?? false) ? [history()] : []),
+    ...((options.enableHistory ?? false)
+      ? [history()]
+      : [
+          keymap({
+            "Mod-z": () => {
+              runtime.undoManager.undo();
+              return true;
+            },
+            "Mod-y": () => {
+              runtime.undoManager.redo();
+              return true;
+            },
+            "Mod-Shift-z": () => {
+              runtime.undoManager.redo();
+              return true;
+            },
+          }),
+        ]),
     createAnnotationPlugin({
       runtime: runtime as unknown as LoroRuntime,
       onFailClosed: options.onFailClosed,
@@ -704,6 +753,8 @@ function useLfccInit({
   setSlashMenuState,
   setEditorState,
   setBridge,
+  // P0-1: Add setUndoController for sync-aware undo/redo
+  setUndoController,
 }: {
   docId: string;
   peerId: string;
@@ -715,7 +766,10 @@ function useLfccInit({
   setSlashMenuState: React.Dispatch<React.SetStateAction<SlashMenuState | null>>;
   setEditorState: React.Dispatch<React.SetStateAction<EditorState | null>>;
   setBridge: (bridge: BridgeController | null) => void;
+  // P0-1: UndoController setter
+  setUndoController: (controller: UndoController | null) => void;
 }) {
+  // biome-ignore lint/correctness/useExhaustiveDependencies: setUndoController is a stable setter from useState
   React.useEffect(() => {
     let isMounted = true;
     let bridgeInstance: BridgeController | null = null;
@@ -731,6 +785,10 @@ function useLfccInit({
 
         setRuntime(runtime);
 
+        // P0-1: Create sync-aware UndoController
+        const undoCtrl = createUndoController(runtime);
+        setUndoController(undoCtrl);
+
         const { bridge, adapter } = initBridge(
           runtime,
           options,
@@ -741,27 +799,44 @@ function useLfccInit({
         bridgeInstance = bridge;
         setBridge(bridge);
 
+        // P0-3 FIX: Explicitly attach annotation repo to runtime to enable Store sync
+        attachAnnotationRepo(runtime);
+
         // PERF-008: Delegate sync to bridge.onStateChange callback.
         // The bridge handles optimized sync from Loro and notifies React.
         // PERF-009: Batch rapid remote events with microtask queue to reduce re-renders.
-        let syncPending = false;
-        unsubscribeDoc = runtime.doc.subscribe((event) => {
-          // Sync from Loro if the event is remote OR if it's a local undo/redo
-          const isRemote = event.by !== "local";
-          const isUndoRedo = event.origin === "undo" || event.origin === "redo";
+        const _syncPending = false;
+        let hasUndoRedoPending = false; // P0-1: Track if any pending event was undo/redo
 
-          if ((isRemote || isUndoRedo) && bridgeInstance && !syncPending) {
-            syncPending = true;
-            queueMicrotask(() => {
-              syncPending = false;
-              if (bridgeInstance) {
-                try {
-                  bridgeInstance.syncFromLoro();
-                } catch (e) {
-                  console.error("[LFCC] Remote sync failed:", e);
-                }
+        // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Loro event handler needs complex branching for sync logic
+        unsubscribeDoc = runtime.doc.subscribe((event) => {
+          // Simplified Sync Logic (P0-3 Fix):
+          // To ensure correctness and E2E reliability, we sync on ALL events
+          // unless they are explicitly generated by the bridge itself (infinite loop prevention).
+          const isBridgeInternal =
+            event.origin?.startsWith("lfcc-bridge") || event.origin?.startsWith("sys:");
+          if (isBridgeInternal) {
+            return;
+          }
+
+          const isUndoRedo = event.origin === "undo" || event.origin === "redo";
+          if (isUndoRedo) {
+            hasUndoRedoPending = true;
+          }
+
+          if (bridgeInstance) {
+            try {
+              // Synchronous sync for immediate UI updates
+              bridgeInstance.syncFromLoro();
+
+              if (hasUndoRedoPending) {
+                undoCtrl.notifySyncComplete();
+                hasUndoRedoPending = false;
               }
-            });
+            } catch (e) {
+              console.error("[LFCC] Sync failed:", e);
+              hasUndoRedoPending = false;
+            }
           }
         });
 

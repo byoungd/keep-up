@@ -784,6 +784,7 @@ export function createAnnotationPlugin({
     props: {
       decorations(state) {
         const annotations = getAnnotations();
+
         if (annotations.length === 0) {
           return DecorationSet.empty;
         }

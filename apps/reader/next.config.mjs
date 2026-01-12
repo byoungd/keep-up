@@ -99,6 +99,8 @@ const nextConfig = {
     config.experiments = {
       ...config.experiments,
       asyncWebAssembly: true,
+      layers: true,
+      topLevelAwait: true,
     };
 
     if (config.module?.rules) {
