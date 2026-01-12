@@ -19,7 +19,14 @@ import type { MetricsCollector } from "./metrics/metricsCollector";
 import type { ErrorCode, Role } from "./permissions/types";
 
 /** Simplified collab message types */
-export type CollabMessageType = "CRDT_UPDATE" | "JOIN" | "LEAVE" | "PRESENCE" | "ERROR";
+export type CollabMessageType =
+  | "CRDT_UPDATE"
+  | "JOIN"
+  | "LEAVE"
+  | "PRESENCE"
+  | "ERROR"
+  | "SNAPSHOT_REQUEST"
+  | "SNAPSHOT_RESPONSE";
 
 /** Base collab message structure */
 export type CollabMessage = {
@@ -39,6 +46,14 @@ export type CollabPresencePayload = {
   cursor?: { blockId: string; offset: number };
   status?: "active" | "idle" | "away";
   stateHash?: string;
+};
+
+/** CRDT update payload for Redis routing */
+export type CrdtUpdatePayload = {
+  /** Base64-encoded CRDT bytes */
+  bytesB64: string;
+  /** Optional version/sequence number */
+  version?: number;
 };
 
 /** Collab connection info */

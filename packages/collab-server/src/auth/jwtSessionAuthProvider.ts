@@ -116,12 +116,14 @@ export class JwtSessionAuthProvider implements SessionAuthProvider {
     try {
       const algorithm = this.getWebCryptoAlgorithm();
       const keyData = this.prepareKeyData();
+      // Cast to Uint8Array<ArrayBuffer> for Web Crypto API compatibility
+      const keyBuffer = new Uint8Array(keyData) as Uint8Array<ArrayBuffer>;
 
       if (this.isHmacAlgorithm(this.config.algorithm)) {
         // HMAC key import
         this.cryptoKey = await crypto.subtle.importKey(
           "raw",
-          keyData,
+          keyBuffer,
           { name: "HMAC", hash: algorithm.hash },
           false,
           ["verify"]
@@ -130,7 +132,7 @@ export class JwtSessionAuthProvider implements SessionAuthProvider {
         // RSA public key import
         this.cryptoKey = await crypto.subtle.importKey(
           "spki",
-          keyData,
+          keyBuffer,
           { name: "RSASSA-PKCS1-v1_5", hash: algorithm.hash },
           false,
           ["verify"]
@@ -140,7 +142,7 @@ export class JwtSessionAuthProvider implements SessionAuthProvider {
         const namedCurve = this.getEcCurve(this.config.algorithm);
         this.cryptoKey = await crypto.subtle.importKey(
           "spki",
-          keyData,
+          keyBuffer,
           { name: "ECDSA", namedCurve },
           false,
           ["verify"]
@@ -288,8 +290,10 @@ export class JwtSessionAuthProvider implements SessionAuthProvider {
 
     try {
       const encoder = new TextEncoder();
-      const dataBytes = encoder.encode(data);
-      const signature = this.base64UrlToBytes(signatureB64);
+      const dataBytes = new Uint8Array(encoder.encode(data)) as Uint8Array<ArrayBuffer>;
+      const signature = new Uint8Array(
+        this.base64UrlToBytes(signatureB64)
+      ) as Uint8Array<ArrayBuffer>;
 
       const algorithm = this.getWebCryptoAlgorithm();
 

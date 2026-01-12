@@ -164,10 +164,10 @@ export class StatelessCollabRelay {
     });
 
     // Initialize scale components
-    this.batcher = new MessageBatcher({
-      onFlush: (messages) => this.sendBatchedMessages(messages),
-      ...(config.batcher ?? {}),
-    });
+    this.batcher = new MessageBatcher(
+      (docId, batch) => this.sendBatchedMessages(docId, batch),
+      config.batcher ?? {}
+    );
 
     this.rateLimiter = new RateLimiter(config.rateLimiter);
     this.backpressure = new BackpressureHandler(config.backpressure);
@@ -192,7 +192,7 @@ export class StatelessCollabRelay {
 
     this.rooms.clear();
     this.connectionMap.clear();
-    this.batcher.stop();
+    this.batcher.flush();
 
     await this.redisAdapter.disconnect();
   }
@@ -243,7 +243,8 @@ export class StatelessCollabRelay {
         type: "JOIN",
         docId,
         senderId,
-        payload: { docId, senderId },
+        ts: Date.now(),
+        payload: { status: "active" },
       },
       ws
     );
@@ -289,7 +290,8 @@ export class StatelessCollabRelay {
         type: "LEAVE",
         docId,
         senderId,
-        payload: { docId, senderId },
+        ts: Date.now(),
+        payload: { status: "away" },
       },
       undefined
     );
@@ -395,7 +397,9 @@ export class StatelessCollabRelay {
     this.broadcastLocal(docId, message, connection.ws);
 
     // Broadcast to remote servers via Redis
-    await this.relay.broadcastPresence(docId, senderId, message.payload);
+    if (message.payload) {
+      await this.relay.broadcastPresence(docId, senderId, message.payload);
+    }
   }
 
   /**
@@ -510,12 +514,13 @@ export class StatelessCollabRelay {
       type: message.type as CollabMessage["type"],
       docId,
       senderId: message.senderId,
-      payload: message.payload,
+      ts: message.timestamp,
+      payload: message.payload as CollabMessage["payload"],
     };
 
     for (const conn of room) {
       if (this.config.enableBatching) {
-        this.batcher.add(conn.ws, collabMessage);
+        this.batcher.queue(docId, collabMessage);
       } else {
         this.sendToClient(conn.ws, collabMessage);
       }
@@ -590,15 +595,15 @@ export class StatelessCollabRelay {
 
       // Backpressure check
       if (this.config.enableBackpressure) {
-        const action = this.backpressure.check(conn.ws.bufferedAmount, conn.ws.readyState);
-        if (action === "drop") {
+        const action = this.backpressure.recordQueued(conn.clientId);
+        if (action.type === "disconnect") {
           this.metrics.backpressureEvents++;
           continue;
         }
       }
 
       if (this.config.enableBatching) {
-        this.batcher.add(conn.ws, message);
+        this.batcher.queue(docId, message);
       } else {
         this.sendToClient(conn.ws, message);
       }
@@ -617,19 +622,24 @@ export class StatelessCollabRelay {
   /**
    * Send batched messages (called by batcher).
    */
-  private sendBatchedMessages(messages: Array<{ ws: WebSocket; messages: CollabMessage[] }>): void {
-    for (const { ws, messages: batch } of messages) {
-      if (ws.readyState !== ws.OPEN) {
+  private sendBatchedMessages(docId: string, batch: { messages: CollabMessage[] }): void {
+    const room = this.rooms.get(docId);
+    if (!room) {
+      return;
+    }
+
+    for (const conn of room) {
+      if (conn.ws.readyState !== conn.ws.OPEN) {
         continue;
       }
 
-      if (batch.length === 1) {
-        ws.send(JSON.stringify(batch[0]));
+      if (batch.messages.length === 1) {
+        conn.ws.send(JSON.stringify(batch.messages[0]));
       } else {
-        ws.send(
+        conn.ws.send(
           JSON.stringify({
             type: "BATCH",
-            messages: batch,
+            messages: batch.messages,
           })
         );
       }

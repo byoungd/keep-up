@@ -21,7 +21,7 @@ export function createAIRequestEnvelope(params: {
   policyContext?: AIRequestEnvelope["policy_context"];
 }): AIRequestEnvelope {
   const requestId = params.requestId ?? params.clientRequestId ?? generateRequestId();
-  return {
+  return normalizeAIRequestEnvelope({
     doc_frontier: params.docFrontier,
     request_id: requestId,
     agent_id: params.agentId,
@@ -32,7 +32,7 @@ export function createAIRequestEnvelope(params: {
     client_request_id: params.clientRequestId,
     options: params.returnCanonicalTree ? { return_canonical_tree: true } : undefined,
     policy_context: params.policyContext,
-  };
+  });
 }
 
 /**
@@ -65,6 +65,16 @@ export function is409Conflict(response: unknown): response is AI409Conflict {
     "code" in response &&
     (response as AI409Conflict).code === "CONFLICT"
   );
+}
+
+/**
+ * Normalize envelope fields to ensure canonical id/frontier presence.
+ */
+export function normalizeAIRequestEnvelope(envelope: AIRequestEnvelope): AIRequestEnvelope {
+  return {
+    ...envelope,
+    request_id: envelope.request_id ?? envelope.client_request_id ?? generateRequestId(),
+  };
 }
 
 /**

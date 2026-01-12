@@ -1,3 +1,6 @@
+import type { ContentChunk, DataAccessPolicy } from "@keepup/core";
+import { applyDataAccessPolicyToChunks } from "@keepup/core";
+
 export type ConsentOverride = "allow" | "deny";
 
 export type ConsentDecision = {
@@ -32,6 +35,12 @@ export type ContextPayload = {
 
 const DEFAULT_MAX_SELECTED_CHARS = 2000;
 const DEFAULT_MAX_PAGE_CHARS = 6000;
+
+const DEFAULT_DATA_ACCESS_POLICY: DataAccessPolicy = {
+  max_context_chars: 8000,
+  redaction_strategy: "mask",
+  pii_handling: "mask",
+};
 
 const REDACTION_RULES: Array<{ label: string; pattern: RegExp }> = [
   { label: "api_key", pattern: /\bsk-[A-Za-z0-9]{16,}\b/g },
@@ -138,15 +147,21 @@ export function createContextPayload(options: {
   maxSelectedChars?: number;
   maxPageChars?: number;
   includePageContextWithSelection?: boolean;
+  policy?: DataAccessPolicy;
 }): ContextPayload | null {
   const sections = buildContextSections(options);
   if (sections.length === 0) {
     return null;
   }
-  const block = formatContextBlock(sections);
+  const policy = options.policy ?? DEFAULT_DATA_ACCESS_POLICY;
+  const filteredSections = applyPolicyToSections(sections, policy);
+  if (filteredSections.length === 0) {
+    return null;
+  }
+  const block = formatContextBlock(filteredSections);
   const redacted = redactSensitiveText(block);
   return {
-    sections,
+    sections: filteredSections,
     text: redacted.text,
     redactions: redacted.summary,
   };
@@ -157,4 +172,45 @@ export function composePromptWithContext(prompt: string, contextBlock: string | 
     return prompt;
   }
   return `${prompt}\n\n${contextBlock}`;
+}
+
+function buildPolicyChunks(sections: ContextSection[]): {
+  chunks: ContentChunk[];
+  lookup: Map<string, ContextSection>;
+} {
+  const lookup = new Map<string, ContextSection>();
+  const chunks: ContentChunk[] = sections.map((section, idx) => {
+    const blockId = section.label === "Selected Text" ? "selected" : `visible_${idx}`;
+    lookup.set(blockId, section);
+    return {
+      block_id: blockId,
+      content: section.text,
+      relevance: 1,
+    };
+  });
+  return { chunks, lookup };
+}
+
+function applyPolicyToSections(
+  sections: ContextSection[],
+  policy: DataAccessPolicy
+): ContextSection[] {
+  const { chunks, lookup } = buildPolicyChunks(sections);
+  const filteredChunks = applyDataAccessPolicyToChunks(chunks, policy);
+  if (filteredChunks.length === 0) {
+    return [];
+  }
+  const filteredSections: ContextSection[] = [];
+  for (const chunk of filteredChunks) {
+    const original = lookup.get(chunk.block_id);
+    if (!original) {
+      continue;
+    }
+    filteredSections.push({
+      ...original,
+      text: chunk.content,
+      truncated: original.originalLength > chunk.content.length || original.truncated,
+    });
+  }
+  return filteredSections;
 }

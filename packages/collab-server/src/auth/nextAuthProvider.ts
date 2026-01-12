@@ -199,7 +199,7 @@ export class NextAuthProvider implements SessionAuthProvider {
   static generateTestToken(
     secret: string,
     payload: Partial<NextAuthJwtPayload> & { sub: string },
-    expiresIn = "1h"
+    expiresIn: number | `${number}${"s" | "m" | "h" | "d"}` = "1h"
   ): string {
     return jwt.sign(payload, secret, { expiresIn });
   }

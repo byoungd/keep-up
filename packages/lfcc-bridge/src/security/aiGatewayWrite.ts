@@ -23,6 +23,10 @@ export const AI_GATEWAY_SOURCE = "ai-gateway-source";
 export const AI_GATEWAY_REQUEST_ID = "ai-gateway-request-id";
 /** Agent id for AI gateway writes (audit) */
 export const AI_GATEWAY_AGENT_ID = "ai-gateway-agent-id";
+/** Intent id for AI gateway writes (audit) */
+export const AI_GATEWAY_INTENT_ID = "ai-gateway-intent-id";
+/** Provenance metadata for AI gateway writes */
+export const AI_GATEWAY_META_DATA = "ai-gateway-meta";
 
 export type AIWriteAction = "replace" | "insert_below" | "insert_above";
 
@@ -37,6 +41,10 @@ export interface AIGatewayWriteOptions {
   requestId?: string;
   /** Agent id for audit attribution */
   agentId?: string;
+  /** Intent id for traceability */
+  intentId?: string;
+  /** Provenance metadata blob */
+  aiMeta?: unknown;
 }
 
 export interface AIGatewayWriteResult {
@@ -59,7 +67,15 @@ export function applyAIGatewayWrite(
   view: EditorView,
   options: AIGatewayWriteOptions
 ): AIGatewayWriteResult {
-  const { text, action, source = "ai-context-menu", requestId, agentId } = options;
+  const {
+    text,
+    action,
+    source = "ai-context-menu",
+    requestId,
+    agentId,
+    intentId,
+    aiMeta,
+  } = options;
 
   if (!view || !view.state) {
     return { success: false, error: "No editor view available" };
@@ -107,6 +123,12 @@ export function applyAIGatewayWrite(
     }
     if (agentId) {
       tr = tr.setMeta(AI_GATEWAY_AGENT_ID, agentId);
+    }
+    if (intentId) {
+      tr = tr.setMeta(AI_GATEWAY_INTENT_ID, intentId);
+    }
+    if (aiMeta) {
+      tr = tr.setMeta(AI_GATEWAY_META_DATA, aiMeta);
     }
 
     // Dispatch the transaction

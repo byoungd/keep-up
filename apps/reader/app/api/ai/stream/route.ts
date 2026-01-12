@@ -113,6 +113,7 @@ type ParsedPayload = {
   hashes: string[];
   requestId: string;
   clientRequestId: string | null;
+  policyContext?: { policy_id?: string; redaction_profile?: string; data_access_profile?: string };
 };
 
 type ParseResult = { payload: ParsedPayload } | { error: Response };
@@ -168,6 +169,7 @@ const parseFrontier = (
   }
 };
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: request parsing requires multiple validation steps
 async function parseRequestPayload(req: Request): Promise<ParseResult> {
   let body: unknown;
   try {
@@ -186,6 +188,10 @@ async function parseRequestPayload(req: Request): Promise<ParseResult> {
   const prompt = getPayloadString(payload, "prompt");
   const context = getPayloadString(payload, "context");
   const model = getPayloadString(payload, "model");
+  const policyContext =
+    typeof payload.policy_context === "object" && payload.policy_context !== null
+      ? (payload.policy_context as ParsedPayload["policyContext"])
+      : undefined;
 
   if (!prompt || !context) {
     return { error: invalidRequest("prompt and context are required", requestId, clientRequestId) };
@@ -234,6 +240,7 @@ async function parseRequestPayload(req: Request): Promise<ParseResult> {
       hashes,
       requestId,
       clientRequestId,
+      policyContext,
     },
   };
 }
@@ -258,8 +265,16 @@ export async function POST(req: Request) {
     return parsed.error;
   }
 
-  const { prompt, context, hashes, parsedFrontier, requestId, clientRequestId, model } =
-    parsed.payload;
+  const {
+    prompt,
+    context,
+    hashes,
+    parsedFrontier,
+    requestId,
+    clientRequestId,
+    model,
+    policyContext,
+  } = parsed.payload;
   const contextHash = await computeOptimisticHash(context);
 
   if (hashes.some((hash) => hash !== contextHash)) {
@@ -295,7 +310,15 @@ export async function POST(req: Request) {
   const messages = buildStreamMessages(prompt, context);
 
   try {
-    return await streamWithProvider(resolved.target, messages);
+    const response = await streamWithProvider(resolved.target, messages);
+    const headers = new Headers(response.headers);
+    if (requestId) {
+      headers.set("x-request-id", requestId);
+    }
+    if (policyContext?.policy_id) {
+      headers.set("x-policy-id", policyContext.policy_id);
+    }
+    return new Response(response.body, { status: response.status, headers });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Stream request failed";
     return jsonErrorResponse(500, "PROVIDER_ERROR", message, {

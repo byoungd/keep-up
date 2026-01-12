@@ -1,25 +1,25 @@
-# Task Prompt: Model Catalog Consolidation
+# Task Prompt: Model Catalog & Provider Alignment (Post-LFCC Merge)
 
 ## Goal
-Use a single model catalog/resolver across the stack to prevent drift in capabilities, defaults, and provider routing.
+Adopt the merged LFCC branch model/catalog expectations by using a single resolver across ai-core, collab-server, and reader so defaults, aliases, and provider routing stay deterministic.
 
 ## Background
-- `apps/reader/src/lib/ai/models.ts` duplicates the catalog from `packages/ai-core/src/catalog/models.ts`; the two can drift (ids, provider labels, defaults).
-- Model resolution logic is spread across `apps/reader/app/api/ai/modelResolver.ts`, `providerResolver.ts`, and `packages/collab-server/src/ai/gateway.ts` without shared validation of capabilities (vision/tools/thinking).
-- UI model selectors and API routes hardcode aliases separately from the ai-core catalog.
+- The merged branch adds env-driven defaults and multi-provider routing hooks; current code still keeps separate catalogs in `@keepup/ai-core`, reader API routes, and collab-server gateway.
+- UI selectors and API validators hardcode aliases/capabilities independently, risking drift from the canonical list and from provider capability flags (vision/tools/streaming).
+- Provider fallbacks for missing env defaults are inconsistent between collab-server and reader routes.
 
 ## Scope
-- Expose a reusable catalog/resolver module from `@keepup/ai-core` that includes aliases, provider metadata, and capability checks.
-- Replace the duplicated `MODEL_CAPABILITIES`/alias maps in reader with imports from the shared module; keep UI labels in one place (short/long labels).
-- Update collab-server gateway to consume the shared resolver for default model selection and provider routing, eliminating local hardcoded lists.
-- Add guardrails to prevent serving a model that lacks required capabilities (e.g., attachments/vision) by reusing the shared capability check.
+- Expand `@keepup/ai-core` catalog/resolver to be the single source (aliases, provider metadata, capability checks, env default resolution) and export a helper for request validation.
+- Replace duplicated model/alias maps in reader (`app/api/ai/*`, `src/lib/ai/models.ts`, panel selectors) with imports from the shared resolver; keep UI label mapping centralized.
+- Update collab-server gateway to use the same resolver for default model selection and provider routing, including env fallback behavior and capability enforcement.
+- Add guardrails for capability-required requests (attachments/vision/tools) and consistent error messaging when a model/provider is unavailable.
 
 ## Deliverables
-- Single catalog + resolver exported from ai-core; reader and collab-server routes use it.
-- Removed or minimized duplicate model lists/aliases; UI still renders friendly labels.
-- Tests to catch drift (snapshots or equality checks) between UI catalog and ai-core catalog removed.
+- Canonical catalog/resolver in ai-core reused by reader routes/UI and collab-server; no local hardcoded lists remain.
+- Env default handling and provider routing behave the same in reader and collab-server; friendly labels still render from one mapping.
+- Drift tests guard against catalog divergence and capability mismatches.
 
 ## Testing
-- Unit: add coverage in ai-core for the resolver (aliases + capability filtering) and reader API routes for model validation errors.
-- Integration: add a small test ensuring provider routing falls back correctly when env overrides are missing.
-- E2E: run `pnpm test:e2e:features` (AI features) to confirm model selection UI still works.
+- Unit: resolver/alias/capability tests in ai-core; reader API validation tests for capability errors and env default fallback.
+- Integration: collab-server gateway test covering resolver-driven defaults + provider selection without env keys.
+- E2E: `pnpm test:e2e:features` (AI features) to confirm model selection UI and provider routing still work.

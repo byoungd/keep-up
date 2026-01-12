@@ -77,6 +77,7 @@ export interface AIRequestEnvelope {
   policy_context?: {
     policy_id?: string;
     redaction_profile?: string;
+    data_access_profile?: string;
   };
   /** Legacy client request ID (deprecated) */
   client_request_id?: string;
@@ -225,6 +226,7 @@ export function createAIRequestEnvelope(params: {
   policyContext?: {
     policy_id?: string;
     redaction_profile?: string;
+    data_access_profile?: string;
   };
 }): AIRequestEnvelope {
   const requestId = params.requestId ?? params.clientRequestId ?? generateRequestId();

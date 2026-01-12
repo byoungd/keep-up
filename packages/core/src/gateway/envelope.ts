@@ -29,7 +29,8 @@ import type {
  */
 export function createGatewayRequest(params: {
   docId: string;
-  docFrontierTag: DocFrontierTag;
+  docFrontierTag?: DocFrontierTag;
+  docFrontier?: DocFrontierTag;
   targetSpans: TargetSpan[];
   instructions: string;
   format: AIRequestFormat;
@@ -37,23 +38,39 @@ export function createGatewayRequest(params: {
   payload?: string;
   requestId?: string;
   clientRequestId?: string;
+  agentId?: string;
+  intentId?: string;
+  intent?: unknown;
+  aiMeta?: AIGatewayRequest["ai_meta"];
+  policyContext?: AIGatewayRequest["policy_context"];
   returnCanonicalTree?: boolean;
   sanitizationPolicy?: AISanitizationPolicyV1;
 }): AIGatewayRequest {
+  const frontier = params.docFrontier ?? params.docFrontierTag;
+  if (!frontier) {
+    throw new Error("docFrontier is required to build a gateway request");
+  }
+  const requestId = params.requestId ?? params.clientRequestId;
   return {
     doc_id: params.docId,
-    doc_frontier_tag: params.docFrontierTag,
+    doc_frontier_tag: frontier,
+    doc_frontier: frontier,
+    agent_id: params.agentId,
+    intent_id: params.intentId,
+    intent: params.intent,
+    ai_meta: params.aiMeta,
     target_spans: params.targetSpans,
     instructions: params.instructions,
     format: params.format,
+    request_id: requestId,
+    client_request_id: params.clientRequestId,
     model: params.model,
     payload: params.payload,
-    request_id: params.requestId,
-    client_request_id: params.clientRequestId,
     options: {
       return_canonical_tree: params.returnCanonicalTree,
       sanitization_policy: params.sanitizationPolicy,
     },
+    policy_context: params.policyContext,
   };
 }
 
@@ -81,6 +98,7 @@ export function createTargetSpan(
  */
 export function createGatewayResponse(params: {
   serverFrontierTag: DocFrontierTag;
+  serverDocFrontier?: DocFrontierTag;
   canonFragment?: CanonNode;
   applyPlan?: ApplyPlan;
   requestId?: string;
@@ -90,6 +108,7 @@ export function createGatewayResponse(params: {
   return {
     status: 200,
     server_frontier_tag: params.serverFrontierTag,
+    server_doc_frontier: params.serverDocFrontier ?? params.serverFrontierTag,
     canon_fragment: params.canonFragment,
     apply_plan: params.applyPlan,
     request_id: params.requestId,
@@ -104,6 +123,7 @@ export function createGatewayResponse(params: {
 export function createGateway409(params: {
   reason: ConflictReason;
   serverFrontierTag: DocFrontierTag;
+  serverDocFrontier?: DocFrontierTag;
   failedPreconditions: FailedPrecondition[];
   message: string;
   requestId?: string;
@@ -113,6 +133,7 @@ export function createGateway409(params: {
     status: 409,
     reason: params.reason,
     server_frontier_tag: params.serverFrontierTag,
+    server_doc_frontier: params.serverDocFrontier ?? params.serverFrontierTag,
     failed_preconditions: params.failedPreconditions,
     message: params.message,
     request_id: params.requestId,
@@ -202,10 +223,13 @@ function validateRequiredFields(req: Record<string, unknown>, errors: Validation
     errors.push({ field: "doc_id", message: "doc_id is required and must be a non-empty string" });
   }
 
-  if (typeof req.doc_frontier_tag !== "string") {
+  const hasFrontierTag = typeof req.doc_frontier_tag === "string";
+  const hasDocFrontier = typeof req.doc_frontier === "string";
+
+  if (!hasFrontierTag && !hasDocFrontier) {
     errors.push({
-      field: "doc_frontier_tag",
-      message: "doc_frontier_tag is required and must be a string",
+      field: "doc_frontier",
+      message: "doc_frontier (or doc_frontier_tag) is required and must be a string",
     });
   }
 
@@ -255,6 +279,7 @@ function validateTargetSpans(req: Record<string, unknown>, errors: ValidationErr
   }
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: validation logic is inherently complex
 function validateOptionalFields(req: Record<string, unknown>, errors: ValidationError[]): void {
   // Optional fields type checks
   if (req.model !== undefined && typeof req.model !== "string") {
@@ -263,6 +288,20 @@ function validateOptionalFields(req: Record<string, unknown>, errors: Validation
 
   if (req.payload !== undefined && typeof req.payload !== "string") {
     errors.push({ field: "payload", message: "payload must be a string if provided" });
+  }
+
+  if (req.doc_frontier_tag !== undefined && typeof req.doc_frontier_tag !== "string") {
+    errors.push({
+      field: "doc_frontier_tag",
+      message: "doc_frontier_tag must be a string if provided",
+    });
+  }
+
+  if (req.doc_frontier !== undefined && typeof req.doc_frontier !== "string") {
+    errors.push({
+      field: "doc_frontier",
+      message: "doc_frontier must be a string if provided",
+    });
   }
 
   if (req.request_id !== undefined && typeof req.request_id !== "string") {
@@ -285,6 +324,35 @@ function validateOptionalFields(req: Record<string, unknown>, errors: Validation
       message: "request_id or client_request_id is required",
     });
   }
+
+  if (req.policy_context !== undefined) {
+    if (typeof req.policy_context !== "object" || req.policy_context === null) {
+      errors.push({
+        field: "policy_context",
+        message: "policy_context must be an object if provided",
+      });
+    } else {
+      const ctx = req.policy_context as Record<string, unknown>;
+      if (ctx.policy_id !== undefined && typeof ctx.policy_id !== "string") {
+        errors.push({
+          field: "policy_context.policy_id",
+          message: "policy_id must be a string if provided",
+        });
+      }
+      if (ctx.redaction_profile !== undefined && typeof ctx.redaction_profile !== "string") {
+        errors.push({
+          field: "policy_context.redaction_profile",
+          message: "redaction_profile must be a string if provided",
+        });
+      }
+      if (ctx.data_access_profile !== undefined && typeof ctx.data_access_profile !== "string") {
+        errors.push({
+          field: "policy_context.data_access_profile",
+          message: "data_access_profile must be a string if provided",
+        });
+      }
+    }
+  }
 }
 
 /**
@@ -295,5 +363,22 @@ export function parseGatewayRequest(request: unknown): AIGatewayRequest | null {
   if (errors.length > 0) {
     return null;
   }
-  return request as AIGatewayRequest;
+  return normalizeGatewayRequest(request as AIGatewayRequest);
+}
+
+/**
+ * Normalize a gateway request to ensure canonical fields are present.
+ * - Ensures `doc_frontier` mirrors `doc_frontier_tag`
+ * - Ensures `request_id` mirrors `client_request_id` when missing
+ */
+export function normalizeGatewayRequest(request: AIGatewayRequest): AIGatewayRequest {
+  const frontier = request.doc_frontier ?? request.doc_frontier_tag;
+  const requestId = request.request_id ?? request.client_request_id;
+
+  return {
+    ...request,
+    doc_frontier: frontier,
+    doc_frontier_tag: frontier ?? request.doc_frontier_tag,
+    request_id: requestId,
+  };
 }

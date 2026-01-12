@@ -222,6 +222,7 @@ export function useAIPanelController({
             status: "complete",
             aiContext: {
               model,
+              request_id: result.requestId,
               confidence: result.confidence,
               provenance: result.provenance,
             },

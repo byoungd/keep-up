@@ -269,7 +269,7 @@ Skip:
 
     return {
       claims,
-      tokensUsed: response.usage?.total_tokens ?? 0,
+      tokensUsed: response.usage?.totalTokens ?? 0,
     };
   }
 
@@ -298,7 +298,7 @@ Skip:
           text: item.text ?? "",
           position: {
             start: item.start ?? 0,
-            end: item.end ?? item.text?.length,
+            end: item.end ?? (item.start ?? 0) + (item.text?.length ?? 0),
           },
           type: (item.type as Claim["type"]) ?? "factual",
           entities: item.entities ?? [],
@@ -424,7 +424,7 @@ Output format (JSON):
         explanation: parsed.explanation,
         correction: parsed.correction,
       },
-      tokensUsed: response.usage?.total_tokens ?? 0,
+      tokensUsed: response.usage?.totalTokens ?? 0,
     };
   }
 

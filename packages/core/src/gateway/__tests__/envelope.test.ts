@@ -12,6 +12,7 @@ import {
   isGateway409,
   isGatewayError,
   isGatewaySuccess,
+  normalizeGatewayRequest,
   parseGatewayRequest,
   validateGatewayRequest,
 } from "../envelope.js";
@@ -29,6 +30,7 @@ describe("AI Gateway Envelope", () => {
 
       expect(request.doc_id).toBe("doc123");
       expect(request.doc_frontier_tag).toBe("frontier:abc");
+      expect(request.doc_frontier).toBe("frontier:abc");
       expect(request.target_spans).toHaveLength(1);
       expect(request.instructions).toBe("Fix the typo");
       expect(request.format).toBe("canonical_fragment");
@@ -46,6 +48,7 @@ describe("AI Gateway Envelope", () => {
         requestId: "req-123",
         clientRequestId: "legacy-123",
         returnCanonicalTree: true,
+        policyContext: { policy_id: "policy-1", redaction_profile: "strict" },
       });
 
       expect(request.model).toBe("gpt-4");
@@ -53,6 +56,21 @@ describe("AI Gateway Envelope", () => {
       expect(request.request_id).toBe("req-123");
       expect(request.client_request_id).toBe("legacy-123");
       expect(request.options?.return_canonical_tree).toBe(true);
+      expect(request.policy_context?.policy_id).toBe("policy-1");
+    });
+
+    it("accepts canonical doc_frontier and normalizes legacy field", () => {
+      const request = createGatewayRequest({
+        docId: "doc123",
+        docFrontier: "frontier:canonical",
+        targetSpans: [],
+        instructions: "Test",
+        format: "html",
+        requestId: "req-1",
+      });
+
+      expect(request.doc_frontier).toBe("frontier:canonical");
+      expect(request.doc_frontier_tag).toBe("frontier:canonical");
     });
   });
 
@@ -76,6 +94,7 @@ describe("AI Gateway Envelope", () => {
 
       expect(response.status).toBe(200);
       expect(response.server_frontier_tag).toBe("frontier:xyz");
+      expect(response.server_doc_frontier).toBe("frontier:xyz");
       expect(response.request_id).toBe("req-123");
       expect(response.client_request_id).toBe("legacy-123");
       expect(response.diagnostics).toEqual([]);
@@ -85,10 +104,12 @@ describe("AI Gateway Envelope", () => {
       const canonFragment = { id: "1", type: "paragraph", attrs: {}, children: [] };
       const response = createGatewayResponse({
         serverFrontierTag: "frontier:xyz",
+        serverDocFrontier: "frontier:new",
         canonFragment,
       });
 
       expect(response.canon_fragment).toEqual(canonFragment);
+      expect(response.server_doc_frontier).toBe("frontier:new");
     });
 
     it("includes apply plan when provided", () => {
@@ -111,6 +132,7 @@ describe("AI Gateway Envelope", () => {
       const response = createGateway409({
         reason: "hash_mismatch",
         serverFrontierTag: "frontier:xyz",
+        serverDocFrontier: "frontier:new",
         failedPreconditions: [{ span_id: "s1", annotation_id: "a1", reason: "hash_mismatch" }],
         message: "Content has changed",
         requestId: "req-123",
@@ -119,6 +141,7 @@ describe("AI Gateway Envelope", () => {
       expect(response.status).toBe(409);
       expect(response.reason).toBe("hash_mismatch");
       expect(response.server_frontier_tag).toBe("frontier:xyz");
+      expect(response.server_doc_frontier).toBe("frontier:new");
       expect(response.failed_preconditions).toHaveLength(1);
       expect(response.message).toBe("Content has changed");
     });
@@ -217,7 +240,7 @@ describe("AI Gateway Envelope", () => {
       const errors = validateGatewayRequest({});
 
       expect(errors.some((e) => e.field === "doc_id")).toBe(true);
-      expect(errors.some((e) => e.field === "doc_frontier_tag")).toBe(true);
+      expect(errors.some((e) => e.field === "doc_frontier")).toBe(true);
       expect(errors.some((e) => e.field === "target_spans")).toBe(true);
       expect(errors.some((e) => e.field === "instructions")).toBe(true);
       expect(errors.some((e) => e.field === "format")).toBe(true);
@@ -259,6 +282,19 @@ describe("AI Gateway Envelope", () => {
       expect(validateGatewayRequest("string")).toHaveLength(1);
       expect(validateGatewayRequest(123)).toHaveLength(1);
     });
+
+    it("accepts canonical doc_frontier without legacy tag", () => {
+      const errors = validateGatewayRequest({
+        doc_id: "doc123",
+        doc_frontier: "f:1",
+        target_spans: [],
+        instructions: "Test",
+        format: "html",
+        request_id: "req-123",
+      });
+
+      expect(errors).toHaveLength(0);
+    });
   });
 
   describe("parseGatewayRequest", () => {
@@ -280,6 +316,37 @@ describe("AI Gateway Envelope", () => {
     it("returns null for invalid input", () => {
       const result = parseGatewayRequest({ invalid: true });
       expect(result).toBeNull();
+    });
+
+    it("normalizes doc_frontier and request ids", () => {
+      const input = {
+        doc_id: "doc123",
+        doc_frontier: "frontier:canonical",
+        target_spans: [],
+        instructions: "Test",
+        format: "html",
+        client_request_id: "legacy-1",
+      };
+
+      const result = parseGatewayRequest(input);
+      expect(result?.doc_frontier_tag).toBe("frontier:canonical");
+      expect(result?.request_id).toBe("legacy-1");
+    });
+  });
+
+  describe("normalizeGatewayRequest", () => {
+    it("fills missing canonical fields", () => {
+      const normalized = normalizeGatewayRequest({
+        doc_id: "doc1",
+        doc_frontier_tag: "f1",
+        target_spans: [],
+        instructions: "x",
+        format: "html",
+        client_request_id: "legacy-req",
+      });
+
+      expect(normalized.doc_frontier).toBe("f1");
+      expect(normalized.request_id).toBe("legacy-req");
     });
   });
 });

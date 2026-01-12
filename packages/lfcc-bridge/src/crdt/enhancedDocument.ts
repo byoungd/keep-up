@@ -169,6 +169,8 @@ export interface AIContext {
   confidence?: number;
   /** Agent ID for multi-agent scenarios */
   agent_id?: string;
+  /** Request ID for idempotency/audit */
+  request_id?: string;
 }
 
 export interface ToolCallRecord {

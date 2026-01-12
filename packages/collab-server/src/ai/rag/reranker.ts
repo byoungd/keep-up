@@ -224,7 +224,7 @@ Scoring criteria:
 
     return {
       results: scores,
-      tokens: response.usage?.total_tokens ?? 0,
+      tokens: response.usage?.totalTokens ?? 0,
     };
   }
 

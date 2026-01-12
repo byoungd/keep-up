@@ -82,6 +82,16 @@ describe("createContextPayload", () => {
     const payload = createContextPayload({});
     expect(payload).toBeNull();
   });
+
+  it("applies data access policy limits", () => {
+    const payload = createContextPayload({
+      selectedText: "abcdef",
+      policy: { max_context_chars: 3, redaction_strategy: "mask", pii_handling: "mask" },
+    });
+    expect(payload).not.toBeNull();
+    expect(payload?.sections[0]?.text.length).toBeLessThanOrEqual(3);
+    expect(payload?.sections[0]?.truncated).toBe(true);
+  });
 });
 
 describe("composePromptWithContext", () => {

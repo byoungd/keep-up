@@ -33,12 +33,22 @@ export type TargetSpan = {
 /** AI request format */
 export type AIRequestFormat = "canonical_tree" | "canonical_fragment" | "html" | "markdown";
 
-/** AI Gateway request envelope */
+/** AI Gateway request envelope (v0.9.1 aligned). Prefer `doc_frontier` + `request_id`; keep aliases for backward compatibility. */
 export type AIGatewayRequest = {
   /** Document ID */
   doc_id: string;
-  /** Document frontier at time of read */
+  /** Document frontier at time of read (legacy field) */
   doc_frontier_tag: DocFrontierTag;
+  /** Canonical frontier field */
+  doc_frontier?: DocFrontierTag;
+  /** Agent identifier for audit/policy */
+  agent_id?: string;
+  /** Optional intent identifier */
+  intent_id?: string;
+  /** Optional intent payload */
+  intent?: unknown;
+  /** AI operation metadata */
+  ai_meta?: import("../kernel/ai/opcodes").AIOperationMeta;
   /** Target spans with preconditions */
   target_spans: TargetSpan[];
   /** User instructions / prompt */
@@ -47,14 +57,20 @@ export type AIGatewayRequest = {
   model?: string;
   /** Output format preference */
   format: AIRequestFormat;
-  /** Request ID for idempotency */
-  request_id?: string;
-  /** Client-generated request ID for idempotency */
-  client_request_id?: string;
   /** Raw payload (HTML/Markdown/XML) */
   payload?: string;
   /** Additional options */
   options?: AIGatewayRequestOptions;
+  /** Canonical request id for idempotency */
+  request_id?: string;
+  /** Legacy client-provided request id */
+  client_request_id?: string;
+  /** Policy context for governance/redaction */
+  policy_context?: {
+    policy_id?: string;
+    redaction_profile?: string;
+    data_access_profile?: string;
+  };
 };
 
 /** Request options */
@@ -79,8 +95,10 @@ export type AIGatewayResponse = {
   canon_fragment?: CanonNode;
   /** Apply plan explanation */
   apply_plan?: ApplyPlan;
-  /** Server's current frontier */
+  /** Server's current frontier (legacy field) */
   server_frontier_tag: DocFrontierTag;
+  /** Canonical server frontier */
+  server_doc_frontier?: DocFrontierTag;
   /** Request ID echo */
   request_id?: string;
   /** Request ID echo */
@@ -144,8 +162,10 @@ export type AIGateway409Response = {
   status: 409;
   /** Primary conflict reason */
   reason: ConflictReason;
-  /** Server's current frontier */
+  /** Server's current frontier (legacy field) */
   server_frontier_tag: DocFrontierTag;
+  /** Canonical server frontier */
+  server_doc_frontier?: DocFrontierTag;
   /** Failed preconditions */
   failed_preconditions: FailedPrecondition[];
   /** Detailed error message */

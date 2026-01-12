@@ -30,6 +30,9 @@ interface ResearchRequest {
   userId: string;
   docIds?: string[];
   model?: string;
+  request_id?: string;
+  client_request_id?: string;
+  policy_context?: { policy_id?: string; redaction_profile?: string; data_access_profile?: string };
 }
 
 interface Citation {
@@ -47,6 +50,7 @@ interface ResearchResponse {
   answer: string;
   citations: Citation[];
   processingTimeMs: number;
+  request_id?: string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -192,18 +196,22 @@ export async function POST(req: Request): Promise<Response> {
 
   try {
     const body = (await req.json()) as ResearchRequest;
+    const requestId = body.request_id ?? body.client_request_id ?? crypto.randomUUID();
+    const policyContext = body.policy_context;
 
     // Validate request
     if (!body.query?.trim()) {
       return NextResponse.json(
-        { error: { code: "INVALID_REQUEST", message: "query is required" } },
+        { error: { code: "INVALID_REQUEST", message: "query is required", request_id: requestId } },
         { status: 400 }
       );
     }
 
     if (!body.userId?.trim()) {
       return NextResponse.json(
-        { error: { code: "INVALID_REQUEST", message: "userId is required" } },
+        {
+          error: { code: "INVALID_REQUEST", message: "userId is required", request_id: requestId },
+        },
         { status: 400 }
       );
     }
@@ -213,12 +221,16 @@ export async function POST(req: Request): Promise<Response> {
 
     // Handle empty content case
     if (contentItems.length === 0) {
-      return NextResponse.json({
-        answer:
-          "I couldn't find any imported content to search. Please add some content to your library first, then ask me questions about it.",
-        citations: [],
-        processingTimeMs: Date.now() - startTime,
-      } satisfies ResearchResponse);
+      return NextResponse.json(
+        {
+          answer:
+            "I couldn't find any imported content to search. Please add some content to your library first, then ask me questions about it.",
+          citations: [],
+          processingTimeMs: Date.now() - startTime,
+          request_id: requestId,
+        } satisfies ResearchResponse,
+        { headers: { "x-request-id": requestId } }
+      );
     }
 
     // Build context with citations
@@ -236,9 +248,15 @@ export async function POST(req: Request): Promise<Response> {
       answer,
       citations: usedCitations.length > 0 ? usedCitations : citations.slice(0, 3),
       processingTimeMs: Date.now() - startTime,
+      request_id: requestId,
     };
 
-    return NextResponse.json(response);
+    const headers: Record<string, string> = { "x-request-id": requestId };
+    if (policyContext?.policy_id) {
+      headers["x-policy-id"] = policyContext.policy_id;
+    }
+
+    return NextResponse.json(response, { headers });
   } catch (error) {
     console.error("[Research API] Error:", error);
 
@@ -247,6 +265,7 @@ export async function POST(req: Request): Promise<Response> {
         error: {
           code: "INTERNAL_ERROR",
           message: error instanceof Error ? error.message : "An error occurred",
+          request_id: crypto.randomUUID(),
         },
       },
       { status: 500 }

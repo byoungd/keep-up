@@ -401,6 +401,25 @@ describe("AI Gateway Controller", () => {
           expect(result.diagnostics.some((d) => d.kind === "removed_attr")).toBe(true);
         }
       });
+
+      it("returns cached response when the same request_id is reused", async () => {
+        const provider = createTestProvider();
+        const gateway = createAIGatewayWithDefaults(provider);
+
+        const request: AIGatewayRequest = {
+          doc_id: "doc123",
+          doc_frontier_tag: "frontier:v1",
+          target_spans: [],
+          instructions: "Test",
+          format: "html",
+          request_id: "req-idem",
+        };
+
+        const first = await gateway.processRequest(request);
+        const second = await gateway.processRequest(request);
+
+        expect(second).toEqual(first);
+      });
     });
 
     describe("updateConfig", () => {

@@ -515,6 +515,7 @@ export class StreamingController {
         status,
         aiContext: {
           ...this.options.aiContext,
+          request_id: this.options.aiContext?.request_id,
           tokens: {
             input: 0,
             output: Math.ceil(this.state.totalContent.length / 4),

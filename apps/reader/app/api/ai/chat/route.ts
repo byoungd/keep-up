@@ -26,6 +26,9 @@ type RequestBody = {
   attachments?: Array<{ type: "image"; url: string }>;
   workflow?: "tdd" | "refactoring" | "debugging" | "research" | "none";
   systemPrompt?: string;
+  request_id?: string;
+  client_request_id?: string;
+  policy_context?: { policy_id?: string; redaction_profile?: string; data_access_profile?: string };
 };
 
 type ErrorCode =
@@ -122,7 +125,15 @@ async function handleStreamResponse(
   messages: Message[],
   model: string,
   requestId: string,
-  options?: { promptTemplateId?: string; contextHash?: string }
+  options?: {
+    promptTemplateId?: string;
+    contextHash?: string;
+    policyContext?: {
+      policy_id?: string;
+      redaction_profile?: string;
+      data_access_profile?: string;
+    };
+  }
 ): Promise<Response> {
   const textEncoder = new TextEncoder();
   const promptHash = await computeOptimisticHash(
@@ -169,13 +180,19 @@ async function handleStreamResponse(
 
   return new Response(streamBody, {
     status: 200,
-    headers: { "Content-Type": "text/event-stream; charset=utf-8", "x-request-id": requestId },
+    headers: {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "x-request-id": requestId,
+      ...(options?.policyContext?.policy_id
+        ? { "x-policy-id": options.policyContext.policy_id }
+        : {}),
+    },
   });
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: request parsing plus multi-provider routing
 export async function POST(req: Request) {
-  const requestId = crypto.randomUUID();
+  const fallbackRequestId = req.headers.get("x-request-id") ?? crypto.randomUUID();
   try {
     const url = new URL(req.url);
     const queryModel = url.searchParams.get("model") ?? undefined;
@@ -191,7 +208,11 @@ export async function POST(req: Request) {
       attachments,
       workflow = "none",
       systemPrompt,
+      request_id,
+      client_request_id,
+      policy_context,
     } = body ?? {};
+    const requestId = request_id ?? client_request_id ?? fallbackRequestId;
 
     if (!prompt) {
       return errorResponse("missing_prompt", "prompt is required", requestId, 400);
@@ -244,20 +265,32 @@ export async function POST(req: Request) {
         {
           promptTemplateId,
           contextHash,
+          policyContext: policy_context,
         }
       );
     }
 
     const content = await completeWithProvider(resolved.target, providerMessages);
 
+    const headers: Record<string, string> = {
+      "Content-Type": "text/plain; charset=utf-8",
+      "x-request-id": requestId,
+    };
+    if (policy_context?.policy_id) {
+      headers["x-policy-id"] = policy_context.policy_id;
+    }
     return new Response(content, {
       status: 200,
-      headers: { "Content-Type": "text/plain; charset=utf-8", "x-request-id": requestId },
+      headers,
     });
   } catch (error) {
     const message = (error as Error).message;
-    console.error("[AI API Error]", { message, requestId, originalError: error });
+    console.error("[AI API Error]", {
+      message,
+      requestId: fallbackRequestId,
+      originalError: error,
+    });
     const code: ErrorCode = /api key/i.test(message) ? "config_error" : "provider_error";
-    return errorResponse(code, message, requestId, 500);
+    return errorResponse(code, message, fallbackRequestId, 500);
   }
 }

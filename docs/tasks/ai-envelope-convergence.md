@@ -1,28 +1,33 @@
-# Task Prompt: AI Envelope Convergence
+# Task Prompt: LFCC Merge Protocol Alignment (Envelope + Policy + Provenance)
 
 ## Goal
-Create a single, canonical AI envelope/request/response definition across `@keepup/core`, `@keepup/collab-server`, and `apps/reader` so idempotency, conflict handling, and policy hooks stay in sync.
+Align the merged LFCC branch protocol updates across core, collab-server, agent-runtime, and reader so the AI envelope, policy/context gating, and provenance/telemetry are deterministic and idempotent.
 
 ## Background
-- Two envelope shapes exist today: `packages/core/src/kernel/ai` (`AIRequestEnvelope`) and `packages/core/src/gateway` (`AIGatewayRequest`), plus a separate `packages/collab-server/src/ai/gateway.ts` layer and ad-hoc request ids in `apps/reader/app/api/ai/*`.
-- Client flows (AI panel, agent-runtime) generate `requestId`/`agentId` but do not rely on one canonical builder/validator, increasing drift risk and making 409 retry logic hard to reuse.
-- Policy manifest extensions (ai_native_policy, data_access) live in `packages/core/src/kernel/policy`, but gateway routes do not surface a consistent `policy_context`.
+- The merged LFCC branch requires the v0.9.1 AI envelope (`request_id` required, `agent_id`/`intent` preferred, `doc_frontier` canonical) plus `policy_context` (`ai_native_policy` + `data_access`) on every AI write/read.
+- Current stack still mixes legacy shapes (`doc_frontier_tag`, optional `client_request_id`, ad-hoc policy) and partial provenance (request ids not persisted to commit origins or SSE responses), making 409 retries and audit trails unreliable.
+- Data-access redaction remains app-specific and not negotiated, leaving the gateway/agent-runtime unaware of the active policy profile.
 
 ## Scope
-- Define and export a single envelope module from `@keepup/core` (request/response types, builders, validators, idempotency helpers, conflict parsing) and consume it in:
-  - `packages/core/src/gateway/*`
-  - `packages/collab-server/src/ai/gateway.ts` (rename internal envelope wiring to use the shared module)
-  - `apps/reader/app/api/ai/*` routes (chat/stream/research) for request id construction + response metadata.
-- Standardize field names (`doc_frontier`, `doc_frontier_tag`, `request_id`, `agent_id`, `intent`, `ai_meta`) and remove duplicated aliases where possible; keep backwards compatibility via a thin adapter.
-- Ensure `policy_context` (policy id + redaction profile) flows through the envelope and is validated against `packages/core/src/kernel/policy/schema.ts`.
-- Add integration helpers for 409 retry flow (span relocation hooks) so UI/agents can share the same retry policy constants.
+- **Canonical envelope + validators**
+  - Export a single `AIEnvelopeV2` (request/response + 409 parsing + retry helpers) from `@keepup/core` and adopt it in `packages/core/src/gateway/*`, `packages/collab-server/src/ai/gateway.ts`, `apps/reader/app/api/ai/*`, and `packages/agent-runtime` builders.
+  - Enforce required fields (`request_id`, `doc_frontier`) with backward-compatible aliases for `client_request_id`/`doc_frontier_tag`; normalize response echoes.
+  - Align 409/422 payloads to merged spec (failed preconditions, relocation hints, sanitization diagnostics) and expose shared retry policy constants.
+- **Policy + data access enforcement**
+  - Wire `policy_context` (policy id, redaction profile) through envelope builders and gateway handlers; validate against `policy_manifest_v0.9.1`.
+  - Replace ad-hoc redaction with a shared `DataAccessPolicy` helper (core export) used by reader context builders, agent-runtime LFCC tools, and collab-server RAG/digest paths; log omitted blocks.
+- **Provenance + telemetry**
+  - Persist `request_id`/`agent_id`/`intent`/`ai_meta` into commit origins, Loro metadata, and EnhancedDocument message meta; ensure SSE/REST responses echo them.
+  - Add unified telemetry/audit hooks (latency, idempotency hits, conflicts, sanitization rejects) shared by core gateway and collab-server; surface request ids/conflict reasons in reader diagnostics.
+- **Idempotency + de-dupe**
+  - Add bounded request-id caches on client and gateway; drop late retries before write apply without breaking cross-replica determinism.
 
 ## Deliverables
-- Single envelope source of truth exported from `@keepup/core`.
-- Collab-server gateway and reader API routes use the shared builder/validator; legacy fields shimmed with tests.
-- Updated docs/specs if field names change; remove stale envelope helpers.
+- Single envelope/policy module in `@keepup/core` consumed by collab-server, reader API routes, and agent-runtime.
+- Policy-aware context/redaction applied end-to-end; provenance fields stored in commit origins and surfaced in UI/history.
+- Telemetry/audit events emitted with request ids and conflict codes; legacy envelope helpers removed or shimmed with tests.
 
 ## Testing
-- Unit: `packages/core/src/gateway/__tests__/*` extended to cover the unified builder + alias shims.
-- Integration: add a lightweight route test under `apps/reader` that builds a request via the shared module and asserts 409/200 responses echo `request_id`/`client_request_id`.
-- E2E: `pnpm test:e2e:features` (AI gateway category) to ensure no regression in AI write enforcement.
+- Unit: gateway/envelope/relocation + policy/data-access helpers in `packages/core` and agent-runtime LFCC tool tests.
+- Integration: reader API route test covering policy-aware context and 409/200 echoes for `request_id`.
+- E2E: `pnpm test:e2e:features` (AI gateway/context) to validate no regressions in apply + redaction + provenance surfacing.

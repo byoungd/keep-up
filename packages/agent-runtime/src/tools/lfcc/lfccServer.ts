@@ -158,10 +158,15 @@ function filterBlocksByPolicy(blocks: LFCCBlock[], contentMap: Map<string, strin
 
 function applyDataAccessPolicyToBlocks(
   blocks: LFCCBlock[],
-  policy: DataAccessPolicy
+  policy?: DataAccessPolicy
 ): { content: string; blocks: LFCCBlock[] } {
+  const effectivePolicy: DataAccessPolicy = policy ?? {
+    max_context_chars: 8000,
+    redaction_strategy: "mask",
+    pii_handling: "mask",
+  };
   const chunks = collectContentChunks(blocks);
-  const filteredChunks = applyDataAccessPolicyToChunks(chunks, policy);
+  const filteredChunks = applyDataAccessPolicyToChunks(chunks, effectivePolicy);
   const contentMap = new Map(filteredChunks.map((chunk) => [chunk.block_id, chunk.content]));
   const content = filteredChunks.map((chunk) => chunk.content).join("\n\n");
   const filteredBlocks = filterBlocksByPolicy(blocks, contentMap);
@@ -171,14 +176,19 @@ function applyDataAccessPolicyToBlocks(
 
 function applyPolicyToSearchResults(
   results: SearchResult[],
-  policy: DataAccessPolicy
+  policy?: DataAccessPolicy
 ): SearchResult[] {
+  const effectivePolicy: DataAccessPolicy = policy ?? {
+    max_context_chars: 8000,
+    redaction_strategy: "mask",
+    pii_handling: "mask",
+  };
   const chunks: ContentChunk[] = results.map((result) => ({
     block_id: result.blockId,
     content: result.content,
     relevance: result.score,
   }));
-  const filteredChunks = applyDataAccessPolicyToChunks(chunks, policy);
+  const filteredChunks = applyDataAccessPolicyToChunks(chunks, effectivePolicy);
   const contentMap = new Map(filteredChunks.map((chunk) => [chunk.block_id, chunk.content]));
 
   return results

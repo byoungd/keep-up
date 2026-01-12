@@ -167,8 +167,8 @@ export class ProductionRedisAdapter implements IRedisAdapter {
         }
 
         const options = this.buildRedisOptions();
-        this.publisher = new Redis(this.config.redisUrl, options) as unknown as RedisClient;
-        this.subscriber = new Redis(this.config.redisUrl, options) as unknown as RedisClient;
+        this.publisher = new Redis(this.config.redisUrl, options);
+        this.subscriber = new Redis(this.config.redisUrl, options);
       }
 
       // Set up event handlers
@@ -311,11 +311,17 @@ export class ProductionRedisAdapter implements IRedisAdapter {
   // Private Methods
   // ============================================================================
 
-  private async loadRedisModule(): Promise<unknown> {
+  private async loadRedisModule(): Promise<
+    (new (url: string, options: Record<string, unknown>) => RedisClient) | null
+  > {
     try {
       // Dynamic import for optional dependency
+      // @ts-expect-error - ioredis is an optional peer dependency
       const module = await import("ioredis");
-      return module.default || module;
+      return (module.default || module) as new (
+        url: string,
+        options: Record<string, unknown>
+      ) => RedisClient;
     } catch {
       return null;
     }
@@ -346,17 +352,20 @@ export class ProductionRedisAdapter implements IRedisAdapter {
     }
 
     // Handle incoming messages
-    this.subscriber.on("message", (channel: string, message: string) => {
+    this.subscriber.on("message", (...args: unknown[]) => {
+      const [channel, message] = args as [string, string];
       this.handleMessage(channel, message);
     });
 
     // Handle connection errors
-    this.subscriber.on("error", (err: Error) => {
+    this.subscriber.on("error", (...args: unknown[]) => {
+      const [err] = args as [Error];
       console.error("[ProductionRedis] Subscriber error:", err);
       this.handleConnectionError(err);
     });
 
-    this.publisher?.on("error", (err: Error) => {
+    this.publisher?.on("error", (...args: unknown[]) => {
+      const [err] = args as [Error];
       console.error("[ProductionRedis] Publisher error:", err);
       this.handleConnectionError(err);
     });
