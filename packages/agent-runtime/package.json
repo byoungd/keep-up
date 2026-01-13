@@ -43,6 +43,7 @@
   "dependencies": {
     "@keepup/ai-core": "workspace:*",
     "@keepup/core": "workspace:*",
+    "@keepup/db": "workspace:*",
     "zod": "^3.25.76"
   },
   "devDependencies": {

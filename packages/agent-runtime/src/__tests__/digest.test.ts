@@ -1,112 +1,102 @@
 import type { DbDriver, FeedItemRow } from "@keepup/db";
+/**
+ * Digest Tool Tests
+ */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ToolContext } from "../../types";
-import { fetchItemsTool } from "../tools/digest";
+import { DbDigestProvider, DigestToolServer } from "../tools/digest/digestToolServer";
+import type { ToolContext } from "../types";
 
-// Mock ToolContext
-function createMockContext(db: Partial<DbDriver>): ToolContext {
-  return {
-    services: {
-      get: (name: string) => {
-        if (name === "db") {
-          return db;
-        }
-        return undefined;
-      },
-    } as unknown as ToolContext["services"],
-    // Other context fields not needed for this tool
-    security: {} as ToolContext["security"],
-    permissions: {},
-    traceId: "test-trace",
-    agentId: "test-agent",
-  };
-}
+// Mock DbDriver
+const mockDb = {
+  listFeedItems: vi.fn(),
+} as unknown as DbDriver;
 
-describe("Digest Tools", () => {
-  describe("fetchItemsTool", () => {
-    let mockDb: Partial<DbDriver>;
-    let context: ToolContext;
+describe("DigestToolServer", () => {
+  let server: DigestToolServer;
+  let provider: DbDigestProvider;
 
-    beforeEach(() => {
-      mockDb = {
-        listFeedItems: vi.fn(),
-      };
-      context = createMockContext(mockDb);
-    });
+  beforeEach(() => {
+    vi.clearAllMocks();
+    provider = new DbDigestProvider(mockDb);
+    server = new DigestToolServer(provider);
+  });
 
-    it("should fetch unread items with default limit", async () => {
+  describe("fetchItems", () => {
+    it("should fetch unread items within time window", async () => {
       const mockItems: FeedItemRow[] = [
         {
-          id: "1",
-          guid: "guid-1",
+          itemId: "1",
+          subscriptionId: "sub1",
           title: "Test Item 1",
-          contentHtml: "<p>Content 1</p>",
-          subscriptionId: "sub-1",
           readState: "unread",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          publishedAt: new Date(),
-          saved: false,
+          publishedAt: Date.now() - 1000 * 60 * 60 * 2, // 2 hours ago
+          contentHtml: "Context",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        } as FeedItemRow,
+        {
+          itemId: "2",
+          subscriptionId: "sub1",
+          title: "Test Item 2",
+          readState: "unread",
+          publishedAt: Date.now() - 1000 * 60 * 60 * 25, // 25 hours ago
+          contentHtml: "Context",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
         } as FeedItemRow,
       ];
 
-      (mockDb.listFeedItems as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(mockItems);
+      vi.mocked(mockDb.listFeedItems).mockResolvedValue(mockItems);
 
-      const result = await fetchItemsTool.execute({ userId: "user-123" }, { context });
-
-      expect(result.success).toBe(true);
-
-      const content = JSON.parse(result.content[0].text);
-      expect(content).toHaveLength(1);
-      expect(content[0].title).toBe("Test Item 1");
-      expect(content[0].guid).toBe("guid-1");
-
-      expect(mockDb.listFeedItems).toHaveBeenCalledWith({
-        readState: "unread",
-        limit: 50, // Default
-      });
-    });
-
-    it("should respect limit argument", async () => {
-      (mockDb.listFeedItems as unknown as ReturnType<typeof vi.fn>).mockResolvedValue([]);
-
-      await fetchItemsTool.execute({ userId: "user-123", limit: 10 }, { context });
-
-      expect(mockDb.listFeedItems).toHaveBeenCalledWith({
-        readState: "unread",
-        limit: 10,
-      });
-    });
-
-    it("should handle missing database service", async () => {
-      const noDbContext = createMockContext(null as unknown as DbDriver);
-      // Override get to return null for db
-      // biome-ignore lint/suspicious/noExplicitAny: mocking private property in test
-      (noDbContext.services.get as any) = () => null;
-
-      const result = await fetchItemsTool.execute({ userId: "user-123" }, { context: noDbContext });
-
-      expect(result.success).toBe(false);
-      expect(result.error?.code).toBe("SERVICE_UNAVAILABLE");
-    });
-
-    it("should truncate long content", async () => {
-      const longContent = "a".repeat(6000);
-      const mockItems = [
+      const result = await server.callTool(
+        { name: "fetchItems", arguments: { timeWindow: "24h", limit: 10 } },
         {
-          id: "1",
-          title: "Long Item",
-          contentHtml: longContent,
-          readState: "unread",
-        },
-      ] as FeedItemRow[];
+          security: { permissions: { network: "full" } },
+        } as unknown as ToolContext
+      );
 
-      (mockDb.listFeedItems as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(mockItems);
+      expect(mockDb.listFeedItems).toHaveBeenCalled();
+      const contentItem = result.content[0];
+      if (contentItem.type !== "text") {
+        throw new Error("Expected text result");
+      }
+      const content = JSON.parse(contentItem.text);
 
-      const result = await fetchItemsTool.execute({ userId: "user-123" }, { context });
+      expect(content).toHaveLength(1);
+      expect(content[0].id).toBe("1");
+    });
 
-      const content = JSON.parse(result.content[0].text);
-      expect(content[0].content.length).toBe(5000);
+    it("should handle empty results", async () => {
+      vi.mocked(mockDb.listFeedItems).mockResolvedValue([]);
+
+      const result = await server.callTool(
+        { name: "fetchItems", arguments: { timeWindow: "24h" } },
+        {
+          security: { permissions: { network: "full" } },
+        } as unknown as ToolContext
+      );
+
+      const contentItem = result.content[0];
+      if (contentItem.type !== "text") {
+        throw new Error("Expected text result");
+      }
+      const content = JSON.parse(contentItem.text);
+      expect(content).toEqual([]);
+    });
+  });
+
+  describe("clusterItems", () => {
+    it("should return placeholder message", async () => {
+      const result = await server.callTool(
+        { name: "clusterItems", arguments: { itemIds: ["1", "2"] } },
+        {} as unknown as ToolContext
+      );
+      const contentItem = result.content[0];
+      if (contentItem.type !== "text") {
+        throw new Error("Expected text result");
+      }
+      const content = JSON.parse(contentItem.text);
+      expect(content.message).toContain("not yet implemented");
     });
   });
 });
