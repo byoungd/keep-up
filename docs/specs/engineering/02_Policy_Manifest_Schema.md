@@ -1,7 +1,7 @@
 ﻿# Policy Manifest Schema (JSON Schema + TypeScript) — v0.9 RC
 
 **Applies to:** LFCC v0.9 RC  
-**Last updated:** 2025-12-31  
+**Last updated:** 2026-01-13  
 **Audience:** Web/iOS/Android leads, platform architects, integration owners.  
 **Source of truth:** LFCC v0.9 RC §2.
 
@@ -54,6 +54,12 @@ export type PolicyManifestV09 = {
     version: string;
     context_hash: { enabled: boolean; mode: "lazy_verify" | "eager"; debounce_ms: number };
     chain_hash: { enabled: boolean; mode: "eager" | "lazy_verify" };
+    document_checksum: {
+      enabled: boolean;
+      mode: "lazy_verify" | "eager";
+      strategy: "two_tier";
+      algorithm: "LFCC_DOC_V1";
+    };
     checkpoint: { enabled: boolean; every_ops: number; every_ms: number };
   };
 
@@ -74,7 +80,7 @@ export type PolicyManifestV09 = {
   };
 
   ai_sanitization_policy: {
-    version: "v1";
+    version: "v2";
     sanitize_mode: "whitelist";
     allowed_marks: CanonMark[];
     allowed_block_types: string[];
@@ -280,7 +286,7 @@ See `23_AI_Native_Extension.md` for negotiation rules and normative requirements
 
     "integrity_policy": {
       "type": "object",
-      "required": ["version","context_hash","chain_hash","checkpoint"],
+      "required": ["version","context_hash","chain_hash","document_checksum","checkpoint"],
       "properties": {
         "version": { "type": "string" },
         "context_hash": {
@@ -299,6 +305,17 @@ See `23_AI_Native_Extension.md` for negotiation rules and normative requirements
           "properties": {
             "enabled": { "type": "boolean" },
             "mode": { "enum": ["eager","lazy_verify"] }
+          },
+          "additionalProperties": false
+        },
+        "document_checksum": {
+          "type": "object",
+          "required": ["enabled","mode","strategy","algorithm"],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "mode": { "enum": ["lazy_verify","eager"] },
+            "strategy": { "const": "two_tier" },
+            "algorithm": { "const": "LFCC_DOC_V1" }
           },
           "additionalProperties": false
         },
@@ -338,7 +355,7 @@ See `23_AI_Native_Extension.md` for negotiation rules and normative requirements
       "type": "object",
       "required": ["version","trusted_local_undo","restore_enters_unverified","restore_skip_grace","force_verify_on_restore"],
       "properties": {
-        "version": { "const": "v1" },
+        "version": { "const": "v2" },
         "trusted_local_undo": { "type": "boolean" },
         "restore_enters_unverified": { "type": "boolean" },
         "restore_skip_grace": { "type": "boolean" },
@@ -454,6 +471,7 @@ function negotiate(manifests: PolicyManifestV09[]): PolicyManifestV09 {
   assertAllEqual(manifests.map(m => m.anchor_encoding.version));
   assertAllEqual(manifests.map(m => stableStringify(m.canonicalizer_policy)));
   assertAllEqual(manifests.map(m => stableStringify(m.history_policy)));
+  assertAllEqual(manifests.map(m => m.integrity_policy.document_checksum.algorithm));
   assertAllCompatibleBlockIdPolicy(manifests.map(m => m.block_id_policy.version));
 
   // 2) Capabilities = intersection
@@ -484,6 +502,7 @@ function negotiate(manifests: PolicyManifestV09[]): PolicyManifestV09 {
 Rules:
 - For `max_intervening_blocks`: choose `min()`.
 - If `bounded_gap=false` in effective caps → chain kind MUST degrade to `strict_adjacency`.
+- `document_checksum.enabled` uses AND; `mode` uses eager if any participant requires it; `strategy` MUST be `two_tier`.
 - For dev tooling fields: may differ per replica; ignore or treat as non-blocking.
 - Unknown top-level fields MUST be rejected unless under `extensions`.
 ### 3.1 AI-native Negotiation (Optional)

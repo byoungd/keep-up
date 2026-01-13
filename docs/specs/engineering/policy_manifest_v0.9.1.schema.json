@@ -83,7 +83,7 @@
     },
     "integrity_policy": {
       "type": "object",
-      "required": ["version", "context_hash", "chain_hash", "checkpoint"],
+      "required": ["version", "context_hash", "chain_hash", "document_checksum", "checkpoint"],
       "properties": {
         "version": { "type": "string" },
         "context_hash": {
@@ -102,6 +102,17 @@
           "properties": {
             "enabled": { "type": "boolean" },
             "mode": { "enum": ["eager", "lazy_verify"] }
+          },
+          "additionalProperties": false
+        },
+        "document_checksum": {
+          "type": "object",
+          "required": ["enabled", "mode", "strategy", "algorithm"],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "mode": { "enum": ["lazy_verify", "eager"] },
+            "strategy": { "const": "two_tier" },
+            "algorithm": { "const": "LFCC_DOC_V1" }
           },
           "additionalProperties": false
         },
@@ -164,7 +175,7 @@
         "limits"
       ],
       "properties": {
-        "version": { "const": "v1" },
+        "version": { "const": "v2" },
         "sanitize_mode": { "const": "whitelist" },
         "allowed_marks": {
           "type": "array",

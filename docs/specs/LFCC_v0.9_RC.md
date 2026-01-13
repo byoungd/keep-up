@@ -1,7 +1,7 @@
 # Local-First Collaboration Contract (LFCC) v0.9 — Release Candidate
 
 **Status:** Release Candidate (RC)  
-**Last updated:** 2025-12-31  
+**Last updated:** 2026-01-13  
 **Primary audience:** Architects and senior engineers building collaborative rich-text editors with annotations and AI assistance.  
 **Scope:** Deterministic interoperability rules across: **CRDT engine ⇄ Editor Bridge ⇄ Metadata/Annotations ⇄ LLM Gateway**.
 
@@ -69,6 +69,7 @@
 
 ### 1.2 Persistence
 **INV-PERSIST-001:** Persist **stable anchors** only. Absolute indices are derived/cache-only.
+**INV-PERSIST-002:** Persisted snapshots/updates MUST use the Storage Envelope defined in Appendix D, including versioning and checksum.
 
 ### 1.3 Determinism & Fail-Closed
 **INV-DET-001:** Same CRDT updates → identical state and placements (or identical orphan/partial).  
@@ -108,9 +109,15 @@ LFCC requires a versioned **Policy Manifest** and a deterministic **Negotiation 
   },
 
   "integrity_policy": {
-    "version": "v3",
+    "version": "v4",
     "context_hash": { "enabled": true, "mode": "lazy_verify", "debounce_ms": 500 },
     "chain_hash":   { "enabled": true, "mode": "eager" },
+    "document_checksum": {
+      "enabled": true,
+      "mode": "lazy_verify",
+      "strategy": "two_tier",
+      "algorithm": "LFCC_DOC_V1"
+    },
     "checkpoint":   { "enabled": true, "every_ops": 200, "every_ms": 5000 }
   },
 
@@ -131,7 +138,7 @@ LFCC requires a versioned **Policy Manifest** and a deterministic **Negotiation 
   },
 
   "ai_sanitization_policy": {
-    "version": "v1",
+    "version": "v2",
     "sanitize_mode": "whitelist",
     "allowed_marks": ["bold","italic","underline","strike","code","link"],
     "allowed_block_types": ["paragraph","heading","list_item","code","quote","table","table_row","table_cell"],
@@ -190,12 +197,14 @@ During handshake, participants compute an **effective manifest**:
    - `anchor_encoding.version`
    - `canonicalizer_policy` (version, mode, mark_order, normalize_whitespace, drop_empty_nodes)
    - `history_policy` (all fields)
+   - `integrity_policy.document_checksum.algorithm` (when `document_checksum.enabled=true`)
 3. **Unknown fields:** Any unknown top-level field MUST be rejected unless it lives under `extensions`.
 4. **Capabilities:** `effective_capabilities = AND` across participants.
 5. **Chain policy:** choose most restrictive kind (order above); `max_intervening_blocks = min(...)`.  
    If `effective_capabilities.bounded_gap=false`, force `strict_adjacency`.
 6. **Partial policy:** choose most restrictive per kind: `none` > `allow_drop_tail` > `allow_islands`.
-7. **Integrity policy:** for `context_hash`/`chain_hash` mode, choose `eager` if any participant requires it; `checkpoint` cadence uses `min(every_ops)` and `min(every_ms)`.
+7. **Integrity policy:** for `context_hash`/`chain_hash`/`document_checksum` mode, choose `eager` if any participant requires it; `checkpoint` cadence uses `min(every_ops)` and `min(every_ms)`.  
+   `document_checksum.enabled = AND`; `document_checksum.strategy` MUST be `two_tier` (Appendix A).
 8. **Relocation policy:** `default_level = min(...)`; `enable_level_2/3 = AND`; `level_2_max_distance_ratio = min(...)`; `level_3_max_block_radius = min(...)`.
 9. **AI sanitization policy:** `allowed_marks` and `allowed_block_types` use intersection; `reject_unknown_structure = AND`; `limits` use min across participants.
 
@@ -278,7 +287,9 @@ When multiple structural operations target the same or overlapping blocks, imple
 1. Operations are ordered by: `(block_id, operation_type, timestamp)` where:
    - `block_id`: Lexicographic ordering
    - `operation_type`: Predefined priority (splits before joins, joins before converts)
-   - `timestamp`: CRDT logical timestamp (for tie-breaking)
+   - `timestamp`: CRDT logical timestamp (Lamport/OpId) for tie-breaking; wall-clock time MUST NOT be used
+
+**OP-ORDER-001:** Ordering MUST use CRDT logical timestamps only; wall-clock time is non-conformant.
 
 2. **Conflict Detection:**
    - Detect overlapping structural operations (e.g., split and join on same block)
@@ -538,6 +549,7 @@ A local undo/redo that restores a prior state.
 - Checkpoints MUST verify:
   - context hash (if enabled),
   - chain policy + chain hash (if enabled),
+  - document checksum (if enabled; Appendix A),
   - then transition stored state to `active|active_partial|orphan`.
 
 **CHECKPOINT-001:** A checkpoint must yield deterministic verified state on all replicas given same updates.
@@ -560,6 +572,16 @@ A local undo/redo that restores a prior state.
 
 ---
 
+### 10.2 Document Checksum + Divergence Detection (REQUIRED)
+
+Implementations MUST compute a document checksum for integrity verification and cross-implementation divergence detection.
+
+**DOCSUM-001:** The checksum algorithm MUST be `LFCC_DOC_V1` (Appendix A).  
+**DOCSUM-002:** Two-tier strategy is REQUIRED: Tier 1 uses cached block digests; Tier 2 recomputes from raw document state to confirm mismatches.  
+**DOCSUM-003:** If Tier 2 still mismatches, emit `INTEGRITY_CHECK_FAILED_HASH_MISMATCH` (Appendix C) and enter a recovery flow (resync or snapshot rebuild).
+
+---
+
 ## 11. AI Gateway + Dry‑Run Sanitization (REQUIRED when AI ops enabled)
 
 LFCC separates **targeting safety** from **payload safety**.
@@ -573,16 +595,17 @@ AI write requests MUST include:
 - `doc_frontier` (observed)
 - `if_match_context_hash` per targeted span
 
-If any precondition fails → reject with **409 Conflict**.
+If any precondition fails (`doc_frontier` or `if_match_context_hash`) → reject with **409 Conflict** and `AI_PRECONDITION_FAILED` (Appendix C).  
+All other AI failures MUST NOT use 409.
 
 ### 11.2 AI Payload Dry‑Run (NEW, REQUIRED)
 
 Before applying any AI-generated content, the bridge MUST perform a **dry-run pipeline**:
 
 1) **Sanitize (Whitelist)**
-- Strip or reject disallowed tags/blocks/marks/attrs per `ai_sanitization_policy`.
+- Strip or reject disallowed tags/blocks/marks/attrs per `ai_sanitization_policy` and Appendix B.
 - Disallow script/style/event handlers.
-- Enforce safe URL policy for links.
+- Enforce safe URL policy for links (Appendix B).
 
 2) **Normalize**
 - Canonicalize the payload using the canonicalizer (at least enough to produce a valid Canon tree / leaf spans).
@@ -594,7 +617,8 @@ Before applying any AI-generated content, the bridge MUST perform a **dry-run pi
 
 **AI-SANITIZE-001:** Bridge MUST reject or sanitize AI payloads containing non-canonical structure or marks before applying.  
 **AI-DRYRUN-001:** Dry-run MUST be performed before any real editor mutation.  
-**AI-DRYRUN-002:** Failure MUST be fail-closed (no partial apply).
+**AI-DRYRUN-002:** Failure MUST be fail-closed (no partial apply).  
+**AI-DRYRUN-003:** Failures MUST return a protocol error code from Appendix C (no 409 unless precondition mismatch).
 
 ### 11.3 Smart Retry Guidance (Client, SHOULD)
 On 409:
@@ -685,11 +709,16 @@ To avoid divergent re-implementations, LFCC defines a recommended reference libr
 
 - **v0.9 (RC):** Adds recursive canonicalization (CanonNode tree), HISTORY_RESTORE semantics, AI dry-run sanitization, and formalizes the lfcc-kernel conformance kit concept.
 - **v0.9.1 (RC Update):** Clarifies UTF-16 surrogate pair handling (§1.1), adds performance requirements (§10.1), and enhances BlockMapping verification requirements (§7.2).
+- **v0.9.2 (RC Update):** Adds document checksum + two-tier divergence detection (Appendix A), standard sanitization profile (Appendix B), protocol error codes (Appendix C), and storage envelope requirements (Appendix D).
 
 ---
 
 ## 16. Supplementary Documentation
 
+- **Appendix A:** Canonical Serialization + Document Checksum (Normative)
+- **Appendix B:** Sanitization Profile (Normative)
+- **Appendix C:** Error Codes and Telemetry (Normative)
+- **Appendix D:** Storage Envelope (Normative)
 - **§17:** Custom Types Extension Guide — Registration, validation, canonicalization
 - **§18:** Security Best Practices — AI validation, hash collisions, anchor security
 - **§19:** Version Migration Guide — Compatibility matrix, migration procedures
@@ -697,3 +726,174 @@ To avoid divergent re-implementations, LFCC defines a recommended reference libr
 - **§21:** Fuzzing Strategy and Bug Reproduction — Seed management, CI integration  
 
 ---
+
+## Appendix A: Canonical Serialization + Document Checksum (Normative)
+
+This appendix defines the canonical serialization used by `LFCC_DOC_V1` checksums.
+
+### A.1 Canonical Serialization Rules
+- Canonicalize the editor state using §8 (recursive CanonNode).
+- Normalize all text to NFC and convert CRLF/CR to LF.
+- Serialize any JSON using JCS (RFC 8785).
+- Marks are treated as a set and ordered by `canonicalizer_policy.mark_order`.
+- Only `link` marks may carry `attrs.href`, and `href` MUST pass Appendix B URL rules.
+- Document order is depth-first pre-order traversal of CanonBlock nodes (do NOT sort by id).
+
+**SER-001:** Hash inputs MUST be UTF-8 encoded.
+
+### A.2 Inline Segment Representation
+Represent each inline segment as a JSON object:
+```json
+{ "text": "string", "marks": ["bold","italic"], "attrs": { "href": "https://..." } }
+```
+Rules:
+- `marks` MUST be sorted (canonicalizer mark order).
+- `attrs` MUST be `{}` unless a `link` mark is present.
+
+### A.3 Block Digest (LFCC_BLOCK_V1)
+Compute `block_digest` as SHA-256 over:
+```
+LFCC_BLOCK_V1\n + JCS(block_payload)
+```
+Where `block_payload` is:
+```json
+{
+  "block_id": "uuid",
+  "type": "paragraph|heading|list_item|code|quote|table_cell|custom",
+  "attrs": {},
+  "inline": [ { "text": "...", "marks": [], "attrs": {} } ],
+  "children": [ "child_block_digest_1", "child_block_digest_2" ]
+}
+```
+Notes:
+- `block_id` MUST be the LFCC block_id from the bridge (not the CanonNode id).
+- `children` is empty for leaf blocks.
+- All keys in `block_payload` MUST be present; use `{}` or `[]` for empty values.
+
+**HASH-ENC-001:** SHA-256 outputs MUST be lower-case hex.
+
+### A.4 Document Checksum (LFCC_DOC_V1)
+Compute `LFCC_DOC_V1` as SHA-256 over:
+```
+LFCC_DOC_V1\n + JCS(doc_payload)
+```
+Where `doc_payload` is:
+```json
+{
+  "blocks": [
+    { "block_id": "uuid", "digest": "sha256_hex" }
+  ]
+}
+```
+Blocks MUST appear in document order (§A.1).
+
+**DOC-ORDER-001:** Sorting blocks by ID is non-conformant.
+
+### A.5 Two-Tier Strategy (REQUIRED)
+- **Tier 1 (surface):** compute `LFCC_DOC_V1` using cached block digests.
+- **Tier 2 (deep):** recompute canonicalization and all block digests from raw editor state.
+
+---
+
+## Appendix B: Sanitization Profile (Normative)
+
+This appendix defines the LFCC sanitization baseline for `ai_sanitization_policy.version = v2`.
+
+### B.1 Allowed Elements and Marks
+- Allowed block types and marks are negotiated via `ai_sanitization_policy.allowed_block_types` and `allowed_marks`.
+- All other tags/blocks/marks MUST be dropped or rejected.
+
+### B.2 Attribute Whitelist
+Only the following attributes are allowed:
+- `link` mark: `href`
+- `code` block: `language`
+- `table_cell` block: `rowspan`, `colspan`
+All other attributes MUST be dropped.
+
+### B.3 URL Policy (REQUIRED)
+`href` MUST match the following regex (case-insensitive):
+```
+^(https?|mailto):[^\\s]+$
+```
+Forbidden patterns (case-insensitive, after trimming):
+- `javascript:`
+- `data:` (unless an explicit extension allows image-only data URIs)
+- `vbscript:`
+
+### B.4 Limits
+Enforce `ai_sanitization_policy.limits` strictly:
+- `max_payload_bytes`
+- `max_nesting_depth`
+- `max_attribute_count`
+
+---
+
+## Appendix C: Error Codes and Telemetry (Normative)
+
+### C.1 Error Envelope
+Implementations MUST emit structured error objects:
+```json
+{
+  "code": "ERROR_CODE",
+  "phase": "negotiation|integrity|ai_gateway|storage|anchor",
+  "retryable": true,
+  "detail": "optional human-readable message",
+  "diagnostics": [ { "kind": "string", "detail": "string" } ]
+}
+```
+
+### C.2 Required Codes
+Negotiation:
+- `NEGOTIATION_FAILED_CAPABILITY_MISMATCH`
+- `NEGOTIATION_FAILED_VERSION_INCOMPATIBLE`
+- `NEGOTIATION_FAILED_POLICY_MISMATCH`
+
+Integrity:
+- `INTEGRITY_CHECK_FAILED_HASH_MISMATCH`
+- `INTEGRITY_CHECK_FAILED_CONTEXT_HASH`
+- `INTEGRITY_CHECK_FAILED_CHAIN_HASH`
+
+AI Gateway:
+- `AI_PRECONDITION_FAILED` (409)
+- `AI_PAYLOAD_REJECTED_SANITIZE`
+- `AI_PAYLOAD_REJECTED_SCHEMA_VIOLATION`
+- `AI_PAYLOAD_REJECTED_LIMITS`
+
+Storage:
+- `STORAGE_ENVELOPE_VERSION_UNSUPPORTED`
+- `STORAGE_ENVELOPE_CHECKSUM_MISMATCH`
+
+Anchor:
+- `ANCHOR_CHECKSUM_INVALID`
+
+### C.3 Transport Mapping (Guidance)
+- 409: `AI_PRECONDITION_FAILED` only
+- 400: `AI_PAYLOAD_REJECTED_SANITIZE`, `AI_PAYLOAD_REJECTED_LIMITS`
+- 422: `AI_PAYLOAD_REJECTED_SCHEMA_VIOLATION`
+
+---
+
+## Appendix D: Storage Envelope (Normative)
+
+Persisted snapshots/updates MUST be wrapped in a storage envelope.
+
+### D.1 Envelope Structure
+```json
+{
+  "lfcc_storage_ver": "1.0",
+  "lfcc_spec_ver": "0.9",
+  "crdt_format": "loro_snapshot|loro_updates",
+  "payload_encoding": "json|cbor|msgpack|binary",
+  "payload": "bytes_or_base64",
+  "checksum": { "algo": "sha256", "value": "hex" }
+}
+```
+
+### D.2 Checksum Rules
+- `checksum` is computed over the raw `payload` bytes (after encoding, before compression).
+- If `payload_encoding` is JSON, serialization MUST use JCS (RFC 8785).
+- Any mismatch MUST emit `STORAGE_ENVELOPE_CHECKSUM_MISMATCH` (Appendix C).
+
+### D.3 Versioning
+- Unknown `lfcc_storage_ver` MUST be rejected (`STORAGE_ENVELOPE_VERSION_UNSUPPORTED`).
+- Implementations MAY include optional fields (e.g., `doc_id`, `frontier`, `created_at`) but MUST NOT alter checksum semantics.
