@@ -8,16 +8,16 @@
  * 3. Schema Apply Simulation - Validate against editor schema
  */
 
-import { dryRunAIPayload } from "../kernel/ai/dryRun";
-import { createSanitizer } from "../kernel/ai/sanitizer";
+import { dryRunAIPayload } from "../kernel/ai/dryRun.js";
+import { createSanitizer } from "../kernel/ai/sanitizer.js";
 import type {
   AIPayloadSanitizer,
   AISanitizationPolicyV1,
   EditorSchemaValidator,
-} from "../kernel/ai/types";
-import { DEFAULT_AI_SANITIZATION_POLICY } from "../kernel/ai/types";
-import type { CanonNode } from "../kernel/canonicalizer/types";
-import type { GatewayDiagnostic } from "./types";
+} from "../kernel/ai/types.js";
+import { DEFAULT_AI_SANITIZATION_POLICY } from "../kernel/ai/types.js";
+import type { CanonNode } from "../kernel/canonicalizer/types.js";
+import type { GatewayDiagnostic } from "./types.js";
 
 // ============================================================================
 // Pipeline Result Types

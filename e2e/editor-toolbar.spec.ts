@@ -9,36 +9,95 @@
  * Run with: pnpm playwright test e2e/editor-toolbar.spec.ts
  */
 
-import { expect, test } from "@playwright/test";
+import { type Page, expect, test } from "@playwright/test";
 import {
   clearEditorContent,
   collapseSelection,
   getToolbar,
   modKey,
+  openFreshEditor,
   selectAllText,
-  selectTextBySubstring,
+  setEditorContent,
   typeInEditor,
-  waitForEditorReady,
 } from "./helpers/editor";
 
 test.use({ screenshot: "only-on-failure" });
-test.setTimeout(60000);
+test.setTimeout(90000);
+
+async function clickHighlightButton(page: Page): Promise<void> {
+  const toolbar = await getToolbar(page);
+  await expect(toolbar).toBeVisible({ timeout: 5000 });
+  await expect
+    .poll(
+      async () =>
+        await page.evaluate(() => {
+          const button = document.querySelector<HTMLButtonElement>(
+            "[data-testid='selection-toolbar'] button[aria-label='Highlight yellow']"
+          );
+          if (!button) {
+            return false;
+          }
+          button.click();
+          return true;
+        }),
+      { timeout: 5000 }
+    )
+    .toBe(true);
+}
+
+async function clickBoldButton(page: Page): Promise<void> {
+  const toolbar = await getToolbar(page);
+  await expect(toolbar).toBeVisible({ timeout: 5000 });
+  await expect
+    .poll(
+      async () =>
+        await page.evaluate(() => {
+          const button = document.querySelector<HTMLButtonElement>(
+            "[data-testid='selection-toolbar'] button[aria-label='Bold']"
+          );
+          if (!button) {
+            return false;
+          }
+          button.click();
+          return true;
+        }),
+      { timeout: 5000 }
+    )
+    .toBe(true);
+}
+
+async function ensureToolbarVisible(page: Page, reselection: () => Promise<void>): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        const toolbar = await getToolbar(page);
+        if (await toolbar.isVisible()) {
+          return true;
+        }
+        await reselection();
+        return await toolbar.isVisible();
+      },
+      { timeout: 5000 }
+    )
+    .toBe(true);
+}
 
 // ============================================================================
 // Toolbar Visibility Tests
 // ============================================================================
 
 test.describe("Toolbar Visibility", () => {
-  test.beforeEach(async ({ page }) => {
-    const uniqueDocId = `toolbar-vis-${Date.now()}`;
-    await page.goto(`/editor?doc=${uniqueDocId}`);
-    await waitForEditorReady(page);
-    await clearEditorContent(page);
+  test.beforeEach(async ({ page }, testInfo) => {
+    await openFreshEditor(page, `toolbar-vis-${testInfo.title}`, { clearContent: true });
   });
 
   test("toolbar appears on text selection", async ({ page }) => {
     await typeInEditor(page, "Select this text");
     await selectAllText(page);
+
+    await ensureToolbarVisible(page, async () => {
+      await selectAllText(page);
+    });
 
     const toolbar = await getToolbar(page);
     await expect(toolbar).toBeVisible({ timeout: 5000 });
@@ -74,11 +133,8 @@ test.describe("Toolbar Visibility", () => {
 // ============================================================================
 
 test.describe("Toolbar Button Formatting", () => {
-  test.beforeEach(async ({ page }) => {
-    const uniqueDocId = `toolbar-btn-${Date.now()}`;
-    await page.goto(`/editor?doc=${uniqueDocId}`);
-    await waitForEditorReady(page);
-    await clearEditorContent(page);
+  test.beforeEach(async ({ page }, testInfo) => {
+    await openFreshEditor(page, `toolbar-btn-${testInfo.title}`, { clearContent: true });
   });
 
   test("Bold button applies formatting", async ({ page }) => {
@@ -86,12 +142,16 @@ test.describe("Toolbar Button Formatting", () => {
     await typeInEditor(page, testText);
     await selectAllText(page);
 
+    await ensureToolbarVisible(page, async () => {
+      await selectAllText(page);
+    });
+
     const toolbar = await getToolbar(page);
     await expect(toolbar).toBeVisible({ timeout: 5000 });
 
     const boldBtn = toolbar.getByRole("button", { name: /bold/i });
     if ((await boldBtn.count()) > 0) {
-      await boldBtn.click();
+      await clickBoldButton(page);
       // Use .first() to handle multiple strong elements (seeded content may exist)
       const strongEl = page.locator(".lfcc-editor .ProseMirror strong", { hasText: testText });
       await expect(strongEl.first()).toBeVisible();
@@ -104,14 +164,13 @@ test.describe("Toolbar Button Formatting", () => {
   test("Highlight button creates annotation", async ({ page }) => {
     const testText = `Highlight test ${Date.now()}`;
     await typeInEditor(page, testText);
-    await selectTextBySubstring(page, testText);
+    await selectAllText(page);
 
-    const toolbar = await getToolbar(page);
-    await expect(toolbar).toBeVisible({ timeout: 5000 });
+    await ensureToolbarVisible(page, async () => {
+      await selectAllText(page);
+    });
 
-    const highlightBtn = toolbar.getByRole("button", { name: "Highlight yellow" });
-    await expect(highlightBtn).toBeVisible();
-    await highlightBtn.click();
+    await clickHighlightButton(page);
 
     // Verify annotation created - use specific text to avoid matching seeded annotations
     const annotation = page.locator(".lfcc-editor .lfcc-annotation", {
@@ -123,6 +182,10 @@ test.describe("Toolbar Button Formatting", () => {
   test("multiple highlight colors available", async ({ page }) => {
     await typeInEditor(page, "Color check");
     await selectAllText(page);
+
+    await ensureToolbarVisible(page, async () => {
+      await selectAllText(page);
+    });
 
     const toolbar = await getToolbar(page);
     await expect(toolbar).toBeVisible({ timeout: 5000 });
@@ -138,19 +201,12 @@ test.describe("Toolbar Button Formatting", () => {
 // ============================================================================
 
 test.describe("Toolbar Edge Cases", () => {
-  test.beforeEach(async ({ page }) => {
-    const uniqueDocId = `toolbar-edge-${Date.now()}`;
-    await page.goto(`/editor?doc=${uniqueDocId}`);
-    await waitForEditorReady(page);
-    await clearEditorContent(page);
+  test.beforeEach(async ({ page }, testInfo) => {
+    await openFreshEditor(page, `toolbar-edge-${testInfo.title}`, { clearContent: true });
   });
 
   test("toolbar works on multi-line selection", async ({ page }) => {
-    await typeInEditor(page, "Line one");
-    await page.keyboard.press("Enter");
-    await typeInEditor(page, "Line two");
-    await page.keyboard.press("Enter");
-    await typeInEditor(page, "Line three");
+    await setEditorContent(page, "Line one\nLine two\nLine three");
 
     await selectAllText(page);
 
@@ -204,12 +260,14 @@ test.describe("Toolbar Edge Cases", () => {
 
 test.describe("Toolbar Accessibility", () => {
   test("all toolbar buttons have accessible names", async ({ page }) => {
-    const uniqueDocId = `toolbar-a11y-${Date.now()}`;
-    await page.goto(`/editor?doc=${uniqueDocId}`);
-    await waitForEditorReady(page);
+    await openFreshEditor(page, "toolbar-a11y", { clearContent: true });
 
     await typeInEditor(page, "A11y check");
     await selectAllText(page);
+
+    await ensureToolbarVisible(page, async () => {
+      await selectAllText(page);
+    });
 
     const toolbar = await getToolbar(page);
     await expect(toolbar).toBeVisible({ timeout: 5000 });

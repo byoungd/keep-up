@@ -1,4 +1,4 @@
-import type { BlockMapping, MappedPosition } from "./types";
+import type { BlockMapping, MappedPosition } from "./types.js";
 
 // Define supported operation types for structural mapping
 // These align with the core textual and structural operations

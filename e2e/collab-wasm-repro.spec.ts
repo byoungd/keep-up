@@ -44,17 +44,9 @@ async function getEditorText(page: Page): Promise<string> {
 }
 
 async function waitForConnected(page: Page, timeout = 15000): Promise<void> {
-  await expect
-    .poll(
-      async () =>
-        page.evaluate(
-          () =>
-            (window as { __lfccDiagnostics?: { connectionState?: string } }).__lfccDiagnostics
-              ?.connectionState
-        ),
-      { timeout }
-    )
-    .toBe("connected");
+  const status = page.locator("[data-testid='connection-status']");
+  await expect(status).toBeVisible({ timeout });
+  await expect(status).toContainText(/Online|Connected/i, { timeout });
 }
 
 test.use({ screenshot: "only-on-failure", trace: "off" });

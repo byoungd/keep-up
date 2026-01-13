@@ -1,5 +1,5 @@
-import { type Anchor, createAnchor } from "./anchors";
-import type { BlockMapping } from "./types";
+import { type Anchor, createAnchor } from "./anchors.js";
+import type { BlockMapping } from "./types.js";
 
 export type RelocationStrategy = "exact" | "integrity_check" | "fuzzy";
 

@@ -260,9 +260,9 @@ export class DigestService {
     const clusters: RankResult["clusters"] = clusteringResult.clusters.map(
       (cluster: ContentCluster) => ({
         id: cluster.id,
-        label: cluster.title,
+        topic: cluster.title,
         itemIds: cluster.items.map((i) => i.item.id),
-        cohesion: cluster.cohesion,
+        relevanceScore: cluster.relevanceScore,
       })
     );
 

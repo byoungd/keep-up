@@ -10,21 +10,21 @@ export {
   runCheckpoint,
   shouldTriggerCheckpoint,
   type AnnotationForVerify,
-} from "./checkpoint";
+} from "./checkpoint.js";
 export {
   computeChainHash,
   computeContextHash,
   computeContextHashBatch,
   verifyChainHash,
   verifyContextHash,
-} from "./hash";
+} from "./hash.js";
 export {
   IntegrityScanner,
   shouldRunFullScanNow,
   type AnnotationScanData,
   type DocumentStateProvider,
-} from "./scanner";
-export * from "./types";
+} from "./scanner.js";
+export * from "./types.js";
 
 // P1.2: Large Document Performance Optimizations
 export {
@@ -39,4 +39,4 @@ export {
   type IncrementalVerificationOptions,
   type BlockIndexEntry,
   type LargeDocPerformanceMetrics,
-} from "./performanceOptimizations";
+} from "./performanceOptimizations.js";

@@ -1,10 +1,10 @@
-import { isManifestHashFormat, validateManifest } from "../kernel/policy";
+import { isManifestHashFormat, validateManifest } from "../kernel/policy/index.js";
 import {
   DEFAULT_VALIDATION_CONFIG,
   validatePresencePayload as validatePresencePayloadSize,
   validateUpdatePayload,
-} from "../security/validation";
-import { PROTOCOL_VERSION } from "./protocol";
+} from "../security/validation.js";
+import { PROTOCOL_VERSION } from "./protocol.js";
 import type {
   CatchUpRequestMessage,
   CatchUpResponseMessage,
@@ -22,7 +22,7 @@ import type {
   PresencePayload,
   SelectionRange,
   UserMeta,
-} from "./protocol";
+} from "./protocol.js";
 
 export type ClientInboundMessage =
   | HandshakeAckMessage

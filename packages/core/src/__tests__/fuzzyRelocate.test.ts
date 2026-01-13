@@ -5,15 +5,15 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { createAnchor } from "../kernel/mapping/anchors";
+import { createAnchor } from "../kernel/mapping/anchors.js";
 import {
   type DocumentContentAccessor,
   computeContentHash,
   computeTextSimilarity,
   findSubstringMatches,
   fuzzyRelocateAnchor,
-} from "../kernel/mapping/fuzzyRelocate";
-import type { BlockMapping } from "../kernel/mapping/types";
+} from "../kernel/mapping/fuzzyRelocate.js";
+import type { BlockMapping } from "../kernel/mapping/types.js";
 
 // Mock BlockMapping that simulates content deletion
 function createMockMapping(deletedBlocks: Set<string>): BlockMapping {

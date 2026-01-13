@@ -4,20 +4,20 @@
  * @see docs/product/LFCC_v0.9_RC_Engineering_Docs/07_AI_Dry_Run_Pipeline_Design.md
  */
 
-import { canonicalizeDocument } from "../canonicalizer/canonicalize";
+import { canonicalizeDocument } from "../canonicalizer/canonicalize.js";
 import type {
   CanonBlock,
   CanonInputNode,
   CanonNode,
   CanonicalizerPolicyV2,
-} from "../canonicalizer/types";
-import { DEFAULT_CANONICALIZER_POLICY, isCanonBlock } from "../canonicalizer/types";
+} from "../canonicalizer/types.js";
+import { DEFAULT_CANONICALIZER_POLICY, isCanonBlock } from "../canonicalizer/types.js";
 import type {
   AIPayloadSanitizer,
   AISanitizationPolicyV1,
   DryRunReport,
   EditorSchemaValidator,
-} from "./types";
+} from "./types.js";
 
 type DryRunDiag = { kind: string; detail: string };
 

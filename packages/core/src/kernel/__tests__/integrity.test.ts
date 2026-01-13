@@ -19,8 +19,8 @@ import {
   shouldRunFullScanNow,
   shouldTriggerCheckpoint,
   verifyContextHash,
-} from "../integrity";
-import type { IntegrityPolicy } from "../policy";
+} from "../integrity/index.js";
+import type { IntegrityPolicy } from "../policy/index.js";
 
 describe("Hash Computation", () => {
   describe("computeContextHash", () => {

@@ -4,16 +4,16 @@
  * WebSocket client for Loro document synchronization.
  */
 
-import { LfccError } from "../errors";
+import { LfccError } from "../errors.js";
 import {
   type PolicyManifestV09,
   computePolicyManifestHash,
   validateManifest,
-} from "../kernel/policy";
-import { getLogger } from "../observability/logger";
-import { getMetrics, hasMetricsRegistry } from "../observability/metrics";
-import { base64Decode, base64Encode } from "./encoding";
-import { createDefaultSyncManifest, negotiateManifests } from "./negotiate";
+} from "../kernel/policy/index.js";
+import { getLogger } from "../observability/logger.js";
+import { getMetrics, hasMetricsRegistry } from "../observability/metrics.js";
+import { base64Decode, base64Encode } from "./encoding.js";
+import { createDefaultSyncManifest, negotiateManifests } from "./negotiate.js";
 import {
   type CatchUpRequestPayload,
   type CatchUpResponseMessage,
@@ -33,8 +33,8 @@ import {
   createMessage,
   deserializeMessage,
   serializeMessage,
-} from "./protocol";
-import { validateClientInboundMessage } from "./validation";
+} from "./protocol.js";
+import { validateClientInboundMessage } from "./validation.js";
 
 const DEFAULT_CONNECT_TIMEOUT_MS = 10000;
 const DEFAULT_PING_INTERVAL_MS = 30000;

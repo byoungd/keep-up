@@ -3,11 +3,11 @@
  * @see docs/product/LFCC_v0.9_RC_Engineering_Docs/09_DevTools_Manual.md Section 3
  */
 
-import type { AnnotationScanData, IntegrityScanner } from "../integrity/scanner";
-import type { CompareMismatch } from "../integrity/types";
-import type { DirtyInfo } from "../mapping/types";
-import { generateFullScanReport } from "./compareHarness";
-import type { FullScanReport } from "./types";
+import type { AnnotationScanData, IntegrityScanner } from "../integrity/scanner.js";
+import type { CompareMismatch } from "../integrity/types.js";
+import type { DirtyInfo } from "../mapping/types.js";
+import { generateFullScanReport } from "./compareHarness.js";
+import type { FullScanReport } from "./types.js";
 
 /** Force full scan options */
 export type ForceFullScanOptions = {

@@ -5,7 +5,7 @@
  * Supports document updates, presence, and policy negotiation.
  */
 
-import type { PolicyManifestV09 } from "../kernel/policy/types";
+import type { PolicyManifestV09 } from "../kernel/policy/types.js";
 
 /** Protocol version for backward compatibility */
 export const PROTOCOL_VERSION = "1.0.0";

@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import type { AnnoAction } from "../annotations";
-import { routeVerifyAction } from "../annotations/verifyRouter";
-import { CheckpointScheduler } from "../integrity/checkpoint";
-import type { IntegrityPolicy } from "../policy";
+import type { AnnoAction } from "../annotations/index.js";
+import { routeVerifyAction } from "../annotations/verifyRouter.js";
+import { CheckpointScheduler } from "../integrity/checkpoint.js";
+import type { IntegrityPolicy } from "../policy/index.js";
 
 const defaultPolicy: IntegrityPolicy = {
   version: "v3",

@@ -7,8 +7,8 @@
  * @see docs/specs/proposals/LFCC_v0.9.1_AI_Native_Enhancement.md §3.4
  */
 
-import type { AgentIdentity } from "./agentIdentity";
-import type { EditIntent } from "./intent";
+import type { AgentIdentity } from "./agentIdentity.js";
+import type { EditIntent } from "./intent.js";
 
 // ============================================================================
 // Agent Session

@@ -9,6 +9,10 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./types": {
+      "types": "./src/driver/types.ts",
+      "default": "./src/driver/types.ts"
+    },
     "./web": {
       "types": "./src/web/index.ts",
       "default": "./src/web/index.ts"

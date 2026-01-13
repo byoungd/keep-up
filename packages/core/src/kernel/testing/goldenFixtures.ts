@@ -3,9 +3,9 @@
  * @see docs/product/LFCC_v0.9_RC_Engineering_Docs/08_Conformance_Test_Suite_Plan.md Section 4.3
  */
 
-import type { CanonBlock } from "../canonicalizer/types";
-import type { TypedOp } from "../shadow/types";
-import type { GoldenFixture } from "./types";
+import type { CanonBlock } from "../canonicalizer/types.js";
+import type { TypedOp } from "../shadow/types.js";
+import type { GoldenFixture } from "./types.js";
 
 /**
  * Create a golden fixture from test results

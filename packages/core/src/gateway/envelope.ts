@@ -3,9 +3,9 @@
  * @see docs/product/LFCC_v0.9_RC_Parallel_Workstreams/05_AI_Gateway_Envelope_and_Dry_Run.md Section A
  */
 
-import { normalizeDocFrontier, normalizeRequestIdentifiers } from "../kernel/ai/envelope";
-import type { AISanitizationPolicyV1 } from "../kernel/ai/types";
-import type { CanonNode } from "../kernel/canonicalizer/types";
+import { normalizeDocFrontier, normalizeRequestIdentifiers } from "../kernel/ai/envelope.js";
+import type { AISanitizationPolicyV1 } from "../kernel/ai/types.js";
+import type { CanonNode } from "../kernel/canonicalizer/types.js";
 import type {
   AIGateway409Response,
   AIGatewayErrorResponse,
@@ -19,7 +19,7 @@ import type {
   FailedPrecondition,
   GatewayDiagnostic,
   TargetSpan,
-} from "./types";
+} from "./types.js";
 
 // ============================================================================
 // Request Envelope Creation

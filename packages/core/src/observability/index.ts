@@ -5,8 +5,8 @@
  * Enables quick diagnosis of fail-closed events and performance issues.
  */
 
-export * from "./debugExport";
-// export * from "./logger";
-export * from "./metrics";
-export * from "./tracer";
-export * from "./types";
+export * from "./debugExport.js";
+// export * from "./logger.js";
+export * from "./metrics.js";
+export * from "./tracer.js";
+export * from "./types.js";

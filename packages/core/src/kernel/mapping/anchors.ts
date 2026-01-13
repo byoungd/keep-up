@@ -3,7 +3,7 @@
  * @see docs/product/LFCC_v0.9_RC_Engineering_Docs/01_Kernel_API_Specification.md Section 3
  */
 
-import { decodeAnchorV2, encodeAnchorV2 } from "../../anchors/codec";
+import { decodeAnchorV2, encodeAnchorV2 } from "../../anchors/codec.js";
 
 /** Anchor data structure */
 export type Anchor = {

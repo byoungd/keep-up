@@ -11,9 +11,9 @@ import {
   type CanonInputNode,
   type CanonText,
   canonicalizeDocument,
-} from "../canonicalizer";
-import { type BlockTransform, createBlockMapping } from "../mapping/axioms";
-import { computeDirtyInfo } from "../mapping/computeDirty";
+} from "../canonicalizer/index.js";
+import { type BlockTransform, createBlockMapping } from "../mapping/axioms.js";
+import { computeDirtyInfo } from "../mapping/computeDirty.js";
 
 // ============================================================================
 // 1. Empty Document Edge Cases (EDGE-EMPTY-001)

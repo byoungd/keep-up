@@ -3,9 +3,9 @@
  * @see docs/product/LFCC_v0.9_RC_Engineering_Docs/08_Conformance_Test_Suite_Plan.md
  */
 
-import type { DirtyInfo } from "../mapping/types";
-import { computeChainHash, computeContextHash } from "./hash";
-import type { ChainData, CompareMismatch, DevComparePolicy, SpanData } from "./types";
+import type { DirtyInfo } from "../mapping/types.js";
+import { computeChainHash, computeContextHash } from "./hash.js";
+import type { ChainData, CompareMismatch, DevComparePolicy, SpanData } from "./types.js";
 
 /** Annotation data for scanning */
 export type AnnotationScanData = {

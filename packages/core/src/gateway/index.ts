@@ -10,7 +10,7 @@
  */
 
 // Types
-export * from "./types";
+export * from "./types.js";
 
 // Envelope
 export {
@@ -25,7 +25,7 @@ export {
   parseGatewayRequest,
   validateGatewayRequest,
   type ValidationError,
-} from "./envelope";
+} from "./envelope.js";
 
 // Conflict Safety
 export {
@@ -38,7 +38,7 @@ export {
   type ConflictCheckResult,
   type ConflictMiddleware,
   type MockProviderConfig,
-} from "./conflict";
+} from "./conflict.js";
 
 // Dry-Run Pipeline
 export {
@@ -52,7 +52,7 @@ export {
   type PipelineConfig,
   type PipelineResult,
   type PipelineStage,
-} from "./pipeline";
+} from "./pipeline.js";
 
 // Retry Playbook
 export {
@@ -72,7 +72,7 @@ export {
   type RebaseResult,
   type RelocationProvider,
   type RetryLoopResult,
-} from "./retry";
+} from "./retry.js";
 
 // Gateway Controller
 export {
@@ -81,4 +81,4 @@ export {
   createAIGatewayWithDefaults,
   createDefaultGatewayConfig,
   type GatewayConfig,
-} from "./gateway";
+} from "./gateway.js";

@@ -12,7 +12,7 @@ import {
   isCanonBlock,
   isCanonText,
   stableStringifyCanon,
-} from "../canonicalizer";
+} from "../canonicalizer/index.js";
 
 describe("Canonicalizer", () => {
   describe("canonicalizeDocument", () => {

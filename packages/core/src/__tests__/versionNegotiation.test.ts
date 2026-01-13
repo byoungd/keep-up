@@ -5,12 +5,12 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { type PolicyManifestV09, computePolicyManifestHash } from "../kernel/policy";
+import { type PolicyManifestV09, computePolicyManifestHash } from "../kernel/policy/index.js";
 import {
   createDefaultSyncManifest,
   negotiateManifests,
   validateSyncManifest,
-} from "../sync/negotiate";
+} from "../sync/negotiate.js";
 
 describe("Track 15: Version Negotiation", () => {
   const base = createDefaultSyncManifest();

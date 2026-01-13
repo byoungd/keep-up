@@ -4,8 +4,8 @@
  * @see docs/product/LFCC_v0.9_RC_Engineering_Docs/04_Annotation_State_Machine_and_UX_Spec.md Section 3
  */
 
-import type { GraceEntry, GraceToken } from "./types";
-import { DEFAULT_GRACE_PERIOD_MS } from "./types";
+import type { GraceEntry, GraceToken } from "./types.js";
+import { DEFAULT_GRACE_PERIOD_MS } from "./types.js";
 
 /**
  * Generate a new grace token (UUID v4)

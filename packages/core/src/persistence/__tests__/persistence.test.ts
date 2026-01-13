@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { DEFAULT_COMPACTION_POLICY, runCompaction, shouldCompact } from "../compaction";
-import { getRecoveryState, recoverDoc } from "../recovery";
-import { InMemoryStorage } from "../storage";
-import type { DocSnapshot, OpLogEntry } from "../types";
+import { DEFAULT_COMPACTION_POLICY, runCompaction, shouldCompact } from "../compaction.js";
+import { getRecoveryState, recoverDoc } from "../recovery.js";
+import { InMemoryStorage } from "../storage.js";
+import type { DocSnapshot, OpLogEntry } from "../types.js";
 
 describe("InMemoryStorage", () => {
   let storage: InMemoryStorage;

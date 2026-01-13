@@ -3,8 +3,8 @@
  * @see docs/product/LFCC_v0.9_RC_Engineering_Docs/08_Conformance_Test_Suite_Plan.md Section 4
  */
 
-import type { ShadowDocument, TypedOp } from "../shadow/types";
-import type { FuzzConfig, FuzzOpConfig, FuzzOpType } from "./types";
+import type { ShadowDocument, TypedOp } from "../shadow/types.js";
+import type { FuzzConfig, FuzzOpConfig, FuzzOpType } from "./types.js";
 
 /** Random number generator state */
 export type RngState = {

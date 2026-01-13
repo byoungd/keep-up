@@ -4,7 +4,7 @@
  * @see docs/product/LFCC_v0.9_RC_Engineering_Docs/14_Concurrent_Operations_Handling.md
  */
 
-import type { TypedOp } from "./types";
+import type { TypedOp } from "./types.js";
 
 /**
  * Operation priority for deterministic ordering

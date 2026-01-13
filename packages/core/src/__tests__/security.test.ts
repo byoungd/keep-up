@@ -3,15 +3,15 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AllowAllAuthAdapter, type AuthContext, TokenAuthAdapter } from "../security/auth";
-import { SlidingWindowRateLimiter, TokenBucketRateLimiter } from "../security/rateLimit";
+import { AllowAllAuthAdapter, type AuthContext, TokenAuthAdapter } from "../security/auth.js";
+import { SlidingWindowRateLimiter, TokenBucketRateLimiter } from "../security/rateLimit.js";
 import {
   DEFAULT_VALIDATION_CONFIG,
   validateMessageSchema,
   validateMessageSize,
   validatePresencePayload,
   validateUpdatePayload,
-} from "../security/validation";
+} from "../security/validation.js";
 
 describe("Track 11: Security", () => {
   describe("AuthAdapter", () => {

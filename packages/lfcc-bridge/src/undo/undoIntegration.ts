@@ -55,7 +55,7 @@ const SYNC_TIMEOUT_MS = 500;
 
 export function createUndoController(
   runtime: LoroRuntime,
-  excludeOriginPrefix = "lfcc"
+  excludeOriginPrefix = "lfcc:"
 ): UndoController {
   runtime.undoManager.addExcludeOriginPrefix(excludeOriginPrefix);
 

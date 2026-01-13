@@ -4,7 +4,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { base64Decode, base64Encode } from "../encoding";
+import { base64Decode, base64Encode } from "../encoding.js";
 
 describe("base64Encode/base64Decode", () => {
   describe("round-trip correctness", () => {

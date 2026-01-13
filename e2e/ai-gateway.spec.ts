@@ -21,10 +21,18 @@ test.describe("AI Gateway Write Enforcement", () => {
     // Select all text to assert selection is available for AI actions
     await selectAllText(page);
 
-    // Get the selection text
+    // Get the selection text from ProseMirror state (DOM selection can be empty in headless runs)
     const selectedText = await page.evaluate(() => {
-      const selection = window.getSelection();
-      return selection?.toString() || "";
+      const view = (window as unknown as { __lfccView?: import("prosemirror-view").EditorView })
+        .__lfccView;
+      if (!view) {
+        return "";
+      }
+      const { from, to } = view.state.selection;
+      if (to <= from) {
+        return "";
+      }
+      return view.state.doc.textBetween(from, to, "\n");
     });
 
     expect(selectedText.length).toBeGreaterThan(0);
@@ -89,7 +97,13 @@ test.describe("AI Gateway Write Enforcement", () => {
     // Check that pipeline validation is available
     // (Full AI menu testing would require mocking the AI API)
     const hasSelection = await page.evaluate(() => {
-      return (window.getSelection()?.toString().length ?? 0) > 0;
+      const view = (window as unknown as { __lfccView?: import("prosemirror-view").EditorView })
+        .__lfccView;
+      if (!view) {
+        return false;
+      }
+      const { from, to } = view.state.selection;
+      return to > from;
     });
 
     expect(hasSelection).toBe(true);

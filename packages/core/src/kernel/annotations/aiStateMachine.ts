@@ -10,11 +10,11 @@ import type {
   AIAnchorRecoveryResult,
   AIAnnoContext,
   AIAnnoEvent,
-} from "./aiTypes";
-import { DEFAULT_AI_RECOVERY_OPTIONS } from "./aiTypes";
-import { generateGraceToken } from "./tokenizedTimers";
-import type { AnnoEvent, GraceToken } from "./types";
-import { DEFAULT_GRACE_PERIOD_MS } from "./types";
+} from "./aiTypes.js";
+import { DEFAULT_AI_RECOVERY_OPTIONS } from "./aiTypes.js";
+import { generateGraceToken } from "./tokenizedTimers.js";
+import type { AnnoEvent, GraceToken } from "./types.js";
+import { DEFAULT_GRACE_PERIOD_MS } from "./types.js";
 
 /** Combined event type for AI-enhanced state machine */
 export type EnhancedAnnoEvent = AnnoEvent | AIAnnoEvent;

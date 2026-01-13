@@ -7,8 +7,8 @@
  * @see docs/specs/proposals/LFCC_v0.9.1_AI_Native_Enhancement.md
  */
 
-import type { EditIntent } from "./intent";
-import type { DataAccessPolicy } from "./types";
+import type { EditIntent } from "./intent.js";
+import type { DataAccessPolicy } from "./types.js";
 
 // ============================================================================
 // Document Structure

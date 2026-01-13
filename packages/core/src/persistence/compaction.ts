@@ -1,4 +1,4 @@
-import type { CompactionPolicy, CompactionResult, DocSnapshot, StorageBackend } from "./types";
+import type { CompactionPolicy, CompactionResult, DocSnapshot, StorageBackend } from "./types.js";
 
 export const DEFAULT_COMPACTION_POLICY: CompactionPolicy = {
   updateThreshold: 100,

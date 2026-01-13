@@ -3,8 +3,8 @@
  */
 
 import { beforeEach, describe, expect, it } from "vitest";
-import { computePolicyManifestHash } from "../../kernel/policy";
-import { createDefaultSyncManifest } from "../negotiate";
+import { computePolicyManifestHash } from "../../kernel/policy/index.js";
+import { createDefaultSyncManifest } from "../negotiate.js";
 import {
   type DocUpdatePayload,
   type HandshakePayload,
@@ -15,7 +15,7 @@ import {
   resetSeqCounter,
   serializeMessage,
   validateMessage,
-} from "../protocol";
+} from "../protocol.js";
 
 describe("Sync Protocol", () => {
   const manifest = createDefaultSyncManifest();

@@ -1,4 +1,4 @@
-import type { DbDriver, FeedItemRow } from "@keepup/db";
+import type { DbDriver, FeedItemRow } from "@keepup/db/types";
 /**
  * Digest Tool Tests
  */

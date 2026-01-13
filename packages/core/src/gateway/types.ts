@@ -3,9 +3,9 @@
  * @see docs/product/LFCC_v0.9_RC_Parallel_Workstreams/05_AI_Gateway_Envelope_and_Dry_Run.md
  */
 
-import { DEFAULT_AI_ENVELOPE_RETRY_POLICY } from "../kernel/ai/envelope";
-import type { AISanitizationPolicyV1 } from "../kernel/ai/types";
-import type { CanonNode } from "../kernel/canonicalizer/types";
+import { DEFAULT_AI_ENVELOPE_RETRY_POLICY } from "../kernel/ai/envelope.js";
+import type { AISanitizationPolicyV1 } from "../kernel/ai/types.js";
+import type { CanonNode } from "../kernel/canonicalizer/types.js";
 
 // ============================================================================
 // Document Frontier
@@ -49,7 +49,7 @@ export type AIGatewayRequest = {
   /** Optional intent payload */
   intent?: unknown;
   /** AI operation metadata */
-  ai_meta?: import("../kernel/ai/opcodes").AIOperationMeta;
+  ai_meta?: import("../kernel/ai/opcodes.js").AIOperationMeta;
   /** Target spans with preconditions */
   target_spans: TargetSpan[];
   /** User instructions / prompt */

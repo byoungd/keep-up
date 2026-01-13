@@ -11,8 +11,8 @@
  * - Relocation validation (prevents unauthorized span movement)
  */
 
-import type { AISanitizationPolicyV1 } from "../kernel/ai/types";
-import { DEFAULT_AI_SANITIZATION_POLICY } from "../kernel/ai/types";
+import type { AISanitizationPolicyV1 } from "../kernel/ai/types.js";
+import { DEFAULT_AI_SANITIZATION_POLICY } from "../kernel/ai/types.js";
 
 // ============================================================================
 // Types

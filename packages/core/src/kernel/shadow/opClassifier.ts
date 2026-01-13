@@ -3,7 +3,7 @@
  * @see docs/product/LFCC_v0.9_RC_Engineering_Docs/03_Shadow_Model_and_Bridge_Architecture.md Section 3
  */
 
-import type { OpCode, TypedOp } from "./types";
+import type { OpCode, TypedOp } from "./types.js";
 
 /** Editor event types (generic) */
 export type EditorEvent =

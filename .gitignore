@@ -118,6 +118,7 @@ coverage/.tmp
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+/test-logs/
 
 # E2E
 e2e/test-results/

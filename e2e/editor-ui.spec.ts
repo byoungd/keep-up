@@ -1,6 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { openFreshEditor, waitForEditorReady } from "./helpers/editor";
 
+const workerIndex = process.env.PLAYWRIGHT_WORKER_INDEX ?? Math.random().toString(36).slice(2, 5);
+const dbName = `reader-db-worker-${workerIndex}`;
+
 test.describe("Editor UI Controls", () => {
   test.beforeEach(async ({ page }, testInfo) => {
     await openFreshEditor(page, `editor-ui-${testInfo.title}`, { clearContent: true });
@@ -142,7 +145,7 @@ test.describe("Editor UI Controls", () => {
 
 test.describe("Editor URL Parameters", () => {
   test("?seed=1k seeds content with perf blocks", async ({ page }) => {
-    await page.goto("/editor?seed=1k");
+    await page.goto(`/editor?seed=1k&db=${dbName}`);
     await waitForEditorReady(page);
 
     const editor = page.locator(".lfcc-editor .ProseMirror");
@@ -152,7 +155,7 @@ test.describe("Editor URL Parameters", () => {
 
   test("?doc= parameter creates isolated document", async ({ page }) => {
     const docId = `test-doc-${Date.now()}`;
-    await page.goto(`/editor?doc=${docId}`);
+    await page.goto(`/editor?doc=${docId}&db=${dbName}&seed=0`);
     await waitForEditorReady(page);
 
     // Editor should load without errors

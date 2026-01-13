@@ -2,8 +2,8 @@
  * LFCC v0.9 RC - Deterministic Network Simulator
  */
 
-import type { TypedOp } from "../shadow/types";
-import { type RngState, createRng, nextRandom, randomInt } from "./generators";
+import type { TypedOp } from "../shadow/types.js";
+import { type RngState, createRng, nextRandom, randomInt } from "./generators.js";
 import type {
   FuzzConfig,
   NetworkLogEntry,
@@ -14,7 +14,7 @@ import type {
   NetworkScenarioName,
   NetworkSimState,
   NetworkStats,
-} from "./types";
+} from "./types.js";
 
 const DEFAULT_STATS: NetworkStats = {
   queued: 0,

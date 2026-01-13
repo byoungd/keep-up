@@ -3,8 +3,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { CanonBlock } from "../canonicalizer";
-import { addBlock, createShadowDocument } from "../shadow";
+import type { CanonBlock } from "../canonicalizer/index.js";
+import { addBlock, createShadowDocument } from "../shadow/index.js";
 import {
   DEFAULT_FUZZ_CONFIG,
   GOLDEN_FIXTURES,
@@ -25,7 +25,7 @@ import {
   runSECAssertion,
   selectOpType,
   serializeFixture,
-} from "../testing";
+} from "../testing/index.js";
 
 describe("Testing Module - Generators", () => {
   describe("createRng", () => {

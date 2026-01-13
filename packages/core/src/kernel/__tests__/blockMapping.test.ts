@@ -7,7 +7,7 @@ import {
   verifyDeterminism,
   verifyLocality,
   verifyMonotonicity,
-} from "../mapping/axioms";
+} from "../mapping/axioms.js";
 
 // Arbitrary for PositionDelta
 const positionDeltaArbitrary = fc.record({

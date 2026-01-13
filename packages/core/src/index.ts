@@ -26,26 +26,26 @@ export type Doc = {
 };
 
 // LFCC v0.9 RC Kernel
-export * from "./kernel";
+export * from "./kernel/index.js";
 
 // LFCC v0.9 RC Gateway
-export * as gateway from "./gateway";
-export type { GatewayTelemetryEvent } from "./gateway/types";
+export * as gateway from "./gateway/index.js";
+export type { GatewayTelemetryEvent } from "./gateway/types.js";
 
 // Text Normalization
-export * from "./text/normalization";
+export * from "./text/normalization.js";
 
 // Sync Protocol
-export * from "./sync";
+export * from "./sync/index.js";
 
 // Observability (Track 12)
-export * as observability from "./observability";
+export * as observability from "./observability/index.js";
 
 // Persistence (Track 10)
-export * as persistence from "./persistence";
+export * as persistence from "./persistence/index.js";
 
 // Security (Track 11)
-export * as security from "./security";
+export * as security from "./security/index.js";
 
 // Errors
-export * from "./errors";
+export * from "./errors.js";

@@ -3,10 +3,10 @@
  */
 
 import { beforeEach, describe, expect, it } from "vitest";
-import { LfccError } from "../../errors";
-import { LFCCLogger, getLogger } from "../logger";
-import { MetricsRegistry, getMetrics, initMetricsRegistry } from "../metrics";
-import { LFCCTracer, getTracer, setDefaultTracer, traceAsync } from "../tracer";
+import { LfccError } from "../../errors.js";
+import { LFCCLogger, getLogger } from "../logger.js";
+import { MetricsRegistry, getMetrics, initMetricsRegistry } from "../metrics.js";
+import { LFCCTracer, getTracer, setDefaultTracer, traceAsync } from "../tracer.js";
 
 describe("LFCCLogger", () => {
   let logger: LFCCLogger;

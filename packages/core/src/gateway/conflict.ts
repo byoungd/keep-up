@@ -8,7 +8,7 @@
  * - Target verification status
  */
 
-import { createGateway409 } from "./envelope";
+import { createGateway409 } from "./envelope.js";
 import type {
   AIGateway409Response,
   AIGatewayRequest,
@@ -18,7 +18,7 @@ import type {
   GatewayDocumentProvider,
   SpanState,
   TargetSpan,
-} from "./types";
+} from "./types.js";
 
 // ============================================================================
 // Conflict Check Result

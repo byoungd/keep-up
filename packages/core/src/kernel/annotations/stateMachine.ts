@@ -4,9 +4,9 @@
  * @see docs/product/LFCC_v0.9_RC_Engineering_Docs/04_Annotation_State_Machine_and_UX_Spec.md
  */
 
-import { generateGraceToken } from "./tokenizedTimers";
-import type { AnnoContext, AnnoEvent, GraceToken, StoredAnnoState } from "./types";
-import { DEFAULT_GRACE_PERIOD_MS } from "./types";
+import { generateGraceToken } from "./tokenizedTimers.js";
+import type { AnnoContext, AnnoEvent, GraceToken, StoredAnnoState } from "./types.js";
+import { DEFAULT_GRACE_PERIOD_MS } from "./types.js";
 
 /** State machine definition for annotation display */
 export type StateMachineConfig = {

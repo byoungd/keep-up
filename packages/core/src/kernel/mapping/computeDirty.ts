@@ -1,4 +1,4 @@
-import { expandTouchedBlocks } from "./neighborExpansion";
+import { expandTouchedBlocks } from "./neighborExpansion.js";
 
 /**
  * LFCC v0.9 RC - Dirty Info Computation
@@ -33,7 +33,7 @@ export function computeDirtyInfo(
       contentBlockIds: string[];
       blockMeta?: Record<string, { listDepth: number; tableDepth: number }>;
     };
-    neighborPolicy?: import("./types").NeighborExpansionPolicy;
+    neighborPolicy?: import("./types.js").NeighborExpansionPolicy;
   }
 ): ComputedDirtyInfo {
   const touchedBlockIds = input.touchedBlocks.map((b) => b.blockId);

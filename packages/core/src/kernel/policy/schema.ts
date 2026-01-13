@@ -5,7 +5,7 @@
  * P0.1: Strict schema validation - reject unknown top-level fields unless in extensions
  */
 
-import type { PolicyManifestV09 } from "./types";
+import type { PolicyManifestV09 } from "./types.js";
 
 /**
  * Known top-level fields in PolicyManifestV09

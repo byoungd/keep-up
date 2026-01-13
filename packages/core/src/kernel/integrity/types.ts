@@ -3,7 +3,7 @@
  * @see docs/product/Local-First_Collaboration_Contract_v0.9_RC.md §6, §10
  */
 
-import type { ChainKind } from "../policy/types";
+import type { ChainKind } from "../policy/types.js";
 
 /** Span data for hash computation */
 export type SpanData = {

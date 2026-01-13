@@ -3,11 +3,11 @@
  * @see docs/product/LFCC_v0.9_RC_Engineering_Docs/03_Shadow_Model_and_Bridge_Architecture.md
  */
 
-import { type BlockTransform, createBlockMapping } from "../mapping/axioms";
-import type { BlockMapping, DirtyInfo } from "../mapping/types";
-import { validateRange } from "../utils/unicode";
-import type { BlockIdRules, OpResult, ShadowBlock, ShadowDocument, TypedOp } from "./types";
-import { DEFAULT_BLOCK_ID_RULES } from "./types";
+import { type BlockTransform, createBlockMapping } from "../mapping/axioms.js";
+import type { BlockMapping, DirtyInfo } from "../mapping/types.js";
+import { validateRange } from "../utils/unicode.js";
+import type { BlockIdRules, OpResult, ShadowBlock, ShadowDocument, TypedOp } from "./types.js";
+import { DEFAULT_BLOCK_ID_RULES } from "./types.js";
 
 /** Generate a new block ID */
 function generateBlockId(): string {

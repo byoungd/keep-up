@@ -10,8 +10,8 @@
  * Compatible with Prometheus/OpenTelemetry export formats.
  */
 
-import { LfccError } from "../errors";
-import type { Metric, MetricLabels, VerificationOutcome } from "./types";
+import { LfccError } from "../errors.js";
+import type { Metric, MetricLabels, VerificationOutcome } from "./types.js";
 
 // ============================================================================
 // Histogram Buckets

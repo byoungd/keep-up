@@ -4,8 +4,8 @@
  * Deterministic hash for PolicyManifestV09 using stable serialization.
  */
 
-import { stableStringify } from "./stableStringify";
-import type { PolicyManifestV09 } from "./types";
+import { stableStringify } from "./stableStringify.js";
+import type { PolicyManifestV09 } from "./types.js";
 
 function bufferToHex(buffer: ArrayBuffer): string {
   return Array.from(new Uint8Array(buffer))
@@ -42,8 +42,12 @@ async function sha256(text: string): Promise<string> {
   return simpleHash256(text);
 }
 
+function normalizeManifestForHash(manifest: PolicyManifestV09): PolicyManifestV09 {
+  return JSON.parse(JSON.stringify(manifest)) as PolicyManifestV09;
+}
+
 export async function computePolicyManifestHash(manifest: PolicyManifestV09): Promise<string> {
-  const serialized = stableStringify(manifest);
+  const serialized = stableStringify(normalizeManifestForHash(manifest));
   return sha256(serialized);
 }
 

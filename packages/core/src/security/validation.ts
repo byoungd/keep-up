@@ -5,7 +5,7 @@
  * Ensures fail-closed on malformed input.
  */
 
-import type { SyncMessage } from "../sync/protocol";
+import type { SyncMessage } from "../sync/protocol.js";
 
 /** Validation configuration */
 export type ValidationConfig = {

@@ -12,8 +12,8 @@
  * - Observability hooks
  */
 
-import type { Anchor } from "../mapping/anchors";
-import type { BlockMapping } from "../mapping/types";
+import type { Anchor } from "../mapping/anchors.js";
+import type { BlockMapping } from "../mapping/types.js";
 import {
   type AnnotationId,
   type BlockId,
@@ -31,7 +31,7 @@ import {
   traceId,
   validationError,
   withTiming,
-} from "./primitives";
+} from "./primitives.js";
 
 // ============================================
 // Types (Immutable)

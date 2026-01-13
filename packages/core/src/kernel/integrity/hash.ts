@@ -3,7 +3,7 @@
  * @see docs/product/Local-First_Collaboration_Contract_v0.9_RC.md §6.2
  */
 
-import type { ChainData, ChainHashResult, ContextHashResult, SpanData } from "./types";
+import type { ChainData, ChainHashResult, ContextHashResult, SpanData } from "./types.js";
 
 /**
  * Normalize text to LF line endings

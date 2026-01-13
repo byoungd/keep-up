@@ -5,7 +5,7 @@
  * Compatible with OpenTelemetry trace format.
  */
 
-import type { CorrelationContext, SpanStatus, TraceSpan } from "./types";
+import type { CorrelationContext, SpanStatus, TraceSpan } from "./types.js";
 
 // ============================================================================
 // Span Builder

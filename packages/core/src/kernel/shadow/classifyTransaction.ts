@@ -6,7 +6,7 @@
  * MUST be deterministic: same transaction -> same opCodes, touchedBlocks, txnIndex.
  */
 
-import type { OpCode, TypedOp } from "./types";
+import type { OpCode, TypedOp } from "./types.js";
 
 /**
  * Input for transaction classification

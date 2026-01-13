@@ -4,9 +4,9 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { isValidUrl, processMarkAttributes, validateAndSanitizeHref } from "../attrs";
-import { canonicalizeDocument } from "../canonicalize";
-import { DEFAULT_CANONICALIZER_POLICY } from "../types";
+import { isValidUrl, processMarkAttributes, validateAndSanitizeHref } from "../attrs.js";
+import { canonicalizeDocument } from "../canonicalize.js";
+import { DEFAULT_CANONICALIZER_POLICY } from "../types.js";
 
 describe("Canonical Attribute Enforcement", () => {
   describe("isValidUrl()", () => {

@@ -3,9 +3,9 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { computePolicyManifestHash } from "../../kernel/policy";
-import type { AuthAdapter } from "../../security/auth";
-import { createDefaultSyncManifest } from "../negotiate";
+import { computePolicyManifestHash } from "../../kernel/policy/index.js";
+import type { AuthAdapter } from "../../security/auth.js";
+import { createDefaultSyncManifest } from "../negotiate.js";
 import {
   type CatchUpResponsePayload,
   type HandshakeAckPayload,
@@ -15,9 +15,9 @@ import {
   createMessage,
   deserializeMessage,
   serializeMessage,
-} from "../protocol";
-import { type PersistenceHooks, SyncServer, type WebSocketLike } from "../server";
-import { validateClientInboundMessage } from "../validation";
+} from "../protocol.js";
+import { type PersistenceHooks, SyncServer, type WebSocketLike } from "../server.js";
+import { validateClientInboundMessage } from "../validation.js";
 
 describe("Sync Server", () => {
   let server: SyncServer;

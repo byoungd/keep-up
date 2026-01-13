@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { selectFirstTextRange, waitForEditorReady } from "./helpers/editor";
+import { getToolbar, selectFirstTextRange, waitForEditorReady } from "./helpers/editor";
 import { getPersistedDocMeta, waitForPersistedDoc } from "./helpers/persistence";
 
 test.describe("Document Persistence", () => {
@@ -26,9 +26,11 @@ test.describe("Document Persistence", () => {
 
     await selectFirstTextRange(page);
 
-    const highlightBtn = page.getByRole("button", { name: "Highlight yellow" });
+    const toolbar = await getToolbar(page);
+    await toolbar.waitFor({ state: "visible", timeout: 2000 });
+    const highlightBtn = toolbar.getByRole("button", { name: "Highlight yellow" });
     if (await highlightBtn.isVisible({ timeout: 2000 })) {
-      await highlightBtn.click();
+      await highlightBtn.click({ force: true });
     }
 
     await waitForPersistedDoc(page, docId, baselineUpdatedAt, 15000, baselineSnapshotLength);

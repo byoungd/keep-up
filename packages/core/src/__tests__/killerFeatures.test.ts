@@ -16,7 +16,7 @@ import {
   createGhostPeer,
   createGhostPresence,
   createGhostSession,
-} from "../kernel/ai/ghostCollaborator";
+} from "../kernel/ai/ghostCollaborator.js";
 import {
   type AnnotationMigration,
   type LiquidOp,
@@ -25,16 +25,16 @@ import {
   createLiquidInput,
   planLiquidRefactoring,
   validateLiquidPlan,
-} from "../kernel/ai/liquidRefactoring";
-import { annotationId, blockId, snapshotId } from "../kernel/ai/primitives";
+} from "../kernel/ai/liquidRefactoring.js";
+import { annotationId, blockId, snapshotId } from "../kernel/ai/primitives.js";
 import {
   SemanticTimeTravel,
   createResurrectionRequest,
   createSemanticTimeTravel,
   createShadowViewConfig,
-} from "../kernel/ai/semanticTimeTravel";
-import type { HistoryState } from "../kernel/shadow/history";
-import type { ShadowDocument } from "../kernel/shadow/types";
+} from "../kernel/ai/semanticTimeTravel.js";
+import type { HistoryState } from "../kernel/shadow/history.js";
+import type { ShadowDocument } from "../kernel/shadow/types.js";
 
 // ============================================
 // Liquid Refactoring Tests
@@ -205,7 +205,7 @@ describe("Liquid Refactoring", () => {
   describe("validateLiquidPlan", () => {
     it("returns valid for clean plans", () => {
       const result: LiquidRefactoringResult = {
-        traceId: "test-trace" as ReturnType<typeof import("../kernel/ai/primitives").traceId>,
+        traceId: "test-trace" as ReturnType<typeof import("../kernel/ai/primitives.js").traceId>,
         success: true,
         ops: [],
         annotationMigrations: [
@@ -234,7 +234,7 @@ describe("Liquid Refactoring", () => {
 
     it("reports fuzzy migrations as warnings", () => {
       const result: LiquidRefactoringResult = {
-        traceId: "test-trace" as ReturnType<typeof import("../kernel/ai/primitives").traceId>,
+        traceId: "test-trace" as ReturnType<typeof import("../kernel/ai/primitives.js").traceId>,
         success: true,
         ops: [],
         annotationMigrations: [
@@ -263,7 +263,7 @@ describe("Liquid Refactoring", () => {
 
     it("reports critical confidence migrations as errors", () => {
       const result: LiquidRefactoringResult = {
-        traceId: "test-trace" as ReturnType<typeof import("../kernel/ai/primitives").traceId>,
+        traceId: "test-trace" as ReturnType<typeof import("../kernel/ai/primitives.js").traceId>,
         success: true,
         ops: [],
         annotationMigrations: [
@@ -295,14 +295,14 @@ describe("Liquid Refactoring", () => {
     it("applies operations in order with progress", async () => {
       const ops: LiquidOp[] = [
         {
-          id: "op1" as ReturnType<typeof import("../kernel/ai/primitives").opId>,
+          id: "op1" as ReturnType<typeof import("../kernel/ai/primitives.js").opId>,
           opCode: "OP_BLOCK_CONVERT",
           blockId: blockId("b1"),
           targetType: "heading",
           timestamp: 1,
         },
         {
-          id: "op2" as ReturnType<typeof import("../kernel/ai/primitives").opId>,
+          id: "op2" as ReturnType<typeof import("../kernel/ai/primitives.js").opId>,
           opCode: "OP_REORDER",
           blockId: blockId("b1"),
           newIndex: 0,
@@ -321,7 +321,7 @@ describe("Liquid Refactoring", () => {
       ];
 
       const result: LiquidRefactoringResult = {
-        traceId: "test-trace" as ReturnType<typeof import("../kernel/ai/primitives").traceId>,
+        traceId: "test-trace" as ReturnType<typeof import("../kernel/ai/primitives.js").traceId>,
         success: true,
         ops,
         annotationMigrations: migrations,
@@ -347,11 +347,11 @@ describe("Liquid Refactoring", () => {
 
     it("tracks failed operations", async () => {
       const result: LiquidRefactoringResult = {
-        traceId: "test-trace" as ReturnType<typeof import("../kernel/ai/primitives").traceId>,
+        traceId: "test-trace" as ReturnType<typeof import("../kernel/ai/primitives.js").traceId>,
         success: true,
         ops: [
           {
-            id: "op1" as ReturnType<typeof import("../kernel/ai/primitives").opId>,
+            id: "op1" as ReturnType<typeof import("../kernel/ai/primitives.js").opId>,
             opCode: "OP_BLOCK_CONVERT" as const,
             blockId: blockId("b1"),
             timestamp: 1,

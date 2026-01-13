@@ -11,9 +11,9 @@ import {
   areManifestsCompatible,
   negotiate,
   validateManifest,
-} from "../kernel/policy";
-import { DEFAULT_POLICY_MANIFEST } from "../kernel/policy/types";
-import type { NegotiationLogEntry } from "./protocol";
+} from "../kernel/policy/index.js";
+import { DEFAULT_POLICY_MANIFEST } from "../kernel/policy/types.js";
+import type { NegotiationLogEntry } from "./protocol.js";
 
 /** Negotiation result */
 export type SyncNegotiationResult = {

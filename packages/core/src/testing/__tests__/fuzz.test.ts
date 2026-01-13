@@ -8,12 +8,16 @@
 
 import * as fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { type CanonInputNode, canonicalizeDocument } from "../../kernel/canonicalizer";
-import { type Anchor, absoluteFromAnchor, anchorFromAbsolute } from "../../kernel/mapping/anchors";
-import { type BlockTransform, createBlockMapping } from "../../kernel/mapping/axioms";
-import { runSECAssertion } from "../../kernel/testing/fuzz";
-import { DEFAULT_FUZZ_CONFIG } from "../../kernel/testing/generators";
-import { generateSeedCorpus } from "./corpus_generator";
+import { type CanonInputNode, canonicalizeDocument } from "../../kernel/canonicalizer/index.js";
+import {
+  type Anchor,
+  absoluteFromAnchor,
+  anchorFromAbsolute,
+} from "../../kernel/mapping/anchors.js";
+import { type BlockTransform, createBlockMapping } from "../../kernel/mapping/axioms.js";
+import { runSECAssertion } from "../../kernel/testing/fuzz.js";
+import { DEFAULT_FUZZ_CONFIG } from "../../kernel/testing/generators.js";
+import { generateSeedCorpus } from "./corpus_generator.js";
 
 // Mutation helpers removed as they operated on buffers, but API uses strings
 

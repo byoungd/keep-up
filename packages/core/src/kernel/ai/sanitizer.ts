@@ -4,7 +4,7 @@
  * @see docs/product/LFCC_v0.9_RC_Engineering_Docs/07_AI_Dry_Run_Pipeline_Design.md Section 2
  */
 
-import type { AIPayloadSanitizer, AISanitizationPolicyV1, SanitizedPayload } from "./types";
+import type { AIPayloadSanitizer, AISanitizationPolicyV1, SanitizedPayload } from "./types.js";
 
 type SanitizeDiag = { kind: string; detail: string; severity?: "error" | "warning" };
 

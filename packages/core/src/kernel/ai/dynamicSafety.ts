@@ -7,8 +7,8 @@
  * @see docs/specs/proposals/LFCC_v0.9.1_AI_Native_Enhancement.md
  */
 
-import type { AIOpCode } from "./opcodes";
-import type { AISanitizationPolicyV1 } from "./types";
+import type { AIOpCode } from "./opcodes.js";
+import type { AISanitizationPolicyV1 } from "./types.js";
 
 // ============================================================================
 // Policy Condition Types

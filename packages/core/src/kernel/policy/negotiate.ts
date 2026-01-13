@@ -3,7 +3,7 @@
  * @see docs/product/LFCC_v0.9_RC_Engineering_Docs/02_Policy_Manifest_Schema.md Section 3
  */
 
-import { stableStringify } from "./stableStringify";
+import { stableStringify } from "./stableStringify.js";
 import type {
   AINativePolicy,
   AISanitizationPolicy,
@@ -15,8 +15,8 @@ import type {
   PolicyManifestV09,
   RelocationPolicy,
   VerifyMode,
-} from "./types";
-import { DEFAULT_POLICY_MANIFEST } from "./types";
+} from "./types.js";
+import { DEFAULT_POLICY_MANIFEST } from "./types.js";
 
 export type NegotiationError = {
   field: string;

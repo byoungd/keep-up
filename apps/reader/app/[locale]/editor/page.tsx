@@ -221,6 +221,18 @@ function EditorPageContent() {
 
   const annotationsById = useAnnotationStore((state) => state.annotations);
   const forcedDivergenceRef = React.useRef(false);
+  const triggerForceDivergence = React.useCallback(() => {
+    if (forcedDivergenceRef.current) {
+      return;
+    }
+    forcedDivergenceRef.current = true;
+    handleDivergence({
+      diverged: true,
+      editorChecksum: "forced-editor",
+      loroChecksum: "forced-loro",
+      reason: "Forced divergence for testing",
+    });
+  }, [handleDivergence]);
 
   const { missingAnnotationId } = useDeepLinking({
     view: contextValue?.view ?? null,
@@ -264,21 +276,27 @@ function EditorPageContent() {
   }, [contextValue, effectiveReadOnly]);
 
   React.useEffect(() => {
-    if (!isDev || forcedDivergenceRef.current) {
-      return;
-    }
-    const force = searchParams?.get("forceDivergence");
+    const force =
+      searchParams?.get("forceDivergence") ??
+      new URLSearchParams(window.location.search).get("forceDivergence");
     if (force !== "1") {
       return;
     }
-    forcedDivergenceRef.current = true;
-    handleDivergence({
-      diverged: true,
-      editorChecksum: "forced-editor",
-      loroChecksum: "forced-loro",
-      reason: "Forced divergence for testing",
-    });
-  }, [handleDivergence, isDev, searchParams]);
+    triggerForceDivergence();
+  }, [searchParams, triggerForceDivergence]);
+
+  React.useEffect(() => {
+    const handler = () => triggerForceDivergence();
+    const globalAny = window as Window & { __lfccForceDivergence?: () => void };
+    globalAny.__lfccForceDivergence = handler;
+    window.addEventListener("lfcc-force-divergence", handler);
+    return () => {
+      if (globalAny.__lfccForceDivergence === handler) {
+        globalAny.__lfccForceDivergence = undefined;
+      }
+      window.removeEventListener("lfcc-force-divergence", handler);
+    };
+  }, [triggerForceDivergence]);
 
   useSelectionToolbarActions({
     lfcc: contextValue,

@@ -10,7 +10,7 @@ import {
   isPolicyManifestV09,
   negotiate,
   validateManifest,
-} from "../policy";
+} from "../policy/index.js";
 
 describe("Policy Validation", () => {
   it("should validate default manifest", () => {

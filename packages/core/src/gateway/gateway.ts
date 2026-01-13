@@ -10,28 +10,28 @@
  * - Response generation
  */
 
-import { normalizeRequestIdentifiers } from "../kernel/ai/envelope";
-import type { AISanitizationPolicyV1 } from "../kernel/ai/types";
-import { DEFAULT_AI_SANITIZATION_POLICY } from "../kernel/ai/types";
-import type { CanonNode } from "../kernel/canonicalizer/types";
+import { normalizeRequestIdentifiers } from "../kernel/ai/envelope.js";
+import type { AISanitizationPolicyV1 } from "../kernel/ai/types.js";
+import { DEFAULT_AI_SANITIZATION_POLICY } from "../kernel/ai/types.js";
+import type { CanonNode } from "../kernel/canonicalizer/types.js";
 import {
   AIPayloadValidator,
   type AIValidatorConfig,
   DEFAULT_AI_VALIDATOR_CONFIG,
-} from "../security/aiValidator";
-import { checkConflicts } from "./conflict";
+} from "../security/aiValidator.js";
+import { checkConflicts } from "./conflict.js";
 import {
   createGateway409,
   createGatewayError,
   createGatewayResponse,
   validateGatewayRequest,
-} from "./envelope";
+} from "./envelope.js";
 import {
   type PipelineConfig,
   detectMaliciousPayload,
   executePipeline,
   validatePayloadSize,
-} from "./pipeline";
+} from "./pipeline.js";
 import type {
   AIGatewayRequest,
   AIGatewayResult,
@@ -40,7 +40,7 @@ import type {
   GatewayDiagnostic,
   GatewayDocumentProvider,
   GatewayTelemetryEvent,
-} from "./types";
+} from "./types.js";
 
 // ============================================================================
 // Gateway Configuration

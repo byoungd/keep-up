@@ -10,41 +10,23 @@
  * Run with: npx playwright test e2e/editing-kernel.spec.ts
  */
 
-import { type Page, expect, test } from "@playwright/test";
-import {
-  clearEditorContent,
-  getEditorText,
-  modKey,
-  typeInEditor,
-  waitForEditorReady,
-} from "./helpers/editor";
+import { expect, test } from "@playwright/test";
+import { getEditorText, modKey, openFreshEditor, typeInEditor } from "./helpers/editor";
 
 test.use({ screenshot: "only-on-failure" });
+test.setTimeout(90000);
 
 const modShortcut = (key: string) => `${modKey}+${key}`;
 const redoShortcuts =
   process.platform === "darwin" ? ["Meta+Shift+z", "Meta+y"] : ["Control+Shift+z", "Control+y"];
 
 // ============================================================================
-// Helpers (remaining local ones)
-// ============================================================================
-
-// Alias for backward compatibility
-async function clearEditor(page: Page): Promise<void> {
-  await clearEditorContent(page);
-}
-
-// ============================================================================
 // Test Suite
 // ============================================================================
 
 test.describe("Editing Kernel Stability", () => {
-  test.beforeEach(async ({ page }) => {
-    // Use unique doc ID to avoid persisted content conflicts between test runs
-    const uniqueDocId = `test-kernel-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    await page.goto(`/editor?doc=${uniqueDocId}`);
-    await waitForEditorReady(page);
-    await clearEditor(page);
+  test.beforeEach(async ({ page }, testInfo) => {
+    await openFreshEditor(page, `kernel-${testInfo.title}`, { clearContent: true });
   });
 
   test("cursor position stable after typing", async ({ page }) => {
@@ -58,7 +40,6 @@ test.describe("Editing Kernel Stability", () => {
   });
 
   test("undo restores previous state", async ({ page }) => {
-    await clearEditor(page);
     await typeInEditor(page, "First");
     await page.keyboard.press("Enter");
     await typeInEditor(page, "Second");
@@ -78,7 +59,6 @@ test.describe("Editing Kernel Stability", () => {
   });
 
   test("redo restores undone state", async ({ page }) => {
-    await clearEditor(page);
     await typeInEditor(page, "Test");
 
     let text = "";
@@ -111,7 +91,6 @@ test.describe("Editing Kernel Stability", () => {
   });
 
   test("bold toggle creates strong element", async ({ page }) => {
-    await clearEditor(page);
     await typeInEditor(page, "Bold text");
 
     // Select all and toggle bold (use Meta on macOS)
@@ -143,7 +122,6 @@ test.describe("Editing Kernel Stability", () => {
   });
 
   test("cursor stays in document after mark toggle", async ({ page }) => {
-    await clearEditor(page);
     await typeInEditor(page, "Test cursor position");
 
     // Toggle bold (use Meta on macOS)
@@ -158,7 +136,6 @@ test.describe("Editing Kernel Stability", () => {
   });
 
   test("emoji insertion preserves cursor position", async ({ page }) => {
-    await clearEditor(page);
     await typeInEditor(page, "Hello ");
 
     // Type emoji (surrogate pair)
@@ -174,8 +151,6 @@ test.describe("Editing Kernel Stability", () => {
   });
 
   test("paste preserves formatting deterministically", async ({ page }) => {
-    await clearEditor(page);
-
     await page.evaluate(() => {
       const editor = document.querySelector(".lfcc-editor .ProseMirror");
       if (!editor) {
@@ -199,8 +174,6 @@ test.describe("Editing Kernel Stability", () => {
   });
 
   test("paste implementation strips unsafe attributes", async ({ page }) => {
-    await clearEditor(page);
-
     await page.evaluate(() => {
       const editor = document.querySelector(".lfcc-editor .ProseMirror");
       if (!editor) {
@@ -233,7 +206,6 @@ test.describe("Editing Kernel Stability", () => {
   });
 
   test("selection stable after block split", async ({ page }) => {
-    await clearEditor(page);
     await typeInEditor(page, "First line");
 
     await page.keyboard.press("Enter");
@@ -253,8 +225,6 @@ test.describe("Editing Kernel Stability", () => {
   });
 
   test("rapid edits do not corrupt state", async ({ page }) => {
-    await clearEditor(page);
-
     // Type rapidly without delay
     const editor = page.locator("[data-lfcc-editor]");
     await editor.click();

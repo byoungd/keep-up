@@ -12,14 +12,14 @@ export {
   resetAfterFullScan,
   selectSampleBlocks,
   type SamplingState,
-} from "./compareHarness";
+} from "./compareHarness.js";
 export {
   createBugReportTemplate,
   forceFullScan,
   formatScanReport,
   type ForceFullScanOptions,
   type ForceFullScanResult,
-} from "./forceFullScan";
+} from "./forceFullScan.js";
 export {
   compareRenderingKeys,
   createSimpleRenderingKeysProvider,
@@ -29,5 +29,5 @@ export {
   verifyRenderingKeysDeterminism,
   type RenderingKey,
   type RenderingKeysSnapshot,
-} from "./renderingKeys";
-export * from "./types";
+} from "./renderingKeys.js";
+export * from "./types.js";

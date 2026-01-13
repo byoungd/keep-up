@@ -6,10 +6,10 @@
  * The corpus provides starting points for mutation-based fuzzing.
  */
 
-import { addBlock, createShadowDocument } from "../../kernel/shadow/shadowModel";
-import type { ShadowDocument, TypedOp } from "../../kernel/shadow/types";
-import { DEFAULT_FUZZ_CONFIG, createRng, generateOp } from "../../kernel/testing/generators";
-import type { FuzzConfig } from "../../kernel/testing/types";
+import { addBlock, createShadowDocument } from "../../kernel/shadow/shadowModel.js";
+import type { ShadowDocument, TypedOp } from "../../kernel/shadow/types.js";
+import { DEFAULT_FUZZ_CONFIG, createRng, generateOp } from "../../kernel/testing/generators.js";
+import type { FuzzConfig } from "../../kernel/testing/types.js";
 
 // ============================================================================
 // Corpus Types

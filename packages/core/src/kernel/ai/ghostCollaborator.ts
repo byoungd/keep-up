@@ -12,7 +12,7 @@
  * - Observability hooks
  */
 
-import { createEditIntent } from "./intent";
+import { createEditIntent } from "./intent.js";
 import {
   type BlockId,
   type ConflictId,
@@ -34,8 +34,8 @@ import {
   sessionId,
   traceId,
   withTiming,
-} from "./primitives";
-import type { AIRequestEnvelope, DocFrontier, SpanPrecondition } from "./types";
+} from "./primitives.js";
+import type { AIRequestEnvelope, DocFrontier, SpanPrecondition } from "./types.js";
 
 // ============================================
 // Types (Immutable)

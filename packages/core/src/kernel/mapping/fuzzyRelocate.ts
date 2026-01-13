@@ -6,9 +6,9 @@
  * integrity-check based relocation fails.
  */
 
-import { type Anchor, createAnchor } from "./anchors";
-import { relocateAnchor } from "./relocate";
-import type { BlockMapping } from "./types";
+import { type Anchor, createAnchor } from "./anchors.js";
+import { relocateAnchor } from "./relocate.js";
+import type { BlockMapping } from "./types.js";
 
 /** Options for fuzzy relocation */
 export type FuzzyRelocateOptions = {

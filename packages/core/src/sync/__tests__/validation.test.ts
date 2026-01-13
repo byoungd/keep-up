@@ -3,11 +3,11 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { computePolicyManifestHash } from "../../kernel/policy";
-import { DEFAULT_VALIDATION_CONFIG } from "../../security/validation";
-import { createDefaultSyncManifest } from "../negotiate";
-import { createMessage } from "../protocol";
-import { validateClientInboundMessage, validateServerInboundMessage } from "../validation";
+import { computePolicyManifestHash } from "../../kernel/policy/index.js";
+import { DEFAULT_VALIDATION_CONFIG } from "../../security/validation.js";
+import { createDefaultSyncManifest } from "../negotiate.js";
+import { createMessage } from "../protocol.js";
+import { validateClientInboundMessage, validateServerInboundMessage } from "../validation.js";
 
 const manifest = createDefaultSyncManifest();
 const manifestHashPromise = computePolicyManifestHash(manifest);

@@ -13,8 +13,8 @@
  * - Observability hooks
  */
 
-import type { HistoryEntry, HistoryState } from "../shadow/history";
-import type { ShadowBlock, ShadowDocument } from "../shadow/types";
+import type { HistoryEntry, HistoryState } from "../shadow/history.js";
+import type { ShadowBlock, ShadowDocument } from "../shadow/types.js";
 import {
   type BlockId,
   Err,
@@ -31,7 +31,7 @@ import {
   snapshotId,
   traceId,
   withTiming,
-} from "./primitives";
+} from "./primitives.js";
 
 // ============================================
 // Types (Immutable)

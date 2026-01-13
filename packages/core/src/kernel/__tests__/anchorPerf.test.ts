@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { absoluteFromAnchor, anchorFromAbsolute } from "../mapping/anchors";
+import { absoluteFromAnchor, anchorFromAbsolute } from "../mapping/anchors.js";
 
 function warmUp(iterations = 5): void {
   const anchors: string[] = [];

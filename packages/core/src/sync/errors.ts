@@ -1,4 +1,4 @@
-import type { ErrorCategory, ErrorCode, ErrorPayload } from "./protocol";
+import type { ErrorCategory, ErrorCode, ErrorPayload } from "./protocol.js";
 
 type ErrorDescriptor = {
   category: ErrorCategory;

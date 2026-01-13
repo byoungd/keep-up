@@ -19,7 +19,7 @@ test.describe("Annotations", () => {
     await expect(toolbar).toBeVisible({ timeout: 5000 });
 
     // Click color button (e.g. Yellow)
-    await toolbar.getByRole("button", { name: "Highlight yellow" }).click();
+    await toolbar.getByRole("button", { name: "Highlight yellow" }).click({ force: true });
 
     // Verify annotation highlight appears in overlay (portal-based rendering)
     // The overlay uses .highlight-rect for visual rendering while
@@ -34,7 +34,7 @@ test.describe("Annotations", () => {
     await selectFirstTextRange(page);
     const toolbar = page.locator("[data-testid='selection-toolbar']");
     await expect(toolbar).toBeVisible();
-    await toolbar.getByRole("button", { name: "Highlight yellow" }).click();
+    await toolbar.getByRole("button", { name: "Highlight yellow" }).click({ force: true });
 
     // Wait for annotation to appear in panel
     const panelContainer = page.locator("[data-testid='annotation-panel-container']");

@@ -13,7 +13,7 @@ import {
   decodeAnchorV2,
   encodeAnchorV2,
   verifyCRC32,
-} from "../anchors/codec";
+} from "../anchors/codec.js";
 
 describe("Unified Anchor Codec", () => {
   describe("encodeAnchorV2 / decodeAnchorV2", () => {

@@ -4,7 +4,7 @@
  * Provides specialized tools for the DigestAgent to fetch and process feed items.
  */
 
-import type { DbDriver, FeedItemRow } from "@keepup/db";
+import type { DbDriver, FeedItemRow } from "@keepup/db/types";
 import type { MCPTool, MCPToolResult, ToolContext } from "../../types";
 import { BaseToolServer, errorResult, textResult } from "../mcp/baseServer";
 

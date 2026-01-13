@@ -14,26 +14,26 @@ export {
   type HistoryEntry,
   type HistoryRestoreResult,
   type HistoryState,
-} from "./history";
+} from "./history.js";
 export {
   classifyEvent,
   eventToTypedOp,
   isStructuralOp,
   requiresFullScan,
   type EditorEvent,
-} from "./opClassifier";
+} from "./opClassifier.js";
 export {
   classifyTransaction,
   resetTxnCounter,
   type ClassifyTransactionResult,
   type TransactionInput,
   type TransactionStep,
-} from "./classifyTransaction";
+} from "./classifyTransaction.js";
 export {
   addBlock,
   applyOp,
   createShadowDocument,
   getBlock,
   getContentBlocks,
-} from "./shadowModel";
-export * from "./types";
+} from "./shadowModel.js";
+export * from "./types.js";

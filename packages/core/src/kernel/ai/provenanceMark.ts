@@ -6,7 +6,7 @@
  * @see docs/specs/proposals/LFCC_v0.9.1_AI_Native_Enhancement.md §3.3
  */
 
-import type { CanonMark } from "../canonicalizer/types";
+import type { CanonMark } from "../canonicalizer/types.js";
 
 // ============================================================================
 // Extended Mark Types

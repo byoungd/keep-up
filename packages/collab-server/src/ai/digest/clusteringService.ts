@@ -7,6 +7,7 @@
  * Track B: Intelligence & Grounding
  */
 
+import { estimateTokens } from "@keepup/ai-core";
 import type { EmbeddingService } from "../extraction/embeddingService";
 import type { AIGateway } from "../gateway";
 import type { ContentItem } from "./types";
@@ -172,14 +173,20 @@ export class ClusteringService {
     const embeddings = new Map<string, number[]>();
 
     // Create pseudo-chunks from content items
-    const chunks = items.map((item) => ({
-      id: item.id,
-      docId: item.id,
-      content: `${item.title}\n\n${item.snippet ?? item.content.slice(0, 500)}`,
-      startOffset: 0,
-      endOffset: 0,
-      metadata: {},
-    }));
+    const chunks = items.map((item, index) => {
+      const content = `${item.title}\n\n${item.snippet ?? item.content.slice(0, 500)}`;
+      return {
+        id: item.id,
+        docId: item.id,
+        index,
+        content,
+        tokenCount: estimateTokens(content),
+        charCount: content.length,
+        startOffset: 0,
+        endOffset: content.length,
+        metadata: {},
+      };
+    });
 
     const results = await this.embeddingService.embedChunks(chunks, userId);
 
@@ -390,7 +397,9 @@ Generate:
 Respond in JSON format:
 {"title": "...", "summary": "..."}`;
 
-        const response = await this.gateway.complete([{ role: "user", content: prompt }], userId);
+        const response = await this.gateway.complete([{ role: "user", content: prompt }], {
+          userId,
+        });
 
         const parsed = this.parseJsonResponse(response.content);
         labeled.push({

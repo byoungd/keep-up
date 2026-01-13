@@ -10,46 +10,46 @@
 // v0.9.1 AI-Native Enhancements
 // ============================================================================
 // Phase 1: OpCodes & Intent
-export * from "./opcodes";
-export * from "./intent";
-export * from "./intentRegistry";
+export * from "./opcodes.js";
+export * from "./intent.js";
+export * from "./intentRegistry.js";
 
 // Phase 2: Provenance
-export * from "./provenance";
-export * from "./provenanceTracker";
-export * from "./provenanceMark";
+export * from "./provenance.js";
+export * from "./provenanceTracker.js";
+export * from "./provenanceMark.js";
 
 // Phase 3: Multi-Agent Coordination
-export * from "./agentIdentity";
-export * from "./agentCoordinator";
+export * from "./agentIdentity.js";
+export * from "./agentCoordinator.js";
 
 // Phase 4: Semantic Conflict Resolution
-export * from "./semanticMerge";
-export * from "./semanticMergeEngine";
+export * from "./semanticMerge.js";
+export * from "./semanticMergeEngine.js";
 
 // ============================================================================
 // v0.9.1+ Advanced AI-Native (P0)
 // ============================================================================
-export * from "./streaming";
-export * from "./speculation";
+export * from "./streaming.js";
+export * from "./speculation.js";
 
 // ============================================================================
 // v0.9.1+ Advanced AI-Native (P1)
 // ============================================================================
-export * from "./documentContext";
-export * from "./confidenceUI";
+export * from "./documentContext.js";
+export * from "./confidenceUI.js";
 
 // ============================================================================
 // v0.9.1+ Advanced AI-Native (P2)
 // ============================================================================
-export * from "./crossDocument";
-export * from "./dynamicSafety";
+export * from "./crossDocument.js";
+export * from "./dynamicSafety.js";
 
 // ============================================================================
 // v0.9.1+ Infrastructure
 // ============================================================================
-export * from "./constants";
-export * from "./validation";
+export * from "./constants.js";
+export * from "./validation.js";
 
 // ============================================================================
 // v0.9 AI Gateway & Validation
@@ -61,7 +61,7 @@ export {
   dryRunStructural,
   type StructuralOp,
   type StructuralPreview,
-} from "./dryRun";
+} from "./dryRun.js";
 export {
   create409Conflict,
   createAIRequestEnvelope,
@@ -83,12 +83,12 @@ export {
   type AIEnvelopeRetryPolicy,
   type AIEnvelopeSuccess,
   type AIEnvelopeUnprocessable,
-} from "./envelope";
-export { createSanitizer } from "./sanitizer";
-export * from "./types";
-export * from "./context";
+} from "./envelope.js";
+export { createSanitizer } from "./sanitizer.js";
+export * from "./types.js";
+export * from "./context.js";
 
 // Killer Features
-export * from "./liquidRefactoring";
-export * from "./ghostCollaborator";
-export * from "./semanticTimeTravel";
+export * from "./liquidRefactoring.js";
+export * from "./ghostCollaborator.js";
+export * from "./semanticTimeTravel.js";

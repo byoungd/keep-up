@@ -11,8 +11,8 @@
  * - Monotonicity: For positions posA < posB, mapped(posA) <= mapped(posB) for non-null results.
  */
 
-import { validateRange } from "../utils/unicode";
-import type { BlockMapping, MappedPosition } from "./types";
+import { validateRange } from "../utils/unicode.js";
+import type { BlockMapping, MappedPosition } from "./types.js";
 
 /** Position delta for a single edit operation */
 export type PositionDelta = {

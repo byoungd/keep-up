@@ -15,7 +15,7 @@ import {
   dryRunAIPayload,
   is409Conflict,
   validatePreconditions,
-} from "../ai";
+} from "../ai/index.js";
 
 describe("AI Sanitizer", () => {
   const sanitizer = createSanitizer();

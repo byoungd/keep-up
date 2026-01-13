@@ -4,8 +4,8 @@
  * @see docs/product/LFCC_v0.9_RC_Engineering_Docs/11_Dirty_Region_and_Neighbor_Expansion.md
  */
 
-import type { DocumentBlockOrder, NeighborExpansionPolicy } from "./types";
-import { DEFAULT_NEIGHBOR_EXPANSION_POLICY } from "./types";
+import type { DocumentBlockOrder, NeighborExpansionPolicy } from "./types.js";
+import { DEFAULT_NEIGHBOR_EXPANSION_POLICY } from "./types.js";
 
 function clampAdaptiveK(
   policy: NeighborExpansionPolicy,

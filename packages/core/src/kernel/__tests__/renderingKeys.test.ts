@@ -11,7 +11,7 @@ import {
   getRenderingKeys,
   registerRenderingKeysProvider,
   unregisterRenderingKeysProvider,
-} from "../devtools/renderingKeys";
+} from "../devtools/renderingKeys.js";
 
 describe("Rendering Keys (D6)", () => {
   afterEach(() => {

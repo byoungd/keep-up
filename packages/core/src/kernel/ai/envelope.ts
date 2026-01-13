@@ -4,10 +4,10 @@
  * @see docs/specs/proposals/LFCC_v0.9.1_AI_Native_Enhancement.md
  */
 
-import type { CanonNode } from "../canonicalizer/types";
-import type { EditIntent } from "./intent";
-import type { AIOperationMeta } from "./opcodes";
-import type { AI409Conflict, AIRequestEnvelope, DocFrontier, SpanPrecondition } from "./types";
+import type { CanonNode } from "../canonicalizer/types.js";
+import type { EditIntent } from "./intent.js";
+import type { AIOperationMeta } from "./opcodes.js";
+import type { AI409Conflict, AIRequestEnvelope, DocFrontier, SpanPrecondition } from "./types.js";
 
 /**
  * Policy context carried with AI envelopes to enforce redaction/governance.

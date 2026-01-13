@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { CanonBlock } from "../canonicalizer";
+import type { CanonBlock } from "../canonicalizer/index.js";
 import {
   PerformanceTracker,
   compareCanonTrees,
@@ -15,9 +15,9 @@ import {
   recordStructuralOp,
   resetAfterFullScan,
   selectSampleBlocks,
-} from "../devtools";
-import type { CompareMismatch } from "../integrity";
-import { DEFAULT_DEV_COMPARE_POLICY } from "../integrity";
+} from "../devtools/index.js";
+import type { CompareMismatch } from "../integrity/index.js";
+import { DEFAULT_DEV_COMPARE_POLICY } from "../integrity/index.js";
 
 describe("DevTools Compare Harness", () => {
   describe("createSamplingState", () => {

@@ -9,23 +9,23 @@ import {
   type PolicyManifestV09,
   computePolicyManifestHash,
   validateManifest,
-} from "../kernel/policy";
-import { getLogger } from "../observability/logger";
-import { getMetrics, hasMetricsRegistry } from "../observability/metrics";
-import { type AuthAdapter, createDefaultAuthAdapter } from "../security/auth";
+} from "../kernel/policy/index.js";
+import { getLogger } from "../observability/logger.js";
+import { getMetrics, hasMetricsRegistry } from "../observability/metrics.js";
+import { type AuthAdapter, createDefaultAuthAdapter } from "../security/auth.js";
 import {
   DEFAULT_RATE_LIMIT_CONFIG,
   type RateLimiterConfig,
   TokenBucketRateLimiter,
-} from "../security/rateLimit";
+} from "../security/rateLimit.js";
 import {
   DEFAULT_VALIDATION_CONFIG,
   type ValidationConfig,
   validateMessageSize,
-} from "../security/validation";
-import { base64Decode, base64Encode } from "./encoding";
-import { buildErrorPayload } from "./errors";
-import { createDefaultSyncManifest, negotiateManifests } from "./negotiate";
+} from "../security/validation.js";
+import { base64Decode, base64Encode } from "./encoding.js";
+import { buildErrorPayload } from "./errors.js";
+import { createDefaultSyncManifest, negotiateManifests } from "./negotiate.js";
 import {
   type CatchUpRequestMessage,
   type DocUpdateMessage,
@@ -40,8 +40,8 @@ import {
   createMessage,
   deserializeMessage,
   serializeMessage,
-} from "./protocol";
-import { type ServerInboundMessage, validateServerInboundMessage } from "./validation";
+} from "./protocol.js";
+import { type ServerInboundMessage, validateServerInboundMessage } from "./validation.js";
 
 const DEFAULT_HANDSHAKE_TIMEOUT_MS = 10000;
 const DEFAULT_PRESENCE_TTL_MS = 30000;

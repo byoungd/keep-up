@@ -5,9 +5,9 @@
  * Dev-only endpoint - should not be exposed in production.
  */
 
-import { getMetrics, hasMetricsRegistry, initMetricsRegistry } from "./metrics";
-import { getTracer } from "./tracer";
-import type { FailClosedEvent, ReproBundle } from "./types";
+import { getMetrics, hasMetricsRegistry, initMetricsRegistry } from "./metrics.js";
+import { getTracer } from "./tracer.js";
+import type { FailClosedEvent, ReproBundle } from "./types.js";
 
 // ============================================================================
 // Repro Bundle Builder

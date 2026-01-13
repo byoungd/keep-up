@@ -4,9 +4,9 @@
  * @see docs/product/LFCC_v0.9_RC_Engineering_Docs/10_Recursive_Canonicalization_Deep_Dive.md
  */
 
-import { processMarkAttributes } from "./attrs";
-import { isMarkTag, sortMarks, tagToMark } from "./marks";
-import { isEmptyText, normalizeWhitespace, wasWhitespaceNormalized } from "./normalizeText";
+import { processMarkAttributes } from "./attrs.js";
+import { isMarkTag, sortMarks, tagToMark } from "./marks.js";
+import { isEmptyText, normalizeWhitespace, wasWhitespaceNormalized } from "./normalizeText.js";
 import type {
   CanonBlock,
   CanonDiag,
@@ -17,8 +17,8 @@ import type {
   CanonicalizeDocumentInput,
   CanonicalizeResult,
   CanonicalizerPolicyV2,
-} from "./types";
-import { DEFAULT_CANONICALIZER_POLICY } from "./types";
+} from "./types.js";
+import { DEFAULT_CANONICALIZER_POLICY } from "./types.js";
 
 /** Default tag to block type mapping */
 const DEFAULT_BLOCK_TAGS: Record<string, string> = {

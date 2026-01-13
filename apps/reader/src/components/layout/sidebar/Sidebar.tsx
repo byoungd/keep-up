@@ -21,6 +21,7 @@ import type {
   SidebarBadgeStyle,
   SidebarConfigActions,
 } from "@/lib/sidebar";
+import { FeedProvider } from "@/providers/FeedProvider";
 import { cn } from "@keepup/shared/utils";
 import { CircleHelp, MoreHorizontal, Settings2 } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -200,7 +201,11 @@ export const Sidebar = React.memo(function Sidebar({
       </div>
 
       {/* Add Feed Modal for Sidebar */}
-      <RssManagementModal open={showAddFeedModal} onOpenChange={setShowAddFeedModal} />
+      {showAddFeedModal ? (
+        <FeedProvider>
+          <RssManagementModal open={showAddFeedModal} onOpenChange={setShowAddFeedModal} />
+        </FeedProvider>
+      ) : null}
     </aside>
   );
 });

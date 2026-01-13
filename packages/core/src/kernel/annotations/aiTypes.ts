@@ -5,7 +5,7 @@
  * Extends the base annotation system with AI-specific types and capabilities.
  */
 
-import type { DisplayAnnoState, GraceToken, StoredAnnoState } from "./types";
+import type { DisplayAnnoState, GraceToken, StoredAnnoState } from "./types.js";
 
 // ============================================================================
 // AI Annotation Kinds

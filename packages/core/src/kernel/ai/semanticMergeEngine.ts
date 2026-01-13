@@ -15,8 +15,8 @@ import type {
   MergeValidationResult,
   ResolutionStrategy,
   SemanticConflict,
-} from "./semanticMerge";
-import { DEFAULT_MERGE_PREFERENCES, requireHumanResolution } from "./semanticMerge";
+} from "./semanticMerge.js";
+import { DEFAULT_MERGE_PREFERENCES, requireHumanResolution } from "./semanticMerge.js";
 
 // ============================================================================
 // Semantic Merge Engine Interface

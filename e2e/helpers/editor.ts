@@ -1,6 +1,7 @@
 import { type Page, expect } from "@playwright/test";
 
 const DEFAULT_TIMEOUT = 25_000;
+const FALLBACK_WORKER_INDEX = Math.random().toString(36).slice(2, 5);
 
 type WaitOptions = {
   timeout?: number;
@@ -99,6 +100,7 @@ export async function selectFirstTextRange(page: Page, maxChars = 12): Promise<v
     const selection = window.getSelection();
     selection?.removeAllRanges();
     selection?.addRange(range);
+    document.dispatchEvent(new Event("selectionchange"));
     document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
 
     const lfccWindow = window as unknown as LfccWindow & {
@@ -167,6 +169,8 @@ export async function selectTextBySubstring(page: Page, needle: string): Promise
     const sel = window.getSelection();
     sel?.removeAllRanges();
     sel?.addRange(range);
+    document.dispatchEvent(new Event("selectionchange"));
+    document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
 
     const lfccWindow = window as unknown as LfccWindow & {
       pmTextSelection?: {
@@ -237,6 +241,7 @@ export async function selectRangeBetweenSubstrings(
       const selection = window.getSelection();
       selection?.removeAllRanges();
       selection?.addRange(range);
+      document.dispatchEvent(new Event("selectionchange"));
       document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
 
       const lfccWindow = window as unknown as {
@@ -827,7 +832,7 @@ export async function openFreshEditor(
 
   // Support unique DB name per Playwright worker to prevent state conflicts
   // Fallback to random ID if parallel index is somehow unavailable
-  const workerIndex = process.env.PLAYWRIGHT_WORKER_INDEX ?? Math.random().toString(36).slice(2, 5);
+  const workerIndex = process.env.PLAYWRIGHT_WORKER_INDEX ?? FALLBACK_WORKER_INDEX;
   const dbName = `reader-db-worker-${workerIndex}`;
 
   // Log to terminal for debugging (use warn to ensure it shows)
@@ -856,10 +861,21 @@ export async function openFreshEditor(
  */
 export async function selectAllText(page: Page): Promise<void> {
   // First ensure there's content to select
-  const hasContent = await page.evaluate(() => {
-    const editor = document.querySelector(".lfcc-editor .ProseMirror");
-    return (editor?.textContent?.trim() ?? "").length > 0;
-  });
+  const hasContent = await page
+    .evaluate(() => {
+      const editor = document.querySelector(".lfcc-editor .ProseMirror");
+      return (editor?.textContent?.trim() ?? "").length > 0;
+    })
+    .catch(async (error) => {
+      if (error instanceof Error && error.message.includes("Execution context was destroyed")) {
+        await page.waitForLoadState("domcontentloaded");
+        return await page.evaluate(() => {
+          const editor = document.querySelector(".lfcc-editor .ProseMirror");
+          return (editor?.textContent?.trim() ?? "").length > 0;
+        });
+      }
+      throw error;
+    });
 
   if (!hasContent) {
     // If no content, nothing to select
@@ -923,18 +939,66 @@ export async function selectAllText(page: Page): Promise<void> {
     await page.keyboard.press(`${modKey}+a`);
   }
 
-  // Wait for selection to be non-empty
-  await page
-    .waitForFunction(
-      () => {
-        const sel = window.getSelection();
-        return sel && sel.toString().trim().length > 0;
-      },
-      { timeout: 3000 }
-    )
-    .catch(() => {
-      // If timeout, try one more time
-    });
+  const domSelected = await page.evaluate(() => {
+    const selection = window.getSelection();
+    if (selection && selection.toString().trim().length > 0) {
+      return true;
+    }
+
+    const root = document.querySelector(".lfcc-editor .ProseMirror");
+    if (!root) {
+      return false;
+    }
+
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let firstNode: Text | null = null;
+    let lastNode: Text | null = null;
+
+    while (walker.nextNode()) {
+      const node = walker.currentNode as Text;
+      if (node.textContent && node.textContent.trim().length > 0) {
+        if (!firstNode) {
+          firstNode = node;
+        }
+        lastNode = node;
+      }
+    }
+
+    if (!firstNode || !lastNode) {
+      return false;
+    }
+
+    const range = document.createRange();
+    range.setStart(firstNode, 0);
+    range.setEnd(lastNode, lastNode.textContent?.length ?? 0);
+
+    const domSelection = window.getSelection();
+    domSelection?.removeAllRanges();
+    domSelection?.addRange(range);
+    document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+
+    return (domSelection?.toString().trim().length ?? 0) > 0;
+  });
+
+  if (!domSelected) {
+    // Wait briefly for selection to update if it was set asynchronously.
+    await page
+      .waitForFunction(
+        () => {
+          const sel = window.getSelection();
+          return sel && sel.toString().trim().length > 0;
+        },
+        { timeout: 3000 }
+      )
+      .catch(() => {
+        // Keep silent: callers can assert selection if required.
+      });
+  }
+
+  await page.evaluate(() => {
+    document.dispatchEvent(new Event("selectionchange"));
+    document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+  });
 
   await page.waitForTimeout(100);
 }

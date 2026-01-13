@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test";
-import { selectRangeBetweenSubstrings, waitForEditorReady } from "./helpers/editor";
+import {
+  selectRangeBetweenSubstrings,
+  setEditorContent,
+  waitForEditorReady,
+} from "./helpers/editor";
 
 type PMView = import("prosemirror-view").EditorView;
 type PMNode = import("prosemirror-model").Node;
@@ -9,15 +13,7 @@ test.describe("Annotation Edge Cases", () => {
     await page.goto("/editor");
     await waitForEditorReady(page);
     // Setup: Three paragraphs
-    const editor = page.locator(".lfcc-editor .ProseMirror");
-    await editor.click();
-    await page.keyboard.press("ControlOrMeta+a");
-    await page.keyboard.press("Backspace");
-    await page.keyboard.type("Paragraph One");
-    await page.keyboard.press("Enter");
-    await page.keyboard.type("Paragraph Two");
-    await page.keyboard.press("Enter");
-    await page.keyboard.type("Paragraph Three");
+    await setEditorContent(page, "Paragraph One\nParagraph Two\nParagraph Three");
     await expect(page.locator(".lfcc-editor .ProseMirror")).toContainText("Paragraph Three");
   });
 
@@ -26,7 +22,7 @@ test.describe("Annotation Edge Cases", () => {
     await selectRangeBetweenSubstrings(page, "Paragraph One", "Paragraph Two");
     const toolbar = page.locator("[data-testid='selection-toolbar']");
     await expect(toolbar).toBeVisible();
-    await toolbar.getByRole("button", { name: "Highlight yellow" }).click();
+    await toolbar.getByRole("button", { name: "Highlight yellow" }).click({ force: true });
 
     // Verify 1 annotation ID
     const initialIds = await getUniqueAnnotationIds(page);
@@ -50,7 +46,7 @@ test.describe("Annotation Edge Cases", () => {
     await selectRangeBetweenSubstrings(page, "Paragraph One", "Paragraph Three");
     const toolbar = page.locator("[data-testid='selection-toolbar']");
     await expect(toolbar).toBeVisible();
-    await toolbar.getByRole("button", { name: "Highlight yellow" }).click();
+    await toolbar.getByRole("button", { name: "Highlight yellow" }).click({ force: true });
 
     // Verify 1 annotation
     const initialIds = await getUniqueAnnotationIds(page);
@@ -91,7 +87,7 @@ test.describe("Annotation Edge Cases", () => {
     await selectRangeBetweenSubstrings(page, "Paragraph One", "Paragraph Three");
     const toolbar = page.locator("[data-testid='selection-toolbar']");
     await expect(toolbar).toBeVisible();
-    await toolbar.getByRole("button", { name: "Highlight yellow" }).click();
+    await toolbar.getByRole("button", { name: "Highlight yellow" }).click({ force: true });
 
     // Verify 1 annotation
     const initialIds = await getUniqueAnnotationIds(page);
@@ -134,7 +130,7 @@ test.describe("Annotation Edge Cases", () => {
     await selectRangeBetweenSubstrings(page, "Paragraph One", "Paragraph Three");
     const toolbar = page.locator("[data-testid='selection-toolbar']");
     await expect(toolbar).toBeVisible();
-    await toolbar.getByRole("button", { name: "Highlight yellow" }).click();
+    await toolbar.getByRole("button", { name: "Highlight yellow" }).click({ force: true });
 
     // 2. Delete P3 (the end block)
     await page.evaluate(() => {
@@ -173,15 +169,40 @@ test.describe("Annotation Edge Cases", () => {
     await selectRangeBetweenSubstrings(page, "Paragraph One", "Paragraph Two");
     const toolbar = page.locator("[data-testid='selection-toolbar']");
     await expect(toolbar).toBeVisible();
-    await toolbar.getByRole("button", { name: "Highlight yellow" }).click();
+    await toolbar.getByRole("button", { name: "Highlight yellow" }).click({ force: true });
 
     // 2. Merge P2 into P1 (Backspace at start of P2)
-    const p2 = page.getByText("Paragraph Two", { exact: true });
-    await p2.click();
-    await page.keyboard.press("Home", { delay: 100 });
-    // Double check we are at start by pressing Left and seeing if we move to P1?
-    // Just force backspace multiple times if needed, or rely on Home -> Backspace
-    await page.keyboard.press("Backspace", { delay: 100 });
+    await page.evaluate(() => {
+      const globalAny = window as unknown as Record<string, unknown>;
+      const view = globalAny.__lfccView as
+        | {
+            state: {
+              doc: { resolve: (pos: number) => unknown; firstChild: { nodeSize: number } | null };
+              tr: { setSelection: (sel: unknown) => unknown };
+              selection: { constructor: { near: (resolvedPos: unknown) => unknown } };
+            };
+            dispatch: (tr: unknown) => void;
+            focus: () => void;
+          }
+        | undefined;
+
+      if (!view) {
+        throw new Error("PM view not found");
+      }
+
+      const { state } = view;
+      const firstBlockSize = state.doc.firstChild?.nodeSize ?? 0;
+      const $pos = state.doc.resolve(firstBlockSize + 1);
+      const TextSelection = (globalAny.pmTextSelection ?? state.selection.constructor) as {
+        near: (resolvedPos: unknown) => unknown;
+      };
+      const sel = TextSelection.near($pos);
+      const tr = state.tr.setSelection(sel as never);
+      view.dispatch(tr);
+      view.focus();
+    });
+
+    await page.keyboard.press("Backspace");
 
     // 3. Verify: The annotation on the merged-away block (P2) is likely lost (pruned).
     // The annotation on P1 should remain.

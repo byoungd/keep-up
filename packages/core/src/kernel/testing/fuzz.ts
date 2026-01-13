@@ -3,10 +3,14 @@
  * @see docs/product/LFCC_v0.9_RC_Engineering_Docs/08_Conformance_Test_Suite_Plan.md
  */
 
-import { type CanonInputNode, canonicalizeDocument, stableStringifyCanon } from "../canonicalizer";
-import { applyOp } from "../shadow/shadowModel";
-import type { ShadowBlock, ShadowDocument, TypedOp } from "../shadow/types";
-import { DEFAULT_FUZZ_CONFIG, createRng, generateOp, randomInt } from "./generators";
+import {
+  type CanonInputNode,
+  canonicalizeDocument,
+  stableStringifyCanon,
+} from "../canonicalizer/index.js";
+import { applyOp } from "../shadow/shadowModel.js";
+import type { ShadowBlock, ShadowDocument, TypedOp } from "../shadow/types.js";
+import { DEFAULT_FUZZ_CONFIG, createRng, generateOp, randomInt } from "./generators.js";
 import {
   advanceNetwork,
   createNetworkSim,
@@ -14,7 +18,7 @@ import {
   mergeNetworkStats,
   resolveNetworkScenario,
   summarizeNetworkLog,
-} from "./networkSim";
+} from "./networkSim.js";
 import type {
   ConvergenceResult,
   FuzzConfig,
@@ -26,7 +30,7 @@ import type {
   SECAssertionResult,
   SECFailure,
   TestHarnessState,
-} from "./types";
+} from "./types.js";
 
 /**
  * Create initial test harness state

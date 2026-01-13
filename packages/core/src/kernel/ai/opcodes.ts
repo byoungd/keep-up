@@ -7,7 +7,7 @@
  * @see docs/specs/proposals/LFCC_v0.9.1_AI_Native_Enhancement.md §3.1
  */
 
-import type { EditIntent } from "./intent";
+import type { EditIntent } from "./intent.js";
 
 // ============================================================================
 // AI OpCode Taxonomy

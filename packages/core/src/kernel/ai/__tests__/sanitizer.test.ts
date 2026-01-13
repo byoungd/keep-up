@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_AI_SANITIZATION_POLICY, createSanitizer } from "../sanitizer";
-import type { AISanitizationPolicyV1 } from "../types";
+import { DEFAULT_AI_SANITIZATION_POLICY, createSanitizer } from "../sanitizer.js";
+import type { AISanitizationPolicyV1 } from "../types.js";
 
 describe("AI Sanitizer Limits", () => {
   const sanitizer = createSanitizer();

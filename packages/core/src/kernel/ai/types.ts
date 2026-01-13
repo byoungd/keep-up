@@ -5,9 +5,9 @@
  * @see docs/specs/proposals/LFCC_v0.9.1_AI_Native_Enhancement.md
  */
 
-import type { CanonMark, CanonNode } from "../canonicalizer/types";
-import type { EditIntent } from "./intent";
-import type { AIOperationMeta } from "./opcodes";
+import type { CanonMark, CanonNode } from "../canonicalizer/types.js";
+import type { EditIntent } from "./intent.js";
+import type { AIOperationMeta } from "./opcodes.js";
 
 /** Document frontier (opaque version vector encoding) */
 export type DocFrontier = string;

@@ -3,8 +3,8 @@
  * @see docs/product/LFCC_v0.9_RC_Engineering_Docs/09_DevTools_Manual.md
  */
 
-import type { DisplayAnnoState, GraceToken, StoredAnnoState } from "../annotations/types";
-import type { CompareMismatch } from "../integrity/types";
+import type { DisplayAnnoState, GraceToken, StoredAnnoState } from "../annotations/types.js";
+import type { CompareMismatch } from "../integrity/types.js";
 
 /** Block inspector data */
 export type BlockInspectorData = {

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { type BlockTransform, createBlockMapping } from "../mapping/axioms";
+import { type BlockTransform, createBlockMapping } from "../mapping/axioms.js";
 
 /**
  * Performance test stability (P1.1):

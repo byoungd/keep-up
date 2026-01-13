@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { negotiate } from "../negotiate";
-import { DEFAULT_POLICY_MANIFEST } from "../types";
+import { negotiate } from "../negotiate.js";
+import { DEFAULT_POLICY_MANIFEST } from "../types.js";
 
 describe("Policy Negotiation", () => {
   it("should return success for single manifest", () => {

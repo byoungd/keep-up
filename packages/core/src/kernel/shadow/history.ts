@@ -3,8 +3,8 @@
  * @see docs/product/LFCC_v0.9_RC_Engineering_Docs/05_History_Integration_Guide.md
  */
 
-import type { HistoryPolicy } from "../policy/types";
-import type { ShadowBlock, ShadowDocument } from "./types";
+import type { HistoryPolicy } from "../policy/types.js";
+import type { ShadowBlock, ShadowDocument } from "./types.js";
 
 /** History entry for undo/redo */
 export type HistoryEntry = {

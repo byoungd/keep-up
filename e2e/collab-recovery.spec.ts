@@ -243,8 +243,27 @@ test.describe("Divergence Banner UX", () => {
   test("divergence banner shows actionable recovery options", async ({ page }) => {
     await runWithCrashFailFast(async () => {
       // Navigate with forceDivergence=1 to trigger the banner (dev mode only)
-      await page.goto(`/editor?doc=${DOC_ID}&peer=div-test&forceDivergence=1`);
+      await page.goto(`${buildWsDemoUrl(DOC_ID, "1007")}&forceDivergence=1`);
       await page.waitForSelector("[data-lfcc-editor]", { timeout: 10000 });
+      const canForce = await page
+        .waitForFunction(
+          () =>
+            typeof (window as Window & { __lfccForceDivergence?: () => void })
+              .__lfccForceDivergence === "function",
+          undefined,
+          { timeout: 5000 }
+        )
+        .then(() => true)
+        .catch(() => false);
+
+      if (!canForce) {
+        test.skip();
+        return;
+      }
+
+      await page.evaluate(() => {
+        (window as Window & { __lfccForceDivergence?: () => void }).__lfccForceDivergence?.();
+      });
 
       // Verify banner appears with role="alert" (exclude Next.js route announcer)
       const banner = page

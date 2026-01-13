@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { DEFAULT_POLICY_MANIFEST } from "../policy";
+import { DEFAULT_POLICY_MANIFEST } from "../policy/index.js";
 import {
   type EditorEvent,
   type TypedOp,
@@ -18,7 +18,7 @@ import {
   pushHistory,
   redo,
   undo,
-} from "../shadow";
+} from "../shadow/index.js";
 
 describe("Shadow Model", () => {
   describe("createShadowDocument", () => {

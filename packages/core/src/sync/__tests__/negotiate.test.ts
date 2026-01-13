@@ -3,14 +3,14 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { type PolicyManifestV09, areManifestsCompatible } from "../../kernel/policy";
+import { type PolicyManifestV09, areManifestsCompatible } from "../../kernel/policy/index.js";
 import {
   createDefaultSyncManifest,
   getSyncDegradedFeatures,
   isSyncFeatureSupported,
   negotiateManifests,
   validateSyncManifest,
-} from "../negotiate";
+} from "../negotiate.js";
 
 describe("Policy Negotiation (Sync)", () => {
   const base = createDefaultSyncManifest();

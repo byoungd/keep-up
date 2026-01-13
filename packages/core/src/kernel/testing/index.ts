@@ -9,7 +9,7 @@ export {
   runFuzz,
   runFuzzIteration,
   runSECAssertion,
-} from "./fuzz";
+} from "./fuzz.js";
 export {
   DEFAULT_FUZZ_CONFIG,
   createRng,
@@ -20,7 +20,7 @@ export {
   randomString,
   selectOpType,
   type RngState,
-} from "./generators";
+} from "./generators.js";
 export {
   GOLDEN_FIXTURES,
   compareAgainstGolden,
@@ -28,7 +28,7 @@ export {
   deserializeFixture,
   runGoldenFixtureTests,
   serializeFixture,
-} from "./goldenFixtures";
+} from "./goldenFixtures.js";
 export {
   NETWORK_SCENARIOS,
   advanceNetwork,
@@ -38,5 +38,5 @@ export {
   mergeNetworkStats,
   resolveNetworkScenario,
   summarizeNetworkLog,
-} from "./networkSim";
-export * from "./types";
+} from "./networkSim.js";
+export * from "./types.js";

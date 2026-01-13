@@ -3,10 +3,10 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import * as policyModule from "../../kernel/policy";
-import { SyncClient, type SyncClientConfig } from "../client";
-import { createDefaultSyncManifest, negotiateManifests } from "../negotiate";
-import { type HandshakeAckPayload, createMessage, serializeMessage } from "../protocol";
+import * as policyModule from "../../kernel/policy/index.js";
+import { SyncClient, type SyncClientConfig } from "../client.js";
+import { createDefaultSyncManifest, negotiateManifests } from "../negotiate.js";
+import { type HandshakeAckPayload, createMessage, serializeMessage } from "../protocol.js";
 
 // Mock WebSocket
 class MockWebSocket {

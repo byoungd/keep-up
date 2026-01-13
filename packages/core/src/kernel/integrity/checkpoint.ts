@@ -3,15 +3,15 @@
  * @see docs/product/Local-First_Collaboration_Contract_v0.9_RC.md §10
  */
 
-import type { IntegrityPolicy } from "../policy/types";
-import { computeChainHash, computeContextHash } from "./hash";
+import type { IntegrityPolicy } from "../policy/types.js";
+import { computeChainHash, computeContextHash } from "./hash.js";
 import type {
   ChainData,
   CheckpointFailure,
   CheckpointResult,
   CheckpointSchedulerState,
   SpanData,
-} from "./types";
+} from "./types.js";
 
 /** Annotation with spans for verification */
 export type AnnotationForVerify = {

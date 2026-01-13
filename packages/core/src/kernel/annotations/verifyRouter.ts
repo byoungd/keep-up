@@ -3,8 +3,8 @@
  * Maps TRIGGER_VERIFY actions to CheckpointScheduler priority.
  */
 
-import type { CheckpointScheduler } from "../integrity/checkpoint";
-import type { AnnoAction } from "./stateMachine";
+import type { CheckpointScheduler } from "../integrity/checkpoint.js";
+import type { AnnoAction } from "./stateMachine.js";
 
 /**
  * Route TRIGGER_VERIFY actions to the checkpoint scheduler.

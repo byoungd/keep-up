@@ -7,7 +7,7 @@
  * @see docs/specs/proposals/LFCC_v0.9.1_AI_Native_Enhancement.md §3.3
  */
 
-import type { AIOpCode } from "./opcodes";
+import type { AIOpCode } from "./opcodes.js";
 
 // ============================================================================
 // Content Origin

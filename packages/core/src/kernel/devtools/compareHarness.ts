@@ -3,10 +3,10 @@
  * @see docs/product/LFCC_v0.9_RC_Engineering_Docs/08_Conformance_Test_Suite_Plan.md Section 5
  */
 
-import { stableStringifyCanon } from "../canonicalizer/canonicalize";
-import type { CanonNode } from "../canonicalizer/types";
-import type { CompareMismatch, DevComparePolicy } from "../integrity/types";
-import type { CanonCompareResult, FullScanReport, PerformanceMetrics } from "./types";
+import { stableStringifyCanon } from "../canonicalizer/canonicalize.js";
+import type { CanonNode } from "../canonicalizer/types.js";
+import type { CompareMismatch, DevComparePolicy } from "../integrity/types.js";
+import type { CanonCompareResult, FullScanReport, PerformanceMetrics } from "./types.js";
 
 /** Sampling state for adaptive-with-coverage */
 export type SamplingState = {

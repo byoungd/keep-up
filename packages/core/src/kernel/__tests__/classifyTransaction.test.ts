@@ -8,7 +8,7 @@ import {
   type TransactionInput,
   classifyTransaction,
   resetTxnCounter,
-} from "../shadow/classifyTransaction";
+} from "../shadow/classifyTransaction.js";
 
 describe("Transaction Classification (D4)", () => {
   beforeEach(() => {

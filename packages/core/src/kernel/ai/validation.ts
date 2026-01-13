@@ -5,13 +5,13 @@
  * Use at API boundaries and for untrusted input.
  */
 
-import type { AgentCapability, AgentType } from "./agentIdentity";
-import { ALL_AGENT_CAPABILITIES, ALL_AGENT_TYPES } from "./agentIdentity";
-import type { EditIntent } from "./intent";
-import { ALL_INTENT_CATEGORIES } from "./intent";
-import type { AIOpCode, AIOperationMeta, AIProvenance } from "./opcodes";
-import { ALL_AI_OPCODES } from "./opcodes";
-import type { ContentOrigin } from "./provenance";
+import type { AgentCapability, AgentType } from "./agentIdentity.js";
+import { ALL_AGENT_CAPABILITIES, ALL_AGENT_TYPES } from "./agentIdentity.js";
+import type { EditIntent } from "./intent.js";
+import { ALL_INTENT_CATEGORIES } from "./intent.js";
+import type { AIOpCode, AIOperationMeta, AIProvenance } from "./opcodes.js";
+import { ALL_AI_OPCODES } from "./opcodes.js";
+import type { ContentOrigin } from "./provenance.js";
 
 // ============================================================================
 // Validation Result

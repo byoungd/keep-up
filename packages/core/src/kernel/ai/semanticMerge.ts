@@ -7,8 +7,8 @@
  * @see docs/specs/proposals/LFCC_v0.9.1_AI_Native_Enhancement.md §3.5
  */
 
-import type { EditIntent } from "./intent";
-import type { AIOpCode } from "./opcodes";
+import type { EditIntent } from "./intent.js";
+import type { AIOpCode } from "./opcodes.js";
 
 // ============================================================================
 // Conflict Types

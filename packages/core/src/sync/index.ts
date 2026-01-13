@@ -5,10 +5,10 @@
  */
 
 // Protocol types and utilities
-export * from "./protocol";
+export * from "./protocol.js";
 
 // Policy negotiation
-export * from "./negotiate";
+export * from "./negotiate.js";
 
 // Client adapter
 export {
@@ -16,8 +16,8 @@ export {
   type SyncClientConfig,
   type SyncClientEvents,
   type SyncClientState,
-} from "./client";
+} from "./client.js";
 
 // Server router
 // Server router - REMOVED to avoid 'ws' dependency in browser bundles
-// export { SyncServer, type ClientConnection, type PersistenceHooks, type SyncServerConfig, type WebSocketLike } from "./server";
+// export { SyncServer, type ClientConnection, type PersistenceHooks, type SyncServerConfig, type WebSocketLike } from "./server.js";

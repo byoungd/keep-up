@@ -10,7 +10,7 @@
  * Track 3: Performance Optimizations (PERF)
  */
 
-import type { DocSnapshot, OpLogEntry, StorageBackend } from "./types";
+import type { DocSnapshot, OpLogEntry, StorageBackend } from "./types.js";
 
 // ===========================================================================
 // Configuration

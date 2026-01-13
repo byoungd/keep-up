@@ -11,13 +11,13 @@ import type {
   AIGenerationRecord,
   ContentOrigin,
   ReviewStatus,
-} from "./provenance";
+} from "./provenance.js";
 import {
   addGenerationRecord,
   createHumanProvenance,
   setReviewStatus,
   transitionToMixed,
-} from "./provenance";
+} from "./provenance.js";
 
 // ============================================================================
 // Provenance Tracker Interface

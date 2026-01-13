@@ -1,4 +1,4 @@
-import type { DocSnapshot, OpLogEntry, StorageBackend } from "./types";
+import type { DocSnapshot, OpLogEntry, StorageBackend } from "./types.js";
 
 type DocData = {
   snapshots: DocSnapshot[];

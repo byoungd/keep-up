@@ -1,4 +1,4 @@
-import type { CorrelationContext, LogCategory, LogEntry, LogLevel } from "./types";
+import type { CorrelationContext, LogCategory, LogEntry, LogLevel } from "./types.js";
 
 export type LoggerConfig = {
   minLevel: LogLevel;

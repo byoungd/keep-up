@@ -7,14 +7,14 @@ export {
   negotiate,
   type NegotiationError,
   type NegotiationResult,
-} from "./negotiate";
-export { computePolicyManifestHash, isManifestHashFormat } from "./hash";
-export { stableStringify } from "./stableStringify";
-export * from "./schema";
-export * from "./types";
+} from "./negotiate.js";
+export { computePolicyManifestHash, isManifestHashFormat } from "./hash.js";
+export { stableStringify } from "./stableStringify.js";
+export * from "./schema.js";
+export * from "./types.js";
 export {
   isPolicyManifestV09,
   validateManifest,
   type ValidationError,
   type ValidationResult,
-} from "./validate";
+} from "./validate.js";

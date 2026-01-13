@@ -4,9 +4,9 @@
  * Snapshot + OpLog + Compaction for durable document storage.
  */
 
-export * from "./compaction";
-export * from "./recovery";
-export * from "./storage";
-export * from "./types";
+export * from "./compaction.js";
+export * from "./recovery.js";
+export * from "./storage.js";
+export * from "./types.js";
 
-export * from "./optimizedStorage";
+export * from "./optimizedStorage.js";

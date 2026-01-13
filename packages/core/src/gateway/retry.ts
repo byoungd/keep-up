@@ -22,7 +22,7 @@ import type {
   RetryState,
   SpanState,
   TargetSpan,
-} from "./types";
+} from "./types.js";
 
 /** Initial retry state */
 export const INITIAL_RETRY_STATE: RetryState = {

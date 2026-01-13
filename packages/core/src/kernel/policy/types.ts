@@ -3,9 +3,9 @@
  * @see docs/product/LFCC_v0.9_RC_Engineering_Docs/02_Policy_Manifest_Schema.md
  */
 
-import type { AIOpCode } from "../ai/opcodes";
-import type { DataAccessPolicy } from "../ai/types";
-import type { CanonMark } from "../canonicalizer/types";
+import type { AIOpCode } from "../ai/opcodes.js";
+import type { DataAccessPolicy } from "../ai/types.js";
+import type { CanonMark } from "../canonicalizer/types.js";
 
 export type { CanonMark };
 

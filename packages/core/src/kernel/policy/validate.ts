@@ -3,7 +3,7 @@
  * @see docs/product/LFCC_v0.9_RC_Engineering_Docs/02_Policy_Manifest_Schema.md
  */
 
-import type { CanonMark, ChainKind, PolicyManifestV09 } from "./types";
+import type { CanonMark, ChainKind, PolicyManifestV09 } from "./types.js";
 
 export type ValidationError = {
   path: string;

@@ -11,8 +11,8 @@ import {
   createBlockMapping,
   expandTouchedBlocks,
   verifyMonotonicity,
-} from "../mapping";
-import { sortOperations } from "../operationOrdering";
+} from "../mapping/index.js";
+import { sortOperations } from "../operationOrdering.js";
 
 describe("BlockMapping", () => {
   describe("createBlockMapping", () => {

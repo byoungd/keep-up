@@ -9,7 +9,7 @@ import {
   isGraceTokenCurrent,
   newGraceEntry,
   transition,
-} from "../annotations";
+} from "../annotations/index.js";
 
 describe("Annotation State Machine", () => {
   describe("transition", () => {

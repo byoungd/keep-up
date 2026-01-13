@@ -8,8 +8,8 @@
 
 import * as fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { type BlockTransform, createBlockMapping } from "../mapping/axioms";
-import { isValidPosition, validateRange } from "../utils/unicode";
+import { type BlockTransform, createBlockMapping } from "../mapping/axioms.js";
+import { isValidPosition, validateRange } from "../utils/unicode.js";
 
 // Test seed for reproducibility - on failure, print this seed
 const TEST_SEED = process.env.CONFORMANCE_SEED

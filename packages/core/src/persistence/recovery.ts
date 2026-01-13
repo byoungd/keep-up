@@ -1,5 +1,5 @@
-import { LfccError } from "../errors";
-import type { RecoveryResult, StorageBackend } from "./types";
+import { LfccError } from "../errors.js";
+import type { RecoveryResult, StorageBackend } from "./types.js";
 
 export type RecoveryOptions = {
   storage: StorageBackend;
