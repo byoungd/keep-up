@@ -102,6 +102,10 @@ const nextConfig = {
       layers: true,
       topLevelAwait: true,
     };
+    config.output.environment = {
+      ...config.output.environment,
+      asyncFunction: true,
+    };
 
     if (config.module?.rules) {
       config.module.rules.push({

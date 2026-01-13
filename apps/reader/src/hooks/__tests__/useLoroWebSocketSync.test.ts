@@ -15,15 +15,26 @@ describe("useLoroWebSocketSync", () => {
       const id = getOrCreateReplicaId();
       expect(id).toBeDefined();
       expect(id.length).toBeGreaterThan(0);
+      expect(id).toMatch(/^\d+$/);
       expect(localStorage.getItem(REPLICA_ID_KEY)).toBe(id);
     });
 
     it("should return existing ID if present in localStorage", () => {
-      const existingId = "existing-uuid-123";
+      const existingId = "123456";
       localStorage.setItem(REPLICA_ID_KEY, existingId);
 
       const id = getOrCreateReplicaId();
       expect(id).toBe(existingId);
+    });
+
+    it("should replace invalid stored IDs with a numeric peer ID", () => {
+      const existingId = "existing-uuid-123";
+      localStorage.setItem(REPLICA_ID_KEY, existingId);
+
+      const id = getOrCreateReplicaId();
+      expect(id).not.toBe(existingId);
+      expect(id).toMatch(/^\d+$/);
+      expect(localStorage.getItem(REPLICA_ID_KEY)).toBe(id);
     });
 
     it("should return empty string in SSR (window undefined)", () => {

@@ -1,6 +1,7 @@
 "use client";
 
 import type { Message } from "@/components/layout/MessageItem";
+import { createNumericPeerId, isValidLoroPeerId } from "@/lib/loroPeerId";
 import {
   type AIContext,
   type DocumentFacade,
@@ -12,6 +13,7 @@ import {
 import * as React from "react";
 
 const STORAGE_KEY = "ai-chat-loro-v1";
+const CHAT_PEER_ID_KEY = "ai-chat-peer-id";
 const KEY_STORAGE = "ai-companion-key-v1";
 const STORAGE_VERSION = 4;
 const MAX_MESSAGES = 200;
@@ -149,6 +151,19 @@ export function sanitizeMarkdown(content: string): string {
   return sanitized;
 }
 
+function getOrCreateChatPeerId(): `${number}` {
+  if (typeof window === "undefined") {
+    return "1";
+  }
+  const cached = window.localStorage.getItem(CHAT_PEER_ID_KEY);
+  if (cached && isValidLoroPeerId(cached)) {
+    return cached as `${number}`;
+  }
+  const nextId = createNumericPeerId();
+  window.localStorage.setItem(CHAT_PEER_ID_KEY, nextId);
+  return nextId as `${number}`;
+}
+
 /** Convert MessageBlock to legacy Message format for UI compatibility */
 function messageBlockToMessage(block: MessageBlock): Message {
   return {
@@ -168,7 +183,7 @@ export function useChatPersistence(defaultModel: string) {
 
   // Initialize runtime and facade
   React.useEffect(() => {
-    const rt = createLoroRuntime({ peerId: "chat" as `${number}` });
+    const rt = createLoroRuntime({ peerId: getOrCreateChatPeerId() });
     const fc = createDocumentFacade(rt);
     setRuntime(rt);
     setFacade(fc);

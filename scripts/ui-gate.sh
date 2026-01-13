@@ -4,18 +4,32 @@ set -euo pipefail
 
 repeat="${UI_GATE_REPEAT:-1}"
 conformance="${UI_GATE_CONFORMANCE:-0}"
+log_dir="${UI_GATE_LOG_DIR:-test-results}"
+targeted_log="${log_dir}/final_targeted_test.log"
+full_log="${log_dir}/full_verification.log"
 
 if ! [[ "$repeat" =~ ^[0-9]+$ ]] || [ "$repeat" -lt 1 ]; then
   echo "UI_GATE_REPEAT must be a positive integer (got: $repeat)" >&2
   exit 1
 fi
 
+if [ -z "$log_dir" ]; then
+  log_dir="test-results"
+  targeted_log="${log_dir}/final_targeted_test.log"
+  full_log="${log_dir}/full_verification.log"
+fi
+
+mkdir -p "$log_dir"
+: > "$targeted_log"
+: > "$full_log"
+exec > >(tee "$full_log") 2>&1
+
 echo "UI Gate: unit tests"
 pnpm test:unit
 
 for ((i = 1; i <= repeat; i++)); do
   echo "UI Gate: e2e critical path (run $i/$repeat)"
-  pnpm test:e2e:smoke
+  pnpm test:e2e:smoke 2>&1 | tee -a "$targeted_log"
 done
 
 if [ "$conformance" = "1" ]; then

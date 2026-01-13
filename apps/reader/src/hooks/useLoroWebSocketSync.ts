@@ -22,6 +22,7 @@ import {
 import * as React from "react";
 
 import { usePresenceStore } from "@/lib/lfcc/presenceStore";
+import { createNumericPeerId, isValidLoroPeerId } from "@/lib/loroPeerId";
 import { DEFAULT_PRESENCE_COLOR, getRandomPresenceColor } from "@/lib/theme/presenceColors";
 
 export interface WebSocketSyncOptions {
@@ -641,10 +642,11 @@ export function getOrCreateReplicaId(): string {
     // SSR: return empty, will be set on client
     return "";
   }
-  let id = localStorage.getItem(REPLICA_ID_KEY);
-  if (!id) {
-    id = crypto.randomUUID();
-    localStorage.setItem(REPLICA_ID_KEY, id);
+  const cached = localStorage.getItem(REPLICA_ID_KEY);
+  if (cached && isValidLoroPeerId(cached)) {
+    return cached;
   }
-  return id;
+  const nextId = createNumericPeerId();
+  localStorage.setItem(REPLICA_ID_KEY, nextId);
+  return nextId;
 }

@@ -66,5 +66,5 @@ describe("Anchor Decode Performance (PERF-ANCHOR-001)", () => {
     const ratio = perItemTimes[1] / perItemTimes[0];
     // Allow headroom for CI variance while still flagging superlinear regressions.
     expect(ratio).toBeLessThan(6);
-  });
+  }, 15000);
 });

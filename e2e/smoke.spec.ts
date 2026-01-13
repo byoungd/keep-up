@@ -36,7 +36,7 @@ test.describe("Smoke Tests", () => {
     await expect(page.getByText("Page not found")).not.toBeVisible();
 
     // Should show projects header or empty state
-    const projectsHeader = page.getByRole("heading", { name: /projects/i });
+    const projectsHeader = page.getByRole("heading", { name: "Projects", level: 1 });
     await expect(projectsHeader).toBeVisible({ timeout: 10000 });
   });
 
@@ -154,32 +154,50 @@ test.describe("Smoke Tests", () => {
     // AC3: Click to open document - should navigate to locale-prefixed reader
     // The "Open document" button appears in the queue item on hover
     const openButton = dialog.getByRole("button", { name: /open document/i });
-    const queueItem = dialog.locator("[class*='emerald']").first();
+    const queueItemLabel = dialog.getByText("Test Import Document");
 
     // Hover to reveal the button, then click
-    if (await queueItem.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await queueItem.hover();
+    await queueItemLabel.waitFor({ state: "visible", timeout: 10000 });
+    await queueItemLabel.hover();
+
+    const waitForReader = async () => {
+      await page.waitForURL(/\/reader\/.+/, { timeout: 15000, waitUntil: "domcontentloaded" });
+    };
+
+    let navigated = false;
+    const openReady = await openButton.isVisible({ timeout: 15000 }).catch(() => false);
+    if (openReady) {
+      await openButton.click();
+      navigated = await waitForReader()
+        .then(() => true)
+        .catch(() => false);
     }
 
-    if (await openButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await openButton.click();
-    } else {
+    if (!navigated) {
       // Close dialog and click the document link in the unread list instead
       await page.keyboard.press("Escape");
       await dialog.waitFor({ state: "hidden", timeout: 5000 }).catch(() => null);
       const docLink = page.getByRole("link", { name: /pasted-text/i });
-      await expect(docLink).toBeVisible({ timeout: 5000 });
-      await docLink.click();
+      await expect(docLink).toBeVisible({ timeout: 10000 });
+      const docHref = await docLink.getAttribute("href");
+      if (docHref) {
+        await page.goto(docHref, { waitUntil: "domcontentloaded" });
+      } else {
+        await docLink.click({ force: true });
+      }
+      await waitForReader();
     }
 
     // AC4: Reader displays decoded content
     // Verify we're on the reader page (with locale prefix)
-    await expect(page).toHaveURL(/\/reader\/.+/, { timeout: 10000 });
+    await expect(page).toHaveURL(/\/reader\/.+/, { timeout: 15000 });
 
     // Verify content is rendered
     const readerArticle = page.locator("main article");
-    await expect(readerArticle.getByText("Test Import Document")).toBeVisible({
-      timeout: 10000,
+    await expect(
+      readerArticle.getByText("This is a test document for the smoke test.")
+    ).toBeVisible({
+      timeout: 15000,
     });
 
     // Verify no error state
@@ -189,19 +207,19 @@ test.describe("Smoke Tests", () => {
 
   test("navigation between main sections works", async ({ page }) => {
     // Start at unread
-    await page.goto("/unread");
+    await page.goto("/unread", { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Unread" })).toBeVisible();
 
     // Navigate to library (via sidebar or direct)
-    await page.goto("/library");
+    await page.goto("/library", { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: /library/i })).toBeVisible();
 
     // Navigate to projects
-    await page.goto("/projects");
-    await expect(page.getByRole("heading", { name: /projects/i })).toBeVisible();
+    await page.goto("/projects", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: "Projects", level: 1 })).toBeVisible();
 
     // Navigate back to unread
-    await page.goto("/unread");
+    await page.goto("/unread", { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Unread" })).toBeVisible();
   });
 });

@@ -3,6 +3,12 @@
  *
  * Main endpoint for AI Panel chat functionality.
  * Routes requests across OpenAI-compatible, Anthropic, and Gemini providers.
+ *
+ * Features:
+ * - Multi-provider routing with automatic fallback
+ * - End-to-end distributed tracing (W3C Trace Context)
+ * - Standardized error responses
+ * - Request idempotency
  */
 
 import { type ChatMessage, buildChatMessages } from "@/lib/ai/contextBuilder";
