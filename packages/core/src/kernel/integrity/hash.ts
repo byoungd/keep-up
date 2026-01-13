@@ -16,6 +16,9 @@ function normalizeLF(text: string): string {
  * Convert string to UTF-8 bytes
  */
 function stringToBytes(str: string): Uint8Array {
+  if (typeof Buffer !== "undefined") {
+    return Buffer.from(str, "utf8");
+  }
   return new TextEncoder().encode(str);
 }
 
@@ -50,11 +53,9 @@ function simpleHash256(str: string): string {
  */
 async function sha256(data: string): Promise<string> {
   const bytes = stringToBytes(data);
-  const buffer = new ArrayBuffer(bytes.byteLength);
-  new Uint8Array(buffer).set(bytes);
   const subtle = typeof globalThis !== "undefined" ? globalThis.crypto?.subtle : undefined;
   if (subtle) {
-    const hashBuffer = await subtle.digest("SHA-256", buffer);
+    const hashBuffer = await subtle.digest("SHA-256", bytes);
     return bytesToHex(new Uint8Array(hashBuffer));
   }
   return simpleHash256(data);
