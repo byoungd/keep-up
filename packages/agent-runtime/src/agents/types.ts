@@ -28,7 +28,8 @@ export type AgentType =
   | "test-writer" // Test writing specialist
   | "code-reviewer" // Code review specialist
   | "implementer" // Implementation specialist
-  | "debugger"; // Debugging specialist
+  | "debugger" // Debugging specialist
+  | "digest"; // Digest generation with semantic clustering
 
 /**
  * Agent profile containing configuration for a specific agent type.
