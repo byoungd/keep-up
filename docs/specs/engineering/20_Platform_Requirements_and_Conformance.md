@@ -1,7 +1,7 @@
 # Platform Requirements and Conformance — v0.9 RC
 
 **Applies to:** LFCC v0.9 RC  
-**Last updated:** 2025-01-01  
+**Last updated:** 2026-01-13  
 **Audience:** Platform engineers, QA engineers.  
 **Source of truth:** LFCC v0.9 RC (various sections)
 
@@ -37,15 +37,17 @@ This document specifies platform requirements for LFCC implementations to ensure
 
 ---
 
-## 2. Timestamp Precision
+## 2. Timekeeping and Observability
 
 ### 2.1 Requirements
 
-- **Minimum precision:** Milliseconds (1ms)
-- **Recommended:** Microseconds (1μs) for high-frequency operations
+- Wall-clock timestamps are for telemetry/audit only.
+- Ordering and conflict resolution MUST use CRDT logical timestamps (Lamport/OpId).
+- **Minimum precision (telemetry):** Milliseconds (1ms)
+- **Recommended (telemetry):** Microseconds (1μs) for high-frequency operations
 - **Format:** ISO 8601 or Unix timestamp (milliseconds)
 
-### 2.2 Platform Considerations
+### 2.2 Platform Considerations (Telemetry)
 
 **JavaScript:**
 - `Date.now()` returns milliseconds
@@ -94,5 +96,4 @@ Verify that same operations produce identical results across platforms.
 ---
 
 **Document Version:** 1.0  
-**Last Updated:** 2025-01-01
-
+**Last Updated:** 2026-01-13

@@ -1,9 +1,13 @@
 # Local-First Collaboration Contract (LFCC) v0.9 — Release Candidate
 
 **Status:** Release Candidate (RC)  
-**Last updated:** 2026-01-13  
+**Last updated:** 2026-01-14  
 **Primary audience:** Architects and senior engineers building collaborative rich-text editors with annotations and AI assistance.  
 **Scope:** Deterministic interoperability rules across: **CRDT engine ⇄ Editor Bridge ⇄ Metadata/Annotations ⇄ LLM Gateway**.
+
+> [!IMPORTANT]
+> **CRDT Engine Binding:** LFCC v1.x is designed and tested exclusively with **Loro CRDT**. Anchor encoding, frontier format, and storage envelope definitions are Loro-specific. Future versions (v2.0+) may introduce a CRDT-agnostic abstraction layer. See §2.4 for details.
+
 
 > v0.9 RC closes the remaining “deep water” gaps from v0.8 by making three areas *normative*:
 > 1) **Recursive Canonicalization** for nested structures (tables/lists/quotes)  
@@ -90,6 +94,8 @@ LFCC requires a versioned **Policy Manifest** and a deterministic **Negotiation 
   "coords": { "kind": "utf16" },
   "anchor_encoding": { "version": "vX", "format": "base64|bytes" },
 
+  "crdt_config": { "engine": "loro", "frontier_format": "loro_op_ids_v1" },
+
   "structure_mode": "A|B",
 
   "block_id_policy": { "version": "v1", "overrides": {} },
@@ -138,7 +144,7 @@ LFCC requires a versioned **Policy Manifest** and a deterministic **Negotiation 
   },
 
   "ai_sanitization_policy": {
-    "version": "v2",
+    "version": "v3",
     "sanitize_mode": "whitelist",
     "allowed_marks": ["bold","italic","underline","strike","code","link"],
     "allowed_block_types": ["paragraph","heading","list_item","code","quote","table","table_row","table_cell"],
@@ -195,6 +201,8 @@ During handshake, participants compute an **effective manifest**:
 2. **Hard-refusal fields:** All participants MUST match exactly on:
    - `coords.kind`
    - `anchor_encoding.version`
+   - `crdt_config.frontier_format`
+   - `structure_mode`
    - `canonicalizer_policy` (version, mode, mark_order, normalize_whitespace, drop_empty_nodes)
    - `history_policy` (all fields)
    - `integrity_policy.document_checksum.algorithm` (when `document_checksum.enabled=true`)
@@ -208,14 +216,48 @@ During handshake, participants compute an **effective manifest**:
 8. **Relocation policy:** `default_level = min(...)`; `enable_level_2/3 = AND`; `level_2_max_distance_ratio = min(...)`; `level_3_max_block_radius = min(...)`.
 9. **AI sanitization policy:** `allowed_marks` and `allowed_block_types` use intersection; `reject_unknown_structure = AND`; `limits` use min across participants.
 
+### 2.2.2 Extensions Negotiation (Normative)
+Extensions are **optional** and negotiated independently of core conformance.
+
+Rules:
+- Unknown extensions in peer manifests are ignored (not hard-refused).
+- Each extension entry MUST include `version` and `min_compatible_version`.
+- An extension is **enabled** only if all participants declare it and their versions are mutually compatible.
+- If extension configs differ and no extension-specific negotiation rule exists, the extension MUST be treated as **disabled**.
+- `effective_extensions` is the intersection of enabled extensions.
+
 ### 2.3 Non‑Negotiable Mismatches (Hard Refusal)
 If any participant differs on:
 - coordinate system (UTF‑16),
 - anchor encoding/version,
+- CRDT frontier format,
+- structure mode,
 - block identity policy version (incompatible),
 then co-edit MUST be refused (read-only is allowed).
 
+### 2.4 CRDT Engine Scope (Normative)
+
+LFCC v1.x is **Loro-specific**. The following components are bound to Loro CRDT internals:
+
+| Component | Loro Dependency |
+|-----------|-----------------|
+| `anchor_encoding` | Loro stable position encoding |
+| `crdt_config.frontier_format` | Loro OpId format (`peer:counter`) |
+| `storageEnvelope.crdt_format` | `loro_snapshot` / `loro_updates` |
+| BlockMapping internals | Loro transaction semantics |
+
+**CRDT-SCOPE-001:** Implementations using a different CRDT engine (Yjs, Automerge, etc.) are **non-conformant** with LFCC v1.x.
+
+**Future Roadmap (v2.0+):**
+A future version may introduce a `CRDTAdapter` abstraction layer:
+- `anchor_encoding` → adapter-provided
+- `frontier_format` → adapter-provided
+- Storage format → adapter-provided
+
+Until then, LFCC v1.x assumes Loro as the sole CRDT backend.
+
 ---
+
 
 ## 3. Core Data Model (REQUIRED)
 
@@ -320,6 +362,24 @@ Implementations MUST follow KEEP-ID / REPLACE-ID / retirement rules:
 - Convert/reparent/table structural replacement: replace id unless overridden in manifest
 
 **BLOCKID-001:** Any override MUST be versioned in `block_id_policy.overrides` and gated by tests.
+
+`block_id_policy.overrides` schema (Normative):
+- Keys MUST be structural op codes from §4.1 (e.g., `OP_BLOCK_CONVERT`, `OP_LIST_REPARENT`, `OP_TABLE_STRUCT`).
+- Values MUST be `"KEEP_ID"` or `"REPLACE_ID"`.
+- Unknown keys MUST be rejected during manifest validation.
+
+Example:
+```json
+{
+  "block_id_policy": {
+    "version": "v1",
+    "overrides": {
+      "OP_BLOCK_CONVERT": "KEEP_ID",
+      "OP_LIST_REPARENT": "KEEP_ID"
+    }
+  }
+}
+```
 
 ---
 
@@ -464,7 +524,7 @@ type CanonMark = "bold"|"italic"|"underline"|"strike"|"code"|"link";
 type CanonNode = CanonBlock | CanonText;
 
 type CanonBlock = {
-  id: string;              // deterministic snapshot-local id (NOT LFCC block_id)
+  id: string;              // deterministic snapshot-local id (decimal counter string, NOT LFCC block_id)
   type: string;            // "paragraph", "table_row", "list_item", ...
   attrs: Record<string, any>;
   children: CanonNode[];   // recursive children
@@ -485,6 +545,7 @@ type CanonText = {
 
 **CANON-RECURSIVE-001:** Canonicalizer MUST traverse the document tree recursively.  
 **CANON-CONTAINER-001:** For container blocks (tables/lists), semantic equivalence depends on the ordered sequence of canonical children.
+**CANON-ID-001:** `CanonBlock.id` MUST be assigned by a deterministic pre-order counter starting at 0 (root=0, next node=1, ...).
 
 ### 8.2 Algorithm (Normative)
 Canonicalization is **recursive Flatten–Sort–Trim**:
@@ -541,6 +602,11 @@ A local undo/redo that restores a prior state.
 
 > Rationale: local undo is “trusted” in intent, but not globally authoritative under collaboration; verification reconciles remote interleavings.
 
+#### 9.3.2 Structural Undo/Redo (Normative)
+**HISTORY-STRUCT-001:** Undo of `OP_BLOCK_SPLIT` MUST restore the original `block_id`; the split-created `block_id` is retired.
+**HISTORY-STRUCT-002:** Undo of `OP_BLOCK_JOIN` MUST restore both original `block_id` values in their original order and positions.
+**HISTORY-STRUCT-003:** All affected annotations MUST re-enter `active_unverified` and trigger a checkpoint verification.
+
 ---
 
 ## 10. Integrity Verification (Lazy + Checkpoints) (REQUIRED)
@@ -594,6 +660,13 @@ AI MUST target stable IDs only:
 AI write requests MUST include:
 - `doc_frontier` (observed)
 - `if_match_context_hash` per targeted span
+
+`doc_frontier` format (Normative):
+```json
+{ "loro_frontier": ["peer:counter", "..."] }
+```
+- The format MUST match `crdt_config.frontier_format` from the manifest.
+- `loro_frontier` entries MUST be stable Loro OpId strings and deterministically ordered (peer id, then counter).
 
 If any precondition fails (`doc_frontier` or `if_match_context_hash`) → reject with **409 Conflict** and `AI_PRECONDITION_FAILED` (Appendix C).  
 All other AI failures MUST NOT use 409.
@@ -710,6 +783,8 @@ To avoid divergent re-implementations, LFCC defines a recommended reference libr
 - **v0.9 (RC):** Adds recursive canonicalization (CanonNode tree), HISTORY_RESTORE semantics, AI dry-run sanitization, and formalizes the lfcc-kernel conformance kit concept.
 - **v0.9.1 (RC Update):** Clarifies UTF-16 surrogate pair handling (§1.1), adds performance requirements (§10.1), and enhances BlockMapping verification requirements (§7.2).
 - **v0.9.2 (RC Update):** Adds document checksum + two-tier divergence detection (Appendix A), standard sanitization profile (Appendix B), protocol error codes (Appendix C), and storage envelope requirements (Appendix D).
+- **v0.9.3 (RC Update):** Extends sanitization to media attributes (Appendix B), clarifies checksum text cleaning (Appendix A), adds integrity recovery codes (Appendix C), and clarifies storage compression (Appendix D).
+- **v0.9.4 (RC Update):** Clarifies structure_mode negotiation, defines block_id overrides schema, adds structural undo/redo rules, defines canonical id assignment, specifies Loro doc_frontier format, adds extensions negotiation, and introduces Appendix E test vectors.
 
 ---
 
@@ -719,6 +794,7 @@ To avoid divergent re-implementations, LFCC defines a recommended reference libr
 - **Appendix B:** Sanitization Profile (Normative)
 - **Appendix C:** Error Codes and Telemetry (Normative)
 - **Appendix D:** Storage Envelope (Normative)
+- **Appendix E:** Normative Test Vectors (Normative)
 - **§17:** Custom Types Extension Guide — Registration, validation, canonicalization
 - **§18:** Security Best Practices — AI validation, hash collisions, anchor security
 - **§19:** Version Migration Guide — Compatibility matrix, migration procedures
@@ -734,6 +810,7 @@ This appendix defines the canonical serialization used by `LFCC_DOC_V1` checksum
 ### A.1 Canonical Serialization Rules
 - Canonicalize the editor state using §8 (recursive CanonNode).
 - Normalize all text to NFC and convert CRLF/CR to LF.
+- Implementations MUST strip control characters: remove all C0/C1 control characters (U+0000–U+001F, U+0080–U+009F) EXCEPT U+0009 (Tab) and U+000A (LF).
 - Serialize any JSON using JCS (RFC 8785).
 - Marks are treated as a set and ordered by `canonicalizer_policy.mark_order`.
 - Only `link` marks may carry `attrs.href`, and `href` MUST pass Appendix B URL rules.
@@ -769,6 +846,7 @@ Notes:
 - `block_id` MUST be the LFCC block_id from the bridge (not the CanonNode id).
 - `children` is empty for leaf blocks.
 - All keys in `block_payload` MUST be present; use `{}` or `[]` for empty values.
+- If a node is pruned by the canonicalizer (e.g., empty wrapper), it is omitted entirely.
 
 **HASH-ENC-001:** SHA-256 outputs MUST be lower-case hex.
 
@@ -787,7 +865,7 @@ Where `doc_payload` is:
 ```
 Blocks MUST appear in document order (§A.1).
 
-**DOC-ORDER-001:** Sorting blocks by ID is non-conformant.
+**DOC-ORDER-001:** Sorting blocks by ID MUST NOT be used.
 
 ### A.5 Two-Tier Strategy (REQUIRED)
 - **Tier 1 (surface):** compute `LFCC_DOC_V1` using cached block digests.
@@ -797,7 +875,7 @@ Blocks MUST appear in document order (§A.1).
 
 ## Appendix B: Sanitization Profile (Normative)
 
-This appendix defines the LFCC sanitization baseline for `ai_sanitization_policy.version = v2`.
+This appendix defines the LFCC sanitization baseline for `ai_sanitization_policy.version = v3`.
 
 ### B.1 Allowed Elements and Marks
 - Allowed block types and marks are negotiated via `ai_sanitization_policy.allowed_block_types` and `allowed_marks`.
@@ -808,20 +886,22 @@ Only the following attributes are allowed:
 - `link` mark: `href`
 - `code` block: `language`
 - `table_cell` block: `rowspan`, `colspan`
+- `image` block (if negotiated): `src`, `alt`, `title`, `width`, `height`
+- `video` block (if negotiated): `src`, `poster`, `controls`
 All other attributes MUST be dropped.
 
 ### B.3 URL Policy (REQUIRED)
-`href` MUST match the following regex (case-insensitive):
+`href`, `src`, and `poster` MUST match the following regex (case-insensitive):
 ```
 ^(https?|mailto):[^\\s]+$
 ```
 Forbidden patterns (case-insensitive, after trimming):
-- `javascript:`
-- `data:` (unless an explicit extension allows image-only data URIs)
-- `vbscript:`
+- `javascript:` (MUST reject)
+- `data:` (MUST reject unless an explicit extension allows image-only data URIs)
+- `vbscript:` (MUST reject)
 
 ### B.4 Limits
-Enforce `ai_sanitization_policy.limits` strictly:
+Implementations MUST enforce `ai_sanitization_policy.limits`:
 - `max_payload_bytes`
 - `max_nesting_depth`
 - `max_attribute_count`
@@ -843,6 +923,8 @@ Implementations MUST emit structured error objects:
 ```
 
 ### C.2 Required Codes
+Implementations MUST emit the following codes when applicable.
+
 Negotiation:
 - `NEGOTIATION_FAILED_CAPABILITY_MISMATCH`
 - `NEGOTIATION_FAILED_VERSION_INCOMPATIBLE`
@@ -852,6 +934,8 @@ Integrity:
 - `INTEGRITY_CHECK_FAILED_HASH_MISMATCH`
 - `INTEGRITY_CHECK_FAILED_CONTEXT_HASH`
 - `INTEGRITY_CHECK_FAILED_CHAIN_HASH`
+- `INTEGRITY_RECOVERED_SILENTLY`
+- `INTEGRITY_RECOVERED_FULL_RESYNC`
 
 AI Gateway:
 - `AI_PRECONDITION_FAILED` (409)
@@ -893,7 +977,22 @@ Persisted snapshots/updates MUST be wrapped in a storage envelope.
 - `checksum` is computed over the raw `payload` bytes (after encoding, before compression).
 - If `payload_encoding` is JSON, serialization MUST use JCS (RFC 8785).
 - Any mismatch MUST emit `STORAGE_ENVELOPE_CHECKSUM_MISMATCH` (Appendix C).
+- `payload` bytes MUST be uncompressed; any compression MUST be applied to the serialized envelope as a transport/storage concern.
 
 ### D.3 Versioning
 - Unknown `lfcc_storage_ver` MUST be rejected (`STORAGE_ENVELOPE_VERSION_UNSUPPORTED`).
 - Implementations MAY include optional fields (e.g., `doc_id`, `frontier`, `created_at`) but MUST NOT alter checksum semantics.
+
+---
+
+## Appendix E: Normative Test Vectors (Normative)
+
+Implementations MUST include the following vectors in their conformance kit:
+- Canonicalizer: input document → expected `CanonNode` tree (JSON).
+- Document checksum: input document → expected `LFCC_DOC_V1` hash.
+- BlockMapping: operation + pre-state → expected mapping output.
+- Sanitization: disallowed markup → expected sanitized output + diagnostics.
+- AI preconditions: stale frontier + hash mismatch → expected `AI_PRECONDITION_FAILED` envelope.
+- Storage envelope: invalid version/checksum cases → expected Appendix C error codes.
+
+Vectors MUST be published in a deterministic, machine-readable format (JSON fixtures) and referenced by the conformance test suite.

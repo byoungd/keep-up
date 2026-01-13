@@ -31,6 +31,7 @@
     "perf:baseline": "node scripts/lfcc-perf-baseline.mjs",
     "lint": "turbo run lint && biome check .",
     "lint:fix": "biome check --write .",
+    "docs:normative-index": "node scripts/update-normative-index.mjs",
     "ui:contract": "bash scripts/check-ui-contract.sh",
     "format": "biome format --write .",
     "format:check": "biome format .",

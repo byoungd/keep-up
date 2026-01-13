@@ -1,9 +1,9 @@
 # Security Best Practices — v0.9 RC
 
 **Applies to:** LFCC v0.9 RC  
-**Last updated:** 2025-01-01  
+**Last updated:** 2026-01-14  
 **Audience:** Security engineers, backend engineers, AI platform engineers.  
-**Source of truth:** LFCC v0.9 RC §11 (AI Gateway), §5 (Stable Anchors)
+**Source of truth:** LFCC v0.9 RC §11 (AI Gateway), §5 (Stable Anchors), Appendix B (Sanitization Profile)
 
 ---
 
@@ -18,40 +18,39 @@ This guide provides security best practices for LFCC implementations, covering A
 ### 1.1 Sanitization Rules
 
 **Whitelist Approach (REQUIRED):**
-- Only allow explicitly permitted tags, attributes, and structures
-- Reject all unknown elements by default
+- Follow LFCC v0.9 RC Appendix B (Sanitization Profile).
+- Only allow explicitly permitted tags, attributes, and structures.
+- Reject all unknown elements by default.
+- Enforce the attribute whitelist: `link.href`, `code.language`, `table_cell.rowspan`, `table_cell.colspan`, `image.src/alt/title/width/height`, `video.src/poster/controls`.
 
 **Security Review Checklist:**
 - [ ] Script tags blocked
 - [ ] Style tags blocked
 - [ ] Event handlers blocked (onclick, onerror, etc.)
 - [ ] iframe/object/embed blocked
-- [ ] data: URLs blocked (unless explicitly allowed)
-- [ ] javascript: URLs blocked
+- [ ] data: URLs blocked (unless explicitly allowed for image-only data URIs)
+- [ ] javascript: and vbscript: URLs blocked
+- [ ] URL regex enforced: `^(https?|mailto):[^\\s]+$`
 - [ ] CSS injection prevented
 
 ### 1.2 URL Validation
 
+Apply URL validation to all URL-bearing attributes (`href`, `src`, `poster`).
+
 ```typescript
 function validateURL(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    
-    // Only allow safe protocols
-    const allowedProtocols = ["https:", "http:", "mailto:"];
-    if (!allowedProtocols.includes(parsed.protocol)) {
-      return false;
-    }
-    
-    // Block javascript: and data: URLs
-    if (url.startsWith("javascript:") || url.startsWith("data:")) {
-      return false;
-    }
-    
-    return true;
-  } catch {
+  const trimmed = url.trim();
+  const lower = trimmed.toLowerCase();
+
+  if (
+    lower.startsWith("javascript:") ||
+    lower.startsWith("data:") ||
+    lower.startsWith("vbscript:")
+  ) {
     return false;
   }
+
+  return /^(https?|mailto):\S+$/i.test(trimmed);
 }
 ```
 
@@ -153,6 +152,20 @@ function validateAnchor(anchor: Anchor): boolean {
 - Maximum resolutions per second: 1000
 - Maximum resolutions per minute: 10000
 - Block suspicious patterns
+
+---
+
+## 3.4 Storage Envelope Security
+
+### 3.4.1 Validation Rules
+- Implementations MUST reject unsupported `lfcc_storage_ver`.
+- Implementations MUST validate `checksum` before decoding payload bytes.
+- For JSON payloads, implementations MUST require JCS serialization when computing checksum.
+- Implementations MUST reject unknown `crdt_format` values.
+
+### 3.4.2 Logging and Telemetry
+- Implementations MUST emit `STORAGE_ENVELOPE_VERSION_UNSUPPORTED` on version mismatch.
+- Implementations MUST emit `STORAGE_ENVELOPE_CHECKSUM_MISMATCH` on checksum failure.
 
 ---
 

@@ -1,7 +1,7 @@
 # Conformance Test Suite Plan — v0.9 RC
 
 **Applies to:** LFCC v0.9 RC  
-**Last updated:** 2025-12-31  
+**Last updated:** 2026-01-14  
 **Audience:** SDET, QA engineers, platform verification.  
 **Source of truth:** LFCC v0.9 RC §13 (Conformance), §8 (Canonicalizer), §7 (Dirty), §9 (History), §11 (AI).
 
@@ -24,10 +24,18 @@ To claim LFCC v0.9 RC compliance, the following gates are **required**:
 | BlockMapping | axioms property tests + perf target | fuzzed ops across 10k seeds |
 | Canonicalizer | idempotency + determinism | semantic equivalence corpus |
 | AI Safety | preconditions + dry-run reject/accept corpus | adversarial payload fuzzing |
+| Integrity | document checksum + divergence detection | cross-implementation hash corpus |
+| Storage | envelope version + checksum tests | corrupted payload fuzzing |
 | Dirty/Compare | dev compare (no mismatches) | injected-bug detection tests |
 | History | HISTORY_RESTORE transitions | multi-user restore interleavings |
 
 **Compliance rule:** All required gates MUST pass in CI to advertise LFCC v0.9 RC conformance.
+
+---
+
+## 0.2 Normative Test Vectors (Required)
+
+Conformance kits MUST include the Appendix E vectors from `LFCC_v0.9_RC.md` and execute them in CI.
 
 ---
 
@@ -137,13 +145,14 @@ Intentionally inject a bug (skip neighbor expansion) and assert harness detects 
 ## 7. AI Safety Tests
 
 ### 7.1 Preconditions
-- mismatch hash → 409
-- missing span → 409
-- unverified span → 409
+- mismatch hash → 409 + `AI_PRECONDITION_FAILED`
+- missing span → 409 + `AI_PRECONDITION_FAILED`
+- unverified span → 409 + `AI_PRECONDITION_FAILED`
 
 ### 7.2 Dry-run
-- disallowed tags removed/rejected
-- schema invalid payload rejected
+- disallowed tags removed/rejected → `AI_PAYLOAD_REJECTED_SANITIZE` (400)
+- schema invalid payload rejected → `AI_PAYLOAD_REJECTED_SCHEMA_VIOLATION` (422)
+- limit violations rejected → `AI_PAYLOAD_REJECTED_LIMITS` (400)
 - success returns canonical tree
 
 ### 7.3 Deterministic apply
@@ -159,14 +168,28 @@ Run only when AI-native is negotiated:
 - audit: accepted and rejected requests emit audit records
 - policy validation: `auto_merge_threshold` within 0..1, `ai_autonomy=full` requires audit retention
 
-## 8. Property-Based Testing Requirements
+## 8. Integrity + Storage Tests
 
-### 8.1 Framework Requirements
+### 8.1 Document Checksum
+- compute `LFCC_DOC_V1` for a fixed fixture set
+- verify Tier 1 and Tier 2 checksum match on identical state
+- introduce a controlled divergence and assert `INTEGRITY_CHECK_FAILED_HASH_MISMATCH`
+
+### 8.2 Storage Envelope
+- invalid `lfcc_storage_ver` rejected → `STORAGE_ENVELOPE_VERSION_UNSUPPORTED`
+- checksum mismatch rejected → `STORAGE_ENVELOPE_CHECKSUM_MISMATCH`
+- JSON payloads serialized via JCS when verifying checksum
+
+---
+
+## 9. Property-Based Testing Requirements
+
+### 9.1 Framework Requirements
 - Use property-based testing framework (fast-check, jsverify, or equivalent)
 - Generate arbitrary operations, documents, and annotations
 - Verify axioms hold for all generated inputs
 
-### 8.2 Properties to Test
+### 9.2 Properties to Test
 
 **BlockMapping Axioms:**
 - Determinism: Same operation → same mapping
@@ -184,7 +207,7 @@ Run only when AI-native is negotiated:
 - Determinism: Same operations → same annotation states
 - Chain policy compliance: All annotations satisfy chain policy
 
-### 8.3 Coverage Requirements
+### 9.3 Coverage Requirements
 
 **Minimum Coverage Thresholds:**
 - BlockMapping axioms: 100% of operation types
@@ -201,9 +224,9 @@ Run only when AI-native is negotiated:
 
 ---
 
-## 9. Integration Test Scenarios
+## 10. Integration Test Scenarios
 
-### 9.1 Full Workflow Tests
+### 10.1 Full Workflow Tests
 
 **Scenario 1: Collaborative Editing**
 1. Two users edit same document
@@ -225,12 +248,12 @@ Run only when AI-native is negotiated:
 
 ---
 
-## 10. Exit Criteria (Release)
+## 11. Exit Criteria (Release)
 
 - 0 critical determinism failures across 10k fuzz cases
 - 0 silent-drift findings in annotation reconcile suite
 - Mode B semantic double-blind stable across browsers used in CI
 - AI dry-run suite passes with malicious payload corpus
 - Property-based tests pass for all axioms (1000+ generated cases each)
-- Minimum coverage thresholds met (see §8.3)
+- Minimum coverage thresholds met (see §9.3)
 - All integration scenarios pass

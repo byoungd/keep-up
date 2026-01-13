@@ -1,7 +1,7 @@
 ﻿# Policy Manifest Schema (JSON Schema + TypeScript) — v0.9 RC
 
 **Applies to:** LFCC v0.9 RC  
-**Last updated:** 2026-01-13  
+**Last updated:** 2026-01-14  
 **Audience:** Web/iOS/Android leads, platform architects, integration owners.  
 **Source of truth:** LFCC v0.9 RC §2.
 
@@ -22,12 +22,29 @@
 ```ts
 export type StructureMode = "A" | "B";
 
+export type CrdtFrontierFormat = "loro_op_ids_v1";
+
+export type BlockIdOverrideOp =
+  | "OP_BLOCK_CONVERT"
+  | "OP_LIST_REPARENT"
+  | "OP_TABLE_STRUCT"
+  | "OP_IMMUTABLE_REWRITE";
+
+export type BlockIdOverride = "KEEP_ID" | "REPLACE_ID";
+
 export type ChainKind = "strict_adjacency" | "required_order" | "bounded_gap";
 
 export type PartialBehavior = "allow_drop_tail" | "allow_islands" | "none";
 
 export type CanonMark =
   | "bold" | "italic" | "underline" | "strike" | "code" | "link";
+
+export type ExtensionEntry = {
+  version: string;
+  min_compatible_version: string;
+  config?: Record<string, unknown>;
+  [key: string]: unknown;
+};
 
 export type PolicyManifestV09 = {
   lfcc_version: "0.9";
@@ -36,9 +53,11 @@ export type PolicyManifestV09 = {
   coords: { kind: "utf16" };
   anchor_encoding: { version: string; format: "base64" | "bytes" };
 
+  crdt_config: { engine: "loro"; frontier_format: CrdtFrontierFormat };
+
   structure_mode: StructureMode;
 
-  block_id_policy: { version: string; overrides: Record<string, unknown> };
+  block_id_policy: { version: string; overrides: Partial<Record<BlockIdOverrideOp, BlockIdOverride>> };
 
   chain_policy: {
     version: string;
@@ -80,7 +99,7 @@ export type PolicyManifestV09 = {
   };
 
   ai_sanitization_policy: {
-    version: "v2";
+    version: "v3";
     sanitize_mode: "whitelist";
     allowed_marks: CanonMark[];
     allowed_block_types: string[];
@@ -121,7 +140,7 @@ export type PolicyManifestV09 = {
     kernel_required_in_repo: boolean;
   };
 
-  extensions?: Record<string, unknown>;
+  extensions?: Record<string, ExtensionEntry>;
   v: number;
 };
 ```
@@ -201,6 +220,14 @@ export type PolicyManifestV091 = PolicyManifestV09 & {
 
 See `23_AI_Native_Extension.md` for negotiation rules and normative requirements, including the audit requirement when `ai_autonomy` is `full`.
 
+### 1.3 Extensions (Normative)
+
+Extensions are optional. Each extension entry MUST include:
+- `version`
+- `min_compatible_version`
+
+Implementations MAY include additional extension-specific fields under the same object or a nested `config` object.
+
 ## 2. JSON Schema (Draft 2020-12) — Reference
 
 > This schema is intended to be copied into a repo as `policy_manifest.schema.json`.
@@ -212,7 +239,7 @@ See `23_AI_Native_Extension.md` for negotiation rules and normative requirements
   "$id": "https://example.org/lfcc/policy_manifest_v0.9.schema.json",
   "type": "object",
   "required": [
-    "lfcc_version","policy_id","coords","anchor_encoding","structure_mode",
+    "lfcc_version","policy_id","coords","anchor_encoding","crdt_config","structure_mode",
     "block_id_policy","chain_policy","partial_policy","integrity_policy",
     "canonicalizer_policy","history_policy","ai_sanitization_policy",
     "relocation_policy","dev_tooling_policy","capabilities","conformance_kit_policy","v"
@@ -238,6 +265,16 @@ See `23_AI_Native_Extension.md` for negotiation rules and normative requirements
       "additionalProperties": false
     },
 
+    "crdt_config": {
+      "type": "object",
+      "required": ["engine","frontier_format"],
+      "properties": {
+        "engine": { "const": "loro" },
+        "frontier_format": { "const": "loro_op_ids_v1" }
+      },
+      "additionalProperties": false
+    },
+
     "structure_mode": { "enum": ["A","B"] },
 
     "block_id_policy": {
@@ -245,7 +282,18 @@ See `23_AI_Native_Extension.md` for negotiation rules and normative requirements
       "required": ["version","overrides"],
       "properties": {
         "version": { "type": "string", "minLength": 1 },
-        "overrides": { "type": "object" }
+        "overrides": {
+          "type": "object",
+          "propertyNames": {
+            "enum": [
+              "OP_BLOCK_CONVERT",
+              "OP_LIST_REPARENT",
+              "OP_TABLE_STRUCT",
+              "OP_IMMUTABLE_REWRITE"
+            ]
+          },
+          "additionalProperties": { "enum": ["KEEP_ID","REPLACE_ID"] }
+        }
       },
       "additionalProperties": false
     },
@@ -337,7 +385,7 @@ See `23_AI_Native_Extension.md` for negotiation rules and normative requirements
       "type": "object",
       "required": ["version","mode","mark_order","normalize_whitespace","drop_empty_nodes"],
       "properties": {
-        "version": { "const": "v2" },
+        "version": { "const": "v3" },
         "mode": { "const": "recursive_tree" },
         "mark_order": {
           "type": "array",
@@ -451,7 +499,16 @@ See `23_AI_Native_Extension.md` for negotiation rules and normative requirements
 
     "extensions": {
       "type": "object",
-      "additionalProperties": true
+      "additionalProperties": {
+        "type": "object",
+        "required": ["version","min_compatible_version"],
+        "properties": {
+          "version": { "type": "string", "minLength": 1 },
+          "min_compatible_version": { "type": "string", "minLength": 1 },
+          "config": { "type": "object", "additionalProperties": true }
+        },
+        "additionalProperties": true
+      }
     },
 
     "v": { "type": "integer", "minimum": 1 }
@@ -469,6 +526,8 @@ function negotiate(manifests: PolicyManifestV09[]): PolicyManifestV09 {
   // 1) Reject if any correctness-critical mismatch.
   assertAllEqual(manifests.map(m => m.coords.kind));
   assertAllEqual(manifests.map(m => m.anchor_encoding.version));
+  assertAllEqual(manifests.map(m => stableStringify(m.crdt_config)));
+  assertAllEqual(manifests.map(m => m.structure_mode));
   assertAllEqual(manifests.map(m => stableStringify(m.canonicalizer_policy)));
   assertAllEqual(manifests.map(m => stableStringify(m.history_policy)));
   assertAllEqual(manifests.map(m => m.integrity_policy.document_checksum.algorithm));
@@ -494,6 +553,7 @@ function negotiate(manifests: PolicyManifestV09[]): PolicyManifestV09 {
   effective.integrity_policy = restrictIntegrityPolicies(manifests.map(m => m.integrity_policy));
   effective.relocation_policy = restrictRelocationPolicies(manifests.map(m => m.relocation_policy));
   effective.ai_sanitization_policy = restrictAiSanitization(manifests.map(m => m.ai_sanitization_policy));
+  effective.extensions = negotiateExtensions(manifests.map(m => m.extensions ?? {}));
 
   return effective;
 }
@@ -505,5 +565,6 @@ Rules:
 - `document_checksum.enabled` uses AND; `mode` uses eager if any participant requires it; `strategy` MUST be `two_tier`.
 - For dev tooling fields: may differ per replica; ignore or treat as non-blocking.
 - Unknown top-level fields MUST be rejected unless under `extensions`.
+- Extensions are negotiated via intersection; incompatible versions or config mismatches disable that extension without hard-refusal.
 ### 3.1 AI-native Negotiation (Optional)
 If AI-native fields are present and supported by all participants, negotiate them using the restriction rules in `23_AI_Native_Extension.md`. If any participant lacks AI-native support, treat AI-native as disabled and fall back to v0.9 behavior.

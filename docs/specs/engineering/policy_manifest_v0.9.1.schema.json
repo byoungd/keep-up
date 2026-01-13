@@ -7,6 +7,7 @@
     "policy_id",
     "coords",
     "anchor_encoding",
+    "crdt_config",
     "structure_mode",
     "block_id_policy",
     "chain_policy",
@@ -39,13 +40,33 @@
       },
       "additionalProperties": false
     },
+    "crdt_config": {
+      "type": "object",
+      "required": ["engine", "frontier_format"],
+      "properties": {
+        "engine": { "const": "loro" },
+        "frontier_format": { "const": "loro_op_ids_v1" }
+      },
+      "additionalProperties": false
+    },
     "structure_mode": { "enum": ["A", "B"] },
     "block_id_policy": {
       "type": "object",
       "required": ["version", "overrides"],
       "properties": {
         "version": { "type": "string", "minLength": 1 },
-        "overrides": { "type": "object" }
+        "overrides": {
+          "type": "object",
+          "propertyNames": {
+            "enum": [
+              "OP_BLOCK_CONVERT",
+              "OP_LIST_REPARENT",
+              "OP_TABLE_STRUCT",
+              "OP_IMMUTABLE_REWRITE"
+            ]
+          },
+          "additionalProperties": { "enum": ["KEEP_ID", "REPLACE_ID"] }
+        }
       },
       "additionalProperties": false
     },
@@ -133,7 +154,7 @@
       "type": "object",
       "required": ["version", "mode", "mark_order", "normalize_whitespace", "drop_empty_nodes"],
       "properties": {
-        "version": { "const": "v2" },
+        "version": { "const": "v3" },
         "mode": { "const": "recursive_tree" },
         "mark_order": {
           "type": "array",
@@ -394,7 +415,16 @@
     },
     "extensions": {
       "type": "object",
-      "additionalProperties": true
+      "additionalProperties": {
+        "type": "object",
+        "required": ["version", "min_compatible_version"],
+        "properties": {
+          "version": { "type": "string", "minLength": 1 },
+          "min_compatible_version": { "type": "string", "minLength": 1 },
+          "config": { "type": "object", "additionalProperties": true }
+        },
+        "additionalProperties": true
+      }
     },
     "v": { "type": "integer", "minimum": 1 }
   },

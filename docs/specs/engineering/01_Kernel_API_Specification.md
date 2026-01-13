@@ -1,7 +1,7 @@
 # lfcc-kernel API Specification (v0.9 RC)
 
 **Applies to:** LFCC v0.9 RC  
-**Last updated:** 2025-12-31  
+**Last updated:** 2026-01-14  
 **Audience:** Kernel library maintainers, platform architects, editor/bridge maintainers.  
 **Source of truth:** LFCC v0.9 RC §14 (Conformance Kit), §8 (Canonicalizer), §7 (BlockMapping/Dirty), §11 (AI Dry-Run).
 
@@ -64,7 +64,7 @@ export type CanonMark =
 export type CanonNode = CanonBlock | CanonText;
 
 export type CanonBlock = {
-  /** Snapshot-local deterministic id for diffs/debug ONLY (MUST NOT replace LFCC block_id) */
+  /** Snapshot-local deterministic id for diffs/debug ONLY (pre-order counter string; MUST NOT replace LFCC block_id) */
   id: string;
 
   /** Structural role, e.g. "paragraph", "list_item", "table_row", "table_cell" */
@@ -89,6 +89,8 @@ export type CanonText = {
 - Only the `link` mark may carry `attrs.href`.
 - `href` MUST pass the URL policy in `ai_sanitization_policy`.
 - Unknown attributes MUST be dropped during canonicalization with diagnostics.
+
+**CANON-ID-001:** `CanonBlock.id` MUST be a deterministic pre-order counter starting at 0.
 
 ### 2.2 Canonicalizer Options
 
@@ -264,7 +266,9 @@ export { lfccAnnoDisplayMachine } from "./stateMachine";
 ### 5.1 AI Envelope Types
 
 ```ts
-export type DocFrontier = string; // opaque (e.g., version vector encoding)
+export type DocFrontier = {
+  loro_frontier: string[]; // Loro OpId strings, deterministically ordered
+};
 
 export type SpanPrecondition = {
   span_id: string;
@@ -278,13 +282,23 @@ export type AIRequestEnvelope = {
   client_request_id?: string;
 };
 
-export type AI409Conflict = {
-  code: "CONFLICT";
+export type AIPreconditionFailed = {
+  code: "AI_PRECONDITION_FAILED";
   current_frontier: DocFrontier;
   failed_preconditions: Array<{
     span_id: string;
     reason: "hash_mismatch" | "span_missing" | "unverified";
   }>;
+};
+
+export type AIPayloadRejectCode =
+  | "AI_PAYLOAD_REJECTED_SANITIZE"
+  | "AI_PAYLOAD_REJECTED_SCHEMA_VIOLATION"
+  | "AI_PAYLOAD_REJECTED_LIMITS";
+
+export type AIPayloadRejected = {
+  code: AIPayloadRejectCode;
+  diagnostics: Array<{ kind: string; detail: string }>;
 };
 ```
 
@@ -312,8 +326,8 @@ export type AIRequestEnvelopeV2 = AIRequestEnvelope & {
 ### 5.2 Sanitization Policy
 
 ```ts
-export type AISanitizationPolicyV1 = {
-  version: "v1";
+export type AISanitizationPolicyV3 = {
+  version: "v3";
   sanitize_mode: "whitelist";
   allowed_marks: CanonMark[];
   allowed_block_types: string[];
@@ -326,6 +340,9 @@ export type AISanitizationPolicyV1 = {
 };
 ```
 
+Notes:
+- Policy v3 aligns with Appendix B in LFCC v0.9 RC (media attributes + URL regex for `href`, `src`, `poster`).
+
 ### 5.3 Sanitizer Interface
 
 ```ts
@@ -336,7 +353,7 @@ export type SanitizedPayload = {
 };
 
 export interface AIPayloadSanitizer {
-  sanitize(input: { html?: string; markdown?: string }, policy: AISanitizationPolicyV1): SanitizedPayload;
+  sanitize(input: { html?: string; markdown?: string }, policy: AISanitizationPolicyV3): SanitizedPayload;
 }
 ```
 
@@ -345,7 +362,7 @@ export interface AIPayloadSanitizer {
 ```ts
 export type DryRunReport = {
   ok: boolean;
-  reason?: string;
+  code?: AIPayloadRejectCode;
   canon_root?: import("../canonicalizer/types").CanonNode;
   diagnostics: Array<{ kind: string; detail: string }>;
 };
@@ -360,13 +377,107 @@ export async function dryRunAIPayload(
   sanitizer: AIPayloadSanitizer,
   validator: EditorSchemaValidator,
   canonicalize: (doc: any) => any,
-  policy: AISanitizationPolicyV1
+  policy: AISanitizationPolicyV3
 ): Promise<DryRunReport>;
 ```
 
 ---
 
-## 6. Dev Compare Harness APIs
+## 6. Document Checksum APIs
+
+Kernel SHOULD provide helpers for `LFCC_DOC_V1` (Appendix A).
+
+### 6.1 Types
+
+```ts
+export type DocumentChecksumAlgorithm = "LFCC_DOC_V1";
+
+export type BlockDigestEntry = {
+  block_id: string;
+  digest: string; // sha256 hex, lower-case
+};
+
+export type DocumentChecksumPayload = {
+  blocks: BlockDigestEntry[]; // document order
+};
+
+export type DocumentChecksumPolicy = {
+  algorithm: DocumentChecksumAlgorithm;
+  strategy: "two_tier";
+};
+```
+
+### 6.2 Interfaces
+
+```ts
+export interface DocumentChecksumProvider {
+  computeBlockDigest(input: {
+    block_id: string;
+    type: string;
+    attrs: Record<string, unknown>;
+    inline: Array<{ text: string; marks: CanonMark[]; attrs: { href?: string } }>;
+    children: string[]; // child block digests
+  }): string;
+
+  computeDocumentChecksum(payload: DocumentChecksumPayload): string;
+}
+
+export interface DocumentChecksumVerifier {
+  computeTier1(payload: DocumentChecksumPayload): string;
+  computeTier2(input: { doc: unknown }): Promise<string>;
+}
+```
+
+---
+
+## 7. Storage Envelope APIs
+
+Kernel SHOULD provide helpers for the Appendix D storage envelope.
+
+### 7.1 Types
+
+```ts
+export type StorageEnvelopeVersion = "1.0";
+export type StorageEnvelopeSpecVersion = "0.9";
+export type StorageEnvelopeCrdtFormat = "loro_snapshot" | "loro_updates";
+export type StorageEnvelopeEncoding = "json" | "cbor" | "msgpack" | "binary";
+
+export type StorageEnvelopeChecksum = {
+  algo: "sha256";
+  value: string; // hex
+};
+
+export type StorageEnvelope = {
+  lfcc_storage_ver: StorageEnvelopeVersion;
+  lfcc_spec_ver: StorageEnvelopeSpecVersion;
+  crdt_format: StorageEnvelopeCrdtFormat;
+  payload_encoding: StorageEnvelopeEncoding;
+  payload: string; // bytes or base64, depending on encoding
+  checksum: StorageEnvelopeChecksum;
+};
+```
+
+### 7.2 Interfaces
+
+```ts
+export interface StorageEnvelopeCodec {
+  encode(input: {
+    specVersion: StorageEnvelopeSpecVersion;
+    crdtFormat: StorageEnvelopeCrdtFormat;
+    payloadEncoding: StorageEnvelopeEncoding;
+    payloadBytes: Uint8Array;
+  }): StorageEnvelope;
+
+  decode(envelope: StorageEnvelope): {
+    payloadBytes: Uint8Array;
+    checksumValid: boolean;
+  };
+}
+```
+
+---
+
+## 8. Dev Compare Harness APIs
 
 ```ts
 export type DevComparePolicy = {
@@ -400,7 +511,7 @@ export function shouldRunFullScanNow(params: {
 
 ---
 
-## 7. Versioning Rules
+## 9. Versioning Rules
 
 - Kernel exports MUST be versioned and tied to LFCC minor versions during 0.x.
 - Any behavior changes MUST bump `canonicalizer_policy.version`, `ai_sanitization_policy.version`, etc.

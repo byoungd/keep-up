@@ -42,7 +42,7 @@ Recommended capability flags:
 {
   "request_id": "uuid",
   "agent_id": "agent_uuid",
-  "doc_frontier": "FRONTIER_ENCODED",
+  "doc_frontier": { "loro_frontier": ["peer:counter"] },
   "intent_id": "intent_uuid",
   "intent": { "id": "intent_uuid", "category": "rewrite", "summary": "Improve clarity" },
   "preconditions": [
@@ -65,7 +65,7 @@ Recommended capability flags:
 ```json
 {
   "status": "accepted",
-  "applied_frontier": "FRONTIER_AFTER_APPLY",
+  "applied_frontier": { "loro_frontier": ["peer:counter"] },
   "applied_ops": ["op_id_1", "op_id_2"],
   "audit_id": "audit_uuid",
   "dry_run_report": { "stage": "schema_apply", "ok": true }

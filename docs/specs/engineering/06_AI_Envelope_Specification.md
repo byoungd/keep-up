@@ -1,7 +1,7 @@
 # AI Envelope Specification (Client ⇄ Gateway) — v0.9 RC
 
 **Applies to:** LFCC v0.9 RC  
-**Last updated:** 2025-12-31  
+**Last updated:** 2026-01-14  
 **Audience:** Backend engineers, AI engineers, client integrators.  
 **Source of truth:** LFCC v0.9 RC §11 (AI Gateway), §8 (Canonicalizer), §10 (Integrity).
 
@@ -21,7 +21,15 @@
 ## 1. Common Types
 
 ### 1.1 Frontier
-`doc_frontier` is an opaque string representing the client’s observed CRDT frontier (e.g., encoded version vector).
+`doc_frontier` is a Loro frontier object representing the client’s observed CRDT boundary.
+
+```json
+{ "loro_frontier": ["peer:counter", "..."] }
+```
+
+Notes:
+- `loro_frontier` entries MUST be deterministically ordered (peer id, then counter).
+- The format MUST match `crdt_config.frontier_format` from the manifest.
 
 ### 1.2 Precondition
 ```json
@@ -39,7 +47,7 @@
 
 ```json
 {
-  "doc_frontier": "FRONTIER_ENCODED",
+  "doc_frontier": { "loro_frontier": ["peer:counter"] },
   "client_request_id": "uuid",
   "ops_xml": "<replace_spans annotation=\"anno_uuid\">...</replace_spans>",
   "preconditions": [
@@ -53,9 +61,11 @@
 
 ### 2.2 Semantics
 - Gateway MUST ensure its doc state is **at least** `doc_frontier` causally (read-your-writes barrier).
-- If any precondition fails → **409 Conflict**.
-- If payload dry-run fails → **422 Unprocessable Entity** (or policy-defined) with diagnostics.
+- If any precondition fails → **409 Conflict** with `code = AI_PRECONDITION_FAILED` (Appendix C).
+- If payload dry-run fails → **422 Unprocessable Entity** with `AI_PAYLOAD_REJECTED_SCHEMA_VIOLATION`.
+- Sanitization and limit failures MUST use **400** with `AI_PAYLOAD_REJECTED_SANITIZE` or `AI_PAYLOAD_REJECTED_LIMITS`.
 - Gateway MUST enforce `ai_sanitization_policy.limits` and reject on limit violations.
+- All errors MUST use the Appendix C error envelope.
 
 ---
 
@@ -66,7 +76,7 @@ AI-native implementations use the v2 envelope defined in `23_AI_Native_Extension
 {
   "request_id": "uuid",
   "agent_id": "agent_uuid",
-  "doc_frontier": "FRONTIER_ENCODED",
+  "doc_frontier": { "loro_frontier": ["peer:counter"] },
   "intent_id": "intent_uuid",
   "preconditions": [
     { "span_id": "span_uuid", "if_match_context_hash": "sha256_hex" }
@@ -87,7 +97,7 @@ When `return_canonical_tree=true`, gateway SHOULD return canonicalized represent
 ```json
 {
   "status": "ok",
-  "applied_frontier": "FRONTIER_AFTER_APPLY",
+  "applied_frontier": { "loro_frontier": ["peer:counter"] },
   "canon_root": {
     "type": "paragraph",
     "id": "canon_1",
@@ -114,15 +124,17 @@ AI-native responses may include `applied_ops` and `audit_id` (see addendum).
 
 ```json
 {
-  "code": "CONFLICT",
-  "current_frontier": "FRONTIER_NOW",
+  "code": "AI_PRECONDITION_FAILED",
+  "phase": "ai_gateway",
+  "retryable": true,
+  "current_frontier": { "loro_frontier": ["peer:counter"] },
   "failed_preconditions": [
     { "span_id": "span_uuid", "reason": "hash_mismatch" }
   ]
 }
 ```
 
-AI-native error codes and diagnostics are defined in the addendum.
+AI error codes and diagnostics are defined in Appendix C.
 
 Allowed reasons:
 - `hash_mismatch`
@@ -149,8 +161,9 @@ Relocation MUST NOT write shared repair updates without user confirmation.
 
 ```json
 {
-  "code": "DRYRUN_REJECTED",
-  "reason": "schema_invalid",
+  "code": "AI_PAYLOAD_REJECTED_SCHEMA_VIOLATION",
+  "phase": "ai_gateway",
+  "retryable": false,
   "diagnostics": [
     { "kind": "disallowed_tag", "detail": "<iframe> not allowed" },
     { "kind": "parse_error", "detail": "Editor schema parse failed at ..." }
@@ -158,6 +171,6 @@ Relocation MUST NOT write shared repair updates without user confirmation.
 }
 ```
 
-Allowed reasons (non-exhaustive):
-- `schema_invalid`
-- `limit_exceeded`
+Other error codes:
+- `AI_PAYLOAD_REJECTED_SANITIZE` (400)
+- `AI_PAYLOAD_REJECTED_LIMITS` (400)

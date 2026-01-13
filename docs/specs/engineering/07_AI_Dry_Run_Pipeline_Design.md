@@ -1,7 +1,7 @@
 # AI Dry-Run Pipeline Design (Sanitize → Normalize → Schema Apply) — v0.9 RC
 
 **Applies to:** LFCC v0.9 RC  
-**Last updated:** 2025-12-31  
+**Last updated:** 2026-01-13  
 **Audience:** Backend engineers, AI platform engineers.  
 **Source of truth:** LFCC v0.9 RC §11.2 (Dry-Run), §8 (Canonicalizer).
 
@@ -48,14 +48,11 @@ See `23_AI_Native_Extension.md` for normative requirements.
 - AI output fragments: HTML or Markdown (prefer structured XML ops)
 - policy: `ai_sanitization_policy`
 
-### 2.2 Rules (Recommended baseline)
-- Remove or reject:
-  - `<script>`, `<style>`, `<iframe>`, `<object>`, `<embed>`
-  - any `on*=` event attributes
-  - `style=` (unless you have a safe subset; LFCC recommends default reject)
-- For links:
-  - allow only safe protocols: `https:`, `http:` (optional), `mailto:` (optional)
-  - reject `javascript:` and data URLs by default
+### 2.2 Rules (Normative baseline)
+- Follow Appendix B (Sanitization Profile) in LFCC v0.9 RC.
+- Remove or reject disallowed tags/blocks/marks/attrs per policy.
+- Disallow script/style/event handlers.
+- Enforce URL policy (`^(https?|mailto):[^\\s]+$`) and forbid `javascript:`, `data:`, `vbscript:`.
 - Enforce `ai_sanitization_policy.limits`:
   - `max_payload_bytes`
   - `max_nesting_depth`
@@ -119,7 +116,10 @@ Ensure the editor can accept the payload deterministically without mutation.
 ### 5.2 On failure
 - return structured diagnostics
 - do not apply any mutation
-- error code `DRYRUN_REJECTED` (recommended)
+- use Appendix C error codes:
+  - `AI_PAYLOAD_REJECTED_SANITIZE`
+  - `AI_PAYLOAD_REJECTED_SCHEMA_VIOLATION`
+  - `AI_PAYLOAD_REJECTED_LIMITS`
 
 ---
 
