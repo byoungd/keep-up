@@ -10,6 +10,7 @@ import type { LoroDoc } from "loro-crdt";
 import type { Schema } from "prosemirror-model";
 import type { EditorState } from "prosemirror-state";
 import { projectLoroToPm } from "../projection/projection";
+import { getChecksumInput } from "../security/canonicalizer";
 
 export type DivergenceCheckResult = {
   diverged: boolean;
@@ -191,27 +192,11 @@ export class DivergenceDetector {
 
   /**
    * Compute structural checksum for Editor state
-   * P1.1-Hardened: Includes block order, text content, marks, and attrs
+   * LFCC v0.9.4: Uses Canonicalizer (§8) for deterministic serialization
    */
   private computeEditorChecksum(editorState: EditorState): string {
-    const doc = editorState.doc;
-    const segments: string[] = [];
-    let order = 0;
-
-    doc.descendants((node) => {
-      const blockId = node.attrs.block_id;
-      if (typeof blockId === "string" && blockId.trim() !== "") {
-        // Include: order, blockId, type, text content, marks, attrs
-        const textContent = node.textContent;
-        const marks = this.serializeMarks(node);
-        const attrs = this.serializeAttrs(node.attrs);
-
-        segments.push(`${order}|${blockId}|${node.type.name}|${textContent}|${marks}|${attrs}`);
-        order++;
-      }
-    });
-
-    return this.simpleHash(segments.join(";"));
+    const canonicalInput = getChecksumInput(editorState.doc);
+    return this.simpleHash(canonicalInput);
   }
 
   /**
@@ -247,27 +232,13 @@ export class DivergenceDetector {
 
   /**
    * Compute structural checksum for Loro state
-   * P1.1-Hardened: Includes block order, text content, marks, and attrs
+   * LFCC v0.9.4: Uses Canonicalizer (§8) for deterministic serialization
    */
   private computeLoroChecksum(loroDoc: LoroDoc, schema: Schema): string {
     try {
       const pmDoc = projectLoroToPm(loroDoc, schema);
-      const segments: string[] = [];
-      let order = 0;
-
-      pmDoc.descendants((node) => {
-        const blockId = node.attrs.block_id;
-        if (typeof blockId === "string" && blockId.trim() !== "") {
-          const textContent = node.textContent;
-          const marks = this.serializeMarks(node);
-          const attrs = this.serializeAttrs(node.attrs);
-
-          segments.push(`${order}|${blockId}|${node.type.name}|${textContent}|${marks}|${attrs}`);
-          order++;
-        }
-      });
-
-      return this.simpleHash(segments.join(";"));
+      const canonicalInput = getChecksumInput(pmDoc);
+      return this.simpleHash(canonicalInput);
     } catch (_error) {
       return "";
     }

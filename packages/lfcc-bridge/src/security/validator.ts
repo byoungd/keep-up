@@ -267,98 +267,120 @@ export class SecurityValidator {
   }
 
   /**
-   * Sanitize payload using whitelist approach
-   * Removes or rejects disallowed tags, attributes, and event handlers
+   * LFCC Appendix B Whitelist Configuration
+   * Only these tags/attributes are allowed; all others are stripped.
+   */
+  private static readonly ALLOWED_TAGS = new Set([
+    // Block elements
+    "p",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "blockquote",
+    "ul",
+    "ol",
+    "li",
+    "pre",
+    "code",
+    "hr",
+    "br",
+    // Inline elements
+    "strong",
+    "em",
+    "s",
+    "u",
+    "a",
+    "span",
+    "sub",
+    "sup",
+    // Media (LFCC Appendix B.2)
+    "img",
+    "video",
+    // Table elements
+    "table",
+    "thead",
+    "tbody",
+    "tr",
+    "th",
+    "td",
+  ]);
+
+  /**
+   * LFCC Appendix B.2 Attribute Whitelist
+   * Tag-specific allowed attributes
+   */
+  private static readonly ALLOWED_ATTRS_BY_TAG: Record<string, Set<string>> = {
+    // Media attributes (LFCC Appendix B.2)
+    img: new Set(["src", "alt", "title", "width", "height"]),
+    video: new Set(["src", "poster", "controls", "width", "height"]),
+    // Link attributes
+    a: new Set(["href", "title", "target", "rel"]),
+    // Code block attributes
+    code: new Set(["language", "class"]),
+    pre: new Set(["language", "class"]),
+    // Table cell attributes
+    td: new Set(["rowspan", "colspan"]),
+    th: new Set(["rowspan", "colspan"]),
+    // Global allowed on all elements
+    _global: new Set(["id", "class", "data-block-id", "data-annotation-id"]),
+  };
+
+  /**
+   * Sanitize payload using STRICT WHITELIST approach (LFCC Appendix B)
+   * Only allowed tags and attributes pass through; everything else is stripped.
    */
   sanitizePayload(html: string): SecurityValidationResult {
     const errors: SecurityError[] = [];
     const warnings: SecurityWarning[] = [];
     let sanitized = html;
 
-    // Blocked tags (must be removed)
-    const blockedTags = [
-      "script",
-      "style",
-      "iframe",
-      "object",
-      "embed",
-      "frame",
-      "frameset",
-      "form",
-      "input",
-      "button",
-      "textarea",
-      "select",
-    ];
+    // Step 1: Remove all tags not in whitelist
+    const tagPattern = /<\/?([a-zA-Z][a-zA-Z0-9]*)[^>]*>/g;
+    const tagsToRemove: string[] = [];
 
-    // Blocked attributes (event handlers and dangerous attributes)
-    const blockedAttributes = [
-      "onclick",
-      "onerror",
-      "onload",
-      "onmouseover",
-      "onmouseout",
-      "onfocus",
-      "onblur",
-      "onchange",
-      "onsubmit",
-      "onkeydown",
-      "onkeyup",
-      "onkeypress",
-      "onabort",
-      "onload",
-      "onunload",
-      "onresize",
-      "onscroll",
-      "style", // Block inline styles (CSS injection)
-    ];
-
-    // Remove blocked tags
-    for (const tag of blockedTags) {
-      const regex = new RegExp(`<${tag}[^>]*>.*?</${tag}>`, "gis");
-      const matches = sanitized.match(regex);
-      if (matches) {
-        warnings.push({
-          code: "BLOCKED_TAG_REMOVED",
-          message: `Removed blocked tag: <${tag}>`,
-          detail: `Found ${matches.length} occurrence(s)`,
-        });
-        sanitized = sanitized.replace(regex, "");
-      }
-
-      // Also remove self-closing blocked tags
-      const selfClosingRegex = new RegExp(`<${tag}[^>]*/?>`, "gi");
-      const selfClosingMatches = sanitized.match(selfClosingRegex);
-      if (selfClosingMatches) {
-        warnings.push({
-          code: "BLOCKED_TAG_REMOVED",
-          message: `Removed self-closing blocked tag: <${tag}/>`,
-          detail: `Found ${selfClosingMatches.length} occurrence(s)`,
-        });
-        sanitized = sanitized.replace(selfClosingRegex, "");
+    for (const match of sanitized.matchAll(tagPattern)) {
+      const tagName = match[1].toLowerCase();
+      if (!SecurityValidator.ALLOWED_TAGS.has(tagName)) {
+        tagsToRemove.push(tagName);
       }
     }
 
-    // Remove blocked attributes
-    for (const attr of blockedAttributes) {
-      const regex = new RegExp(`\\s${attr}\\s*=\\s*["'][^"']*["']`, "gi");
-      const matches = sanitized.match(regex);
-      if (matches) {
+    // Remove disallowed tags (unwrap content, don't delete)
+    for (const tag of [...new Set(tagsToRemove)]) {
+      // Remove opening and closing tags but keep inner content
+      const openTagRegex = new RegExp(`<${tag}[^>]*>`, "gi");
+      const closeTagRegex = new RegExp(`</${tag}>`, "gi");
+      if (sanitized.match(openTagRegex)) {
         warnings.push({
-          code: "BLOCKED_ATTRIBUTE_REMOVED",
-          message: `Removed blocked attribute: ${attr}`,
-          detail: `Found ${matches.length} occurrence(s)`,
+          code: "DISALLOWED_TAG_STRIPPED",
+          message: `Stripped disallowed tag: <${tag}>`,
         });
-        sanitized = sanitized.replace(regex, "");
+        sanitized = sanitized.replace(openTagRegex, "");
+        sanitized = sanitized.replace(closeTagRegex, "");
       }
     }
 
-    // Validate that no dangerous patterns remain
+    // Step 2: Strip disallowed attributes from allowed tags
+    const attrPattern = /<([a-zA-Z][a-zA-Z0-9]*)([^>]*)>/g;
+    sanitized = sanitized.replace(attrPattern, (_match, tagName: string, attrString: string) => {
+      const tag = tagName.toLowerCase();
+      if (!SecurityValidator.ALLOWED_TAGS.has(tag)) {
+        return _match; // Already handled above
+      }
+
+      const cleanAttrs = this.parseAndFilterAttributes(tag, attrString, warnings);
+      return cleanAttrs.length > 0 ? `<${tagName} ${cleanAttrs.join(" ")}>` : `<${tagName}>`;
+    });
+
+    // Step 3: Final safety check - reject if dangerous patterns remain
     const dangerousPatterns = [
       /javascript:/gi,
       /data:text\/html/gi,
       /vbscript:/gi,
-      /on\w+\s*=/gi, // Any event handler
+      /on\w+\s*=/gi, // Any remaining event handler
     ];
 
     for (const pattern of dangerousPatterns) {
@@ -366,8 +388,8 @@ export class SecurityValidator {
       if (matches) {
         errors.push({
           code: "DANGEROUS_PATTERN_DETECTED",
-          message: `Dangerous pattern detected: ${pattern.source}`,
-          detail: `Found ${matches.length} occurrence(s)`,
+          message: `Dangerous pattern detected after sanitization: ${pattern.source}`,
+          detail: `Found ${matches.length} occurrence(s) - rejecting payload`,
         });
       }
     }
@@ -378,6 +400,59 @@ export class SecurityValidator {
       warnings,
       sanitized: errors.length === 0 ? sanitized : undefined,
     };
+  }
+
+  /**
+   * Parse and filter attributes based on whitelist (LFCC Appendix B.2)
+   */
+  private parseAndFilterAttributes(
+    tag: string,
+    attrString: string,
+    warnings: SecurityWarning[]
+  ): string[] {
+    const allowedForTag = SecurityValidator.ALLOWED_ATTRS_BY_TAG[tag] ?? new Set<string>();
+    const globalAllowed = SecurityValidator.ALLOWED_ATTRS_BY_TAG._global;
+    const cleanAttrs: string[] = [];
+
+    // Use matchAll for cleaner iteration
+    const attrRegex = /([a-zA-Z][-a-zA-Z0-9]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]*)))?/g;
+    const matches = attrString.matchAll(attrRegex);
+
+    for (const attrMatch of matches) {
+      const attrName = attrMatch[1].toLowerCase();
+      const attrValue = attrMatch[2] ?? attrMatch[3] ?? attrMatch[4] ?? "";
+
+      // Check if attribute is allowed (tag-specific or global)
+      if (allowedForTag.has(attrName) || globalAllowed.has(attrName)) {
+        // For URL attributes, validate the URL
+        if (["href", "src", "poster"].includes(attrName)) {
+          if (this.validateURL(attrValue)) {
+            cleanAttrs.push(`${attrName}="${this.escapeHtml(attrValue)}"`);
+          } else {
+            warnings.push({
+              code: "INVALID_URL_REMOVED",
+              message: `Removed invalid URL in ${attrName}: ${attrValue.substring(0, 50)}...`,
+            });
+          }
+        } else {
+          cleanAttrs.push(`${attrName}="${this.escapeHtml(attrValue)}"`);
+        }
+      }
+    }
+
+    return cleanAttrs;
+  }
+
+  /**
+   * Escape HTML entities in attribute values
+   */
+  private escapeHtml(str: string): string {
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#x27;");
   }
 
   /**

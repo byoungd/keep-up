@@ -99,7 +99,22 @@ export interface GatewayRequestOptions {
   metadata?: Record<string, unknown>;
   /** Abort signal for cancellation */
   signal?: AbortSignal;
+  /**
+   * LFCC §11.1: Document frontier for conflict detection
+   * For Loro: { loro_frontier: string[] }
+   * For Yjs: { yjs_state_vector: string }
+   */
+  docFrontier?: DocFrontier;
 }
+
+/**
+ * LFCC §11.1: Document frontier types
+ * Represents the observed CRDT state boundary for AI precondition checks.
+ */
+export type DocFrontier =
+  | { loro_frontier: string[] }
+  | { yjs_state_vector: string }
+  | { automerge_heads: string[] };
 
 /** Stream options (extends request options) */
 export interface GatewayStreamOptions extends GatewayRequestOptions {
