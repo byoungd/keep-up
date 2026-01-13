@@ -213,6 +213,32 @@ export class WorkerDbClient implements DbDriver {
     });
   }
 
+  async addSubscriptionToTopic(subscriptionId: string, topicId: string): Promise<void> {
+    return this.sendRequest<void>({ type: "addSubscriptionToTopic", subscriptionId, topicId });
+  }
+
+  async removeSubscriptionFromTopic(subscriptionId: string, topicId: string): Promise<void> {
+    return this.sendRequest<void>({ type: "removeSubscriptionFromTopic", subscriptionId, topicId });
+  }
+
+  async listSubscriptionsByTopic(
+    topicId: string
+  ): Promise<import("./driver/types").RssSubscriptionRow[]> {
+    return this.sendRequest<import("./driver/types").RssSubscriptionRow[]>({
+      type: "listSubscriptionsByTopic",
+      topicId,
+    });
+  }
+
+  async listTopicsBySubscription(
+    subscriptionId: string
+  ): Promise<import("./driver/types").TopicRow[]> {
+    return this.sendRequest<import("./driver/types").TopicRow[]>({
+      type: "listTopicsBySubscription",
+      subscriptionId,
+    });
+  }
+
   async appendUpdate(update: CrdtUpdateRow): Promise<void> {
     return this.sendRequest<void>({ type: "appendUpdate", update });
   }
@@ -900,6 +926,24 @@ export class AutoSwitchDbClient implements DbDriver {
 
   listTopicsByDocument(documentId: string): Promise<import("./driver/types").TopicRow[]> {
     return this.driver.listTopicsByDocument(documentId);
+  }
+
+  addSubscriptionToTopic(subscriptionId: string, topicId: string): Promise<void> {
+    return this.driver.addSubscriptionToTopic(subscriptionId, topicId);
+  }
+
+  removeSubscriptionFromTopic(subscriptionId: string, topicId: string): Promise<void> {
+    return this.driver.removeSubscriptionFromTopic(subscriptionId, topicId);
+  }
+
+  listSubscriptionsByTopic(
+    topicId: string
+  ): Promise<import("./driver/types").RssSubscriptionRow[]> {
+    return this.driver.listSubscriptionsByTopic(topicId);
+  }
+
+  listTopicsBySubscription(subscriptionId: string): Promise<import("./driver/types").TopicRow[]> {
+    return this.driver.listTopicsBySubscription(subscriptionId);
   }
 
   appendUpdate(u: CrdtUpdateRow): Promise<void> {

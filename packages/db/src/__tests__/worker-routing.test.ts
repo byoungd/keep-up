@@ -64,6 +64,10 @@ function createStubDriver(): { driver: DbDriver; initResult: DbInitResult; jobRo
   const removeDocumentFromTopic = vi.fn().mockResolvedValue(undefined);
   const listDocumentsByTopic = vi.fn().mockResolvedValue([]);
   const listTopicsByDocument = vi.fn().mockResolvedValue([]);
+  const addSubscriptionToTopic = vi.fn().mockResolvedValue(undefined);
+  const removeSubscriptionFromTopic = vi.fn().mockResolvedValue(undefined);
+  const listSubscriptionsByTopic = vi.fn().mockResolvedValue([]);
+  const listTopicsBySubscription = vi.fn().mockResolvedValue([]);
   const deleteImportJob = vi.fn().mockResolvedValue(undefined);
   const healthCheck = vi.fn<DbDriver["healthCheck"]>().mockResolvedValue(health);
   const reset = vi.fn<DbDriver["reset"]>().mockResolvedValue(undefined);
@@ -154,6 +158,10 @@ function createStubDriver(): { driver: DbDriver; initResult: DbInitResult; jobRo
     removeDocumentFromTopic,
     listDocumentsByTopic,
     listTopicsByDocument,
+    addSubscriptionToTopic,
+    removeSubscriptionFromTopic,
+    listSubscriptionsByTopic,
+    listTopicsBySubscription,
     deleteImportJob,
     healthCheck,
     reset,

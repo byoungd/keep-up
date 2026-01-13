@@ -568,6 +568,24 @@ export class IndexedDbDriver implements DbDriver {
     }));
   }
 
+  async addSubscriptionToTopic(_subscriptionId: string, _topicId: string): Promise<void> {
+    throw new Error("Method not implemented.");
+  }
+
+  async removeSubscriptionFromTopic(_subscriptionId: string, _topicId: string): Promise<void> {
+    throw new Error("Method not implemented.");
+  }
+
+  async listSubscriptionsByTopic(
+    _topicId: string
+  ): Promise<import("../types").RssSubscriptionRow[]> {
+    throw new Error("Method not implemented.");
+  }
+
+  async listTopicsBySubscription(_subscriptionId: string): Promise<TopicRow[]> {
+    throw new Error("Method not implemented.");
+  }
+
   async appendUpdate(update: CrdtUpdateRow): Promise<void> {
     // Use put with ignore if exists (Dexie doesn't have INSERT OR IGNORE)
     const existing = await this.ensureDb().crdtUpdates.get([

@@ -1,8 +1,13 @@
 "use client";
 
-import { useRssFeeds } from "@/hooks/useRssFeeds";
-import type { RssFolder, RssSubscription, RssSubscriptionRow } from "@keepup/db";
-import { createFolder, deleteFolder, getUnreadCount, updateFolder } from "@keepup/db";
+import { type FeedSubscription, useFeedItems, useFeedProvider } from "@/providers/FeedProvider";
+import type {
+  FeedItemRow as FeedItemRowType,
+  RssFolder,
+  RssSubscription,
+  RssSubscriptionRow,
+} from "@keepup/db";
+import { createFolder, deleteFolder, updateFolder } from "@keepup/db";
 import { cn } from "@keepup/shared/utils";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -39,6 +44,7 @@ interface FeedListItemsProps {
   onItemClick: (itemId: string) => void;
   className?: string;
   activeItemId?: string | null;
+  items?: FeedItemRowType[];
 }
 
 type FeedListProps = FeedListManagementProps | FeedListItemsProps;
@@ -300,8 +306,24 @@ function FeedManagementList({
   );
 }
 
-function FeedItemsList({ filter, onItemClick, className, activeItemId }: FeedListItemsProps) {
-  const { items, subscriptions, markAsRead, toggleSaved, isHydrated } = useRssFeeds();
+function FeedItemsList({
+  filter,
+  onItemClick,
+  className,
+  activeItemId,
+  items: providedItems,
+}: FeedListItemsProps) {
+  const { subscriptions, markAsRead, toggleSaved } = useFeedProvider();
+
+  // Use provided items or fetch them
+  const isControlled = !!providedItems;
+  const { data: fetchedItems = [], isLoading } = useFeedItems(
+    !isControlled ? (typeof filter === "string" ? filter : "all") : undefined,
+    { enabled: !isControlled }
+  );
+
+  const items = providedItems ?? fetchedItems;
+  const isHydrated = isControlled || !isLoading;
 
   const subscriptionMap = useMemo(() => {
     const map = new Map<string, RssSubscriptionRow>();
@@ -320,6 +342,9 @@ function FeedItemsList({ filter, onItemClick, className, activeItemId }: FeedLis
         return item.saved;
       }
       if (filter === "all") {
+        return true;
+      }
+      if (typeof filter === "string" && filter.startsWith("topic:")) {
         return true;
       }
       return item.subscriptionId === filter;
@@ -351,34 +376,32 @@ function FeedItemsList({ filter, onItemClick, className, activeItemId }: FeedLis
         {filter === "unread" ? (
           // All caught up state
           <>
-            <div className="w-16 h-16 rounded-full bg-linear-to-br from-green-500/20 to-emerald-500/20 flex items-center justify-center mb-4">
-              <Check className="h-8 w-8 text-green-500" />
+            <div className="w-10 h-10 rounded-full bg-surface-2 flex items-center justify-center mb-3">
+              <Check className="h-5 w-5 text-muted-foreground" />
             </div>
-            <h3 className="text-lg font-semibold text-foreground mb-1">All caught up!</h3>
-            <p className="text-sm text-muted-foreground max-w-60">
-              You've read everything. Check back later for new articles.
-            </p>
+            <h3 className="text-sm font-medium text-foreground mb-1">All caught up</h3>
+            <p className="text-xs text-muted-foreground max-w-50">No unread articles left.</p>
           </>
         ) : filter === "saved" ? (
           // No saved items
           <>
-            <div className="w-16 h-16 rounded-full bg-linear-to-br from-primary/20 to-accent-cyan/20 flex items-center justify-center mb-4">
-              <Bookmark className="h-8 w-8 text-primary" />
+            <div className="w-10 h-10 rounded-full bg-surface-2 flex items-center justify-center mb-3">
+              <Bookmark className="h-5 w-5 text-muted-foreground" />
             </div>
-            <h3 className="text-lg font-semibold text-foreground mb-1">No saved articles</h3>
-            <p className="text-sm text-muted-foreground max-w-60">
-              Save articles for later by clicking the bookmark icon.
+            <h3 className="text-sm font-medium text-foreground mb-1">No saved articles</h3>
+            <p className="text-xs text-muted-foreground max-w-50">
+              Click the bookmark icon to save for later.
             </p>
           </>
         ) : (
           // Empty feed
           <>
-            <div className="w-16 h-16 rounded-full bg-linear-to-br from-muted/50 to-muted/30 flex items-center justify-center mb-4">
-              <Rss className="h-8 w-8 text-muted-foreground/50" />
+            <div className="w-10 h-10 rounded-full bg-surface-2 flex items-center justify-center mb-3">
+              <Rss className="h-5 w-5 text-muted-foreground" />
             </div>
-            <h3 className="text-lg font-semibold text-foreground mb-1">No articles yet</h3>
-            <p className="text-sm text-muted-foreground max-w-60">
-              Add some feeds to start reading. Articles will appear here.
+            <h3 className="text-sm font-medium text-foreground mb-1">No articles</h3>
+            <p className="text-xs text-muted-foreground max-w-50">
+              Add feeds to see articles here.
             </p>
           </>
         )}
@@ -423,7 +446,7 @@ function FeedItemsList({ filter, onItemClick, className, activeItemId }: FeedLis
               isActive={activeItemId === item.itemId}
               onClick={() => onItemClick(item.itemId)}
               onMarkRead={() => markAsRead(item.itemId)}
-              onToggleSaved={() => toggleSaved(item.itemId)}
+              onToggleSaved={() => toggleSaved(item.itemId, item.saved)}
               onOpenExternal={() => item.link && window.open(item.link, "_blank", "noopener")}
             />
           );
@@ -475,7 +498,7 @@ function FeedItemsList({ filter, onItemClick, className, activeItemId }: FeedLis
                 isActive={activeItemId === item.itemId}
                 onClick={() => onItemClick(item.itemId)}
                 onMarkRead={() => markAsRead(item.itemId)}
-                onToggleSaved={() => toggleSaved(item.itemId)}
+                onToggleSaved={() => toggleSaved(item.itemId, item.saved)}
                 onOpenExternal={() => item.link && window.open(item.link, "_blank", "noopener")}
               />
             </div>
@@ -497,7 +520,7 @@ function FeedItem({
   onDelete: (id: string) => void;
   onToggle: (id: string, enabled: boolean) => void;
 }) {
-  const unreadCount = getUnreadCount(sub.subscriptionId);
+  const unreadCount = (sub as FeedSubscription).unreadCount ?? 0;
   const t = useTranslations("Feeds");
 
   return (
