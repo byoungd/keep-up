@@ -30,8 +30,6 @@ export class DbDigestProvider implements IDigestProvider {
     return this.db.listFeedItems({
       readState: "unread",
       limit,
-      orderBy: "publishedAt",
-      order: "desc",
     });
   }
 
@@ -42,8 +40,6 @@ export class DbDigestProvider implements IDigestProvider {
     // Assuming simple fetch for now.
     const items = await this.db.listFeedItems({
       limit: limit * 2, // Fetch more to account for filtering
-      orderBy: "publishedAt",
-      order: "desc",
     });
 
     return items.filter((item: FeedItemRow) => (item.publishedAt ?? 0) > since).slice(0, limit);
@@ -113,9 +109,15 @@ export class DigestToolServer extends BaseToolServer {
     const limit = (args.limit as number) || 50;
     const timeWindow = (args.timeWindow as string) || "24h";
     const hours = Number.parseInt(timeWindow.replace("h", ""), 10) || 24;
+    const includeRead = Boolean(args.includeRead);
+    const since = Date.now() - hours * 60 * 60 * 1000;
 
     try {
-      const items = await this.provider.fetchItemsByWindow(hours, limit);
+      const items = includeRead
+        ? await this.provider.fetchItemsByWindow(hours, limit)
+        : (await this.provider.fetchUnreadItems(limit * 2))
+            .filter((item) => (item.publishedAt ?? 0) > since)
+            .slice(0, limit);
 
       // Format as simplified JSON for the agent to consume
       const simplifiedItems = items.map((item) => ({
