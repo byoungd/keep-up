@@ -31,17 +31,27 @@ export function FeedsSidebarSection({ onAddFeed }: FeedsSidebarSectionProps) {
   );
 
   // Compute counts
-  const unreadCount = items.filter((i) => i.readState === "unread").length;
-  const savedCount = items.filter((i) => i.saved).length;
+  const unreadCount = React.useMemo(
+    () => subscriptions.reduce((acc, sub) => acc + (sub.unreadCount ?? 0), 0),
+    [subscriptions]
+  );
+  const savedCount = React.useMemo(() => items.filter((i) => i.saved).length, [items]);
+  const totalCount = items.length;
 
-  const getUnreadCountForSub = (subId: string) => {
-    return items.filter((i) => i.subscriptionId === subId && i.readState === "unread").length;
-  };
+  const unreadCountBySub = React.useMemo(() => {
+    const map = new Map<string, number>();
+    for (const sub of subscriptions) {
+      map.set(sub.subscriptionId, sub.unreadCount ?? 0);
+    }
+    return map;
+  }, [subscriptions]);
+
+  const getUnreadCountForSub = (subId: string) => unreadCountBySub.get(subId) ?? 0;
 
   const staticFilters = [
     { id: "unread", label: "Unread", icon: Inbox, count: unreadCount },
     { id: "saved", label: "Saved", icon: Bookmark, count: savedCount },
-    { id: "all", label: "All", icon: List, count: items.length },
+    { id: "all", label: "All", icon: List, count: totalCount },
   ];
 
   const handleCreateTopic = () => {

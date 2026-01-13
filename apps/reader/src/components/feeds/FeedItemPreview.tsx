@@ -7,7 +7,7 @@
 
 "use client";
 
-import { useFeedProvider } from "@/providers/FeedProvider";
+import { type FeedSubscription, useFeedProvider } from "@/providers/FeedProvider";
 import type { FeedItemRow } from "@keepup/db";
 import { cn } from "@keepup/shared/utils";
 import {
@@ -31,8 +31,6 @@ export interface FeedItemPreviewProps {
 }
 
 // Breakdown into smaller components to reduce complexity
-
-import type { FeedSubscription } from "@/providers/FeedProvider";
 
 function FeedItemPreviewHeader({
   item,
