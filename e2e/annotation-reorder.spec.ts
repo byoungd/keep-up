@@ -1,6 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { selectRangeBetweenSubstrings, waitForEditorReady } from "./helpers/editor";
 
+type PMView = import("prosemirror-view").EditorView;
+type PMNode = import("prosemirror-model").Node;
+
 test.describe("Annotation Reorder & Splitting", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/editor");
@@ -13,7 +16,7 @@ test.describe("Annotation Reorder & Splitting", () => {
     await page.keyboard.type("Paragraph One");
     await page.keyboard.press("Enter");
     await page.keyboard.type("Paragraph Two");
-    await page.waitForTimeout(100);
+    await expect(page.locator(".lfcc-editor .ProseMirror")).toContainText("Paragraph Two");
   });
 
   /**
@@ -85,9 +88,6 @@ test.describe("Annotation Reorder & Splitting", () => {
 
     // Release
     await page.mouse.up();
-
-    // Wait for transaction
-    await page.waitForTimeout(1000);
   }
 
   async function getUniqueAnnotationIds(page: import("@playwright/test").Page) {
@@ -97,6 +97,15 @@ test.describe("Annotation Reorder & Splitting", () => {
       for (const node of nodes) ids.add(node.getAttribute("data-annotation-id"));
       return Array.from(ids);
     });
+  }
+
+  async function waitForAnnotationCount(
+    page: import("@playwright/test").Page,
+    expected: number
+  ): Promise<void> {
+    await expect
+      .poll(async () => (await getUniqueAnnotationIds(page)).length, { timeout: 5000 })
+      .toBe(expected);
   }
 
   test("Splits multi-block annotation when blocks are reordered via Drag Handle (UI)", async ({
@@ -117,6 +126,7 @@ test.describe("Annotation Reorder & Splitting", () => {
     await dragBlockByIndex(page, 0, 1);
 
     // 3. Verify: Should be 2 annotations now
+    await waitForAnnotationCount(page, 2);
     const finalIds = await getUniqueAnnotationIds(page);
     expect(finalIds.length).toBe(2);
   });
@@ -139,17 +149,18 @@ test.describe("Annotation Reorder & Splitting", () => {
 
     // 2. Reorder blocks: Move "Paragraph Two" above "Paragraph One" directly via ProseMirror
     await page.evaluate(() => {
-      // @ts-ignore
-      const view = window.__lfccView;
-      if (!view) throw new Error("View not found");
+      const view = (window as unknown as { __lfccView?: PMView }).__lfccView;
+      if (!view) {
+        throw new Error("View not found");
+      }
 
       const state = view.state;
       const doc = state.doc;
 
       // Find Paragraph Two
       let p2Pos = -1;
-      let p2Node: { nodeSize: number } | null = null;
-      doc.descendants((node: { textContent: string; nodeSize: number }, pos: number) => {
+      let p2Node: PMNode | null = null;
+      doc.descendants((node: PMNode, pos: number) => {
         if (node.textContent === "Paragraph Two") {
           p2Pos = pos;
           p2Node = node;
@@ -158,7 +169,9 @@ test.describe("Annotation Reorder & Splitting", () => {
         return true;
       });
 
-      if (p2Pos === -1 || !p2Node) throw new Error("Paragraph Two not found");
+      if (p2Pos === -1 || !p2Node) {
+        throw new Error("Paragraph Two not found");
+      }
 
       const tr = state.tr;
       const node = p2Node; // TypeScript narrowing
@@ -170,23 +183,11 @@ test.describe("Annotation Reorder & Splitting", () => {
       view.dispatch(tr);
     });
 
-    // Wait for healing logic (debounced)
-    // Wait longer to ensure debounced check runs
-    await page.waitForTimeout(2000);
-
-    // DEBUG: Print content to verify reorder
-    // const editor = page.locator(".lfcc-editor .ProseMirror");
-    // const content = await editor.innerText();
-    // console.log("Editor Content after Reorder:", content);
+    await waitForAnnotationCount(page, 2);
 
     // 3. Verify annotation split
     // Should now have 2 unique annotations (IDs)
-    const finalIdSet = await page.evaluate(() => {
-      const nodes = document.querySelectorAll(".lfcc-annotation");
-      const ids = new Set<string | null>();
-      for (const node of nodes) ids.add(node.getAttribute("data-annotation-id"));
-      return Array.from(ids);
-    });
+    const finalIdSet = await getUniqueAnnotationIds(page);
     expect(finalIdSet.length).toBe(2);
 
     // Check text content - we can't easily rely on DOM order for IDs,
