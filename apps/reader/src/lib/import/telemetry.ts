@@ -1,9 +1,10 @@
 /**
  * Import Telemetry
  *
- * Placeholder telemetry functions for import events.
- * Replace with actual telemetry implementation (e.g., PostHog, Mixpanel, etc.)
+ * Import-specific telemetry functions routed through the unified adapter.
  */
+
+import { getTelemetryAdapter } from "@/lib/analytics/telemetryAdapter";
 
 type ImportTelemetryEvent =
   | { name: "import_modal_opened"; tab: string }
@@ -14,22 +15,11 @@ type ImportTelemetryEvent =
   | { name: "import_failed"; jobId: string; error: string }
   | { name: "import_dedupe_hit"; jobId: string; existingDocId: string };
 
-const DEBUG = process.env.NODE_ENV === "development";
-
 /**
- * Track an import-related event.
+ * Track an import-related event through the unified telemetry adapter.
  */
 export function trackImportEvent(event: ImportTelemetryEvent): void {
-  if (DEBUG) {
-    console.debug("[Import Telemetry]", event.name, event);
-  }
-
-  // TODO: Replace with actual telemetry provider
-  // Example for PostHog:
-  // posthog?.capture(event.name, event);
-
-  // Example for custom analytics:
-  // analytics.track(event.name, event);
+  getTelemetryAdapter().track(event);
 }
 
 /**

@@ -4,6 +4,7 @@ import { type NodeViewComponentProps, useEditorEffect } from "@handlewithcare/re
 import { Check, Sparkles } from "lucide-react";
 import type { EditorView } from "prosemirror-view";
 import * as React from "react";
+import { orderedListNumberingKey } from "./orderedListNumberingPlugin";
 
 /** Indent amount in pixels per level */
 const INDENT_PX = 24;
@@ -140,27 +141,19 @@ export const BlockNodeView = React.forwardRef<HTMLDivElement, BlockNodeProps>(
     const level = node.attrs.level || 1;
 
     // Calculate ordered list number
-    const orderedNumber = React.useMemo(() => {
+    const orderedNumber = (() => {
       if (listType !== "ordered" || !view || view.isDestroyed) {
         return 1;
       }
-      const pos = getPos();
-      if (pos === undefined) {
+
+      const blockId = node.attrs.block_id as string | undefined;
+      if (!blockId) {
         return 1;
       }
-      const doc = view.state.doc;
-      let count = 1;
-      doc.nodesBetween(0, pos, (n, nodePos) => {
-        if (nodePos >= pos) {
-          return false;
-        }
-        if (n.attrs.list_type === "ordered" && (n.attrs.indent_level || 0) === indentLevel) {
-          count++;
-        }
-        return false;
-      });
-      return count;
-    }, [listType, view, getPos, indentLevel]);
+
+      const state = orderedListNumberingKey.getState(view.state);
+      return state?.byBlockId.get(blockId) ?? 1;
+    })();
 
     // Handle task checkbox toggle
     const handleToggleTask = React.useCallback(() => {

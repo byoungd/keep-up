@@ -245,9 +245,12 @@ export class RequestCache {
 
     for (const msg of messages) {
       parts.push(msg.role);
-      // Handle discriminated union - only some roles have content
       if (msg.role === "user" || msg.role === "assistant" || msg.role === "system") {
-        parts.push(msg.content.substring(0, 200)); // Limit length
+        parts.push(msg.content); // Full content for accurate dedup
+      }
+      if (msg.role === "tool") {
+        parts.push(msg.toolName);
+        parts.push(this.serializeToolResult(msg.result));
       }
       // Only assistant has toolCalls
       if (msg.role === "assistant" && msg.toolCalls) {
@@ -258,16 +261,19 @@ export class RequestCache {
     return this.hashString(parts.join("|"));
   }
 
-  private hashTools(tools: Array<{ name: string; description?: string }>): string {
+  private hashTools(
+    tools: Array<{ name: string; description?: string; inputSchema?: unknown }>
+  ): string {
     if (!tools || tools.length === 0) {
       return "no-tools";
     }
 
-    const names = tools
-      .map((t) => t.name)
+    // Include tool input schemas for stronger dedup
+    const toolSpecs = tools
+      .map((t) => `${t.name}:${JSON.stringify(t.inputSchema ?? {})}`)
       .sort()
       .join(",");
-    return this.hashString(names);
+    return this.hashString(toolSpecs);
   }
 
   private hashString(str: string): string {
@@ -278,6 +284,14 @@ export class RequestCache {
       hash = (hash * 16777619) >>> 0;
     }
     return hash.toString(36);
+  }
+
+  private serializeToolResult(result: unknown): string {
+    try {
+      return JSON.stringify(result);
+    } catch {
+      return "[unserializable]";
+    }
   }
 
   private evictLRU(): void {

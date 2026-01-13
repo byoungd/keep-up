@@ -5,6 +5,7 @@
  */
 
 import { beforeEach, describe, expect, it } from "vitest";
+import { createAnnotation } from "../../annotations/annotationSchema";
 import { createEmptyDoc } from "../../crdt/crdtSchema";
 import { type LoroRuntime, createLoroRuntime } from "../../runtime/loroRuntime";
 import { LoroDocumentFacade, createDocumentFacade } from "../documentFacade";
@@ -34,6 +35,23 @@ describe("DocumentFacade", () => {
       expect(blocks).toHaveLength(1);
       expect(blocks[0].type).toBe("paragraph");
     });
+
+    it("caches blocks between reads and invalidates on mutation", () => {
+      const first = facade.getBlocks();
+      const second = facade.getBlocks();
+      expect(second).toBe(first);
+
+      facade.insertBlock({
+        parentId: null,
+        index: 1,
+        type: "paragraph",
+        text: "Cache invalidation",
+      });
+
+      const third = facade.getBlocks();
+      expect(third).not.toBe(first);
+      expect(third).toHaveLength(2);
+    });
   });
 
   describe("getBlock", () => {
@@ -48,6 +66,21 @@ describe("DocumentFacade", () => {
     it("returns undefined for non-existent block", () => {
       const block = facade.getBlock("non-existent");
       expect(block).toBeUndefined();
+    });
+
+    it("returns cached child instances after lookup", () => {
+      const parentId = facade.getBlocks()[0].id;
+      const childId = facade.insertBlock({
+        parentId,
+        index: 0,
+        type: "paragraph",
+        text: "Child",
+      });
+
+      const blocks = facade.getBlocks();
+      const childFromTree = blocks[0].children[0];
+      const childFromLookup = facade.getBlock(childId);
+      expect(childFromLookup).toBe(childFromTree);
     });
   });
 
@@ -153,6 +186,64 @@ describe("DocumentFacade", () => {
 
       expect(facade.getBlocks()).toHaveLength(1);
       expect(facade.getBlock(blockId)).toBeUndefined();
+    });
+  });
+
+  describe("moveBlock", () => {
+    it("preserves nested children when moving blocks", () => {
+      const quoteId = facade.insertBlock({
+        parentId: null,
+        index: 1,
+        type: "quote",
+        text: "",
+      });
+
+      const childId = facade.insertBlock({
+        parentId: quoteId,
+        index: 0,
+        type: "paragraph",
+        text: "Nested content",
+      });
+
+      facade.moveBlock({ blockId: quoteId, newParentId: null, newIndex: 0 });
+
+      const moved = facade.getBlock(quoteId);
+      expect(moved?.children).toHaveLength(1);
+      expect(moved?.children[0].id).toBe(childId);
+    });
+
+    it("keeps annotations intact after moving a block", () => {
+      const quoteId = facade.insertBlock({
+        parentId: null,
+        index: 1,
+        type: "quote",
+        text: "",
+      });
+
+      const childId = facade.insertBlock({
+        parentId: quoteId,
+        index: 0,
+        type: "paragraph",
+        text: "Annotated text",
+      });
+
+      createAnnotation(runtime.doc, {
+        id: "anno-1",
+        spanList: [{ blockId: childId, start: 0, end: 5 }],
+        chain: {
+          policy: { kind: "strict_adjacency", maxInterveningBlocks: 0 },
+          order: [childId],
+        },
+        content: "Test annotation",
+      });
+      runtime.commit("test-annotation");
+
+      facade.moveBlock({ blockId: childId, newParentId: null, newIndex: 0 });
+
+      const annotations = facade.getAnnotations();
+      const annotation = annotations.find((entry) => entry.id === "anno-1");
+      expect(annotation).toBeDefined();
+      expect(annotation?.spans[0].blockId).toBe(childId);
     });
   });
 

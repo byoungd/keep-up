@@ -63,6 +63,7 @@ export class LoroDocumentFacade implements DocumentFacade {
   private readonly runtime: LoroRuntime;
   private readonly subscribers: Set<FacadeSubscriber> = new Set();
   private cachedBlocks: BlockNode[] | null = null;
+  private cachedBlockIndex: Map<string, BlockNode> | null = null;
   private unsubscribeLoroChanges: (() => void) | null = null;
 
   constructor(runtime: LoroRuntime) {
@@ -83,13 +84,13 @@ export class LoroDocumentFacade implements DocumentFacade {
   // ============================================================================
 
   getBlocks(): BlockNode[] {
-    // Invalidate cache and re-read from Loro
-    this.cachedBlocks = readBlockTree(this.runtime.doc);
-    return this.cachedBlocks;
+    this.ensureCache();
+    return this.cachedBlocks ?? [];
   }
 
   getBlock(blockId: string): BlockNode | undefined {
-    return this.findBlockById(this.getBlocks(), blockId);
+    this.ensureCache();
+    return this.cachedBlockIndex?.get(blockId);
   }
 
   getBlockText(blockId: string): string {
@@ -236,26 +237,33 @@ export class LoroDocumentFacade implements DocumentFacade {
 
   moveBlock(intent: MoveBlockIntent): void {
     const { blockId, newParentId, newIndex, origin } = intent;
+    const doc = this.runtime.doc;
 
-    // Delete from current position
-    this.deleteBlock({ blockId, origin: `${origin ?? "facade:move"}-delete` });
-
-    // Get the block data before deletion (need to re-read)
-    const block = this.getBlock(blockId);
-    if (!block) {
-      throw new Error(`Block ${blockId} not found after delete`);
+    const blocks = this.getBlocks();
+    const parentInfo = this.findParentOf(blocks, blockId);
+    if (!parentInfo) {
+      return;
     }
 
-    // Re-insert at new position
-    // Note: This is a simplified implementation. Full implementation would preserve block data.
-    this.insertBlock({
-      parentId: newParentId,
-      index: newIndex,
-      type: block.type,
-      text: block.text,
-      richText: block.richText,
-      attrs: parseAttrs(block.attrs),
-      origin: `${origin ?? "facade:move"}-insert`,
+    const sourceParentId = parentInfo.parent?.id ?? null;
+    const sourceList = this.getChildrenList(doc, sourceParentId);
+    if (parentInfo.index < 0 || parentInfo.index >= sourceList.length) {
+      return;
+    }
+
+    sourceList.delete(parentInfo.index, 1);
+
+    const targetList = this.getChildrenList(doc, newParentId);
+    const boundedIndex = Math.max(0, Math.min(newIndex, targetList.length));
+    targetList.insert(boundedIndex, blockId);
+
+    this.runtime.commit(origin ?? "facade:move");
+    this.invalidateCache();
+    this.emit({
+      type: "block_updated",
+      blockIds: [blockId],
+      source: "local",
+      metadata: { origin },
     });
   }
 
@@ -740,6 +748,7 @@ export class LoroDocumentFacade implements DocumentFacade {
 
   private invalidateCache(): void {
     this.cachedBlocks = null;
+    this.cachedBlockIndex = null;
   }
 
   private emit(event: FacadeChangeEvent): void {
@@ -752,17 +761,29 @@ export class LoroDocumentFacade implements DocumentFacade {
     }
   }
 
-  private findBlockById(blocks: BlockNode[], id: string): BlockNode | undefined {
-    for (const block of blocks) {
-      if (block.id === id) {
-        return block;
-      }
-      const found = this.findBlockById(block.children, id);
-      if (found) {
-        return found;
-      }
+  private ensureCache(): void {
+    if (this.cachedBlocks) {
+      return;
     }
-    return undefined;
+
+    const blocks = readBlockTree(this.runtime.doc);
+    this.cachedBlocks = blocks;
+    this.cachedBlockIndex = this.buildBlockIndex(blocks);
+  }
+
+  private buildBlockIndex(blocks: BlockNode[]): Map<string, BlockNode> {
+    const index = new Map<string, BlockNode>();
+    for (const block of blocks) {
+      this.addBlockToIndex(index, block);
+    }
+    return index;
+  }
+
+  private addBlockToIndex(index: Map<string, BlockNode>, block: BlockNode): void {
+    index.set(block.id, block);
+    for (const child of block.children) {
+      this.addBlockToIndex(index, child);
+    }
   }
 
   private findBlockByPredicate(
@@ -797,6 +818,30 @@ export class LoroDocumentFacade implements DocumentFacade {
       }
     }
     return null;
+  }
+
+  private getChildrenList(
+    doc: LoroRuntime["doc"],
+    parentId: string | null
+  ): {
+    insert: (index: number, value: string) => void;
+    delete: (index: number, count: number) => void;
+    length: number;
+  } {
+    if (parentId === null) {
+      return getRootBlocks(doc) as unknown as {
+        insert: (index: number, value: string) => void;
+        delete: (index: number, count: number) => void;
+        length: number;
+      };
+    }
+
+    const parentMap = ensureBlockMap(doc, parentId);
+    return parentMap.getOrCreateContainer("children", new LoroList()) as unknown as {
+      insert: (index: number, value: string) => void;
+      delete: (index: number, count: number) => void;
+      length: number;
+    };
   }
 
   private collectMessages(blocks: BlockNode[]): MessageBlock[] {

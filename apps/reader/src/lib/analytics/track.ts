@@ -7,9 +7,8 @@
  * - Production analytics (placeholder for PostHog/Mixpanel/etc.)
  */
 
+import { telemetryTrack } from "@/lib/analytics/telemetryAdapter";
 import type { AnalyticsEvent } from "./events";
-
-const DEBUG = process.env.NODE_ENV === "development";
 
 /**
  * Event sink for testing - stores tracked events.
@@ -61,17 +60,7 @@ export function track<T extends AnalyticsEvent>(event: T): void {
     return;
   }
 
-  // Development: log to console
-  if (DEBUG) {
-    console.groupCollapsed(`[Analytics] ${event.name}`);
-    console.groupEnd();
-  }
-
-  // Production: send to analytics provider
-  // TODO: Replace with actual provider (PostHog, Mixpanel, etc.)
-  // Example:
-  // posthog?.capture(event.name, event);
-  // mixpanel?.track(event.name, event);
+  telemetryTrack(event);
 }
 
 /**

@@ -49,6 +49,7 @@ import { createHistoryTrackerPlugin } from "@/lib/editor/historyTrackerPlugin";
 import { createInputRulesPlugin } from "@/lib/editor/inputRulesPlugin";
 import { createKeymapPlugin } from "@/lib/editor/keymapPlugin";
 import { createMarkdownPastePlugin } from "@/lib/editor/markdownPastePlugin";
+import { createOrderedListNumberingPlugin } from "@/lib/editor/orderedListNumberingPlugin";
 import { createPastePipelinePlugin } from "@/lib/editor/pastePipelinePlugin";
 import { createRemoteCursorPlugin, injectCursorStyles } from "@/lib/editor/remoteCursorPlugin";
 import { type SlashMenuState, createSlashMenuPlugin } from "@/lib/editor/slashMenuPlugin";
@@ -666,6 +667,7 @@ function createPlugins(
     ...((options.enableBlockBehaviors ?? true)
       ? [createBlockBehaviorsPlugin({ runtime: runtime as unknown as LoroRuntime })]
       : []),
+    createOrderedListNumberingPlugin(),
     // P0 FIX: PM history is disabled by default; Loro undoManager handles undo/redo
     ...((options.enableHistory ?? false)
       ? [history()]

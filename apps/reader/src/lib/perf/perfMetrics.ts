@@ -2,7 +2,10 @@
  * Performance Metrics
  *
  * Tracks decode time, render time, and scroll FPS for debugging.
+ * Optionally emits events to the telemetry adapter.
  */
+
+import { getTelemetryAdapter } from "@/lib/analytics/telemetryAdapter";
 
 /** Percentile stats */
 export interface PercentileStats {
@@ -64,6 +67,7 @@ export class PerfMetrics {
    */
   recordDecodeTime(durationMs: number): void {
     this.addSample(this.decodeSamples, durationMs);
+    getTelemetryAdapter().observe("perf_decode_ms", durationMs);
   }
 
   /**
@@ -71,6 +75,7 @@ export class PerfMetrics {
    */
   recordRenderTime(durationMs: number): void {
     this.addSample(this.renderSamples, durationMs);
+    getTelemetryAdapter().observe("perf_render_ms", durationMs);
   }
 
   /**
@@ -98,6 +103,7 @@ export class PerfMetrics {
       if (elapsed > 0) {
         const fps = (this.frameCount / elapsed) * 1000;
         this.addSample(this.fpsSamples, fps);
+        getTelemetryAdapter().observe("perf_fps", fps);
       }
 
       this.lastFrameTime = now;

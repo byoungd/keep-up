@@ -56,8 +56,8 @@ export function useAIPanelController({
         status: b.status === "streaming" ? "streaming" : b.status === "error" ? "error" : "done",
         modelId: b.aiContext?.model,
         requestId: b.aiContext?.requestId,
-        confidence: undefined, // TOOD: Add confidence to AIContext
-        provenance: undefined, // TODO: Add provenance to AIContext
+        confidence: b.aiContext?.confidence,
+        provenance: b.aiContext?.provenance,
         createdAt: b.createdAt,
       };
     }) as Message[];
@@ -201,7 +201,8 @@ export function useAIPanelController({
           model,
           requestId: result.requestId,
           agentId: result.agentId,
-          // TODO: confidence/provenance support in AIContext type
+          confidence: result.confidence,
+          provenance: result.provenance,
         });
 
         setAttachments([]);
