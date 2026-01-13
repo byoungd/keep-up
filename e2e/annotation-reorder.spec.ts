@@ -99,6 +99,33 @@ test.describe("Annotation Reorder & Splitting", () => {
     });
   }
 
+  async function getBlockTexts(page: import("@playwright/test").Page): Promise<string[]> {
+    return await page.evaluate(() => {
+      const blocks = document.querySelectorAll(".lfcc-editor .ProseMirror [data-block-id]");
+      return Array.from(blocks, (block) => (block.textContent ?? "").trim());
+    });
+  }
+
+  async function waitForBlockOrder(
+    page: import("@playwright/test").Page,
+    first: string,
+    second: string
+  ): Promise<void> {
+    await expect
+      .poll(
+        async () => {
+          const blocks = await getBlockTexts(page);
+          return (
+            blocks.length >= 2 &&
+            blocks[0]?.includes(first) === true &&
+            blocks[1]?.includes(second) === true
+          );
+        },
+        { timeout: 8000 }
+      )
+      .toBe(true);
+  }
+
   async function waitForAnnotationCount(
     page: import("@playwright/test").Page,
     expected: number
@@ -124,6 +151,7 @@ test.describe("Annotation Reorder & Splitting", () => {
     // P1 is index 0, P2 is index 1. We move P1 below P2, or P2 above P1.
     // Let's drag P1 (index 0) to be after P2 (index 1).
     await dragBlockByIndex(page, 0, 1);
+    await waitForBlockOrder(page, "Paragraph Two", "Paragraph One");
 
     // 3. Verify: Should be 2 annotations now
     await waitForAnnotationCount(page, 2);
@@ -183,6 +211,7 @@ test.describe("Annotation Reorder & Splitting", () => {
       view.dispatch(tr);
     });
 
+    await waitForBlockOrder(page, "Paragraph Two", "Paragraph One");
     await waitForAnnotationCount(page, 2);
 
     // 3. Verify annotation split

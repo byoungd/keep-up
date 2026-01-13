@@ -81,9 +81,10 @@ test.describe("LFCC Bridge Perf Profiling", () => {
         const start = performance.now();
         const tr = view.state.tr.insertText("x");
         view.dispatch(tr);
-        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
         latencies.push(performance.now() - start);
       }
+
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
       const sorted = [...latencies].sort((a, b) => a - b);
       const pick = (p: number) =>
