@@ -695,3 +695,5 @@ To avoid divergent re-implementations, LFCC defines a recommended reference libr
 - **§19:** Version Migration Guide — Compatibility matrix, migration procedures
 - **§20:** Platform Requirements and Conformance — Encoding, timestamp, precision specifications
 - **§21:** Fuzzing Strategy and Bug Reproduction — Seed management, CI integration  
+
+---
