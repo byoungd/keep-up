@@ -38,6 +38,40 @@ type CommentStore = CommentState & CommentActions;
 // Store Factory
 // ============================================================================
 
+const COMMENTS_MAP_KEY = "comments";
+
+function getCommentAnnotationIds(facade: DocumentFacade): string[] {
+  if (typeof facade.getCommentAnnotationIds === "function") {
+    return facade.getCommentAnnotationIds();
+  }
+
+  // Fallback for older facade builds without getCommentAnnotationIds.
+  const runtime = (facade as { getRuntime?: () => LoroRuntime }).getRuntime?.();
+  if (!runtime || typeof runtime !== "object") {
+    return [];
+  }
+
+  const doc = runtime.doc as unknown;
+  if (!doc || typeof doc !== "object" || !("getMap" in doc)) {
+    return [];
+  }
+
+  const getMap = (doc as { getMap?: (key: string) => unknown }).getMap;
+  if (typeof getMap !== "function") {
+    return [];
+  }
+
+  const commentsMap = getMap.call(doc, COMMENTS_MAP_KEY);
+  if (!commentsMap || typeof commentsMap !== "object" || !("keys" in commentsMap)) {
+    return [];
+  }
+
+  const keys = (commentsMap as { keys: () => unknown[] }).keys();
+  const annotationIds = keys.filter((key): key is string => typeof key === "string");
+  annotationIds.sort();
+  return annotationIds;
+}
+
 function syncStateFromFacade(facade: DocumentFacade): Record<string, UIComment[]> {
   // Get all annotation IDs from annotations
   const annotations = facade.getAnnotations();
@@ -50,7 +84,8 @@ function syncStateFromFacade(facade: DocumentFacade): Record<string, UIComment[]
 
   // Also check for comments on annotations we might not have in getAnnotations()
   // This handles the case where comments exist but annotation list is stale
-  for (const annotationId of facade.getCommentAnnotationIds()) {
+  const commentAnnotationIds = getCommentAnnotationIds(facade);
+  for (const annotationId of commentAnnotationIds) {
     annotationIds.add(annotationId);
   }
 

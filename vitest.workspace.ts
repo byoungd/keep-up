@@ -1,9 +1,17 @@
+import path from "node:path";
+
 import { defineProject } from "vitest/config";
 
 const defaultExclude = ["**/node_modules/**", "**/dist/**"];
+const lfccBridgeAlias = path.resolve(__dirname, "packages/lfcc-bridge/src/index.ts");
 
 export default [
   defineProject({
+    resolve: {
+      alias: {
+        "@keepup/lfcc-bridge": lfccBridgeAlias,
+      },
+    },
     test: {
       name: "core-conformance",
       include: [
@@ -15,6 +23,11 @@ export default [
     },
   }),
   defineProject({
+    resolve: {
+      alias: {
+        "@keepup/lfcc-bridge": lfccBridgeAlias,
+      },
+    },
     test: {
       name: "collab-server",
       include: ["packages/collab-server/src/**/*.test.ts"],
@@ -26,6 +39,11 @@ export default [
     },
   }),
   defineProject({
+    resolve: {
+      alias: {
+        "@keepup/lfcc-bridge": lfccBridgeAlias,
+      },
+    },
     test: {
       name: "app-jsdom",
       include: ["packages/app/src/**/*.test.ts"],
@@ -34,6 +52,11 @@ export default [
     },
   }),
   defineProject({
+    resolve: {
+      alias: {
+        "@keepup/lfcc-bridge": lfccBridgeAlias,
+      },
+    },
     test: {
       name: "packages-default",
       include: [
