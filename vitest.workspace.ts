@@ -41,6 +41,7 @@ export default [
         "packages/overlay/src/**/*.test.ts",
         "packages/compat/src/**/*.test.ts",
         "packages/ingest-youtube/src/**/*.test.ts",
+        "packages/agent-runtime/src/**/*.test.ts",
       ],
       exclude: defaultExclude,
     },

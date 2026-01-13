@@ -42,7 +42,8 @@
   },
   "dependencies": {
     "@keepup/ai-core": "workspace:*",
-    "@keepup/core": "workspace:*"
+    "@keepup/core": "workspace:*",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
