@@ -569,21 +569,31 @@ export class IndexedDbDriver implements DbDriver {
   }
 
   async addSubscriptionToTopic(_subscriptionId: string, _topicId: string): Promise<void> {
-    throw new Error("Method not implemented.");
+    console.warn(
+      "[IndexedDbDriver] Subscription topic operations not fully supported in fallback driver"
+    );
   }
 
   async removeSubscriptionFromTopic(_subscriptionId: string, _topicId: string): Promise<void> {
-    throw new Error("Method not implemented.");
+    console.warn(
+      "[IndexedDbDriver] Subscription topic operations not fully supported in fallback driver"
+    );
   }
 
   async listSubscriptionsByTopic(
     _topicId: string
   ): Promise<import("../types").RssSubscriptionRow[]> {
-    throw new Error("Method not implemented.");
+    console.warn(
+      "[IndexedDbDriver] Subscription topic operations not fully supported in fallback driver"
+    );
+    return [];
   }
 
   async listTopicsBySubscription(_subscriptionId: string): Promise<TopicRow[]> {
-    throw new Error("Method not implemented.");
+    console.warn(
+      "[IndexedDbDriver] Subscription topic operations not fully supported in fallback driver"
+    );
+    return [];
   }
 
   async appendUpdate(update: CrdtUpdateRow): Promise<void> {

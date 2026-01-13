@@ -22,12 +22,18 @@ export function FeedListHeader({ filter, onAddFeed, className }: FeedListHeaderP
   const { markAllAsRead, refreshAllFeeds, isLoading, subscriptions } = useFeedProvider();
 
   const unreadCount = React.useMemo(() => {
-    // We don't have all items here easily without fetching them.
-    // FeedProvider provides subscriptions with unread counts.
-    // So for "all" or "unread", we can sum subscription unread counts.
-    if (!subscriptions) return 0;
-    return subscriptions.reduce((acc, sub) => acc + (sub.unreadCount || 0), 0);
-  }, [subscriptions]);
+    if (!subscriptions) {
+      return 0;
+    }
+    if (filter === "all" || filter === "unread") {
+      return subscriptions.reduce((acc, sub) => acc + (sub.unreadCount || 0), 0);
+    }
+    if (filter === "saved" || filter.startsWith("topic:")) {
+      return 0;
+    }
+    const subscription = subscriptions.find((sub) => sub.subscriptionId === filter);
+    return subscription?.unreadCount ?? 0;
+  }, [filter, subscriptions]);
 
   const handleMarkAllRead = async () => {
     if (filter === "all" || filter === "unread") {
@@ -38,7 +44,7 @@ export function FeedListHeader({ filter, onAddFeed, className }: FeedListHeaderP
         .filter((s) => (s.unreadCount || 0) > 0)
         .map((s) => markAllAsRead(s.subscriptionId));
       await Promise.all(promises);
-    } else if (filter !== "saved") {
+    } else if (filter !== "saved" && !filter.startsWith("topic:")) {
       // Filter is a subscription ID
       await markAllAsRead(filter);
     }
