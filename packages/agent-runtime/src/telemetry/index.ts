@@ -100,6 +100,26 @@ export const AGENT_METRICS = {
     labels: ["tool_name", "result"],
   },
 
+  // Cowork policy metrics
+  coworkPolicyEvaluations: {
+    name: "cowork_policy_evaluations_total",
+    type: "counter" as const,
+    description: "Total Cowork policy evaluations",
+    labels: ["decision"],
+  },
+  coworkPolicyDenials: {
+    name: "cowork_policy_denials_total",
+    type: "counter" as const,
+    description: "Total Cowork policy denials",
+    labels: ["reason"],
+  },
+  coworkPolicyLatency: {
+    name: "cowork_policy_latency_ms",
+    type: "histogram" as const,
+    description: "Cowork policy evaluation latency in milliseconds",
+    labels: ["decision"],
+  },
+
   // Performance optimization metrics
   messageCompressionRatio: {
     name: "agent_message_compression_ratio",

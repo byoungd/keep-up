@@ -6,7 +6,7 @@
  */
 
 import { type ContextManager, createContextManager } from "../context";
-import { type MemoryManager, createMemoryManager } from "../memory";
+import { type IMemoryManager, createMemoryManager } from "../memory";
 import type { AgentMessage, AgentState } from "../types";
 import type { ToolResultCache } from "../utils/cache";
 
@@ -68,7 +68,7 @@ export interface ToolDiscoverySnapshot {
 export interface SessionState {
   readonly id: string;
   readonly context?: ContextManager;
-  readonly memory?: MemoryManager;
+  readonly memory?: IMemoryManager;
   readonly toolCache?: ToolResultCache;
   getState(): AgentState;
   setState(state: AgentState): void;
@@ -108,7 +108,7 @@ export interface SessionSnapshot {
 export interface SessionStateConfig {
   id?: string;
   contextManager?: ContextManager;
-  memoryManager?: MemoryManager;
+  memoryManager?: IMemoryManager;
   toolCache?: ToolResultCache;
   initialState?: AgentState;
   initialSnapshot?: SessionSnapshot;
@@ -148,7 +148,7 @@ function createDefaultToolDiscoverySnapshot(): ToolDiscoverySnapshot {
 export class InMemorySessionState implements SessionState {
   readonly id: string;
   readonly context: ContextManager;
-  readonly memory: MemoryManager;
+  readonly memory: IMemoryManager;
   readonly toolCache?: ToolResultCache;
   private readonly contextId: string;
   private state: AgentState;

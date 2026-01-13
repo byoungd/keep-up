@@ -124,6 +124,14 @@ export interface ToolContext {
   signal?: AbortSignal;
   /** Audit logger */
   audit?: AuditLogger;
+  /** Cowork execution context */
+  cowork?: CoworkToolContext;
+}
+
+export interface CoworkToolContext {
+  session: CoworkSession;
+  policyEngine: CoworkPolicyEngine;
+  caseInsensitivePaths?: boolean;
 }
 
 // ============================================================================
@@ -131,6 +139,8 @@ export interface ToolContext {
 // ============================================================================
 
 import type { DataAccessPolicy, PolicyEngine } from "@keepup/core";
+import type { CoworkPolicyEngine } from "../cowork/policy";
+import type { CoworkSession } from "../cowork/types";
 
 /** Security policy for agent execution */
 export interface SecurityPolicy {
@@ -279,6 +289,7 @@ export interface AuditEntry {
   toolName: string;
   action: "call" | "result" | "error";
   userId?: string;
+  correlationId?: string;
   input?: Record<string, unknown>;
   output?: unknown;
   error?: string;
@@ -295,6 +306,7 @@ export interface AuditLogger {
 export interface AuditFilter {
   toolName?: string;
   userId?: string;
+  correlationId?: string;
   since?: number;
   until?: number;
   action?: AuditEntry["action"];
@@ -375,6 +387,8 @@ export interface ConfirmationRequest {
   description: string;
   arguments: Record<string, unknown>;
   risk: "low" | "medium" | "high";
+  reason?: string;
+  riskTags?: string[];
 }
 
 /** Confirmation handler callback */

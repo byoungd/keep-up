@@ -8,6 +8,8 @@
 import { existsSync } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import type { CoworkFileIntent } from "../../cowork/sandbox";
+import { CoworkSandboxAdapter } from "../../cowork/sandbox";
 import type { MCPToolResult, ToolContext } from "../../types";
 import { BaseToolServer, errorResult, textResult } from "../mcp/baseServer";
 
@@ -22,6 +24,7 @@ export interface IFileSystem {
   readdir(path: string): Promise<string[]>;
   stat(path: string): Promise<{ isDirectory: boolean; isFile: boolean; size: number; mtime: Date }>;
   unlink(path: string): Promise<void>;
+  realpath?(path: string): Promise<string>;
   exists(path: string): boolean;
 }
 
@@ -59,6 +62,10 @@ export class NodeFileSystem implements IFileSystem {
 
   async unlink(filePath: string): Promise<void> {
     await fs.unlink(filePath);
+  }
+
+  async realpath(filePath: string): Promise<string> {
+    return fs.realpath(filePath);
   }
 
   exists(filePath: string): boolean {
@@ -279,7 +286,7 @@ export class FileToolServer extends BaseToolServer {
     }
 
     // Validate path
-    const validation = this.validatePath(filePath, context);
+    const validation = await this.validatePath(filePath, context, "read");
     if (!validation.valid) {
       return errorResult("PERMISSION_DENIED", validation.reason ?? "Path validation failed");
     }
@@ -322,7 +329,7 @@ export class FileToolServer extends BaseToolServer {
     }
 
     // Validate path
-    const validation = this.validatePath(filePath, context);
+    const validation = await this.validatePath(filePath, context, "write");
     if (!validation.valid) {
       return errorResult("PERMISSION_DENIED", validation.reason ?? "Path validation failed");
     }
@@ -363,7 +370,7 @@ export class FileToolServer extends BaseToolServer {
       return errorResult("PERMISSION_DENIED", "File access is disabled");
     }
 
-    const validation = this.validatePath(dirPath, context);
+    const validation = await this.validatePath(dirPath, context, "read");
     if (!validation.valid) {
       return errorResult("PERMISSION_DENIED", validation.reason ?? "Path validation failed");
     }
@@ -401,7 +408,7 @@ export class FileToolServer extends BaseToolServer {
       return errorResult("PERMISSION_DENIED", "File access is disabled");
     }
 
-    const validation = this.validatePath(targetPath, context);
+    const validation = await this.validatePath(targetPath, context, "read");
     if (!validation.valid) {
       return errorResult("PERMISSION_DENIED", validation.reason ?? "Path validation failed");
     }
@@ -438,7 +445,7 @@ export class FileToolServer extends BaseToolServer {
       return errorResult("PERMISSION_DENIED", "File delete access is disabled");
     }
 
-    const validation = this.validatePath(filePath, context);
+    const validation = await this.validatePath(filePath, context, "delete");
     if (!validation.valid) {
       return errorResult("PERMISSION_DENIED", validation.reason ?? "Path validation failed");
     }
@@ -462,10 +469,28 @@ export class FileToolServer extends BaseToolServer {
     }
   }
 
-  private validatePath(
+  private async validatePath(
     targetPath: string,
-    context: ToolContext
-  ): { valid: boolean; reason?: string } {
+    context: ToolContext,
+    intent: CoworkFileIntent
+  ): Promise<{ valid: boolean; reason?: string }> {
+    if (context.cowork?.policyEngine && context.cowork.session) {
+      const adapter = new CoworkSandboxAdapter(context.cowork.policyEngine);
+      const resolvedPath = await this.resolveCoworkPath(targetPath, intent);
+      const decision = adapter.evaluateFileAction({
+        session: context.cowork.session,
+        path: resolvedPath ?? targetPath,
+        intent,
+        caseInsensitivePaths: context.cowork.caseInsensitivePaths,
+      });
+
+      if (decision.decision === "deny") {
+        return { valid: false, reason: decision.reason };
+      }
+
+      return { valid: true };
+    }
+
     // Build allowed paths based on permission level
     const allowedPaths: string[] = [];
 
@@ -493,6 +518,39 @@ export class FileToolServer extends BaseToolServer {
     });
 
     return validator.validate(targetPath);
+  }
+
+  private async resolveCoworkPath(
+    targetPath: string,
+    intent: CoworkFileIntent
+  ): Promise<string | null> {
+    try {
+      if (this.fileSystem.exists(targetPath)) {
+        return await this.resolveRealPath(targetPath);
+      }
+    } catch {
+      return null;
+    }
+
+    if (intent === "write") {
+      const parent = path.dirname(targetPath);
+      try {
+        const realParent = await this.resolveRealPath(parent);
+        return path.join(realParent, path.basename(targetPath));
+      } catch {
+        return null;
+      }
+    }
+
+    return null;
+  }
+
+  private async resolveRealPath(targetPath: string): Promise<string> {
+    if (this.fileSystem.realpath) {
+      return this.fileSystem.realpath(targetPath);
+    }
+
+    return path.resolve(targetPath);
   }
 
   private formatSize(bytes: number): string {

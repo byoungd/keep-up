@@ -15,7 +15,13 @@
 import type { IntentRegistry } from "@keepup/core";
 import { createIntentRegistry } from "@keepup/core";
 import type { RuntimeEventBus } from "../events/eventBus";
-import { type ToolExecutionOptions, type ToolExecutor, createToolExecutor } from "../executor";
+import {
+  type ToolConfirmationDetailsProvider,
+  type ToolConfirmationResolver,
+  type ToolExecutionOptions,
+  type ToolExecutor,
+  createToolExecutor,
+} from "../executor";
 import { AGENTS_GUIDE_PROMPT } from "../prompts/agentGuidelines";
 import { createAuditLogger, createPermissionChecker } from "../security";
 import type { SessionState } from "../session";
@@ -231,8 +237,19 @@ export class AgentOrchestrator {
    * Run the agent with a user message.
    */
   async run(userMessage: string): Promise<AgentState> {
+    return this.runWithId(userMessage, this.generateRunId());
+  }
+
+  /**
+   * Run the agent with a provided run ID (task correlation).
+   */
+  async runWithRunId(userMessage: string, runId: string): Promise<AgentState> {
+    return this.runWithId(userMessage, runId);
+  }
+
+  private async runWithId(userMessage: string, runId: string): Promise<AgentState> {
     this.abortController = new AbortController();
-    this.currentRunId = this.generateRunId();
+    this.currentRunId = runId;
 
     // Add user message
     const userMsg: AgentMessage = { role: "user", content: userMessage };
@@ -793,9 +810,25 @@ export class AgentOrchestrator {
   }
 
   private requiresConfirmation(call: MCPToolCall): boolean {
+    if (this.toolExecutor && isToolConfirmationResolver(this.toolExecutor)) {
+      return this.toolExecutor.requiresConfirmation(call, this.createToolContext());
+    }
+
     const tools = this.registry.listTools();
     const tool = tools.find((t) => t.name === call.name || `${call.name}`.endsWith(`:${t.name}`));
     return tool?.annotations?.requiresConfirmation ?? false;
+  }
+
+  private getConfirmationDetails(call: MCPToolCall): { reason?: string; riskTags?: string[] } {
+    if (this.toolExecutor && isToolConfirmationDetailsProvider(this.toolExecutor)) {
+      const details = this.toolExecutor.getConfirmationDetails(call, this.createToolContext());
+      return {
+        reason: details.reason,
+        riskTags: details.riskTags,
+      };
+    }
+
+    return {};
   }
 
   private async requestConfirmation(call: MCPToolCall): Promise<boolean> {
@@ -804,11 +837,14 @@ export class AgentOrchestrator {
       return false;
     }
 
+    const confirmationDetails = this.getConfirmationDetails(call);
     const request: ConfirmationRequest = {
       toolName: call.name,
       description: `Execute ${call.name}`,
       arguments: call.arguments,
       risk: this.assessRisk(call),
+      reason: confirmationDetails.reason,
+      riskTags: confirmationDetails.riskTags,
     };
 
     this.state.status = "waiting_confirmation";
@@ -913,6 +949,22 @@ export class AgentOrchestrator {
   private generateRunId(): string {
     return `run_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
   }
+}
+
+function isToolConfirmationResolver(
+  executor: ToolExecutor
+): executor is ToolExecutor & ToolConfirmationResolver {
+  return (
+    typeof (executor as { requiresConfirmation?: unknown }).requiresConfirmation === "function"
+  );
+}
+
+function isToolConfirmationDetailsProvider(
+  executor: ToolExecutor
+): executor is ToolExecutor & ToolConfirmationDetailsProvider {
+  return (
+    typeof (executor as { getConfirmationDetails?: unknown }).getConfirmationDetails === "function"
+  );
 }
 
 // ============================================================================
@@ -1048,6 +1100,7 @@ export function createOrchestrator(
       cache: options.toolExecution?.cache,
       retryOptions: options.toolExecution?.retryOptions,
       cachePredicate: options.toolExecution?.cachePredicate,
+      contextOverrides: options.toolExecution?.contextOverrides,
     });
 
   const components: OrchestratorComponents = {

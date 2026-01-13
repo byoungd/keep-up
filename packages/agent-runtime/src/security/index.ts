@@ -37,6 +37,7 @@ export interface PermissionResult {
   allowed: boolean;
   reason?: string;
   requiresConfirmation?: boolean;
+  riskTags?: string[];
 }
 
 /**
@@ -199,6 +200,9 @@ export class InMemoryAuditLogger implements AuditLogger {
       }
       if (filter.userId) {
         result = result.filter((e) => e.userId === filter.userId);
+      }
+      if (filter.correlationId) {
+        result = result.filter((e) => e.correlationId === filter.correlationId);
       }
       if (filter.since) {
         const since = filter.since;

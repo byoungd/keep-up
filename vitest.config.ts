@@ -2,8 +2,8 @@ import path from "node:path";
 
 import { defineConfig } from "vitest/config";
 
-// 根配置 - 被 vitest.workspace.ts 使用
-// 各包的具体配置在各自的 vitest.config.ts 中
+// Root configuration - used by vitest.workspace.ts
+// Package-specific configurations are in their respective vitest.config.ts files
 export default defineConfig({
   resolve: {
     alias: {
