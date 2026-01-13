@@ -66,3 +66,28 @@ export {
   type HealthCheck,
   type ResourceCleanup,
 } from "./resourcePool";
+
+// Lazy initialization
+export {
+  lazy,
+  asyncLazy,
+  lazyWithDisposal,
+  memoize,
+  type Lazy,
+  type AsyncLazy,
+  type LazyOptions,
+} from "./lazy";
+
+// Batch processing
+export {
+  BatchProcessor,
+  createBatchProcessor,
+  createDebouncedExecutor,
+  debounce,
+  throttle,
+  parallelBatch,
+  batchToolCalls,
+  type BatchConfig,
+  type BatchResult,
+  type DebounceConfig,
+} from "./batch";

@@ -533,3 +533,17 @@ export function attachTelemetryToEventBus(
     }
   };
 }
+
+// Profiler
+export {
+  Profiler,
+  createProfiler,
+  createNoopProfiler,
+  getGlobalProfiler,
+  setGlobalProfiler,
+  profileMethod,
+  type ProfileEntry,
+  type ProfileStats,
+  type ProfileReport,
+  type ProfilerConfig,
+} from "./profiler";

@@ -38,6 +38,8 @@ export {
   type CompressionConfig,
   type CompressionResult,
   type CompressionStrategy,
+  type ISummarizer,
+  type CompressionMetrics,
 } from "./messageCompression";
 
 export {
@@ -89,3 +91,24 @@ export {
   type IntegratedPlanningConfig,
   type PlanTodoLink,
 } from "./integratedPlanning";
+
+// Lifecycle Hooks
+export {
+  HookRegistry,
+  createHookRegistry,
+  createHookContext,
+  executeBeforeTurnHooks,
+  executeAfterTurnHooks,
+  executeBeforeToolHooks,
+  executeAfterToolHooks,
+  executeErrorHooks,
+  executeCompleteHooks,
+  type HookContext,
+  type OrchestratorHooks,
+  type BeforeTurnHook,
+  type AfterTurnHook,
+  type BeforeToolHook,
+  type AfterToolHook,
+  type ErrorHook,
+  type CompleteHook,
+} from "./hooks";

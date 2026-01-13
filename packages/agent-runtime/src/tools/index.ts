@@ -24,3 +24,6 @@ export * from "./external";
 
 // Tool Naming (LFCC v0.9.1 compliance)
 export * from "./naming";
+
+// Middleware
+export * from "./middleware";

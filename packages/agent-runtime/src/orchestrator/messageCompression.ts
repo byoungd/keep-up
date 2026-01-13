@@ -20,6 +20,23 @@ import type { AgentMessage } from "../types";
 /** Compression strategy */
 export type CompressionStrategy = "sliding_window" | "summarize" | "truncate" | "hybrid";
 
+/**
+ * Interface for LLM-based message summarization.
+ * Inject an implementation to enable the 'summarize' strategy.
+ */
+export interface ISummarizer {
+  /** Summarize a list of messages into a concise summary */
+  summarize(messages: AgentMessage[]): Promise<string>;
+}
+
+/** Compression metrics for observability */
+export interface CompressionMetrics {
+  /** Called when compression occurs */
+  onCompress?: (result: CompressionResult) => void;
+  /** Called when summarization occurs */
+  onSummarize?: (originalCount: number, summaryTokens: number) => void;
+}
+
 /** Compression configuration */
 export interface CompressionConfig {
   /** Maximum tokens to keep in history */
@@ -34,6 +51,10 @@ export interface CompressionConfig {
   enableSummarization: boolean;
   /** Token estimator function */
   estimateTokens: (text: string) => number;
+  /** Optional summarizer for LLM-based compression */
+  summarizer?: ISummarizer;
+  /** Optional metrics callbacks */
+  metrics?: CompressionMetrics;
 }
 
 /** Compression result */
@@ -96,9 +117,19 @@ const DEFAULT_CONFIG: CompressionConfig = {
 export class MessageCompressor {
   private readonly config: CompressionConfig;
   private readonly tokenCache = new Map<string, number>();
+  private summarizer?: ISummarizer;
 
   constructor(config: Partial<CompressionConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
+    this.summarizer = config.summarizer;
+  }
+
+  /**
+   * Set the summarizer for LLM-based compression.
+   * Can be called after construction to inject the LLM adapter.
+   */
+  setSummarizer(summarizer: ISummarizer): void {
+    this.summarizer = summarizer;
   }
 
   /**
@@ -131,14 +162,16 @@ export class MessageCompressor {
       };
     }
 
-    // Apply compression strategy
+    // Apply compression strategy (sync strategies only)
+    // For async strategies, use compressAsync()
     let result: CompressionResult;
     switch (this.config.strategy) {
       case "sliding_window":
         result = this.compressSlidingWindow(messages);
         break;
       case "summarize":
-        result = this.compressWithSummarization(messages);
+        // Fallback to sliding window for sync API; use compressAsync for summarization
+        result = this.compressSlidingWindow(messages);
         break;
       case "truncate":
         result = this.compressTruncate(messages);
@@ -309,12 +342,110 @@ export class MessageCompressor {
   }
 
   /**
-   * Compress with summarization (placeholder - requires LLM).
+   * Compress message history asynchronously.
+   * Required for summarization strategy which needs LLM calls.
    */
-  private compressWithSummarization(messages: AgentMessage[]): CompressionResult {
-    // For now, fall back to sliding window
-    // In production, this would use LLM to summarize old messages
-    return this.compressSlidingWindow(messages);
+  async compressAsync(messages: AgentMessage[]): Promise<CompressionResult> {
+    if (messages.length === 0) {
+      return {
+        messages: [],
+        totalTokens: 0,
+        removedCount: 0,
+        summarizedCount: 0,
+        compressionRatio: 0,
+      };
+    }
+
+    const totalTokens = this.calculateTotalTokens(messages);
+    const _originalCount = messages.length;
+
+    if (totalTokens <= this.config.maxTokens) {
+      return {
+        messages: [...messages],
+        totalTokens,
+        removedCount: 0,
+        summarizedCount: 0,
+        compressionRatio: 0,
+        utilization: (totalTokens / this.config.maxTokens) * 100,
+      };
+    }
+
+    // Use async summarization if available and strategy requests it
+    if (
+      (this.config.strategy === "summarize" || this.config.strategy === "hybrid") &&
+      this.summarizer &&
+      this.config.enableSummarization
+    ) {
+      return this.compressWithSummarization(messages);
+    }
+
+    // Fall back to sync compression
+    return this.compress(messages);
+  }
+
+  /**
+   * Compress with LLM-based summarization.
+   * Summarizes older messages while preserving recent context.
+   */
+  private async compressWithSummarization(messages: AgentMessage[]): Promise<CompressionResult> {
+    if (!this.summarizer) {
+      // Fallback to sliding window if no summarizer available
+      return this.compressSlidingWindow(messages);
+    }
+
+    const originalCount = messages.length;
+    const preserved = this.selectPreserved(messages, this.analyzeMessages(messages));
+    const preservedSet = new Set(preserved);
+
+    // Get messages to summarize (oldest messages not in preserved set)
+    const toSummarize = messages.filter((m) => !preservedSet.has(m) && m.role !== "system");
+
+    if (toSummarize.length === 0) {
+      return this.compressSlidingWindow(messages);
+    }
+
+    try {
+      // Generate summary using LLM
+      const summary = await this.summarizer.summarize(toSummarize);
+      const summaryTokens = this.config.estimateTokens(summary);
+
+      // Emit metrics
+      this.config.metrics?.onSummarize?.(toSummarize.length, summaryTokens);
+
+      // Create summary message
+      const summaryMessage: AgentMessage = {
+        role: "system",
+        content: `[Conversation Summary]\n${summary}`,
+      };
+
+      // Build result: system messages + summary + preserved recent messages
+      const systemMessages = messages.filter((m) => m.role === "system");
+      const recentMessages = preserved.filter((m) => m.role !== "system");
+      const resultMessages = [...systemMessages, summaryMessage, ...recentMessages];
+
+      const totalTokens = this.calculateTotalTokens(resultMessages);
+
+      const result: CompressionResult = {
+        messages: resultMessages,
+        totalTokens,
+        removedCount: originalCount - resultMessages.length,
+        summarizedCount: toSummarize.length,
+        compressionRatio: 1 - resultMessages.length / originalCount,
+        utilization: (totalTokens / this.config.maxTokens) * 100,
+        metadata: {
+          timestamp: Date.now(),
+          strategy: "summarize",
+          preservedIndices: preserved.map((m) => messages.indexOf(m)).filter((i) => i !== -1),
+          summary,
+        },
+      };
+
+      this.config.metrics?.onCompress?.(result);
+      return result;
+    } catch (_error) {
+      // On summarization failure, fall back to sliding window
+      return this.compressSlidingWindow(messages);
+    }
   }
 
   /**

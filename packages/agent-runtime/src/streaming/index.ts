@@ -27,6 +27,7 @@ export {
   type StreamOptions,
   type StreamStats as LegacyStreamStats,
   type StreamCallbacks,
+  type StreamMetrics,
 } from "./streamWriter";
 
 // New enhanced types

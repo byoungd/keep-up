@@ -110,6 +110,16 @@ export interface StreamStats {
   durationMs?: number;
 }
 
+/** Stream metrics callbacks for observability */
+export interface StreamMetrics {
+  /** Called when a chunk is dropped due to backpressure */
+  onChunkDropped?: (streamId: string, chunkType: StreamChunkType) => void;
+  /** Called when buffer pressure changes (0-1 utilization ratio) */
+  onBufferPressure?: (streamId: string, utilization: number) => void;
+  /** Called when stream ends with final stats */
+  onStreamEnd?: (streamId: string, stats: StreamStats) => void;
+}
+
 // ============================================================================
 // Stream Writer
 // ============================================================================
@@ -121,6 +131,7 @@ export class StreamWriter {
   private readonly streamId: string;
   private readonly buffer: StreamChunk[] = [];
   private readonly bufferSize: number;
+  private readonly metrics?: StreamMetrics;
   private sequence = 0;
   private closed = false;
   private stats: StreamStats;
@@ -131,9 +142,10 @@ export class StreamWriter {
     reject: (error: Error) => void;
   }> = [];
 
-  constructor(streamId?: string, options: StreamOptions = {}) {
+  constructor(streamId?: string, options: StreamOptions = {}, metrics?: StreamMetrics) {
     this.streamId = streamId ?? this.generateId();
     this.bufferSize = options.bufferSize ?? 100;
+    this.metrics = metrics;
     this.stats = {
       chunksEmitted: 0,
       chunksDropped: 0,
@@ -245,11 +257,21 @@ export class StreamWriter {
     // Otherwise buffer (with backpressure)
     if (this.buffer.length >= this.bufferSize) {
       // Drop oldest chunk
-      this.buffer.shift();
+      const droppedChunk = this.buffer.shift();
       this.stats.chunksDropped++;
+      // Emit metrics for dropped chunk
+      if (droppedChunk) {
+        this.metrics?.onChunkDropped?.(this.streamId, droppedChunk.type);
+      }
     }
 
     this.buffer.push(chunk);
+
+    // Emit buffer pressure metric
+    const utilization = this.buffer.length / this.bufferSize;
+    if (this.metrics?.onBufferPressure && utilization > 0.5) {
+      this.metrics.onBufferPressure(this.streamId, utilization);
+    }
   }
 
   /**
@@ -284,6 +306,9 @@ export class StreamWriter {
       }
     }
     this.resolvers = [];
+
+    // Emit final stream metrics
+    this.metrics?.onStreamEnd?.(this.streamId, this.stats);
   }
 
   /**
@@ -565,7 +590,14 @@ export async function processStreamWithCallbacks(
 
 /**
  * Create a stream writer.
+ * @param streamId Optional stream identifier
+ * @param options Stream configuration options
+ * @param metrics Optional metrics callbacks for observability
  */
-export function createStreamWriter(streamId?: string, options?: StreamOptions): StreamWriter {
-  return new StreamWriter(streamId, options);
+export function createStreamWriter(
+  streamId?: string,
+  options?: StreamOptions,
+  metrics?: StreamMetrics
+): StreamWriter {
+  return new StreamWriter(streamId, options, metrics);
 }

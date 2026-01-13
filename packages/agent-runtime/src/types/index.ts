@@ -88,7 +88,9 @@ export type ToolErrorCode =
   | "RESOURCE_NOT_FOUND"
   | "RATE_LIMITED"
   | "CONFLICT"
-  | "DRYRUN_REJECTED";
+  | "DRYRUN_REJECTED"
+  | "RETRY_EXHAUSTED"
+  | "VALIDATION_ERROR";
 
 // ============================================================================
 // Tool Server Interface (MCP Server)
