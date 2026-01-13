@@ -19,7 +19,7 @@ export interface FeedListHeaderProps {
 }
 
 export function FeedListHeader({ filter, onAddFeed, className }: FeedListHeaderProps) {
-  const { markAllAsRead, isLoading, subscriptions } = useFeedProvider();
+  const { markAllAsRead, refreshAllFeeds, isLoading, subscriptions } = useFeedProvider();
 
   const unreadCount = React.useMemo(() => {
     // We don't have all items here easily without fetching them.
@@ -45,7 +45,7 @@ export function FeedListHeader({ filter, onAddFeed, className }: FeedListHeaderP
   };
 
   const handleRefresh = async () => {
-    // refresh internal polling?
+    await refreshAllFeeds();
   };
 
   const getFilterLabel = () => {

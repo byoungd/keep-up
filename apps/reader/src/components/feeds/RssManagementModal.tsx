@@ -1,9 +1,11 @@
 "use client";
 
+import { getDbClient } from "@/lib/db";
 import { useFeedProvider } from "@/providers/FeedProvider";
 import type { RssFolder, RssSubscription, TopicRow } from "@keepup/db";
 import { cn } from "@keepup/shared/utils";
 import * as Dialog from "@radix-ui/react-dialog";
+import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, Plus, Rss, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
@@ -160,8 +162,6 @@ export function RssManagementModal({ open, onOpenChange }: RssManagementModalPro
 // ... (FeedList component is now external)
 
 // ============ Edit Feed View ============
-import { getDbClient } from "@/lib/db";
-import { useQuery } from "@tanstack/react-query";
 
 interface EditFeedViewProps {
   subscription: RssSubscription;
