@@ -81,9 +81,7 @@ for (let i = 0; i < lines.length; i += 1) {
   }
   const reqText = reqMatch[1];
 
-  const sourceMatch = sourcePart.match(
-    /\(Source: \[[^\]]+\]\(([^)#]+)(#[^)]+)?\), line (\d+)\)/
-  );
+  const sourceMatch = sourcePart.match(/\(Source: \[[^\]]+\]\(([^)#]+)(#[^)]+)?\), line (\d+)\)/);
   if (!sourceMatch) {
     continue;
   }

@@ -85,6 +85,12 @@ describe("SecurityValidator", () => {
       expect(result.ok).toBe(true);
     });
 
+    it("should allow unquoted https URLs", () => {
+      const payload = "<a href=https://example.com>Link</a>";
+      const result = validator.validate(payload);
+      expect(result.ok).toBe(true);
+    });
+
     it("should reject javascript: URLs", () => {
       const payload = "<a href=\"javascript:alert('XSS')\">Link</a>";
       const result = validator.validate(payload);
@@ -109,6 +115,20 @@ describe("SecurityValidator", () => {
             e.code === "DANGEROUS_URL_PATTERN" ||
             e.code === "DANGEROUS_PATTERN_DETECTED" ||
             e.message.includes("data: URL")
+        )
+      ).toBe(true);
+    });
+
+    it("should reject unquoted javascript: URLs", () => {
+      const payload = "<a href=javascript:alert(1)>Link</a>";
+      const result = validator.validate(payload);
+      expect(result.ok).toBe(false);
+      expect(
+        result.errors.some(
+          (e) =>
+            e.code === "DANGEROUS_PATTERN_DETECTED" ||
+            e.code === "DANGEROUS_URL_PATTERN" ||
+            e.code === "INVALID_URL"
         )
       ).toBe(true);
     });

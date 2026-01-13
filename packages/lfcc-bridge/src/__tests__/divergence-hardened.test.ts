@@ -9,6 +9,7 @@ import { LoroDoc } from "loro-crdt";
 import type { Schema } from "prosemirror-model";
 import { EditorState } from "prosemirror-state";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { type BlockNode, serializeAttrs, writeBlockTree } from "../crdt/crdtSchema";
 import { type DivergenceDetector, createDivergenceDetector } from "../integrity/divergence";
 import { pmSchema } from "../pm/pmSchema";
 
@@ -115,6 +116,42 @@ describe("DivergenceDetector Hardening", () => {
 
       // Different attrs should produce different checksums
       expect(result1.editorChecksum).not.toBe(result2.editorChecksum);
+    });
+
+    it("should re-check when attrs change without affecting quick metrics", () => {
+      detector = createDivergenceDetector({
+        enablePeriodicChecks: false,
+      });
+
+      const attrs = serializeAttrs({ level: 1 });
+      const blocks: BlockNode[] = [
+        { id: "b1", type: "heading", attrs, text: "Title", children: [] },
+      ];
+      writeBlockTree(loroDoc, blocks);
+
+      const editorState1 = EditorState.create({
+        doc: schema.node("doc", null, [
+          schema.node("heading", { block_id: "b1", level: 1, attrs }, [schema.text("Title")]),
+        ]),
+        schema,
+      });
+
+      const baseline = detector.checkDivergence(editorState1, loroDoc, schema);
+      expect(baseline.diverged).toBe(false);
+
+      const editorState2 = EditorState.create({
+        doc: schema.node("doc", null, [
+          schema.node(
+            "heading",
+            { block_id: "b1", level: 2, attrs: serializeAttrs({ level: 2 }) },
+            [schema.text("Title")]
+          ),
+        ]),
+        schema,
+      });
+
+      const updated = detector.checkDivergence(editorState2, loroDoc, schema);
+      expect(updated.diverged).toBe(true);
     });
   });
 

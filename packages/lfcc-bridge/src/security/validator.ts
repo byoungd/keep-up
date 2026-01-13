@@ -55,11 +55,11 @@ const DEFAULT_OPTIONS: Omit<Required<SecurityValidatorOptions>, "schemaValidator
 };
 
 const URL_ATTRIBUTES = [
-  { regex: /href\s*=\s*["']([^"']+)["']/gi, name: "href" },
-  { regex: /src\s*=\s*["']([^"']+)["']/gi, name: "src" },
-  { regex: /srcset\s*=\s*["']([^"']+)["']/gi, name: "srcset" },
-  { regex: /xlink:href\s*=\s*["']([^"']+)["']/gi, name: "xlink:href" },
-  { regex: /poster\s*=\s*["']([^"']+)["']/gi, name: "poster" },
+  { regex: /\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi, name: "href" },
+  { regex: /\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi, name: "src" },
+  { regex: /\bsrcset\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi, name: "srcset" },
+  { regex: /\bxlink:href\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi, name: "xlink:href" },
+  { regex: /\bposter\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi, name: "poster" },
 ];
 
 /**
@@ -151,8 +151,14 @@ export class SecurityValidator {
       { pattern: /<script[^>]*>/gi, name: "script tag" },
       { pattern: /<style[^>]*>/gi, name: "style tag" },
       { pattern: /<iframe[^>]*>/gi, name: "iframe tag" },
-      { pattern: /\s+\w+\s*=\s*["'][^"']*javascript:/gi, name: "javascript: URL in attribute" },
-      { pattern: /\s+\w+\s*=\s*["'][^"']*data:/gi, name: "data: URL in attribute" },
+      {
+        pattern: /\s+\w+\s*=\s*(?:"[^"]*javascript:|'[^']*javascript:|[^"'\s>]*javascript:)/gi,
+        name: "javascript: URL in attribute",
+      },
+      {
+        pattern: /\s+\w+\s*=\s*(?:"[^"]*data:|'[^']*data:|[^"'\s>]*data:)/gi,
+        name: "data: URL in attribute",
+      },
       { pattern: /\s+on\w+\s*=/gi, name: "event handler attribute" },
     ];
 
@@ -540,7 +546,7 @@ export class SecurityValidator {
     for (const { regex, name } of URL_ATTRIBUTES) {
       const matches = Array.from(sanitized.matchAll(regex));
       for (const match of matches) {
-        const url = match[1];
+        const url = match[1] ?? match[2] ?? match[3] ?? "";
         errors.push(...this.validateUrlAttribute(name, url));
       }
     }

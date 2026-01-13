@@ -50,7 +50,9 @@ export class DivergenceDetector {
   private checkTimer: ReturnType<typeof setInterval> | null = null;
   private lastEditorChecksum: string | null = null;
   private lastLoroChecksum: string | null = null;
-  private lastQuickMatch = false;
+  private lastEditorDoc: EditorState["doc"] | null = null;
+  private lastLoroFrontierKey: string | null = null;
+  private lastResult: DivergenceCheckResult | null = null;
   private viewProvider?: () => { view: { state: EditorState } } | null;
   private runtime?: { doc: LoroDoc };
   private schema?: Schema;
@@ -112,8 +114,8 @@ export class DivergenceDetector {
 
   /**
    * Check for divergence between Editor and Loro states
-   * Uses two-tier checksum: O(1) quick check first, then O(N) deep check if needed.
-   * Returns true if divergence detected, false otherwise
+   * Uses cached checks when the editor doc and Loro frontier are unchanged.
+   * Returns true if divergence detected, false otherwise.
    */
   checkDivergence(
     editorState: EditorState,
@@ -121,20 +123,20 @@ export class DivergenceDetector {
     schema: Schema
   ): DivergenceCheckResult {
     try {
-      // Tier 1: Quick structural check (O(1))
-      const quickEditorChecksum = this.computeQuickChecksum(editorState.doc);
-      const quickLoroChecksum = this.computeQuickLoroChecksum(loroDoc, schema);
-
-      // If quick checksums match AND we had a previous full match, skip deep check
-      if (quickEditorChecksum === quickLoroChecksum && this.lastQuickMatch) {
-        return {
-          diverged: false,
-          editorChecksum: quickEditorChecksum,
-          loroChecksum: quickLoroChecksum,
-        };
+      const frontierKey = this.getLoroFrontierKey(loroDoc);
+      if (
+        this.lastResult &&
+        this.lastEditorDoc === editorState.doc &&
+        frontierKey !== null &&
+        frontierKey === this.lastLoroFrontierKey
+      ) {
+        if (this.lastResult.diverged && this.onDivergence) {
+          this.onDivergence(this.lastResult);
+        }
+        return this.lastResult;
       }
 
-      // Tier 2: Deep structural check (O(N))
+      // Deep structural check (O(N))
       const editorChecksum = this.computeEditorChecksum(editorState);
       const loroChecksum = this.computeLoroChecksum(loroDoc, schema);
 
@@ -147,10 +149,12 @@ export class DivergenceDetector {
         reason: diverged ? "Checksum mismatch between editor and Loro states" : undefined,
       };
 
-      // Store checksums and quick match state for next iteration
+      // Store checksums and state for next iteration
       this.lastEditorChecksum = editorChecksum;
       this.lastLoroChecksum = loroChecksum;
-      this.lastQuickMatch = !diverged && quickEditorChecksum === quickLoroChecksum;
+      this.lastEditorDoc = editorState.doc;
+      this.lastLoroFrontierKey = frontierKey;
+      this.lastResult = result;
 
       if (diverged && this.onDivergence) {
         this.onDivergence(result);
@@ -166,27 +170,6 @@ export class DivergenceDetector {
         loroChecksum: "",
         reason: `Error during divergence check: ${err.message}`,
       };
-    }
-  }
-
-  /**
-   * Quick structural checksum (O(1))
-   * Uses childCount, content size, and textContent length for fast comparison
-   */
-  private computeQuickChecksum(doc: EditorState["doc"]): string {
-    return `${doc.childCount}|${doc.content.size}|${doc.textContent.length}`;
-  }
-
-  /**
-   * Quick Loro checksum (O(1) projection time assumed negligible for small docs)
-   * Falls back to empty string on error
-   */
-  private computeQuickLoroChecksum(loroDoc: LoroDoc, schema: Schema): string {
-    try {
-      const pmDoc = projectLoroToPm(loroDoc, schema);
-      return `${pmDoc.childCount}|${pmDoc.content.size}|${pmDoc.textContent.length}`;
-    } catch {
-      return "";
     }
   }
 
@@ -255,6 +238,19 @@ export class DivergenceDetector {
       hash = hash & hash; // Convert to 32-bit integer
     }
     return Math.abs(hash).toString(16);
+  }
+
+  private getLoroFrontierKey(loroDoc: LoroDoc): string | null {
+    const frontiersFn = (loroDoc as { frontiers?: () => unknown }).frontiers;
+    if (typeof frontiersFn !== "function") {
+      return null;
+    }
+
+    try {
+      return JSON.stringify(frontiersFn.call(loroDoc));
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -417,30 +413,39 @@ export class DivergenceDetector {
         }
       });
 
-      // Build transaction to replace only diverged blocks
-      let tr = currentEditorState.tr;
-      let resetCount = 0;
+      // Build transaction to replace only diverged blocks.
+      // Apply from end to start to keep positions valid after replacements.
+      const replacements: Array<{
+        pos: number;
+        nodeSize: number;
+        replacement: import("prosemirror-model").Node;
+      }> = [];
 
       currentEditorState.doc.descendants((node, pos) => {
         const blockId = node.attrs.block_id;
         if (typeof blockId === "string" && loroBlocks.has(blockId)) {
           const replacement = loroBlocks.get(blockId);
-          if (replacement) {
-            tr = tr.replaceWith(pos, pos + node.nodeSize, replacement);
-            resetCount++;
+          if (replacement && !node.eq(replacement)) {
+            replacements.push({ pos, nodeSize: node.nodeSize, replacement });
           }
         }
       });
 
-      if (resetCount === 0) {
+      if (replacements.length === 0) {
         return { transaction: null, resetBlockCount: 0 };
+      }
+
+      let tr = currentEditorState.tr;
+      replacements.sort((a, b) => b.pos - a.pos);
+      for (const { pos, nodeSize, replacement } of replacements) {
+        tr = tr.replaceWith(pos, pos + nodeSize, replacement);
       }
 
       // Mark as coming from Loro
       tr = tr.setMeta("lfcc-bridge-origin", "loro");
       tr = tr.setMeta("addToHistory", false);
 
-      return { transaction: tr, resetBlockCount: resetCount };
+      return { transaction: tr, resetBlockCount: replacements.length };
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       this.onError?.(err);

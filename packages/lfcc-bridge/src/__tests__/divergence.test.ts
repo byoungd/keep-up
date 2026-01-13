@@ -2,6 +2,7 @@ import { LoroDoc } from "loro-crdt";
 import type { Schema } from "prosemirror-model";
 import { EditorState } from "prosemirror-state";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { serializeAttrs, writeBlockTree } from "../crdt/crdtSchema";
 import { type DivergenceDetector, createDivergenceDetector } from "../integrity/divergence";
 import { pmSchema } from "../pm/pmSchema";
 
@@ -80,6 +81,46 @@ describe("DivergenceDetector", () => {
       const resetResult = detector.triggerHardReset(loroDoc, schema, editorState);
       expect(resetResult.newDoc).toBeDefined();
       expect(resetResult.needsReset).toBe(true);
+    });
+  });
+
+  describe("Soft Reset", () => {
+    it("replaces multiple blocks without position drift", () => {
+      const attrs = serializeAttrs({});
+      writeBlockTree(loroDoc, [
+        { id: "b1", type: "paragraph", attrs, text: "Hello there", children: [] },
+        { id: "b2", type: "paragraph", attrs, text: "Second block updated", children: [] },
+      ]);
+
+      const editorState = EditorState.create({
+        doc: schema.node("doc", null, [
+          schema.node("paragraph", { block_id: "b1" }, [schema.text("Hello")]),
+          schema.node("paragraph", { block_id: "b2" }, [schema.text("Second")]),
+        ]),
+        schema,
+      });
+
+      const { transaction, resetBlockCount } = detector.triggerSoftReset(
+        ["b1", "b2"],
+        loroDoc,
+        schema,
+        editorState
+      );
+
+      expect(transaction).not.toBeNull();
+      expect(resetBlockCount).toBe(2);
+
+      const nextState = editorState.apply(transaction ?? editorState.tr);
+      const contentById = new Map<string, string>();
+      nextState.doc.descendants((node) => {
+        const blockId = node.attrs.block_id;
+        if (node.isTextblock && typeof blockId === "string") {
+          contentById.set(blockId, node.textContent);
+        }
+      });
+
+      expect(contentById.get("b1")).toBe("Hello there");
+      expect(contentById.get("b2")).toBe("Second block updated");
     });
   });
 

@@ -115,6 +115,15 @@ export class Negotiator {
    * Returns either an OFFER or REJECT message
    */
   processHello(hello: HelloMessage): OfferMessage | RejectMessage {
+    if (hello.protocolVersion !== this.protocolVersion) {
+      return {
+        type: "REJECT",
+        clientId: this.clientId,
+        reason: "PROTOCOL_VERSION_INCOMPATIBLE",
+        details: `Local: ${this.protocolVersion}, Remote: ${hello.protocolVersion}`,
+      };
+    }
+
     // Check structure_mode match first (hard refusal)
     if (hello.manifest.structure_mode !== this.localManifest.structure_mode) {
       return {
