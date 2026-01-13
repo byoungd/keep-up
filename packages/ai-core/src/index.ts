@@ -371,3 +371,35 @@ export {
   type MemorySnapshot,
   type ProfileSummary,
 } from "./observability";
+
+// ============================================================================
+// Gateway - Unified AI Gateway & Tracing
+// ============================================================================
+export {
+  // Unified Gateway
+  UnifiedAIGateway,
+  createUnifiedAIGateway,
+  type UnifiedGatewayConfig,
+  type GatewayRequestOptions,
+  type GatewayStreamOptions,
+  type GatewayResponse,
+  type GatewayStreamChunk,
+  type GatewayHealthStatus,
+  // Trace Context
+  TraceContext,
+  createTraceContext,
+  extractTraceFromHeaders,
+  injectTraceToHeaders,
+  generateTraceId as generateGatewayTraceId,
+  generateSpanId as generateGatewaySpanId,
+  type TraceContextData,
+  type TracePropagator,
+  // Errors
+  GatewayError,
+  type GatewayErrorCode,
+  createGatewayError,
+  isGatewayError,
+  toHttpStatus,
+  formatErrorResponse,
+  type GatewayErrorResponse,
+} from "./gateway";

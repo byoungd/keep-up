@@ -41,15 +41,13 @@ const initialState: UseAIClientState = {
   result: null,
   health: {
     status: "healthy",
-    circuitState: "CLOSED",
-    failureCount: 0,
-    lastFailureAt: null,
-    retryAfterMs: null,
     metrics: {
       totalRequests: 0,
       totalFailures: 0,
       avgLatencyMs: null,
     },
+    lastFailureAt: null,
+    retryAfterMs: null,
   },
 };
 

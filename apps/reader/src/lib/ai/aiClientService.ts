@@ -1,26 +1,17 @@
 /**
  * AI Client Service (Unified)
  *
- * Production-grade AI streaming client using @keepup/ai-core infrastructure:
- * - CircuitBreaker for fault tolerance
- * - RetryPolicy with exponential backoff
- * - ObservabilityContext for structured logging and metrics
+ * Lightweight AI streaming client that delegates resilience to the server.
  *
- * This is the single source of truth for frontend AI operations.
+ * Design Philosophy:
+ * - Server-side handles circuit breaker, retry, and rate limiting
+ * - Client focuses on: SSE parsing, cancellation, local health tracking
+ * - Fetches health status from /api/ai/health endpoint
+ *
+ * This eliminates duplicate resilience logic between frontend and backend.
  */
 
-import {
-  AIError,
-  CircuitBreaker,
-  CircuitBreakerOpenError,
-  type CircuitState,
-  ConsoleLogger,
-  type AIErrorCode as CoreAIErrorCode,
-  InMemoryMetrics,
-  ObservabilityContext,
-  SimpleTracer,
-  createRetryPolicy,
-} from "@keepup/ai-core";
+import { AIError, type AIErrorCode as CoreAIErrorCode } from "@keepup/ai-core";
 import { DEFAULT_POLICY_MANIFEST, generateRequestId } from "@keepup/core";
 
 import { REQUEST_TIMEOUT_MS, SSE_DONE_MARKER } from "./constants";
@@ -86,15 +77,19 @@ export interface AIStreamResult {
 
 export interface AIServiceHealth {
   status: "healthy" | "degraded" | "unhealthy";
-  circuitState: CircuitState;
-  failureCount: number;
-  lastFailureAt: number | null;
-  retryAfterMs: number | null;
+  /** Server-side health data when available */
+  serverHealth?: {
+    providers: Array<{ name: string; status: string; latencyMs?: number }>;
+    summary: { healthy: number; degraded: number; unhealthy: number };
+  };
+  /** Local client metrics */
   metrics: {
     totalRequests: number;
     totalFailures: number;
     avgLatencyMs: number | null;
   };
+  lastFailureAt: number | null;
+  retryAfterMs: number | null;
 }
 
 // ============================================================================
@@ -165,22 +160,6 @@ export class AIClientError extends Error {
 const API_ENDPOINT = "/api/ai/chat";
 const DEFAULT_POLICY_CONTEXT = { policy_id: DEFAULT_POLICY_MANIFEST.policy_id };
 const DEFAULT_AGENT_ID = "reader-panel";
-
-const CIRCUIT_CONFIG = {
-  failureThreshold: 3,
-  successThreshold: 2,
-  resetTimeoutMs: 30_000,
-  failureWindowMs: 60_000,
-} as const;
-
-const RETRY_CONFIG = {
-  maxAttempts: 2,
-  initialDelayMs: 1000,
-  maxDelayMs: 5000,
-  backoffMultiplier: 2,
-  jitterFactor: 0.1,
-  timeoutMs: REQUEST_TIMEOUT_MS,
-} as const;
 
 // ============================================================================
 // Helpers
@@ -432,103 +411,111 @@ async function readStream(
 // Client
 // ============================================================================
 
-class AIClientService {
-  private readonly circuitBreaker = new CircuitBreaker(CIRCUIT_CONFIG);
-  private readonly observability = new ObservabilityContext({
-    logger: new ConsoleLogger({ prefix: "[AI Client]", minLevel: "info" }),
-    metrics: new InMemoryMetrics(),
-    tracer: new SimpleTracer(),
-  });
-  private readonly retryPolicy = createRetryPolicy({
-    ...RETRY_CONFIG,
-    isRetryable: (error: unknown) => {
-      if (error instanceof AIClientError) {
-        return error.isRetryable;
-      }
-      if (error instanceof AIError) {
-        return AIClientError.fromCoreError(error).isRetryable;
-      }
-      if (error instanceof CircuitBreakerOpenError) {
-        return false;
-      }
-      return isAbortError(error);
-    },
-    onRetry: (attempt: number, error: unknown, delayMs: number) => {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      this.observability.logger.warn("Retrying AI request", {
-        attempt,
-        delayMs,
-        error: message,
-      });
-    },
-  });
+const HEALTH_ENDPOINT = "/api/ai/health";
 
+class AIClientService {
   private totalRequests = 0;
   private totalFailures = 0;
   private totalLatencyMs = 0;
   private lastFailureAt: number | null = null;
   private retryAfterMs: number | null = null;
+  private cachedServerHealth: AIServiceHealth["serverHealth"] | null = null;
+  private lastHealthCheck = 0;
+  private readonly healthCacheDurationMs = 30_000;
 
+  /**
+   * Get health status combining local metrics with server-side health.
+   * Server health is fetched asynchronously and cached.
+   */
   getHealth(): AIServiceHealth {
-    const circuitMetrics = this.circuitBreaker.getMetrics();
     const avgLatencyMs = this.totalRequests ? this.totalLatencyMs / this.totalRequests : null;
+    const errorRate = this.totalRequests > 0 ? this.totalFailures / this.totalRequests : 0;
 
+    // Determine local status based on recent failures
     let status: AIServiceHealth["status"] = "healthy";
-    if (circuitMetrics.state === "OPEN") {
+    if (errorRate > 0.5) {
       status = "unhealthy";
-    } else if (circuitMetrics.state === "HALF_OPEN" || this.totalFailures > 0) {
+    } else if (this.totalFailures > 0) {
       status = "degraded";
+    }
+
+    // Trigger async health fetch if cache is stale
+    if (Date.now() - this.lastHealthCheck > this.healthCacheDurationMs) {
+      this.fetchServerHealth();
     }
 
     return {
       status,
-      circuitState: circuitMetrics.state,
-      failureCount: circuitMetrics.failureCount,
-      lastFailureAt: this.lastFailureAt,
-      retryAfterMs: this.retryAfterMs,
+      serverHealth: this.cachedServerHealth ?? undefined,
       metrics: {
         totalRequests: this.totalRequests,
         totalFailures: this.totalFailures,
         avgLatencyMs,
       },
+      lastFailureAt: this.lastFailureAt,
+      retryAfterMs: this.retryAfterMs,
     };
+  }
+
+  /**
+   * Fetch server-side health status asynchronously.
+   */
+  async fetchServerHealth(): Promise<AIServiceHealth["serverHealth"] | null> {
+    this.lastHealthCheck = Date.now();
+
+    try {
+      const response = await fetch(HEALTH_ENDPOINT, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+      });
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const data = (await response.json()) as {
+        status: string;
+        providers: Array<{ name: string; status: string; latencyMs?: number }>;
+        summary: { healthy: number; degraded: number; unhealthy: number };
+      };
+
+      this.cachedServerHealth = {
+        providers: data.providers,
+        summary: data.summary,
+      };
+
+      return this.cachedServerHealth;
+    } catch {
+      return null;
+    }
   }
 
   async stream(request: AIStreamRequest, callbacks: AIStreamCallbacks): Promise<void> {
     this.totalRequests += 1;
-    this.observability.metrics.increment("ai.stream.request", {
-      model: request.model,
-    });
     const startedAt = performance.now();
 
     try {
-      const result = await this.observability.recordOperation(
-        "ai.stream",
-        async () => this.executeStream(request, callbacks),
-        { model: request.model }
-      );
-
+      const result = await this.performStream(request, callbacks);
       this.totalLatencyMs += performance.now() - startedAt;
-      callbacks.onDone(result);
+      callbacks.onDone({
+        ...result,
+        attempts: 1, // Server handles retries now
+      });
     } catch (error) {
       const clientError = this.normalizeError(error, request.signal);
       if (clientError.code !== "canceled") {
         this.totalFailures += 1;
         this.lastFailureAt = Date.now();
         this.retryAfterMs = clientError.retryAfterMs ?? null;
-        this.observability.metrics.increment("ai.stream.failure", {
-          model: request.model,
-          code: clientError.code,
-        });
       }
       callbacks.onError(clientError);
     }
   }
 
-  private async executeStream(
+  private async performStream(
     request: AIStreamRequest,
     callbacks: AIStreamCallbacks
-  ): Promise<AIStreamResult> {
+  ): Promise<Omit<AIStreamResult, "attempts">> {
     const requestId = request.requestId ?? generateRequestId();
     const normalizedRequest: AIStreamRequest = {
       ...request,
@@ -538,83 +525,68 @@ class AIClientService {
       agentId: request.agentId ?? DEFAULT_AGENT_ID,
     };
 
-    return this.circuitBreaker.execute(async () => {
-      const retryResult = await this.retryPolicy.execute(
-        async (_attempt: number, signal: AbortSignal) => {
-          const combined = combineSignals(signal, request.signal);
-          try {
-            return await this.performStream(normalizedRequest, callbacks, combined.signal);
-          } finally {
-            combined.cleanup();
-          }
-        }
-      );
+    const startedAt = performance.now();
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-      if (retryResult.result._tag === "Ok") {
-        return {
-          ...retryResult.result.value,
-          attempts: retryResult.attempts.length,
-        };
+    // Combine with user-provided signal
+    const { signal, cleanup } = combineSignals(controller.signal, request.signal);
+
+    try {
+      const response = await fetch(API_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-model": normalizedRequest.model,
+        },
+        body: JSON.stringify({
+          prompt: normalizedRequest.prompt,
+          model: normalizedRequest.model,
+          stream: true,
+          messages: normalizedRequest.history ?? [],
+          attachments: normalizedRequest.attachments,
+          workflow: normalizedRequest.workflow,
+          systemPrompt: normalizedRequest.systemPrompt,
+          request_id: normalizedRequest.requestId,
+          client_request_id: normalizedRequest.clientRequestId,
+          policy_context: normalizedRequest.policyContext,
+          agent_id: normalizedRequest.agentId,
+          intent_id: normalizedRequest.intentId,
+        }),
+        signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      const fallbackId = fallbackRequestId();
+      const headerRequestId = response.headers.get("x-request-id") ?? fallbackId;
+      const headerAgentId = response.headers.get("x-agent-id") ?? undefined;
+      const headerIntentId = response.headers.get("x-intent-id") ?? undefined;
+
+      if (!response.ok || !response.body) {
+        const errorInfo = parseErrorPayload(await response.text());
+        const code = mapErrorCode(response.status, errorInfo.code);
+        throw new AIClientError(code, errorInfo.message, {
+          requestId: errorInfo.requestId ?? headerRequestId,
+          retryAfterMs: parseRetryAfterMs(response),
+        });
       }
 
-      throw retryResult.result.error;
-    });
-  }
+      const streamData = await readStream(response.body, startedAt, callbacks.onChunk);
 
-  private async performStream(
-    request: AIStreamRequest,
-    callbacks: AIStreamCallbacks,
-    signal: AbortSignal
-  ): Promise<Omit<AIStreamResult, "attempts">> {
-    const startedAt = performance.now();
-    const response = await fetch(API_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-model": request.model,
-      },
-      body: JSON.stringify({
-        prompt: request.prompt,
-        model: request.model,
-        stream: true,
-        messages: request.history ?? [],
-        attachments: request.attachments,
-        workflow: request.workflow,
-        systemPrompt: request.systemPrompt,
-        request_id: request.requestId,
-        client_request_id: request.clientRequestId,
-        policy_context: request.policyContext,
-        agent_id: request.agentId,
-        intent_id: request.intentId,
-      }),
-      signal,
-    });
-
-    const fallbackId = fallbackRequestId();
-    const headerRequestId = response.headers.get("x-request-id") ?? fallbackId;
-    const headerAgentId = response.headers.get("x-agent-id") ?? undefined;
-    const headerIntentId = response.headers.get("x-intent-id") ?? undefined;
-
-    if (!response.ok || !response.body) {
-      const errorInfo = parseErrorPayload(await response.text());
-      const code = mapErrorCode(response.status, errorInfo.code);
-      throw new AIClientError(code, errorInfo.message, {
-        requestId: errorInfo.requestId ?? headerRequestId,
-        retryAfterMs: parseRetryAfterMs(response),
-      });
+      return {
+        requestId: headerRequestId,
+        content: streamData.content,
+        chunkCount: streamData.chunkCount,
+        ttft: streamData.ttft,
+        totalMs: performance.now() - startedAt,
+        agentId: streamData.agentId ?? headerAgentId,
+        intentId: streamData.intentId ?? headerIntentId,
+      };
+    } finally {
+      clearTimeout(timeoutId);
+      cleanup();
     }
-
-    const streamData = await readStream(response.body, startedAt, callbacks.onChunk);
-
-    return {
-      requestId: headerRequestId,
-      content: streamData.content,
-      chunkCount: streamData.chunkCount,
-      ttft: streamData.ttft,
-      totalMs: performance.now() - startedAt,
-      agentId: streamData.agentId ?? headerAgentId,
-      intentId: streamData.intentId ?? headerIntentId,
-    };
   }
 
   private normalizeError(error: unknown, signal?: AbortSignal): AIClientError {
@@ -626,12 +598,6 @@ class AIClientService {
       return error;
     }
 
-    if (error instanceof CircuitBreakerOpenError) {
-      return new AIClientError("circuit_open", "AI service temporarily unavailable", {
-        retryAfterMs: error.retryAfterMs,
-      });
-    }
-
     if (error instanceof AIError) {
       return AIClientError.fromCoreError(error);
     }
@@ -641,6 +607,10 @@ class AIClientService {
     }
 
     if (error instanceof Error) {
+      // Check for server-side circuit breaker indication
+      if (error.message.includes("circuit") || error.message.includes("unavailable")) {
+        return new AIClientError("circuit_open", "AI service temporarily unavailable");
+      }
       return new AIClientError("network_error", error.message);
     }
 
