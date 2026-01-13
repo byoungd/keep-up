@@ -11,6 +11,8 @@ import { AppShell } from "@/components/layout/AppShell";
 import { useFeedNavigation } from "@/hooks/useFeedNavigation";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { RssStoreProvider } from "@/lib/rss";
+import { useFeedItems } from "@/providers/FeedProvider";
+import type { FeedItemRow } from "@keepup/db";
 import { useSearchParams } from "next/navigation";
 import * as React from "react";
 
@@ -27,6 +29,11 @@ function FeedsPageContent({ initialFilter }: FeedsPageLayoutProps) {
   const [selectedItemId, setSelectedItemId] = React.useState<string | null>(null);
   const isDesktop = useMediaQuery("(min-width: 1024px)");
   const [hydrated, setHydrated] = React.useState(false);
+  const { data: items = [] } = useFeedItems(filter);
+  const selectedItem = React.useMemo(
+    () => items.find((item: FeedItemRow) => item.itemId === selectedItemId) ?? null,
+    [items, selectedItemId]
+  );
 
   React.useEffect(() => {
     setHydrated(true);
@@ -40,15 +47,14 @@ function FeedsPageContent({ initialFilter }: FeedsPageLayoutProps) {
   return (
     <AppShell
       isDesktop={effectiveDesktop}
-      rightPanel={
-        <FeedItemPreview itemId={selectedItemId} onClose={() => setSelectedItemId(null)} />
-      }
+      rightPanel={<FeedItemPreview item={selectedItem} onClose={() => setSelectedItemId(null)} />}
     >
       {/* Main content - no Sources rail */}
       <main className="flex-1 flex flex-col min-w-0 h-full">
         <FeedListHeader filter={filter} />
         <FeedList
           filter={filter}
+          items={items}
           onItemClick={setSelectedItemId}
           activeItemId={selectedItemId}
           className="flex-1"

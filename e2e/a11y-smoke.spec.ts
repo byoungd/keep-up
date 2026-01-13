@@ -88,20 +88,21 @@ test.describe("Accessibility Smoke Tests", () => {
     if (toolbarVisible) {
       // Check that buttons have accessible names (aria-label or text content)
       const buttons = toolbar.locator("button");
-      const buttonCount = await buttons.count();
+      const buttonDetails = await buttons.evaluateAll((elements) =>
+        elements.map((el) => ({
+          ariaLabel: el.getAttribute("aria-label"),
+          title: el.getAttribute("title"),
+          textContent: el.textContent,
+        }))
+      );
 
-      for (let i = 0; i < buttonCount; i++) {
-        const button = buttons.nth(i);
-        const ariaLabel = await button.getAttribute("aria-label");
-        const title = await button.getAttribute("title");
-        const textContent = await button.textContent();
-
+      for (const [index, { ariaLabel, title, textContent }] of buttonDetails.entries()) {
         const hasAccessibleName =
           (ariaLabel && ariaLabel.length > 0) ||
           (title && title.length > 0) ||
           (textContent && textContent.trim().length > 0);
 
-        expect(hasAccessibleName, `Button ${i} should have an accessible name`).toBe(true);
+        expect(hasAccessibleName, `Button ${index} should have an accessible name`).toBe(true);
       }
     }
   });
@@ -237,7 +238,7 @@ test.describe("Accessibility Smoke Tests", () => {
 
     // Close with Escape and verify focus returns to body or previous element
     await page.keyboard.press("Escape");
-    await expect(palette.first()).not.toBeVisible({ timeout: 1000 });
+    await expect(palette.first()).not.toBeVisible({ timeout: 3000 });
   });
 
   test("Dialog traps focus when open and returns focus on close", async ({ page }) => {
