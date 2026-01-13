@@ -7,6 +7,7 @@
 "use client";
 
 import { cn } from "@keepup/shared/utils";
+import { motion } from "framer-motion";
 import { BookmarkIcon, Check, Circle, ExternalLink } from "lucide-react";
 import * as React from "react";
 
@@ -60,19 +61,24 @@ export const FeedItemRow = React.memo(function FeedItemRow({
   }, [publishedAt]);
 
   return (
-    <button
+    <motion.button
       type="button"
       onClick={onClick}
+      layout
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      whileHover={{ backgroundColor: "var(--surface-2)" }}
+      whileTap={{ scale: 0.995 }}
+      transition={{ duration: 0.1 }}
       className={cn(
         // Base styles
         "group relative flex items-center gap-3 px-4 py-2.5 cursor-pointer w-full text-left",
-        "border-b border-border/5 transition-all duration-150",
-        // Hover state with subtle translate
-        "hover:translate-x-0.5 hover:bg-surface-2/60",
+        "border-b border-border/5",
         // Active/selected state
-        isActive && "bg-primary/5 translate-x-0.5",
+        isActive && "bg-primary/5",
         // Unread state
-        !isRead && "bg-surface-1",
+        !isRead && !isActive && "bg-surface-1",
         // Focus state
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-inset"
       )}
@@ -168,6 +174,6 @@ export const FeedItemRow = React.memo(function FeedItemRow({
           <ExternalLink className="h-3.5 w-3.5" />
         </button>
       </div>
-    </button>
+    </motion.button>
   );
 });

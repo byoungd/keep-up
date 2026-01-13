@@ -11,6 +11,7 @@ import { createFolder, deleteFolder, updateFolder } from "@keepup/db";
 import { cn } from "@keepup/shared/utils";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   Bookmark,
   Check,
@@ -209,8 +210,8 @@ function FeedManagementList({
                         )}
                       </span>
                       <Folder className="w-4 h-4 text-blue-500/80" />
-                      <span className="flex-1 truncate">{folder.name}</span>
-                      <span className="text-xs text-muted-foreground mr-2">
+                      <span className="flex-1 truncate text-sm font-medium">{folder.name}</span>
+                      <span className="text-[10px] text-muted-foreground mr-2 font-mono opacity-50">
                         {folderSubs.length}
                       </span>
                     </button>
@@ -252,25 +253,34 @@ function FeedManagementList({
                 )}
               </div>
 
-              {/* Folder Items */}
-              {isExpanded && (
-                <div className="pl-6 space-y-0.5 mt-0.5">
-                  {folderSubs.map((sub) => (
-                    <FeedItem
-                      key={sub.subscriptionId}
-                      sub={sub}
-                      onEdit={onEditSubscription}
-                      onDelete={onDeleteSubscription}
-                      onToggle={onToggleSubscriptionEnabled}
-                    />
-                  ))}
-                  {folderSubs.length === 0 && (
-                    <div className="px-2 py-2 text-xs text-muted-foreground italic">
-                      {t("emptyFolder")}
+              <AnimatePresence initial={false}>
+                {isExpanded && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2, ease: "easeInOut" }}
+                    className="overflow-hidden"
+                  >
+                    <div className="pl-6 space-y-0.5 mt-0.5 pb-1">
+                      {folderSubs.map((sub) => (
+                        <FeedItem
+                          key={sub.subscriptionId}
+                          sub={sub}
+                          onEdit={onEditSubscription}
+                          onDelete={onDeleteSubscription}
+                          onToggle={onToggleSubscriptionEnabled}
+                        />
+                      ))}
+                      {folderSubs.length === 0 && (
+                        <div className="px-2 py-2 text-xs text-muted-foreground italic">
+                          {t("emptyFolder")}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           );
         })}
@@ -344,7 +354,7 @@ function FeedItemsList({
       if (filter === "all") {
         return true;
       }
-      if (typeof filter === "string" && filter.startsWith("topic:")) {
+      if (typeof filter === "string" && (filter as string).startsWith("topic:")) {
         return true;
       }
       return item.subscriptionId === filter;
@@ -425,32 +435,43 @@ function FeedItemsList({
   // For small lists, render without virtualization
   if (sortedItems.length < VIRTUALIZATION_THRESHOLD) {
     return (
-      <div className={cn("flex flex-col overflow-y-auto", className)}>
-        {sortedItems.map((item) => {
-          const subscription = subscriptionMap.get(item.subscriptionId);
-          const sourceName =
-            subscription?.displayName ??
-            subscription?.title ??
-            subscription?.url ??
-            "Unknown source";
+      <div className={cn("flex flex-col overflow-y-auto px-1", className)}>
+        <AnimatePresence initial={false} mode="popLayout">
+          {sortedItems.map((item) => {
+            const subscription = subscriptionMap.get(item.subscriptionId);
+            const sourceName =
+              subscription?.displayName ??
+              subscription?.title ??
+              subscription?.url ??
+              "Unknown source";
 
-          return (
-            <FeedItemRow
-              key={item.itemId}
-              id={item.itemId}
-              title={item.title ?? "Untitled"}
-              sourceName={sourceName}
-              publishedAt={item.publishedAt ? new Date(item.publishedAt).toISOString() : undefined}
-              isRead={item.readState === "read"}
-              isSaved={item.saved}
-              isActive={activeItemId === item.itemId}
-              onClick={() => onItemClick(item.itemId)}
-              onMarkRead={() => markAsRead(item.itemId)}
-              onToggleSaved={() => toggleSaved(item.itemId, item.saved)}
-              onOpenExternal={() => item.link && window.open(item.link, "_blank", "noopener")}
-            />
-          );
-        })}
+            return (
+              <motion.div
+                key={item.itemId}
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.1 } }}
+                layout
+              >
+                <FeedItemRow
+                  id={item.itemId}
+                  title={item.title ?? "Untitled"}
+                  sourceName={sourceName}
+                  publishedAt={
+                    item.publishedAt ? new Date(item.publishedAt).toISOString() : undefined
+                  }
+                  isRead={item.readState === "read"}
+                  isSaved={item.saved}
+                  isActive={activeItemId === item.itemId}
+                  onClick={() => onItemClick(item.itemId)}
+                  onMarkRead={() => markAsRead(item.itemId)}
+                  onToggleSaved={() => toggleSaved(item.itemId, item.saved)}
+                  onOpenExternal={() => item.link && window.open(item.link, "_blank", "noopener")}
+                />
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
       </div>
     );
   }

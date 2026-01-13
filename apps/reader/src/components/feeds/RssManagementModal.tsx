@@ -1,7 +1,7 @@
 "use client";
 
 import { useFeedProvider } from "@/providers/FeedProvider";
-import type { RssFolder, RssSubscription } from "@keepup/db";
+import type { RssFolder, RssSubscription, TopicRow } from "@keepup/db";
 import { cn } from "@keepup/shared/utils";
 import * as Dialog from "@radix-ui/react-dialog";
 import { ChevronLeft, Plus, Rss, X } from "lucide-react";
@@ -186,7 +186,7 @@ function EditFeedView({ subscription, folders, onSave, onCancel }: EditFeedViewP
     },
   });
 
-  const subTopicIds = new Set(subTopics.map((t) => t.topicId));
+  const subTopicIds = new Set(subTopics.map((t: TopicRow) => t.topicId));
 
   const handleToggleTopic = async (topicId: string, isSelected: boolean) => {
     if (isSelected) {
