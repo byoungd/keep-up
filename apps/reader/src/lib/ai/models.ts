@@ -3,10 +3,10 @@ import {
   MODEL_CATALOG,
   getDefaultModelId as getDefaultModelIdFromCatalog,
   getModelCapability as getModelCapabilityFromCatalog,
-  normalizeModelId,
 } from "@keepup/ai-core";
 
 export type { ModelCapability } from "@keepup/ai-core";
+export { normalizeModelId } from "@keepup/ai-core";
 
 export const MODEL_CAPABILITIES: ModelCapability[] = MODEL_CATALOG;
 
@@ -21,5 +21,3 @@ export function getDefaultModel(): ModelCapability {
     MODEL_CAPABILITIES[0]
   );
 }
-
-export { normalizeModelId };

@@ -25,6 +25,7 @@ import {
 import { history } from "prosemirror-history";
 import { keymap } from "prosemirror-keymap";
 import { type EditorState, TextSelection } from "prosemirror-state";
+import { ReplaceAroundStep, ReplaceStep } from "prosemirror-transform";
 import type { EditorView } from "prosemirror-view";
 import * as React from "react";
 
@@ -57,6 +58,34 @@ import { dropCursor } from "prosemirror-dropcursor";
 import { columnResizing, tableEditing } from "prosemirror-tables";
 
 export type SyncMode = "broadcast" | "websocket" | "polling" | "none";
+
+function shouldAssignBlockIds(tr: import("prosemirror-state").Transaction): boolean {
+  if (!tr.docChanged) {
+    return false;
+  }
+
+  for (const step of tr.steps) {
+    if (step instanceof ReplaceStep || step instanceof ReplaceAroundStep) {
+      let hasBlock = false;
+      step.slice.content.descendants((node) => {
+        if (node.isBlock && node.type.name !== "doc") {
+          hasBlock = true;
+          return false;
+        }
+        return true;
+      });
+      if (hasBlock) {
+        return true;
+      }
+      continue;
+    }
+
+    // Unknown step types may mutate block structure; validate defensively.
+    return true;
+  }
+
+  return false;
+}
 
 export type LfccBridgeOptions = {
   seed?: (runtime: LoroRuntime) => void;
@@ -317,7 +346,7 @@ export function useLfccBridge(docId: string, peerId = "1", options: LfccBridgeOp
       // Use cache to ensure deterministic behavior in Strict Mode
       let idTr = idTrCache.current.get(tr);
       if (idTr === undefined) {
-        if (runtime) {
+        if (runtime && shouldAssignBlockIds(tr)) {
           try {
             idTr = assignMissingBlockIds(intermediateState, () => nextBlockId(runtime.doc));
             if (idTr) {
@@ -341,7 +370,7 @@ export function useLfccBridge(docId: string, peerId = "1", options: LfccBridgeOp
       }
 
       // Apply the (possibly modified) tr to get final state
-      const finalState = baseState.apply(tr);
+      const finalState = idTr ? baseState.apply(tr) : intermediateState;
 
       const view = viewRef.current;
       if (view && !view.isDestroyed) {

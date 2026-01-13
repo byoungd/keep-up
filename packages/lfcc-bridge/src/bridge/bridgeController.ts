@@ -2,6 +2,7 @@ import type { DirtyInfo, EditorSchemaValidator, RelocationPolicy } from "@keepup
 import { DEFAULT_POLICY_MANIFEST, gateway } from "@keepup/core";
 import { type Fragment, type Node as PMNode, Slice } from "prosemirror-model";
 import type { EditorState, Transaction } from "prosemirror-state";
+import { ReplaceAroundStep, ReplaceStep } from "prosemirror-transform";
 import type { EditorView } from "prosemirror-view";
 
 import { EditorAdapterPM } from "../adapters/editorAdapterPM";
@@ -123,6 +124,33 @@ function hasOverlappingRanges(ops: Array<{ from: number; to: number }>): boolean
       return true;
     }
   }
+  return false;
+}
+
+function shouldAssignBlockIds(tr: Transaction): boolean {
+  if (!tr.docChanged) {
+    return false;
+  }
+
+  for (const step of tr.steps) {
+    if (step instanceof ReplaceStep || step instanceof ReplaceAroundStep) {
+      let hasBlock = false;
+      step.slice.content.descendants((node) => {
+        if (node.isBlock && node.type.name !== "doc") {
+          hasBlock = true;
+          return false;
+        }
+        return true;
+      });
+      if (hasBlock) {
+        return true;
+      }
+      continue;
+    }
+
+    return true;
+  }
+
   return false;
 }
 
@@ -939,14 +967,16 @@ export class BridgeController {
 
       // P0 SAFETY: Ensure block IDs are assigned before syncing to Loro
       // This is the last chance to fix missing IDs.
-      const idTr = assignMissingBlockIds(this.view.state, () => nextBlockId(this.runtime.doc));
-      if (idTr) {
-        // Apply ID fixes to PM view (to stay in sync)
-        idTr.setMeta("addToHistory", false);
-        this.view.dispatch(idTr);
-        // Note: dispatch will call handleTransaction/syncTransactionToLoro recursively,
-        // which is fine since assignMissingBlockIds is idempotent and will return null next time.
-        return;
+      if (shouldAssignBlockIds(tr)) {
+        const idTr = assignMissingBlockIds(this.view.state, () => nextBlockId(this.runtime.doc));
+        if (idTr) {
+          // Apply ID fixes to PM view (to stay in sync)
+          idTr.setMeta("addToHistory", false);
+          this.view.dispatch(idTr);
+          // Note: dispatch will call handleTransaction/syncTransactionToLoro recursively,
+          // which is fine since assignMissingBlockIds is idempotent and will return null next time.
+          return;
+        }
       }
 
       this.syncTransactionInternal(tr);

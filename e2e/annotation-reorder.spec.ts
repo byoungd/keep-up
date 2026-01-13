@@ -1,22 +1,19 @@
 import { expect, test } from "@playwright/test";
-import { selectRangeBetweenSubstrings, waitForEditorReady } from "./helpers/editor";
+import {
+  assertDocumentContains,
+  openFreshEditor,
+  selectRangeBetweenSubstrings,
+  setEditorContent,
+} from "./helpers/editor";
 
 type PMView = import("prosemirror-view").EditorView;
 type PMNode = import("prosemirror-model").Node;
 
 test.describe("Annotation Reorder & Splitting", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/editor");
-    await waitForEditorReady(page);
-    // Setup: Two paragraphs
-    const editor = page.locator(".lfcc-editor .ProseMirror");
-    await editor.click();
-    await page.keyboard.press("ControlOrMeta+a");
-    await page.keyboard.press("Backspace");
-    await page.keyboard.type("Paragraph One");
-    await page.keyboard.press("Enter");
-    await page.keyboard.type("Paragraph Two");
-    await expect(page.locator(".lfcc-editor .ProseMirror")).toContainText("Paragraph Two");
+    await openFreshEditor(page, "annotation-reorder");
+    await setEditorContent(page, "Paragraph One\nParagraph Two");
+    await assertDocumentContains(page, "Paragraph Two", { timeout: 10_000 });
   });
 
   /**
@@ -92,9 +89,25 @@ test.describe("Annotation Reorder & Splitting", () => {
 
   async function getUniqueAnnotationIds(page: import("@playwright/test").Page) {
     return await page.evaluate(() => {
-      const nodes = document.querySelectorAll(".lfcc-annotation");
-      const ids = new Set<string | null>();
-      for (const node of nodes) ids.add(node.getAttribute("data-annotation-id"));
+      const overlaySelector = ".highlight-overlay .highlight-rect[data-annotation-id]";
+      const targetSelector = ".lfcc-editor .lfcc-annotation-target[data-annotation-id]";
+      const legacySelector = ".lfcc-editor .lfcc-annotation[data-annotation-id]";
+
+      let nodes = document.querySelectorAll<HTMLElement>(overlaySelector);
+      if (nodes.length === 0) {
+        nodes = document.querySelectorAll<HTMLElement>(targetSelector);
+      }
+      if (nodes.length === 0) {
+        nodes = document.querySelectorAll<HTMLElement>(legacySelector);
+      }
+
+      const ids = new Set<string>();
+      for (const node of nodes) {
+        const id = node.getAttribute("data-annotation-id");
+        if (id) {
+          ids.add(id);
+        }
+      }
       return Array.from(ids);
     });
   }
@@ -128,22 +141,45 @@ test.describe("Annotation Reorder & Splitting", () => {
 
   async function waitForAnnotationCount(
     page: import("@playwright/test").Page,
-    expected: number
+    expected: number,
+    timeoutMs = 5000
   ): Promise<void> {
     await expect
-      .poll(async () => (await getUniqueAnnotationIds(page)).length, { timeout: 5000 })
+      .poll(async () => (await getUniqueAnnotationIds(page)).length, { timeout: timeoutMs })
       .toBe(expected);
+  }
+
+  async function applyHighlight(
+    page: import("@playwright/test").Page,
+    start: string,
+    end: string,
+    expectedCount = 1
+  ): Promise<void> {
+    const toolbar = page.locator("[data-testid='selection-toolbar']");
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await selectRangeBetweenSubstrings(page, start, end);
+      await expect(toolbar).toBeVisible({ timeout: 4000 });
+      const button = toolbar.getByRole("button", { name: "Highlight yellow" });
+      try {
+        await button.click({ force: true, timeout: 2000 });
+        await waitForAnnotationCount(page, expectedCount, 2000);
+        return;
+      } catch (error) {
+        if (attempt === 2) {
+          throw error;
+        }
+        await page.waitForTimeout(100);
+      }
+    }
   }
 
   test("Splits multi-block annotation when blocks are reordered via Drag Handle (UI)", async ({
     page,
   }) => {
     // 1. Create highlight across P1 and P2
-    await selectRangeBetweenSubstrings(page, "Paragraph One", "Paragraph Two");
-    const toolbar = page.locator("[data-testid='selection-toolbar']");
-    await expect(toolbar).toBeVisible();
-    await toolbar.getByRole("button", { name: "Highlight yellow" }).click();
+    await applyHighlight(page, "Paragraph One", "Paragraph Two");
 
+    await waitForAnnotationCount(page, 1);
     const initialIds = await getUniqueAnnotationIds(page);
     expect(initialIds.length).toBe(1);
 
@@ -163,15 +199,11 @@ test.describe("Annotation Reorder & Splitting", () => {
     page,
   }) => {
     // 1. Create annotation across both paragraphs
-    await selectRangeBetweenSubstrings(page, "Paragraph One", "Paragraph Two");
-
-    // Create highlight
-    const toolbar = page.locator("[data-testid='selection-toolbar']");
-    await expect(toolbar).toBeVisible();
-    await toolbar.getByRole("button", { name: "Highlight yellow" }).click();
+    await applyHighlight(page, "Paragraph One", "Paragraph Two");
 
     // Verify sigle annotation ID initially
     // Note: Multiple DOM elements may exist (one per block), so we check unique IDs
+    await waitForAnnotationCount(page, 1);
     const idSet = await getUniqueAnnotationIds(page);
     expect(idSet.length).toBe(1);
 

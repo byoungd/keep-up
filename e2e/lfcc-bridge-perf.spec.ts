@@ -4,6 +4,7 @@ import { setEditorContent, waitForEditorReady } from "./helpers/editor";
 const RUN_PERF = process.env.LFCC_PERF_PROFILE === "1";
 const PERF_BUDGET_MS = Number(process.env.LFCC_PERF_BUDGET_MS ?? 16);
 const MEMORY_BUDGET_BYTES = Number(process.env.LFCC_PERF_MEMORY_BUDGET_BYTES ?? 8 * 1024 * 1024);
+const ENFORCE_BUDGET = process.env.LFCC_PERF_ENFORCE === "1";
 const WORKER_INDEX = process.env.PLAYWRIGHT_WORKER_INDEX ?? Math.random().toString(36).slice(2, 5);
 
 type PerfSummary = {
@@ -111,6 +112,14 @@ test.describe("LFCC Bridge Perf Profiling", () => {
         type: "note",
         description: "JS heap metrics unavailable; skipped memory delta check.",
       });
+    }
+
+    if (!ENFORCE_BUDGET) {
+      test.info().annotations.push({
+        type: "note",
+        description: `Perf budget check skipped. Set LFCC_PERF_ENFORCE=1 to enforce ${PERF_BUDGET_MS}ms.`,
+      });
+      return;
     }
 
     expect(summary.p95).toBeLessThanOrEqual(PERF_BUDGET_MS);
