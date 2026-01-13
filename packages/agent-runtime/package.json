@@ -19,6 +19,10 @@
       "types": "./dist/orchestrator/index.d.ts",
       "default": "./dist/orchestrator/index.js"
     },
+    "./orchestrator/edge": {
+      "types": "./dist/orchestrator/edge.d.ts",
+      "default": "./dist/orchestrator/edge.js"
+    },
     "./security": {
       "types": "./dist/security/index.d.ts",
       "default": "./dist/security/index.js"

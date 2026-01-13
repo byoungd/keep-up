@@ -5,6 +5,9 @@ const baseURL =
   process.env.PLAYWRIGHT_BASE_URL ??
   `http://localhost:${process.env.PLAYWRIGHT_PORT ?? DEFAULT_PORT}`;
 
+const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET ?? "test-auth-secret";
+const authUrl = process.env.AUTH_URL ?? process.env.NEXTAUTH_URL ?? baseURL;
+
 const readerPort = (() => {
   try {
     const url = new URL(baseURL);
@@ -76,6 +79,15 @@ export default defineConfig({
       env: {
         PORT: readerPort,
         NEXT_DISABLE_DEV_OVERLAY: "1",
+        AUTH_SECRET: authSecret,
+        NEXTAUTH_SECRET: authSecret,
+        AUTH_URL: authUrl,
+        NEXTAUTH_URL: authUrl,
+        AUTH_TRUST_HOST: process.env.AUTH_TRUST_HOST ?? "1",
+        AUTH_GOOGLE_ID: process.env.AUTH_GOOGLE_ID ?? "test-google-id",
+        AUTH_GOOGLE_SECRET: process.env.AUTH_GOOGLE_SECRET ?? "test-google-secret",
+        AUTH_GITHUB_ID: process.env.AUTH_GITHUB_ID ?? "test-github-id",
+        AUTH_GITHUB_SECRET: process.env.AUTH_GITHUB_SECRET ?? "test-github-secret",
       },
       timeout: 120000,
     },

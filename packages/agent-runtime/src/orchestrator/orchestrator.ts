@@ -16,6 +16,7 @@ import type { IntentRegistry } from "@keepup/core";
 import { createIntentRegistry } from "@keepup/core";
 import type { RuntimeEventBus } from "../events/eventBus";
 import { type ToolExecutionOptions, type ToolExecutor, createToolExecutor } from "../executor";
+import type { KnowledgeMatchResult, KnowledgeRegistry } from "../knowledge";
 import { AGENTS_GUIDE_PROMPT } from "../prompts/agentGuidelines";
 import { createAuditLogger, createPermissionChecker } from "../security";
 import type { SessionState } from "../session";
@@ -134,6 +135,8 @@ export interface OrchestratorComponents {
   toolDiscovery?: ToolDiscoveryEngine;
   /** Intent registry for tracking AI edit intents */
   intentRegistry?: IntentRegistry;
+  /** Knowledge registry for scoped knowledge injection */
+  knowledgeRegistry?: KnowledgeRegistry;
 }
 
 // ============================================================================
@@ -159,6 +162,7 @@ export class AgentOrchestrator {
   private readonly errorRecoveryEngine?: ErrorRecoveryEngine;
   private readonly toolDiscovery?: ToolDiscoveryEngine;
   private readonly intentRegistry?: IntentRegistry;
+  private readonly knowledgeRegistry?: KnowledgeRegistry;
   private currentRunId?: string;
 
   private state: AgentState;
@@ -225,6 +229,9 @@ export class AgentOrchestrator {
 
     // Initialize intent registry for AI edit tracking
     this.intentRegistry = components.intentRegistry ?? createIntentRegistry();
+
+    // Initialize knowledge registry for scoped knowledge injection
+    this.knowledgeRegistry = components.knowledgeRegistry;
   }
 
   /**
@@ -439,11 +446,36 @@ export class AgentOrchestrator {
         turnSpan?.setAttribute("compression.removed", compressedResult.removedCount);
       }
 
+      // Match relevant knowledge based on current context
+      let knowledgeContent: string | undefined;
+      if (this.knowledgeRegistry) {
+        const latestUserMessage = this.getLatestUserMessage();
+        const knowledgeResult: KnowledgeMatchResult | undefined = latestUserMessage
+          ? this.knowledgeRegistry.match({
+              query: latestUserMessage,
+              agentType: this.config.name,
+              maxItems: 5,
+            })
+          : undefined;
+
+        if (knowledgeResult && knowledgeResult.items.length > 0) {
+          knowledgeContent = knowledgeResult.formattedContent;
+          turnSpan?.setAttribute("knowledge.matched", knowledgeResult.items.length);
+        }
+      }
+
+      // Build system prompt with optional knowledge injection
+      const baseSystemPrompt = this.config.systemPrompt ?? AGENTS_GUIDE_PROMPT;
+      const systemPrompt = knowledgeContent
+        ? `${baseSystemPrompt}\n\n## Relevant Knowledge\n\n${knowledgeContent}`
+        : baseSystemPrompt;
+
       // Get LLM response with caching
       const tools = this.getToolDefinitions();
       const request: AgentLLMRequest = {
         messages: messagesToUse,
         tools,
+        systemPrompt,
         temperature: 0.7,
       };
 

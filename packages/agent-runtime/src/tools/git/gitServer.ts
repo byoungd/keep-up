@@ -217,37 +217,39 @@ export class GitToolServer implements MCPToolServer, IGitOperations {
 
       switch (call.name) {
         case "status":
-          return this.handleStatus();
+          return await this.handleStatus();
 
         case "diff":
-          return this.handleDiff(args as { staged?: boolean; file?: string });
+          return await this.handleDiff(args as { staged?: boolean; file?: string });
 
         case "add":
-          return this.handleAdd(args as { files: string | string[] });
+          return await this.handleAdd(args as { files: string | string[] });
 
         case "commit":
-          return this.handleCommit(args as unknown as CommitOptions);
+          return await this.handleCommit(args as unknown as CommitOptions);
 
         case "log":
-          return this.handleLog(args as { limit?: number; file?: string });
+          return await this.handleLog(args as { limit?: number; file?: string });
 
         case "branches":
-          return this.handleBranches();
+          return await this.handleBranches();
 
         case "checkout":
-          return this.handleCheckout(args as { branch: string; create?: boolean });
+          return await this.handleCheckout(args as { branch: string; create?: boolean });
 
         case "semantic_diff":
-          return this.handleSemanticDiff(args as { staged?: boolean });
+          return await this.handleSemanticDiff(args as { staged?: boolean });
 
         case "suggest_commit":
-          return this.handleSuggestCommit();
+          return await this.handleSuggestCommit();
 
         case "conflicts":
-          return this.handleConflicts();
+          return await this.handleConflicts();
 
         case "resolve_conflict":
-          return this.handleResolveConflict(args as { file: string; strategy: ConflictStrategy });
+          return await this.handleResolveConflict(
+            args as { file: string; strategy: ConflictStrategy }
+          );
 
         default:
           return {
