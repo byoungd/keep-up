@@ -35,7 +35,9 @@ export interface FeedContextValue {
   removeFeed: (subscriptionId: string) => Promise<void>;
   updateFeed: (subscriptionId: string, updates: UpdateRssSubscriptionInput) => Promise<void>;
   refreshFeed: (subscriptionId: string) => Promise<void>;
+  refreshAllFeeds: () => Promise<void>;
   markAsRead: (itemId: string) => Promise<void>;
+  markAsUnread: (itemId: string) => Promise<void>;
   markAllAsRead: (subscriptionId: string) => Promise<void>;
   toggleSaved: (itemId: string, currentSaved: boolean) => Promise<void>;
 
@@ -75,7 +77,7 @@ export function FeedProvider({ children }: { children: React.ReactNode }) {
     queryKey: ["feeds", "subscriptions"],
     queryFn: async () => {
       const db = await getDbClient();
-      const subs = await db.listRssSubscriptions({ enabled: true });
+      const subs = await db.listRssSubscriptions();
 
       // Enhance with unread counts
       const enhanced = await Promise.all(
@@ -89,6 +91,20 @@ export function FeedProvider({ children }: { children: React.ReactNode }) {
     },
     // Refresh every minute to reflect background polling
     refetchInterval: 60 * 1000,
+  });
+
+  // 1a. Fetch Items (full list for counts/navigation)
+  const {
+    data: items = [],
+    isLoading: isLoadingItems,
+    error: itemsError,
+  } = useQuery({
+    queryKey: ["feed-items", "all", "full"],
+    queryFn: async () => {
+      const db = await getDbClient();
+      return db.listFeedItems();
+    },
+    staleTime: 30 * 1000,
   });
 
   // 1b. Fetch Topics
@@ -187,16 +203,12 @@ export function FeedProvider({ children }: { children: React.ReactNode }) {
     },
   });
 
-  // 4. Refresh Feed (Manual Poll)
-  const refreshFeedMutation = useMutation({
-    mutationFn: async (_id: string) => {
-      // Manual refresh not fully exposed yet via Scheduler public API.
-      // We rely on background polling for now.
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["feeds"] });
-    },
-  });
+  const refreshAllFeeds = React.useCallback(async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["feeds"] }),
+      queryClient.invalidateQueries({ queryKey: ["feed-items"] }),
+    ]);
+  }, [queryClient]);
 
   // 5. Mark as Read
   const markReadMutation = useMutation({
@@ -205,8 +217,19 @@ export function FeedProvider({ children }: { children: React.ReactNode }) {
       await db.updateFeedItem(itemId, { readState: "read" });
     },
     onSuccess: () => {
-      // Optimistic or invalidate
       queryClient.invalidateQueries({ queryKey: ["feeds"] });
+      queryClient.invalidateQueries({ queryKey: ["feed-items"] });
+    },
+  });
+
+  const markUnreadMutation = useMutation({
+    mutationFn: async (itemId: string) => {
+      const db = await getDbClient();
+      await db.updateFeedItem(itemId, { readState: "unread" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["feeds"] });
+      queryClient.invalidateQueries({ queryKey: ["feed-items"] });
     },
   });
 
@@ -235,6 +258,7 @@ export function FeedProvider({ children }: { children: React.ReactNode }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["feed-items"] });
+      queryClient.invalidateQueries({ queryKey: ["feeds"] });
     },
   });
 
@@ -336,14 +360,16 @@ export function FeedProvider({ children }: { children: React.ReactNode }) {
 
   const value: FeedContextValue = {
     subscriptions,
-    items: [], // Deprecated in favor of useFeedItems
-    isLoading: isLoadingSubs,
-    error: subsError as Error,
+    items,
+    isLoading: isLoadingSubs || isLoadingItems,
+    error: (subsError ?? itemsError ?? null) as Error | null,
     addFeed: async (url) => addFeedMutation.mutateAsync(url),
     removeFeed: async (id) => removeFeedMutation.mutateAsync(id),
     updateFeed: async (id, updates) => updateFeedMutation.mutateAsync({ id, updates }),
-    refreshFeed: async (id) => refreshFeedMutation.mutateAsync(id),
+    refreshFeed: async (_id) => refreshAllFeeds(),
+    refreshAllFeeds,
     markAsRead: async (id) => markReadMutation.mutateAsync(id),
+    markAsUnread: async (id) => markUnreadMutation.mutateAsync(id),
     markAllAsRead: async (subId) => markAllReadMutation.mutateAsync(subId),
     toggleSaved: async (id, saved) =>
       toggleSavedMutation.mutateAsync({ itemId: id, currentSaved: saved }),

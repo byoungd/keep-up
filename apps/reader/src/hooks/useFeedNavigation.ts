@@ -12,16 +12,11 @@
  */
 
 import type { FeedFilter } from "@/components/feeds";
-import { useRssStore } from "@/lib/rss";
+import { useFeedItems, useFeedProvider } from "@/providers/FeedProvider";
+import type { FeedItemRow } from "@keepup/db";
 import * as React from "react";
 
-interface FeedItem {
-  id: string;
-  url?: string;
-  readState: "unread" | "read";
-  savedState: boolean;
-  subscriptionId: string;
-}
+type FeedItem = FeedItemRow;
 
 interface NavigationContext {
   filteredItems: FeedItem[];
@@ -32,8 +27,8 @@ interface NavigationContext {
 interface NavigationActions {
   markAsRead: (id: string) => void;
   markAsUnread: (id: string) => void;
-  toggleSaved: (id: string) => void;
-  syncAllFeeds: () => void;
+  toggleSaved: (id: string, currentSaved: boolean) => void;
+  refreshAllFeeds: () => void;
   isLoading: boolean;
 }
 
@@ -58,16 +53,16 @@ function handleNavigationKey(
 
   if (key === "j" || key === "ArrowDown") {
     if (currentIndex < filteredItems.length - 1) {
-      setSelectedItemId(filteredItems[currentIndex + 1].id);
+      setSelectedItemId(filteredItems[currentIndex + 1].itemId);
     } else if (currentIndex === -1 && filteredItems.length > 0) {
-      setSelectedItemId(filteredItems[0].id);
+      setSelectedItemId(filteredItems[0].itemId);
     }
     return true;
   }
 
   if (key === "k" || key === "ArrowUp") {
     if (currentIndex > 0) {
-      setSelectedItemId(filteredItems[currentIndex - 1].id);
+      setSelectedItemId(filteredItems[currentIndex - 1].itemId);
     }
     return true;
   }
@@ -84,27 +79,27 @@ function handleNavigationKey(
 function handleActionKey(key: string, ctx: NavigationContext, actions: NavigationActions): boolean {
   const { selectedItem } = ctx;
 
-  if ((key === "o" || key === "Enter") && selectedItem?.url) {
-    window.open(selectedItem.url, "_blank", "noopener,noreferrer");
+  if ((key === "o" || key === "Enter") && selectedItem?.link) {
+    window.open(selectedItem.link, "_blank", "noopener,noreferrer");
     return true;
   }
 
   if (key === "m" && selectedItem) {
     if (selectedItem.readState === "unread") {
-      actions.markAsRead(selectedItem.id);
+      actions.markAsRead(selectedItem.itemId);
     } else {
-      actions.markAsUnread(selectedItem.id);
+      actions.markAsUnread(selectedItem.itemId);
     }
     return true;
   }
 
   if (key === "s" && selectedItem) {
-    actions.toggleSaved(selectedItem.id);
+    actions.toggleSaved(selectedItem.itemId, selectedItem.saved);
     return true;
   }
 
   if (key === "r" && !actions.isLoading) {
-    actions.syncAllFeeds();
+    actions.refreshAllFeeds();
     return true;
   }
 
@@ -116,22 +111,12 @@ export function useFeedNavigation(
   selectedItemId: string | null,
   setSelectedItemId: (id: string | null) => void
 ) {
-  const { items, markAsRead, markAsUnread, toggleSaved, syncAllFeeds, isLoading } = useRssStore();
+  const { markAsRead, markAsUnread, toggleSaved, refreshAllFeeds, isLoading } = useFeedProvider();
+  const { data: items = [] } = useFeedItems(filter);
 
   const getFilteredItems = React.useCallback((): FeedItem[] => {
-    return items.filter((item) => {
-      if (filter === "unread") {
-        return item.readState === "unread";
-      }
-      if (filter === "saved") {
-        return item.savedState;
-      }
-      if (filter === "all") {
-        return true;
-      }
-      return item.subscriptionId === filter;
-    });
-  }, [filter, items]);
+    return items;
+  }, [items]);
 
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -141,10 +126,10 @@ export function useFeedNavigation(
 
       const filteredItems = getFilteredItems();
       const currentIndex = selectedItemId
-        ? filteredItems.findIndex((i) => i.id === selectedItemId)
+        ? filteredItems.findIndex((i) => i.itemId === selectedItemId)
         : -1;
       const selectedItem = selectedItemId
-        ? (filteredItems.find((i) => i.id === selectedItemId) ?? null)
+        ? (filteredItems.find((i) => i.itemId === selectedItemId) ?? null)
         : null;
 
       const ctx: NavigationContext = { filteredItems, currentIndex, selectedItem };
@@ -152,7 +137,7 @@ export function useFeedNavigation(
         markAsRead,
         markAsUnread,
         toggleSaved,
-        syncAllFeeds,
+        refreshAllFeeds,
         isLoading,
       };
 
@@ -173,7 +158,7 @@ export function useFeedNavigation(
     markAsRead,
     markAsUnread,
     toggleSaved,
-    syncAllFeeds,
+    refreshAllFeeds,
     isLoading,
   ]);
 }

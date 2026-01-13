@@ -1,7 +1,7 @@
 "use client";
 import { FeedsSidebarSection } from "@/components/feeds/FeedsSidebarSection";
-import { RssStoreProvider } from "@/lib/rss";
 import type { EffectiveSidebarItem, SidebarBadgeStyle } from "@/lib/sidebar";
+import { FeedProvider } from "@/providers/FeedProvider";
 import { cn } from "@keepup/shared/utils";
 import { ChevronRight } from "lucide-react";
 import * as React from "react";
@@ -90,9 +90,9 @@ export const SidebarGroup = React.memo(function SidebarGroup({
                 {/* Nested Feeds Section */}
                 {item.id === "feeds" && activePath.startsWith("/feeds") && (
                   <div className="ml-4 pl-2 border-l border-border/30 my-1 animate-in slide-in-from-left-1 duration-200 fade-in-0">
-                    <RssStoreProvider>
+                    <FeedProvider>
                       <FeedsSidebarSection onAddFeed={onAddFeed} />
-                    </RssStoreProvider>
+                    </FeedProvider>
                   </div>
                 )}
               </React.Fragment>

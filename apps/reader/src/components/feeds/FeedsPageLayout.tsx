@@ -10,9 +10,7 @@ import {
 import { AppShell } from "@/components/layout/AppShell";
 import { useFeedNavigation } from "@/hooks/useFeedNavigation";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
-import { RssStoreProvider } from "@/lib/rss";
-import { useFeedItems } from "@/providers/FeedProvider";
-import type { FeedItemRow } from "@keepup/db";
+import { FeedProvider, useFeedItems } from "@/providers/FeedProvider";
 import { useSearchParams } from "next/navigation";
 import * as React from "react";
 
@@ -31,7 +29,7 @@ function FeedsPageContent({ initialFilter }: FeedsPageLayoutProps) {
   const [hydrated, setHydrated] = React.useState(false);
   const { data: items = [] } = useFeedItems(filter);
   const selectedItem = React.useMemo(
-    () => items.find((item: FeedItemRow) => item.itemId === selectedItemId) ?? null,
+    () => items.find((item) => item.itemId === selectedItemId) ?? null,
     [items, selectedItemId]
   );
 
@@ -51,7 +49,7 @@ function FeedsPageContent({ initialFilter }: FeedsPageLayoutProps) {
     >
       {/* Main content - no Sources rail */}
       <main className="flex-1 flex flex-col min-w-0 h-full">
-        <FeedListHeader filter={filter} />
+        <FeedListHeader filter={filter} onAddFeed={() => setShowAddModal(true)} />
         <FeedList
           filter={filter}
           items={items}
@@ -67,8 +65,8 @@ function FeedsPageContent({ initialFilter }: FeedsPageLayoutProps) {
 
 export function FeedsPageLayout(props: FeedsPageLayoutProps) {
   return (
-    <RssStoreProvider>
+    <FeedProvider>
       <FeedsPageContent {...props} />
-    </RssStoreProvider>
+    </FeedProvider>
   );
 }
