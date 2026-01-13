@@ -201,6 +201,12 @@ export interface TaskResult<T = unknown> {
  * Interface for task queue operations.
  */
 export interface ITaskQueue {
+  /** Register a task executor */
+  registerExecutor<TPayload, TResult>(
+    type: TaskType,
+    executor: ITaskExecutor<TPayload, TResult>
+  ): void;
+
   /** Enqueue a task */
   enqueue<TPayload, _TResult>(definition: TaskDefinition<TPayload>): Promise<string>;
 
@@ -229,6 +235,9 @@ export interface ITaskQueue {
 
   /** Subscribe to task completion */
   onComplete<TResult = unknown>(taskId: string, handler: CompleteHandler<TResult>): () => void;
+
+  /** Subscribe to task events */
+  on(handler: TaskEventHandler): () => void;
 
   /** Wait for task completion */
   waitFor<TResult = unknown>(taskId: string): Promise<TaskResult<TResult>>;

@@ -4,7 +4,7 @@
  * Centralizes policy checks, auditing, rate limiting, caching, retry, and telemetry.
  */
 
-import type { IPermissionChecker } from "../security";
+import type { IPermissionChecker, PermissionResult } from "../security";
 import { AGENT_METRICS } from "../telemetry";
 import type { TelemetryContext } from "../telemetry";
 import type { IToolRegistry } from "../tools/mcp/registry";
@@ -24,6 +24,20 @@ export interface ToolExecutor {
   execute(call: MCPToolCall, context: ToolContext): Promise<MCPToolResult>;
 }
 
+export interface ToolConfirmationResolver extends ToolExecutor {
+  requiresConfirmation(call: MCPToolCall, context: ToolContext): boolean;
+}
+
+export interface ToolConfirmationDetails {
+  requiresConfirmation: boolean;
+  reason?: string;
+  riskTags?: string[];
+}
+
+export interface ToolConfirmationDetailsProvider extends ToolConfirmationResolver {
+  getConfirmationDetails(call: MCPToolCall, context: ToolContext): ToolConfirmationDetails;
+}
+
 export type CachePredicate = (tool: MCPTool | undefined, call: MCPToolCall) => boolean;
 
 export interface ToolExecutorConfig {
@@ -35,6 +49,7 @@ export interface ToolExecutorConfig {
   cache?: ToolResultCache;
   retryOptions?: RetryOptions;
   cachePredicate?: CachePredicate;
+  contextOverrides?: Partial<ToolContext>;
 }
 
 export interface ToolExecutionOptions {
@@ -45,9 +60,12 @@ export interface ToolExecutionOptions {
   cache?: ToolResultCache;
   retryOptions?: RetryOptions;
   cachePredicate?: CachePredicate;
+  contextOverrides?: Partial<ToolContext>;
 }
 
-export class ToolExecutionPipeline implements ToolExecutor {
+export class ToolExecutionPipeline
+  implements ToolExecutor, ToolConfirmationResolver, ToolConfirmationDetailsProvider
+{
   private readonly registry: IToolRegistry;
   private readonly policy: IPermissionChecker;
   private readonly audit?: AuditLogger;
@@ -56,6 +74,7 @@ export class ToolExecutionPipeline implements ToolExecutor {
   private readonly cache?: ToolResultCache;
   private readonly retryOptions?: RetryOptions;
   private readonly cachePredicate?: CachePredicate;
+  private readonly contextOverrides?: Partial<ToolContext>;
   private readonly toolCache = new Map<string, MCPTool>();
 
   constructor(config: ToolExecutorConfig) {
@@ -67,14 +86,16 @@ export class ToolExecutionPipeline implements ToolExecutor {
     this.cache = config.cache;
     this.retryOptions = config.retryOptions;
     this.cachePredicate = config.cachePredicate;
+    this.contextOverrides = config.contextOverrides;
   }
 
   async execute(call: MCPToolCall, context: ToolContext): Promise<MCPToolResult> {
+    const executionContext = this.applyContextOverrides(context);
     const startTime = Date.now();
     this.recordToolMetric(call.name, "started");
 
     const tool = this.resolveTool(call.name);
-    const policyResult = this.checkPolicy(call, tool, context);
+    const policyResult = this.checkPolicy(call, tool, executionContext);
     if (!policyResult.allowed) {
       const denied = this.createErrorResult(
         "PERMISSION_DENIED",
@@ -82,11 +103,11 @@ export class ToolExecutionPipeline implements ToolExecutor {
       );
       this.recordDenied(call, startTime, policyResult.reason);
       this.recordToolMetric(call.name, "error");
-      this.auditResult(call, context, denied);
+      this.auditResult(call, executionContext, denied);
       return denied;
     }
 
-    const rateResult = this.checkRateLimit(call, context);
+    const rateResult = this.checkRateLimit(call, executionContext);
     if (!rateResult.allowed) {
       const limited = this.createErrorResult(
         "RATE_LIMITED",
@@ -94,7 +115,7 @@ export class ToolExecutionPipeline implements ToolExecutor {
       );
       this.recordToolMetric(call.name, "error");
       this.recordDuration(call.name, startTime);
-      this.auditResult(call, context, limited);
+      this.auditResult(call, executionContext, limited);
       return limited;
     }
 
@@ -108,10 +129,10 @@ export class ToolExecutionPipeline implements ToolExecutor {
       }
     }
 
-    this.auditCall(call, context);
+    this.auditCall(call, executionContext);
 
     try {
-      const result = await this.executeWithRetry(call, context);
+      const result = await this.executeWithRetry(call, executionContext);
       this.recordToolMetric(call.name, result.success ? "success" : "error");
       this.recordDuration(call.name, startTime);
 
@@ -119,16 +140,45 @@ export class ToolExecutionPipeline implements ToolExecutor {
         this.cache.set(call.name, call.arguments, result);
       }
 
-      this.auditResult(call, context, result);
+      this.auditResult(call, executionContext, result);
       return result;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const exceptionResult = this.createErrorResult("EXECUTION_FAILED", message);
       this.recordToolMetric(call.name, "exception");
       this.recordDuration(call.name, startTime);
-      this.auditResult(call, context, exceptionResult);
+      this.auditResult(call, executionContext, exceptionResult);
       return exceptionResult;
     }
+  }
+
+  requiresConfirmation(call: MCPToolCall, _context: ToolContext): boolean {
+    const tool = this.resolveTool(call.name);
+    const policyResult = this.checkPolicyResult(call);
+
+    if (!policyResult.allowed) {
+      return false;
+    }
+
+    if (policyResult.requiresConfirmation) {
+      return true;
+    }
+
+    return tool?.annotations?.requiresConfirmation ?? false;
+  }
+
+  getConfirmationDetails(call: MCPToolCall, _context: ToolContext): ToolConfirmationDetails {
+    const tool = this.resolveTool(call.name);
+    const policyResult = this.checkPolicyResult(call);
+    const requiresConfirmation =
+      policyResult.allowed &&
+      (policyResult.requiresConfirmation || tool?.annotations?.requiresConfirmation === true);
+
+    return {
+      requiresConfirmation,
+      reason: policyResult.reason,
+      riskTags: policyResult.riskTags,
+    };
   }
 
   private resolveTool(callName: string): MCPTool | undefined {
@@ -150,15 +200,26 @@ export class ToolExecutionPipeline implements ToolExecutor {
     _tool: MCPTool | undefined,
     _context: ToolContext
   ): { allowed: boolean; reason?: string } {
-    const { tool, operation } = this.parseToolName(call.name);
-    const resource = this.extractResource(call);
-
-    const result = this.policy.check({ tool, operation, resource });
+    const result = this.checkPolicyResult(call);
     if (!result.allowed) {
       return { allowed: false, reason: result.reason };
     }
 
     return { allowed: true };
+  }
+
+  private checkPolicyResult(call: MCPToolCall): PermissionResult {
+    const { tool, operation } = this.parseToolName(call.name);
+    const resource = this.extractResource(call);
+
+    return this.policy.check({ tool, operation, resource });
+  }
+
+  private applyContextOverrides(context: ToolContext): ToolContext {
+    if (!this.contextOverrides) {
+      return context;
+    }
+    return { ...context, ...this.contextOverrides };
   }
 
   private checkRateLimit(call: MCPToolCall, context: ToolContext) {
@@ -184,6 +245,7 @@ export class ToolExecutionPipeline implements ToolExecutor {
       toolName: call.name,
       action: "call",
       userId: context.userId,
+      correlationId: context.correlationId,
       input: call.arguments,
       sandboxed: context.security.sandbox.type !== "none",
     });
@@ -195,6 +257,7 @@ export class ToolExecutionPipeline implements ToolExecutor {
       toolName: call.name,
       action: result.success ? "result" : "error",
       userId: context.userId,
+      correlationId: context.correlationId,
       output: result.success ? result.content : result.error,
       sandboxed: context.security.sandbox.type !== "none",
     });

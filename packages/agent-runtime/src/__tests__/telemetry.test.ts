@@ -238,5 +238,9 @@ describe("AGENT_METRICS", () => {
     expect(AGENT_METRICS.turnsTotal.name).toBe("agent_turns_total");
     expect(AGENT_METRICS.llmRequestsTotal.name).toBe("agent_llm_requests_total");
     expect(AGENT_METRICS.activeAgents.type).toBe("gauge");
+
+    expect(AGENT_METRICS.coworkPolicyEvaluations.name).toBe("cowork_policy_evaluations_total");
+    expect(AGENT_METRICS.coworkPolicyDenials.name).toBe("cowork_policy_denials_total");
+    expect(AGENT_METRICS.coworkPolicyLatency.type).toBe("histogram");
   });
 });
