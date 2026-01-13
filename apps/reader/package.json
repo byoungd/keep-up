@@ -63,6 +63,7 @@
     "prosemirror-model": "^1.25.4",
     "prosemirror-state": "^1.4.4",
     "prosemirror-tables": "^1.8.5",
+    "prosemirror-transform": "^1.10.2",
     "prosemirror-view": "^1.41.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

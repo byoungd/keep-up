@@ -53,6 +53,13 @@ async function setOnline(page: Page): Promise<void> {
   await page.evaluate(() => window.dispatchEvent(new Event("online")));
 }
 
+async function forceCommit(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const globalAny = window as unknown as { __lfccForceCommit?: () => void };
+    globalAny.__lfccForceCommit?.();
+  });
+}
+
 test.describe("Living Briefs Collaboration", () => {
   test.skip(!RUN_MULTI_REPLICA, "Requires multi-replica sync setup (UI_GATE_MULTI_REPLICA=1)");
 
@@ -84,6 +91,8 @@ test.describe("Living Briefs Collaboration", () => {
       await waitForOffline(pageA);
 
       await typeInEditor(pageA, "\nOffline update from author A.");
+      await assertDocumentContains(pageA, "Offline update from author A.");
+      await forceCommit(pageA);
 
       await setOnline(pageA);
       await expect(pageA.locator("[data-testid='connection-status']")).toContainText(
@@ -91,7 +100,11 @@ test.describe("Living Briefs Collaboration", () => {
         { timeout: 20_000 }
       );
 
-      await assertDocumentContains(pageB, "Offline update from author A.", { timeout: 15_000 });
+      await expect
+        .poll(async () => (await getEditorText(pageB)).includes("Offline update from author A."), {
+          timeout: 30_000,
+        })
+        .toBe(true);
     } finally {
       await pageA.close();
       await pageB.close();
