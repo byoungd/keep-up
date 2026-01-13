@@ -403,3 +403,68 @@ export {
   formatErrorResponse,
   type GatewayErrorResponse,
 } from "./gateway";
+
+// ============================================================================
+// Lanes - Multi-Lane Model Routing (Fast/Deep/Consensus)
+// ============================================================================
+export {
+  // Lane Router
+  LaneRouter,
+  createLaneRouter,
+  type ProviderFactory,
+  // Types
+  type ModelLane,
+  type LaneConfig,
+  type LaneModelConfig,
+  type MultiLaneConfig,
+  type LaneRouterConfig,
+  type LaneCompletionRequest,
+  type LaneCompletionResponse,
+  type LaneSelector,
+  type LaneSelectionContext,
+  type ComplexityHints,
+  type ConsensusConfig,
+  type ConsensusMergeStrategy,
+  type ConsensusResult,
+  type ConsensusModelResult,
+  type ConsensusDiff,
+  type LaneLogger,
+  type LaneTelemetryEvent,
+  // Selectors
+  createComplexityBasedSelector,
+  createPreferenceBasedSelector,
+  createConsensusSelector,
+  combineSelectors,
+  type ComplexitySelectorOptions,
+  type PreferenceSelectorOptions,
+  type ConsensusSelectorOptions,
+} from "./lanes";
+
+// ============================================================================
+// Middleware - Response Processing & Citation Grounding
+// ============================================================================
+export {
+  // Middleware Chain
+  MiddlewareChain,
+  createMiddlewareChain,
+  createSimpleMiddleware,
+  // Citation Middleware
+  CitationMiddleware,
+  createCitationMiddleware,
+  // Types
+  type ResponseMiddleware,
+  type MiddlewareResponse,
+  type MiddlewareContext,
+  type MiddlewareRequestOptions,
+  type ResponseMetadata,
+  type CitationRef,
+  type SourceContext,
+  type ResponseFlag,
+  type ResponseFlagType,
+  type FlagSeverity,
+  type ProcessedResponse,
+  type GroundingSummary,
+  type MiddlewareChainConfig,
+  type CitationMiddlewareConfig,
+  type MiddlewareLogger,
+} from "./middleware";

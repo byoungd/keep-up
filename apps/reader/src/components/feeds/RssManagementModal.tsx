@@ -1,15 +1,11 @@
 "use client";
 
-import {
-  createSubscription,
-  deleteSubscription,
-  listFolders,
-  listSubscriptions,
-  updateSubscription,
-} from "@keepup/db";
-import type { RssFolder, RssSubscription } from "@keepup/db";
+import { getDbClient } from "@/lib/db";
+import { useFeedProvider } from "@/providers/FeedProvider";
+import type { RssFolder, RssSubscription, TopicRow } from "@keepup/db";
 import { cn } from "@keepup/shared/utils";
 import * as Dialog from "@radix-ui/react-dialog";
+import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, Plus, Rss, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
@@ -26,51 +22,44 @@ type ModalView = "list" | "add" | "edit";
 
 export function RssManagementModal({ open, onOpenChange }: RssManagementModalProps) {
   const t = useTranslations("Feeds");
-  const [view, setView] = useState<ModalView>("list");
-  const [subscriptions, setSubscriptions] = useState<RssSubscription[]>([]);
-  const [folders, setFolders] = useState<RssFolder[]>([]);
-  const [editingSubscription, setEditingSubscription] = useState<RssSubscription | null>(null);
+  const { subscriptions, folders, addFeed, removeFeed, updateFeed } = useFeedProvider();
 
-  const loadData = useCallback(() => {
-    setSubscriptions(listSubscriptions());
-    setFolders(listFolders());
-  }, []);
+  const [view, setView] = useState<ModalView>("list");
+  const [editingSubscription, setEditingSubscription] = useState<RssSubscription | null>(null);
 
   useEffect(() => {
     if (open) {
-      loadData();
       setView("list");
     }
-  }, [open, loadData]);
+  }, [open]);
 
   const handleAddFeed = useCallback(
-    (url: string, title?: string) => {
+    async (url: string, _title?: string) => {
+      // Title is optional and often unused
       try {
-        createSubscription({ url, title });
-        loadData();
+        await addFeed(url);
+        // loadData(); // Handled by provider
         setView("list");
       } catch (err) {
         // Handle duplicate error
         console.error("Failed to add feed:", err);
       }
     },
-    [loadData]
+    [addFeed]
   );
 
   const handleDeleteSubscription = useCallback(
-    (subscriptionId: string) => {
-      deleteSubscription(subscriptionId);
-      loadData();
+    async (subscriptionId: string) => {
+      await removeFeed(subscriptionId);
     },
-    [loadData]
+    [removeFeed]
   );
 
   const handleToggleEnabled = useCallback(
-    (subscriptionId: string, enabled: boolean) => {
-      updateSubscription(subscriptionId, { enabled });
-      loadData();
+    async (subscriptionId: string, enabled: boolean) => {
+      await updateFeed(subscriptionId, { enabled });
     },
-    [loadData]
+    [updateFeed]
   );
 
   const renderContent = () => {
@@ -89,9 +78,10 @@ export function RssManagementModal({ open, onOpenChange }: RssManagementModalPro
           <EditFeedView
             subscription={editingSubscription}
             folders={folders}
-            onSave={(updates) => {
-              updateSubscription(editingSubscription.subscriptionId, updates);
-              loadData();
+            onSave={async (updates) => {
+              if (editingSubscription) {
+                await updateFeed(editingSubscription.subscriptionId, updates);
+              }
               setView("list");
             }}
             onCancel={() => setView("list")}
@@ -108,7 +98,9 @@ export function RssManagementModal({ open, onOpenChange }: RssManagementModalPro
             }}
             onDeleteSubscription={handleDeleteSubscription}
             onToggleSubscriptionEnabled={handleToggleEnabled}
-            onRefresh={loadData}
+            onRefresh={() => {
+              /* Provider handles refresh usually */
+            }}
           />
         );
     }
@@ -180,8 +172,30 @@ interface EditFeedViewProps {
 
 function EditFeedView({ subscription, folders, onSave, onCancel }: EditFeedViewProps) {
   const t = useTranslations("Feeds");
+  const { topics, addFeedToTopic, removeFeedFromTopic } = useFeedProvider();
+
   const [displayName, setDisplayName] = useState(subscription.displayName || "");
   const [folderId, setFolderId] = useState(subscription.folderId || "");
+
+  // Fetch topics associated with this subscription
+  const { data: subTopics = [], refetch: refetchSubTopics } = useQuery({
+    queryKey: ["subscription-topics", subscription.subscriptionId],
+    queryFn: async () => {
+      const db = await getDbClient();
+      return db.listTopicsBySubscription(subscription.subscriptionId);
+    },
+  });
+
+  const subTopicIds = new Set(subTopics.map((t: TopicRow) => t.topicId));
+
+  const handleToggleTopic = async (topicId: string, isSelected: boolean) => {
+    if (isSelected) {
+      await removeFeedFromTopic(subscription.subscriptionId, topicId);
+    } else {
+      await addFeedToTopic(subscription.subscriptionId, topicId);
+    }
+    refetchSubTopics();
+  };
 
   return (
     <div className="space-y-4">
@@ -198,24 +212,61 @@ function EditFeedView({ subscription, folders, onSave, onCancel }: EditFeedViewP
           className="w-full px-3 py-2 rounded-lg border border-input bg-background"
         />
       </div>
-      <div>
-        <label htmlFor="folder-select" className="block text-sm font-medium mb-1.5">
-          {t("folder")}
-        </label>
-        <select
-          id="folder-select"
-          value={folderId}
-          onChange={(e) => setFolderId(e.target.value)}
-          className="w-full px-3 py-2 rounded-lg border border-input bg-background"
-        >
-          <option value="">{t("noFolder")}</option>
-          {folders.map((f) => (
-            <option key={f.folderId} value={f.folderId}>
-              {f.name}
-            </option>
-          ))}
-        </select>
-      </div>
+
+      {/* Topics */}
+      <fieldset className="space-y-1.5">
+        <legend className="text-sm font-medium">Topics</legend>
+        <div className="flex flex-wrap gap-2">
+          {topics.map((topic) => {
+            const isSelected = subTopicIds.has(topic.topicId);
+            return (
+              <button
+                key={topic.topicId}
+                type="button"
+                onClick={() => handleToggleTopic(topic.topicId, isSelected)}
+                className={cn(
+                  "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs transition-colors border",
+                  isSelected
+                    ? "bg-primary/10 border-primary/20 text-primary"
+                    : "bg-muted/30 border-transparent text-muted-foreground hover:bg-muted"
+                )}
+              >
+                <div
+                  className="w-2 h-2 rounded-full"
+                  style={{ backgroundColor: topic.color || "currentColor" }}
+                />
+                {topic.name}
+              </button>
+            );
+          })}
+          {topics.length === 0 && (
+            <div className="text-xs text-muted-foreground italic">No topics created.</div>
+          )}
+        </div>
+      </fieldset>
+
+      {/* Folders (Stubbed/Legacy) */}
+      {folders.length > 0 && (
+        <div>
+          <label htmlFor="folder-select" className="block text-sm font-medium mb-1.5">
+            {t("folder")}
+          </label>
+          <select
+            id="folder-select"
+            value={folderId}
+            onChange={(e) => setFolderId(e.target.value)}
+            className="w-full px-3 py-2 rounded-lg border border-input bg-background"
+          >
+            <option value="">{t("noFolder")}</option>
+            {folders.map((f) => (
+              <option key={f.folderId} value={f.folderId}>
+                {f.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       <div className="flex justify-end gap-3 pt-4">
         <button
           type="button"

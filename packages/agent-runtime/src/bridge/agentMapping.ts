@@ -40,6 +40,7 @@ const RUNTIME_TO_CORE_MAP: Record<RuntimeAgentType, CoreAgentType> = {
   "code-reviewer": "reviewer",
   implementer: "writer",
   debugger: "editor",
+  digest: "custom",
 };
 
 /**
@@ -56,6 +57,7 @@ const RUNTIME_CAPABILITIES: Record<RuntimeAgentType, AgentCapability[]> = {
   "code-reviewer": ["add_annotations", "modify_annotations", "approve_suggestions"],
   implementer: ["generate_content", "modify_content", "restructure_document"],
   debugger: ["modify_content"],
+  digest: ["generate_content", "add_annotations"],
 };
 
 // ============================================================================
@@ -119,6 +121,7 @@ const VALID_RUNTIME_TYPES: RuntimeAgentType[] = [
   "code-reviewer",
   "implementer",
   "debugger",
+  "digest",
 ];
 
 /**

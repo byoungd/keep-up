@@ -405,6 +405,94 @@ const driver: DbDriver = {
     }));
   },
 
+  async addSubscriptionToTopic(subscriptionId: string, topicId: string): Promise<void> {
+    const now = Date.now();
+    execStatement(
+      `INSERT OR IGNORE INTO subscription_topics (subscription_id, topic_id, added_at)
+       VALUES (?, ?, ?)`,
+      [subscriptionId, topicId, now]
+    );
+  },
+
+  async removeSubscriptionFromTopic(subscriptionId: string, topicId: string): Promise<void> {
+    execStatement("DELETE FROM subscription_topics WHERE subscription_id = ? AND topic_id = ?", [
+      subscriptionId,
+      topicId,
+    ]);
+  },
+
+  async listSubscriptionsByTopic(
+    topicId: string
+  ): Promise<import("../driver/types").RssSubscriptionRow[]> {
+    const rows = execSql<{
+      subscription_id: string;
+      url: string;
+      title: string | null;
+      display_name: string | null;
+      site_url: string | null;
+      folder_id: string | null;
+      enabled: number;
+      last_fetched_at: number | null;
+      status: string;
+      error_message: string | null;
+      etag: string | null;
+      last_modified: string | null;
+      created_at: number;
+      updated_at: number;
+    }>(
+      `SELECT s.*
+       FROM rss_subscriptions s
+       INNER JOIN subscription_topics st ON s.subscription_id = st.subscription_id
+       WHERE st.topic_id = ?
+       ORDER BY st.added_at DESC`,
+      [topicId]
+    );
+
+    return rows.map((r) => ({
+      subscriptionId: r.subscription_id,
+      url: r.url,
+      title: r.title,
+      displayName: r.display_name,
+      siteUrl: r.site_url,
+      folderId: r.folder_id,
+      enabled: r.enabled === 1,
+      lastFetchedAt: r.last_fetched_at,
+      status: r.status as "ok" | "error",
+      errorMessage: r.error_message,
+      etag: r.etag,
+      lastModified: r.last_modified,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+    }));
+  },
+
+  async listTopicsBySubscription(subscriptionId: string): Promise<TopicRow[]> {
+    const rows = execSql<{
+      topic_id: string;
+      name: string;
+      description: string | null;
+      color: string | null;
+      created_at: number;
+      updated_at: number;
+    }>(
+      `SELECT t.*
+       FROM topics t
+       INNER JOIN subscription_topics st ON t.topic_id = st.topic_id
+       WHERE st.subscription_id = ?
+       ORDER BY st.added_at DESC`,
+      [subscriptionId]
+    );
+
+    return rows.map((r) => ({
+      topicId: r.topic_id,
+      name: r.name,
+      description: r.description,
+      color: r.color,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+    }));
+  },
+
   async upsertDocument(doc) {
     const now = Date.now();
     execStatement(
@@ -1329,23 +1417,34 @@ const driver: DbDriver = {
   async listFeedItems(
     options?: import("../driver/types").ListFeedItemsOptions
   ): Promise<import("../driver/types").FeedItemRow[]> {
-    let sql = "SELECT * FROM feed_items WHERE 1=1";
+    let sql = "SELECT f.* FROM feed_items f";
     const params: unknown[] = [];
 
+    if (options?.topicId) {
+      sql += " INNER JOIN subscription_topics st ON f.subscription_id = st.subscription_id";
+    }
+
+    sql += " WHERE 1=1";
+
+    if (options?.topicId) {
+      sql += " AND st.topic_id = ?";
+      params.push(options.topicId);
+    }
+
     if (options?.subscriptionId) {
-      sql += " AND subscription_id = ?";
+      sql += " AND f.subscription_id = ?";
       params.push(options.subscriptionId);
     }
     if (options?.readState) {
-      sql += " AND read_state = ?";
+      sql += " AND f.read_state = ?";
       params.push(options.readState);
     }
     if (options?.saved !== undefined) {
-      sql += " AND saved = ?";
+      sql += " AND f.saved = ?";
       params.push(options.saved ? 1 : 0);
     }
 
-    sql += " ORDER BY published_at DESC";
+    sql += " ORDER BY f.published_at DESC";
 
     if (options?.limit) {
       sql += ` LIMIT ${options.limit}`;
@@ -2220,6 +2319,10 @@ export type WorkerRequest =
   | { type: "removeDocumentFromTopic"; documentId: string; topicId: string }
   | { type: "listDocumentsByTopic"; topicId: string; options?: ListDocumentsOptions }
   | { type: "listTopicsByDocument"; documentId: string }
+  | { type: "addSubscriptionToTopic"; subscriptionId: string; topicId: string }
+  | { type: "removeSubscriptionFromTopic"; subscriptionId: string; topicId: string }
+  | { type: "listSubscriptionsByTopic"; topicId: string }
+  | { type: "listTopicsBySubscription"; subscriptionId: string }
   // --- RSS Subscription operations ---
   | {
       type: "createRssSubscription";
@@ -2411,6 +2514,18 @@ export async function handleWorkerRequest(
         break;
       case "listTopicsByDocument":
         data = await impl.listTopicsByDocument(request.documentId);
+        break;
+      case "addSubscriptionToTopic":
+        await impl.addSubscriptionToTopic(request.subscriptionId, request.topicId);
+        break;
+      case "removeSubscriptionFromTopic":
+        await impl.removeSubscriptionFromTopic(request.subscriptionId, request.topicId);
+        break;
+      case "listSubscriptionsByTopic":
+        data = await impl.listSubscriptionsByTopic(request.topicId);
+        break;
+      case "listTopicsBySubscription":
+        data = await impl.listTopicsBySubscription(request.subscriptionId);
         break;
       // --- RSS Subscription operations ---
       case "createRssSubscription":

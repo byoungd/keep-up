@@ -159,6 +159,13 @@ export interface ListTopicsOptions {
   order?: "asc" | "desc";
 }
 
+/** Represents a row from the `subscription_topics` table. */
+export interface SubscriptionTopicRow {
+  subscriptionId: string;
+  topicId: string;
+  addedAt: number;
+}
+
 // ============ RSS Types ============
 
 /** Represents a row from the `rss_subscriptions` table. */
@@ -207,6 +214,7 @@ export interface ListRssSubscriptionsOptions {
 /** Options for listing feed items. */
 export interface ListFeedItemsOptions {
   subscriptionId?: string;
+  topicId?: string;
   readState?: "unread" | "read";
   saved?: boolean;
   limit?: number;
@@ -374,6 +382,12 @@ export interface DbDriver {
   removeDocumentFromTopic(documentId: string, topicId: string): Promise<void>;
   listDocumentsByTopic(topicId: string, options?: ListDocumentsOptions): Promise<DocumentRow[]>;
   listTopicsByDocument(documentId: string): Promise<TopicRow[]>;
+
+  // --- Subscription-Topic link operations ---
+  addSubscriptionToTopic(subscriptionId: string, topicId: string): Promise<void>;
+  removeSubscriptionFromTopic(subscriptionId: string, topicId: string): Promise<void>;
+  listSubscriptionsByTopic(topicId: string): Promise<RssSubscriptionRow[]>;
+  listTopicsBySubscription(subscriptionId: string): Promise<TopicRow[]>;
 
   // --- CRDT Update operations ---
   appendUpdate(update: CrdtUpdateRow): Promise<void>;

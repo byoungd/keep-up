@@ -341,6 +341,17 @@ CREATE TABLE IF NOT EXISTS brief_items (
   FOREIGN KEY (brief_id) REFERENCES briefs(brief_id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_brief_items_brief ON brief_items (brief_id, order_index);
+
+-- Subscription-Topics (many-to-many)
+CREATE TABLE IF NOT EXISTS subscription_topics (
+  subscription_id TEXT NOT NULL,
+  topic_id TEXT NOT NULL,
+  added_at INTEGER NOT NULL,
+  PRIMARY KEY (subscription_id, topic_id),
+  FOREIGN KEY (subscription_id) REFERENCES rss_subscriptions(subscription_id) ON DELETE CASCADE,
+  FOREIGN KEY (topic_id) REFERENCES topics(topic_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_subscription_topics_topic ON subscription_topics (topic_id, added_at DESC);
 `;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -628,6 +639,21 @@ async function migrateV9ToV10(execSql: ExecSql): Promise<void> {
   await execSql("PRAGMA user_version = 10;");
 }
 
+async function migrateV10ToV11(execSql: ExecSql): Promise<void> {
+  await execSql(`
+    CREATE TABLE IF NOT EXISTS subscription_topics (
+      subscription_id TEXT NOT NULL,
+      topic_id TEXT NOT NULL,
+      added_at INTEGER NOT NULL,
+      PRIMARY KEY (subscription_id, topic_id),
+      FOREIGN KEY (subscription_id) REFERENCES rss_subscriptions(subscription_id) ON DELETE CASCADE,
+      FOREIGN KEY (topic_id) REFERENCES topics(topic_id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_subscription_topics_topic ON subscription_topics (topic_id, added_at DESC);
+  `);
+  await execSql("PRAGMA user_version = 11;");
+}
+
 // Migration registry: version → migration function
 const MIGRATIONS: Array<{ from: number; to: number; fn: (exec: ExecSql) => Promise<void> }> = [
   { from: 1, to: 2, fn: migrateV1ToV2 },
@@ -639,6 +665,7 @@ const MIGRATIONS: Array<{ from: number; to: number; fn: (exec: ExecSql) => Promi
   { from: 7, to: 8, fn: migrateV7ToV8 },
   { from: 8, to: 9, fn: migrateV8ToV9 },
   { from: 9, to: 10, fn: migrateV9ToV10 },
+  { from: 10, to: 11, fn: migrateV10ToV11 },
 ];
 
 /**
@@ -662,4 +689,4 @@ export async function runMigrations(currentVersion: number, execSql: ExecSql): P
   }
 }
 
-export const CURRENT_SCHEMA_VERSION = 10;
+export const CURRENT_SCHEMA_VERSION = 11;
