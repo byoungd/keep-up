@@ -7,8 +7,10 @@
  * Track 2: Intelligence & Logic (AI)
  */
 
+import type { EmbeddingService } from "../extraction/embeddingService";
 import type { AIGateway } from "../gateway";
 import type { RAGPipeline } from "../rag/ragPipeline";
+import { type ClusteringConfig, ClusteringService, type ContentCluster } from "./clusteringService";
 import {
   type LLMSynthesizer,
   type LLMSynthesizerConfig,
@@ -45,6 +47,10 @@ export interface DigestServiceConfig {
   useLLMSynthesis: boolean;
   /** LLM Synthesizer configuration overrides */
   llmSynthesizer?: Partial<LLMSynthesizerConfig>;
+  /** Whether to use semantic clustering (default: true) */
+  useClustering: boolean;
+  /** Clustering configuration overrides */
+  clustering?: Partial<ClusteringConfig>;
 }
 
 const DEFAULT_CONFIG: DigestServiceConfig = {
@@ -54,6 +60,7 @@ const DEFAULT_CONFIG: DigestServiceConfig = {
   minConfidenceThreshold: 0.7,
   enableVerification: true,
   useLLMSynthesis: true,
+  useClustering: true,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -93,13 +100,15 @@ export class DigestService {
   private readonly contentStore: ContentStore;
   private readonly digestStore: DigestStore;
   private readonly llmSynthesizer: LLMSynthesizer | null;
+  private readonly clusteringService: ClusteringService | null;
 
   constructor(
     gateway: AIGateway,
     rag: RAGPipeline,
     contentStore: ContentStore,
     digestStore: DigestStore,
-    config: Partial<DigestServiceConfig> = {}
+    config: Partial<DigestServiceConfig> = {},
+    embeddingService?: EmbeddingService
   ) {
     this.config = { ...DEFAULT_CONFIG, ...config };
     this.gateway = gateway;
@@ -111,6 +120,12 @@ export class DigestService {
     this.llmSynthesizer = this.config.useLLMSynthesis
       ? createLLMSynthesizer(gateway, rag, config.llmSynthesizer)
       : null;
+
+    // Initialize clustering service if enabled and embedding service provided
+    this.clusteringService =
+      this.config.useClustering && embeddingService
+        ? new ClusteringService(embeddingService, gateway, config.clustering)
+        : null;
   }
 
   /**
@@ -201,9 +216,13 @@ export class DigestService {
    * Phase 2: Rank
    * Score items by importance and cluster related items
    */
-  private async rank(items: ContentItem[], _options: DigestGenerationOptions): Promise<RankResult> {
-    // TODO: Implement intelligent ranking
-    // For now, use recency as the primary signal
+  private async rank(items: ContentItem[], options: DigestGenerationOptions): Promise<RankResult> {
+    // Use clustering service if available
+    if (this.clusteringService) {
+      return this.rankWithClustering(items, options);
+    }
+
+    // Fallback: use recency as the primary signal (no clustering)
     const rankedItems = items
       .map((item) => ({
         item,
@@ -212,8 +231,70 @@ export class DigestService {
       }))
       .sort((a, b) => b.score - a.score);
 
-    // TODO: Implement clustering
-    const clusters: RankResult["clusters"] = [];
+    return { rankedItems, clusters: [] };
+  }
+
+  /**
+   * Rank items using semantic clustering
+   */
+  private async rankWithClustering(
+    items: ContentItem[],
+    options: DigestGenerationOptions
+  ): Promise<RankResult> {
+    // This should only be called when clusteringService is available
+    if (!this.clusteringService) {
+      throw new Error("Clustering service not initialized");
+    }
+
+    const maxClusters = options.maxCards ?? this.config.maxCardsPerDigest;
+
+    const clusteringResult = await this.clusteringService.clusterItems(items, {
+      maxClusters,
+      minClusterSize: 1,
+      similarityThreshold: 0.6,
+      useLLMLabeling: true,
+      userId: "system",
+    });
+
+    // Convert clusters to RankResult format
+    const clusters: RankResult["clusters"] = clusteringResult.clusters.map(
+      (cluster: ContentCluster) => ({
+        id: cluster.id,
+        label: cluster.title,
+        itemIds: cluster.items.map((i) => i.item.id),
+        cohesion: cluster.cohesion,
+      })
+    );
+
+    // Build ranked items with cluster assignments
+    const rankedItems: RankResult["rankedItems"] = [];
+    const processedIds = new Set<string>();
+
+    // First, add items from clusters (in cluster order)
+    for (const cluster of clusteringResult.clusters) {
+      for (const clusteredItem of cluster.items) {
+        if (!processedIds.has(clusteredItem.item.id)) {
+          rankedItems.push({
+            item: clusteredItem.item,
+            score: cluster.relevanceScore * clusteredItem.similarityToCentroid,
+            cluster: cluster.id,
+          });
+          processedIds.add(clusteredItem.item.id);
+        }
+      }
+    }
+
+    // Then, add unclustered items sorted by recency
+    for (const item of clusteringResult.unclustered) {
+      if (!processedIds.has(item.id)) {
+        rankedItems.push({
+          item,
+          score: this.calculateRecencyScore(item.ingestedAt),
+          cluster: undefined,
+        });
+        processedIds.add(item.id);
+      }
+    }
 
     return { rankedItems, clusters };
   }

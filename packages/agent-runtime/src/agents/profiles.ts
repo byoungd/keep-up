@@ -177,6 +177,24 @@ You have access to file and execution tools. Focus on:
 - Implementing fixes
 - Verifying solutions`;
 
+const DIGEST_SYSTEM_PROMPT = `You are a digest generation specialist.
+Your role is to analyze content items, cluster them by semantic similarity,
+and generate concise, grounded summaries.
+
+Guidelines:
+- Fetch unread content items within the specified time window
+- Cluster related items using semantic similarity
+- Generate clear, concise cluster titles and summaries
+- Ensure all summaries are grounded with citations [sourceId]
+- Prioritize recent and high-relevance content
+- Deduplicate similar content from different sources
+
+You have access to digest tools. Focus on:
+- Fetching content by time window and user preferences
+- Clustering items by semantic similarity
+- Generating grounded summaries with citations
+- Ranking clusters by relevance`;
+
 function withAgentsGuide(prompt: string): string {
   return `${prompt}\n\n${AGENTS_GUIDE_PROMPT}`;
 }
@@ -298,6 +316,18 @@ export const AGENT_PROFILES: Record<AgentType, AgentProfile> = {
     securityPreset: "balanced",
     maxTurns: 30,
     requireConfirmation: true,
+  },
+
+  digest: {
+    type: "digest",
+    name: "Digest Agent",
+    description:
+      "Generates clustered content digests with semantic grouping and grounded summaries",
+    allowedTools: ["digest:*", "file:read"],
+    systemPrompt: withAgentsGuide(DIGEST_SYSTEM_PROMPT),
+    securityPreset: "safe",
+    maxTurns: 20,
+    requireConfirmation: false,
   },
 };
 
