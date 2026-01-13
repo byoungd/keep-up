@@ -258,6 +258,9 @@ importers:
       prosemirror-tables:
         specifier: ^1.8.5
         version: 1.8.5
+      prosemirror-transform:
+        specifier: ^1.10.2
+        version: 1.10.5
       prosemirror-view:
         specifier: 1.41.4
         version: 1.41.4
@@ -568,6 +571,9 @@ importers:
       prosemirror-state:
         specifier: 1.4.4
         version: 1.4.4
+      prosemirror-transform:
+        specifier: ^1.10.2
+        version: 1.10.5
       prosemirror-view:
         specifier: 1.41.4
         version: 1.41.4

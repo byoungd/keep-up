@@ -24,6 +24,7 @@ import {
 } from "@keepup/lfcc-bridge";
 import { history } from "prosemirror-history";
 import { keymap } from "prosemirror-keymap";
+import type { Node as PMNode } from "prosemirror-model";
 import { type EditorState, TextSelection } from "prosemirror-state";
 import { ReplaceAroundStep, ReplaceStep } from "prosemirror-transform";
 import type { EditorView } from "prosemirror-view";
@@ -67,7 +68,8 @@ function shouldAssignBlockIds(tr: import("prosemirror-state").Transaction): bool
   for (const step of tr.steps) {
     if (step instanceof ReplaceStep || step instanceof ReplaceAroundStep) {
       let hasBlock = false;
-      step.slice.content.descendants((node) => {
+      const replaceStep = step as ReplaceStep | ReplaceAroundStep;
+      replaceStep.slice.content.descendants((node: PMNode) => {
         if (node.isBlock && node.type.name !== "doc") {
           hasBlock = true;
           return false;

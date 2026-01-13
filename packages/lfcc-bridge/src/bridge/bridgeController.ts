@@ -135,7 +135,8 @@ function shouldAssignBlockIds(tr: Transaction): boolean {
   for (const step of tr.steps) {
     if (step instanceof ReplaceStep || step instanceof ReplaceAroundStep) {
       let hasBlock = false;
-      step.slice.content.descendants((node) => {
+      const replaceStep = step as ReplaceStep | ReplaceAroundStep;
+      replaceStep.slice.content.descendants((node: PMNode) => {
         if (node.isBlock && node.type.name !== "doc") {
           hasBlock = true;
           return false;
