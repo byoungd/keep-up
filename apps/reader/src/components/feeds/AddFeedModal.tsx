@@ -5,7 +5,7 @@
 "use client";
 
 import { Button } from "@/components/ui/Button";
-import { useRssStore } from "@/lib/rss";
+import { useFeedProvider } from "@/providers/FeedProvider";
 import { cn } from "@keepup/shared/utils";
 import { AlertCircle, Loader2, Plus, Rss, X } from "lucide-react";
 import * as React from "react";
@@ -20,7 +20,7 @@ export function AddFeedModal({ open, onClose }: AddFeedModalProps) {
   const [error, setError] = React.useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
-  const { addSubscription } = useRssStore();
+  const { addFeed } = useFeedProvider();
 
   // Focus input when modal opens
   React.useEffect(() => {
@@ -60,7 +60,7 @@ export function AddFeedModal({ open, onClose }: AddFeedModalProps) {
 
     setIsSubmitting(true);
     try {
-      await addSubscription(trimmedUrl);
+      await addFeed(trimmedUrl);
       setUrl("");
       onClose();
     } catch (err) {

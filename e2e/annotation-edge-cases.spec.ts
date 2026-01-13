@@ -1,6 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { selectRangeBetweenSubstrings, waitForEditorReady } from "./helpers/editor";
 
+type PMView = import("prosemirror-view").EditorView;
+type PMNode = import("prosemirror-model").Node;
+
 test.describe("Annotation Edge Cases", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/editor");
@@ -15,7 +18,7 @@ test.describe("Annotation Edge Cases", () => {
     await page.keyboard.type("Paragraph Two");
     await page.keyboard.press("Enter");
     await page.keyboard.type("Paragraph Three");
-    await page.waitForTimeout(100);
+    await expect(page.locator(".lfcc-editor .ProseMirror")).toContainText("Paragraph Three");
   });
 
   test("Splits annotation when a new block is inserted between parts", async ({ page }) => {
@@ -36,9 +39,8 @@ test.describe("Annotation Edge Cases", () => {
     await page.keyboard.press("Enter");
     await page.keyboard.type("Middle Paragraph");
 
-    await page.waitForTimeout(2000);
-
     // 3. Verify split: Should be 2 annotations now because gap > 0
+    await waitForAnnotationCount(page, 2);
     const finalIds = await getUniqueAnnotationIds(page);
     expect(finalIds.length).toBe(2);
   });
@@ -56,11 +58,13 @@ test.describe("Annotation Edge Cases", () => {
 
     // 2. Delete P2 (the middle block)
     await page.evaluate(() => {
-      // @ts-ignore
-      const view = window.__lfccView;
+      const view = (window as unknown as { __lfccView?: PMView }).__lfccView;
+      if (!view) {
+        throw new Error("View not found");
+      }
       let pos = -1;
       let size = 0;
-      view.state.doc.descendants((node: Node, p: number) => {
+      view.state.doc.descendants((node: PMNode, p: number) => {
         if (node.textContent === "Paragraph Two") {
           pos = p;
           size = node.nodeSize;
@@ -72,16 +76,16 @@ test.describe("Annotation Edge Cases", () => {
       }
     });
 
-    await page.waitForTimeout(2000);
-
     // 3. Verify: Should still be 1 annotation (healed by removing the missing block part)
     // because P1 and P3 are now adjacent, so gap is 0.
+    await waitForAnnotationCount(page, 1);
     const finalIds = await getUniqueAnnotationIds(page);
     expect(finalIds.length).toBe(1);
 
     // Verify no warning badges (implies successful healing of ghost span)
     await expect(page.locator(".lfcc-annotation-warning")).toHaveCount(0);
   });
+
   test("Heals annotation when the start block is deleted", async ({ page }) => {
     // 1. Create annotation across P1, P2, P3
     await selectRangeBetweenSubstrings(page, "Paragraph One", "Paragraph Three");
@@ -95,11 +99,13 @@ test.describe("Annotation Edge Cases", () => {
 
     // 2. Delete P1 (the start block)
     await page.evaluate(() => {
-      // @ts-ignore
-      const view = window.__lfccView;
+      const view = (window as unknown as { __lfccView?: PMView }).__lfccView;
+      if (!view) {
+        throw new Error("View not found");
+      }
       let pos = -1;
       let size = 0;
-      view.state.doc.descendants((node: Node, p: number) => {
+      view.state.doc.descendants((node: PMNode, p: number) => {
         if (node.textContent === "Paragraph One") {
           pos = p;
           size = node.nodeSize;
@@ -111,9 +117,8 @@ test.describe("Annotation Edge Cases", () => {
       }
     });
 
-    await page.waitForTimeout(2000);
-
     // 3. Verify: Should still be 1 annotation (healed)
+    await waitForAnnotationCount(page, 1);
     const finalIds = await getUniqueAnnotationIds(page);
     expect(finalIds.length).toBe(1);
 
@@ -133,11 +138,13 @@ test.describe("Annotation Edge Cases", () => {
 
     // 2. Delete P3 (the end block)
     await page.evaluate(() => {
-      // @ts-ignore
-      const view = window.__lfccView;
+      const view = (window as unknown as { __lfccView?: PMView }).__lfccView;
+      if (!view) {
+        throw new Error("View not found");
+      }
       let pos = -1;
       let size = 0;
-      view.state.doc.descendants((node: Node, p: number) => {
+      view.state.doc.descendants((node: PMNode, p: number) => {
         if (node.textContent === "Paragraph Three") {
           pos = p;
           size = node.nodeSize;
@@ -149,9 +156,8 @@ test.describe("Annotation Edge Cases", () => {
       }
     });
 
-    await page.waitForTimeout(2000);
-
     // 3. Verify: Should still be 1 annotation (healed)
+    await waitForAnnotationCount(page, 1);
     const finalIds = await getUniqueAnnotationIds(page);
     expect(finalIds.length).toBe(1);
 
@@ -170,8 +176,6 @@ test.describe("Annotation Edge Cases", () => {
     await toolbar.getByRole("button", { name: "Highlight yellow" }).click();
 
     // 2. Merge P2 into P1 (Backspace at start of P2)
-    // Click at start of P2
-    // Click at start of P2
     const p2 = page.getByText("Paragraph Two", { exact: true });
     await p2.click();
     await page.keyboard.press("Home", { delay: 100 });
@@ -179,10 +183,9 @@ test.describe("Annotation Edge Cases", () => {
     // Just force backspace multiple times if needed, or rely on Home -> Backspace
     await page.keyboard.press("Backspace", { delay: 100 });
 
-    await page.waitForTimeout(2000);
-
     // 3. Verify: The annotation on the merged-away block (P2) is likely lost (pruned).
     // The annotation on P1 should remain.
+    await waitForAnnotationCount(page, 1);
     const finalIds = await getUniqueAnnotationIds(page);
     expect(finalIds.length).toBe(1);
 
@@ -197,14 +200,22 @@ test.describe("Annotation Edge Cases", () => {
   });
 });
 
-async function getUniqueAnnotationIds(page: unknown) {
-  const typedPage = page as { evaluate: <T>(fn: () => T) => Promise<T> };
-  return await typedPage.evaluate(() => {
+async function getUniqueAnnotationIds(page: import("@playwright/test").Page) {
+  return await page.evaluate(() => {
     const nodes = document.querySelectorAll(".lfcc-annotation");
-    const ids = new Set();
+    const ids = new Set<string | null>();
     for (const n of nodes) {
       ids.add(n.getAttribute("data-annotation-id"));
     }
     return Array.from(ids);
   });
+}
+
+async function waitForAnnotationCount(
+  page: import("@playwright/test").Page,
+  expected: number
+): Promise<void> {
+  await expect
+    .poll(async () => (await getUniqueAnnotationIds(page)).length, { timeout: 5000 })
+    .toBe(expected);
 }

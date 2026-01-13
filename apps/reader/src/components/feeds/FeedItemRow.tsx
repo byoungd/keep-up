@@ -7,6 +7,7 @@
 "use client";
 
 import { cn } from "@keepup/shared/utils";
+import { motion } from "framer-motion";
 import { BookmarkIcon, Check, Circle, ExternalLink } from "lucide-react";
 import * as React from "react";
 
@@ -60,56 +61,56 @@ export const FeedItemRow = React.memo(function FeedItemRow({
   }, [publishedAt]);
 
   return (
-    <button
+    <motion.button
       type="button"
       onClick={onClick}
+      layout
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      whileHover={{ backgroundColor: "var(--surface-2)" }}
+      whileTap={{ scale: 0.995 }}
+      transition={{ duration: 0.1 }}
       className={cn(
         // Base styles
         "group relative flex items-center gap-3 px-4 py-2.5 cursor-pointer w-full text-left",
-        "border-b border-border/5 transition-all duration-150",
-        // Hover state with subtle translate
-        "hover:translate-x-0.5 hover:bg-surface-2/60",
+        "border-b border-border/5",
         // Active/selected state
-        isActive && "bg-primary/5 translate-x-0.5",
+        isActive && "bg-primary/5",
         // Unread state
-        !isRead && "bg-surface-1",
+        !isRead && !isActive && "bg-surface-1",
         // Focus state
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-inset"
       )}
     >
-      {/* Active indicator bar */}
+      {/* Active indicator bar - thinner and subtler */}
       {isActive && (
-        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-primary rounded-r-full shadow-[0_0_8px_var(--color-accent-indigo-glow)]" />
+        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-4 bg-primary rounded-r-full shadow-[0_0_6px_var(--color-primary)]" />
       )}
 
-      {/* Unread indicator with pulse animation */}
-      <div className="w-2 shrink-0 flex items-center justify-center">
-        {!isRead && (
-          <div className="relative">
-            <Circle className="h-2 w-2 fill-primary text-primary" />
-            <Circle className="absolute inset-0 h-2 w-2 fill-primary text-primary animate-ping opacity-30" />
-          </div>
-        )}
+      {/* Unread indicator - solid dot, no ping for premium feel */}
+      <div className="w-2.5 shrink-0 flex items-center justify-center mr-1">
+        {!isRead && <Circle className="h-1.5 w-1.5 fill-primary text-primary" />}
       </div>
 
       {/* Content */}
       <div className="flex-1 min-w-0">
         <div
           className={cn(
-            "text-sm leading-snug truncate transition-colors",
-            isRead ? "text-muted-foreground" : "text-foreground font-medium"
+            "text-[13px] leading-relaxed truncate transition-colors",
+            isRead ? "text-muted-foreground font-normal" : "text-foreground font-medium"
           )}
         >
           {title}
         </div>
-        <div className="flex items-center gap-1.5 mt-0.5">
-          <span className="text-[11px] text-muted-foreground/60 truncate max-w-[120px]">
+        <div className="flex items-center gap-1.5">
+          <span className="text-[11px] text-muted-foreground/60 truncate max-w-[120px] font-medium">
             {sourceName}
           </span>
           {formattedDate && (
             <>
-              <span className="text-muted-foreground/30 text-[10px]">•</span>
-              <span className="text-[11px] text-muted-foreground/50 tabular-nums">
+              <span className="text-muted-foreground/20 text-[6px]">•</span>
+              <span className="text-[10px] text-muted-foreground/50 tabular-nums">
                 {formattedDate}
               </span>
             </>
@@ -119,7 +120,7 @@ export const FeedItemRow = React.memo(function FeedItemRow({
 
       {/* Saved indicator (always visible when saved) */}
       {isSaved && (
-        <BookmarkIcon className="h-3.5 w-3.5 text-primary fill-primary shrink-0 group-hover:hidden" />
+        <BookmarkIcon className="h-3 w-3 text-orange-500 fill-orange-500 shrink-0 group-hover:hidden transition-transform" />
       )}
 
       {/* Actions (visible on hover) */}
@@ -173,6 +174,6 @@ export const FeedItemRow = React.memo(function FeedItemRow({
           <ExternalLink className="h-3.5 w-3.5" />
         </button>
       </div>
-    </button>
+    </motion.button>
   );
 });

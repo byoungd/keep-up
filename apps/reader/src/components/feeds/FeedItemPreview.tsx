@@ -7,6 +7,8 @@
 
 "use client";
 
+import { type FeedSubscription, useFeedProvider } from "@/providers/FeedProvider";
+import type { FeedItemRow } from "@keepup/db";
 import { cn } from "@keepup/shared/utils";
 import {
   BookmarkIcon,
@@ -21,37 +23,177 @@ import {
 } from "lucide-react";
 import * as React from "react";
 import { useFeedItemImport } from "../../hooks/useFeedItemImport";
-import { useRssStore } from "../../lib/rss/useRssStore";
 
 export interface FeedItemPreviewProps {
-  itemId: string | null;
+  item: FeedItemRow | null;
   onClose?: () => void;
   className?: string;
 }
 
-export function FeedItemPreview({ itemId, onClose, className }: FeedItemPreviewProps) {
-  const { items, subscriptions, markAsRead, toggleSaved } = useRssStore();
+// Breakdown into smaller components to reduce complexity
+
+function FeedItemPreviewHeader({
+  item,
+  subscription,
+  isImporting,
+  onImport,
+  onToggleSaved,
+  onOpenOriginal,
+  onClose,
+}: {
+  item: FeedItemRow;
+  subscription: FeedSubscription | null;
+  isImporting: boolean;
+  onImport: () => void;
+  onToggleSaved: (id: string, saved: boolean) => void;
+  onOpenOriginal: () => void;
+  onClose?: () => void;
+}) {
+  return (
+    <header className="flex items-center justify-between border-b border-border/5 px-6 py-4 shrink-0 bg-surface-1/50 backdrop-blur-sm sticky top-0 z-10 transition-all duration-200">
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="flex flex-col min-w-0">
+          <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider truncate">
+            {subscription?.displayName ?? subscription?.title ?? "Unknown Source"}
+          </span>
+          {item.readState === "read" && (
+            <span className="text-[10px] text-muted-foreground/50 flex items-center gap-1 mt-0.5">
+              <Check className="h-2.5 w-2.5" /> Read
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center gap-1 shrink-0">
+        <button
+          type="button"
+          onClick={onImport}
+          disabled={isImporting}
+          className={cn(
+            "rounded-md p-2 transition-colors",
+            isImporting
+              ? "text-primary bg-primary/10"
+              : "text-muted-foreground hover:bg-surface-3 hover:text-foreground"
+          )}
+          title="Open in Editor"
+          aria-label="Open article in editor"
+        >
+          {isImporting ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <FileEdit className="h-4 w-4" />
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={() => onToggleSaved(item.itemId, item.saved)}
+          className={cn(
+            "rounded-md p-2 transition-all duration-200",
+            item.saved
+              ? "text-orange-500 bg-orange-500/10 hover:bg-orange-500/20"
+              : "text-muted-foreground hover:bg-surface-3 hover:text-foreground"
+          )}
+          title={item.saved ? "Unsave" : "Save for later"}
+          aria-label={item.saved ? "Unsave article" : "Save article for later"}
+        >
+          <BookmarkIcon className={cn("h-4 w-4", item.saved && "fill-current")} />
+        </button>
+        <div className="w-px h-4 bg-border/10 mx-1" />
+        <button
+          type="button"
+          onClick={onOpenOriginal}
+          className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground"
+          title="Open original"
+          aria-label="Open original article in new tab"
+        >
+          <ExternalLink className="h-4 w-4" />
+        </button>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="ml-1 rounded-md p-2 text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground"
+            title="Close (Esc)"
+            aria-label="Close preview panel"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+    </header>
+  );
+}
+
+function FeedItemArticle({
+  item,
+  formattedDate,
+}: { item: FeedItemRow; formattedDate: string | null }) {
+  return (
+    <article className="px-8 py-10 max-w-3xl mx-auto animate-in fade-in duration-500 slide-in-from-bottom-2">
+      {/* Title */}
+      <h1 className="mb-4 text-3xl font-bold leading-tight text-foreground tracking-tight">
+        {item.title}
+      </h1>
+
+      {/* Meta */}
+      <div className="mb-8 flex flex-wrap items-center gap-4 text-xs text-muted-foreground font-medium border-b border-border/5 pb-6">
+        {item.author && (
+          <span className="flex items-center gap-1.5">
+            <User2 className="h-3.5 w-3.5 opacity-70" />
+            {item.author}
+          </span>
+        )}
+        {formattedDate && (
+          <span className="flex items-center gap-1.5">
+            <Calendar className="h-3.5 w-3.5 opacity-70" />
+            {formattedDate}
+          </span>
+        )}
+      </div>
+
+      {/* Article Content */}
+      <div
+        className={cn(
+          "prose prose-neutral dark:prose-invert max-w-none",
+          // Enhanced typography for readability
+          "prose-p:leading-7 prose-p:text-[15px] prose-p:text-foreground/80 lowercase-nums",
+          "prose-headings:font-semibold prose-headings:tracking-tight prose-headings:text-foreground",
+          "prose-a:text-primary prose-a:font-medium prose-a:no-underline hover:prose-a:underline hover:prose-a:decoration-primary/30",
+          "prose-strong:font-semibold prose-strong:text-foreground",
+          "prose-code:text-[13px] prose-code:bg-surface-2 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:font-mono",
+          "prose-pre:bg-surface-2 prose-pre:border prose-pre:border-border/5 prose-pre:rounded-lg",
+          "prose-img:rounded-lg prose-img:shadow-sm prose-img:border prose-img:border-border/5",
+          "prose-blockquote:border-l-2 prose-blockquote:border-primary/40 prose-blockquote:bg-surface-2/20 prose-blockquote:py-2 prose-blockquote:px-5 prose-blockquote:rounded-r-lg prose-blockquote:italic"
+        )}
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: RSS content
+        dangerouslySetInnerHTML={{
+          __html:
+            item.contentHtml ??
+            item.excerpt ??
+            "<div class='flex flex-col items-center justify-center py-10 text-muted-foreground italic'><p>No content available for this article.</p></div>",
+        }}
+      />
+    </article>
+  );
+}
+
+export function FeedItemPreview({ item, onClose, className }: FeedItemPreviewProps) {
+  const { subscriptions, markAsRead, toggleSaved } = useFeedProvider();
   const { importFeedItem, isImporting } = useFeedItemImport();
   const contentRef = React.useRef<HTMLDivElement>(null);
 
-  const item = React.useMemo(() => {
-    if (!itemId) {
-      return null;
-    }
-    return items.find((i) => i.id === itemId) ?? null;
-  }, [items, itemId]);
+  const itemId = item?.itemId;
 
   const subscription = React.useMemo(() => {
     if (!item) {
       return null;
     }
-    return subscriptions.find((s) => s.id === item.subscriptionId) ?? null;
+    return subscriptions.find((s) => s.subscriptionId === item.subscriptionId) ?? null;
   }, [subscriptions, item]);
 
   // Mark as read when viewed
   React.useEffect(() => {
     if (item && item.readState === "unread") {
-      markAsRead(item.id);
+      markAsRead(item.itemId);
     }
   }, [item, markAsRead]);
 
@@ -98,14 +240,14 @@ export function FeedItemPreview({ itemId, onClose, className }: FeedItemPreviewP
     : null;
 
   const handleOpenOriginal = () => {
-    if (item.url) {
-      window.open(item.url, "_blank", "noopener,noreferrer");
+    if (item.link) {
+      window.open(item.link, "_blank", "noopener,noreferrer");
     }
   };
 
   const handleOpenInEditor = async () => {
     if (item && subscription) {
-      await importFeedItem(item.id, subscription.url ?? item.url);
+      await importFeedItem(item.itemId, subscription.url ?? item.link ?? "");
     }
   };
 
@@ -117,134 +259,36 @@ export function FeedItemPreview({ itemId, onClose, className }: FeedItemPreviewP
         className
       )}
     >
-      {/* Header */}
-      <header className="flex items-center justify-between border-b border-border/10 px-4 py-3 shrink-0">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-xs font-medium text-muted-foreground truncate">
-            {subscription?.displayName ?? subscription?.title ?? "Unknown Source"}
-          </span>
-          {item.readState === "read" && (
-            <span className="flex items-center gap-1 text-[10px] text-muted-foreground/60 shrink-0">
-              <Check className="h-3 w-3" />
-              Read
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-0.5 shrink-0">
-          <button
-            type="button"
-            onClick={handleOpenInEditor}
-            disabled={isImporting}
-            className={cn(
-              "rounded-md p-2 transition-colors",
-              isImporting
-                ? "text-primary bg-primary/10"
-                : "text-muted-foreground hover:bg-surface-3 hover:text-foreground"
-            )}
-            title="Open in Editor"
-            aria-label="Open article in editor"
-          >
-            {isImporting ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <FileEdit className="h-4 w-4" />
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={() => toggleSaved(item.id)}
-            className={cn(
-              "rounded-md p-2 transition-all duration-150",
-              item.savedState
-                ? "text-primary bg-primary/10 hover:bg-primary/15"
-                : "text-muted-foreground hover:bg-surface-3 hover:text-foreground"
-            )}
-            title={item.savedState ? "Unsave" : "Save for later"}
-            aria-label={item.savedState ? "Unsave article" : "Save article for later"}
-          >
-            <BookmarkIcon className={cn("h-4 w-4", item.savedState && "fill-current")} />
-          </button>
-          <button
-            type="button"
-            onClick={handleOpenOriginal}
-            className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground"
-            title="Open original"
-            aria-label="Open original article in new tab"
-          >
-            <ExternalLink className="h-4 w-4" />
-          </button>
-          {onClose && (
-            <button
-              type="button"
-              onClick={onClose}
-              className="ml-1 rounded-md p-2 text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground"
-              title="Close (Esc)"
-              aria-label="Close preview panel"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-      </header>
+      <FeedItemPreviewHeader
+        item={item}
+        subscription={subscription}
+        isImporting={isImporting}
+        onImport={handleOpenInEditor}
+        onToggleSaved={toggleSaved}
+        onOpenOriginal={handleOpenOriginal}
+        onClose={onClose}
+      />
 
-      {/* Content */}
-      <div ref={contentRef} className="flex-1 overflow-y-auto">
-        <article className="p-6 max-w-2xl mx-auto">
-          {/* Title */}
-          <h1 className="mb-4 text-2xl font-semibold leading-tight text-foreground tracking-tight">
-            {item.title}
-          </h1>
-
-          {/* Meta */}
-          <div className="mb-6 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-            {item.author && (
-              <span className="flex items-center gap-1.5">
-                <User2 className="h-3.5 w-3.5" />
-                {item.author}
-              </span>
-            )}
-            {formattedDate && (
-              <span className="flex items-center gap-1.5">
-                <Calendar className="h-3.5 w-3.5" />
-                {formattedDate}
-              </span>
-            )}
-          </div>
-
-          {/* Article Content */}
-          <div
-            className={cn(
-              "prose prose-neutral dark:prose-invert max-w-none",
-              // Enhanced typography
-              "prose-headings:font-semibold prose-headings:tracking-tight",
-              "prose-p:leading-relaxed prose-p:text-foreground/90",
-              "prose-a:text-primary prose-a:no-underline hover:prose-a:underline",
-              "prose-img:rounded-lg prose-img:shadow-md",
-              "prose-code:text-sm prose-code:bg-surface-2 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded",
-              "prose-blockquote:border-l-primary prose-blockquote:bg-surface-2/50 prose-blockquote:py-1 prose-blockquote:px-4 prose-blockquote:rounded-r-md"
-            )}
-            // biome-ignore lint/security/noDangerouslySetInnerHtml: RSS content
-            dangerouslySetInnerHTML={{
-              __html:
-                item.contentHtml ??
-                item.content ??
-                "<p class='text-muted-foreground'>No content available</p>",
-            }}
-          />
-        </article>
+      <div
+        ref={contentRef}
+        className="flex-1 overflow-y-auto selection:bg-primary/20 selection:text-foreground"
+      >
+        <FeedItemArticle item={item} formattedDate={formattedDate} />
       </div>
 
-      {/* Footer with original link */}
-      <footer className="border-t border-border/10 px-4 py-3 shrink-0 bg-surface-1">
+      <footer className="border-t border-border/10 px-6 py-3 shrink-0 bg-surface-1/50 backdrop-blur-sm text-xs text-muted-foreground flex justify-between items-center">
         <a
-          href={item.url}
+          href={item.link ?? "#"}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 text-sm text-primary hover:underline transition-colors"
+          className="inline-flex items-center gap-1.5 text-primary hover:underline transition-colors font-medium"
         >
-          <ExternalLink className="h-3.5 w-3.5" />
-          View original article
+          <ExternalLink className="h-3 w-3" />
+          View Original
         </a>
+        <span>
+          ID: <span className="font-mono opacity-50">{item.itemId.slice(0, 8)}</span>
+        </span>
       </footer>
     </div>
   );

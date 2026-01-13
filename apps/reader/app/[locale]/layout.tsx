@@ -12,6 +12,7 @@ import { PanelStateProvider } from "@/context/PanelStateContext";
 import { ProviderConfigProvider } from "@/context/ProviderConfigContext";
 import { ReaderPreferencesProvider } from "@/context/ReaderPreferencesContext";
 import { RssStoreProvider } from "@/lib/rss";
+import { ReactQueryProvider } from "@/providers/ReactQueryProvider";
 import { LazyMotion, domAnimation } from "framer-motion";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages } from "next-intl/server";
@@ -58,9 +59,11 @@ export default async function LocaleLayout({
                   <LazyMotion features={domAnimation}>
                     <ErrorBoundary>
                       <ProviderConfigProvider>
-                        <RssStoreProvider>
-                          <ImportWrapper>{children}</ImportWrapper>
-                        </RssStoreProvider>
+                        <ReactQueryProvider>
+                          <RssStoreProvider>
+                            <ImportWrapper>{children}</ImportWrapper>
+                          </RssStoreProvider>
+                        </ReactQueryProvider>
                       </ProviderConfigProvider>
                     </ErrorBoundary>
                     <A11yReporter />

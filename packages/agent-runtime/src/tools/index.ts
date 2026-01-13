@@ -27,3 +27,6 @@ export * from "./naming";
 
 // Middleware
 export * from "./middleware";
+
+// Digest Tools
+export * from "./digest";

@@ -32,24 +32,24 @@ Three distinct tracks are proposed to maximize velocity without collision.
 #### Task A1: Feed Management UI Wire-up
 *   **Description**: Connect the `SqliteFeedProvider` (already implemented in backend/core) to the Frontend `feeds` route. Replace mock data with real database queries via TRPC or Server Actions.
 *   **Acceptance Criteria**:
-    *   [ ] "Add Feed" button accepts a generic RSS URL and validates it before saving.
-    *   [ ] Duplicate feeds are detected and rejected with a friendly toast message.
-    *   [ ] The `feeds` list page renders subscribed feeds with their latest fetch status (Healthy/Error).
-    *   [ ] Deleting a feed removes it from the list immediately (optimistic UI).
+    *   [x] "Add Feed" button accepts a generic RSS URL and validates it before saving.
+    *   [x] Duplicate feeds are detected and rejected with a friendly toast message.
+    *   [x] The `feeds` list page renders subscribed feeds with their latest fetch status (Healthy/Error).
+    *   [x] Deleting a feed removes it from the list immediately (optimistic UI).
 
 #### Task A2: Reader List & Detail View Polish
 *   **Description**: Apply the "Linear-quality" design system to the Reader list. Ensure the transition from List -> Detail view is <100ms.
 *   **Acceptance Criteria**:
-    *   [ ] Import via URL/Text appears in the list view within 5 seconds without manual refresh.
-    *   [ ] Clicking an item opens the `reader/[id]` route successfully (no 404s).
-    *   [ ] The Reader view supports basic "Mark as Read" and "Archive" actions that persist after reload.
+    *   [x] Import via URL/Text appears in the list view within 5 seconds without manual refresh.
+    *   [x] Clicking an item opens the `reader/[id]` route successfully (no 404s).
+    *   [x] The Reader view supports basic "Mark as Read" and "Archive" actions that persist after reload.
 
 #### Task A3: Topic Organization Flow
 *   **Description**: Implement the `topics` route. Allow creating simple tag-based topics and mapping them to feeds or individual items.
 *   **Acceptance Criteria**:
-    *   [ ] User can create a new Topic (e.g., "AI Infra") with a color/icon.
-    *   [ ] User can "Pin" a feed to a Topic.
-    *   [ ] The Topic Detail page shows an aggregated list of items from all pinned feeds.
+    *   [x] User can create a new Topic (e.g., "AI Infra") with a color/icon.
+    *   [x] User can "Pin" a feed to a Topic.
+    *   [x] The Topic Detail page shows an aggregated list of items from all pinned feeds.
 
 ---
 

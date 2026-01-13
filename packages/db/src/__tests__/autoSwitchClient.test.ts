@@ -134,6 +134,12 @@ const { acquireLeadershipMock, MockIndexedDbDriver } = vi.hoisted(() => {
     listDigests = vi.fn(async () => []);
     deleteDigest = vi.fn(async () => undefined);
 
+    // Topic stub methods added previously, ensuring complete list if DbDriver changed
+    addSubscriptionToTopic = vi.fn(async () => undefined);
+    removeSubscriptionFromTopic = vi.fn(async () => undefined);
+    listSubscriptionsByTopic = vi.fn(async () => []);
+    listTopicsBySubscription = vi.fn(async () => []);
+
     // Digest Card stub methods
     createDigestCard = vi.fn(async () => undefined);
     listDigestCards = vi.fn(async () => []);
