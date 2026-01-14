@@ -13,6 +13,7 @@
 import { type Page, expect, test } from "@playwright/test";
 import {
   collapseSelection,
+  endUndoGroup,
   focusEditor,
   getAnnotationIds,
   getEditorText,
@@ -21,6 +22,8 @@ import {
   selectAllText,
   selectTextBySubstring,
   setEditorContent,
+  setUndoMergeInterval,
+  startUndoGroup,
   typeInEditor,
 } from "./helpers/editor";
 
@@ -37,6 +40,14 @@ test.setTimeout(60000);
 
 async function pressUndo(page: Page): Promise<void> {
   await page.keyboard.press(`${modKey}+z`);
+  await page.waitForFunction(() => {
+    const globalAny = window as unknown as { __lfccUndoState?: () => string };
+    if (!globalAny.__lfccUndoState) {
+      return true;
+    }
+    const state = globalAny.__lfccUndoState();
+    return state === "idle" || state === "unknown";
+  });
 }
 
 async function pressRedo(page: Page): Promise<void> {
@@ -84,36 +95,30 @@ async function getBlockCount(page: Page): Promise<number> {
 test.describe("Multi-step Undo/Redo History", () => {
   test.beforeEach(async ({ page }) => {
     await openFreshEditor(page, "undo-history", { clearContent: true });
+    await setUndoMergeInterval(page, 0);
+  });
+  test.afterEach(async ({ page }) => {
+    await setUndoMergeInterval(page, 500);
   });
 
-  // NOTE: This test depends on Loro's mergeInterval (500ms) to create separate undo steps.
-  // May be flaky if the dev server timing varies. Uses 700ms waits > mergeInterval.
+  // NOTE: This test uses explicit undo groups to ensure deterministic undo steps.
   test("3-step undo restores each state correctly", async ({ page }) => {
-    // Helper to commit and wait for Loro to register the undo checkpoint
-    const commitAndWait = async () => {
-      await page.evaluate(() => {
-        const w = window as unknown as { __lfccForceCommit?: () => void };
-        w.__lfccForceCommit?.();
-      });
-      await page.waitForTimeout(100); // Brief settle time after commit
-    };
-
-    // Type "First" and commit
+    await startUndoGroup(page);
     await typeInEditor(page, "First");
-    await commitAndWait();
-    await page.waitForTimeout(600); // Exceed mergeInterval to create separate undo step
+    await endUndoGroup(page);
+    await page.waitForTimeout(200);
 
-    // Type Enter + "Second" and commit
+    await startUndoGroup(page);
     await page.keyboard.press("Enter");
     await page.keyboard.type("Second", { delay: 20 });
-    await commitAndWait();
-    await page.waitForTimeout(600);
+    await endUndoGroup(page);
+    await page.waitForTimeout(200);
 
-    // Type Enter + "Third" and commit
+    await startUndoGroup(page);
     await page.keyboard.press("Enter");
     await page.keyboard.type("Third", { delay: 20 });
-    await commitAndWait();
-    await page.waitForTimeout(600);
+    await endUndoGroup(page);
+    await page.waitForTimeout(200);
 
     // Verify initial state
     await expect.poll(() => getEditorText(page), { timeout: 5000 }).toContain("Third");

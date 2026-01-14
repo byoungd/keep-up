@@ -127,6 +127,10 @@ function buildBlockAttrs(
     }
   }
 
+  if (nodeType.name === "code_block") {
+    attrs.language = resolveStringAttr(block.attrs, "language");
+  }
+
   return attrs;
 }
 

@@ -24,7 +24,7 @@ const blockAttrsFromDom = (dom: HTMLElement): { block_id?: string; attrs?: strin
 /** Extract list attrs from DOM for parsing HTML lists */
 const listAttrsFromDom = (
   dom: HTMLElement,
-  listType: "bullet" | "ordered"
+  listType: "bullet" | "ordered" | "task"
 ): Record<string, unknown> => {
   // Walk up to find the indent level by counting nested lists
   let indent = 0;
@@ -52,15 +52,38 @@ const paragraph: NodeSpec = {
   parseDOM: [
     {
       tag: "p",
-      getAttrs: (dom) => blockAttrsFromDom(dom as HTMLElement),
+      getAttrs: (dom) => {
+        const el = dom as HTMLElement;
+        return {
+          ...blockAttrsFromDom(el),
+          // Retain list attributes if self-pasting or explicit
+          list_type: el.getAttribute("data-list-type") || null,
+          indent_level: Number(el.getAttribute("data-indent-level")) || 0,
+          task_checked: el.getAttribute("data-task-checked") === "true",
+        };
+      },
     },
     // Parse li as paragraph with list_type (flat block architecture)
     {
       tag: "li",
       getAttrs: (dom) => {
-        const parent = (dom as HTMLElement).parentElement;
-        const listType = parent?.tagName === "OL" ? "ordered" : "bullet";
-        return listAttrsFromDom(dom as HTMLElement, listType);
+        const el = dom as HTMLElement;
+        const parent = el.parentElement;
+
+        let listType = "bullet";
+        if (parent?.tagName === "OL") {
+          listType = "ordered";
+        }
+
+        // If it specifically has checkbox data, it's a task
+        if (el.hasAttribute("data-task-checked") || el.getAttribute("data-list-type") === "task") {
+          listType = "task";
+        }
+
+        return {
+          ...listAttrsFromDom(el, listType as "bullet" | "ordered" | "task"),
+          task_checked: el.getAttribute("data-task-checked") === "true",
+        };
       },
       // Higher priority than default
       priority: 60,
@@ -138,11 +161,36 @@ const codeBlock: NodeSpec = {
   group: "block",
   content: "text*",
   marks: "",
-  attrs: baseBlockAttrs,
+  attrs: {
+    ...baseBlockAttrs,
+    language: { default: null as string | null },
+  },
   parseDOM: [
     {
       tag: "pre",
-      getAttrs: (dom) => blockAttrsFromDom(dom as HTMLElement),
+      getAttrs: (dom) => {
+        const el = dom as HTMLElement;
+        const base = blockAttrsFromDom(el);
+
+        // Extract language from data attribute or code > class="language-xyz"
+        let language = el.getAttribute("data-language");
+        if (!language) {
+          const code = el.querySelector("code");
+          if (code) {
+            const cls = code.className || "";
+            // Match standard Prism/HighlightJS patterns
+            const match = cls.match(/language-(\w+)/) || cls.match(/lang-(\w+)/);
+            if (match) {
+              language = match[1];
+            }
+          }
+        }
+
+        return {
+          ...base,
+          language: language || null,
+        };
+      },
     },
   ],
   toDOM: (node) => [
@@ -150,6 +198,7 @@ const codeBlock: NodeSpec = {
     {
       "data-block-id": node.attrs.block_id,
       "data-attrs": node.attrs.attrs,
+      "data-language": node.attrs.language,
     },
     ["code", 0],
   ],

@@ -3,6 +3,7 @@ import type { AIMenuState } from "@/lib/editor/aiMenuPlugin";
 import { useLfccDebugStore } from "@/lib/lfcc/debugStore";
 import { createEditorSchemaValidator } from "@/lib/lfcc/editorSchemaValidator";
 import { useCompletion } from "@ai-sdk/react";
+import { autoUpdate, flip, offset, shift, useFloating, useInteractions } from "@floating-ui/react";
 import {
   DEFAULT_POLICY_MANIFEST,
   type EditorSchemaValidator,
@@ -788,14 +789,54 @@ export function AIContextMenu({ state, onClose, bridge }: AIContextMenuProps) {
     { label: "Translate to Chinese", icon: Languages, prompt: "", isTranslate: true },
   ];
 
+  // Float positioning
+  const { refs, floatingStyles } = useFloating({
+    open: state?.isOpen,
+    strategy: "fixed",
+    placement: "bottom-start",
+    middleware: [offset(10), flip({ padding: 10 }), shift({ padding: 10 })],
+    whileElementsMounted: autoUpdate,
+  });
+
+  const { getFloatingProps } = useInteractions([]);
+  const setFloatingRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      refs.setFloating(node);
+      containerRef.current = node;
+    },
+    [refs]
+  );
+
+  // Sync virtual reference
+  const isOpen = state?.isOpen;
+  const x = state?.x;
+  const y = state?.y;
+
+  useEffect(() => {
+    if (isOpen && x !== undefined && y !== undefined) {
+      refs.setReference({
+        getBoundingClientRect() {
+          return {
+            width: 0,
+            height: 0,
+            x: x,
+            y: y,
+            top: y,
+            left: x,
+            right: x,
+            bottom: y,
+          };
+        },
+      });
+    }
+  }, [isOpen, x, y, refs]);
+
   if (!state || !state.isOpen) {
     return null;
   }
 
   const style: React.CSSProperties = {
-    position: "fixed",
-    top: state.y,
-    left: state.x,
+    ...floatingStyles,
     maxWidth: mode === "conflict" || mode === "structural_preview" ? "500px" : "340px",
   };
 
@@ -803,8 +844,9 @@ export function AIContextMenu({ state, onClose, bridge }: AIContextMenuProps) {
     <AnimatePresence>
       {state.isOpen && (
         <motion.div
-          ref={containerRef}
+          ref={setFloatingRef}
           style={style}
+          {...getFloatingProps()}
           initial={{ opacity: 0, scale: 0.95, y: -4 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: -4 }}
@@ -884,8 +926,6 @@ export function AIContextMenu({ state, onClose, bridge }: AIContextMenuProps) {
                   placeholder="Ask AI regarding selection..."
                   value={customPrompt}
                   onChange={(e) => setCustomPrompt(e.target.value)}
-                  // biome-ignore lint/a11y/noAutofocus: Intended behavior
-                  autoFocus
                   aria-label="Custom AI prompt"
                 />
                 <button

@@ -4,6 +4,7 @@ export function markdownToHtml(text: string): string {
   const state = {
     inCodeBlock: false,
     codeBlockContent: [] as string[],
+    codeBlockLanguage: undefined as string | undefined, // Track language
     inList: false,
     listType: "ul" as "ul" | "ol",
     listItems: [] as string[],
@@ -25,6 +26,7 @@ function processLine(
   state: {
     inCodeBlock: boolean;
     codeBlockContent: string[];
+    codeBlockLanguage?: string;
     inList: boolean;
     listType: "ul" | "ol";
     listItems: string[];
@@ -38,6 +40,9 @@ function processLine(
     } else {
       flushList(state, result);
       state.inCodeBlock = true;
+      // Extract language if present
+      const match = line.trim().match(/^```(\w+)/);
+      state.codeBlockLanguage = match ? match[1] : undefined;
     }
     return;
   }
@@ -78,13 +83,18 @@ function processLine(
 }
 
 function flushCodeBlock(
-  state: { inCodeBlock: boolean; codeBlockContent: string[] },
+  state: { inCodeBlock: boolean; codeBlockContent: string[]; codeBlockLanguage?: string },
   result: string[]
 ): void {
   if (state.inCodeBlock && state.codeBlockContent.length > 0) {
-    result.push(`<pre><code>${escapeHtml(state.codeBlockContent.join("\n"))}</code></pre>`);
+    const langObj = state.codeBlockLanguage ? ` class="language-${state.codeBlockLanguage}"` : "";
+    // Output code with language class for schema parser
+    result.push(
+      `<pre><code${langObj}>${escapeHtml(state.codeBlockContent.join("\n"))}</code></pre>`
+    );
   }
   state.codeBlockContent = [];
+  state.codeBlockLanguage = undefined;
   state.inCodeBlock = false;
 }
 
@@ -95,8 +105,22 @@ function flushList(
   if (state.inList && state.listItems.length > 0) {
     result.push(`<${state.listType}>`);
     for (const item of state.listItems) {
+      // Check for task marker
+      let content = item;
+      let taskAttrs = "";
+
+      if (item.startsWith("__TASK:")) {
+        const endMarker = item.indexOf("__", 7);
+        if (endMarker !== -1) {
+          const checked = item.substring(7, endMarker) === "true";
+          content = item.substring(endMarker + 2);
+          taskAttrs = ` data-list-type="task" data-task-checked="${checked}"`;
+        }
+      }
+
       // No <p> wrapper - the flat-list schema parses <li> directly as paragraph
-      result.push(`<li>${processInline(item)}</li>`);
+      // We add task attributes to the li, which our enhanced schema parser will read
+      result.push(`<li${taskAttrs}>${processInline(content)}</li>`);
     }
     result.push(`</${state.listType}>`);
   }
@@ -136,13 +160,38 @@ function tryUnorderedList(
   line: string,
   state: { inList: boolean; listType: "ul" | "ol"; listItems: string[] }
 ): boolean {
-  const match = line.match(/^\s*[-*+]\s+(.+)$/);
+  const match = line.match(/^\s*([-*+])\s+(.+)$/);
   if (match) {
+    let content = match[2];
+
+    // Check for task list: - [ ] or - [x]
+    const taskMatch = content.match(/^\[([ xX])\]\s+(.+)$/);
+    let isTask = false;
+    let isChecked = false;
+
+    if (taskMatch) {
+      isTask = true;
+      isChecked = taskMatch[1].toLowerCase() === "x";
+      content = taskMatch[2]; // Strip the [ ] part
+    }
+
     if (!state.inList || state.listType !== "ul") {
       state.inList = true;
       state.listType = "ul";
     }
-    state.listItems.push(match[1]);
+
+    // Store as object if it's a task, or string if simple (need to update state type)
+    // Actually, let's keep it simple string but embed the metadata in a way processInline can handle?
+    // OR we change how we store listItems.
+    // Hack: Prepend a marker that flushList can detect?
+    // Better: change flushList to handle this.
+    // But modifying state type requires modifying the whole file.
+    // Let's use a special prefix string that flushList detects.
+    if (isTask) {
+      state.listItems.push(`__TASK:${isChecked}__${content}`);
+    } else {
+      state.listItems.push(content);
+    }
     return true;
   }
   return false;

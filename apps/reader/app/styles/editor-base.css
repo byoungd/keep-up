@@ -46,8 +46,8 @@
 
   /* Performance: Skip rendering off-screen blocks for large documents */
   .lfcc-editor .ProseMirror > * {
-    content-visibility: auto;
-    contain-intrinsic-size: auto 80px;
+    /* Performance: Isolate layout/style recalculations to individual blocks */
+    contain: layout style;
   }
 
   .lfcc-editor .ProseMirror > [data-block-id] {

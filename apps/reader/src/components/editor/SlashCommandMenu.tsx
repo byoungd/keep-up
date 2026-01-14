@@ -1,3 +1,4 @@
+import { autoUpdate, flip, offset, shift, useFloating, useInteractions } from "@floating-ui/react";
 import { cn } from "@keepup/shared/utils";
 import { Command } from "cmdk";
 import { AnimatePresence, motion } from "framer-motion";
@@ -16,6 +17,7 @@ import {
   Type,
   Video,
 } from "lucide-react";
+import { useEffect } from "react";
 import type { SlashCommand, SlashMenuState } from "../../lib/editor/slashMenuPlugin";
 
 export type SlashCommandMenuProps = {
@@ -27,17 +29,53 @@ export type SlashCommandMenuProps = {
 /**
  * Slash Command Menu (Top-Tier UX)
  * Uses `cmdk` for accessible command palette and `framer-motion` for transitions.
+ * Now improved with `@floating-ui/react` for collision detection.
  */
 export function SlashCommandMenu({ state, onSelectCommand, onQueryChange }: SlashCommandMenuProps) {
-  // Focus trap handling usually done by cmdk, but needing manual position logic
-  const position = state.position || { top: 0, left: 0 };
+  // Float positioning
+  const { refs, floatingStyles } = useFloating({
+    open: state.active,
+    strategy: "fixed",
+    placement: "bottom-start",
+    middleware: [
+      offset(12), // Gap between cursor and menu
+      flip({ padding: 10 }), // Flip to top if not enough space
+      shift({ padding: 10 }), // Shift to stay on screen
+    ],
+    whileElementsMounted: autoUpdate,
+  });
+
+  const { getFloatingProps } = useInteractions([
+    // Add interactions if needed, mostly handled by manual mount
+  ]);
+
+  // Create virtual element for positioning based on state coordinates
+  useEffect(() => {
+    if (state.active && state.position) {
+      const { left, top } = state.position;
+      refs.setReference({
+        getBoundingClientRect() {
+          return {
+            width: 0,
+            height: 0,
+            x: left,
+            y: top,
+            top: top,
+            left: left,
+            right: left,
+            bottom: top,
+          };
+        },
+      });
+    }
+  }, [state.active, state.position, refs]);
 
   const transitions = {
     popover: {
-      initial: { opacity: 0, scale: 0.97 },
-      animate: { opacity: 1, scale: 1 },
-      exit: { opacity: 0, scale: 0.97 },
-      transition: { duration: 0.12, ease: [0.4, 0, 0.2, 1] as const },
+      initial: { opacity: 0, scale: 0.95, y: -4 },
+      animate: { opacity: 1, scale: 1, y: 0 },
+      exit: { opacity: 0, scale: 0.95, y: -4 },
+      transition: { duration: 0.15, ease: [0.3, 1.3, 0.3, 1] as const }, // Slight spring overshoot for "pop"
     },
   };
 
@@ -45,16 +83,14 @@ export function SlashCommandMenu({ state, onSelectCommand, onQueryChange }: Slas
     <AnimatePresence>
       {state.active && (
         <div
-          className="fixed z-9999 pointer-events-auto"
-          style={{
-            top: 0,
-            left: 0,
-            transform: `translate(${position.left}px, ${position.top}px)`,
-          }}
+          ref={refs.setFloating}
+          style={floatingStyles}
+          className="z-popover"
+          {...getFloatingProps()}
         >
-          <motion.div {...transitions.popover} className="pointer-events-auto">
+          <motion.div {...transitions.popover}>
             <Command
-              className="w-72 max-h-[320px] overflow-hidden rounded-xl border border-border/60 bg-popover/80 backdrop-blur-xl shadow-2xl flex flex-col"
+              className="w-72 max-h-[320px] overflow-hidden rounded-xl border border-border/60 bg-popover/80 backdrop-blur-xl shadow-2xl flex flex-col ring-1 ring-white/10"
               label="Slash Command Menu"
               role="menu"
               data-testid="slash-command-menu"

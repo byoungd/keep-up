@@ -65,7 +65,7 @@ interface BlockExtractionResult {
 // ============================================================================
 
 const DEFAULT_OPTIONS: VirtualizedEditorOptions = {
-  minBlocksForVirtualization: 100, // Enable virtualization for 100+ blocks
+  minBlocksForVirtualization: 2000, // Enable virtualization only for very large docs (>2000 blocks) to prevent "dancing cursor" issues
   config: {
     overscan: 5,
     defaultBlockHeight: 40,
