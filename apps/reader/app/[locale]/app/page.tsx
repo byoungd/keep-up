@@ -4,11 +4,13 @@ import { AnnotationSpan } from "@/components/annotations/AnnotationSpan";
 import { SelectionToolbar } from "@/components/annotations/SelectionToolbar";
 import { AIPanel } from "@/components/layout/AIPanel";
 import { AppShell } from "@/components/layout/AppShell";
+import { OnboardingFlow } from "@/components/layout/OnboardingFlow";
 import { PolicyDegradationBanner } from "@/components/lfcc/PolicyDegradationBanner";
 import { ArticleRenderer } from "@/components/reader/ArticleRenderer";
 import { KeyboardShortcutsProvider } from "@/context/KeyboardShortcutsContext";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { usePolicyDegradationStore } from "@/lib/lfcc/policyDegradationStore";
+import { useRssStore } from "@/lib/rss";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
@@ -17,11 +19,50 @@ export default function App() {
   const isDesktop = useMediaQuery("(min-width: 1024px)");
   const [hydrated, setHydrated] = React.useState(false);
   const { degraded, reasons, clear } = usePolicyDegradationStore();
+  const { subscriptions, addSubscription } = useRssStore();
+  const [showOnboarding, setShowOnboarding] = React.useState(false);
 
   // Simple hydration fix
   React.useEffect(() => {
     setHydrated(true);
   }, []);
+
+  React.useEffect(() => {
+    // Show onboarding if no subscriptions and hydrated
+    if (hydrated && subscriptions.length === 0) {
+      setShowOnboarding(true);
+    }
+  }, [hydrated, subscriptions.length]);
+
+  const handleOnboardingComplete = async (data: { topics: string[]; sources: string[] }) => {
+    // Map bundle IDs to URLs
+    const bundles: Record<string, string[]> = {
+      "tech-news": ["https://techcrunch.com/feed/", "https://www.theverge.com/rss/index.xml"],
+      "ai-research": ["https://blogs.nvidia.com/feed/", "https://openai.com/blog/rss.xml"],
+      design: ["https://sidebar.io/feed.xml", "https://alistapart.com/main/feed/"],
+    };
+
+    const urlsToSubscribe = new Set<string>();
+
+    for (const bundleId of data.sources) {
+      const urls = bundles[bundleId] || [];
+      for (const url of urls) {
+        urlsToSubscribe.add(url);
+      }
+    }
+
+    // Add subscriptions
+    // We do this sequentially or parallel, simplistic for now
+    for (const url of Array.from(urlsToSubscribe)) {
+      try {
+        await addSubscription(url);
+      } catch (e) {
+        console.error("Failed to add onboarding feed", url, e);
+      }
+    }
+
+    setShowOnboarding(false);
+  };
 
   const effectiveDesktop = hydrated && isDesktop;
 
@@ -56,6 +97,14 @@ export default function App() {
       </div>
     </ArticleRenderer>
   );
+
+  if (showOnboarding) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <OnboardingFlow onComplete={handleOnboardingComplete} />
+      </div>
+    );
+  }
 
   return (
     <KeyboardShortcutsProvider>

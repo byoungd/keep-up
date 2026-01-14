@@ -307,8 +307,14 @@ function FeedManagementList({
 
         {/* Empty State */}
         {subscriptions.length === 0 && folders.length === 0 && !isCreatingFolder && (
-          <div className="text-center py-8 text-muted-foreground text-sm">
-            {t("noFeedsOrFolders")}
+          <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+            <div className="w-12 h-12 rounded-full bg-surface-2 flex items-center justify-center mb-4">
+              <Rss className="w-6 h-6 text-muted-foreground/50" />
+            </div>
+            <h3 className="text-sm font-medium text-foreground mb-1">No feeds yet</h3>
+            <p className="text-sm text-muted-foreground max-w-[180px]">
+              Add sources to start building your knowledge base.
+            </p>
           </div>
         )}
       </div>
@@ -377,45 +383,50 @@ function FeedItemsList({
   // Empty state - context-aware messaging
   if (sortedItems.length === 0) {
     return (
-      <div
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.3, ease: "easeOut" }}
         className={cn(
-          "flex-1 flex flex-col items-center justify-center text-center p-8",
+          "flex-1 flex flex-col items-center justify-center text-center p-8 min-h-[50vh]",
           className
         )}
       >
         {filter === "unread" ? (
           // All caught up state
           <>
-            <div className="w-10 h-10 rounded-full bg-surface-2 flex items-center justify-center mb-3">
-              <Check className="h-5 w-5 text-muted-foreground" />
+            <div className="w-16 h-16 rounded-full bg-surface-2/50 border border-white/5 flex items-center justify-center mb-6 shadow-inner">
+              <Check className="h-8 w-8 text-muted-foreground/50" />
             </div>
-            <h3 className="text-sm font-medium text-foreground mb-1">All caught up</h3>
-            <p className="text-xs text-muted-foreground max-w-50">No unread articles left.</p>
+            <h3 className="text-lg font-medium text-foreground mb-2">All caught up</h3>
+            <p className="text-sm text-muted-foreground max-w-[200px]">
+              You've read everything in your queue. Nice work.
+            </p>
           </>
         ) : filter === "saved" ? (
           // No saved items
           <>
-            <div className="w-10 h-10 rounded-full bg-surface-2 flex items-center justify-center mb-3">
-              <Bookmark className="h-5 w-5 text-muted-foreground" />
+            <div className="w-16 h-16 rounded-full bg-surface-2/50 border border-white/5 flex items-center justify-center mb-6 shadow-inner">
+              <Bookmark className="h-8 w-8 text-muted-foreground/50" />
             </div>
-            <h3 className="text-sm font-medium text-foreground mb-1">No saved articles</h3>
-            <p className="text-xs text-muted-foreground max-w-50">
-              Click the bookmark icon to save for later.
+            <h3 className="text-lg font-medium text-foreground mb-2">No saved articles</h3>
+            <p className="text-sm text-muted-foreground max-w-[200px]">
+              Bookmark interesting reads to find them here later.
             </p>
           </>
         ) : (
           // Empty feed
           <>
-            <div className="w-10 h-10 rounded-full bg-surface-2 flex items-center justify-center mb-3">
-              <Rss className="h-5 w-5 text-muted-foreground" />
+            <div className="w-16 h-16 rounded-full bg-surface-2/50 border border-white/5 flex items-center justify-center mb-6 shadow-inner">
+              <Rss className="h-8 w-8 text-muted-foreground/50" />
             </div>
-            <h3 className="text-sm font-medium text-foreground mb-1">No articles</h3>
-            <p className="text-xs text-muted-foreground max-w-50">
-              Add feeds to see articles here.
+            <h3 className="text-lg font-medium text-foreground mb-2">No articles</h3>
+            <p className="text-sm text-muted-foreground max-w-[200px]">
+              Feeds you add will appear here.
             </p>
           </>
         )}
-      </div>
+      </motion.div>
     );
   }
 
