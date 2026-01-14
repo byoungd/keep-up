@@ -124,7 +124,9 @@ export class DigestToolServer extends BaseToolServer {
         id: item.itemId,
         title: item.title,
         source: item.subscriptionId, // In real app, would map to source name
+        url: item.link ?? undefined,
         published: item.publishedAt ? new Date(item.publishedAt).toISOString() : "Unknown",
+        content: item.contentHtml?.slice(0, 2000),
         snippet: item.excerpt?.slice(0, 200),
       }));
 

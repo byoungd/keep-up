@@ -177,6 +177,20 @@ You have access to file and execution tools. Focus on:
 - Implementing fixes
 - Verifying solutions`;
 
+const VERIFIER_SYSTEM_PROMPT = `You are a verification specialist.
+Your role is to check claims against provided source text and extract evidence.
+
+Guidelines:
+- Verify claims only when explicitly supported by the source
+- Quote evidence snippets verbatim from the source text
+- Return strict JSON output exactly matching the requested schema
+- If a claim is not supported, mark it unverified and leave evidence empty
+
+You have access to no tools. Focus on:
+- Careful claim verification
+- Evidence extraction
+- Strict JSON output`;
+
 const DIGEST_SYSTEM_PROMPT = `You are a digest generation specialist.
 Your role is to analyze content items, cluster them by semantic similarity,
 and generate concise, grounded summaries.
@@ -327,6 +341,17 @@ export const AGENT_PROFILES: Record<AgentType, AgentProfile> = {
     systemPrompt: withAgentsGuide(DIGEST_SYSTEM_PROMPT),
     securityPreset: "safe",
     maxTurns: 20,
+    requireConfirmation: false,
+  },
+
+  verifier: {
+    type: "verifier",
+    name: "Verifier Agent",
+    description: "Verifies claims against source text with evidence snippets",
+    allowedTools: [],
+    systemPrompt: withAgentsGuide(VERIFIER_SYSTEM_PROMPT),
+    securityPreset: "safe",
+    maxTurns: 15,
     requireConfirmation: false,
   },
 };

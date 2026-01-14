@@ -21,3 +21,12 @@ export { AGENT_PROFILES, getAgentProfile, listAgentTypes } from "./profiles";
 
 // Manager
 export { AgentManager, createAgentManager } from "./manager";
+
+// Verifier
+export {
+  VerifierAgent,
+  type VerifierRequest,
+  type VerifierResult,
+  type VerifierSource,
+  type VerifierAgentConfig,
+} from "./verifier";

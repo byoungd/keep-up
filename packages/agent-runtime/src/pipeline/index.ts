@@ -23,3 +23,19 @@ export {
   type PipelineResult,
   type StepResult,
 } from "./pipelineBuilder";
+
+export {
+  createDigestSynthesisPipeline,
+  runDigestSynthesis,
+  type DigestSynthesisInput,
+  type DigestSynthesisOutput,
+  type DigestSynthesisDependencies,
+  type DigestSynthesisConfig,
+  type DigestSourceItem,
+  type DigestSummary,
+  type DigestCard,
+  type DigestCardDraft,
+  type DigestCitation,
+  type DigestMapFailure,
+  type DigestReduceFailure,
+} from "./digestSynthesis";
