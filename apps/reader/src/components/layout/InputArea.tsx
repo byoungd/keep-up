@@ -43,7 +43,6 @@ export interface InputAreaProps {
 }
 
 const MAX_CHARS = 4000;
-const MIN_ROWS = 1;
 const MAX_ROWS = 6;
 
 export function InputArea({
@@ -113,19 +112,24 @@ export function InputArea({
     setInput(input ? `${input} [voice:todo]` : "[voice:todo]");
   };
 
-  // Auto-resize textarea
+  // Auto-resize textarea with CSS-derived bounds to prevent initial jump
   // biome-ignore lint/correctness/useExhaustiveDependencies: inputRef.current is stable, input triggers resize
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     const textarea = inputRef.current;
     if (!textarea) {
       return;
     }
+    const styles = window.getComputedStyle(textarea);
+    const minHeight = Number.parseFloat(styles.minHeight);
+    const maxHeight = Number.parseFloat(styles.maxHeight);
+    const resolvedMinHeight = Number.isNaN(minHeight) ? 0 : minHeight;
+    const resolvedMaxHeight = Number.isNaN(maxHeight) ? Number.POSITIVE_INFINITY : maxHeight;
+
     textarea.style.height = "auto";
-    const lineHeight = 20; // Approximate line height
-    const padding = 20; // Vertical padding
-    const maxHeight = lineHeight * MAX_ROWS + padding;
-    const minHeight = lineHeight * MIN_ROWS + padding;
-    const newHeight = Math.min(Math.max(textarea.scrollHeight, minHeight), maxHeight);
+    const newHeight = Math.min(
+      Math.max(textarea.scrollHeight, resolvedMinHeight),
+      resolvedMaxHeight
+    );
     textarea.style.height = `${newHeight}px`;
   }, [input]);
 
