@@ -157,6 +157,11 @@ type DropIndicator = {
   width: number;
 };
 
+type DragCoords = {
+  x: number;
+  y: number;
+};
+
 // Compute the normalized Y position for drop indicator to avoid double indicators
 function computeNormalizedIndicatorY(
   view: EditorView,
@@ -225,6 +230,37 @@ function computeDropIndicatorFromPos(
   }
 }
 
+function computeIndicatorFromCoords(
+  view: EditorView,
+  dropX: number,
+  dropY: number
+): DropIndicator | null {
+  const posInfo = view.posAtCoords({ left: dropX, top: dropY });
+
+  if (!posInfo) {
+    const closest = findClosestBlockByY(view, dropY);
+    if (!closest) {
+      return null;
+    }
+    const indicatorY = computeNormalizedIndicatorY(
+      view,
+      closest.pos,
+      closest.rect,
+      closest.isAbove
+    );
+    return { y: indicatorY, x: closest.rect.left, width: closest.rect.width };
+  }
+
+  return computeDropIndicatorFromPos(view, posInfo, dropY);
+}
+
+function isSameIndicator(a: DropIndicator | null, b: DropIndicator | null): boolean {
+  if (!a || !b) {
+    return a === b;
+  }
+  return a.x === b.x && a.y === b.y && a.width === b.width;
+}
+
 function performMoveTransaction(
   view: EditorView,
   srcPos: number,
@@ -274,6 +310,9 @@ export function LfccDragLayer({ children }: { children: React.ReactNode }) {
   const [activeBlockPreview, setActiveBlockPreview] = React.useState<string | null>(null);
   const [dropIndicator, setDropIndicator] = React.useState<DropIndicator | null>(null);
   const dragStartPosRef = React.useRef<{ x: number; y: number } | null>(null);
+  const dragMoveFrameRef = React.useRef<number | null>(null);
+  const pendingDragMoveRef = React.useRef<DragCoords | null>(null);
+  const lastIndicatorRef = React.useRef<DropIndicator | null>(null);
 
   const sensors = useSensors(
     useSensor(CustomPointerSensor, {
@@ -283,8 +322,48 @@ export function LfccDragLayer({ children }: { children: React.ReactNode }) {
     })
   );
 
+  const clearDragVisuals = () => {
+    if (dragMoveFrameRef.current !== null) {
+      window.cancelAnimationFrame(dragMoveFrameRef.current);
+      dragMoveFrameRef.current = null;
+    }
+    pendingDragMoveRef.current = null;
+    lastIndicatorRef.current = null;
+    setDropIndicator(null);
+    setActiveId(null);
+    setActiveBlockPreview(null);
+    dragStartPosRef.current = null;
+  };
+
+  const updateIndicator = (indicator: DropIndicator | null) => {
+    if (isSameIndicator(lastIndicatorRef.current, indicator)) {
+      return;
+    }
+    lastIndicatorRef.current = indicator;
+    setDropIndicator(indicator);
+  };
+
+  const scheduleIndicatorUpdate = (view: EditorView, coords: DragCoords) => {
+    pendingDragMoveRef.current = coords;
+    if (dragMoveFrameRef.current !== null) {
+      return;
+    }
+
+    dragMoveFrameRef.current = window.requestAnimationFrame(() => {
+      dragMoveFrameRef.current = null;
+      const latest = pendingDragMoveRef.current;
+      pendingDragMoveRef.current = null;
+      if (!latest || view.isDestroyed) {
+        return;
+      }
+      const indicator = computeIndicatorFromCoords(view, latest.x, latest.y);
+      updateIndicator(indicator);
+    });
+  };
+
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string);
+    lastIndicatorRef.current = null;
     // Store initial position for drop calculation
     const activatorEvent = event.activatorEvent as PointerEvent;
     dragStartPosRef.current = { x: activatorEvent.clientX, y: activatorEvent.clientY };
@@ -306,57 +385,28 @@ export function LfccDragLayer({ children }: { children: React.ReactNode }) {
   const handleDragMove = (event: DragMoveEvent) => {
     const view = context?.view;
     if (!view || !dragStartPosRef.current) {
-      setDropIndicator(null);
+      updateIndicator(null);
       return;
     }
 
-    // Calculate current pointer position
     const delta = event.delta;
-    const dropX = dragStartPosRef.current.x + delta.x;
-    const dropY = dragStartPosRef.current.y + delta.y;
-
-    // Try to find position at actual cursor location first
-    const posInfo = view.posAtCoords({ left: dropX, top: dropY });
-
-    // If cursor is outside editor, find the closest block by Y position
-    if (!posInfo) {
-      const closest = findClosestBlockByY(view, dropY);
-      if (closest) {
-        const indicatorY = computeNormalizedIndicatorY(
-          view,
-          closest.pos,
-          closest.rect,
-          closest.isAbove
-        );
-        setDropIndicator({
-          y: indicatorY,
-          x: closest.rect.left,
-          width: closest.rect.width,
-        });
-      } else {
-        setDropIndicator(null);
-      }
-      return;
-    }
-
-    // Cursor is inside editor - compute indicator from position
-    const indicator = computeDropIndicatorFromPos(view, posInfo, dropY);
-    setDropIndicator(indicator);
+    scheduleIndicatorUpdate(view, {
+      x: dragStartPosRef.current.x + delta.x,
+      y: dragStartPosRef.current.y + delta.y,
+    });
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
-    setActiveId(null);
-    setActiveBlockPreview(null);
-    setDropIndicator(null);
-
     const view = context?.view;
     if (!view) {
+      clearDragVisuals();
       return;
     }
 
     // Extract blockId from the draggable id (format: "block:{blockId}")
     const activeIdStr = event.active.id as string;
     if (!activeIdStr.startsWith("block:")) {
+      clearDragVisuals();
       return;
     }
     const blockId = activeIdStr.slice(6); // Remove "block:" prefix
@@ -364,6 +414,7 @@ export function LfccDragLayer({ children }: { children: React.ReactNode }) {
     // Get the final pointer position from the event
     const delta = event.delta;
     if (!dragStartPosRef.current) {
+      clearDragVisuals();
       return;
     }
 
@@ -373,17 +424,23 @@ export function LfccDragLayer({ children }: { children: React.ReactNode }) {
     // Find the source block
     const srcBlock = findBlockById(view, blockId);
     if (!srcBlock) {
+      clearDragVisuals();
       return;
     }
 
     // Determine drop position
     const targetPos = computeDropTargetPos(view, dropX, dropY);
     if (targetPos === null) {
+      clearDragVisuals();
       return;
     }
 
     performMoveTransaction(view, srcBlock.pos, srcBlock.node, targetPos);
-    dragStartPosRef.current = null;
+    clearDragVisuals();
+  };
+
+  const handleDragCancel = () => {
+    clearDragVisuals();
   };
 
   const [mounted, setMounted] = React.useState(false);
@@ -399,6 +456,7 @@ export function LfccDragLayer({ children }: { children: React.ReactNode }) {
       onDragStart={handleDragStart}
       onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
     >
       {children}
       {/* Annotation drag preview - external overlay to avoid text jank */}
