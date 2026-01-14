@@ -4,16 +4,8 @@
  * Provides a serverless-friendly fallback when WebSockets are unavailable.
  */
 
-import {
-  type PolicyManifestV09,
-  type SyncClientState,
-  createDefaultSyncManifest,
-} from "@keepup/core";
-import {
-  AI_COMMIT_ORIGIN_PREFIX,
-  type DegradationStep,
-  type LoroRuntime,
-} from "@keepup/lfcc-bridge";
+import { type PolicyManifestV09, type SyncClientState, createDefaultSyncManifest } from "@ku0/core";
+import { AI_COMMIT_ORIGIN_PREFIX, type DegradationStep, type LoroRuntime } from "@ku0/lfcc-bridge";
 import * as React from "react";
 
 import { getOrCreateReplicaId } from "@/hooks/useLoroWebSocketSync";

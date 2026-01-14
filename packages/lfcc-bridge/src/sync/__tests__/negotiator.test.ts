@@ -1,4 +1,4 @@
-import { DEFAULT_POLICY_MANIFEST } from "@keepup/core";
+import { DEFAULT_POLICY_MANIFEST } from "@ku0/core";
 import { describe, expect, it } from "vitest";
 
 import { createNegotiator } from "../negotiator";

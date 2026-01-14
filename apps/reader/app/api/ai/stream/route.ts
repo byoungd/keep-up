@@ -1,9 +1,9 @@
-import type { Message } from "@keepup/ai-core";
+import type { Message } from "@ku0/ai-core";
 import {
   DEFAULT_POLICY_MANIFEST,
   computeOptimisticHash,
   normalizeRequestIdentifiers,
-} from "@keepup/core";
+} from "@ku0/core";
 import { streamText } from "ai";
 import { toModelMessages } from "../messageUtils";
 import { getDefaultStreamModelId } from "../modelResolver";

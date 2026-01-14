@@ -4,7 +4,7 @@ import { Dialog } from "@/components/ui/Dialog";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { useBriefs } from "@/hooks/useBriefs";
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import { Check, FilePlus, FileText, Loader2, Plus, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 

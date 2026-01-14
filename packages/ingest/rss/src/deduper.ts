@@ -1,4 +1,4 @@
-import { canonicalizeText, computeCanonicalHash } from "@keepup/core";
+import { canonicalizeText, computeCanonicalHash } from "@ku0/core";
 import { RSSNormalizer } from "./normalizer";
 import type { RSSItem } from "./types";
 

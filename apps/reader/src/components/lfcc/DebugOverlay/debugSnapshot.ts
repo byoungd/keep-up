@@ -5,7 +5,7 @@
  * Contains NO user PII - only IDs, counts, and short snippets.
  */
 
-import type { SpanChainPolicy } from "@keepup/lfcc-bridge";
+import type { SpanChainPolicy } from "@ku0/lfcc-bridge";
 
 // ============================================================================
 // Types

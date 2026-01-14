@@ -1,4 +1,4 @@
-import { buildDigestMapPrompt, buildDigestReducePrompt } from "@keepup/ai-core";
+import { buildDigestMapPrompt, buildDigestReducePrompt } from "@ku0/ai-core";
 import type { IAgentManager } from "../agents/types";
 import { VerifierAgent } from "../agents/verifier";
 import type { MCPToolResult } from "../types";

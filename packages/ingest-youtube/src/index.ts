@@ -1,11 +1,11 @@
 /**
- * @packages/ingest-youtube - YouTube Transcript Ingestion Package
+ * @ku0/ingest-youtube - YouTube Transcript Ingestion Package
  *
  * Extracts and ingests YouTube video transcripts for language learning.
  *
  * @example
  * ```typescript
- * import { YouTubeIngestor, createYouTubePlugin } from "@packages/ingest-youtube";
+ * import { YouTubeIngestor, createYouTubePlugin } from "@ku0/ingest-youtube";
  *
  * // Simple usage with YouTubeIngestor
  * const ingestor = new YouTubeIngestor();

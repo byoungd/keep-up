@@ -5,7 +5,7 @@
  * Follows the gateway error format for unified client-side handling.
  */
 
-import { type GatewayErrorCode, toHttpStatus } from "@keepup/ai-core";
+import { type GatewayErrorCode, toHttpStatus } from "@ku0/ai-core";
 
 // ============================================================================
 // Types

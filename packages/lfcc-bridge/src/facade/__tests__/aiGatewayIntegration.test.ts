@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { computeContextHash, gateway } from "@keepup/core";
+import { computeContextHash, gateway } from "@ku0/core";
 import { describe, expect, it } from "vitest";
 import { EditorAdapterPM } from "../../adapters/editorAdapterPM";
 import { BridgeController } from "../../bridge/bridgeController";

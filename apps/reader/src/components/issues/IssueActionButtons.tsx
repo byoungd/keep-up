@@ -2,7 +2,7 @@
 
 import { Button, type ButtonProps } from "@/components/ui/Button";
 import type { IssueAction, IssueDefinition } from "@/lib/issues/issues";
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 
 export type IssueActionHandlers = {
   onCopyDiagnostics?: () => void;

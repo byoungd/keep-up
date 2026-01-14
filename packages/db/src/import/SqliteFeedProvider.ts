@@ -5,7 +5,7 @@
  * Works with the worker-based SQLite driver.
  */
 
-import type { RetryOptions } from "@packages/ingest-rss";
+import type { RetryOptions } from "@ku0/ingest-rss";
 import type { DbDriver, FeedItemRow } from "../driver/types";
 import type { FeedProvider, RssFeedSubscription, RssItemInfo } from "./RssPollingScheduler";
 
@@ -74,11 +74,11 @@ export class SqliteFeedProvider implements FeedProvider {
 
   /**
    * Fetch and parse items from a feed URL.
-   * Uses the RSSIngestor from @packages/ingest-rss.
+   * Uses the RSSIngestor from @ku0/ingest-rss.
    */
   async fetchFeedItems(feedUrl: string): Promise<RssItemInfo[]> {
     // Dynamically import to avoid bundling issues in non-worker contexts
-    const { RSSIngestor } = await import("@packages/ingest-rss");
+    const { RSSIngestor } = await import("@ku0/ingest-rss");
 
     const ingestor = new RSSIngestor();
     const result = await ingestor.fetchFeedItems(

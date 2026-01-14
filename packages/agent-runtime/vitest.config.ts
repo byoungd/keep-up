@@ -4,7 +4,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   resolve: {
     alias: {
-      "@keepup/ai-core": path.resolve(__dirname, "../ai-core/src/index.ts"),
+      "@ku0/ai-core": path.resolve(__dirname, "../ai-core/src/index.ts"),
     },
   },
   test: {

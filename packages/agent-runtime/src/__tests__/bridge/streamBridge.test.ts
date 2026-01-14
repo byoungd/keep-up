@@ -2,7 +2,7 @@
  * Stream Bridge Tests
  */
 
-import type { AIProvenance, EditIntent } from "@keepup/core";
+import type { AIProvenance, EditIntent } from "@ku0/core";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   type StreamBridge,

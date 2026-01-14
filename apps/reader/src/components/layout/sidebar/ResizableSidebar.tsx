@@ -1,7 +1,7 @@
 "use client";
 
 import { useSidebarCollapsed as useSidebarState } from "@/context/PanelStateContext";
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import * as React from "react";
 
 const MIN_WIDTH = 200; // Minimum visible width when expanded

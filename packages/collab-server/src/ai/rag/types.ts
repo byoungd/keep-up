@@ -4,7 +4,7 @@
  * Type definitions for the RAG query pipeline.
  */
 
-import type { DataAccessPolicy } from "@keepup/core";
+import type { DataAccessPolicy } from "@ku0/core";
 import type { ChunkEmbedding, DocumentChunk } from "../extraction";
 
 /** Search result with relevance */

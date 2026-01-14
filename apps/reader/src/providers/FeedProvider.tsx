@@ -9,7 +9,7 @@ import type {
   TopicRow,
   UpdateRssFolderInput,
   UpdateRssSubscriptionInput,
-} from "@keepup/db";
+} from "@ku0/db";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as React from "react";
 

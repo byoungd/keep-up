@@ -1,7 +1,7 @@
 "use client";
 
 import type { ConsentDecision, ConsentOverride, ContextPayload } from "@/lib/ai/contextPrivacy";
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import { AlertTriangle, ChevronRight, Globe, Quote } from "lucide-react";
 import * as React from "react";
 

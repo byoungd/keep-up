@@ -3,7 +3,7 @@
  */
 
 import { getDbClient } from "@/lib/db";
-import type { BriefItemRow, BriefItemType, BriefRow } from "@keepup/db";
+import type { BriefItemRow, BriefItemType, BriefRow } from "@ku0/db";
 import { useCallback, useEffect, useState } from "react";
 
 export interface UseBriefsReturn {

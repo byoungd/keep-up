@@ -1,5 +1,5 @@
 {
-  "name": "@keepup/db",
+  "name": "@ku0/db",
   "private": true,
   "version": "0.0.1",
   "type": "module",
@@ -26,10 +26,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@keepup/core": "workspace:*",
-    "@packages/ingest-rss": "workspace:^",
-    "@packages/ingest-youtube": "workspace:^",
-    "@keepup/lfcc-bridge": "workspace:*",
+    "@ku0/core": "workspace:*",
+    "@ku0/ingest-rss": "workspace:^",
+    "@ku0/ingest-youtube": "workspace:^",
+    "@ku0/lfcc-bridge": "workspace:*",
     "@sqlite.org/sqlite-wasm": "^3.49.0-build1",
     "dexie": "^4.0.10"
   },

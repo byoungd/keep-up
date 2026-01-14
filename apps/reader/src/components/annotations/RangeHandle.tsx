@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import { useCallback, useRef, useState } from "react";
 
 export type RangeHandleSide = "start" | "end";

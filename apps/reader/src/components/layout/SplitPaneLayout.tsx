@@ -1,7 +1,7 @@
 "use client";
 
 import { useSplitResize } from "@/hooks/useSplitResize";
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import type { CSSProperties, ReactNode } from "react";
 
 interface SplitPaneLayoutProps {

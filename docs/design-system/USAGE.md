@@ -1,6 +1,6 @@
 # Design System Usage Guide
 
-This document explains how to consume design tokens and follow component patterns in the `@keepup/reader` application.
+This document explains how to consume design tokens and follow component patterns in the `@ku0/reader` application.
 
 ---
 

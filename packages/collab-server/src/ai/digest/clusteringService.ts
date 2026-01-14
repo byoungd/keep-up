@@ -7,7 +7,7 @@
  * Track B: Intelligence & Grounding
  */
 
-import { estimateTokens } from "@keepup/ai-core";
+import { estimateTokens } from "@ku0/ai-core";
 import type { EmbeddingService } from "../extraction/embeddingService";
 import type { AIGateway } from "../gateway";
 import type { ContentItem } from "./types";

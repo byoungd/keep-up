@@ -1,8 +1,8 @@
 "use client";
 
 import type { AnnotationColor } from "@/lib/kernel/types";
-import { getAnnotationHighlightColor, getHighlightStyle } from "@keepup/app";
-import { cn } from "@keepup/shared/utils";
+import { getAnnotationHighlightColor, getHighlightStyle } from "@ku0/app";
+import { cn } from "@ku0/shared/utils";
 import { StatusTooltip } from "./StatusTooltip";
 
 interface AnnotationSpanProps {

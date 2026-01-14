@@ -2,7 +2,7 @@
  * Hook for accessing documents from the database.
  */
 
-import type { DocumentRow, ListDocumentsOptions } from "@keepup/db";
+import type { DocumentRow, ListDocumentsOptions } from "@ku0/db";
 import { useCallback, useEffect, useState } from "react";
 import { getDbClient } from "../lib/db";
 import { useImportManager } from "./useImportManager";

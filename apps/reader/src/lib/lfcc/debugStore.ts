@@ -1,4 +1,4 @@
-import type { DirtyInfo } from "@keepup/core";
+import type { DirtyInfo } from "@ku0/core";
 
 import type { DirtyInfoEntry, ReproErrorEntry } from "@/lib/lfcc/reproBundle";
 import { createStore } from "@/lib/store";

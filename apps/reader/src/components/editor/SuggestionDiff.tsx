@@ -1,4 +1,4 @@
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import { diff_match_patch } from "diff-match-patch";
 import { Check, Split, X } from "lucide-react";
 import { useMemo } from "react";

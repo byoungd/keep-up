@@ -1,5 +1,5 @@
-import type { DisplayAnnoState, StoredAnnoState } from "@keepup/core";
-import type { SpanChain, SpanList } from "@keepup/lfcc-bridge";
+import type { DisplayAnnoState, StoredAnnoState } from "@ku0/core";
+import type { SpanChain, SpanList } from "@ku0/lfcc-bridge";
 import type { Anchor } from "./anchors";
 
 /** Annotation highlight color options */

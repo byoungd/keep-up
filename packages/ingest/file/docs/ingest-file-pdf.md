@@ -100,7 +100,7 @@ Quality gates are enforced in FULL (nightly) mode only:
 ## Error Handling
 
 ```typescript
-import { EncryptedFileError, ParseError } from '@packages/ingest-file';
+import { EncryptedFileError, ParseError } from '@ku0/ingest-file';
 
 try {
   const meta = await importer.importFile({ path: './doc.pdf' });

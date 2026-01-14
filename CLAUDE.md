@@ -5,7 +5,7 @@
 **Name**: Keep-Up Reader
 **Stack**: TypeScript, Next.js 15, React 19, pnpm monorepo, Turbo
 **Core**: LFCC (Local-First Collaboration Contract) editor with Loro CRDT
-**Namespace**: `@keepup/*`, `@keepup/*`
+**Namespace**: `@ku0/*`, `@ku0/*`
 
 ## Quick Commands
 

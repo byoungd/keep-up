@@ -1,7 +1,7 @@
 "use client";
 
 import { reactKeys } from "@handlewithcare/react-prosemirror";
-import type { DirtyInfo } from "@keepup/core";
+import type { DirtyInfo } from "@ku0/core";
 import {
   type AIGatewayWriteOptions,
   type AIGatewayWriteResult,
@@ -21,7 +21,7 @@ import {
   nextBlockId,
   pmSchema,
   projectLoroToPm,
-} from "@keepup/lfcc-bridge";
+} from "@ku0/lfcc-bridge";
 import { history } from "prosemirror-history";
 import { keymap } from "prosemirror-keymap";
 import type { Node as PMNode } from "prosemirror-model";

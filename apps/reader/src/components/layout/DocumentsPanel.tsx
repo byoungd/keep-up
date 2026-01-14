@@ -12,7 +12,7 @@ import { useDocuments } from "@/hooks/useDocuments";
 import { useRouter } from "@/i18n/navigation";
 import { buildReaderPath } from "@/i18n/paths";
 import { importFeatureFlags } from "@/lib/import/importFeatures";
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import { ChevronRight, Download, FileText, Filter, Loader2, Plus, Rss } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useLocale } from "next-intl";

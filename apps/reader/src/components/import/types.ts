@@ -2,7 +2,7 @@
  * Types for Content Composer v2 (Linear Style)
  */
 
-import type { ImportSourceType } from "@keepup/db";
+import type { ImportSourceType } from "@ku0/db";
 
 /** Source kind for auto-detection */
 export type SourceKind = "text" | "file" | "url";

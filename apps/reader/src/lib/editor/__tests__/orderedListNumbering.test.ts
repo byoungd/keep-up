@@ -1,4 +1,4 @@
-import { pmSchema } from "@keepup/lfcc-bridge";
+import { pmSchema } from "@ku0/lfcc-bridge";
 import { describe, expect, it } from "vitest";
 
 import { buildOrderedListNumbering } from "../orderedListNumberingPlugin";

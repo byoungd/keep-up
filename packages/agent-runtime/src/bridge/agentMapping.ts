@@ -5,7 +5,7 @@
  * and agent-runtime AgentType (tool execution roles).
  */
 
-import type { AgentCapability, AgentType as CoreAgentType } from "@keepup/core";
+import type { AgentCapability, AgentType as CoreAgentType } from "@ku0/core";
 import type { AgentType as RuntimeAgentType } from "../agents/types";
 
 // ============================================================================

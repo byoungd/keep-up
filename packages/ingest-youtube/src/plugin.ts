@@ -14,7 +14,7 @@ import { extractVideoId } from "./urlParser";
 
 /**
  * Internal plugin contract for content sources.
- * Matches the pattern from @packages/ingest-rss.
+ * Matches the pattern from @ku0/ingest-rss.
  */
 export interface ContentSourcePlugin<TSource, TOptions, TMeta> {
   /** Plugin identifier */

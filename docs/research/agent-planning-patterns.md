@@ -2,7 +2,7 @@
 
 > **Date**: 2026-01-13
 > **Scope**: OpenCode (SST) and Manus Agent best practices for "Planning with Files"
-> **Goal**: Identify design patterns to optimize `@keepup/agent-runtime`
+> **Goal**: Identify design patterns to optimize `@ku0/agent-runtime`
 
 ## Executive Summary
 

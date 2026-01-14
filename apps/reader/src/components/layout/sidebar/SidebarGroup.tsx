@@ -2,7 +2,7 @@
 import { FeedsSidebarSection } from "@/components/feeds/FeedsSidebarSection";
 import type { EffectiveSidebarItem, SidebarBadgeStyle } from "@/lib/sidebar";
 import { FeedProvider } from "@/providers/FeedProvider";
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import { ChevronRight } from "lucide-react";
 import * as React from "react";
 import { SidebarItem } from "./SidebarItem";

@@ -1,4 +1,4 @@
-import { anchorFromAbsolute } from "@keepup/core";
+import { anchorFromAbsolute } from "@ku0/core";
 import { LoroDoc } from "loro-crdt";
 import { beforeEach, describe, expect, it } from "vitest";
 import {

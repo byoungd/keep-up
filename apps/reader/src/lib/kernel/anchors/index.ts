@@ -2,7 +2,7 @@ import {
   type Anchor as CoreAnchor,
   absoluteFromAnchor as decodeAnchor,
   anchorFromAbsolute as encodeAnchor,
-} from "@keepup/core";
+} from "@ku0/core";
 
 export type Anchor = string;
 

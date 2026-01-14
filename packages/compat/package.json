@@ -1,5 +1,5 @@
 {
-  "name": "@keepup/compat",
+  "name": "@ku0/compat",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -8,8 +8,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@keepup/core": "workspace:*",
-    "@keepup/lfcc-bridge": "workspace:*"
+    "@ku0/core": "workspace:*",
+    "@ku0/lfcc-bridge": "workspace:*"
   },
   "devDependencies": {
     "vitest": "^1.2.0"

@@ -1,5 +1,5 @@
-import type { DirtyInfo, EditorSchemaValidator, RelocationPolicy } from "@keepup/core";
-import { DEFAULT_POLICY_MANIFEST, gateway } from "@keepup/core";
+import type { DirtyInfo, EditorSchemaValidator, RelocationPolicy } from "@ku0/core";
+import { DEFAULT_POLICY_MANIFEST, gateway } from "@ku0/core";
 import { type Fragment, type Node as PMNode, Slice } from "prosemirror-model";
 import type { EditorState, Transaction } from "prosemirror-state";
 import { ReplaceAroundStep, ReplaceStep } from "prosemirror-transform";

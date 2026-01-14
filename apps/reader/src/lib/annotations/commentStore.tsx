@@ -5,7 +5,7 @@ import {
   type DocumentFacade,
   type LoroRuntime,
   createDocumentFacade,
-} from "@keepup/lfcc-bridge";
+} from "@ku0/lfcc-bridge";
 import * as React from "react";
 import { create, createStore, useStore } from "zustand";
 

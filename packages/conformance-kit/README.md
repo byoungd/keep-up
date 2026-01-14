@@ -45,7 +45,7 @@ conformance-kit/
 The kit uses pluggable adapters to support both real implementations and mocks:
 
 ```typescript
-import type { LoroAdapter, ShadowAdapter, CanonicalizerAdapter } from '@keepup/conformance-kit';
+import type { LoroAdapter, ShadowAdapter, CanonicalizerAdapter } from '@ku0/conformance-kit';
 
 // Implement these interfaces for your real Loro/Shadow bridge
 interface LoroAdapter {
@@ -88,7 +88,7 @@ type FuzzOp =
 Seeded generator for valid random operation programs:
 
 ```typescript
-import { generateProgram, DEFAULT_GEN_CONFIG } from '@keepup/conformance-kit';
+import { generateProgram, DEFAULT_GEN_CONFIG } from '@ku0/conformance-kit';
 
 // Generate deterministic program
 const ops = generateProgram(seed, steps, config, adapter);
@@ -116,7 +116,7 @@ const config = {
 Minimizes failing programs to minimal repro:
 
 ```typescript
-import { shrinkProgram } from '@keepup/conformance-kit';
+import { shrinkProgram } from '@ku0/conformance-kit';
 
 const result = await shrinkProgram(failingOps, predicateFails);
 // result.shrunkOps is minimal sequence that still fails
@@ -127,7 +127,7 @@ const result = await shrinkProgram(failingOps, predicateFails);
 Runs same program against Loro and Shadow, compares canonical output:
 
 ```typescript
-import { DoubleBlindHarness } from '@keepup/conformance-kit';
+import { DoubleBlindHarness } from '@ku0/conformance-kit';
 
 const harness = new DoubleBlindHarness(loro, shadow, canonicalizer, {
   checkpointPolicy: 'everyN',
@@ -242,7 +242,7 @@ Options:
 ### Custom Adapters
 
 ```typescript
-import { AdapterFactory, LoroAdapter } from '@keepup/conformance-kit';
+import { AdapterFactory, LoroAdapter } from '@ku0/conformance-kit';
 
 class MyLoroAdapter implements LoroAdapter {
   // Implement interface methods

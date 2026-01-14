@@ -4,7 +4,7 @@
 
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import type { OperationLogEntry } from "@keepup/core/sync/server";
+import type { OperationLogEntry } from "@ku0/core/sync/server";
 import { LoroDoc } from "loro-crdt";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { FileSystemPersistenceAdapter } from "../persistence/fileSystemAdapter";

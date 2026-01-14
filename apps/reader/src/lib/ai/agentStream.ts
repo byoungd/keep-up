@@ -1,4 +1,4 @@
-import type { MCPToolResult } from "@keepup/agent-runtime";
+import type { MCPToolResult } from "@ku0/agent-runtime";
 
 type AgentBaseEventType =
   | "turn:start"

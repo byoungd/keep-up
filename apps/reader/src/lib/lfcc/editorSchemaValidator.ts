@@ -1,4 +1,4 @@
-import type { EditorSchemaValidator } from "@keepup/core";
+import type { EditorSchemaValidator } from "@ku0/core";
 import { DOMParser as PMDOMParser, type Schema } from "prosemirror-model";
 
 import { markdownToHtml } from "@/lib/editor/markdownToHtml";

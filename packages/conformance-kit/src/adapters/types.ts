@@ -5,7 +5,7 @@
  * Allows running with real implementations or mocks/stubs.
  */
 
-import type { CanonNode } from "@keepup/core";
+import type { CanonNode } from "@ku0/core";
 import type { FuzzOp } from "../op-fuzzer/types";
 
 /**

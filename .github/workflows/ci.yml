@@ -124,7 +124,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Core tests
-        run: pnpm --filter @keepup/core test
+        run: pnpm --filter @ku0/core test
 
       - name: Pack validation
         run: |

@@ -15,9 +15,9 @@ import { type UIComment, useCommentStore } from "@/lib/annotations/commentStore"
 import { formatDisplayState } from "@/lib/annotations/verification";
 import { getIssueDefinitionForAnnotationState } from "@/lib/issues/issues";
 import type { Annotation } from "@/lib/kernel/types";
-import { getBadgeStyle } from "@keepup/app";
-import type { DisplayAnnoState } from "@keepup/core";
-import { cn } from "@keepup/shared/utils";
+import { getBadgeStyle } from "@ku0/app";
+import type { DisplayAnnoState } from "@ku0/core";
+import { cn } from "@ku0/shared/utils";
 import {
   ArrowUpRight,
   ChevronDown,

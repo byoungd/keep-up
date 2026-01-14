@@ -1,6 +1,6 @@
-# @keepup/app
+# @ku0/app
 
-The UI application layer for the Reader project. This package consumes `@keepup/core` and provides the React-based user interface.
+The UI application layer for the Reader project. This package consumes `@ku0/core` and provides the React-based user interface.
 
 ## Architecture
 

@@ -6,7 +6,7 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { CanonNode } from "@keepup/core";
+import type { CanonNode } from "@ku0/core";
 import { generateCanonDiff } from "../double-blind/comparator";
 import type { FrontierLogEntry, MismatchInfo } from "../double-blind/types";
 import type { GenConfig } from "../op-fuzzer/generator";

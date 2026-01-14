@@ -1,5 +1,5 @@
-import type { PolicyManifestV09 } from "@keepup/core";
-import { negotiate } from "@keepup/core";
+import type { PolicyManifestV09 } from "@ku0/core";
+import { negotiate } from "@ku0/core";
 
 import { type DegradationStep, degradationPath } from "../policy/policyDegradation";
 import type { LoroRuntime } from "../runtime/loroRuntime";

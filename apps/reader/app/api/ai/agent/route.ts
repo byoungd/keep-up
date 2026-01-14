@@ -6,14 +6,14 @@ import {
   createAICoreAdapter,
   createCoworkOrchestrator,
   createCoworkSessionState,
-} from "@keepup/agent-runtime";
+} from "@ku0/agent-runtime";
 import {
   PathValidator,
   createBashToolServer,
   createFileToolServer,
   createToolRegistry,
-} from "@keepup/agent-runtime/tools";
-import { normalizeRequestIdentifiers } from "@keepup/core";
+} from "@ku0/agent-runtime/tools";
+import { normalizeRequestIdentifiers } from "@ku0/core";
 import { getDefaultChatModelId } from "../modelResolver";
 import { createAnthropicClient, createOpenAIProvider } from "../providerClients";
 import { type ProviderResolutionError, resolveProviderTarget } from "../providerResolver";

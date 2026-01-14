@@ -22,7 +22,7 @@ import type {
   SidebarConfigActions,
 } from "@/lib/sidebar";
 import { FeedProvider } from "@/providers/FeedProvider";
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import { CircleHelp, MoreHorizontal, Settings2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";

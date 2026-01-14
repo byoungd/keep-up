@@ -12,7 +12,7 @@ import {
 import { List } from "@/components/ui/List";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { type ModelCapability, normalizeModelId } from "@/lib/ai/models";
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import {
   Archive,
   Brain,

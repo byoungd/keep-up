@@ -6,7 +6,7 @@
 
 ## Runtime Infrastructure
 
-The **`@keepup/agent-runtime`** package (`packages/agent-runtime/`) provides the foundational infrastructure for AI agents in Keep-Up Reader:
+The **`@ku0/agent-runtime`** package (`packages/agent-runtime/`) provides the foundational infrastructure for AI agents in Keep-Up Reader:
 
 ```
 packages/agent-runtime/src/

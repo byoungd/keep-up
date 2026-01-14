@@ -5,7 +5,7 @@
  * Pure rendering functions for debug overlay sections
  */
 
-import { STATUS_COLORS } from "@keepup/app";
+import { STATUS_COLORS } from "@ku0/app";
 import type {
   AnnotationsSectionData,
   DebugOverlayState,

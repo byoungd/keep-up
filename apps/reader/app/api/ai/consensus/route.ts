@@ -9,7 +9,7 @@ import {
   type ConsensusConfig,
   type ConsensusModelConfig,
   ConsensusOrchestrator,
-} from "@keepup/agent-runtime/orchestrator/edge";
+} from "@ku0/agent-runtime/orchestrator/edge";
 import { type NextRequest, NextResponse } from "next/server";
 
 export const runtime = "edge";

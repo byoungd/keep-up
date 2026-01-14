@@ -2,15 +2,15 @@
  * Hooks for interacting with the ImportManager.
  */
 
-import type { ImportJobRow, ImportJobStatus } from "@keepup/db";
-import type { ImportManager } from "@keepup/db";
+import type { ImportJobRow, ImportJobStatus } from "@ku0/db";
+import type { ImportManager } from "@ku0/db";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getImportManager } from "../lib/db";
 
 /**
  * Hook to access the ImportManager instance.
  */
-import type { ProxyImportManager } from "@keepup/db";
+import type { ProxyImportManager } from "@ku0/db";
 
 export function useImportManager(): ImportManager | ProxyImportManager | null {
   const [manager, setManager] = useState<ImportManager | ProxyImportManager | null>(null);

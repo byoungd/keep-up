@@ -2,7 +2,7 @@
  * LFCC v0.9 RC - Annotation Visualizer Tests
  */
 
-import { STATUS_COLORS } from "@keepup/app";
+import { STATUS_COLORS } from "@ku0/app";
 import { describe, expect, it } from "vitest";
 import {
   filterEventsByAnnotation,

@@ -1,6 +1,6 @@
 "use client";
 
-import type { DocumentRow } from "@keepup/db";
+import type { DocumentRow } from "@ku0/db";
 
 import { getDbClient } from "@/lib/db";
 import { decodeContentTextFromUpdates } from "./decodeLoro";

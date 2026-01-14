@@ -1,4 +1,4 @@
-import { type LoroRuntime, nextBlockId } from "@keepup/lfcc-bridge";
+import { type LoroRuntime, nextBlockId } from "@ku0/lfcc-bridge";
 import { chainCommands, deleteSelection, exitCode, joinBackward } from "prosemirror-commands";
 import { keymap } from "prosemirror-keymap";
 import type { Command, Plugin } from "prosemirror-state";

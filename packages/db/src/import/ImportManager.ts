@@ -4,7 +4,7 @@
  * Coordinates import jobs with queue management, concurrency control, and retry logic.
  */
 
-import { observability } from "@keepup/core";
+import { observability } from "@ku0/core";
 import type { DbDriver, ImportJobRow, ImportJobStatus, ImportSourceType } from "../driver/types";
 import { normalizeIngestResult } from "./normalization";
 import type { ContentResult } from "./normalization/types";

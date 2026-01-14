@@ -1,4 +1,4 @@
-import { RSSIngestor } from "@packages/ingest-rss";
+import { RSSIngestor } from "@ku0/ingest-rss";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 

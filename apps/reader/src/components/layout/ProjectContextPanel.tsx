@@ -1,7 +1,7 @@
 "use client";
 
 import type { ProjectTaskSummary } from "@/lib/ai/projectContextTypes";
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import { RefreshCw } from "lucide-react";
 import * as React from "react";
 

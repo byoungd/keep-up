@@ -1,4 +1,4 @@
-import type { CoworkTaskSummary, TaskQueueStats } from "@keepup/agent-runtime";
+import type { CoworkTaskSummary, TaskQueueStats } from "@ku0/agent-runtime";
 
 export type TaskStatusSnapshot = "queued" | "running" | "completed" | "failed" | "cancelled";
 

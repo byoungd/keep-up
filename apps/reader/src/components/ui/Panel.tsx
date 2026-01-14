@@ -1,4 +1,4 @@
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import * as React from "react";
 
 const Panel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(

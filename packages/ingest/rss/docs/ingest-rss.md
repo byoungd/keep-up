@@ -1,6 +1,6 @@
 # RSS Ingest Contract
 
-> 本文档定义 `@packages/ingest-rss` 的输入/输出契约、质量指标与门禁策略。
+> 本文档定义 `@ku0/ingest-rss` 的输入/输出契约、质量指标与门禁策略。
 
 ## 数据流
 
@@ -119,7 +119,7 @@ interface RssIngestStats {
 ### Quick 模式 (PR Gate)
 
 ```bash
-pnpm --filter @packages/ingest-rss test:quality
+pnpm --filter @ku0/ingest-rss test:quality
 ```
 
 - 运行本地 mock fixtures + 1 个远程 feed
@@ -129,7 +129,7 @@ pnpm --filter @packages/ingest-rss test:quality
 ### Full 模式 (Nightly)
 
 ```bash
-pnpm --filter @packages/ingest-rss test:quality:full
+pnpm --filter @ku0/ingest-rss test:quality:full
 ```
 
 - 运行所有 fixtures（本地 + 远程）
@@ -139,7 +139,7 @@ pnpm --filter @packages/ingest-rss test:quality:full
 ### JSON 报告
 
 ```bash
-pnpm --filter @packages/ingest-rss test:quality:report
+pnpm --filter @ku0/ingest-rss test:quality:report
 ```
 
 输出到 `artifacts/rss-ingest-report.json`
@@ -149,11 +149,11 @@ pnpm --filter @packages/ingest-rss test:quality:report
 ```yaml
 # PR Gate
 - name: RSS Ingest Quality (Quick)
-  run: pnpm --filter @packages/ingest-rss test:quality
+  run: pnpm --filter @ku0/ingest-rss test:quality
 
 # Nightly
 - name: RSS Ingest Quality (Full)
-  run: pnpm --filter @packages/ingest-rss test:quality:full
+  run: pnpm --filter @ku0/ingest-rss test:quality:full
 ```
 
 ## 踩坑预案

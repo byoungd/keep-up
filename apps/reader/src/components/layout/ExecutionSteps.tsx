@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import { AlertCircle, CheckCircle2, ChevronRight, Clock, Loader2 } from "lucide-react";
 import * as React from "react";
 

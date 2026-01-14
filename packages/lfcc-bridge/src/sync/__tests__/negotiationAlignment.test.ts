@@ -5,7 +5,7 @@
  * P1.2: Ensures Bridge and Core produce identical negotiation results
  */
 
-import { type CanonMark, DEFAULT_POLICY_MANIFEST, negotiate } from "@keepup/core";
+import { type CanonMark, DEFAULT_POLICY_MANIFEST, negotiate } from "@ku0/core";
 import { describe, expect, it } from "vitest";
 import { computeEffectiveManifest } from "../syncAdapter";
 

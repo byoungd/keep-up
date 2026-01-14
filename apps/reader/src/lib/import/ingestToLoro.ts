@@ -1,7 +1,7 @@
 /**
  * Content Import Adapter
  *
- * Converts IngestionMeta from @packages/ingest-file to Loro documents
+ * Converts IngestionMeta from @ku0/ingest-file to Loro documents
  * and saves to persistence layer.
  */
 
@@ -11,7 +11,7 @@ import {
   nextBlockId,
   serializeAttrs,
   writeBlockTree,
-} from "@keepup/lfcc-bridge";
+} from "@ku0/lfcc-bridge";
 
 import {
   type DocMetadata,
@@ -20,7 +20,7 @@ import {
 } from "@/lib/persistence/docMetadata";
 import { docPersistence } from "@/lib/persistence/docPersistence";
 
-/** IngestionMeta type matching @packages/ingest-file output */
+/** IngestionMeta type matching @ku0/ingest-file output */
 export interface IngestionMeta {
   title: string;
   content: string;
@@ -92,7 +92,7 @@ function generateDocId(sourceUrl: string): string {
 /**
  * Import content from IngestionMeta and save to persistence.
  *
- * @param meta - The ingestion metadata from @packages/ingest-file
+ * @param meta - The ingestion metadata from @ku0/ingest-file
  * @param sourceType - The source type (github, rss, url)
  * @param sourceUrl - The original source URL
  * @returns ImportResult with docId, metadata, and snapshot

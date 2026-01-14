@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { cn } from "@/lib/utils";
 import { useFeedProvider } from "@/providers/FeedProvider";
-import type { TopicRow } from "@keepup/db";
+import type { TopicRow } from "@ku0/db";
 import { AlertCircle, Check, Loader2 } from "lucide-react";
 import * as React from "react";
 

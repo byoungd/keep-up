@@ -5,7 +5,7 @@
  * Replaces localStorage-based useRssStore with SQLite/IndexedDB persistence.
  */
 
-import type { FeedItemRow, ListFeedItemsOptions, RssSubscriptionRow } from "@keepup/db";
+import type { FeedItemRow, ListFeedItemsOptions, RssSubscriptionRow } from "@ku0/db";
 import { useCallback, useEffect, useState } from "react";
 import { getDbClient } from "../lib/db";
 

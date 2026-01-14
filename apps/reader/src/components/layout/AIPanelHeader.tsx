@@ -6,7 +6,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/DropdownMenu";
 import type { ModelCapability } from "@/lib/ai/models";
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import { Download, History, MoreHorizontal, PanelRightClose, Plus } from "lucide-react";
 import { ModelSelector, type PanelPosition } from "./ModelSelector";
 

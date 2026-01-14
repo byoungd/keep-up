@@ -5,7 +5,7 @@ import { buildReaderPath } from "@/i18n/paths";
 import { useReducedMotion } from "@/lib/animations/useReducedMotion";
 import { formatImportSourceLabel } from "@/lib/import/importLabel";
 import { cn } from "@/lib/utils";
-import type { ImportJobRow } from "@keepup/db";
+import type { ImportJobRow } from "@ku0/db";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertCircle,
@@ -248,7 +248,7 @@ export function ImportStatus() {
 
 interface JobItemProps {
   job: ImportJobRow;
-  manager: import("@keepup/db").ImportManager | import("@keepup/db").ProxyImportManager | null;
+  manager: import("@ku0/db").ImportManager | import("@ku0/db").ProxyImportManager | null;
   t: (key: string) => string;
   onOpenDocument: (docId: string) => void;
   prefersReducedMotion: boolean;

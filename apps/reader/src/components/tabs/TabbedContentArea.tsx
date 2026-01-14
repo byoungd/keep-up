@@ -3,7 +3,7 @@
 import { type Tab, TabProvider, useTabContext } from "@/context/TabContext";
 import { SplitViewCommands } from "@/hooks/useSplitViewCommands";
 import { TabKeyboardShortcuts } from "@/hooks/useTabKeyboardShortcuts";
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import * as React from "react";
 import { SplitViewContainer } from "./SplitViewContainer";
 

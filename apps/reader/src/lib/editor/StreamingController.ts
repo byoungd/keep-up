@@ -17,9 +17,9 @@ import {
   type ASTNode,
   type StreamingMarkdownParser,
   createStreamingParser,
-} from "@keepup/lfcc-bridge";
+} from "@ku0/lfcc-bridge";
 
-import type { AIContext, DocumentFacade } from "@keepup/lfcc-bridge";
+import type { AIContext, DocumentFacade } from "@ku0/lfcc-bridge";
 
 // ============================================================================
 // Types

@@ -1,5 +1,5 @@
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { AnthropicProvider, OpenAIProvider as CoreOpenAIProvider } from "@keepup/ai-core";
+import { AnthropicProvider, OpenAIProvider as CoreOpenAIProvider } from "@ku0/ai-core";
 import { type ProviderConfig, pickApiKey } from "./providerResolver";
 
 class OpenAICompatibleProvider extends CoreOpenAIProvider {

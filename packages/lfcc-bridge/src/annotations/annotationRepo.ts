@@ -10,7 +10,7 @@
  * - INV-PERSIST-003: No UI-only fields may be stored
  */
 
-import { absoluteFromAnchor, anchorFromAbsolute } from "@keepup/core";
+import { absoluteFromAnchor, anchorFromAbsolute } from "@ku0/core";
 import type { LoroDoc } from "loro-crdt";
 import { decodeAnchor as decodeLegacyCursorAnchor, resolveAnchor } from "../anchors/loroAnchors";
 import type { SpanChainPolicy, SpanList } from "../selection/selectionMapping";

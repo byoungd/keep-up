@@ -2,7 +2,7 @@
  * Normalizer - Converts ParseResult to IngestionMeta format.
  */
 
-import { canonicalizeText, computeCanonicalHash } from "@keepup/core";
+import { canonicalizeText, computeCanonicalHash } from "@ku0/core";
 import type { FileSource, IngestionMeta, ParseResult } from "./types";
 
 export class Normalizer {

@@ -1,5 +1,5 @@
 /**
- * Unit tests for @keepup/db repositories and drivers.
+ * Unit tests for @ku0/db repositories and drivers.
  */
 
 import * as fc from "fast-check";

@@ -1,4 +1,4 @@
-import { buildVerifierPrompt } from "@keepup/ai-core";
+import { buildVerifierPrompt } from "@ku0/ai-core";
 import { parseJsonFromText } from "../utils/llmJson";
 import type { IAgentManager } from "./types";
 

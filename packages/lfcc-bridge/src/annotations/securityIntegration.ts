@@ -1,7 +1,7 @@
 /**
  * Security Integration for Annotation Verification
  *
- * Bridges @keepup/core security validators with LFCC-Bridge verification sync.
+ * Bridges @ku0/core security validators with LFCC-Bridge verification sync.
  * Provides P0.2 security validation for annotation relocations.
  */
 
@@ -10,7 +10,7 @@ import {
   DEFAULT_RELOCATION_VALIDATOR_CONFIG,
   type RelocationValidationResult,
   type RelocationValidatorConfig,
-} from "@keepup/core/security";
+} from "@ku0/core/security";
 import type { RelocationValidator } from "./verificationSync";
 
 // ============================================================================
@@ -51,7 +51,7 @@ export const DEFAULT_SECURITY_INTEGRATION_CONFIG: SecurityIntegrationConfig = {
 /**
  * Create a RelocationValidator compatible with verificationSync.
  *
- * This bridges the @keepup/core security validator with the
+ * This bridges the @ku0/core security validator with the
  * LFCC-Bridge verification sync pipeline.
  */
 export function createSecureRelocationValidator(

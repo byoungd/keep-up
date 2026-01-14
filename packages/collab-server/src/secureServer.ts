@@ -14,7 +14,7 @@ import {
   type ServerResponse,
   createServer,
 } from "node:http";
-import { SyncServer, type SyncServerConfig } from "@keepup/core/sync/server";
+import { SyncServer, type SyncServerConfig } from "@ku0/core/sync/server";
 import { type RawData, type WebSocket, WebSocketServer } from "ws";
 import { RotatingFileAuditStore, type RotatingFileAuditStoreConfig } from "./audit";
 import {

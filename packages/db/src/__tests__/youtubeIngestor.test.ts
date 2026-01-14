@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { createYouTubeIngestor } from "../import/ingestors/youtubeIngestor";
 
-// Mock @packages/ingest-youtube
-vi.mock("@packages/ingest-youtube", () => {
+// Mock @ku0/ingest-youtube
+vi.mock("@ku0/ingest-youtube", () => {
   return {
     YouTubeIngestor: class {
       getTranscript() {

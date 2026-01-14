@@ -7,8 +7,8 @@
  * Track 2: Intelligence & Logic (AI) - P1
  */
 
-import type { Message } from "@keepup/ai-core";
-import { DEFAULT_POLICY_MANIFEST, normalizeRequestIdentifiers } from "@keepup/core";
+import type { Message } from "@ku0/ai-core";
+import { DEFAULT_POLICY_MANIFEST, normalizeRequestIdentifiers } from "@ku0/core";
 import { generateText } from "ai";
 import { NextResponse } from "next/server";
 import { toModelMessages } from "../messageUtils";

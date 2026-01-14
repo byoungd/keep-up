@@ -1,6 +1,6 @@
 "use client";
 
-import { type BlockNode, LoroDoc, readBlockTree } from "@keepup/lfcc-bridge";
+import { type BlockNode, LoroDoc, readBlockTree } from "@ku0/lfcc-bridge";
 
 type UpdateEntry = {
   update: Uint8Array;

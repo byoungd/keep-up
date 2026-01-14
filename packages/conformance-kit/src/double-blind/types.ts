@@ -2,7 +2,7 @@
  * LFCC Conformance Kit - Double-Blind Harness Types (Part E)
  */
 
-import type { CanonNode } from "@keepup/core";
+import type { CanonNode } from "@ku0/core";
 import type { FuzzOp } from "../op-fuzzer/types";
 
 /** Checkpoint policy */

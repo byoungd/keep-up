@@ -11,7 +11,7 @@ import { absoluteFromAnchor, anchorFromAbsolute } from "@/lib/kernel/anchors";
 import { useAnnotationStore } from "@/lib/kernel/store";
 import type { Annotation, AnnotationColor } from "@/lib/kernel/types";
 import { saveImmediately } from "@/lib/persistence/persistenceManager";
-import type { DisplayAnnoState, StoredAnnoState } from "@keepup/core";
+import type { DisplayAnnoState, StoredAnnoState } from "@ku0/core";
 import type {
   AnnotationRecord,
   ChainPolicy,
@@ -20,8 +20,8 @@ import type {
   SpanChainPolicy,
   SpanList,
   VerificationState,
-} from "@keepup/lfcc-bridge";
-import { pmSelectionToSpanList } from "@keepup/lfcc-bridge";
+} from "@ku0/lfcc-bridge";
+import { pmSelectionToSpanList } from "@ku0/lfcc-bridge";
 import type { Node as PmNode } from "prosemirror-model";
 import { type EditorState, type Selection, TextSelection } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";

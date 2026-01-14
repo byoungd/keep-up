@@ -1,4 +1,4 @@
-# @packages/ingest-rss
+# @ku0/ingest-rss
 
 RSS/Atom feed ingestion pipeline for the Reader application.
 
@@ -13,13 +13,13 @@ This package provides:
 ## Installation
 
 ```bash
-pnpm add @packages/ingest-rss
+pnpm add @ku0/ingest-rss
 ```
 
 ## Quick Start
 
 ```typescript
-import { RSSIngestor, getAllDefaultFeeds } from '@packages/ingest-rss';
+import { RSSIngestor, getAllDefaultFeeds } from '@ku0/ingest-rss';
 
 const ingestor = new RSSIngestor();
 
@@ -74,7 +74,7 @@ interface IngestResult {
 ### Default Feeds
 
 ```typescript
-import { getAllDefaultFeeds, getDefaultFeedsByCategory } from '@packages/ingest-rss';
+import { getAllDefaultFeeds, getDefaultFeedsByCategory } from '@ku0/ingest-rss';
 
 // Get all feeds
 const allFeeds = getAllDefaultFeeds();
@@ -90,7 +90,7 @@ const newsFeeds = getDefaultFeedsByCategory('news');
 
 ```typescript
 // Server-side only
-import { extractFromHtml } from '@packages/ingest-rss/src/contentExtractor';
+import { extractFromHtml } from '@ku0/ingest-rss/src/contentExtractor';
 
 const content = extractFromHtml(html, { baseUrl: 'https://example.com' });
 ```
@@ -100,7 +100,7 @@ const content = extractFromHtml(html, { baseUrl: 'https://example.com' });
 For client-side code, use the browser-safe utilities:
 
 ```typescript
-import { containsHtml, stripHtmlTags, isSnippet } from '@packages/ingest-rss';
+import { containsHtml, stripHtmlTags, isSnippet } from '@ku0/ingest-rss';
 
 const hasHtml = containsHtml(text);
 const cleaned = stripHtmlTags(htmlContent);
@@ -128,7 +128,7 @@ if (!result.modified) {
 ## Testing
 
 ```bash
-pnpm --filter @packages/ingest-rss test
+pnpm --filter @ku0/ingest-rss test
 ```
 
 ## License

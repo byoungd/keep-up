@@ -5,7 +5,7 @@ describe("markdownToHtml", () => {
   describe("multi-line list items", () => {
     it("should handle ordered list with multi-line items", () => {
       const markdown = `## Steps
-1. Added \`ResiliencePipeline\` and \`ResilientProvider\` in \`@keepup/ai-core\`, with request
+1. Added \`ResiliencePipeline\` and \`ResilientProvider\` in \`@ku0/ai-core\`, with request
    signals and embedding cache support.
 2. Refactored OpenAI/Anthropic providers to use shared timeout/signal helpers and
    removed internal retry coupling.
@@ -63,14 +63,14 @@ describe("markdownToHtml", () => {
     });
 
     it("should preserve inline code in multi-line list items", () => {
-      const markdown = `1. Added \`ResiliencePipeline\` and \`ResilientProvider\` in \`@keepup/ai-core\`, with request
+      const markdown = `1. Added \`ResiliencePipeline\` and \`ResilientProvider\` in \`@ku0/ai-core\`, with request
    signals and embedding cache support.`;
 
       const html = markdownToHtml(markdown);
 
       expect(html).toContain("<code>ResiliencePipeline</code>");
       expect(html).toContain("<code>ResilientProvider</code>");
-      expect(html).toContain("<code>@keepup/ai-core</code>");
+      expect(html).toContain("<code>@ku0/ai-core</code>");
       expect(html).toContain("signals and embedding cache support");
     });
   });

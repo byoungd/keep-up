@@ -5,7 +5,7 @@
  * Bridges the AI Gateway with the CRDT document model.
  */
 
-import { gateway } from "@keepup/core";
+import { gateway } from "@ku0/core";
 import { readAllAnnotations } from "../annotations/annotationSchema";
 import { verifyAnnotationSpans } from "../annotations/verificationSync";
 import type { BlockNode } from "../crdt/crdtSchema";

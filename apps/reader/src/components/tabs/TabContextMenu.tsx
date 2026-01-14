@@ -1,7 +1,7 @@
 "use client";
 
 import { type Tab, useTabContext } from "@/context/TabContext";
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import {
   ArrowLeftRight,
   Copy,

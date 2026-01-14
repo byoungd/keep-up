@@ -1,4 +1,4 @@
-import { getDefaultModelId } from "@keepup/ai-core";
+import { getDefaultModelId } from "@ku0/ai-core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createAIGateway } from "../gateway";
 

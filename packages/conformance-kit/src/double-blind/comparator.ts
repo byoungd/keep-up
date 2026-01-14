@@ -4,7 +4,7 @@
  * Deep structural comparison of CanonNode trees.
  */
 
-import { type CanonNode, isCanonText } from "@keepup/core";
+import { type CanonNode, isCanonText } from "@ku0/core";
 import type { MismatchInfo } from "./types";
 
 /** Comparison result */

@@ -6,7 +6,7 @@
  *
  * @example
  * ```typescript
- * import { createMiddlewareChain, createCitationMiddleware } from '@keepup/ai-core';
+ * import { createMiddlewareChain, createCitationMiddleware } from '@ku0/ai-core';
  *
  * const chain = createMiddlewareChain({
  *   middlewares: [createCitationMiddleware()],

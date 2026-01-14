@@ -9,7 +9,7 @@ The `SecurityValidator` in `packages/lfcc-bridge` provides additional security v
 When applying AI-generated content on the client side, use `BridgeController.validateAIPayload()` to perform additional security validation:
 
 ```typescript
-import { BridgeController } from "@keepup/lfcc-bridge";
+import { BridgeController } from "@ku0/lfcc-bridge";
 
 // After receiving AI Gateway response
 const gatewayResponse = await aiGateway.processRequest(request);

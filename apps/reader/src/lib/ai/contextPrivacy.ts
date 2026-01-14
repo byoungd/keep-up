@@ -1,5 +1,5 @@
-import type { ContentChunk, DataAccessPolicy } from "@keepup/core";
-import { applyDataAccessPolicyToChunks } from "@keepup/core";
+import type { ContentChunk, DataAccessPolicy } from "@ku0/core";
+import { applyDataAccessPolicyToChunks } from "@ku0/core";
 
 export type ConsentOverride = "allow" | "deny";
 

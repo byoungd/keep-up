@@ -4,7 +4,7 @@
  * Dummy implementations for early bring-up and testing without real bridge.
  */
 
-import type { CanonNode } from "@keepup/core";
+import type { CanonNode } from "@ku0/core";
 import type { FuzzOp } from "../op-fuzzer/types";
 import type {
   AdapterFactory,

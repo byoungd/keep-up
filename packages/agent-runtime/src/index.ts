@@ -1,5 +1,5 @@
 /**
- * @keepup/agent-runtime
+ * @ku0/agent-runtime
  *
  * Agent Runtime with MCP tools, orchestration, and security.
  *
@@ -21,7 +21,7 @@
  *   createOrchestrator,
  *   createMockLLM,
  *   securityPolicy,
- * } from '@keepup/agent-runtime';
+ * } from '@ku0/agent-runtime';
  *
  * // Create tool registry
  * const registry = createToolRegistry();

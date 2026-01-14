@@ -1,4 +1,4 @@
-import { observability } from "@keepup/core";
+import { observability } from "@ku0/core";
 import { type DuplicateEntry, dedupeRssItems, dedupeRssItemsByStableId } from "./deduper";
 import { type FetchResult, RSSFetcher } from "./fetcher";
 import type { RSSIngestReport } from "./ingestReport";
@@ -315,7 +315,7 @@ export class RSSIngestor {
    *
    * NOTE: Browser builds use a lightweight HTML cleaner for full-text fallback.
    * For higher quality extraction, use server-side code with
-   * direct import from '@packages/ingest-rss/src/fullTextFetcher'.
+   * direct import from '@ku0/ingest-rss/src/fullTextFetcher'.
    */
   async fetchFeedEnhanced(
     source: FeedSource,

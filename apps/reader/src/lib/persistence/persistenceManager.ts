@@ -1,6 +1,6 @@
 "use client";
 
-import type { LoroRuntime } from "@keepup/lfcc-bridge";
+import type { LoroRuntime } from "@ku0/lfcc-bridge";
 
 import { docPersistence } from "./docPersistence";
 

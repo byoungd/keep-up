@@ -13,7 +13,7 @@
 
 import type { FeedFilter } from "@/components/feeds";
 import { useFeedItems, useFeedProvider } from "@/providers/FeedProvider";
-import type { FeedItemRow } from "@keepup/db";
+import type { FeedItemRow } from "@ku0/db";
 import * as React from "react";
 
 type FeedItem = FeedItemRow;

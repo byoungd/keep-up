@@ -9,7 +9,7 @@ import {
   type MessageBlock,
   createDocumentFacade,
   createLoroRuntime,
-} from "@keepup/lfcc-bridge";
+} from "@ku0/lfcc-bridge";
 import * as React from "react";
 
 const STORAGE_KEY = "ai-chat-loro-v1";

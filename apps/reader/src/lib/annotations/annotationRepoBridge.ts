@@ -1,4 +1,4 @@
-import type { DisplayAnnoState, StoredAnnoState } from "@keepup/core";
+import type { DisplayAnnoState, StoredAnnoState } from "@ku0/core";
 import {
   type AnnotationRecord,
   type AnnotationRepo,
@@ -8,7 +8,7 @@ import {
   type SpanList,
   type VerificationState,
   createAnnotationRepo,
-} from "@keepup/lfcc-bridge";
+} from "@ku0/lfcc-bridge";
 
 import { absoluteFromAnchor, anchorFromAbsolute } from "@/lib/kernel/anchors";
 import { useAnnotationStore } from "@/lib/kernel/store";

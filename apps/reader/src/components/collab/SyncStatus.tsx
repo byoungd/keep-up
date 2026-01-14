@@ -1,7 +1,7 @@
 "use client";
 
 import { Tooltip } from "@/components/ui/Tooltip";
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import { AlertCircle, AlertTriangle, Cloud, CloudOff, RefreshCw } from "lucide-react";
 
 export type SyncState = "connected" | "reconnecting" | "offline" | "diverged" | "degraded";

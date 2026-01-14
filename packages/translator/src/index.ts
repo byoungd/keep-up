@@ -1,5 +1,5 @@
 /**
- * @keepup/translator - Enhanced Translation Service
+ * @ku0/translator - Enhanced Translation Service
  *
  * Multi-provider translation with intelligent fallback, based on legacy apps/web implementation.
  *
@@ -12,7 +12,7 @@
  *
  * @example
  * ```typescript
- * import { translationService } from '@keepup/translator';
+ * import { translationService } from '@ku0/translator';
  * const result = await translationService.translate('Hello world', 'zh');
  * console.log(result.text); // 你好世界
  * ```

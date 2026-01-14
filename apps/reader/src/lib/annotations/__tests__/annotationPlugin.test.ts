@@ -5,7 +5,7 @@ import {
   projectLoroToPm,
   serializeAttrs,
   writeBlockTree,
-} from "@keepup/lfcc-bridge";
+} from "@ku0/lfcc-bridge";
 import { EditorState } from "prosemirror-state";
 import type { DecorationSet, EditorView } from "prosemirror-view";
 // @vitest-environment jsdom

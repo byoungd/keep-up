@@ -4,7 +4,7 @@
 
 ## Project: Keep-Up Reader
 
-This framework applies to the Keep-Up Reader monorepo (`@keepup/*`, `@keepup/*` packages).
+This framework applies to the Keep-Up Reader monorepo (`@ku0/*`, `@ku0/*` packages).
 
 ## Overview
 
@@ -138,7 +138,7 @@ bash scripts/ui-gate.sh
 ### 3.5 Core Package Gate
 ```bash
 # For changes to packages/core
-pnpm --filter @keepup/core test
+pnpm --filter @ku0/core test
 # Pack validation (no __tests__ in dist)
 ```
 

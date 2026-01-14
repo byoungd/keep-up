@@ -1,4 +1,4 @@
-import type { Message } from "@keepup/ai-core";
+import type { Message } from "@ku0/ai-core";
 import { generateText, streamText } from "ai";
 import { toModelMessages } from "./messageUtils";
 import { createAnthropicClient, createGoogleClient, createOpenAIProvider } from "./providerClients";

@@ -1,4 +1,4 @@
-import type { DisplayAnnoState, SyncClientState } from "@keepup/core";
+import type { DisplayAnnoState, SyncClientState } from "@ku0/core";
 
 export type IssueKind =
   | "ORPHAN"

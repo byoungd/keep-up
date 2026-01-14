@@ -2,10 +2,10 @@
  * LFCC v0.9 RC - JWT Authentication Adapter
  *
  * Validates JWT tokens on WebSocket connections.
- * Implements AuthAdapter interface from @keepup/core.
+ * Implements AuthAdapter interface from @ku0/core.
  */
 
-import type { AuthAdapter, AuthContext, AuthResult } from "@keepup/core/security";
+import type { AuthAdapter, AuthContext, AuthResult } from "@ku0/core/security";
 import jwt from "jsonwebtoken";
 
 /** JWT payload structure */

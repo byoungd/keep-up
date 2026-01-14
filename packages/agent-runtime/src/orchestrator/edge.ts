@@ -8,7 +8,7 @@
  *
  * @example
  * ```typescript
- * import { ConsensusOrchestrator } from "@keepup/agent-runtime/orchestrator/edge";
+ * import { ConsensusOrchestrator } from "@ku0/agent-runtime/orchestrator/edge";
  * ```
  */
 

@@ -5,7 +5,7 @@
  * Ensures bridge-emitted DirtyInfo is never smaller than kernel-computed DirtyInfo.
  */
 
-import type { DirtyInfo } from "@keepup/core";
+import type { DirtyInfo } from "@ku0/core";
 
 /** Difference between kernel and bridge DirtyInfo */
 export interface DirtyInfoDiff {

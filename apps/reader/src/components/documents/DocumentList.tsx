@@ -12,7 +12,7 @@ import { useToggleSaved } from "@/hooks/useToggleSaved";
 import { Link } from "@/i18n/navigation";
 import { buildReaderPath } from "@/i18n/paths";
 import { cn } from "@/lib/utils";
-import type { DocumentRow } from "@keepup/db";
+import type { DocumentRow } from "@ku0/db";
 import {
   Bookmark,
   BookmarkCheck,

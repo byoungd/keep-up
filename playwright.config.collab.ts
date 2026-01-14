@@ -60,8 +60,8 @@ export default defineConfig({
     },
     {
       command: process.env.CI
-        ? "pnpm --filter @keepup/collab-server start"
-        : "pnpm --filter @keepup/collab-server dev",
+        ? "pnpm --filter @ku0/collab-server start"
+        : "pnpm --filter @ku0/collab-server dev",
       url: "http://localhost:3030/health",
       reuseExistingServer,
       timeout: 120000,

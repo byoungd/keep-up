@@ -3,7 +3,7 @@
 import { useImportManager } from "@/hooks/useImportManager";
 import { formatImportSourceLabel } from "@/lib/import/importLabel";
 import { cn } from "@/lib/utils";
-import type { ImportJobRow } from "@keepup/db";
+import type { ImportJobRow } from "@ku0/db";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertCircle, Loader2, RefreshCw, Trash2, X } from "lucide-react";
 import { useTranslations } from "next-intl";

@@ -1,6 +1,6 @@
 "use client";
 import { useSlashCommand } from "@/hooks/useSlashCommand";
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import { AlertTriangle, Loader2, X } from "lucide-react";
 import * as React from "react";
 import { InputBottomBar } from "./InputBottomBar";

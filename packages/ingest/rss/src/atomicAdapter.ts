@@ -8,7 +8,7 @@
  * @see packages/app/src/root/persistence/ATOMIC_INGESTION_CONTRACT.md
  */
 
-import { canonicalizeText, computeCanonicalHash } from "@keepup/core";
+import { canonicalizeText, computeCanonicalHash } from "@ku0/core";
 import { RSSNormalizer } from "./normalizer";
 import type { FeedSource, RSSItem } from "./types";
 

@@ -1,14 +1,14 @@
 "use client";
 
-import type { DirtyInfo } from "@keepup/core";
+import type { DirtyInfo } from "@ku0/core";
 import {
   DEFAULT_NEIGHBOR_EXPANSION_POLICY,
   DEFAULT_POLICY_MANIFEST,
   computePolicyManifestHash,
   validateSyncManifest,
-} from "@keepup/core";
-import { type LoroRuntime, pmSelectionToSpanList } from "@keepup/lfcc-bridge";
-import { shouldEnableDebugOverlay } from "@keepup/overlay";
+} from "@ku0/core";
+import { type LoroRuntime, pmSelectionToSpanList } from "@ku0/lfcc-bridge";
+import { shouldEnableDebugOverlay } from "@ku0/overlay";
 import type { EditorView } from "prosemirror-view";
 import * as React from "react";
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/Button";
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import { Image as ImageIcon, Loader2, Mic, Rocket, Send, Square } from "lucide-react";
 
 export interface InputBottomBarProps {

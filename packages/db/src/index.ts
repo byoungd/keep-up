@@ -1,5 +1,5 @@
 /**
- * @keepup/db - LFCC Local Database Layer
+ * @ku0/db - LFCC Local Database Layer
  *
  * Main entry point. Re-exports the public API.
  */

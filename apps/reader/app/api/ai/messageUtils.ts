@@ -1,4 +1,4 @@
-import type { Message } from "@keepup/ai-core";
+import type { Message } from "@ku0/ai-core";
 import type { ModelMessage } from "ai";
 
 export function toModelMessages(messages: Message[]): ModelMessage[] {

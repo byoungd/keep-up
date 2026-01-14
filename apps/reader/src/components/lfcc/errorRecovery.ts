@@ -5,8 +5,8 @@
  * Handles degradation states, automatic retries, and user notifications.
  */
 
-import type { LoroRuntime } from "@keepup/lfcc-bridge";
-import type { BridgeController } from "@keepup/lfcc-bridge";
+import type { LoroRuntime } from "@ku0/lfcc-bridge";
+import type { BridgeController } from "@ku0/lfcc-bridge";
 import type { EditorView } from "prosemirror-view";
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -1,8 +1,8 @@
 "use client";
 
 import type { TaskSnapshot, TaskStatusSnapshot } from "@/lib/ai/taskStream";
-import type { TaskQueueStats } from "@keepup/agent-runtime";
-import { cn } from "@keepup/shared/utils";
+import type { TaskQueueStats } from "@ku0/agent-runtime";
+import { cn } from "@ku0/shared/utils";
 import { CheckCircle2, ChevronDown, ChevronRight, Loader2, Pause, XCircle } from "lucide-react";
 import * as React from "react";
 

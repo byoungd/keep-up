@@ -1,4 +1,4 @@
-import type { DisplayAnnoState } from "@keepup/core";
+import type { DisplayAnnoState } from "@ku0/core";
 import type { Node as PMNode } from "prosemirror-model";
 import { Decoration, DecorationSet } from "prosemirror-view";
 

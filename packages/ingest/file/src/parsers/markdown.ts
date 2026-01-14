@@ -5,7 +5,7 @@
  * source text for MDVP offset alignment.
  */
 
-import { canonicalizeText } from "@keepup/core";
+import { canonicalizeText } from "@ku0/core";
 import type { FileParser, ParseResult } from "../types";
 
 export interface MarkdownParserOptions {

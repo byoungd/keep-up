@@ -30,7 +30,7 @@ import {
   cullToViewport,
 } from "@/lib/annotations/highlightGeometry";
 import { useAnnotationStore } from "@/lib/kernel/store";
-import { getAnnotationHighlightColor } from "@keepup/app";
+import { getAnnotationHighlightColor } from "@ku0/app";
 import * as React from "react";
 // Removed createPortal import as we now render inline
 

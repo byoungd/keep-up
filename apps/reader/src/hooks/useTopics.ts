@@ -1,4 +1,4 @@
-import type { ListTopicsOptions, TopicRow } from "@keepup/db";
+import type { ListTopicsOptions, TopicRow } from "@ku0/db";
 import { useCallback, useEffect, useState } from "react";
 import { getDbClient } from "../lib/db";
 

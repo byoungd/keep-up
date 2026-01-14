@@ -1,4 +1,4 @@
-import { type Block, canonicalizeText, computeCanonicalHash } from "@keepup/core";
+import { type Block, canonicalizeText, computeCanonicalHash } from "@ku0/core";
 import { RSSNormalizer, hashSync } from "./normalizer";
 import type { FeedSource, IngestDoc, IngestResult, RSSItem } from "./types";
 

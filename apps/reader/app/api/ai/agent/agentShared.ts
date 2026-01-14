@@ -1,6 +1,6 @@
 import * as path from "node:path";
 
-import type { AgentMessage, AgentState } from "@keepup/agent-runtime";
+import type { AgentMessage, AgentState } from "@ku0/agent-runtime";
 
 export const BASE_SYSTEM_PROMPT = `You are a Cowork AI teammate embedded in Keep-Up Reader.
 Work methodically, use tools when needed, and keep responses concise and actionable.

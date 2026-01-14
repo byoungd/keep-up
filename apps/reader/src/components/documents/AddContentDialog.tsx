@@ -10,7 +10,7 @@ import { useImportManager } from "@/hooks/useImportManager";
 import { registerFile } from "@/lib/db";
 import { importFeatureFlags } from "@/lib/import/importFeatures";
 import { trackImportStarted, trackModalOpened } from "@/lib/import/telemetry";
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import { AlertCircle, Globe, Upload, Youtube } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";

@@ -7,7 +7,7 @@ import {
   downloadExport,
   exportDocument,
 } from "@/lib/export";
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, Download, FileText, Globe, Loader2, X } from "lucide-react";
 import { useEffect, useState } from "react";

@@ -4,7 +4,7 @@
  * Type definitions for token-level streaming with partial results.
  */
 
-import type { AIOpCode, AIOperationMeta } from "@keepup/core";
+import type { AIOpCode, AIOperationMeta } from "@ku0/core";
 
 // ============================================================================
 // Stream Configuration

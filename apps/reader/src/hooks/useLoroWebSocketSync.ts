@@ -1,7 +1,7 @@
 /**
  * useLoroWebSocketSync - WebSocket-based sync for Loro documents
  *
- * Integrates @keepup/core SyncClient with the React app.
+ * Integrates @ku0/core SyncClient with the React app.
  */
 
 import {
@@ -12,13 +12,13 @@ import {
   SyncClient,
   type SyncClientState,
   createDefaultSyncManifest,
-} from "@keepup/core";
+} from "@ku0/core";
 import {
   AI_COMMIT_ORIGIN_PREFIX,
   type DegradationStep,
   type LoroRuntime,
   degradationPath,
-} from "@keepup/lfcc-bridge";
+} from "@ku0/lfcc-bridge";
 import * as React from "react";
 
 import { usePresenceStore } from "@/lib/lfcc/presenceStore";

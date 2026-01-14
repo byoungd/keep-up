@@ -1,4 +1,4 @@
-import { normalizeRequestIdentifiers } from "@keepup/core";
+import { normalizeRequestIdentifiers } from "@ku0/core";
 import { getDefaultChatModelId } from "../../modelResolver";
 import { type ProviderResolutionError, resolveProviderTarget } from "../../providerResolver";
 import {
