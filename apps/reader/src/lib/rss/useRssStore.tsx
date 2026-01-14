@@ -360,6 +360,10 @@ export function useRssStore(): RssStore {
   return context;
 }
 
+export function useRssStoreOptional(): RssStore | null {
+  return React.useContext(RssStoreContext);
+}
+
 // ============================================================================
 // Utility
 // ============================================================================

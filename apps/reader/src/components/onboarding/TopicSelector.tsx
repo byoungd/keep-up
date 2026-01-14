@@ -85,7 +85,7 @@ export function TopicSelector({ onSelect, isLoading }: TopicSelectorProps) {
                 </div>
                 {isSelected && (
                   <div className="absolute top-4 right-4 text-primary animate-in zoom-in spin-in-90 duration-200">
-                    <Check className="w-5 h-5" />
+                    <Check className="w-5 h-5" aria-hidden="true" />
                   </div>
                 )}
               </div>

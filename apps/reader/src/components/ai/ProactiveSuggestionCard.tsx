@@ -1,6 +1,5 @@
 "use client";
 
-import { useAIClient } from "@/hooks/useAIClient";
 import { cn } from "@ku0/shared/utils";
 import { ArrowRight, Sparkles } from "lucide-react";
 import * as React from "react";
@@ -9,6 +8,7 @@ interface ProactiveSuggestionCardProps {
   title: string;
   description: string;
   actionPrompt: string;
+  onSelect: (prompt: string) => void;
   icon?: React.ElementType;
 }
 
@@ -16,13 +16,13 @@ export function ProactiveSuggestionCard({
   title,
   description,
   actionPrompt,
+  onSelect,
   icon: Icon = Sparkles,
 }: ProactiveSuggestionCardProps) {
-  const { stream } = useAIClient();
   const [isHovered, setIsHovered] = React.useState(false);
 
   const handleClick = () => {
-    stream({ prompt: actionPrompt, model: "claude-3-5-sonnet-20241022" });
+    onSelect(actionPrompt);
   };
 
   return (
@@ -43,7 +43,7 @@ export function ProactiveSuggestionCard({
           "bg-primary/5 text-primary group-hover:bg-primary group-hover:text-primary-foreground"
         )}
       >
-        <Icon className="w-5 h-5" />
+        <Icon className="w-5 h-5" aria-hidden="true" />
       </div>
 
       <div className="flex-1 space-y-1">
@@ -59,7 +59,7 @@ export function ProactiveSuggestionCard({
           isHovered && "opacity-100 translate-x-0"
         )}
       >
-        <ArrowRight className="w-4 h-4 text-primary" />
+        <ArrowRight className="w-4 h-4 text-primary" aria-hidden="true" />
       </div>
     </button>
   );

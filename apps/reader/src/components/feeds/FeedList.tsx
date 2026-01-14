@@ -362,11 +362,9 @@ function FeedItemsList({
   const isHydrated = isControlled || !isLoading;
 
   const subscriptionMap = useMemo(() => {
-    // biome-ignore lint/suspicious/noExplicitAny: upstream type mismatch
-    const map = new Map<string, any>();
+    const map = new Map<string, FeedSubscription>();
     for (const sub of subscriptions) {
-      // biome-ignore lint/suspicious/noExplicitAny: upstream type mismatch
-      map.set((sub as any).subscriptionId, sub);
+      map.set(sub.subscriptionId, sub);
     }
     return map;
   }, [subscriptions]);

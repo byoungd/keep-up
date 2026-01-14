@@ -73,6 +73,7 @@ export function AIPanel({
     projectContext,
     backgroundTasks,
     handleSend,
+    runPrompt,
     handleRunBackground,
     handleAbort,
     handleClear,
@@ -277,6 +278,7 @@ export function AIPanel({
                 description={s.description}
                 actionPrompt={s.actionPrompt}
                 icon={s.icon}
+                onSelect={runPrompt}
               />
             ))}
           </div>

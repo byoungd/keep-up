@@ -1,8 +1,15 @@
 "use client";
 
-import { useFeedProvider } from "@/providers/FeedProvider";
+import { useRssStoreOptional } from "@/lib/rss";
+import { type FeedSubscription, useFeedProviderOptional } from "@/providers/FeedProvider";
 import { Atom, Cloud, Coffee, Newspaper } from "lucide-react";
 import * as React from "react";
+
+interface SubscriptionSummary {
+  title: string | null;
+  url: string;
+  unreadCount?: number;
+}
 
 export interface ProactiveSuggestion {
   id: string;
@@ -13,8 +20,34 @@ export interface ProactiveSuggestion {
 }
 
 export function useProactiveSuggestions() {
-  const { subscriptions } = useFeedProvider();
+  const feedContext = useFeedProviderOptional();
+  const rssStore = useRssStoreOptional();
+  const rssSubscriptions = rssStore?.subscriptions ?? [];
+  const rssItems = rssStore?.items ?? [];
+  const feedSubscriptions = feedContext?.subscriptions;
   const [suggestions, setSuggestions] = React.useState<ProactiveSuggestion[]>([]);
+
+  const subscriptions = React.useMemo<SubscriptionSummary[]>(() => {
+    if (feedSubscriptions) {
+      return feedSubscriptions.map((sub: FeedSubscription) => ({
+        title: sub.displayName ?? sub.title ?? null,
+        url: sub.url,
+        unreadCount: sub.unreadCount,
+      }));
+    }
+
+    return rssSubscriptions.map((sub) => ({
+      title: sub.displayName ?? sub.title,
+      url: sub.url,
+    }));
+  }, [feedSubscriptions, rssSubscriptions]);
+
+  const hasUnread = React.useMemo(() => {
+    if (feedSubscriptions) {
+      return feedSubscriptions.some((sub) => (sub.unreadCount ?? 0) > 0);
+    }
+    return rssItems.some((item) => item.readState === "unread");
+  }, [feedSubscriptions, rssItems]);
 
   React.useEffect(() => {
     // Simple heuristic generation for now
@@ -35,7 +68,6 @@ export function useProactiveSuggestions() {
     }
 
     // 2. Unread Summary (Content based)
-    const hasUnread = subscriptions.some((sub) => (sub.unreadCount || 0) > 0);
     if (hasUnread) {
       generated.push({
         id: "unread-summary",
@@ -48,9 +80,8 @@ export function useProactiveSuggestions() {
 
     // 3. Topic specific (if subscribed)
     const hasReact = subscriptions.some(
-      // biome-ignore lint/suspicious/noExplicitAny: upstream type mismatch
-      (sub: any) =>
-        (sub.title ?? "").toLowerCase().includes("react") || (sub.url ?? "").includes("react")
+      (sub) =>
+        (sub.title ?? "").toLowerCase().includes("react") || sub.url.toLowerCase().includes("react")
     );
     if (hasReact) {
       generated.push({
@@ -64,9 +95,8 @@ export function useProactiveSuggestions() {
     }
 
     // 4. Cloud/Infra
-    const hasCloud = subscriptions.some(
-      // biome-ignore lint/suspicious/noExplicitAny: upstream type mismatch
-      (sub: any) => (sub.title ?? "").match(/cloud|aws|k8s|kubernetes/i)
+    const hasCloud = subscriptions.some((sub) =>
+      (sub.title ?? "").match(/cloud|aws|k8s|kubernetes/i)
     );
     if (hasCloud) {
       generated.push({
@@ -80,7 +110,7 @@ export function useProactiveSuggestions() {
     }
 
     setSuggestions(generated.slice(0, 3)); // Limit to top 3
-  }, [subscriptions]);
+  }, [hasUnread, subscriptions]);
 
   return { suggestions };
 }
