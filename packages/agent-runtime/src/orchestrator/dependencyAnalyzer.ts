@@ -74,9 +74,20 @@ const RESOURCE_EXTRACTORS: Array<{ pattern: RegExp; extractor: ResourceExtractor
   },
 ];
 
-// Specific tools that always serialize (must execute one at a time)
-// Note: read-only tools like git:status, git:log are NOT here (can parallelize)
-const SERIALIZED_TOOLS = new Set([
+/**
+ * Tools that always serialize (must execute one at a time).
+ *
+ * These tools have side effects that could conflict if run in parallel.
+ * Read-only tools like `git:status`, `git:log`, `file:read` are NOT here
+ * and can safely run in parallel.
+ *
+ * @example
+ * ```ts
+ * // Extend with custom serialized tools
+ * SERIALIZED_TOOLS.add('custom:dangerous-op');
+ * ```
+ */
+export const SERIALIZED_TOOLS = new Set([
   "bash:execute",
   "git:commit",
   "git:push",

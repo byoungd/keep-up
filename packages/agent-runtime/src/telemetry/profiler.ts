@@ -292,15 +292,25 @@ export class Profiler {
   }
 
   /**
-   * Get entry count.
+   * Get current entry count (capped at maxEntries).
    */
   get entryCount(): number {
     return Math.min(this.entryWriteCount, this.config.maxEntries);
   }
 
   /**
+   * Get all recorded entries in chronological order.
+   * Returns a copy of the entries array.
+   */
+  getEntries(): ProfileEntry[] {
+    return this.getEntriesInOrder();
+  }
+
+  /**
    * Get all entries in chronological order.
-   * Handles ring buffer wrap-around.
+   * Handles ring buffer wrap-around correctly:
+   * - If buffer is not full: entries are at indices [0, entryCount)
+   * - If buffer is full: oldest entry is at writeIndex, newest at writeIndex-1
    */
   private getEntriesInOrder(): ProfileEntry[] {
     const count = this.entryCount;
