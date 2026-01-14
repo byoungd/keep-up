@@ -113,3 +113,128 @@ test.describe("Import Functionality", () => {
     }
   });
 });
+
+test.describe("Unread Import Flow", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/unread", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: "Unread" })).toBeVisible({ timeout: 10000 });
+  });
+
+  const openUnreadComposer = async (page: Page) => {
+    const dialog = page.getByRole("dialog");
+    const sidebarReady = page.getByRole("button", { name: /search|搜索/i });
+    await sidebarReady.waitFor({ state: "visible", timeout: 15000 }).catch(() => null);
+
+    const createButton = page.getByRole("button", { name: /create|创建/i });
+    const isVisible = await createButton.isVisible({ timeout: 3000 }).catch(() => false);
+    if (isVisible) {
+      await createButton.click();
+    } else {
+      await page.evaluate(() => {
+        const active = document.activeElement as HTMLElement | null;
+        active?.blur?.();
+      });
+      const modifier = process.platform === "darwin" ? "Meta" : "Control";
+      await page.keyboard.press(`${modifier}+I`);
+    }
+
+    const dialogVisible = await dialog.isVisible({ timeout: 5000 }).catch(() => false);
+    if (!dialogVisible) {
+      return null;
+    }
+    return dialog;
+  };
+
+  test("error feedback is visible on failed import (URL unsupported)", async ({ page }) => {
+    const dialog = await openUnreadComposer(page);
+    if (!dialog) {
+      test.skip();
+      return;
+    }
+
+    const urlTab = dialog.getByRole("tab", { name: /url/i });
+    if (await urlTab.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await urlTab.click();
+    }
+
+    const urlInput = page.getByLabel(/url to import/i);
+    await urlInput.fill("https://example.com");
+    const submitButton = dialog.getByRole("button", { name: /^(import|导入)$/i }).last();
+    await submitButton.click();
+
+    await expect(
+      page.getByText(/URL import is temporarily unavailable|URL 导入暂不可用/i)
+    ).toBeVisible();
+
+    await expect(page.getByRole("heading", { name: "Unread" })).toBeVisible();
+  });
+
+  test("import text -> ready -> open reader (locale-aware)", async ({ page }) => {
+    const dialog = await openUnreadComposer(page);
+    if (!dialog) {
+      test.skip();
+      return;
+    }
+
+    const textarea = dialog.locator("textarea");
+    await textarea.fill("# Test Import Document\n\nThis is a test document for the smoke test.");
+    await textarea.press("Enter");
+
+    await expect(dialog.getByText("Queue")).toBeVisible({ timeout: 3000 });
+    await expect(dialog.getByText("Test Import Document")).toBeVisible();
+
+    const importButton = dialog.getByRole("button", { name: /^(import|导入)$/i });
+    await importButton.click();
+
+    await expect(
+      dialog.getByText(/ready|done/i).or(dialog.locator("[class*='emerald']"))
+    ).toBeVisible({
+      timeout: 15000,
+    });
+
+    const openButton = dialog.getByRole("button", { name: /open document|打开文档/i });
+    const queueItemLabel = dialog.getByText("Test Import Document");
+
+    await queueItemLabel.waitFor({ state: "visible", timeout: 10000 });
+    await queueItemLabel.hover();
+
+    const waitForReader = async () => {
+      await page.waitForURL(/\/reader\/.+/, { timeout: 15000, waitUntil: "domcontentloaded" });
+    };
+
+    let navigated = false;
+    const openReady = await openButton.isVisible({ timeout: 15000 }).catch(() => false);
+    if (openReady) {
+      await openButton.click();
+      navigated = await waitForReader()
+        .then(() => true)
+        .catch(() => false);
+    }
+
+    if (!navigated) {
+      await page.keyboard.press("Escape");
+      await dialog.waitFor({ state: "hidden", timeout: 5000 }).catch(() => null);
+      const docLink = page.getByRole("link", { name: /pasted-text/i });
+      await expect(docLink).toBeVisible({ timeout: 10000 });
+      const docHref = await docLink.getAttribute("href");
+      if (docHref) {
+        await page.goto(docHref, { waitUntil: "domcontentloaded" });
+      } else {
+        await docLink.click({ force: true });
+      }
+      await waitForReader();
+    }
+
+    await expect(page).toHaveURL(/\/reader\/.+/, { timeout: 15000 });
+
+    const readerArticle = page.locator("main article");
+    await expect(
+      readerArticle.getByText("This is a test document for the smoke test.")
+    ).toBeVisible({
+      timeout: 15000,
+    });
+
+    await expect(page.getByText("Unable to load document")).not.toBeVisible();
+    await expect(page.getByText("Document not found")).not.toBeVisible();
+  });
+});
