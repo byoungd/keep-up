@@ -5,7 +5,7 @@
  * Uses the ImportManager to process new RSS items.
  */
 
-import { observability } from "@keepup/core";
+import { observability } from "@ku0/core";
 import type { DbDriver } from "../driver/types";
 import type { ImportManager } from "./ImportManager";
 import { createRssSourceRef } from "./ingestors/rssIngestor";

@@ -2,7 +2,7 @@
  * LFCC Conformance Kit - Artifact Types (Part F)
  */
 
-import type { CanonNode } from "@keepup/core";
+import type { CanonNode } from "@ku0/core";
 import type { FrontierLogEntry, MismatchInfo } from "../double-blind/types";
 import type { GenConfig } from "../op-fuzzer/generator";
 import type { FuzzOp } from "../op-fuzzer/types";

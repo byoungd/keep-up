@@ -4,7 +4,7 @@ import type { Annotation } from "@/lib/kernel/types";
 import type { DiagnosticsSyncSummary } from "@/lib/lfcc/diagnosticsBundle";
 import { createDiagnosticsBundle } from "@/lib/lfcc/diagnosticsBundle";
 import type { DirtyInfoEntry, ReproErrorEntry } from "@/lib/lfcc/reproBundle";
-import type { LoroRuntime } from "@keepup/lfcc-bridge";
+import type { LoroRuntime } from "@ku0/lfcc-bridge";
 
 describe("diagnosticsBundle", () => {
   it("builds a stable diagnostics bundle snapshot", () => {

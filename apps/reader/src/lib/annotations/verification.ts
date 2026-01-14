@@ -1,5 +1,5 @@
 import type { Annotation } from "@/lib/kernel/types";
-import type { DisplayAnnoState } from "@keepup/core";
+import type { DisplayAnnoState } from "@ku0/core";
 
 const VERIFIED_STATES: DisplayAnnoState[] = ["active", "active_partial"];
 

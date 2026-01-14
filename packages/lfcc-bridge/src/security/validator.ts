@@ -7,7 +7,7 @@
  * and schema dry-run validation (LFCC §11.2) for AI payloads.
  */
 
-import type { EditorSchemaValidator } from "@keepup/core";
+import type { EditorSchemaValidator } from "@ku0/core";
 
 export type SecurityValidationResult = {
   ok: boolean;

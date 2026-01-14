@@ -6,7 +6,7 @@ import {
   projectLoroToPm,
   serializeAttrs,
   writeBlockTree,
-} from "@keepup/lfcc-bridge";
+} from "@ku0/lfcc-bridge";
 import { EditorState, TextSelection, type Transaction } from "prosemirror-state";
 import { describe, expect, it } from "vitest";
 

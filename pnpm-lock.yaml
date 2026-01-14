@@ -80,7 +80,7 @@ importers:
 
   apps/collab-server:
     dependencies:
-      '@keepup/core':
+      '@ku0/core':
         specifier: workspace:*
         version: link:../../packages/core
       loro-crdt:
@@ -135,37 +135,37 @@ importers:
       '@handlewithcare/react-prosemirror':
         specifier: ^2.7.0
         version: 2.7.0(prosemirror-model@1.25.4)(prosemirror-state@1.4.4)(prosemirror-view@1.41.4)(react-dom@19.2.3(react@19.2.3))(react-reconciler@0.33.0(react@19.2.3))(react@19.2.3)
-      '@keepup/agent-runtime':
+      '@ku0/agent-runtime':
         specifier: workspace:*
         version: link:../../packages/agent-runtime
-      '@keepup/ai-core':
+      '@ku0/ai-core':
         specifier: workspace:*
         version: link:../../packages/ai-core
-      '@keepup/app':
+      '@ku0/app':
         specifier: workspace:*
         version: link:../../packages/app
-      '@keepup/core':
+      '@ku0/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@keepup/db':
+      '@ku0/db':
         specifier: workspace:^
         version: link:../../packages/db
-      '@keepup/lfcc-bridge':
+      '@ku0/lfcc-bridge':
         specifier: workspace:*
         version: link:../../packages/lfcc-bridge
-      '@keepup/overlay':
+      '@ku0/overlay':
         specifier: workspace:*
         version: link:../../packages/overlay
-      '@keepup/shared':
+      '@ku0/shared':
         specifier: workspace:*
         version: link:../../packages/shared
-      '@keepup/token':
+      '@ku0/token':
         specifier: workspace:*
         version: link:../../packages/token
-      '@keepup/translator':
+      '@ku0/translator':
         specifier: workspace:*
         version: link:../../packages/translator
-      '@packages/ingest-rss':
+      '@ku0/ingest-rss':
         specifier: workspace:*
         version: link:../../packages/ingest/rss
       '@radix-ui/react-dialog':
@@ -340,13 +340,13 @@ importers:
 
   packages/agent-runtime:
     dependencies:
-      '@keepup/ai-core':
+      '@ku0/ai-core':
         specifier: workspace:*
         version: link:../ai-core
-      '@keepup/core':
+      '@ku0/core':
         specifier: workspace:*
         version: link:../core
-      '@keepup/db':
+      '@ku0/db':
         specifier: workspace:*
         version: link:../db
       zod:
@@ -371,7 +371,7 @@ importers:
 
   packages/app:
     dependencies:
-      '@keepup/core':
+      '@ku0/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -384,10 +384,10 @@ importers:
 
   packages/bench:
     dependencies:
-      '@keepup/core':
+      '@ku0/core':
         specifier: workspace:*
         version: link:../core
-      '@keepup/lfcc-bridge':
+      '@ku0/lfcc-bridge':
         specifier: workspace:*
         version: link:../lfcc-bridge
       loro-crdt:
@@ -400,10 +400,10 @@ importers:
 
   packages/collab-server:
     dependencies:
-      '@keepup/ai-core':
+      '@ku0/ai-core':
         specifier: workspace:*
         version: link:../ai-core
-      '@keepup/core':
+      '@ku0/core':
         specifier: workspace:*
         version: link:../core
       jsonwebtoken:
@@ -434,10 +434,10 @@ importers:
 
   packages/compat:
     dependencies:
-      '@keepup/core':
+      '@ku0/core':
         specifier: workspace:*
         version: link:../core
-      '@keepup/lfcc-bridge':
+      '@ku0/lfcc-bridge':
         specifier: workspace:*
         version: link:../lfcc-bridge
     devDependencies:
@@ -447,10 +447,10 @@ importers:
 
   packages/conformance-kit:
     dependencies:
-      '@keepup/core':
+      '@ku0/core':
         specifier: workspace:*
         version: link:../core
-      '@keepup/lfcc-bridge':
+      '@ku0/lfcc-bridge':
         specifier: workspace:*
         version: link:../lfcc-bridge
     devDependencies:
@@ -471,16 +471,16 @@ importers:
 
   packages/db:
     dependencies:
-      '@keepup/core':
+      '@ku0/core':
         specifier: workspace:*
         version: link:../core
-      '@keepup/lfcc-bridge':
+      '@ku0/lfcc-bridge':
         specifier: workspace:*
         version: link:../lfcc-bridge
-      '@packages/ingest-rss':
+      '@ku0/ingest-rss':
         specifier: workspace:^
         version: link:../ingest/rss
-      '@packages/ingest-youtube':
+      '@ku0/ingest-youtube':
         specifier: workspace:^
         version: link:../ingest-youtube
       '@sqlite.org/sqlite-wasm':
@@ -512,7 +512,7 @@ importers:
 
   packages/ingest/file:
     dependencies:
-      '@keepup/core':
+      '@ku0/core':
         specifier: workspace:*
         version: link:../../core
       epub2:
@@ -540,7 +540,7 @@ importers:
 
   packages/ingest/rss:
     dependencies:
-      '@keepup/core':
+      '@ku0/core':
         specifier: workspace:*
         version: link:../../core
       '@mozilla/readability':
@@ -565,7 +565,7 @@ importers:
 
   packages/lfcc-bridge:
     dependencies:
-      '@keepup/core':
+      '@ku0/core':
         specifier: workspace:*
         version: link:../core
       loro-crdt:
@@ -586,10 +586,10 @@ importers:
 
   packages/overlay:
     dependencies:
-      '@keepup/app':
+      '@ku0/app':
         specifier: workspace:*
         version: link:../app
-      '@keepup/core':
+      '@ku0/core':
         specifier: workspace:*
         version: link:../core
 

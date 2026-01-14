@@ -8,7 +8,7 @@ import {
   normalizeModelId,
 } from "@/lib/ai/models";
 import { decryptApiKey, encryptApiKey, isEncrypted } from "@/lib/crypto/keyEncryption";
-import { type ProviderKind, getProviderDisplayInfo, getProviderEnvConfig } from "@keepup/ai-core";
+import { type ProviderKind, getProviderDisplayInfo, getProviderEnvConfig } from "@ku0/ai-core";
 import * as React from "react";
 
 /**

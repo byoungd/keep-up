@@ -1,4 +1,4 @@
-import type { Annotation, ChainPolicy, ChainPolicyEntry, StoredAnnoState } from "@keepup/core";
+import type { Annotation, ChainPolicy, ChainPolicyEntry, StoredAnnoState } from "@ku0/core";
 
 // Define the Runtime/Bridge extended annotation type
 export interface BridgeAnnotation extends Annotation {

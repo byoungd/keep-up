@@ -1,5 +1,5 @@
 {
-  "name": "@keepup/app",
+  "name": "@ku0/app",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -20,7 +20,7 @@
     "react-dom": "^19.0.0"
   },
   "dependencies": {
-    "@keepup/core": "workspace:*"
+    "@ku0/core": "workspace:*"
   },
   "scripts": {
     "build": "tsc",

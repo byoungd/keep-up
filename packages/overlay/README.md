@@ -1,4 +1,4 @@
-# @keepup/overlay
+# @ku0/overlay
 
 DevTools Debug Overlay for the LFCC v0.9 RC system. Provides developer tooling for debugging LFCC integration, block visibility, annotation state machines, and integrity scanning.
 
@@ -36,7 +36,7 @@ The overlay is platform-agnostic and provides rendering data structures rather t
 ### Usage
 
 ```typescript
-import { createOverlayController } from "@keepup/overlay";
+import { createOverlayController } from "@ku0/overlay";
 
 const controller = createOverlayController({
   enabled: true,

@@ -1,4 +1,4 @@
-import { observability } from "@keepup/core";
+import { observability } from "@ku0/core";
 import { type RetryOptions, withRetry } from "./retry";
 import type { FeedSource, RSSIngestOptions } from "./types";
 

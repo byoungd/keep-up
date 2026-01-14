@@ -1,4 +1,4 @@
-import { type LoroRuntime, createDocumentFacade } from "@keepup/lfcc-bridge";
+import { type LoroRuntime, createDocumentFacade } from "@ku0/lfcc-bridge";
 import * as React from "react";
 
 type VirtualizedDocViewProps = {

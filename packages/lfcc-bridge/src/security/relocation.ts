@@ -6,7 +6,7 @@
  * for Level 1 (exact), Level 2 (distance limit), and Level 3 (block radius).
  */
 
-import type { RelocationPolicy } from "@keepup/core";
+import type { RelocationPolicy } from "@ku0/core";
 import type { SpanRange } from "../selection/selectionMapping";
 
 export type RelocationLevel = 1 | 2 | 3;

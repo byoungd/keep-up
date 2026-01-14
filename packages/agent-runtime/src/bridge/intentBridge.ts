@@ -5,8 +5,8 @@
  * Enables intent tracking for agent actions.
  */
 
-import type { EditIntent, EditIntentCategory, IntentRegistry } from "@keepup/core";
-import { createEditIntent, createIntentRegistry } from "@keepup/core";
+import type { EditIntent, EditIntentCategory, IntentRegistry } from "@ku0/core";
+import { createEditIntent, createIntentRegistry } from "@ku0/core";
 import type { AgentType } from "../agents/types";
 import { mapRuntimeAgentToCore } from "./agentMapping";
 

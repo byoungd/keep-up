@@ -5,11 +5,11 @@ import {
   type ProviderProtocol,
   getModelCapability,
   resolveProviderFromEnv,
-} from "@keepup/ai-core";
+} from "@ku0/ai-core";
 import { type ModelProvider, resolveModelSelection } from "./modelResolver";
 
 // Re-export types for backwards compatibility
-export type { ProviderKind as ProviderKindLegacy } from "@keepup/ai-core";
+export type { ProviderKind as ProviderKindLegacy } from "@ku0/ai-core";
 
 export type ProviderConfig = {
   provider: ModelProvider;

@@ -1,5 +1,5 @@
-import type { CanonBlock, CanonNode, CanonText } from "@keepup/core";
-import { isCanonBlock, isCanonText } from "@keepup/core";
+import type { CanonBlock, CanonNode, CanonText } from "@ku0/core";
+import { isCanonBlock, isCanonText } from "@ku0/core";
 import {
   Fragment,
   type Mark,

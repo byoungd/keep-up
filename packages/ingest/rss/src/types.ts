@@ -1,4 +1,4 @@
-import type { Doc } from "@keepup/core";
+import type { Doc } from "@ku0/core";
 import type { RetryOptions } from "./retry";
 
 export interface RSSIngestOptions {

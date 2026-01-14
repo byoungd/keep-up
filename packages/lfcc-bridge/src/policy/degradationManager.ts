@@ -8,7 +8,7 @@
  * - Transactional migration execution
  */
 
-import type { PolicyManifestV09 } from "@keepup/core";
+import type { PolicyManifestV09 } from "@ku0/core";
 import { updateAnnotationState } from "../annotations/annotationSchema";
 import type { LoroRuntime } from "../runtime/loroRuntime";
 import {

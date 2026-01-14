@@ -4,7 +4,7 @@
  * Implements token-level streaming with backpressure and checkpoints.
  */
 
-import type { AIOperationMeta } from "@keepup/core";
+import type { AIOperationMeta } from "@ku0/core";
 import type {
   CreateStreamOptions,
   IStreamReader,

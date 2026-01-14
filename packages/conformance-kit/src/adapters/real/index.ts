@@ -13,7 +13,7 @@ import {
   canonicalizeDocument,
   createShadowDocument,
   stableStringifyCanon,
-} from "@keepup/core";
+} from "@ku0/core";
 import {
   type BlockNode,
   type LoroRuntime,
@@ -24,7 +24,7 @@ import {
   parseAttrs,
   readBlockTree,
   updateBlockText,
-} from "@keepup/lfcc-bridge";
+} from "@ku0/lfcc-bridge";
 import type { FuzzOp } from "../../op-fuzzer/types";
 import type {
   AdapterFactory,

@@ -1,7 +1,7 @@
 "use client";
 
 import { Tooltip } from "@/components/ui/Tooltip";
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import { Pencil, Users } from "lucide-react";
 
 import { getPresenceColorFromId } from "@/lib/theme/presenceColors";

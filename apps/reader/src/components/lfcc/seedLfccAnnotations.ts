@@ -3,9 +3,9 @@
 import { annotationController } from "@/lib/annotations/annotationController";
 import { useCommentStore } from "@/lib/annotations/commentStore";
 import { useAnnotationStore } from "@/lib/kernel/store";
-import type { SpanList } from "@keepup/lfcc-bridge";
-import { pmSelectionToSpanList, spanListToPmRanges } from "@keepup/lfcc-bridge";
-import type { LoroRuntime } from "@keepup/lfcc-bridge";
+import type { SpanList } from "@ku0/lfcc-bridge";
+import { pmSelectionToSpanList, spanListToPmRanges } from "@ku0/lfcc-bridge";
+import type { LoroRuntime } from "@ku0/lfcc-bridge";
 import type { Node as PMNode } from "prosemirror-model";
 import { TextSelection } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";

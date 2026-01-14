@@ -1,5 +1,5 @@
 {
-  "name": "@keepup/lfcc-bridge",
+  "name": "@ku0/lfcc-bridge",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -12,7 +12,7 @@
     }
   },
   "dependencies": {
-    "@keepup/core": "workspace:*",
+    "@ku0/core": "workspace:*",
     "loro-crdt": "^1.10.3",
     "prosemirror-model": "^1.25.4",
     "prosemirror-state": "^1.4.4",

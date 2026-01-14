@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import * as React from "react";
 import ReactMarkdown from "react-markdown";
 import { ThinkingIndicator, TypingCursor } from "./TypingCursor";

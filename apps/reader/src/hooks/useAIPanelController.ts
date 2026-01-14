@@ -14,8 +14,8 @@ import { composePromptWithContext, createContextPayload } from "@/lib/ai/context
 import { MODEL_CAPABILITIES, getDefaultModel, normalizeModelId } from "@/lib/ai/models";
 import { buildReferenceAnchors } from "@/lib/ai/referenceAnchors";
 import { getWorkflowSystemPrompt } from "@/lib/ai/workflowPrompts";
-import { DEFAULT_POLICY_MANIFEST } from "@keepup/core";
-import type { AIContext, LoroRuntime, SpanList, ToolCallRecord } from "@keepup/lfcc-bridge";
+import { DEFAULT_POLICY_MANIFEST } from "@ku0/core";
+import type { AIContext, LoroRuntime, SpanList, ToolCallRecord } from "@ku0/lfcc-bridge";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 import type { ExecutionStep } from "../components/layout/ExecutionSteps";

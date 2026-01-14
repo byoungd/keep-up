@@ -9,7 +9,7 @@ LFCC Core is a platform-agnostic, deterministic collaborative editing kernel tha
 ## Install
 
 ```bash
-pnpm add @keepup/core
+pnpm add @ku0/core
 ```
 
 ## Quick Start
@@ -28,7 +28,7 @@ import {
   // AI Pipeline
   sanitizePayload,
   runDryRun,
-} from '@keepup/core';
+} from '@ku0/core';
 
 // 1. Create a document
 let doc = createShadowDocument();
@@ -76,7 +76,7 @@ packages/core/src/kernel/
 Converts any document structure into a deterministic canonical tree.
 
 ```typescript
-import { canonicalize, normalizeMarks } from '@keepup/core';
+import { canonicalize, normalizeMarks } from '@ku0/core';
 
 // Canonicalize a document
 const canonTree = canonicalize(shadowDoc);
@@ -98,7 +98,7 @@ import {
   addBlock,
   applyOp,
   classifyOp,
-} from '@keepup/core';
+} from '@ku0/core';
 
 // Create an empty document
 let doc = createShadowDocument();
@@ -143,7 +143,7 @@ import {
   createAnnotation,
   transitionAnnotation,
   AnnotationState,
-} from '@keepup/core';
+} from '@ku0/core';
 
 // Create an annotation
 const anno = createAnnotation(
@@ -177,7 +177,7 @@ import {
   runDryRun,
   createEnvelope,
   DEFAULT_SANITIZATION_POLICY,
-} from '@keepup/core';
+} from '@ku0/core';
 
 // 1. Create request envelope
 const envelope = createEnvelope(
@@ -216,7 +216,7 @@ import {
   validateManifest,
   negotiatePolicies,
   DEFAULT_POLICY_MANIFEST,
-} from '@keepup/core';
+} from '@ku0/core';
 
 // Validate a policy manifest
 const validation = validateManifest(manifest);
@@ -242,7 +242,7 @@ import {
   createCheckpoint,
   verifyCheckpoint,
   runIntegrityScan,
-} from '@keepup/core';
+} from '@ku0/core';
 
 // Compute a block hash
 const hash = computeBlockHash(block);
@@ -267,7 +267,7 @@ import {
   resolveAnchor,
   expandNeighbors,
   MAPPING_AXIOMS,
-} from '@keepup/core';
+} from '@ku0/core';
 
 // Create an anchor
 const anchor = createAnchor('block-1', 10, 'after');
@@ -289,7 +289,7 @@ import {
   generateFullScanReport,
   PerformanceTracker,
   createBugReportTemplate,
-} from '@keepup/core';
+} from '@ku0/core';
 
 // Compare two canonical trees
 const diff = compareCanonTrees(tree1, tree2);
@@ -320,7 +320,7 @@ import {
   runSECAssertion,
   GOLDEN_FIXTURES,
   runGoldenFixtureTests,
-} from '@keepup/core';
+} from '@ku0/core';
 
 // SEC (strong eventual consistency) assertion
 const result = runSECAssertion({
@@ -349,7 +349,7 @@ If you wrap tests with a timeout in CI, prefer minute-level caps (unit tests can
 The server must call `handleConnection()` (or use `attachToWebSocket()`) before receiving any messages, otherwise the handshake will be rejected.
 
 ```typescript
-import { SyncServer, attachToWebSocket } from '@keepup/core/sync/server';
+import { SyncServer, attachToWebSocket } from '@ku0/core/sync/server';
 
 const server = new SyncServer(config, persistence);
 
@@ -394,7 +394,7 @@ import type {
   FuzzConfig,
   SECAssertionResult,
   GoldenFixture,
-} from '@keepup/core';
+} from '@ku0/core';
 ```
 
 ## Design Principles

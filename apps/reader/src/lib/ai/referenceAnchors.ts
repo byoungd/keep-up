@@ -1,5 +1,5 @@
-import { ensureBlockMap } from "@keepup/lfcc-bridge";
-import type { LoroRuntime, SpanList } from "@keepup/lfcc-bridge";
+import { ensureBlockMap } from "@ku0/lfcc-bridge";
+import type { LoroRuntime, SpanList } from "@ku0/lfcc-bridge";
 import type { Node as PMNode } from "prosemirror-model";
 import type { EditorState } from "prosemirror-state";
 

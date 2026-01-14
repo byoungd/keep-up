@@ -7,7 +7,7 @@
  * Track 2: Intelligence & Logic (AI) - P1
  */
 
-import { type Message, type ProviderKind, normalizeMessages } from "@keepup/ai-core";
+import { type Message, type ProviderKind, normalizeMessages } from "@ku0/ai-core";
 import { NextResponse } from "next/server";
 import { completeWithProvider } from "../llmGateway";
 import { getDefaultChatModelId } from "../modelResolver";

@@ -2,7 +2,7 @@
  * Hook for document management actions (create, delete, rename).
  */
 
-import { LoroDoc, createEmptyDoc } from "@keepup/lfcc-bridge";
+import { LoroDoc, createEmptyDoc } from "@ku0/lfcc-bridge";
 import { useCallback, useState } from "react";
 import { getDbClient } from "../lib/db";
 import { createLocalDocMetadata } from "../lib/persistence/docMetadata";

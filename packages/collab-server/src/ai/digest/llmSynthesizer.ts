@@ -7,7 +7,7 @@
  * Track 2: Intelligence & Logic (AI)
  */
 
-import type { Message } from "@keepup/ai-core";
+import type { Message } from "@ku0/ai-core";
 import type { AIGateway, AIRequestOptions } from "../gateway";
 import type { RAGPipeline } from "../rag/ragPipeline";
 import type {

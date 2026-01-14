@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import { Gauge, Timer, Wifi, WifiOff, Zap } from "lucide-react";
 import { useState } from "react";
 

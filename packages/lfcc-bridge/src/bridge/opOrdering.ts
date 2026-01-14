@@ -1,5 +1,5 @@
-import { detectConflict, sortOperations } from "@keepup/core";
-import type { DirtyInfo, StructuralOperation as KernelStructuralOperation } from "@keepup/core";
+import { detectConflict, sortOperations } from "@ku0/core";
+import type { DirtyInfo, StructuralOperation as KernelStructuralOperation } from "@ku0/core";
 
 export type StructuralOp = KernelStructuralOperation & {
   source: "local" | "remote" | "replay";

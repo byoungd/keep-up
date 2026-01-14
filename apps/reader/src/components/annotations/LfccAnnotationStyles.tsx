@@ -1,4 +1,4 @@
-import { generateAllCss } from "@keepup/app";
+import { generateAllCss } from "@ku0/app";
 
 const annotationCss = generateAllCss();
 

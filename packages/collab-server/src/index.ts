@@ -1,8 +1,8 @@
 /**
- * @keepup/collab-server
+ * @ku0/collab-server
  *
  * Production-ready WebSocket collaboration server for LFCC.
- * Wraps @keepup/core SyncServer with JWT auth, file-system persistence,
+ * Wraps @ku0/core SyncServer with JWT auth, file-system persistence,
  * and protocol version enforcement.
  */
 

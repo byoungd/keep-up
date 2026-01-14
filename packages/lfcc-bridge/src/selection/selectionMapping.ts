@@ -1,4 +1,4 @@
-import { anchorFromAbsolute } from "@keepup/core";
+import { anchorFromAbsolute } from "@ku0/core";
 import { LoroText } from "loro-crdt";
 import type { Node as PMNode } from "prosemirror-model";
 import type { EditorState, Selection } from "prosemirror-state";

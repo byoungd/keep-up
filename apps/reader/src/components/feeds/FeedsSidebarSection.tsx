@@ -26,7 +26,7 @@ export function FeedsSidebarSection({ onAddFeed }: FeedsSidebarSectionProps) {
   const currentFilter = searchParams.get("filter") ?? "unread";
 
   const [isTopicModalOpen, setIsTopicModalOpen] = React.useState(false);
-  const [editingTopic, setEditingTopic] = React.useState<import("@keepup/db").TopicRow | undefined>(
+  const [editingTopic, setEditingTopic] = React.useState<import("@ku0/db").TopicRow | undefined>(
     undefined
   );
 
@@ -59,7 +59,7 @@ export function FeedsSidebarSection({ onAddFeed }: FeedsSidebarSectionProps) {
     setIsTopicModalOpen(true);
   };
 
-  const handleEditTopic = (e: React.MouseEvent, topic: import("@keepup/db").TopicRow) => {
+  const handleEditTopic = (e: React.MouseEvent, topic: import("@ku0/db").TopicRow) => {
     e.preventDefault();
     e.stopPropagation();
     setEditingTopic(topic);

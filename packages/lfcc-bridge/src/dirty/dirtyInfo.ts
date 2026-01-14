@@ -1,5 +1,5 @@
-import type { DirtyInfo, DocumentBlockOrder, NeighborExpansionPolicy } from "@keepup/core";
-import { DEFAULT_NEIGHBOR_EXPANSION_POLICY, expandTouchedBlocks } from "@keepup/core";
+import type { DirtyInfo, DocumentBlockOrder, NeighborExpansionPolicy } from "@ku0/core";
+import { DEFAULT_NEIGHBOR_EXPANSION_POLICY, expandTouchedBlocks } from "@ku0/core";
 import type { Frontiers, LoroDoc } from "loro-crdt";
 import type { Node as PMNode, ResolvedPos } from "prosemirror-model";
 import type { Transaction } from "prosemirror-state";

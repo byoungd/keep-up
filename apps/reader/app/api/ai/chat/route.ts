@@ -13,13 +13,13 @@
 
 import { type ChatMessage, buildChatMessages } from "@/lib/ai/contextBuilder";
 import { type WorkflowType, getWorkflowSystemPrompt } from "@/lib/ai/workflowPrompts";
-import type { Message } from "@keepup/ai-core";
-import { normalizeMessages } from "@keepup/ai-core";
+import type { Message } from "@ku0/ai-core";
+import { normalizeMessages } from "@ku0/ai-core";
 import {
   DEFAULT_POLICY_MANIFEST,
   computeOptimisticHash,
   normalizeRequestIdentifiers,
-} from "@keepup/core";
+} from "@ku0/core";
 import { validateChatRequest } from "../chatValidation";
 import { completeWithProvider, streamProviderContent } from "../llmGateway";
 import { getDefaultChatModelId } from "../modelResolver";

@@ -1,6 +1,6 @@
 import { buildBlockIndex } from "@/lib/annotations/annotationResolution";
 import type { Annotation } from "@/lib/kernel/types";
-import type { DirtyInfo } from "@keepup/core";
+import type { DirtyInfo } from "@ku0/core";
 import {
   type AnnotationScanData,
   DEFAULT_DEV_COMPARE_POLICY,
@@ -10,7 +10,7 @@ import {
   computeChainHash,
   computeContextHash,
   forceFullScan,
-} from "@keepup/core";
+} from "@ku0/core";
 import type { EditorView } from "prosemirror-view";
 
 type SpanLookupEntry = {

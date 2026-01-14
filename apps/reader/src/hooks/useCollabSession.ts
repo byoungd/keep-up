@@ -13,12 +13,12 @@
 
 "use client";
 
-import { type LoroRuntime, createLoroRuntime } from "@keepup/lfcc-bridge";
-import { getFeatureFlag } from "@keepup/shared";
+import { type LoroRuntime, createLoroRuntime } from "@ku0/lfcc-bridge";
+import { getFeatureFlag } from "@ku0/shared";
 import * as React from "react";
 
 import { type PresencePeer, usePresenceSummary } from "@/lib/lfcc/presenceStore";
-import type { SyncClientState } from "@keepup/core";
+import type { SyncClientState } from "@ku0/core";
 
 import { useInviteToken } from "./useInviteToken";
 import {

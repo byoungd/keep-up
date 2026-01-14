@@ -1,12 +1,12 @@
 /**
  * YouTube Ingestor
  *
- * Integrates @keepup/ingest-youtube to fetch transcripts.
+ * Integrates @ku0/ingest-youtube to fetch transcripts.
  */
 
 // We use dynamic import or expect the package to be available.
 // Since it's a monorepo package, we import it directly.
-import { type TranscriptParagraph, YouTubeIngestor } from "@packages/ingest-youtube";
+import { type TranscriptParagraph, YouTubeIngestor } from "@ku0/ingest-youtube";
 import type { IngestResult, IngestorFn } from "../types";
 
 /**

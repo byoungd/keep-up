@@ -5,7 +5,7 @@
  * Styled with a premium "Linear-like" aesthetic.
  */
 
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import { Bug, Check, ChevronDown, Code, Library, Sparkles, TestTube } from "lucide-react";
 import * as React from "react";
 

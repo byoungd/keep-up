@@ -1,6 +1,6 @@
 /**
  * DB Client - Main thread interface to the DB Worker.
- * This is the primary public API for consumers of @keepup/db.
+ * This is the primary public API for consumers of @ku0/db.
  */
 import { IndexedDbDriver } from "./driver/idb-dexie/index";
 import type {

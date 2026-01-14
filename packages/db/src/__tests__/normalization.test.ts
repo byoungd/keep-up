@@ -1,4 +1,4 @@
-import { LoroDoc, getMetaMap, readBlockTree } from "@keepup/lfcc-bridge";
+import { LoroDoc, getMetaMap, readBlockTree } from "@ku0/lfcc-bridge";
 import { describe, expect, it } from "vitest";
 import { NormalizationService } from "../import/normalization";
 import type { IngestResult } from "../import/types";

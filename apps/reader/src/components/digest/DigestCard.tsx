@@ -22,7 +22,7 @@ export interface DigestCardProps {
   onAsk: (id: string) => void;
 }
 
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import { useState } from "react";
 import { PinToBriefModal } from "./PinToBriefModal";
 

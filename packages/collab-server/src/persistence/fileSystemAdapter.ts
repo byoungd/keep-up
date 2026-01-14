@@ -7,11 +7,7 @@
 
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import type {
-  OperationLogEntry,
-  OperationLogQuery,
-  PersistenceHooks,
-} from "@keepup/core/sync/server";
+import type { OperationLogEntry, OperationLogQuery, PersistenceHooks } from "@ku0/core/sync/server";
 import { LoroDoc } from "loro-crdt";
 
 const SNAPSHOT_FILE = "snapshot.bin";

@@ -6,7 +6,7 @@ import { useCommandPalette } from "@/components/ui/CommandPalette";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { useImportContextOptional } from "@/context/ImportContext";
 import { useSidebarCollapsed } from "@/context/PanelStateContext";
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import { ChevronDown, PanelLeft, Plus, Search } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";

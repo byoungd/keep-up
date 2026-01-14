@@ -13,7 +13,7 @@ Outputs `IngestionMeta` for use with `AtomicIngestionService`.
 ## Installation
 
 ```bash
-pnpm add @packages/ingest-file
+pnpm add @ku0/ingest-file
 ```
 
 ## Usage
@@ -21,7 +21,7 @@ pnpm add @packages/ingest-file
 ### Import from Local File
 
 ```typescript
-import { createFileImporter } from '@packages/ingest-file';
+import { createFileImporter } from '@ku0/ingest-file';
 
 const importer = createFileImporter();
 
@@ -63,8 +63,8 @@ const metas = await importer.importFromUrls([
 ### With AtomicIngestionService
 
 ```typescript
-import { createFilePlugin } from '@packages/ingest-file';
-import { AtomicIngestionService } from '@keepup/app/src/root/persistence';
+import { createFilePlugin } from '@ku0/ingest-file';
+import { AtomicIngestionService } from '@ku0/app/src/root/persistence';
 
 const plugin = createFilePlugin();
 const meta = await plugin.import({ path: './book.epub' });
@@ -114,7 +114,7 @@ import {
   EncryptedFileError,
   FileTooLargeError,
   UrlFetchError,
-} from '@packages/ingest-file';
+} from '@ku0/ingest-file';
 
 try {
   const meta = await importer.importFromUrl('https://example.com/doc.pdf');

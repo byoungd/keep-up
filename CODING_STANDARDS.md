@@ -198,7 +198,7 @@ All content equality checks (Shadow Model vs Real Editor) use **Recursive Canoni
 
 ### 11.2 Shared Types
 *   Export types from package entry points.
-*   Use `@keepup/core`, `@keepup/lfcc-bridge` workspace aliases.
+*   Use `@ku0/core`, `@ku0/lfcc-bridge` workspace aliases.
 
 ### 11.3 Turbo Cache
 *   Never commit `.turbo/` directory.

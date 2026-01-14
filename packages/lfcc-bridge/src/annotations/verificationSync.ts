@@ -10,7 +10,7 @@
  * - Remote clients see the same verification state
  */
 
-import { absoluteFromAnchor } from "@keepup/core";
+import { absoluteFromAnchor } from "@ku0/core";
 import type { LoroDoc } from "loro-crdt";
 import { decodeAnchor as decodeLegacyCursorAnchor, resolveAnchor } from "../anchors/loroAnchors";
 import type { LoroRuntime } from "../runtime/loroRuntime";

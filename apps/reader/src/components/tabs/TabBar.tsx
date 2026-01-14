@@ -1,7 +1,7 @@
 "use client";
 
 import { type Tab, usePaneTabs, useTabContext } from "@/context/TabContext";
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import { ArrowLeftRight, Plus, SplitSquareHorizontal, X } from "lucide-react";
 import * as React from "react";
 import { TabContextMenu, useTabContextMenu } from "./TabContextMenu";

@@ -2,7 +2,7 @@
  * Import from URL
  *
  * Fetches content from a URL and imports it as a Loro document.
- * Uses native fetch instead of @packages/ingest-file for browser compatibility.
+ * Uses native fetch instead of @ku0/ingest-file for browser compatibility.
  */
 
 import type { DocSourceType } from "@/lib/persistence/docMetadata";

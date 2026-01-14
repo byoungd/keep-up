@@ -8,8 +8,8 @@
 "use client";
 
 import { type FeedSubscription, useFeedProvider } from "@/providers/FeedProvider";
-import type { FeedItemRow } from "@keepup/db";
-import { cn } from "@keepup/shared/utils";
+import type { FeedItemRow } from "@ku0/db";
+import { cn } from "@ku0/shared/utils";
 import {
   BookmarkIcon,
   Calendar,

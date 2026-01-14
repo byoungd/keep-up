@@ -36,8 +36,8 @@ import {
   isRetryableError,
   normalizeMessages,
   resolveProviderFromEnv,
-} from "@keepup/ai-core";
-import { type GatewayTelemetryEvent, generateRequestId } from "@keepup/core";
+} from "@ku0/ai-core";
+import { type GatewayTelemetryEvent, generateRequestId } from "@ku0/core";
 import type { AuditLogger } from "../audit/auditLogger";
 
 /** AI Gateway configuration */

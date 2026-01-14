@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/Button";
 import { Panel, PanelContent, PanelHeader, PanelTitle } from "@/components/ui/Panel";
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import { AlignJustify, Monitor, Moon, Sun, Type, X } from "lucide-react";
 import { useTheme } from "next-themes";
 import * as React from "react";

@@ -3,13 +3,13 @@
  *
  * Exports for AI Gateway, providers, and suggestion functionality.
  *
- * Core infrastructure is now provided by @keepup/ai-core.
+ * Core infrastructure is now provided by @ku0/ai-core.
  * This module re-exports ai-core for backward compatibility
  * and adds business-specific modules (gateway, rag, safety, extraction).
  */
 
 // ============================================================================
-// Re-export from @keepup/ai-core (Core Infrastructure)
+// Re-export from @ku0/ai-core (Core Infrastructure)
 // ============================================================================
 
 // Providers
@@ -54,7 +54,7 @@ export {
   type RateLimitConfig,
   type UsageRecord,
   type UsageSummary,
-} from "@keepup/ai-core";
+} from "@ku0/ai-core";
 
 // Context management
 export {
@@ -85,7 +85,7 @@ export {
   estimateMessagesTokens,
   truncateToTokens,
   splitIntoChunks,
-} from "@keepup/ai-core";
+} from "@ku0/ai-core";
 
 // Resilience (Circuit Breaker, Queue, Errors, Observability)
 export {
@@ -136,7 +136,7 @@ export {
   createResiliencePipeline,
   type ResilienceContext,
   type ResiliencePipelineConfig,
-} from "@keepup/ai-core";
+} from "@ku0/ai-core";
 
 // Performance (Cache, Batching, Lazy Loading)
 export {
@@ -161,7 +161,7 @@ export {
   lazy,
   lazySync,
   lazyFactory,
-} from "@keepup/ai-core";
+} from "@ku0/ai-core";
 
 // Types (Branded Types, Validation)
 export {
@@ -243,7 +243,7 @@ export {
   validate,
   createParser,
   tryValidate,
-} from "@keepup/ai-core";
+} from "@ku0/ai-core";
 
 // ============================================================================
 // Business-Specific Modules (collab-server only)

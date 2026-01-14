@@ -1,4 +1,4 @@
-import { anchorFromAbsolute } from "@keepup/core";
+import { anchorFromAbsolute } from "@ku0/core";
 import { describe, expect, it } from "vitest";
 import {
   type AnnotationRecord,

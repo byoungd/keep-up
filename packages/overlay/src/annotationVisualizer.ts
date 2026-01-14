@@ -5,8 +5,8 @@
  * Visualizes annotation state machine state including grace tokens.
  */
 
-import type { AnnotationStatus } from "@keepup/app";
-import { STATUS_COLORS, STATUS_LABELS } from "@keepup/app";
+import type { AnnotationStatus } from "@ku0/app";
+import { STATUS_COLORS, STATUS_LABELS } from "@ku0/app";
 import type { AnnotationDisplayData, OverlayCssTokens, OverlayEvent } from "./types";
 import { DEFAULT_CSS_TOKENS } from "./types";
 

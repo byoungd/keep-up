@@ -1,3 +1,3 @@
 "use client";
 
-export { useMediaQuery } from "@keepup/app";
+export { useMediaQuery } from "@ku0/app";

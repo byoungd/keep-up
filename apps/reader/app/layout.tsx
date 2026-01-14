@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import "./globals.css";
 import { LfccAnnotationStyles } from "@/components/annotations/LfccAnnotationStyles";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 
 const sans = Manrope({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
 const serif = Fraunces({ subsets: ["latin"], variable: "--font-serif", display: "swap" });

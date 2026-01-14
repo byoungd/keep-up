@@ -4,7 +4,7 @@ import type {
   PartialBehavior,
   PartialPolicy,
   PolicyManifestV09,
-} from "@keepup/core";
+} from "@ku0/core";
 
 export type DegradationStep = {
   field: string;

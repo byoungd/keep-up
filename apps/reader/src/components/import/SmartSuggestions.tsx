@@ -11,7 +11,7 @@
  */
 
 import { cn } from "@/lib/utils";
-import type { DocumentRow, TopicRow } from "@keepup/db";
+import type { DocumentRow, TopicRow } from "@ku0/db";
 import { AnimatePresence, motion } from "framer-motion";
 import { BookOpen, Lightbulb, Loader2, Search, Sparkles, TrendingUp, X } from "lucide-react";
 import { useTranslations } from "next-intl";

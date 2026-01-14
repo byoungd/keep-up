@@ -3,7 +3,7 @@
 import { Badge } from "@/components/ui/Badge";
 import { Link } from "@/i18n/navigation";
 import type { SidebarBadgeStyle } from "@/lib/sidebar";
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import type { LucideIcon } from "lucide-react";
 import * as React from "react";
 

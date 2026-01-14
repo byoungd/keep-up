@@ -1,4 +1,4 @@
-import { translationService } from "@keepup/translator";
+import { translationService } from "@ku0/translator";
 
 export async function POST(req: Request) {
   const { text, targetLang = "zh" } = await req.json();

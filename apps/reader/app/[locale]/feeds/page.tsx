@@ -11,7 +11,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { useFeedNavigation } from "@/hooks/useFeedNavigation";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { FeedProvider, useFeedItems } from "@/providers/FeedProvider";
-import type { FeedItemRow } from "@keepup/db";
+import type { FeedItemRow } from "@ku0/db";
 import { useSearchParams } from "next/navigation";
 import * as React from "react";
 

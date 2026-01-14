@@ -1,4 +1,4 @@
-# Deep Review & Refactor Report: `@keepup/app`
+# Deep Review & Refactor Report: `@ku0/app`
 
 **Date:** 2025-12-31
 **Status:** ✅ Completed
@@ -39,4 +39,4 @@ Perform a deep review of the `packages/app` package, identify code quality, main
 
 ## Recommendations (Future Work)
 *   **Dependency Injection:** `DragHandleController` currently uses a global singleton. For better isolation (especially in SSR or strict unit testing), migrate to a React Context or Dependency Injection system.
-*   **AppRoot Implementation:** `AppRoot` is currently empty. It needs to be connected to the `@keepup/core` kernel and handle workspace initialization.
+*   **AppRoot Implementation:** `AppRoot` is currently empty. It needs to be connected to the `@ku0/core` kernel and handle workspace initialization.

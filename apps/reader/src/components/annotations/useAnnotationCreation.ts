@@ -3,7 +3,7 @@ import type { LfccEditorContextValue } from "@/components/lfcc/LfccEditorContext
 import { annotationController } from "@/lib/annotations/annotationController";
 import type { SelectionResult } from "@/lib/dom/selection";
 import { absoluteFromAnchor } from "@/lib/kernel/anchors";
-import type { SpanChainPolicy } from "@keepup/lfcc-bridge";
+import type { SpanChainPolicy } from "@ku0/lfcc-bridge";
 import { useCallback } from "react";
 
 export type AnnotationCreationOptions = {

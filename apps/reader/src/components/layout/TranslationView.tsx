@@ -1,4 +1,4 @@
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import { ArrowRight, Check, Copy } from "lucide-react";
 import * as React from "react";
 

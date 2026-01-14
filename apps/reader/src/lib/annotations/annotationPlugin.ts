@@ -1,6 +1,6 @@
 import type { FailClosedPayload } from "@/components/lfcc/DevFailClosedBanner";
-import { BRIDGE_ORIGIN_META, buildGapDecorations } from "@keepup/lfcc-bridge";
-import type { AnnotationWithRanges, LoroRuntime } from "@keepup/lfcc-bridge";
+import { BRIDGE_ORIGIN_META, buildGapDecorations } from "@ku0/lfcc-bridge";
+import type { AnnotationWithRanges, LoroRuntime } from "@ku0/lfcc-bridge";
 import type { Node as PMNode } from "prosemirror-model";
 import { type EditorState, Plugin, PluginKey, TextSelection } from "prosemirror-state";
 import { Decoration, DecorationSet, type EditorView } from "prosemirror-view";

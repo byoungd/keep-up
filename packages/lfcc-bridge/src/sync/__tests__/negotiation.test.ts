@@ -1,4 +1,4 @@
-import { DEFAULT_POLICY_MANIFEST, type PolicyManifestV09 } from "@keepup/core";
+import { DEFAULT_POLICY_MANIFEST, type PolicyManifestV09 } from "@ku0/core";
 import { describe, expect, test } from "vitest";
 import { computeEffectiveManifest } from "../syncAdapter";
 

@@ -1,4 +1,4 @@
-import type { ChainPolicy, TokenRange } from "@keepup/core";
+import type { ChainPolicy, TokenRange } from "@ku0/core";
 import { describe, expect, test } from "vitest";
 import {
   type BridgeAnnotation,

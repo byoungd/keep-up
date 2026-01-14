@@ -42,7 +42,7 @@ const useWebpackDev = (() => {
 })();
 
 const devServerCommand = useWebpackDev
-  ? "pnpm --filter @keepup/reader dev --webpack"
+  ? "pnpm --filter @ku0/reader dev --webpack"
   : "pnpm dev:reader";
 
 const collabServerEnabled = process.env.CI || process.env.PLAYWRIGHT_COLLAB_SERVER === "1";
@@ -97,8 +97,8 @@ export default defineConfig({
       ? [
           {
             command: process.env.CI
-              ? "pnpm --filter @keepup/collab-server start"
-              : "pnpm --filter @keepup/collab-server dev",
+              ? "pnpm --filter @ku0/collab-server start"
+              : "pnpm --filter @ku0/collab-server dev",
             url: "http://localhost:3030/health",
             reuseExistingServer,
             timeout: 120000,

@@ -40,7 +40,7 @@ This document defines the **frozen contract** between UI components and the LFCC
 UI components MAY depend on:
 
 ```typescript
-import { pmSchema } from "@keepup/lfcc-bridge";
+import { pmSchema } from "@ku0/lfcc-bridge";
 
 // ✅ ALLOWED: Schema-based operations
 const paragraph = pmSchema.nodes.paragraph;
@@ -50,7 +50,7 @@ const bold = pmSchema.marks.bold;
 ### 2. Bridge Controller API
 
 ```typescript
-import { BridgeController, type DivergenceResult } from "@keepup/lfcc-bridge";
+import { BridgeController, type DivergenceResult } from "@ku0/lfcc-bridge";
 
 // ✅ ALLOWED: Bridge lifecycle
 bridge.setView(view);
@@ -68,7 +68,7 @@ onDivergence?: (result: DivergenceResult) => void;
 ### 3. Document Facade API (Preferred for Non-Editor UI)
 
 ```typescript
-import { createDocumentFacade, type DocumentFacade } from "@keepup/lfcc-bridge";
+import { createDocumentFacade, type DocumentFacade } from "@ku0/lfcc-bridge";
 
 // ✅ ALLOWED: Read operations
 facade.getBlocks();
@@ -93,7 +93,7 @@ import {
   pmSelectionToSpanList,
   spanListToPmRanges,
   type SpanList,
-} from "@keepup/lfcc-bridge";
+} from "@ku0/lfcc-bridge";
 
 // ✅ ALLOWED: Selection ↔ SpanList conversion
 const spanList = pmSelectionToSpanList(selection, state, runtime);
@@ -109,7 +109,7 @@ import type {
   SpanChainPolicy,
   BlockNode,
   RichText,
-} from "@keepup/lfcc-bridge";
+} from "@ku0/lfcc-bridge";
 
 // ✅ ALLOWED: Type-only imports for function signatures
 ```
@@ -120,7 +120,7 @@ import type {
 import {
   BRIDGE_ORIGIN_META,
   AI_INTENT_META,
-} from "@keepup/lfcc-bridge";
+} from "@ku0/lfcc-bridge";
 
 // ✅ ALLOWED: Transaction metadata keys
 tr.getMeta(BRIDGE_ORIGIN_META);
@@ -147,10 +147,10 @@ loroText.insert(0, "text");
 
 ```typescript
 // ❌ FORBIDDEN: Direct CRDT schema functions
-import { ensureBlockMap, updateBlockText } from "@keepup/lfcc-bridge/crdt";
+import { ensureBlockMap, updateBlockText } from "@ku0/lfcc-bridge/crdt";
 
 // ❌ FORBIDDEN: Reading block tree directly
-import { readBlockTree, getRootBlocks } from "@keepup/lfcc-bridge";
+import { readBlockTree, getRootBlocks } from "@ku0/lfcc-bridge";
 // Exception: VirtualizedDocView (legacy, to be migrated to Facade)
 ```
 
@@ -208,7 +208,7 @@ EXCEPTION_FILES=(
 )
 
 report_violations "Direct loro-crdt imports found" "from ['\"]loro-crdt['\"]"
-report_violations "Internal CRDT imports found" "from ['\"]@keepup/lfcc-bridge/crdt"
+report_violations "Internal CRDT imports found" "from ['\"]@ku0/lfcc-bridge/crdt"
 report_violations "Direct CRDT tree reads found" "readBlockTree\\s*\\(|getRootBlocks\\s*\\("
 report_violations "Direct Loro runtime access found" \
   "runtime\\.doc\\.(getMap|getList|getText|subscribe|frontiers|version|setPeerId|peerIdStr)"
@@ -228,9 +228,9 @@ Configure `tsconfig.json` to guide developers:
   "compilerOptions": {
     "paths": {
       // Preferred imports
-      "@keepup/lfcc-bridge": ["./packages/lfcc-bridge/src/index.ts"],
-      "@keepup/lfcc-bridge/facade": ["./packages/lfcc-bridge/src/facade/index.ts"]
-      // Note: Internal paths like @keepup/lfcc-bridge/crdt/* are NOT exposed
+      "@ku0/lfcc-bridge": ["./packages/lfcc-bridge/src/index.ts"],
+      "@ku0/lfcc-bridge/facade": ["./packages/lfcc-bridge/src/facade/index.ts"]
+      // Note: Internal paths like @ku0/lfcc-bridge/crdt/* are NOT exposed
     }
   }
 }
@@ -277,12 +277,12 @@ During PR review, check:
 
 ```typescript
 // BEFORE (violation)
-import { readBlockTree } from "@keepup/lfcc-bridge";
+import { readBlockTree } from "@ku0/lfcc-bridge";
 const blocks = readBlockTree(runtime.doc);
 runtime.doc.subscribe(updateRows);
 
 // AFTER (compliant)
-import { createDocumentFacade } from "@keepup/lfcc-bridge";
+import { createDocumentFacade } from "@ku0/lfcc-bridge";
 const facade = createDocumentFacade(runtime);
 const blocks = facade.getBlocks();
 const unsubscribe = facade.subscribe(() => setBlocks(facade.getBlocks()));

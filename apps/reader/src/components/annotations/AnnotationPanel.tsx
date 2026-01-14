@@ -16,9 +16,9 @@ import {
   type AnnotationStatus,
   filterAnnotations,
   filterAnnotationsByStatuses,
-} from "@keepup/app";
-import type { DisplayAnnoState } from "@keepup/core";
-import { cn } from "@keepup/shared/utils";
+} from "@ku0/app";
+import type { DisplayAnnoState } from "@ku0/core";
+import { cn } from "@ku0/shared/utils";
 import { X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 

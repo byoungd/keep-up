@@ -1,5 +1,5 @@
 import { autoUpdate, flip, offset, shift, useFloating, useInteractions } from "@floating-ui/react";
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import { Command } from "cmdk";
 import { AnimatePresence, motion } from "framer-motion";
 import {

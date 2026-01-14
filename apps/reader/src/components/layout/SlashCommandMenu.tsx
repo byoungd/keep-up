@@ -1,7 +1,7 @@
 "use client";
 
 import { type AIPrompt, AI_PROMPTS } from "@/lib/ai/prompts";
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import { BookOpen, FileText, Languages, List, Search } from "lucide-react";
 import type * as React from "react";
 

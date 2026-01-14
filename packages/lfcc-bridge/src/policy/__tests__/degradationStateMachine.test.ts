@@ -1,4 +1,4 @@
-import type { PolicyManifestV09, TokenRange } from "@keepup/core";
+import type { PolicyManifestV09, TokenRange } from "@ku0/core";
 import { describe, expect, test, vi } from "vitest";
 import {
   type BridgeAnnotation,

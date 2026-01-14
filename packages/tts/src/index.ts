@@ -1,5 +1,5 @@
 /**
- * @keepup/tts - Text-to-Speech Package
+ * @ku0/tts - Text-to-Speech Package
  *
  * Plugin-based TTS solution with multi-provider support.
  *
@@ -9,7 +9,7 @@
  *   TTSEngine,
  *   EdgeTTSProvider,
  *   BrowserTTSProvider
- * } from "@keepup/tts";
+ * } from "@ku0/tts";
  *
  * const engine = new TTSEngine();
  * engine.registerProvider(new EdgeTTSProvider());

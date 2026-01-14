@@ -1,5 +1,5 @@
 {
-  "name": "@packages/ingest-file",
+  "name": "@ku0/ingest-file",
   "version": "1.0.0",
   "description": "File import plugin for Markdown, PDF, EPUB, and TXT files",
   "main": "dist/index.js",
@@ -16,7 +16,7 @@
     "ingest-file:pdf:report": "tsx scripts/test-pdf-ingest.ts --json"
   },
   "dependencies": {
-    "@keepup/core": "workspace:*",
+    "@ku0/core": "workspace:*",
     "epub2": "^3.0.2",
     "pdf-parse": "^1.1.4",
     "unpdf": "^1.4.0",

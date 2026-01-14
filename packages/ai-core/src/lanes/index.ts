@@ -5,7 +5,7 @@
  *
  * @example
  * ```typescript
- * import { createLaneRouter, createComplexityBasedSelector } from '@keepup/ai-core';
+ * import { createLaneRouter, createComplexityBasedSelector } from '@ku0/ai-core';
  *
  * const router = createLaneRouter({
  *   lanes: {

@@ -1,4 +1,4 @@
-import type { EditorSchemaValidator } from "@keepup/core";
+import type { EditorSchemaValidator } from "@ku0/core";
 import { beforeEach, describe, expect, it } from "vitest";
 import { type SecurityValidator, createSecurityValidator } from "../security/validator";
 

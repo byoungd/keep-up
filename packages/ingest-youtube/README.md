@@ -1,4 +1,4 @@
-# @packages/ingest-youtube
+# @ku0/ingest-youtube
 
 YouTube transcript ingestion for language learning.
 
@@ -13,13 +13,13 @@ This package provides:
 ## Installation
 
 ```bash
-pnpm add @packages/ingest-youtube
+pnpm add @ku0/ingest-youtube
 ```
 
 ## Quick Start
 
 ```typescript
-import { YouTubeIngestor } from '@packages/ingest-youtube';
+import { YouTubeIngestor } from '@ku0/ingest-youtube';
 
 const ingestor = new YouTubeIngestor();
 
@@ -45,7 +45,7 @@ class YouTubeIngestor {
 ### URL Utilities
 
 ```typescript
-import { extractVideoId, isValidVideoId, buildWatchUrl } from '@packages/ingest-youtube';
+import { extractVideoId, isValidVideoId, buildWatchUrl } from '@ku0/ingest-youtube';
 
 const videoId = extractVideoId('https://youtu.be/abc123'); // 'abc123'
 const isValid = isValidVideoId('abc123'); // true
@@ -94,7 +94,7 @@ interface YouTubeVideoMetadata {
 For use with AtomicIngestionService:
 
 ```typescript
-import { createYouTubePlugin } from '@packages/ingest-youtube';
+import { createYouTubePlugin } from '@ku0/ingest-youtube';
 
 const plugin = createYouTubePlugin();
 
@@ -112,7 +112,7 @@ if (plugin.canHandle('https://youtu.be/VIDEO_ID')) {
 ### Paragraph Grouping
 
 ```typescript
-import { groupIntoParagraphs, formatTimestamp } from '@packages/ingest-youtube';
+import { groupIntoParagraphs, formatTimestamp } from '@ku0/ingest-youtube';
 
 const paragraphs = groupIntoParagraphs(segments, {
   maxParagraphDuration: 30,  // seconds
@@ -128,7 +128,7 @@ Transcript fetching requires a server-side API route:
 
 ```typescript
 // pages/api/youtube/transcript.ts
-import { fetchTranscript } from '@packages/ingest-youtube';
+import { fetchTranscript } from '@ku0/ingest-youtube';
 
 export async function GET(req: Request) {
   const videoId = new URL(req.url).searchParams.get('videoId');
@@ -140,7 +140,7 @@ export async function GET(req: Request) {
 ## Testing
 
 ```bash
-pnpm --filter @packages/ingest-youtube test
+pnpm --filter @ku0/ingest-youtube test
 ```
 
 ## License

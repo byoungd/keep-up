@@ -10,7 +10,7 @@ import {
   computeContextHash,
   computeOptimisticHash,
   gateway,
-} from "@keepup/core";
+} from "@ku0/core";
 import {
   type BridgeController,
   type DocumentFacade,
@@ -23,8 +23,8 @@ import {
   createLoroDocumentProvider,
   createLoroGatewayRetryProviders,
   pmSelectionToSpanList,
-} from "@keepup/lfcc-bridge";
-import { cn } from "@keepup/shared/utils";
+} from "@ku0/lfcc-bridge";
+import { cn } from "@ku0/shared/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,

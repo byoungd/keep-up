@@ -2,8 +2,8 @@
 
 import { getDbClient } from "@/lib/db";
 import { useFeedProvider } from "@/providers/FeedProvider";
-import type { RssFolder, RssSubscription, TopicRow } from "@keepup/db";
-import { cn } from "@keepup/shared/utils";
+import type { RssFolder, RssSubscription, TopicRow } from "@ku0/db";
+import { cn } from "@ku0/shared/utils";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, Plus, Rss, X } from "lucide-react";

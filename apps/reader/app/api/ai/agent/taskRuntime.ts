@@ -16,13 +16,13 @@ import {
   createCoworkSessionState,
   createTaskQueue,
   mapTaskEventToCoworkEvent,
-} from "@keepup/agent-runtime";
+} from "@ku0/agent-runtime";
 import {
   PathValidator,
   createBashToolServer,
   createFileToolServer,
   createToolRegistry,
-} from "@keepup/agent-runtime/tools";
+} from "@ku0/agent-runtime/tools";
 import { createAnthropicClient, createOpenAIProvider } from "../providerClients";
 import type { ProviderConfig } from "../providerResolver";
 import { buildInitialState, buildSystemPrompt, resolveWorkspaceRoot } from "./agentShared";

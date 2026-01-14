@@ -12,7 +12,7 @@
  * - Batch verification for efficiency
  */
 
-import type { Message } from "@keepup/ai-core";
+import type { Message } from "@ku0/ai-core";
 import type { AIGateway } from "../gateway";
 import type { Citation, RAGPipeline, SearchResult } from "../rag";
 

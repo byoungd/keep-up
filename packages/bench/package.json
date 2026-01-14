@@ -1,5 +1,5 @@
 {
-  "name": "@keepup/bench",
+  "name": "@ku0/bench",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -8,8 +8,8 @@
     "bench:json": "tsx src/runner.ts --json"
   },
   "dependencies": {
-    "@keepup/core": "workspace:*",
-    "@keepup/lfcc-bridge": "workspace:*",
+    "@ku0/core": "workspace:*",
+    "@ku0/lfcc-bridge": "workspace:*",
     "loro-crdt": "^1.10.3"
   },
   "devDependencies": {

@@ -16,7 +16,7 @@ import { isValidHttpUrl } from "@/hooks/useGlobalDropTarget";
 import { useRouter } from "@/i18n/navigation";
 import { buildReaderPath } from "@/i18n/paths";
 import { cn } from "@/lib/utils";
-import { registerFile } from "@keepup/db";
+import { registerFile } from "@ku0/db";
 import { AnimatePresence, motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";

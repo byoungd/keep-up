@@ -19,7 +19,7 @@ Review RSS feed/article persistence in `packages/db` and optimize the unread-ite
 - Added migration `V11 -> V12` so existing databases receive the new index.
 
 ## Notes
-- No circular dependencies were found between `@keepup/core` and the ingest packages. Ingest depends on core utilities; core does not import ingest modules.
+- No circular dependencies were found between `@ku0/core` and the ingest packages. Ingest depends on core utilities; core does not import ingest modules.
 - The unread-list ordering index (`idx_feed_items_read_state` with `published_at DESC`) remains the best fit for list queries and is preserved.
 
 ## Follow-Up Ideas (Not in Scope)

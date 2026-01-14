@@ -1,4 +1,4 @@
-# @keepup/tts
+# @ku0/tts
 
 Text-to-Speech engine with multi-provider support for the Reader application.
 
@@ -13,13 +13,13 @@ This package provides:
 ## Installation
 
 ```bash
-pnpm add @keepup/tts
+pnpm add @ku0/tts
 ```
 
 ## Quick Start
 
 ```typescript
-import { createTTSEngine } from '@keepup/tts';
+import { createTTSEngine } from '@ku0/tts';
 
 // Create engine with default providers (Edge + Browser fallback)
 const engine = createTTSEngine();
@@ -112,7 +112,7 @@ Uses Web Speech API:
 ### Custom Provider
 
 ```typescript
-import { ITTSProvider, TTSEngine } from '@keepup/tts';
+import { ITTSProvider, TTSEngine } from '@ku0/tts';
 
 class MyTTSProvider implements ITTSProvider {
   readonly id = 'my-provider';
@@ -132,7 +132,7 @@ engine.registerProvider(new MyTTSProvider());
 ## Testing
 
 ```bash
-pnpm --filter @keepup/tts test
+pnpm --filter @ku0/tts test
 ```
 
 ## License

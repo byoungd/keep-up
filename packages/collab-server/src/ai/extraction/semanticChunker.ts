@@ -5,7 +5,7 @@
  * Supports multiple chunking strategies optimized for RAG.
  */
 
-import { estimateTokens } from "@keepup/ai-core";
+import { estimateTokens } from "@ku0/ai-core";
 import type { ChunkingOptions, DocumentChunk } from "./types";
 
 /** Default chunking options */

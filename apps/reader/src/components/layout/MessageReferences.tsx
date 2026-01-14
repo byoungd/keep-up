@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReferenceAnchor, ReferenceRange } from "@/lib/ai/referenceAnchors";
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import * as React from "react";
 
 export interface MessageReferencesLabels {

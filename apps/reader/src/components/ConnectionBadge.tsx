@@ -5,7 +5,7 @@
  */
 
 import { cn } from "@/lib/utils";
-import type { SyncClientState } from "@keepup/core";
+import type { SyncClientState } from "@ku0/core";
 import type * as React from "react";
 
 interface ConnectionBadgeProps {

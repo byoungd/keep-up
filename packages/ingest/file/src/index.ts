@@ -1,5 +1,5 @@
 /**
- * @packages/ingest-file
+ * @ku0/ingest-file
  *
  * File import plugin for Markdown, PDF, EPUB, and TXT files.
  * Outputs IngestionMeta for use with AtomicIngestionService.

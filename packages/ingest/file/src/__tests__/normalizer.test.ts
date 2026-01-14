@@ -1,4 +1,4 @@
-import { canonicalizeText, computeCanonicalHash } from "@keepup/core";
+import { canonicalizeText, computeCanonicalHash } from "@ku0/core";
 import { describe, expect, it } from "vitest";
 import { Normalizer } from "../normalizer";
 import { MarkdownParser } from "../parsers/markdown";

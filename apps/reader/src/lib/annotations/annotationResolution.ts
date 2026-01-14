@@ -1,8 +1,8 @@
 import type { Annotation } from "@/lib/kernel/types";
-import { absoluteFromAnchor } from "@keepup/core";
-import type { DisplayAnnoState } from "@keepup/core";
-import type { LoroRuntime, ResolvedRange, SpanList, SpanRange } from "@keepup/lfcc-bridge";
-import { decodeAnchor as decodeLegacyCursorAnchor, resolveAnchor } from "@keepup/lfcc-bridge";
+import { absoluteFromAnchor } from "@ku0/core";
+import type { DisplayAnnoState } from "@ku0/core";
+import type { LoroRuntime, ResolvedRange, SpanList, SpanRange } from "@ku0/lfcc-bridge";
+import { decodeAnchor as decodeLegacyCursorAnchor, resolveAnchor } from "@ku0/lfcc-bridge";
 import type { Node as PMNode } from "prosemirror-model";
 import type { EditorState } from "prosemirror-state";
 

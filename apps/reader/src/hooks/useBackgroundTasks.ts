@@ -3,7 +3,7 @@
 import { aiClient } from "@/lib/ai/aiClientService";
 import { type TaskSnapshot, type TaskStreamEvent, parseTaskStreamEvent } from "@/lib/ai/taskStream";
 import { createNotifier } from "@/lib/errors/notify";
-import type { TaskQueueStats } from "@keepup/agent-runtime";
+import type { TaskQueueStats } from "@ku0/agent-runtime";
 import * as React from "react";
 
 type TaskApprovalRequest = {

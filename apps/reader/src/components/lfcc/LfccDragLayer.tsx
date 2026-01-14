@@ -14,7 +14,7 @@ import * as React from "react";
 import { createPortal } from "react-dom";
 
 import { AnnotationDragOverlay } from "@/components/annotations/AnnotationDragOverlay";
-import { BRIDGE_ORIGIN_META } from "@keepup/lfcc-bridge";
+import { BRIDGE_ORIGIN_META } from "@ku0/lfcc-bridge";
 // Removed HighlightOverlay import as it's now rendered in page.tsx
 import { useLfccEditorContext } from "./LfccEditorContext";
 

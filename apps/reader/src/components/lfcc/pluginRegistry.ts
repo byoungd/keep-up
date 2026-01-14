@@ -5,7 +5,7 @@
  * Allows dynamic registration and conditional loading of ProseMirror plugins.
  */
 
-import type { LoroRuntime } from "@keepup/lfcc-bridge";
+import type { LoroRuntime } from "@ku0/lfcc-bridge";
 import type { Schema } from "prosemirror-model";
 import type { Plugin } from "prosemirror-state";
 

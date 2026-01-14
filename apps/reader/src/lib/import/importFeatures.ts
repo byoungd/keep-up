@@ -1,6 +1,6 @@
 "use client";
 
-import type { ImportSourceType } from "@keepup/db";
+import type { ImportSourceType } from "@ku0/db";
 
 function readBooleanFlag(value: string | undefined, fallback: boolean): boolean {
   if (value === undefined) {

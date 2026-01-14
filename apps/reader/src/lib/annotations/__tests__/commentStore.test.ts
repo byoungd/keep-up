@@ -1,4 +1,4 @@
-import { createDocumentFacade, createLoroRuntime } from "@keepup/lfcc-bridge";
+import { createDocumentFacade, createLoroRuntime } from "@ku0/lfcc-bridge";
 import { beforeEach, describe, expect, it } from "vitest";
 import { useCommentStore } from "../commentStore";
 

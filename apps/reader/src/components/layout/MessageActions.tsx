@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import { Check, Copy, Edit3, GitBranch, Quote, RefreshCcw } from "lucide-react";
 import * as React from "react";
 

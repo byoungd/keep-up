@@ -12,7 +12,7 @@ import {
   isSuccessResponse,
   isUnprocessableResponse,
   normalizeAIRequestEnvelope,
-} from "@keepup/core";
+} from "@ku0/core";
 import type {
   AIEnvelopeConflict,
   AIEnvelopeDiagnostic,
@@ -25,7 +25,7 @@ import type {
   AIRequestEnvelope,
   EditIntent,
   SpanPrecondition,
-} from "@keepup/core";
+} from "@ku0/core";
 
 export type AIEnvelopeMeta = AIOperationMeta;
 export type AIEnvelopeIntent = EditIntent;

@@ -1,4 +1,4 @@
-import { computeContextHash } from "@keepup/core";
+import { computeContextHash } from "@ku0/core";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createAnnotation } from "../../annotations/annotationSchema";
 import { createEmptyDoc } from "../../crdt/crdtSchema";

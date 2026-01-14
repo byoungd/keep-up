@@ -5,7 +5,7 @@
  * P0: Implement degradation state machine (Negotiating -> Degrading -> Validating -> Migrating)
  */
 
-import type { PolicyManifestV09 } from "@keepup/core";
+import type { PolicyManifestV09 } from "@ku0/core";
 import type { BridgeAnnotation, DegradationResult } from "./policyManager";
 import { computeMigrationPlan } from "./policyManager";
 

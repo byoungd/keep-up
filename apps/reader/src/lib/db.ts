@@ -4,7 +4,7 @@
 
 import { ErrorCodes } from "@/lib/errors/types";
 import { importFeatureFlags } from "@/lib/import/importFeatures";
-import { AutoSwitchDbClient } from "@keepup/db";
+import { AutoSwitchDbClient } from "@ku0/db";
 import {
   ImportManager,
   type IngestorFn,
@@ -15,13 +15,11 @@ import {
   createUrlIngestor,
   createYouTubeIngestor,
   registerFile,
-} from "@keepup/db";
+} from "@ku0/db";
 
 // Singleton instances
 let dbClientPromise: Promise<AutoSwitchDbClient> | undefined;
-let importManagerPromise:
-  | Promise<ImportManager | import("@keepup/db").ProxyImportManager>
-  | undefined;
+let importManagerPromise: Promise<ImportManager | import("@ku0/db").ProxyImportManager> | undefined;
 let rssScheduler: RssPollingScheduler | undefined;
 
 type ErrorWithCode = Error & { code?: string };
@@ -64,7 +62,7 @@ export function getDbClient(): Promise<AutoSwitchDbClient> {
  * Initializes it if not already initialized.
  */
 export async function getImportManager(): Promise<
-  ImportManager | import("@keepup/db").ProxyImportManager
+  ImportManager | import("@ku0/db").ProxyImportManager
 > {
   if (!importManagerPromise) {
     importManagerPromise = (async () => {
@@ -73,7 +71,7 @@ export async function getImportManager(): Promise<
 
       // If using Worker (SQLite), use ProxyImportManager
       if (health.driver === "sqlite-opfs") {
-        const { ProxyImportManager } = await import("@keepup/db");
+        const { ProxyImportManager } = await import("@ku0/db");
         // biome-ignore lint/suspicious/noExplicitAny: WorkerDbClient compatibility checked via driver string
         const proxyManager = new ProxyImportManager(db as any);
 
@@ -135,7 +133,7 @@ async function createLocalImportManager(db: AutoSwitchDbClient): Promise<ImportM
  */
 function startRssPollingScheduler(
   db: AutoSwitchDbClient,
-  importManager: import("@keepup/db").ProxyImportManager
+  importManager: import("@ku0/db").ProxyImportManager
 ): void {
   if (rssScheduler) {
     return; // Already started

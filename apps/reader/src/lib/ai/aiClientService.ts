@@ -11,8 +11,8 @@
  * This eliminates duplicate resilience logic between frontend and backend.
  */
 
-import { AIError, type AIErrorCode as CoreAIErrorCode } from "@keepup/ai-core";
-import { DEFAULT_POLICY_MANIFEST, generateRequestId } from "@keepup/core";
+import { AIError, type AIErrorCode as CoreAIErrorCode } from "@ku0/ai-core";
+import { DEFAULT_POLICY_MANIFEST, generateRequestId } from "@ku0/core";
 
 import { type AgentStreamEvent, parseAgentStreamEvent } from "./agentStream";
 import { REQUEST_TIMEOUT_MS, SSE_DONE_MARKER } from "./constants";

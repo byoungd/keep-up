@@ -1,4 +1,4 @@
-import { DEFAULT_POLICY_MANIFEST } from "@keepup/core";
+import { DEFAULT_POLICY_MANIFEST } from "@ku0/core";
 import { beforeEach, describe, expect, it } from "vitest";
 import { type RelocationSecurity, createRelocationSecurity } from "../security/relocation";
 

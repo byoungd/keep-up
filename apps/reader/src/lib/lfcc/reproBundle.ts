@@ -1,8 +1,8 @@
 import { buildBlockIndex } from "@/lib/annotations/annotationResolution";
 import type { Annotation } from "@/lib/kernel/types";
-import type { DirtyInfo, PolicyManifestV09 } from "@keepup/core";
-import { DEFAULT_POLICY_MANIFEST } from "@keepup/core";
-import type { LoroRuntime } from "@keepup/lfcc-bridge";
+import type { DirtyInfo, PolicyManifestV09 } from "@ku0/core";
+import { DEFAULT_POLICY_MANIFEST } from "@ku0/core";
+import type { LoroRuntime } from "@ku0/lfcc-bridge";
 import type { EditorView } from "prosemirror-view";
 
 export type DirtyInfoEntry = {

@@ -9,7 +9,7 @@
  *   createPluginLoader,
  *   createPluginRegistry,
  *   BasePlugin,
- * } from '@keepup/agent-runtime';
+ * } from '@ku0/agent-runtime';
  *
  * // Create a custom plugin
  * class MyPlugin extends BasePlugin {

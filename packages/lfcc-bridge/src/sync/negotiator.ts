@@ -10,7 +10,7 @@
  * - extensions: Intersection of compatible versions
  */
 
-import { type PolicyManifestV09, areManifestsCompatible, negotiate } from "@keepup/core";
+import { type PolicyManifestV09, areManifestsCompatible, negotiate } from "@ku0/core";
 
 // ============================================================================
 // Types

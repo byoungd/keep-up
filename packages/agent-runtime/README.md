@@ -1,4 +1,4 @@
-# @keepup/agent-runtime
+# @ku0/agent-runtime
 
 Agent Runtime with MCP tools, orchestration, and security for building AI agents.
 
@@ -48,7 +48,7 @@ This package provides the core infrastructure for building AI agents with:
 ## Installation
 
 ```bash
-pnpm add @keepup/agent-runtime
+pnpm add @ku0/agent-runtime
 ```
 
 ## Quick Start
@@ -62,7 +62,7 @@ import {
   createOrchestrator,
   createAICoreAdapter,
   securityPolicy,
-} from '@keepup/agent-runtime';
+} from '@ku0/agent-runtime';
 
 // 1. Create tool registry
 const registry = createToolRegistry();
@@ -213,7 +213,7 @@ import {
   createAgentManager,
   createToolRegistry,
   createMockLLM,
-} from '@keepup/agent-runtime';
+} from '@ku0/agent-runtime';
 
 // Create agent manager
 const manager = createAgentManager({
@@ -252,7 +252,7 @@ const results = await manager.spawnParallel([
 Search the web and fetch content:
 
 ```typescript
-import { createWebSearchToolServer } from '@keepup/agent-runtime';
+import { createWebSearchToolServer } from '@ku0/agent-runtime';
 
 // With mock provider (for testing)
 const webServer = createWebSearchToolServer();
@@ -266,7 +266,7 @@ await registry.register(webServer);
 Implement `IWebSearchProvider` to connect to real search backends:
 
 ```typescript
-import type { IWebSearchProvider } from '@keepup/agent-runtime';
+import type { IWebSearchProvider } from '@ku0/agent-runtime';
 
 class MySearchProvider implements IWebSearchProvider {
   readonly name = 'my-provider';
@@ -294,7 +294,7 @@ import {
   createTelemetryContext,
   createOrchestrator,
   AGENT_METRICS,
-} from '@keepup/agent-runtime';
+} from '@ku0/agent-runtime';
 
 // Create telemetry context
 const telemetry = createTelemetryContext();
@@ -332,7 +332,7 @@ const spans = telemetry.tracer.getSpans();
 The package provides adapter stubs for integrating external frameworks:
 
 ```typescript
-import { LangChainAdapter, DifyAdapter, AdapterRegistry } from '@keepup/agent-runtime';
+import { LangChainAdapter, DifyAdapter, AdapterRegistry } from '@ku0/agent-runtime';
 
 // Register adapters (implement when needed)
 const adapters = createAdapterRegistry([

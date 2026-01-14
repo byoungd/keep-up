@@ -1,6 +1,6 @@
-# @keepup/lfcc-bridge
+# @ku0/lfcc-bridge
 
-The LFCC Bridge package connects the `@keepup/core` LFCC (Low-Friction Commenting & Correction) kernel to ProseMirror and Loro CRDT.
+The LFCC Bridge package connects the `@ku0/core` LFCC (Low-Friction Commenting & Correction) kernel to ProseMirror and Loro CRDT.
 
 ## Purpose
 

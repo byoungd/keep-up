@@ -1,7 +1,7 @@
 "use client";
 
-import type { SyncClientState } from "@keepup/core";
-import { cn } from "@keepup/shared/utils";
+import type { SyncClientState } from "@ku0/core";
+import { cn } from "@ku0/shared/utils";
 
 import { ConnectionStatus } from "@/components/lfcc/ConnectionStatus";
 

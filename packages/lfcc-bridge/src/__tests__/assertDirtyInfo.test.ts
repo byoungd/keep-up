@@ -3,7 +3,7 @@
  * @see docs/product/Audit/phase6/gaps/TASK_PROMPT_DIRTYINFO_ENFORCEMENT_BRIDGE.md D4
  */
 
-import type { DirtyInfo } from "@keepup/core";
+import type { DirtyInfo } from "@ku0/core";
 import { describe, expect, it } from "vitest";
 import {
   type DirtyInfoDiff,

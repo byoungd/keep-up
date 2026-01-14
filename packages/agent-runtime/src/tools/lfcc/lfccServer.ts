@@ -7,8 +7,8 @@
  * Design: Uses dependency injection for the LFCC bridge to maintain loose coupling.
  */
 
-import type { ContentChunk, DataAccessPolicy } from "@keepup/core";
-import { applyDataAccessPolicyToChunks } from "@keepup/core";
+import type { ContentChunk, DataAccessPolicy } from "@ku0/core";
+import { applyDataAccessPolicyToChunks } from "@ku0/core";
 import type { MCPToolResult, ToolContext } from "../../types";
 import { BaseToolServer, errorResult, textResult } from "../mcp/baseServer";
 

@@ -5,9 +5,9 @@
  * Combines vector search with LLM generation for accurate, cited answers.
  */
 
-import type { Message } from "@keepup/ai-core";
-import { estimateTokens, truncateToTokens } from "@keepup/ai-core";
-import { type DataAccessPolicy, applyDataAccessPolicyToChunks } from "@keepup/core";
+import type { Message } from "@ku0/ai-core";
+import { estimateTokens, truncateToTokens } from "@ku0/ai-core";
+import { type DataAccessPolicy, applyDataAccessPolicyToChunks } from "@ku0/core";
 import type { DocumentChunk } from "../extraction";
 import { EmbeddingService } from "../extraction";
 import type { AIGateway } from "../gateway";

@@ -6,7 +6,7 @@
 
 import { Button } from "@/components/ui/Button";
 import { useFeedProvider } from "@/providers/FeedProvider";
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import { AlertCircle, Loader2, Plus, Rss, X } from "lucide-react";
 import * as React from "react";
 

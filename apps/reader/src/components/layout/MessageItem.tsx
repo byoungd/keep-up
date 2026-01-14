@@ -2,7 +2,7 @@
 
 import { parseArtifactsFromContent } from "@/lib/ai/artifacts";
 import type { ReferenceAnchor, ReferenceRange } from "@/lib/ai/referenceAnchors";
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import { Bot, User } from "lucide-react";
 import * as React from "react";
 import { type AIProvenance, ConfidenceBadge } from "../ai/ConfidenceBadge";

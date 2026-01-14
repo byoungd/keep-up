@@ -297,7 +297,7 @@ export class OpenTelemetryTracer implements Tracer {
         ...this.config.resource,
       },
       instrumentationScope: {
-        name: "@keepup/ai-core",
+        name: "@ku0/ai-core",
         version: "1.0.0",
       },
     };

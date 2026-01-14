@@ -4,7 +4,7 @@
  * Bridges the DbDriver interface to the ContentStore/DigestStore
  * interfaces expected by DigestService.
  *
- * NOTE: These adapters are designed to work with DbDriver from @keepup/db.
+ * NOTE: These adapters are designed to work with DbDriver from @ku0/db.
  * Import the actual DbDriver types when integrating with the app.
  */
 
@@ -20,7 +20,7 @@ import type {
 } from "./types";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DbDriver Types (mirrored from @keepup/db for decoupling)
+// DbDriver Types (mirrored from @ku0/db for decoupling)
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Represents a row from the `content_items` table. */
@@ -93,7 +93,7 @@ interface ListDigestsOptions {
 
 /**
  * Minimal DbDriver interface for digest operations.
- * Implementations should come from @keepup/db.
+ * Implementations should come from @ku0/db.
  */
 export interface DigestDbDriver {
   // Content Item operations

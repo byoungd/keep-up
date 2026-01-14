@@ -1,5 +1,5 @@
 /**
- * @keepup/ai-core
+ * @ku0/ai-core
  *
  * AI Infrastructure Core - Provider-agnostic AI abstractions.
  *

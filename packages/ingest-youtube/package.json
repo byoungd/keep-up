@@ -1,5 +1,5 @@
 {
-  "name": "@packages/ingest-youtube",
+  "name": "@ku0/ingest-youtube",
   "version": "1.0.0",
   "type": "module",
   "main": "dist/index.js",

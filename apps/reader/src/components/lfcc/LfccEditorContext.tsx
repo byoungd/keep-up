@@ -3,7 +3,7 @@
 import { CommandRegistryProvider } from "@/lib/editor/commandRegistry";
 import type { SlashMenuState } from "@/lib/editor/slashMenuPlugin";
 import type { DiagnosticsSyncSummary } from "@/lib/lfcc/diagnosticsBundle";
-import type { LoroRuntime } from "@keepup/lfcc-bridge";
+import type { LoroRuntime } from "@ku0/lfcc-bridge";
 import type { EditorView } from "prosemirror-view";
 import * as React from "react";
 

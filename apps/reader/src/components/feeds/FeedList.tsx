@@ -6,9 +6,9 @@ import type {
   RssFolder,
   RssSubscription,
   RssSubscriptionRow,
-} from "@keepup/db";
-import { createFolder, deleteFolder, updateFolder } from "@keepup/db";
-import { cn } from "@keepup/shared/utils";
+} from "@ku0/db";
+import { createFolder, deleteFolder, updateFolder } from "@ku0/db";
+import { cn } from "@ku0/shared/utils";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { AnimatePresence, motion } from "framer-motion";

@@ -25,7 +25,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import * as FocusScope from "@radix-ui/react-focus-scope";
 import { GripVertical, X } from "lucide-react";
 import { useTranslations } from "next-intl";

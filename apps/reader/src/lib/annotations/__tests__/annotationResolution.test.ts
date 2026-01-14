@@ -6,7 +6,7 @@ import {
   pmSchema,
   serializeAttrs,
   writeBlockTree,
-} from "@keepup/lfcc-bridge";
+} from "@ku0/lfcc-bridge";
 import { EditorState } from "prosemirror-state";
 import { describe, expect, it } from "vitest";
 

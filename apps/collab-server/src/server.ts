@@ -2,13 +2,13 @@
  * LFCC Collaboration Server
  *
  * WebSocket server for real-time document collaboration using Loro CRDTs.
- * Wraps the @keepup/core SyncServer with ws library.
+ * Wraps the @ku0/core SyncServer with ws library.
  */
 
 import { type IncomingMessage, type ServerResponse, createServer } from "node:http";
 import { parse } from "node:url";
 // Import directly from sync/server since it's not re-exported from main to avoid ws in browser bundles
-import { type PersistenceHooks, SyncServer, type WebSocketLike } from "@keepup/core/sync/server";
+import { type PersistenceHooks, SyncServer, type WebSocketLike } from "@ku0/core/sync/server";
 import { LoroDoc } from "loro-crdt";
 import { WebSocket, WebSocketServer } from "ws";
 

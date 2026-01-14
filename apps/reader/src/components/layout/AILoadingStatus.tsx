@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import { Loader2, Sparkles, Zap } from "lucide-react";
 
 export type AILoadingState = "idle" | "connecting" | "thinking" | "streaming";

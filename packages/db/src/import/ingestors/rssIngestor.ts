@@ -4,7 +4,7 @@
  * Imports content from RSS items by fetching their linked content.
  */
 
-import { type RetryOptions, withRetry } from "@packages/ingest-rss";
+import { type RetryOptions, withRetry } from "@ku0/ingest-rss";
 import type { DbDriver } from "../../driver/types";
 import { computeHash, getAssetStore } from "../AssetStore";
 import type { IngestResult, IngestorFn } from "../types";

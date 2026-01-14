@@ -140,7 +140,7 @@ export interface CoworkToolContext {
 // Security Types
 // ============================================================================
 
-import type { DataAccessPolicy, PolicyEngine } from "@keepup/core";
+import type { DataAccessPolicy, PolicyEngine } from "@ku0/core";
 import type { CoworkPolicyEngine } from "../cowork/policy";
 import type { CoworkSession } from "../cowork/types";
 

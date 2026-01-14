@@ -5,7 +5,7 @@
  * All UI interactions should go through DocumentFacade, not direct Loro access.
  */
 
-import type { gateway } from "@keepup/core";
+import type { gateway } from "@ku0/core";
 import type { BlockKind, BlockNode, RichText } from "../crdt/crdtSchema";
 
 /** ApplyPlan type from gateway */

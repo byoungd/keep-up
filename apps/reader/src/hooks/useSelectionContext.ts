@@ -1,7 +1,7 @@
 "use client";
 
-import type { LoroRuntime, SpanList } from "@keepup/lfcc-bridge";
-import { pmSelectionToSpanList } from "@keepup/lfcc-bridge";
+import type { LoroRuntime, SpanList } from "@ku0/lfcc-bridge";
+import { pmSelectionToSpanList } from "@ku0/lfcc-bridge";
 import type { EditorView } from "prosemirror-view";
 import * as React from "react";
 

@@ -1,4 +1,4 @@
-import { type SpanList, createLoroRuntime, ensureBlockMap } from "@keepup/lfcc-bridge";
+import { type SpanList, createLoroRuntime, ensureBlockMap } from "@ku0/lfcc-bridge";
 import { describe, expect, it } from "vitest";
 import { buildReferenceAnchors, resolveReferenceInBlock } from "../referenceAnchors";
 

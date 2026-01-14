@@ -12,8 +12,8 @@
  * - Streaming support for real-time feedback
  */
 
-import type { IntentRegistry } from "@keepup/core";
-import { createIntentRegistry } from "@keepup/core";
+import type { IntentRegistry } from "@ku0/core";
+import { createIntentRegistry } from "@ku0/core";
 import type { RuntimeEventBus } from "../events/eventBus";
 import {
   type ToolConfirmationDetailsProvider,

@@ -124,7 +124,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Core tests
-        run: pnpm --filter @keepup/core test
+        run: pnpm --filter @ku0/core test
 
       - name: Pack validation
         run: |
@@ -162,6 +162,9 @@ jobs:
 
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps
+
+      - name: Build packages
+        run: pnpm build
 
       - name: UI Integration Gate
         run: bash scripts/ui-gate.sh

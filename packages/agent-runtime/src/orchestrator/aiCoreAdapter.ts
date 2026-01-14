@@ -1,7 +1,7 @@
 /**
  * AI-Core Provider Adapter
  *
- * Bridges @keepup/ai-core providers to the Agent runtime's IAgentLLM interface.
+ * Bridges @ku0/ai-core providers to the Agent runtime's IAgentLLM interface.
  * This maintains loose coupling while enabling integration with existing infrastructure.
  */
 
@@ -15,11 +15,11 @@ import type {
 import type { AgentMessage, MCPToolCall } from "../types";
 
 // ============================================================================
-// AI-Core Provider Interface (from @keepup/ai-core)
+// AI-Core Provider Interface (from @ku0/ai-core)
 // ============================================================================
 
 /**
- * Minimal interface matching @keepup/ai-core LLMProvider.
+ * Minimal interface matching @ku0/ai-core LLMProvider.
  * We define it here to avoid hard dependency on ai-core.
  */
 export interface AICoreProvider {
@@ -81,7 +81,7 @@ export interface AICoreAdapterOptions {
 }
 
 /**
- * Adapts an @keepup/ai-core provider to the IAgentLLM interface.
+ * Adapts an @ku0/ai-core provider to the IAgentLLM interface.
  */
 export class AICoreProviderAdapter implements IAgentLLM {
   private readonly provider: AICoreProvider;
@@ -270,7 +270,7 @@ export class MockAgentLLM implements IAgentLLM {
 // ============================================================================
 
 /**
- * Create an adapter for an @keepup/ai-core provider.
+ * Create an adapter for an @ku0/ai-core provider.
  */
 export function createAICoreAdapter(
   provider: AICoreProvider,

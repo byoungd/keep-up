@@ -7,7 +7,7 @@ import {
   serializeAttrs,
   spanListToPmRanges,
   writeBlockTree,
-} from "@keepup/lfcc-bridge";
+} from "@ku0/lfcc-bridge";
 import { EditorState, TextSelection } from "prosemirror-state";
 import { beforeEach, describe, expect, it } from "vitest";
 

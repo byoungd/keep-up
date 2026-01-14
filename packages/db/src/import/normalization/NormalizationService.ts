@@ -11,7 +11,7 @@ import {
   nextBlockId,
   serializeAttrs,
   writeBlockTree,
-} from "@keepup/lfcc-bridge";
+} from "@ku0/lfcc-bridge";
 import { type Token, type Tokens, lexer } from "marked";
 import type { IngestResult } from "../types";
 import type { ContentResult } from "./types";

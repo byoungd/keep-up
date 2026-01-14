@@ -5,7 +5,7 @@
 "use client";
 
 import { useRssStore } from "@/lib/rss";
-import { cn } from "@keepup/shared/utils";
+import { cn } from "@ku0/shared/utils";
 import { AlertCircle, Circle, Inbox, Plus, Rss, Star } from "lucide-react";
 import * as React from "react";
 import type { FeedFilter } from "./FeedList";

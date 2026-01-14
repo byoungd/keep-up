@@ -3,7 +3,7 @@
  * Test script for default RSS feeds
  *
  * Tests connectivity and parsing for all default feeds.
- * Run with: pnpm --filter @packages/ingest-rss test:feeds
+ * Run with: pnpm --filter @ku0/ingest-rss test:feeds
  */
 
 import {

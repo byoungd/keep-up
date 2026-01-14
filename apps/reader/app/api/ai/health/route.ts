@@ -10,7 +10,7 @@
  * Response format follows industry standards (Kubernetes health probes compatible).
  */
 
-import type { HealthStatus } from "@keepup/ai-core";
+import type { HealthStatus } from "@ku0/ai-core";
 import { type NextRequest, NextResponse } from "next/server";
 import {
   createAnthropicClient,
