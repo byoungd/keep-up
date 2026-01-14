@@ -26,6 +26,7 @@ import type { KnowledgeMatchResult, KnowledgeRegistry } from "../knowledge";
 import { AGENTS_GUIDE_PROMPT } from "../prompts/agentGuidelines";
 import { createAuditLogger, createPermissionChecker } from "../security";
 import type { SessionState } from "../session";
+import type { TaskGraphStore, TaskNodeStatus } from "../tasks/taskGraph";
 import type { IMetricsCollector, ITracer, SpanContext, TelemetryContext } from "../telemetry";
 import { AGENT_METRICS } from "../telemetry";
 import {
@@ -143,6 +144,8 @@ export interface OrchestratorComponents {
   intentRegistry?: IntentRegistry;
   /** Knowledge registry for scoped knowledge injection */
   knowledgeRegistry?: KnowledgeRegistry;
+  /** Optional task graph for event-sourced task tracking */
+  taskGraph?: TaskGraphStore;
 }
 
 // ============================================================================
@@ -169,7 +172,9 @@ export class AgentOrchestrator {
   private readonly toolDiscovery?: ToolDiscoveryEngine;
   private readonly intentRegistry?: IntentRegistry;
   private readonly knowledgeRegistry?: KnowledgeRegistry;
+  private readonly taskGraph?: TaskGraphStore;
   private currentRunId?: string;
+  private readonly taskGraphToolCalls = new WeakMap<MCPToolCall, string>();
 
   private state: AgentState;
   private confirmationHandler?: ConfirmationHandler;
@@ -238,6 +243,7 @@ export class AgentOrchestrator {
 
     // Initialize knowledge registry for scoped knowledge injection
     this.knowledgeRegistry = components.knowledgeRegistry;
+    this.taskGraph = components.taskGraph;
   }
 
   /**
@@ -786,6 +792,7 @@ export class AgentOrchestrator {
     toolStart: number,
     toolSpan?: SpanContext
   ): Promise<void> {
+    const taskNodeId = this.ensureTaskGraphToolNode(call, "running");
     this.emit("tool:calling", { toolName: call.name, arguments: call.arguments });
     if (!this.toolExecutor) {
       this.metrics?.increment(AGENT_METRICS.toolCallsTotal.name, {
@@ -816,6 +823,7 @@ export class AgentOrchestrator {
 
     this.emit("tool:result", { toolName: call.name, result });
     this.addToolResult(call.name, result);
+    this.updateTaskGraphStatus(taskNodeId, result.success ? "completed" : "failed");
 
     // Record metrics when no executor is provided
     if (!this.toolExecutor) {
@@ -832,6 +840,8 @@ export class AgentOrchestrator {
 
   private recordToolException(call: MCPToolCall, err: unknown, toolSpan?: SpanContext): void {
     const errorMessage = err instanceof Error ? err.message : String(err);
+    const taskNodeId = this.taskGraphToolCalls.get(call);
+    this.updateTaskGraphStatus(taskNodeId, "failed");
     if (!this.toolExecutor) {
       this.metrics?.increment(AGENT_METRICS.toolCallsTotal.name, {
         tool_name: call.name,
@@ -953,6 +963,38 @@ export class AgentOrchestrator {
 
     const filtered = tools.filter((tool) => selected.has(tool.name));
     return filtered.length > 0 ? filtered : tools;
+  }
+
+  private ensureTaskGraphToolNode(call: MCPToolCall, status: TaskNodeStatus): string | undefined {
+    if (!this.taskGraph) {
+      return undefined;
+    }
+
+    const existing = this.taskGraphToolCalls.get(call);
+    if (existing) {
+      this.updateTaskGraphStatus(existing, status);
+      return existing;
+    }
+
+    const node = this.taskGraph.createNode({
+      type: "tool_call",
+      title: `Tool: ${call.name}`,
+      status,
+    });
+    this.taskGraphToolCalls.set(call, node.id);
+    return node.id;
+  }
+
+  private updateTaskGraphStatus(nodeId: string | undefined, status: TaskNodeStatus): void {
+    if (!this.taskGraph || !nodeId) {
+      return;
+    }
+
+    try {
+      this.taskGraph.updateNodeStatus(nodeId, status);
+    } catch {
+      // Avoid breaking orchestration on task graph transition errors.
+    }
   }
 
   private emit(type: OrchestratorEventType, data: unknown): void {
