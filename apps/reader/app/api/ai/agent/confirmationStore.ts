@@ -9,6 +9,8 @@ type ConfirmationEntry = {
   timeoutId: NodeJS.Timeout;
 };
 
+// NOTE: This in-memory store assumes a single long-lived server process (local desktop/dev).
+// Replace with a persistent store for serverless or multi-instance deployments.
 const confirmations = new Map<string, ConfirmationEntry>();
 
 export function createPendingConfirmation(options: {
