@@ -88,6 +88,7 @@ export function useAIPanelTranslations(selectedProvider: string) {
     () => ({
       attachmentsLabel: t("attachmentsLabel"),
       addImage: t("addImage"),
+      runBackground: t("runBackground"),
       removeAttachment: t("removeAttachment"),
       inputPlaceholder: t("inputPlaceholder"),
     }),
@@ -155,6 +156,34 @@ export function useAIPanelTranslations(selectedProvider: string) {
     [t]
   );
 
+  const taskQueueTranslations = React.useMemo(
+    () => ({
+      title: t("taskQueueTitle"),
+      subtitle: t("taskQueueSubtitle"),
+      empty: t("taskQueueEmpty"),
+      runningLabel: t("taskQueueRunningLabel"),
+      queuedLabel: t("taskQueueQueuedLabel"),
+      completedLabel: t("taskQueueCompletedLabel"),
+      statusQueued: t("taskStatusQueued"),
+      statusRunning: t("taskStatusRunning"),
+      statusCompleted: t("taskStatusCompleted"),
+      statusFailed: t("taskStatusFailed"),
+      statusCancelled: t("taskStatusCancelled"),
+      progressLabel: t("taskProgressLabel"),
+      summaryLabel: t("taskSummaryLabel"),
+      outputsLabel: t("taskOutputsLabel"),
+      filesLabel: t("taskFilesLabel"),
+      actionsLabel: t("taskActionsLabel"),
+      followupsLabel: t("taskFollowupsLabel"),
+      expand: t("taskExpand"),
+      collapse: t("taskCollapse"),
+      cancelTask: t("taskCancel"),
+      updateTask: t("taskUpdateTask"),
+      updateWalkthrough: t("taskUpdateWalkthrough"),
+    }),
+    [t]
+  );
+
   return {
     t,
     statusLabels,
@@ -167,6 +196,7 @@ export function useAIPanelTranslations(selectedProvider: string) {
     contextStatusTranslations,
     projectContextTranslations,
     approvalTranslations,
+    taskQueueTranslations,
     providerLabel,
   };
 }

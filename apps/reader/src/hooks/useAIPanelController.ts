@@ -5,6 +5,7 @@ import { useAIClient } from "@/hooks/useAIClient";
 import { useAiContextConsent } from "@/hooks/useAiContextConsent";
 import { useAttachments } from "@/hooks/useAttachments";
 import { useAutoScroll } from "@/hooks/useAutoScroll";
+import { useBackgroundTasks } from "@/hooks/useBackgroundTasks";
 import { useChatPersistence } from "@/hooks/useChatPersistence";
 import { useDocumentContent } from "@/hooks/useDocumentContent";
 import { useProjectContext } from "@/hooks/useProjectContext";
@@ -112,6 +113,13 @@ export function useAIPanelController({
   runtime?: LoroRuntime | null;
 }) {
   const t = useTranslations("AIPanel");
+
+  const backgroundTasks = useBackgroundTasks({
+    completed: (name) => t("taskToastCompleted", { name }),
+    failed: (name) => t("taskToastFailed", { name }),
+    cancelled: (name) => t("taskToastCancelled", { name }),
+    streamError: t("taskStreamError"),
+  });
 
   // 1. Persistence & State (Facade)
   const {
@@ -733,6 +741,65 @@ export function useAIPanelController({
     handleAgentEvent,
   ]);
 
+  const handleRunBackground = React.useCallback(async () => {
+    const rawContent = input.trim();
+    const isBusy = attachments.some(
+      (att) => att.status === "processing" || att.status === "sending" || att.status === "error"
+    );
+
+    if (!rawContent || isLoading || isStreaming || isBusy || !facade) {
+      return;
+    }
+
+    if (attachments.length > 0) {
+      setAttachmentError(t("taskAttachmentsUnsupported"));
+      return;
+    }
+
+    const { contextBlock } = prepareContext();
+    const content = composePromptWithContext(rawContent, contextBlock);
+    const draftContent = rawContent;
+
+    setInput("");
+    setAttachmentError(null);
+
+    addMessage("user", content);
+
+    const previousHistory = rawMessages.map((b) => ({
+      role: b.role as "user" | "assistant",
+      content: b.text,
+    }));
+
+    const taskLabel = buildTaskLabel(rawContent);
+    try {
+      await backgroundTasks.enqueueTask({
+        prompt: content,
+        model,
+        history: previousHistory,
+        systemPrompt: workflowPrompt ?? undefined,
+      });
+      addMessage("assistant", t("taskQueuedMessage", { task: taskLabel }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t("taskEnqueueFailed");
+      addMessage("assistant", t("taskEnqueueFailedMessage", { message }));
+      setInput(draftContent);
+    }
+  }, [
+    input,
+    isLoading,
+    isStreaming,
+    attachments,
+    facade,
+    prepareContext,
+    addMessage,
+    rawMessages,
+    backgroundTasks,
+    model,
+    workflowPrompt,
+    setAttachmentError,
+    t,
+  ]);
+
   const handleAbort = React.useCallback(() => {
     abortReasonRef.current = "user";
     abort();
@@ -827,6 +894,28 @@ export function useAIPanelController({
     void navigator.clipboard.writeText(content);
   }, []);
 
+  const handleUpdateTask = React.useCallback(
+    (taskTitle: string, summary?: string) => {
+      const prompt = summary
+        ? t("taskUpdatePrompt", { task: taskTitle, summary })
+        : t("taskUpdatePromptFallback", { task: taskTitle });
+      setInput(prompt);
+      inputRef.current?.focus();
+    },
+    [t]
+  );
+
+  const handleUpdateWalkthrough = React.useCallback(
+    (taskTitle: string, summary?: string) => {
+      const prompt = summary
+        ? t("walkthroughUpdatePrompt", { task: taskTitle, summary })
+        : t("walkthroughUpdatePromptFallback", { task: taskTitle });
+      setInput(prompt);
+      inputRef.current?.focus();
+    },
+    [t]
+  );
+
   return {
     // State
     messages,
@@ -854,9 +943,11 @@ export function useAIPanelController({
     selectedCapability,
     visionFallback,
     projectContext,
+    backgroundTasks,
 
     // Actions
     handleSend,
+    handleRunBackground,
     handleAbort,
     handleClear,
     handleRetry,
@@ -869,6 +960,19 @@ export function useAIPanelController({
     handleUseTask,
     handleApprove,
     handleReject,
+    handleUpdateTask,
+    handleUpdateWalkthrough,
     exportHistory,
   };
+}
+
+function buildTaskLabel(prompt: string): string {
+  const trimmed = prompt.trim().replace(/\s+/g, " ");
+  if (!trimmed) {
+    return "task";
+  }
+  if (trimmed.length <= 48) {
+    return trimmed;
+  }
+  return `${trimmed.slice(0, 45)}...`;
 }

@@ -50,6 +50,10 @@ Define the runtime behavior required to align Keep-Up agent-runtime with Cowork 
 - TaskQueue must support pause/resume/cancel.
 - Progress updates must be emitted at stable intervals.
 
+## Implementation Notes (Reader App)
+- The Reader API uses an in-memory task queue and confirmation store scoped to the server process.
+- For multi-instance or serverless deployments, replace these with persistent backing (Redis/DB) and shared routing.
+
 ## Event Vocabulary (Draft)
 ### Session Events
 - `session.start`, `session.end`, `session.error`

@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/Button";
 import { cn } from "@keepup/shared/utils";
-import { Image as ImageIcon, Loader2, Mic, Send, Square } from "lucide-react";
+import { Image as ImageIcon, Loader2, Mic, Rocket, Send, Square } from "lucide-react";
 
 export interface InputBottomBarProps {
   isLoading: boolean;
@@ -14,11 +14,13 @@ export interface InputBottomBarProps {
   maxChars: number;
   translations: {
     addImage: string;
+    runBackground: string;
     inputPlaceholder: string;
   };
   onAddAttachment: () => void;
   onSend: () => void;
   onVoiceInput: () => void;
+  onRunBackground: () => void;
 }
 
 export function InputBottomBar({
@@ -33,6 +35,7 @@ export function InputBottomBar({
   onAddAttachment,
   onSend,
   onVoiceInput,
+  onRunBackground,
 }: InputBottomBarProps) {
   return (
     <div className="flex items-center justify-between gap-2 px-3 pb-2 pt-1">
@@ -49,6 +52,18 @@ export function InputBottomBar({
           title={translations.addImage}
         >
           <ImageIcon className="h-4 w-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 rounded-full text-muted-foreground hover:text-foreground"
+          onClick={onRunBackground}
+          disabled={!hasContent || isOverLimit || isAttachmentBusy || isLoading || isStreaming}
+          aria-label={translations.runBackground}
+          title={translations.runBackground}
+        >
+          <Rocket className="h-4 w-4" />
         </Button>
         <Button
           type="button"

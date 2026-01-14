@@ -1,10 +1,12 @@
 "use client";
 
+import { parseArtifactsFromContent } from "@/lib/ai/artifacts";
 import type { ReferenceAnchor, ReferenceRange } from "@/lib/ai/referenceAnchors";
 import { cn } from "@keepup/shared/utils";
 import { Bot, User } from "lucide-react";
 import * as React from "react";
 import { type AIProvenance, ConfidenceBadge } from "../ai/ConfidenceBadge";
+import { ArtifactList } from "./ArtifactCard";
 import { ExecutionSteps } from "./ExecutionSteps";
 import { MessageActions } from "./MessageActions";
 import { MessageAlert } from "./MessageAlert";
@@ -116,6 +118,12 @@ export const MessageItem = React.memo(function MessageItem({
   const m = message;
   const isUser = m.role === "user";
   const isStreaming = m.status === "streaming";
+  const { content: displayContent, artifacts } = React.useMemo(
+    () => parseArtifactsFromContent(m.content),
+    [m.content]
+  );
+  const showBubble = isUser || isStreaming || displayContent.length > 0;
+  const assistantArtifacts = isUser ? [] : artifacts;
 
   return (
     <div
@@ -148,83 +156,54 @@ export const MessageItem = React.memo(function MessageItem({
         )}
       >
         {/* Bubble Content */}
-        <MessageBubble content={m.content} isUser={isUser} isStreaming={isStreaming} />
+        {showBubble && (
+          <MessageBubble content={displayContent} isUser={isUser} isStreaming={isStreaming} />
+        )}
+
+        {/* Artifacts */}
+        <ArtifactList artifacts={assistantArtifacts} />
 
         {/* Status Badge + Confidence + Actions - Assistant */}
-        {!isUser && m.status && (
-          <div className="mt-2 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <MessageStatusBadge status={m.status} labels={translations.statusLabels} />
-              {m.confidence !== undefined && (
-                <ConfidenceBadge score={m.confidence} provenance={m.provenance} size="sm" />
-              )}
-            </div>
-            <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-              <MessageActions
-                role={m.role}
-                messageId={m.id}
-                content={m.content}
-                onEdit={onEdit}
-                onBranch={onBranch}
-                onQuote={onQuote}
-                onCopy={onCopy}
-                onRetry={onRetry}
-                translations={translations}
-              />
-            </div>
-          </div>
-        )}
+        <AssistantStatusRow
+          isUser={isUser}
+          message={m}
+          translations={translations}
+          onEdit={onEdit}
+          onBranch={onBranch}
+          onQuote={onQuote}
+          onCopy={onCopy}
+          onRetry={onRetry}
+        />
 
         {/* References */}
-        {!isUser && m.references && m.references.length > 0 && (
-          <MessageReferences
-            references={m.references}
-            resolveReference={resolveReference}
-            onReferenceSelect={onReferenceSelect}
-            labels={{
-              label: translations.referenceLabel,
-              resolved: translations.referenceResolved,
-              remapped: translations.referenceRemapped,
-              unresolved: translations.referenceUnresolved,
-              find: translations.referenceFind,
-              unavailable: translations.referenceUnavailable,
-            }}
-          />
-        )}
+        <AssistantReferences
+          isUser={isUser}
+          message={m}
+          translations={translations}
+          resolveReference={resolveReference}
+          onReferenceSelect={onReferenceSelect}
+        />
 
         {/* Execution Steps (Tool Calls) */}
-        {!isUser && m.executionSteps && m.executionSteps.length > 0 && (
-          <ExecutionSteps steps={m.executionSteps} />
-        )}
+        <AssistantExecutionSteps isUser={isUser} message={m} />
 
         {/* Thinking Process */}
-        {!isUser && m.thinking && m.thinking.length > 0 && (
-          <ThinkingProcess thinking={m.thinking} />
-        )}
+        <AssistantThinking isUser={isUser} message={m} />
 
         {/* Token Usage */}
-        {!isUser && m.tokenUsage && (
-          <div className="mt-2">
-            <TokenUsageDisplay usage={m.tokenUsage} showDetails />
-          </div>
-        )}
+        <AssistantTokenUsage isUser={isUser} message={m} />
 
         {/* User Actions on Hover */}
-        {isUser && (
-          <div className="mt-3 flex justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-            <MessageActions
-              role={m.role}
-              messageId={m.id}
-              content={m.content}
-              onEdit={onEdit}
-              onBranch={onBranch}
-              onQuote={onQuote}
-              onCopy={onCopy}
-              onRetry={onRetry}
-              translations={translations}
-            />
-          </div>
-        )}
+        <UserActionsRow
+          isUser={isUser}
+          message={m}
+          onEdit={onEdit}
+          onBranch={onBranch}
+          onQuote={onQuote}
+          onCopy={onCopy}
+          onRetry={onRetry}
+          translations={translations}
+        />
 
         {/* Error/Canceled Alert */}
         {!isUser && (m.status === "error" || m.status === "canceled") && (
@@ -240,6 +219,156 @@ export const MessageItem = React.memo(function MessageItem({
     </div>
   );
 });
+
+function AssistantStatusRow({
+  isUser,
+  message,
+  translations,
+  onEdit,
+  onBranch,
+  onQuote,
+  onCopy,
+  onRetry,
+}: {
+  isUser: boolean;
+  message: Message;
+  translations: MessageItemTranslations;
+  onEdit: (id: string) => void;
+  onBranch: (id: string) => void;
+  onQuote: (content: string) => void;
+  onCopy: (content: string) => void;
+  onRetry: (id: string) => void;
+}) {
+  if (isUser || !message.status) {
+    return null;
+  }
+
+  return (
+    <div className="mt-2 flex items-center justify-between">
+      <div className="flex items-center gap-2">
+        <MessageStatusBadge status={message.status} labels={translations.statusLabels} />
+        {message.confidence !== undefined && (
+          <ConfidenceBadge score={message.confidence} provenance={message.provenance} size="sm" />
+        )}
+      </div>
+      <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+        <MessageActions
+          role={message.role}
+          messageId={message.id}
+          content={message.content}
+          onEdit={onEdit}
+          onBranch={onBranch}
+          onQuote={onQuote}
+          onCopy={onCopy}
+          onRetry={onRetry}
+          translations={translations}
+        />
+      </div>
+    </div>
+  );
+}
+
+function AssistantReferences({
+  isUser,
+  message,
+  translations,
+  resolveReference,
+  onReferenceSelect,
+}: {
+  isUser: boolean;
+  message: Message;
+  translations: MessageItemTranslations;
+  resolveReference?: (anchor: ReferenceAnchor) => ReferenceRange;
+  onReferenceSelect?: (anchor: ReferenceAnchor) => void;
+}) {
+  if (isUser || !message.references?.length) {
+    return null;
+  }
+
+  return (
+    <MessageReferences
+      references={message.references}
+      resolveReference={resolveReference}
+      onReferenceSelect={onReferenceSelect}
+      labels={{
+        label: translations.referenceLabel,
+        resolved: translations.referenceResolved,
+        remapped: translations.referenceRemapped,
+        unresolved: translations.referenceUnresolved,
+        find: translations.referenceFind,
+        unavailable: translations.referenceUnavailable,
+      }}
+    />
+  );
+}
+
+function AssistantExecutionSteps({ isUser, message }: { isUser: boolean; message: Message }) {
+  if (isUser || !message.executionSteps?.length) {
+    return null;
+  }
+
+  return <ExecutionSteps steps={message.executionSteps} />;
+}
+
+function AssistantThinking({ isUser, message }: { isUser: boolean; message: Message }) {
+  if (isUser || !message.thinking?.length) {
+    return null;
+  }
+
+  return <ThinkingProcess thinking={message.thinking} />;
+}
+
+function AssistantTokenUsage({ isUser, message }: { isUser: boolean; message: Message }) {
+  if (isUser || !message.tokenUsage) {
+    return null;
+  }
+
+  return (
+    <div className="mt-2">
+      <TokenUsageDisplay usage={message.tokenUsage} showDetails />
+    </div>
+  );
+}
+
+function UserActionsRow({
+  isUser,
+  message,
+  onEdit,
+  onBranch,
+  onQuote,
+  onCopy,
+  onRetry,
+  translations,
+}: {
+  isUser: boolean;
+  message: Message;
+  onEdit: (id: string) => void;
+  onBranch: (id: string) => void;
+  onQuote: (content: string) => void;
+  onCopy: (content: string) => void;
+  onRetry: (id: string) => void;
+  translations: MessageItemTranslations;
+}) {
+  if (!isUser) {
+    return null;
+  }
+
+  return (
+    <div className="mt-3 flex justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+      <MessageActions
+        role={message.role}
+        messageId={message.id}
+        content={message.content}
+        onEdit={onEdit}
+        onBranch={onBranch}
+        onQuote={onQuote}
+        onCopy={onCopy}
+        onRetry={onRetry}
+        translations={translations}
+      />
+    </div>
+  );
+}
 
 // ============================================================================
 // MessageItem

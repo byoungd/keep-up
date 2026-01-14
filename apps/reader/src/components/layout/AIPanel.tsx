@@ -16,6 +16,7 @@ import { MessageList } from "./MessageList";
 import type { PanelPosition } from "./ModelSelector";
 import { ProjectContextPanel } from "./ProjectContextPanel";
 import { ReferenceDebugPanel } from "./ReferenceDebugPanel";
+import { TaskQueuePanel } from "./TaskQueuePanel";
 
 interface AIPanelProps {
   onClose: () => void;
@@ -68,7 +69,9 @@ export function AIPanel({
     selectedCapability,
     visionFallback,
     projectContext,
+    backgroundTasks,
     handleSend,
+    handleRunBackground,
     handleAbort,
     handleClear,
     handleRetry,
@@ -81,6 +84,8 @@ export function AIPanel({
     handleUseTask,
     handleApprove,
     handleReject,
+    handleUpdateTask,
+    handleUpdateWalkthrough,
     exportHistory,
     workflow,
     setWorkflow,
@@ -116,6 +121,7 @@ export function AIPanel({
     contextStatusTranslations,
     projectContextTranslations,
     approvalTranslations,
+    taskQueueTranslations,
     providerLabel,
   } = useAIPanelTranslations(selectedCapability.provider);
 
@@ -206,6 +212,35 @@ export function AIPanel({
         translations={projectContextTranslations}
       />
 
+      <TaskQueuePanel
+        tasks={backgroundTasks.tasks}
+        stats={backgroundTasks.stats}
+        error={backgroundTasks.streamError}
+        onCancelTask={backgroundTasks.cancelTask}
+        onUpdateTask={(task) => handleUpdateTask(task.name)}
+        onUpdateWalkthrough={(task) => handleUpdateWalkthrough(task.name)}
+        translations={taskQueueTranslations}
+      />
+
+      {backgroundTasks.pendingApproval && (
+        <ApprovalRequestCard
+          request={{
+            confirmationId: backgroundTasks.pendingApproval.confirmationId,
+            toolName: backgroundTasks.pendingApproval.toolName,
+            description: backgroundTasks.pendingApproval.description,
+            arguments: backgroundTasks.pendingApproval.arguments,
+            risk: backgroundTasks.pendingApproval.risk,
+            reason: backgroundTasks.pendingApproval.reason,
+            riskTags: backgroundTasks.pendingApproval.riskTags,
+          }}
+          isBusy={backgroundTasks.approvalBusy}
+          error={backgroundTasks.approvalError}
+          onApprove={backgroundTasks.approveNext}
+          onReject={backgroundTasks.rejectNext}
+          translations={approvalTranslations}
+        />
+      )}
+
       <MessageList
         messages={messages}
         suggestions={suggestions}
@@ -240,6 +275,7 @@ export function AIPanel({
         input={input}
         setInput={setInput}
         onSend={handleSend}
+        onRunBackground={handleRunBackground}
         onAbort={handleAbort}
         isLoading={isLoading}
         isStreaming={isStreaming}

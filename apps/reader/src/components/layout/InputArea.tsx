@@ -20,6 +20,7 @@ export interface InputAreaProps {
   input: string;
   setInput: (value: string) => void;
   onSend: () => void;
+  onRunBackground: () => void;
   onAbort: () => void;
   isLoading: boolean;
   isStreaming: boolean;
@@ -33,6 +34,7 @@ export interface InputAreaProps {
     attachmentsLabel: string;
     attachmentsMeta: string;
     addImage: string;
+    runBackground: string;
     removeAttachment: string;
     inputPlaceholder: string;
   };
@@ -49,6 +51,7 @@ export function InputArea({
   input,
   setInput,
   onSend,
+  onRunBackground,
   onAbort,
   isLoading,
   isStreaming,
@@ -247,6 +250,7 @@ export function InputArea({
           onAddAttachment={handleAddAttachment}
           onSend={handleSendClick}
           onVoiceInput={handleVoiceInput}
+          onRunBackground={onRunBackground}
         />
       </div>
 

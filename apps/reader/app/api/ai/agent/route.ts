@@ -1,8 +1,6 @@
 import * as path from "node:path";
 
 import {
-  type AgentMessage,
-  type AgentState,
   type CoworkSession,
   type OrchestratorEvent,
   createAICoreAdapter,
@@ -20,15 +18,12 @@ import { getDefaultChatModelId } from "../modelResolver";
 import { createAnthropicClient, createOpenAIProvider } from "../providerClients";
 import { type ProviderResolutionError, resolveProviderTarget } from "../providerResolver";
 import { createErrorResponse, createStreamResponse, handleUnknownError } from "../responseUtils";
+import { buildInitialState, buildSystemPrompt, resolveWorkspaceRoot } from "./agentShared";
 import { createPendingConfirmation } from "./confirmationStore";
 
 export const runtime = "nodejs";
 
 const DEFAULT_AGENT_ID = "reader-panel";
-const BASE_SYSTEM_PROMPT = `You are a Cowork AI teammate embedded in Keep-Up Reader.
-Work methodically, use tools when needed, and keep responses concise and actionable.
-Ask for clarification when the task is ambiguous, and avoid risky actions without user approval.`;
-
 type AgentRequestBody = {
   prompt?: string;
   model?: string;
@@ -48,38 +43,7 @@ function providerErrorResponse(error: ProviderResolutionError, requestId: string
   return createErrorResponse(code, error.message, { requestId });
 }
 
-function buildSystemPrompt(systemPrompt?: string): string {
-  if (!systemPrompt) {
-    return BASE_SYSTEM_PROMPT;
-  }
-  return `${BASE_SYSTEM_PROMPT}\n\n${systemPrompt}`;
-}
-
-function buildInitialState(
-  systemPrompt: string,
-  history: AgentRequestBody["messages"]
-): AgentState {
-  const messages: AgentMessage[] = [{ role: "system", content: systemPrompt }];
-  if (history) {
-    for (const message of history) {
-      const content = message.content?.trim();
-      if (!content) {
-        continue;
-      }
-      messages.push({ role: message.role, content });
-    }
-  }
-  return {
-    turn: 0,
-    messages,
-    pendingToolCalls: [],
-    status: "idle",
-  };
-}
-
-function resolveWorkspaceRoot(): string {
-  return path.resolve(process.cwd());
-}
+type AgentHistory = AgentRequestBody["messages"];
 
 type StreamSenders = {
   send: (payload: object) => void;
@@ -263,7 +227,7 @@ export async function POST(request: Request) {
 
     const systemPrompt = buildSystemPrompt(body.systemPrompt);
     const sessionState = createCoworkSessionState({
-      initialState: buildInitialState(systemPrompt, body.messages),
+      initialState: buildInitialState(systemPrompt, body.messages as AgentHistory),
     });
 
     const orchestrator = createCoworkOrchestrator(llm, registry, {
