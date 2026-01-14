@@ -6,8 +6,9 @@
  * specialized subagents for specific tasks.
  */
 
-import type { AgentManager } from "../agents/manager";
-import type { AgentResult, AgentType, SpawnAgentOptions } from "../agents/types";
+import type { AgentResult, AgentType, IAgentManager, SpawnAgentOptions } from "../agents/types";
+import { createSecurityPolicy } from "../security";
+import type { SecurityPolicy } from "../types";
 
 // ============================================================================
 // Types
@@ -25,6 +26,17 @@ export interface SubagentTask {
   context?: Record<string, unknown>;
   /** Priority (higher = earlier execution) */
   priority?: number;
+  /** Scoped permissions for the subagent */
+  scope?: SubagentScope;
+}
+
+export interface SubagentScope {
+  /** Restrict tools available to the subagent */
+  allowedTools?: string[];
+  /** File access scope */
+  fileAccess?: "none" | "read" | "write";
+  /** Network access scope */
+  network?: "none" | "restricted" | "full";
 }
 
 /**
@@ -59,10 +71,10 @@ export interface AggregatedResults {
  * Subagent orchestrator for managing multi-agent workflows.
  */
 export class SubagentOrchestrator {
-  private readonly manager: AgentManager;
+  private readonly manager: IAgentManager;
   private relationships = new Map<string, AgentRelationship>();
 
-  constructor(manager: AgentManager) {
+  constructor(manager: IAgentManager) {
     this.manager = manager;
   }
 
@@ -80,14 +92,14 @@ export class SubagentOrchestrator {
     const sortedTasks = [...tasks].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
 
     // Convert to spawn options
-    const spawnOptions: SpawnAgentOptions[] = sortedTasks.map((task) => ({
-      type: task.type,
-      task: this.buildTaskWithContext(task.task, task.context),
-      signal: options.signal,
-    }));
+    const spawnOptions: SpawnAgentOptions[] = sortedTasks.map((task) =>
+      this.buildSpawnOptions(task, options.signal)
+    );
 
-    // Spawn in parallel with concurrency control
-    const results = await this.manager.spawnParallel(spawnOptions);
+    const results =
+      options.maxConcurrent && options.maxConcurrent > 0
+        ? await this.spawnWithConcurrency(spawnOptions, options.maxConcurrent)
+        : await this.manager.spawnParallel(spawnOptions);
 
     // Track relationships
     this.relationships.set(parentId, {
@@ -108,11 +120,7 @@ export class SubagentOrchestrator {
     task: SubagentTask,
     options: { signal?: AbortSignal } = {}
   ): Promise<AgentResult> {
-    const result = await this.manager.spawn({
-      type: task.type,
-      task: this.buildTaskWithContext(task.task, task.context),
-      signal: options.signal,
-    });
+    const result = await this.manager.spawn(this.buildSpawnOptions(task, options.signal));
 
     // Track relationship
     const existing = this.relationships.get(parentId);
@@ -248,6 +256,61 @@ export class SubagentOrchestrator {
     return `${task}\n\n---\n\n**Context from parent:**\n${contextStr}`;
   }
 
+  private buildSpawnOptions(task: SubagentTask, signal?: AbortSignal): SpawnAgentOptions {
+    const scopedContext = task.scope
+      ? { ...(task.context ?? {}), scope: task.scope }
+      : task.context;
+    return {
+      type: task.type,
+      task: this.buildTaskWithContext(task.task, scopedContext),
+      signal,
+      security: task.scope ? this.buildScopeSecurity(task) : undefined,
+      allowedTools: task.scope?.allowedTools,
+    };
+  }
+
+  private buildScopeSecurity(task: SubagentTask): SecurityPolicy {
+    const profile = this.manager.getProfile(task.type);
+    const basePolicy = createSecurityPolicy(profile.securityPreset);
+    const scope = task.scope;
+
+    if (!scope) {
+      return basePolicy;
+    }
+
+    const permissions = { ...basePolicy.permissions };
+
+    if (scope.network) {
+      permissions.network =
+        scope.network === "none" ? "none" : scope.network === "restricted" ? "allowlist" : "full";
+    }
+
+    if (scope.fileAccess) {
+      permissions.file =
+        scope.fileAccess === "none" ? "none" : scope.fileAccess === "read" ? "read" : "workspace";
+    }
+
+    return {
+      ...basePolicy,
+      permissions,
+    };
+  }
+
+  private async spawnWithConcurrency(
+    options: SpawnAgentOptions[],
+    maxConcurrent: number
+  ): Promise<AgentResult[]> {
+    const results: AgentResult[] = [];
+
+    for (let i = 0; i < options.length; i += maxConcurrent) {
+      const batch = options.slice(i, i + maxConcurrent);
+      const batchResults = await Promise.all(batch.map((opts) => this.manager.spawn(opts)));
+      results.push(...batchResults);
+    }
+
+    return results;
+  }
+
   /**
    * Get parent's hierarchy level.
    */
@@ -318,6 +381,6 @@ export class SubagentOrchestrator {
 /**
  * Create a subagent orchestrator.
  */
-export function createSubagentOrchestrator(manager: AgentManager): SubagentOrchestrator {
+export function createSubagentOrchestrator(manager: IAgentManager): SubagentOrchestrator {
   return new SubagentOrchestrator(manager);
 }

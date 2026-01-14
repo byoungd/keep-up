@@ -110,6 +110,9 @@ export interface SpawnAgentOptions {
   /** Custom security policy override */
   security?: SecurityPolicy;
 
+  /** Optional tool allowlist override for scoped execution */
+  allowedTools?: string[];
+
   /**
    * Current recursion depth (internal use).
    * Automatically incremented when spawning child agents.

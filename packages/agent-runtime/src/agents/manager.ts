@@ -113,6 +113,7 @@ export class AgentManager implements IAgentManager {
     this.totalSpawnedCount++;
     const agentId = this.generateAgentId(options.type);
     const profile = getAgentProfile(options.type);
+    const allowedTools = this.resolveAllowedTools(profile.allowedTools, options.allowedTools);
 
     this.emitAgentEvent(
       "agent:spawned",
@@ -125,7 +126,7 @@ export class AgentManager implements IAgentManager {
     );
 
     // Create orchestrator with profile settings
-    const orchestrator = this.createAgentOrchestrator(profile, options);
+    const orchestrator = this.createAgentOrchestrator(profile, options, allowedTools);
 
     // Track the running agent
     const runningAgent: RunningAgent = {
@@ -297,7 +298,8 @@ export class AgentManager implements IAgentManager {
 
   private createAgentOrchestrator(
     profile: AgentProfile,
-    options: SpawnAgentOptions
+    options: SpawnAgentOptions,
+    allowedTools: string[]
   ): AgentOrchestrator {
     // Determine security policy
     const security: SecurityPolicy =
@@ -306,7 +308,7 @@ export class AgentManager implements IAgentManager {
       createSecurityPolicy(profile.securityPreset);
 
     // Create filtered registry based on allowed tools
-    const filteredRegistry = this.createFilteredRegistry(profile.allowedTools);
+    const filteredRegistry = this.createFilteredRegistry(allowedTools);
 
     return createOrchestrator(this.config.llm, filteredRegistry, {
       name: `${profile.name} Agent`,
@@ -350,6 +352,19 @@ export class AgentManager implements IAgentManager {
       unregister: (name) => originalRegistry.unregister(name),
       on: (event, handler) => originalRegistry.on(event, handler),
     };
+  }
+
+  private resolveAllowedTools(profileAllowed: string[], scopedAllowed?: string[]): string[] {
+    if (!scopedAllowed || scopedAllowed.length === 0) {
+      return profileAllowed;
+    }
+
+    if (profileAllowed.includes("*")) {
+      return scopedAllowed;
+    }
+
+    const scopedSet = new Set(scopedAllowed);
+    return profileAllowed.filter((tool) => scopedSet.has(tool) || scopedSet.has("*"));
   }
 
   private isToolAllowed(toolName: string, allowedTools: string[]): boolean {
