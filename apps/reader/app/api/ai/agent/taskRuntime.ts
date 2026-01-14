@@ -1,0 +1,393 @@
+import { EventEmitter } from "node:events";
+import * as path from "node:path";
+
+import {
+  type CoworkSession,
+  type CoworkTaskSummary,
+  type ITaskExecutor,
+  type OrchestratorEvent,
+  type Task,
+  type TaskExecutionContext,
+  type TaskQueueStats,
+  buildCoworkTaskSummary,
+  createAICoreAdapter,
+  createAuditLogger,
+  createCoworkOrchestrator,
+  createCoworkSessionState,
+  createTaskQueue,
+  mapTaskEventToCoworkEvent,
+} from "@keepup/agent-runtime";
+import {
+  PathValidator,
+  createBashToolServer,
+  createFileToolServer,
+  createToolRegistry,
+} from "@keepup/agent-runtime/tools";
+import { createAnthropicClient, createOpenAIProvider } from "../providerClients";
+import type { ProviderConfig } from "../providerResolver";
+import { buildInitialState, buildSystemPrompt, resolveWorkspaceRoot } from "./agentShared";
+import { createPendingConfirmation } from "./confirmationStore";
+
+export type TaskStreamEvent =
+  | {
+      type: "task.snapshot";
+      timestamp: number;
+      data: { tasks: TaskSnapshot[]; stats: TaskQueueStats };
+    }
+  | {
+      type:
+        | "task.queued"
+        | "task.running"
+        | "task.progress"
+        | "task.completed"
+        | "task.failed"
+        | "task.cancelled";
+      taskId: string;
+      timestamp: number;
+      data?: Record<string, unknown>;
+    }
+  | {
+      type: "task.confirmation_required";
+      taskId: string;
+      timestamp: number;
+      data: {
+        confirmation_id: string;
+        toolName: string;
+        description: string;
+        arguments: Record<string, unknown>;
+        risk: "low" | "medium" | "high";
+        reason?: string;
+        riskTags?: string[];
+        request_id: string;
+      };
+    }
+  | {
+      type: "task.confirmation_received";
+      taskId: string;
+      timestamp: number;
+      data: { confirmation_id: string; confirmed: boolean };
+    };
+
+export type TaskSnapshot = {
+  taskId: string;
+  name: string;
+  prompt: string;
+  status: TaskStatusSnapshot;
+  progress: number;
+  progressMessage?: string;
+  createdAt: number;
+  queuedAt?: number;
+  startedAt?: number;
+  completedAt?: number;
+  error?: string;
+  summary?: CoworkTaskSummary;
+};
+
+export type TaskStatusSnapshot = "queued" | "running" | "completed" | "failed" | "cancelled";
+
+type BackgroundTaskPayload = {
+  prompt: string;
+  modelId: string;
+  provider: ProviderConfig;
+  systemPrompt?: string;
+  history?: Array<{ role: "user" | "assistant"; content: string }>;
+  agentId: string;
+  requestId: string;
+  name: string;
+  workspaceRoot: string;
+  outputRoot: string;
+};
+
+type BackgroundTaskResult = {
+  summary?: CoworkTaskSummary;
+  runId: string;
+};
+
+const TASK_EVENT_NAME = "task-event";
+const taskEvents = new EventEmitter();
+const taskQueue = createTaskQueue();
+let queueListenerAttached = false;
+let executorRegistered = false;
+
+export function subscribeTaskEvents(handler: (event: TaskStreamEvent) => void): () => void {
+  taskEvents.on(TASK_EVENT_NAME, handler);
+  return () => taskEvents.off(TASK_EVENT_NAME, handler);
+}
+
+export function getTaskSnapshots(): TaskSnapshot[] {
+  return taskQueue.listTasks().map((task) => serializeTask(task));
+}
+
+export function getTaskStats(): TaskQueueStats {
+  return taskQueue.getStats();
+}
+
+export async function enqueueBackgroundTask(options: {
+  prompt: string;
+  modelId: string;
+  provider: ProviderConfig;
+  systemPrompt?: string;
+  history?: Array<{ role: "user" | "assistant"; content: string }>;
+  agentId: string;
+  requestId: string;
+  name: string;
+}): Promise<string> {
+  ensureQueueListener();
+  ensureExecutor();
+
+  const workspaceRoot = resolveWorkspaceRoot();
+  const outputRoot = path.join(workspaceRoot, ".keep-up", "outputs");
+
+  const taskId = await taskQueue.enqueue<BackgroundTaskPayload, BackgroundTaskResult>({
+    type: "agent",
+    name: options.name,
+    payload: {
+      prompt: options.prompt,
+      modelId: options.modelId,
+      provider: options.provider,
+      systemPrompt: options.systemPrompt,
+      history: options.history,
+      agentId: options.agentId,
+      requestId: options.requestId,
+      name: options.name,
+      workspaceRoot,
+      outputRoot,
+    },
+  });
+
+  return taskId;
+}
+
+export async function cancelBackgroundTask(taskId: string): Promise<boolean> {
+  return taskQueue.cancel(taskId);
+}
+
+function ensureQueueListener() {
+  if (queueListenerAttached) {
+    return;
+  }
+  queueListenerAttached = true;
+  taskQueue.on((event) => {
+    const mapped = mapTaskEventToCoworkEvent(event);
+    if (!mapped) {
+      return;
+    }
+
+    const task = taskQueue.getTask(event.taskId);
+    const snapshot = task ? serializeTask(task) : undefined;
+    emitTaskEvent({
+      type: mapped.type,
+      taskId: mapped.taskId,
+      timestamp: mapped.timestamp,
+      data: {
+        ...(mapped.data ?? {}),
+        ...(snapshot ? { task: snapshot } : {}),
+      },
+    });
+  });
+}
+
+function ensureExecutor() {
+  if (executorRegistered) {
+    return;
+  }
+  executorRegistered = true;
+  taskQueue.registerExecutor("agent", new CoworkAgentTaskExecutor());
+}
+
+function emitTaskEvent(event: TaskStreamEvent) {
+  taskEvents.emit(TASK_EVENT_NAME, event);
+}
+
+function serializeTask(task: Task<BackgroundTaskPayload, BackgroundTaskResult>): TaskSnapshot {
+  const payload = task.payload;
+  const status = mapStatus(task.status);
+  const summary = task.result?.summary;
+  return {
+    taskId: task.id,
+    name: task.name,
+    prompt: payload.prompt,
+    status,
+    progress: task.progress,
+    progressMessage: task.progressMessage,
+    createdAt: task.createdAt,
+    queuedAt: task.queuedAt,
+    startedAt: task.startedAt,
+    completedAt: task.completedAt,
+    error: task.error,
+    summary,
+  };
+}
+
+function mapStatus(status: Task<unknown>["status"]): TaskStatusSnapshot {
+  if (status === "cancelled" || status === "timeout") {
+    return "cancelled";
+  }
+  if (status === "failed") {
+    return "failed";
+  }
+  if (status === "completed") {
+    return "completed";
+  }
+  if (status === "running") {
+    return "running";
+  }
+  return "queued";
+}
+
+class CoworkAgentTaskExecutor
+  implements ITaskExecutor<BackgroundTaskPayload, BackgroundTaskResult>
+{
+  canHandle(type: string): boolean {
+    return type === "agent";
+  }
+
+  async execute(payload: BackgroundTaskPayload, context: TaskExecutionContext) {
+    const auditLogger = createAuditLogger();
+    const registry = await createToolRegistryForWorkspace(payload.workspaceRoot);
+    const llm = createAICoreAdapter(resolveProvider(payload.provider), { model: payload.modelId });
+    const session = createCoworkSession(payload);
+
+    const systemPrompt = buildSystemPrompt(payload.systemPrompt);
+    const initialState = buildInitialState(systemPrompt, payload.history);
+    const sessionState = createCoworkSessionState({ initialState });
+
+    const orchestrator = createCoworkOrchestrator(llm, registry, {
+      cowork: { session, audit: auditLogger },
+      components: { sessionState },
+      requireConfirmation: true,
+      maxTurns: 25,
+    });
+
+    const unsubscribe = attachOrchestratorEvents(
+      orchestrator,
+      context,
+      payload.name,
+      payload.requestId
+    );
+
+    context.signal.addEventListener("abort", () => {
+      orchestrator.stop();
+    });
+
+    const runId = context.taskId;
+    try {
+      await orchestrator.runWithRunId(payload.prompt, runId);
+    } finally {
+      unsubscribe();
+    }
+
+    const summary = buildCoworkTaskSummary({
+      taskId: runId,
+      auditEntries: auditLogger.getEntries({ correlationId: runId }),
+      outputRoots: [payload.outputRoot],
+    });
+
+    return { runId, summary };
+  }
+}
+
+async function createToolRegistryForWorkspace(workspaceRoot: string) {
+  const registry = createToolRegistry();
+  const validator = new PathValidator({ allowedPaths: [workspaceRoot] });
+
+  await registry.register(createFileToolServer({ validator }));
+  await registry.register(createBashToolServer());
+
+  return registry;
+}
+
+function resolveProvider(config: ProviderConfig) {
+  return config.kind === "anthropic" ? createAnthropicClient(config) : createOpenAIProvider(config);
+}
+
+function createCoworkSession(payload: BackgroundTaskPayload): CoworkSession {
+  return {
+    sessionId: payload.requestId,
+    userId: payload.agentId,
+    deviceId: "reader",
+    platform: "macos",
+    mode: "cowork",
+    grants: [
+      {
+        id: "workspace",
+        rootPath: payload.workspaceRoot,
+        allowWrite: true,
+        allowDelete: true,
+        allowCreate: true,
+        outputRoots: [payload.outputRoot],
+      },
+    ],
+    connectors: [],
+    createdAt: Date.now(),
+  };
+}
+
+function attachOrchestratorEvents(
+  orchestrator: ReturnType<typeof createCoworkOrchestrator>,
+  context: TaskExecutionContext,
+  taskName: string,
+  requestId: string
+): () => void {
+  let progress = 5;
+  const updateProgress = (message: string, increment = 5) => {
+    progress = Math.min(95, progress + increment);
+    context.reportProgress(progress, message);
+  };
+
+  const unsubscribe = orchestrator.on((event: OrchestratorEvent) => {
+    if (event.type === "plan:created") {
+      updateProgress("Plan ready", 10);
+      return;
+    }
+    if (event.type === "plan:approved") {
+      updateProgress("Plan approved", 5);
+      return;
+    }
+    if (event.type === "tool:calling") {
+      const toolName =
+        typeof event.data === "object" && event.data && "toolName" in event.data
+          ? String((event.data as { toolName?: unknown }).toolName ?? "tool")
+          : "tool";
+      updateProgress(`Running ${toolName}`, 8);
+      return;
+    }
+    if (event.type === "tool:result") {
+      updateProgress("Tool result captured", 5);
+      return;
+    }
+  });
+
+  orchestrator.setConfirmationHandler(async (confirmation) => {
+    const { confirmationId, promise } = createPendingConfirmation({ requestId });
+    emitTaskEvent({
+      type: "task.confirmation_required",
+      taskId: context.taskId,
+      timestamp: Date.now(),
+      data: {
+        ...confirmation,
+        description: formatTaskDescription(taskName, confirmation.description),
+        confirmation_id: confirmationId,
+        request_id: requestId,
+      },
+    });
+    promise.then((confirmed) => {
+      emitTaskEvent({
+        type: "task.confirmation_received",
+        taskId: context.taskId,
+        timestamp: Date.now(),
+        data: { confirmation_id: confirmationId, confirmed },
+      });
+    });
+    return promise;
+  });
+
+  return unsubscribe;
+}
+
+function formatTaskDescription(taskName: string, description: string): string {
+  if (!description) {
+    return taskName;
+  }
+  return `${taskName}: ${description}`;
+}
