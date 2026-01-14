@@ -19,7 +19,7 @@ The product is **AI-native** (assistant + commands embedded in the reading/edito
 - **Parallel multi-LLM execution** for verification/consensus
 - **LFCC-based local-first collaborative documents** for “Living Briefs” (team co-editing, offline-first, deterministic merging)
 
-**Immediate focus (per latest audit/status):** restore the core reading loop (import persistence + Reader entry + Topics/Projects routes) and ship an **RSS-driven Digest MVP** inside the Web Reader.
+**Immediate focus (per latest audit/status):** restore the core reading loop (import persistence + Reader entry + Topics/Projects routes), ship an **RSS-driven Digest MVP**, and **upgrade AIPanel to a Cowork Partner** (Project-aware, Agentic, and Artifact-driven).
 
 ---
 
@@ -44,6 +44,7 @@ Technical users face:
 2. **Ship Daily/Weekly Digest MVP:** high-signal summaries from RSS/URL ingestion with evidence links/citations.
 3. **Enable trust:** enforce grounding (citations) for digest outputs and “Ask KU0” answers.
 4. **Enable compounding knowledge:** create and maintain **Living Briefs** (LFCC local-first docs) that agents can update as suggestions.
+5. **Establish Cowork Paradigm:** shift AIPanel from a passive "Coding Assistant" to a proactive **"AI Partner"** that shares project context (Memory), executes complex tasks (Autonomy), and collaborates via structured objects (Artifacts).
 
 ### 3.2 Non-goals (initial releases)
 - Being a general “tech news” portal for everyone.
@@ -85,6 +86,7 @@ Technical users face:
 - For each digest item: read “What changed”, “Why it matters”, “Who should care”, and **open evidence**.
 - Ask follow-ups grounded in the same evidence.
 - Pin high-value items into a Living Brief (single-user initially; team collaboration expands).
+- **Assign simple tasks to AI:** "Check the latest breaking changes in Next.js and update our migration plan" (requires web search + doc reading + plan update).
 
 ---
 
@@ -261,6 +263,17 @@ Each digest card must include:
 - Offline-first editing; eventual sync.
 - Agent updates are applied as **suggestions**, not silent edits.
 - Each suggestion records provenance: agent + model + timestamp + evidence.
+
+---
+
+### FR10 — Cowork (AI Partner) (P1)
+**Requirement:** AI acts as a proactively collaborating partner with shared context and agency, not just a reactive chat bot.
+
+**Acceptance criteria**
+- **Project Awareness (Memory):** AI can read and understand `docs/tasks/*.md` and global project structure. Conversations persist and build upon previous decisions.
+- **Autonomy (Agent Runtime):** AI can execute tools (read files, search codebase, run commands) to complete closed-loop tasks, subject to user "Approval" UI.
+- **Artifact-based Collaboration:** AI communicates via structured **Artifacts** (Plans, Checklists, Drafts) that render as interactive UI cards, not just text blocks.
+- **Task Management:** AI can update the status of items in `task.md` as it completes work.
 
 ---
 
