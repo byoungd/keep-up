@@ -27,7 +27,7 @@ test.describe("Smoke Tests", () => {
     // 3. Topic Selector onboarding (new user, no subscriptions)
     const importButton = page.getByRole("button", { name: /import/i });
     const documentList = page.locator("[data-testid='document-list']");
-    const topicSelector = page.getByRole("heading", { name: /choose your topics/i });
+    const topicSelector = page.getByRole("heading", { name: /what defines your role/i });
 
     // Wait for any of these states to appear
     await expect(importButton.or(documentList).or(topicSelector)).toBeVisible({ timeout: 10000 });
