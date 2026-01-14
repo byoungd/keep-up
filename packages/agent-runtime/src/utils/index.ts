@@ -91,3 +91,6 @@ export {
   type BatchResult,
   type DebounceConfig,
 } from "./batch";
+
+// LLM response parsing
+export { parseJsonFromText } from "./llmJson";

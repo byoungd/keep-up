@@ -29,7 +29,8 @@ export type AgentType =
   | "code-reviewer" // Code review specialist
   | "implementer" // Implementation specialist
   | "debugger" // Debugging specialist
-  | "digest"; // Digest generation with semantic clustering
+  | "digest" // Digest generation with semantic clustering
+  | "verifier"; // Claim verification with evidence extraction
 
 /**
  * Agent profile containing configuration for a specific agent type.
