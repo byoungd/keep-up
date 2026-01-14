@@ -11,9 +11,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint:
+  # Combined quality checks (lint + typecheck) - saves ~60s by eliminating duplicate setup
+  quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -38,27 +39,10 @@ jobs:
       - name: UI Contract
         run: pnpm ui:contract
 
-  typecheck:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.28.0
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
       - name: Typecheck
         run: pnpm typecheck
 
+  # Build job with artifact upload
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -80,6 +64,16 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: |
+            packages/*/dist
+            apps/*/.next
+          retention-days: 1
+
+  # Tests - downloads build artifacts instead of rebuilding
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -99,15 +93,28 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-output
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps
 
       - name: Test
         run: pnpm test:ci
 
+  # Core release gate - runs independently (small and fast)
   core_release_gate:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    needs: [build]
     steps:
       - uses: actions/checkout@v4
 
@@ -122,6 +129,11 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-output
 
       - name: Core tests
         run: pnpm --filter @ku0/core test
@@ -141,6 +153,7 @@ jobs:
           fi
           rm -f "${TARBALL_LIST}" "${TARBALL_PATH}"
 
+  # UI gate - downloads build artifacts and shares Playwright cache
   ui_gate:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -160,11 +173,19 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-output
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps
-
-      - name: Build packages
-        run: pnpm build
 
       - name: UI Integration Gate
         run: bash scripts/ui-gate.sh
