@@ -3,6 +3,7 @@
 import { cn } from "@keepup/shared/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, Check, Sparkles } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
 export interface OnboardingFlowProps {
@@ -15,80 +16,92 @@ export interface OnboardingData {
   sources: string[];
 }
 
-const TOPICS = [
-  "Artificial Intelligence",
-  "Crypto & Web3",
-  "Startups",
-  "Product Design",
-  "Engineering",
-  "Marketing",
-  "Finance",
-  "Science",
-];
+const TOPIC_KEYS = [
+  "ai",
+  "cryptoWeb3",
+  "startups",
+  "productDesign",
+  "engineering",
+  "marketing",
+  "finance",
+  "science",
+] as const;
+
+type TopicKey = (typeof TOPIC_KEYS)[number];
 
 const SOURCE_BUNDLES = [
   {
     id: "tech-news",
-    title: "Tech News Bundle",
-    description: "TechCrunch, Verge, HackerNews",
+    key: "techNews",
     icon: "🚀",
   },
   {
     id: "ai-research",
-    title: "AI Research",
-    description: "Arxiv, OpenAI Blog, Anthropic",
+    key: "aiResearch",
     icon: "🤖",
   },
   {
     id: "design",
-    title: "Design Daily",
-    description: "Sidebar.io, A List Apart, Smashing",
+    key: "designDaily",
     icon: "🎨",
   },
-];
+] as const;
+
+type BundleId = (typeof SOURCE_BUNDLES)[number]["id"];
+type BundleKey = (typeof SOURCE_BUNDLES)[number]["key"];
 
 type Step = "topics" | "sources" | "completing";
 
 export function OnboardingFlow({ onComplete, className }: OnboardingFlowProps) {
+  const t = useTranslations("Onboarding");
   const [step, setStep] = useState<Step>("topics");
-  const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
-  const [selectedBundles, setSelectedBundles] = useState<string[]>([]);
+  const [selectedTopics, setSelectedTopics] = useState<TopicKey[]>([]);
+  const [selectedBundles, setSelectedBundles] = useState<BundleId[]>([]);
 
   const [completionProgress, setCompletionProgress] = useState(0);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (step === "completing") {
-      let progress = 0;
-      interval = setInterval(() => {
-        progress += 2; // Slower, smoother progress
-        setCompletionProgress(progress);
-        if (progress >= 100) {
-          clearInterval(interval);
-          setTimeout(() => {
-            onComplete({ topics: selectedTopics, sources: selectedBundles });
-          }, 800);
-        }
-      }, 30);
+    if (step !== "completing") {
+      return undefined;
     }
-    return () => clearInterval(interval);
+
+    let progress = 0;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    const intervalId = setInterval(() => {
+      progress = Math.min(progress + 2, 100); // Slower, smoother progress
+      setCompletionProgress(progress);
+      if (progress >= 100) {
+        clearInterval(intervalId);
+        timeoutId = setTimeout(() => {
+          onComplete({ topics: selectedTopics, sources: selectedBundles });
+        }, 800);
+      }
+    }, 30);
+
+    return () => {
+      clearInterval(intervalId);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
   }, [step, onComplete, selectedTopics, selectedBundles]);
 
   const handleNext = () => {
     if (step === "topics") {
       setStep("sources");
     } else if (step === "sources") {
+      setCompletionProgress(0);
       setStep("completing");
     }
   };
 
-  const toggleTopic = (topic: string) => {
+  const toggleTopic = (topic: TopicKey) => {
     setSelectedTopics((prev) =>
       prev.includes(topic) ? prev.filter((t) => t !== topic) : [...prev, topic]
     );
   };
 
-  const toggleBundle = (id: string) => {
+  const toggleBundle = (id: BundleId) => {
     setSelectedBundles((prev) =>
       prev.includes(id) ? prev.filter((b) => b !== id) : [...prev, id]
     );
@@ -118,20 +131,20 @@ export function OnboardingFlow({ onComplete, className }: OnboardingFlowProps) {
           >
             <div className="text-center space-y-4">
               <h2 className="text-4xl font-bold tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-white/60">
-                What interests you?
+                {t("topicsTitle")}
               </h2>
-              <p className="text-zinc-400 text-lg">Select a few topics to personalize your feed.</p>
+              <p className="text-zinc-400 text-lg">{t("topicsSubtitle")}</p>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {TOPICS.map((topic) => {
-                const isSelected = selectedTopics.includes(topic);
+              {TOPIC_KEYS.map((topicKey) => {
+                const isSelected = selectedTopics.includes(topicKey);
                 return (
                   <motion.button
                     layout
                     type="button"
-                    key={topic}
-                    onClick={() => toggleTopic(topic)}
+                    key={topicKey}
+                    onClick={() => toggleTopic(topicKey)}
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     className={cn(
@@ -145,7 +158,7 @@ export function OnboardingFlow({ onComplete, className }: OnboardingFlowProps) {
                     {!isSelected && (
                       <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-tr from-white/0 via-white/5 to-white/0" />
                     )}
-                    <span className="relative z-10">{topic}</span>
+                    <span className="relative z-10">{t(`topics.${topicKey}`)}</span>
                   </motion.button>
                 );
               })}
@@ -160,7 +173,7 @@ export function OnboardingFlow({ onComplete, className }: OnboardingFlowProps) {
                 whileTap={{ scale: 0.95 }}
                 className="group flex items-center gap-2 px-8 py-3 bg-white text-black rounded-full font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-[0_4px_20px_rgba(255,255,255,0.15)] hover:shadow-[0_4px_25px_rgba(255,255,255,0.25)]"
               >
-                Continue
+                {t("continue")}
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </motion.button>
             </div>
@@ -178,16 +191,15 @@ export function OnboardingFlow({ onComplete, className }: OnboardingFlowProps) {
           >
             <div className="text-center space-y-4">
               <h2 className="text-4xl font-bold tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-white/60">
-                Start with a bundle
+                {t("sourcesTitle")}
               </h2>
-              <p className="text-zinc-400 text-lg">
-                Curated sources to get you up to speed instantly.
-              </p>
+              <p className="text-zinc-400 text-lg">{t("sourcesSubtitle")}</p>
             </div>
 
             <div className="grid grid-cols-1 gap-4">
               {SOURCE_BUNDLES.map((bundle) => {
                 const isSelected = selectedBundles.includes(bundle.id);
+                const bundleKey = bundle.key as BundleKey;
                 return (
                   <motion.button
                     layout
@@ -222,10 +234,10 @@ export function OnboardingFlow({ onComplete, className }: OnboardingFlowProps) {
                           isSelected ? "text-purple-100" : "text-white"
                         )}
                       >
-                        {bundle.title}
+                        {t(`bundles.${bundleKey}.title`)}
                       </h3>
                       <p className="text-sm text-zinc-400 group-hover:text-zinc-300 transition-colors mt-1">
-                        {bundle.description}
+                        {t(`bundles.${bundleKey}.description`)}
                       </p>
                     </div>
                   </motion.button>
@@ -239,7 +251,7 @@ export function OnboardingFlow({ onComplete, className }: OnboardingFlowProps) {
                 onClick={() => setStep("topics")}
                 className="text-sm text-zinc-500 hover:text-white transition-colors px-4 font-medium"
               >
-                Back
+                {t("back")}
               </button>
               <motion.button
                 type="button"
@@ -248,7 +260,7 @@ export function OnboardingFlow({ onComplete, className }: OnboardingFlowProps) {
                 whileTap={{ scale: 0.95 }}
                 className="group flex items-center gap-2 px-8 py-3 bg-white text-black rounded-full font-bold text-sm transition-all shadow-[0_4px_20px_rgba(255,255,255,0.15)] hover:shadow-[0_4px_25px_rgba(255,255,255,0.25)]"
               >
-                {selectedBundles.length === 0 ? "Skip for now" : "Finish Setup"}
+                {selectedBundles.length === 0 ? t("skipForNow") : t("finishSetup")}
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </motion.button>
             </div>
@@ -266,14 +278,14 @@ export function OnboardingFlow({ onComplete, className }: OnboardingFlowProps) {
           >
             <div className="relative">
               <div className="absolute -inset-8 bg-purple-500/30 blur-2xl rounded-full animate-pulse" />
-              <Sparkles className="w-16 h-16 text-purple-200 relative z-10 animate-spin-slow" />
+              <Sparkles className="w-16 h-16 text-purple-200 relative z-10 motion-safe:animate-spin" />
             </div>
 
             <div className="space-y-3">
               <h3 className="text-3xl font-bold tracking-tighter text-white">
-                Setting up your space...
+                {t("completingTitle")}
               </h3>
-              <p className="text-zinc-400 text-lg">We're gathering the latest updates for you.</p>
+              <p className="text-zinc-400 text-lg">{t("completingSubtitle")}</p>
             </div>
 
             <div className="w-64 h-1 bg-zinc-800/50 rounded-full overflow-hidden backdrop-blur-sm">

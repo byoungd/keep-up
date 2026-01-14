@@ -109,6 +109,8 @@
     "disable": "Disable",
     "noSubscriptions": "No RSS subscriptions yet",
     "noSubscriptionsHint": "Add a feed to start reading",
+    "emptyTitle": "No feeds yet",
+    "emptySubtitle": "Add sources to start building your knowledge base.",
     "popularFeeds": "Popular Feeds",
     "feedDetected": "Feed detected",
     "invalidUrl": "Please enter a valid URL",
@@ -125,6 +127,42 @@
     "pinToBrief": "Pin to Brief",
     "readOriginal": "Read Original",
     "lowConfidence": "Low Confidence (Missing Evidence)"
+  },
+  "Onboarding": {
+    "topicsTitle": "What interests you?",
+    "topicsSubtitle": "Select a few topics to personalize your feed.",
+    "topics": {
+      "ai": "Artificial Intelligence",
+      "cryptoWeb3": "Crypto & Web3",
+      "startups": "Startups",
+      "productDesign": "Product Design",
+      "engineering": "Engineering",
+      "marketing": "Marketing",
+      "finance": "Finance",
+      "science": "Science"
+    },
+    "sourcesTitle": "Start with a bundle",
+    "sourcesSubtitle": "Curated sources to get you up to speed instantly.",
+    "bundles": {
+      "techNews": {
+        "title": "Tech News Bundle",
+        "description": "TechCrunch, Verge, HackerNews"
+      },
+      "aiResearch": {
+        "title": "AI Research",
+        "description": "Arxiv, OpenAI Blog, Anthropic"
+      },
+      "designDaily": {
+        "title": "Design Daily",
+        "description": "Sidebar.io, A List Apart, Smashing"
+      }
+    },
+    "continue": "Continue",
+    "back": "Back",
+    "skipForNow": "Skip for now",
+    "finishSetup": "Finish Setup",
+    "completingTitle": "Setting up your space...",
+    "completingSubtitle": "We're gathering the latest updates for you."
   },
   "CustomizeSidebar": {
     "title": "Customize sidebar",

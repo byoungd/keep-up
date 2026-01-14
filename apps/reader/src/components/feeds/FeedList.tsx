@@ -311,10 +311,8 @@ function FeedManagementList({
             <div className="w-12 h-12 rounded-full bg-surface-2 flex items-center justify-center mb-4">
               <Rss className="w-6 h-6 text-muted-foreground/50" />
             </div>
-            <h3 className="text-sm font-medium text-foreground mb-1">No feeds yet</h3>
-            <p className="text-sm text-muted-foreground max-w-[180px]">
-              Add sources to start building your knowledge base.
-            </p>
+            <h3 className="text-sm font-medium text-foreground mb-1">{t("emptyTitle")}</h3>
+            <p className="text-sm text-muted-foreground max-w-[180px]">{t("emptySubtitle")}</p>
           </div>
         )}
       </div>

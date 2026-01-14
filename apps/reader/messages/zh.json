@@ -109,10 +109,48 @@
     "disable": "禁用",
     "noSubscriptions": "暂无 RSS 订阅",
     "noSubscriptionsHint": "添加订阅源开始阅读",
+    "emptyTitle": "还没有订阅源",
+    "emptySubtitle": "添加来源，开始构建你的知识库。",
     "popularFeeds": "热门订阅源",
     "feedDetected": "检测到订阅源",
     "invalidUrl": "请输入有效的 URL",
     "invalidProtocol": "URL 必须使用 http 或 https"
+  },
+  "Onboarding": {
+    "topicsTitle": "你对什么感兴趣？",
+    "topicsSubtitle": "选择几个主题来个性化你的信息流。",
+    "topics": {
+      "ai": "人工智能",
+      "cryptoWeb3": "加密与 Web3",
+      "startups": "创业",
+      "productDesign": "产品设计",
+      "engineering": "工程开发",
+      "marketing": "市场营销",
+      "finance": "金融",
+      "science": "科学"
+    },
+    "sourcesTitle": "从精选包开始",
+    "sourcesSubtitle": "精选来源，快速上手。",
+    "bundles": {
+      "techNews": {
+        "title": "科技新闻合集",
+        "description": "TechCrunch、Verge、HackerNews"
+      },
+      "aiResearch": {
+        "title": "AI 研究",
+        "description": "Arxiv、OpenAI Blog、Anthropic"
+      },
+      "designDaily": {
+        "title": "设计日报",
+        "description": "Sidebar.io、A List Apart、Smashing"
+      }
+    },
+    "continue": "继续",
+    "back": "返回",
+    "skipForNow": "先跳过",
+    "finishSetup": "完成设置",
+    "completingTitle": "正在设置你的空间...",
+    "completingSubtitle": "我们正在为你汇总最新动态。"
   },
   "CustomizeSidebar": {
     "title": "自定义侧边栏",
