@@ -165,6 +165,11 @@ export { createWorkflowTemplateManager, BUILT_IN_WORKFLOWS } from "./workflows";
 export type { WorkflowTemplate, WorkflowPhase, WorkflowContext } from "./workflows";
 
 // ============================================================================
+// Artifacts
+// ============================================================================
+export * from "./artifacts";
+
+// ============================================================================
 // Prompts
 // ============================================================================
 export { createPromptBuilder } from "./prompts";
