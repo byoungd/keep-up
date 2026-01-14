@@ -94,13 +94,14 @@ describe("SecurityValidator Enforcement in UI Entrypoints", () => {
   });
 
   describe("SecurityValidator direct tests", () => {
-    it("should allow non-blocked tags", () => {
+    it("should strip non-blocked but unknown tags", () => {
       const validator = createSecurityValidator();
       const result = validator.validate("<custom-tag>content</custom-tag>");
 
-      // Custom tags are not blocked, so they should remain intact.
-      expect(result.ok).toBe(true);
-      expect(result.sanitized).toContain("<custom-tag>");
+      // LFCC 0.9.4 mandates a strict whitelist. Unknown tags must be stripped.
+      expect(result.ok).toBe(true); // Still valid, but content is unwrapped
+      expect(result.sanitized).not.toContain("<custom-tag>");
+      expect(result.sanitized).toContain("content");
     });
 
     it("should reject iframe tags in strict mode", () => {
