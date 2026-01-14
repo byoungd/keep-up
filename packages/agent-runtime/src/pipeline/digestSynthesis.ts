@@ -113,14 +113,20 @@ interface DigestCluster {
   topics: string[];
 }
 
+function wrapTransform<TInput, TOutput>(
+  handler: (input: TInput, context: PipelineContext) => Promise<TOutput>
+): (input: unknown, context: PipelineContext) => Promise<TOutput> {
+  return (input, context) => handler(input as TInput, context);
+}
+
 export function createDigestSynthesisPipeline(): Pipeline {
   return createPipeline("Digest Synthesis")
     .id("digest_synthesis")
     .description("Map-reduce digest synthesis with claim verification")
-    .transform("Resolve items", resolveItems)
-    .transform("Map summaries", mapSummaries)
-    .transform("Reduce clusters", reduceClusters)
-    .transform("Verify cards", verifyCards)
+    .transform("Resolve items", wrapTransform(resolveItems))
+    .transform("Map summaries", wrapTransform(mapSummaries))
+    .transform("Reduce clusters", wrapTransform(reduceClusters))
+    .transform("Verify cards", wrapTransform(verifyCards))
     .build();
 }
 
