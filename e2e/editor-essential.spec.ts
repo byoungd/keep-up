@@ -16,6 +16,7 @@
 
 import { expect, test } from "@playwright/test";
 import {
+  collapseSelection,
   focusEditor,
   getEditorHTML,
   getEditorText,
@@ -481,16 +482,33 @@ test.describe("Essential Editor Tests", () => {
 
     test("Tab indents list item", async ({ page }) => {
       await openFreshEditor(page, "list-indent");
-      const editor = page.locator(".lfcc-editor .ProseMirror");
-      await editor.click();
-      await page.keyboard.press(`${modKey}+a`);
-      await page.keyboard.press("Backspace");
-      // Create first item
-      await page.keyboard.type("-");
-      await page.keyboard.press("Space");
-      await page.keyboard.type("Parent");
-      await page.keyboard.press("Enter");
-      await page.keyboard.type("Child");
+      await setEditorContent(page, "Parent\nChild");
+      await page.evaluate(() => {
+        const globalAny = window as unknown as {
+          __lfccView?: import("prosemirror-view").EditorView;
+        };
+        const view = globalAny.__lfccView;
+        if (!view) {
+          return;
+        }
+        const { tr, doc, schema } = view.state;
+        let updated = 0;
+        doc.forEach((node, offset) => {
+          if (updated >= 2 || node.type !== schema.nodes.paragraph) {
+            return;
+          }
+          tr.setNodeMarkup(offset, schema.nodes.paragraph, {
+            ...node.attrs,
+            list_type: "bullet",
+            indent_level: 0,
+            task_checked: false,
+          });
+          updated += 1;
+        });
+        view.dispatch(tr);
+      });
+      await selectTextBySubstring(page, "Child");
+      await collapseSelection(page);
       // Tab to indent
       await page.keyboard.press("Tab");
       await page.waitForTimeout(200);
@@ -505,16 +523,33 @@ test.describe("Essential Editor Tests", () => {
 
     test("Shift+Tab outdents list item", async ({ page }) => {
       await openFreshEditor(page, "list-outdent");
-      const editor = page.locator(".lfcc-editor .ProseMirror");
-      await editor.click();
-      await page.keyboard.press(`${modKey}+a`);
-      await page.keyboard.press("Backspace");
-      // Create first item
-      await page.keyboard.type("-");
-      await page.keyboard.press("Space");
-      await page.keyboard.type("Parent");
-      await page.keyboard.press("Enter");
-      await page.keyboard.type("Child");
+      await setEditorContent(page, "Parent\nChild");
+      await page.evaluate(() => {
+        const globalAny = window as unknown as {
+          __lfccView?: import("prosemirror-view").EditorView;
+        };
+        const view = globalAny.__lfccView;
+        if (!view) {
+          return;
+        }
+        const { tr, doc, schema } = view.state;
+        let updated = 0;
+        doc.forEach((node, offset) => {
+          if (updated >= 2 || node.type !== schema.nodes.paragraph) {
+            return;
+          }
+          tr.setNodeMarkup(offset, schema.nodes.paragraph, {
+            ...node.attrs,
+            list_type: "bullet",
+            indent_level: 0,
+            task_checked: false,
+          });
+          updated += 1;
+        });
+        view.dispatch(tr);
+      });
+      await selectTextBySubstring(page, "Child");
+      await collapseSelection(page);
       await page.keyboard.press("Tab"); // Indent first
       await page.waitForTimeout(200);
 

@@ -10,6 +10,7 @@ import { validateAnchorIntegrity } from "../anchors/loroAnchors";
 import {
   type ApplyPmTransactionResult,
   BRIDGE_ORIGIN_META,
+  LFCC_STRUCTURAL_META,
   applyPmTransactionToLoro,
 } from "../apply/applyPmTransaction";
 import { createEmptyDoc, getRootBlocks, migrateToSchemaV2, nextBlockId } from "../crdt/crdtSchema";
@@ -296,6 +297,7 @@ export type DivergenceResult = {
   editorChecksum: string;
   loroChecksum: string;
   reason?: string;
+  analysis?: import("../integrity/divergence").DivergenceAnalysis;
 };
 
 export type AIGatewayPlanApplyOptions = {
@@ -461,7 +463,19 @@ export class BridgeController {
       runtime: this.runtime,
       schema: this.adapter.schema,
       onDivergence: (result) => {
-        this.handleDivergence(result);
+        if (!this.view) {
+          this.handleDivergence(result);
+          return;
+        }
+        const analysis = this.divergenceDetector.analyzeDivergence(
+          this.view.state,
+          this.runtime.doc,
+          this.adapter.schema
+        );
+        this.handleDivergence({
+          ...result,
+          analysis,
+        });
       },
       onError: (error) => {
         this.onError?.(error);
@@ -776,12 +790,7 @@ export class BridgeController {
   /**
    * Handle divergence detection result
    */
-  private handleDivergence(result: {
-    diverged: boolean;
-    editorChecksum: string;
-    loroChecksum: string;
-    reason?: string;
-  }): void {
+  private handleDivergence(result: DivergenceResult): void {
     if (!result.diverged || !this.view) {
       return;
     }
@@ -790,6 +799,7 @@ export class BridgeController {
       editorChecksum: result.editorChecksum,
       loroChecksum: result.loroChecksum,
       reason: result.reason,
+      analysis: result.analysis,
     });
 
     // Notify external UI (e.g., DivergenceBanner)
@@ -993,50 +1003,53 @@ export class BridgeController {
    */
   private syncTransactionInternal(tr: Transaction): void {
     this.enforceAIGateway(tr);
+    this.ensureHistoryMeta(tr);
 
-    // Filter out history-only transactions if somehow reached here
+    const bridgeDirtyInfo = this.emitDirtyInfo(tr);
+    this.assertDirtyInfo(bridgeDirtyInfo);
+
+    this.applyTransactionToLoro(tr);
+    this.checkDivergenceAfterSync(tr);
+  }
+
+  private ensureHistoryMeta(tr: Transaction): void {
     if (!tr.docChanged && tr.getMeta("addToHistory") !== false && !tr.getMeta("history")) {
       tr.setMeta("addToHistory", false);
     }
+  }
 
-    // D2: DirtyInfo enforcement at emission boundary
+  private emitDirtyInfo(tr: Transaction): DirtyInfo {
     const documentOrder = collectContentBlockOrder(tr.doc);
     const { dirtyInfo: bridgeDirtyInfo, expandedBlocks } = computeDirtyInfoWithPolicy(
       tr,
       documentOrder
     );
     this.recordStructuralOps(bridgeDirtyInfo, "local");
-
-    // Emit DirtyInfo for UI/sync consumers
     this.onDirtyInfo?.({ ...bridgeDirtyInfo, expandedBlocks });
+    return bridgeDirtyInfo;
+  }
 
-    // In dev mode, validate self-consistency
-    if (process.env.NODE_ENV !== "production") {
-      const result = assertDirtyInfoSuperset(bridgeDirtyInfo, bridgeDirtyInfo);
-      if (!result.ok) {
-        const error = new Error(`DirtyInfo under-reported: ${formatDirtyInfoDiff(result.diff)}`);
-        (error as Error & { code: string }).code = "DIRTYINFO_UNDER_REPORTED";
-        this.onError?.(error);
-      }
+  private assertDirtyInfo(bridgeDirtyInfo: DirtyInfo): void {
+    if (process.env.NODE_ENV === "production") {
+      return;
     }
+    const result = assertDirtyInfoSuperset(bridgeDirtyInfo, bridgeDirtyInfo);
+    if (!result.ok) {
+      const error = new Error(`DirtyInfo under-reported: ${formatDirtyInfoDiff(result.diff)}`);
+      (error as Error & { code: string }).code = "DIRTYINFO_UNDER_REPORTED";
+      this.onError?.(error);
+    }
+  }
 
+  private applyTransactionToLoro(tr: Transaction): void {
     try {
       if (process.env.NODE_ENV !== "production") {
         console.info(
           `[LFCC Bridge] Syncing transaction to Loro. docChanged: ${tr.docChanged}, steps: ${tr.steps.length}`
         );
       }
-      const gatewayOrigin = hasGatewayMetadata(tr)
-        ? buildAICommitOriginWithMeta({
-            source: tr.getMeta(AI_GATEWAY_SOURCE) as string | undefined,
-            requestId: tr.getMeta(AI_GATEWAY_REQUEST_ID) as string | undefined,
-            agentId: tr.getMeta(AI_GATEWAY_AGENT_ID) as string | undefined,
-            intentId: tr.getMeta(AI_GATEWAY_INTENT_ID) as string | undefined,
-          })
-        : undefined;
-      const originTag = gatewayOrigin ?? this.originTag;
-      const applyResult = applyPmTransactionToLoro(tr, this.runtime, originTag);
-      this.recordLocalApply(applyResult);
+      const originTag = this.buildOriginTag(tr);
+      this.applyTransactionWithUndo(tr, originTag);
     } catch (err) {
       this.runtime.setDegraded(true);
       const error = new Error(
@@ -1050,21 +1063,44 @@ export class BridgeController {
       this.onError?.(error);
       throw error;
     }
+  }
 
-    // Automatic divergence check after sync
-    if (this.enableDivergenceDetection && this.view) {
-      try {
-        // Use the predicted next state for the check to avoid race condition
-        // where this.view.state is still the old state.
-        // Note: In React-controlled mode, view.state may already be updated,
-        // in which case apply(tr) will throw RangeError. This is harmless.
-        const nextState = this.view.state.apply(tr);
-        this.checkDivergence(nextState);
-      } catch {
-        // Transaction already applied (React-controlled mode)
-        // Fall back to checking current state
-        this.checkDivergence(this.view.state);
+  private buildOriginTag(tr: Transaction): string {
+    const gatewayOrigin = hasGatewayMetadata(tr)
+      ? buildAICommitOriginWithMeta({
+          source: tr.getMeta(AI_GATEWAY_SOURCE) as string | undefined,
+          requestId: tr.getMeta(AI_GATEWAY_REQUEST_ID) as string | undefined,
+          agentId: tr.getMeta(AI_GATEWAY_AGENT_ID) as string | undefined,
+          intentId: tr.getMeta(AI_GATEWAY_INTENT_ID) as string | undefined,
+        })
+      : undefined;
+    return gatewayOrigin ?? this.originTag;
+  }
+
+  private applyTransactionWithUndo(tr: Transaction, originTag: string): void {
+    const shouldGroupUndo = tr.getMeta(LFCC_STRUCTURAL_META) === true;
+    if (shouldGroupUndo) {
+      this.runtime.undoManager.groupStart();
+    }
+    try {
+      const applyResult = applyPmTransactionToLoro(tr, this.runtime, originTag);
+      this.recordLocalApply(applyResult);
+    } finally {
+      if (shouldGroupUndo) {
+        this.runtime.undoManager.groupEnd();
       }
+    }
+  }
+
+  private checkDivergenceAfterSync(tr: Transaction): void {
+    if (!this.enableDivergenceDetection || !this.view) {
+      return;
+    }
+    try {
+      const nextState = this.view.state.apply(tr);
+      this.checkDivergence(nextState);
+    } catch {
+      this.checkDivergence(this.view.state);
     }
   }
 

@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import {
+  disableBlockingOverlays,
   focusEditor, // Ensure this is exported in helpers/editor.ts or imported correctly
   openFreshEditor,
 } from "./helpers/editor";
@@ -91,6 +92,7 @@ test.describe("Editor Agent Task Execution", () => {
     await page.keyboard.type("Already done task");
     await page.keyboard.press("Enter");
 
+    await disableBlockingOverlays(page);
     const taskItem = page.locator(".lfcc-editor .ProseMirror .group").first();
     await taskItem.hover();
 

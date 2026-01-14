@@ -19,6 +19,7 @@ import type { LoroRuntime } from "../runtime/loroRuntime";
 import { validateRange } from "../utils/unicode";
 
 export const BRIDGE_ORIGIN_META = "lfcc-bridge-origin" as const;
+export const LFCC_STRUCTURAL_META = "lfcc-structural" as const;
 export type BridgeOrigin = "pm" | "loro";
 
 export type ApplyPmTransactionResult = {
@@ -407,9 +408,10 @@ export function applyPmTransactionToLoro(
   if (origin === "loro") {
     return null;
   }
+  const forceStructural = tr.getMeta(LFCC_STRUCTURAL_META) === true;
 
   // Try fast path for text-only edits
-  const fastPathResult = tryFastPath(tr);
+  const fastPathResult = forceStructural ? null : tryFastPath(tr);
   if (fastPathResult) {
     // DEFECT-001: UTF-16 Surrogate Pair Guard - Validate text before updating
     const validation = validateRange(fastPathResult.afterText, 0, fastPathResult.afterText.length);
@@ -443,7 +445,7 @@ export function applyPmTransactionToLoro(
   const opCodeSet = new Set(dirtyInfo.opCodes);
   if (isTextOnlyOps(dirtyInfo.opCodes)) {
     const attrChanged = hasAttributeChanges(tr.before, tr.doc, dirtyInfo.touchedBlocks);
-    if (!attrChanged) {
+    if (!attrChanged && !forceStructural) {
       const batchResult = tryBatchTextUpdate(
         tr,
         runtime,

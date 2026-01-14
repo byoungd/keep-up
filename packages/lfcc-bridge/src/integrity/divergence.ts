@@ -17,6 +17,7 @@ export type DivergenceCheckResult = {
   editorChecksum: string;
   loroChecksum: string;
   reason?: string;
+  analysis?: DivergenceAnalysis;
 };
 
 export type DivergenceDetectorOptions = {
@@ -142,11 +143,13 @@ export class DivergenceDetector {
 
       const diverged = editorChecksum !== loroChecksum;
 
+      const analysis = diverged ? this.analyzeDivergence(editorState, loroDoc, schema) : undefined;
       const result: DivergenceCheckResult = {
         diverged,
         editorChecksum,
         loroChecksum,
         reason: diverged ? "Checksum mismatch between editor and Loro states" : undefined,
+        analysis,
       };
 
       // Store checksums and state for next iteration
