@@ -115,6 +115,7 @@ export function looksLikeMarkdown(text: string): boolean {
 }
 
 const SINGLE_LINE_PATTERNS = [
+  /^#{1,6}\s+.+/, // Headings: # Title
   /^\s*```/, // Code block fence
   /^\s*[-*+]\s+\[[ xX]\]\s+.+/, // Task list
   /^\s*[-*+]\s+.+/, // Unordered list

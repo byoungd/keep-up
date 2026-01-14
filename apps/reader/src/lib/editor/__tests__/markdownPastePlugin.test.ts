@@ -17,6 +17,10 @@ describe("looksLikeMarkdown", () => {
     expect(looksLikeMarkdown("```ts")).toBe(true);
   });
 
+  it("detects single-line headings", () => {
+    expect(looksLikeMarkdown("# Heading")).toBe(true);
+  });
+
   it("detects multi-line lists with multiple markers", () => {
     const text = "- First\n- Second";
     expect(looksLikeMarkdown(text)).toBe(true);
