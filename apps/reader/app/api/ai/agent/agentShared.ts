@@ -35,5 +35,9 @@ export function buildInitialState(systemPrompt: string, history: AgentHistory): 
 }
 
 export function resolveWorkspaceRoot(): string {
+  const override = process.env.KEEPUP_WORKSPACE_ROOT;
+  if (override) {
+    return path.resolve(override);
+  }
   return path.resolve(process.cwd());
 }

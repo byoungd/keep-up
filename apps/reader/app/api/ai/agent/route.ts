@@ -128,8 +128,16 @@ function registerConfirmationHandler(options: {
   sendEvent: (event: object) => void;
 }) {
   options.orchestrator.setConfirmationHandler(async (confirmation) => {
-    const { confirmationId, promise } = createPendingConfirmation({
+    const { confirmationId, promise } = await createPendingConfirmation({
       requestId: options.requestId,
+      metadata: {
+        toolName: confirmation.toolName,
+        description: confirmation.description,
+        risk: confirmation.risk,
+        reason: confirmation.reason,
+        riskTags: confirmation.riskTags,
+        arguments: confirmation.arguments,
+      },
     });
     const snapshot = options.orchestrator.getState();
     options.sendEvent({

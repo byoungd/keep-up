@@ -25,7 +25,7 @@ export async function POST(request: Request) {
   const confirmed = body?.confirmed === true;
   const requestId = body?.request_id;
 
-  const result = resolvePendingConfirmation({
+  const result = await resolvePendingConfirmation({
     confirmationId,
     confirmed,
     requestId,
@@ -37,6 +37,11 @@ export async function POST(request: Request) {
 
   if (result.status === "request_mismatch") {
     return createErrorResponse("invalid_request", "Confirmation does not match request", {
+      requestId: result.requestId,
+    });
+  }
+  if (result.status === "expired") {
+    return createErrorResponse("invalid_request", "Confirmation expired", {
       requestId: result.requestId,
     });
   }

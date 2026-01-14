@@ -27,6 +27,7 @@ import { createAnthropicClient, createOpenAIProvider } from "../providerClients"
 import type { ProviderConfig } from "../providerResolver";
 import { buildInitialState, buildSystemPrompt, resolveWorkspaceRoot } from "./agentShared";
 import { createPendingConfirmation } from "./confirmationStore";
+import { getArchivedTaskSnapshots, recordTaskSnapshot } from "./taskStore";
 
 export type TaskStreamEvent =
   | {
@@ -37,6 +38,7 @@ export type TaskStreamEvent =
   | {
       type:
         | "task.queued"
+        | "task.paused"
         | "task.running"
         | "task.progress"
         | "task.completed"
@@ -83,7 +85,13 @@ export type TaskSnapshot = {
   summary?: CoworkTaskSummary;
 };
 
-export type TaskStatusSnapshot = "queued" | "running" | "completed" | "failed" | "cancelled";
+export type TaskStatusSnapshot =
+  | "queued"
+  | "paused"
+  | "running"
+  | "completed"
+  | "failed"
+  | "cancelled";
 
 type BackgroundTaskPayload = {
   prompt: string;
@@ -108,19 +116,33 @@ const taskEvents = new EventEmitter();
 const DEFAULT_TASK_TIMEOUT_MS = 1000 * 60 * 30;
 // In-memory queue scoped to this process. Replace with a persistent adapter for multi-instance deployments.
 const taskQueue = createTaskQueue({ defaultTimeout: DEFAULT_TASK_TIMEOUT_MS });
+const TASK_EVENT_HISTORY_LIMIT = 200;
+const taskEventHistory: Array<{ id: number; event: TaskStreamEvent }> = [];
+let lastTaskEventId = 0;
 let queueListenerAttached = false;
 let executorRegistered = false;
 
-export function subscribeTaskEvents(handler: (event: TaskStreamEvent) => void): () => void {
+export function subscribeTaskEvents(
+  handler: (event: TaskStreamEvent, eventId: number) => void
+): () => void {
   taskEvents.on(TASK_EVENT_NAME, handler);
   return () => taskEvents.off(TASK_EVENT_NAME, handler);
 }
 
-export function getTaskSnapshots(): TaskSnapshot[] {
-  return taskQueue
+export async function getTaskSnapshots(): Promise<TaskSnapshot[]> {
+  const archived = await getArchivedTaskSnapshots();
+  const live = taskQueue
     .listTasks()
     .filter(isBackgroundTask)
     .map((task) => serializeTask(task));
+  const merged = new Map<string, TaskSnapshot>();
+  for (const task of archived) {
+    merged.set(task.taskId, task);
+  }
+  for (const task of live) {
+    merged.set(task.taskId, task);
+  }
+  return Array.from(merged.values());
 }
 
 export function getTaskStats(): TaskQueueStats {
@@ -167,6 +189,61 @@ export async function cancelBackgroundTask(taskId: string): Promise<boolean> {
   return taskQueue.cancel(taskId);
 }
 
+export async function pauseBackgroundTask(taskId: string): Promise<boolean> {
+  ensureQueueListener();
+  const paused = await taskQueue.pause(taskId);
+  if (!paused) {
+    return false;
+  }
+  const task = taskQueue.getTask<BackgroundTaskPayload, BackgroundTaskResult>(taskId);
+  if (task) {
+    const snapshot = serializeTask(task);
+    void recordTaskSnapshot(snapshot);
+    emitTaskEvent({
+      type: "task.paused",
+      taskId,
+      timestamp: Date.now(),
+      data: { task: snapshot },
+    });
+  }
+  return true;
+}
+
+export async function resumeBackgroundTask(taskId: string): Promise<boolean> {
+  ensureQueueListener();
+  const resumed = await taskQueue.resume(taskId);
+  if (!resumed) {
+    return false;
+  }
+  const task = taskQueue.getTask<BackgroundTaskPayload, BackgroundTaskResult>(taskId);
+  if (task) {
+    const snapshot = serializeTask(task);
+    void recordTaskSnapshot(snapshot);
+    emitTaskEvent({
+      type: "task.queued",
+      taskId,
+      timestamp: Date.now(),
+      data: { task: snapshot, resumed: true },
+    });
+  }
+  return true;
+}
+
+export function getTaskEventHistorySince(eventId: number): {
+  entries: Array<{ id: number; event: TaskStreamEvent }>;
+  hasGap: boolean;
+} {
+  const oldestId = taskEventHistory[0]?.id;
+  const hasGap = eventId > 0 && (oldestId === undefined || eventId < oldestId);
+  if (!Number.isFinite(eventId) || hasGap) {
+    return { entries: [], hasGap };
+  }
+  return {
+    entries: taskEventHistory.filter((entry) => entry.id > eventId),
+    hasGap,
+  };
+}
+
 function ensureQueueListener() {
   if (queueListenerAttached) {
     return;
@@ -184,6 +261,9 @@ function ensureQueueListener() {
 
     const task = taskQueue.getTask<BackgroundTaskPayload, BackgroundTaskResult>(event.taskId);
     const snapshot = task ? serializeTask(task) : undefined;
+    if (snapshot) {
+      void recordTaskSnapshot(snapshot);
+    }
     emitTaskEvent({
       type: mapped.type,
       taskId: mapped.taskId,
@@ -205,7 +285,12 @@ function ensureExecutor() {
 }
 
 function emitTaskEvent(event: TaskStreamEvent) {
-  taskEvents.emit(TASK_EVENT_NAME, event);
+  const eventId = ++lastTaskEventId;
+  taskEventHistory.push({ id: eventId, event });
+  if (taskEventHistory.length > TASK_EVENT_HISTORY_LIMIT) {
+    taskEventHistory.shift();
+  }
+  taskEvents.emit(TASK_EVENT_NAME, event, eventId);
 }
 
 function serializeTask(task: Task<BackgroundTaskPayload, BackgroundTaskResult>): TaskSnapshot {
@@ -241,6 +326,7 @@ type StreamableTaskEventType = Exclude<
 
 const STREAMABLE_TASK_EVENT_TYPES: ReadonlySet<StreamableTaskEventType> = new Set([
   "task.queued",
+  "task.paused",
   "task.running",
   "task.progress",
   "task.completed",
@@ -264,6 +350,9 @@ function mapStatus(status: Task<unknown>["status"]): TaskStatusSnapshot {
   }
   if (status === "running") {
     return "running";
+  }
+  if (status === "paused") {
+    return "paused";
   }
   return "queued";
 }
@@ -393,7 +482,18 @@ function attachOrchestratorEvents(
   });
 
   orchestrator.setConfirmationHandler(async (confirmation) => {
-    const { confirmationId, promise } = createPendingConfirmation({ requestId });
+    const { confirmationId, promise } = await createPendingConfirmation({
+      requestId,
+      metadata: {
+        taskId: context.taskId,
+        toolName: confirmation.toolName,
+        description: confirmation.description,
+        risk: confirmation.risk,
+        reason: confirmation.reason,
+        riskTags: confirmation.riskTags,
+        arguments: confirmation.arguments,
+      },
+    });
     emitTaskEvent({
       type: "task.confirmation_required",
       taskId: context.taskId,
