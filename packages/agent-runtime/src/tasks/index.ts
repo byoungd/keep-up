@@ -27,6 +27,25 @@ export type {
 
 export { DEFAULT_TASK_QUEUE_CONFIG } from "./types";
 
+// Task Graph
+export type {
+  TaskGraphConfig,
+  TaskGraphEdge,
+  TaskGraphEvent,
+  TaskGraphEventType,
+  TaskGraphNode,
+  TaskGraphNodeInput,
+  TaskGraphNodeUpdate,
+  TaskGraphSnapshot,
+  TaskNodeStatus,
+  TaskNodeType,
+} from "./taskGraph";
+export {
+  TaskGraphStore,
+  createTaskGraphStore,
+  createTaskGraphStoreFromSnapshot,
+} from "./taskGraph";
+
 // Task Queue
 export { TaskQueue, createTaskQueue } from "./taskQueue";
 
