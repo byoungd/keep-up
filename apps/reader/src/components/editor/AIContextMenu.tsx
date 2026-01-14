@@ -792,6 +792,7 @@ export function AIContextMenu({ state, onClose, bridge }: AIContextMenuProps) {
   // Float positioning
   const { refs, floatingStyles } = useFloating({
     open: state?.isOpen,
+    strategy: "fixed",
     placement: "bottom-start",
     middleware: [offset(10), flip({ padding: 10 }), shift({ padding: 10 })],
     whileElementsMounted: autoUpdate,

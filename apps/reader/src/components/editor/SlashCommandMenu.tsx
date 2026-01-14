@@ -35,6 +35,7 @@ export function SlashCommandMenu({ state, onSelectCommand, onQueryChange }: Slas
   // Float positioning
   const { refs, floatingStyles } = useFloating({
     open: state.active,
+    strategy: "fixed",
     placement: "bottom-start",
     middleware: [
       offset(12), // Gap between cursor and menu
@@ -74,8 +75,7 @@ export function SlashCommandMenu({ state, onSelectCommand, onQueryChange }: Slas
       initial: { opacity: 0, scale: 0.95, y: -4 },
       animate: { opacity: 1, scale: 1, y: 0 },
       exit: { opacity: 0, scale: 0.95, y: -4 },
-      // biome-ignore lint/suspicious/noExplicitAny: Framer motion types are complex
-      transition: { duration: 0.15, ease: [0.3, 1.3, 0.3, 1] as any }, // Slight spring overshoot for "pop"
+      transition: { duration: 0.15, ease: [0.3, 1.3, 0.3, 1] as const }, // Slight spring overshoot for "pop"
     },
   };
 
