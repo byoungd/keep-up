@@ -44,7 +44,7 @@ export function Header({
   const syncStatus = useSyncStatus();
   const t = useTranslations("Header");
   const { title, sourceType } = useDocumentHeader(docId);
-  const { isCollapsed, expandSidebar } = useSidebarState();
+  const { isCollapsed, toggleCollapsed } = useSidebarState();
 
   const SourceIcon = SOURCE_ICONS[sourceType || "local"];
 
@@ -52,19 +52,18 @@ export function Header({
     <header className="flex h-12 items-center justify-between px-4 bg-background/80 backdrop-blur-md border-b border-border/20 z-20 w-full select-none">
       <div className="flex items-center gap-3">
         {/* Sidebar expand button - shows when sidebar is collapsed */}
-        {isCollapsed && (
-          <Tooltip content="Expand sidebar" side="right" sideOffset={8}>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={expandSidebar}
-              className="text-muted-foreground hover:text-foreground"
-              aria-label="Expand sidebar"
-            >
-              <PanelLeft className="h-4 w-4" />
-            </Button>
-          </Tooltip>
-        )}
+        {/* Sidebar expand/collapse button - always visible to prevent layout shift */}
+        <Tooltip content={isCollapsed ? t("expand") : t("collapse")} side="right" sideOffset={8}>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleCollapsed}
+            className="text-muted-foreground hover:text-foreground"
+            aria-label={isCollapsed ? t("expand") : t("collapse")}
+          >
+            <PanelLeft className="h-4 w-4" />
+          </Button>
+        </Tooltip>
 
         {/* Mobile toggle - hidden on desktop */}
         <Button

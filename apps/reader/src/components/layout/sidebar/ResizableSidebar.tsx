@@ -169,7 +169,7 @@ export function ResizableSidebar({
   }
 
   // Normal resizable sidebar
-  return (
+  const sidebar = (
     <div
       className={cn(
         "relative shrink-0 z-overlay border-r bg-surface-1",
@@ -198,4 +198,15 @@ export function ResizableSidebar({
       />
     </div>
   );
+
+  if (isFloating) {
+    return (
+      <>
+        <div style={{ width: collapsedWidth }} className="shrink-0 relative" />
+        {sidebar}
+      </>
+    );
+  }
+
+  return sidebar;
 }
