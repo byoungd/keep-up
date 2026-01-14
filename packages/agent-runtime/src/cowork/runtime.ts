@@ -22,6 +22,7 @@ import {
   type CoworkTaskRunnerConfig,
 } from "./taskRunner";
 import type { CoworkTaskSummary } from "./types";
+import type { IVmProvider } from "./vm";
 
 export interface CoworkRuntimeOptions {
   llm?: IAgentLLM;
@@ -34,6 +35,8 @@ export interface CoworkRuntimeOptions {
   auditLogger?: AuditLogger;
   outputRoots?: string[];
   caseInsensitivePaths?: boolean;
+  /** Optional VM provider for sandboxed execution */
+  vmProvider?: IVmProvider;
 }
 
 export class CoworkRuntime {
