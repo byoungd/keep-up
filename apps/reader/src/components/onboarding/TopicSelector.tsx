@@ -61,6 +61,7 @@ export function TopicSelector({ onSelect, isLoading }: TopicSelectorProps) {
           return (
             <button
               type="button"
+              aria-pressed={isSelected}
               key={topic.id}
               onClick={() => toggleTopic(topic.id)}
               className={cn(
@@ -80,7 +81,7 @@ export function TopicSelector({ onSelect, isLoading }: TopicSelectorProps) {
                       : "bg-surface-2 text-muted-foreground group-hover:text-primary"
                   )}
                 >
-                  <Icon className="w-5 h-5" />
+                  <Icon className="w-5 h-5" aria-hidden="true" />
                 </div>
                 {isSelected && (
                   <div className="absolute top-4 right-4 text-primary animate-in zoom-in spin-in-90 duration-200">
