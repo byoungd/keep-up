@@ -13,3 +13,12 @@ export {
   type ContextManagerOptions,
   type CreateContextOptions,
 } from "./contextManager";
+
+export {
+  TieredContextBuilder,
+  type ContextItem,
+  type ContextTier,
+  type ContextBudget,
+  type ContextBuildResult,
+  type TieredContextConfig,
+} from "./contextBuilder";
