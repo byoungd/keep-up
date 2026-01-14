@@ -3,6 +3,7 @@
 import { useRssStoreOptional } from "@/lib/rss";
 import { type FeedSubscription, useFeedProviderOptional } from "@/providers/FeedProvider";
 import { Atom, Cloud, Coffee, Newspaper } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 interface SubscriptionSummary {
@@ -20,6 +21,7 @@ export interface ProactiveSuggestion {
 }
 
 export function useProactiveSuggestions() {
+  const t = useTranslations("AIPanel");
   const feedContext = useFeedProviderOptional();
   const rssStore = useRssStoreOptional();
   const rssSubscriptions = rssStore?.subscriptions ?? [];
@@ -75,10 +77,9 @@ export function useProactiveSuggestions() {
     if (hour < 12) {
       generated.push({
         id: "morning-brief",
-        title: "Morning Briefing",
-        description: "Get a 10-minute summary of the most critical tech updates to start your day.",
-        actionPrompt:
-          "Generate a morning briefing based on my top feeds. Focus on React, Cloud, and AI. Format as key stories.",
+        title: t("suggestions.morning-brief.title"),
+        description: t("suggestions.morning-brief.description"),
+        actionPrompt: t("suggestions.morning-brief.actionPrompt"),
         icon: Coffee,
       });
     }
@@ -87,9 +88,9 @@ export function useProactiveSuggestions() {
     if (hasUnread) {
       generated.push({
         id: "unread-summary",
-        title: "Summarize Unreads",
-        description: "You have unread references. I can scan them and highlight what matters.",
-        actionPrompt: "Scan all my unread articles and summarize the top 5 most interesting ones.",
+        title: t("suggestions.unread-summary.title"),
+        description: t("suggestions.unread-summary.description"),
+        actionPrompt: t("suggestions.unread-summary.actionPrompt"),
         icon: Newspaper,
       });
     }
@@ -102,10 +103,9 @@ export function useProactiveSuggestions() {
     if (hasReact) {
       generated.push({
         id: "react-updates",
-        title: "React Ecosystem Updates",
-        description: "Check for new releases or RFCs in the React world.",
-        actionPrompt:
-          "Are there any recent React releases or important RFCs in my feeds? Summarize them.",
+        title: t("suggestions.react-updates.title"),
+        description: t("suggestions.react-updates.description"),
+        actionPrompt: t("suggestions.react-updates.actionPrompt"),
         icon: Atom,
       });
     }
@@ -117,16 +117,15 @@ export function useProactiveSuggestions() {
     if (hasCloud) {
       generated.push({
         id: "infra-monitor",
-        title: "Cloud & Infra Report",
-        description: "Outages, incidents, or major architectural shifts.",
-        actionPrompt:
-          "Check my feeds for any cloud outages, incidents, or major architectural announcements.",
+        title: t("suggestions.infra-monitor.title"),
+        description: t("suggestions.infra-monitor.description"),
+        actionPrompt: t("suggestions.infra-monitor.actionPrompt"),
         icon: Cloud,
       });
     }
 
     setSuggestions(generated.slice(0, 3)); // Limit to top 3
-  }, [hasUnread, subscriptions, refreshTick]);
+  }, [hasUnread, subscriptions, refreshTick, t]);
 
   return { suggestions };
 }

@@ -132,6 +132,30 @@
     "sourcesTitle": "从精选包开始",
     "sourcesSubtitle": "精选来源，快速上手。",
     "bundles": {
+      "react": {
+        "title": "React 生态",
+        "description": "Next.js、React 19 和 UI 库"
+      },
+      "ai": {
+        "title": "AI 工程化",
+        "description": "大模型、智能体与相关研究"
+      },
+      "cloud": {
+        "title": "云原生",
+        "description": "K8s、无服务器与系统设计"
+      },
+      "frontend": {
+        "title": "现代前端",
+        "description": "CSS、Web 平台与 TypeScript"
+      },
+      "backend": {
+        "title": "后端与系统",
+        "description": "数据库、Rust 和 Go"
+      },
+      "tech_lead": {
+        "title": "技术管理者",
+        "description": "管理、架构与文化"
+      },
       "techNews": {
         "title": "科技新闻合集",
         "description": "TechCrunch、Verge、HackerNews"
@@ -465,7 +489,29 @@
     "exportChat": "导出对话",
     "modelBackToModels": "返回模型列表",
     "modelLegacyGroup": "传统模型",
-    "proactiveSuggestionsTitle": "这些更新可能对你有帮助"
+    "proactiveSuggestionsTitle": "这些更新可能对你有帮助",
+    "suggestions": {
+      "morning-brief": {
+        "title": "早报",
+        "description": "获取 10 分钟科技重点汇总，开启高效的一天。",
+        "actionPrompt": "根据我的顶层订阅源生成一份早报。重点关注 React、Cloud 和 AI。以重点故事的形式呈现。"
+      },
+      "unread-summary": {
+        "title": "未读汇总",
+        "description": "你有未读内容。我可以为你扫描并提取重点。",
+        "actionPrompt": "扫描我所有的未读文章，并总结出最有趣的 5 篇。"
+      },
+      "react-updates": {
+        "title": "React 生态动态",
+        "description": "检查 React 领域的最新发布或 RFC。",
+        "actionPrompt": "我的订阅源中最近有 React 发布或重要的 RFC 吗？请总结一下。"
+      },
+      "infra-monitor": {
+        "title": "云与基础设施报告",
+        "description": "停机、事故或重大架构变动。",
+        "actionPrompt": "检查我的订阅源，看是否有任何云服务停机、事故或重大架构公告。"
+      }
+    }
   },
   "AppearanceMenu": {
     "title": "显示设置",

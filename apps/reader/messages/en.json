@@ -144,6 +144,30 @@
     "sourcesTitle": "Start with a bundle",
     "sourcesSubtitle": "Curated sources to get you up to speed instantly.",
     "bundles": {
+      "react": {
+        "title": "React Ecosystem",
+        "description": "Next.js, React 19, and UI libraries"
+      },
+      "ai": {
+        "title": "AI Engineering",
+        "description": "LLMs, Agents, and Research"
+      },
+      "cloud": {
+        "title": "Cloud Native",
+        "description": "K8s, Serverless, and System Design"
+      },
+      "frontend": {
+        "title": "Modern Frontend",
+        "description": "CSS, Web Platform, and TS"
+      },
+      "backend": {
+        "title": "Backend & Systems",
+        "description": "Databases, Rust, and Go"
+      },
+      "tech_lead": {
+        "title": "Engineering Leadership",
+        "description": "Management, Architecture, and Culture"
+      },
       "techNews": {
         "title": "Tech News Bundle",
         "description": "TechCrunch, Verge, HackerNews"
@@ -479,7 +503,29 @@
     "exportChat": "Export chat",
     "modelBackToModels": "Back to models",
     "modelLegacyGroup": "Legacy Models",
-    "proactiveSuggestionsTitle": "Here are some updates for you"
+    "proactiveSuggestionsTitle": "Here are some updates for you",
+    "suggestions": {
+      "morning-brief": {
+        "title": "Morning Briefing",
+        "description": "Get a 10-minute summary of the most critical tech updates to start your day.",
+        "actionPrompt": "Generate a morning briefing based on my top feeds. Focus on React, Cloud, and AI. Format as key stories."
+      },
+      "unread-summary": {
+        "title": "Summarize Unreads",
+        "description": "You have unread references. I can scan them and highlight what matters.",
+        "actionPrompt": "Scan all my unread articles and summarize the top 5 most interesting ones."
+      },
+      "react-updates": {
+        "title": "React Ecosystem Updates",
+        "description": "Check for new releases or RFCs in the React world.",
+        "actionPrompt": "Are there any recent React releases or important RFCs in my feeds? Summarize them."
+      },
+      "infra-monitor": {
+        "title": "Cloud & Infra Report",
+        "description": "Outages, incidents, or major architectural shifts.",
+        "actionPrompt": "Check my feeds for any cloud outages, incidents, or major architectural announcements."
+      }
+    }
   },
   "AppearanceMenu": {
     "title": "Display Settings",

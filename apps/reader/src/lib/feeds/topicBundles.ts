@@ -9,6 +9,7 @@ export interface FeedBundle {
   }[];
 }
 
+// Note: Labels and descriptions are now handled via i18n translation keys in Onboarding.bundles.[id]
 export const TOPIC_BUNDLES: Record<string, FeedBundle> = {
   react: {
     id: "react",

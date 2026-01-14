@@ -87,8 +87,12 @@ export function TopicSelector({ onSelect, isLoading }: TopicSelectorProps) {
                 )}
               </div>
 
-              <h3 className="font-semibold text-foreground mb-1">{topic.label}</h3>
-              <p className="text-xs text-muted-foreground leading-relaxed">{topic.description}</p>
+              <h3 className="font-semibold text-foreground mb-1">
+                {t(`bundles.${topic.id}.title`)}
+              </h3>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                {t(`bundles.${topic.id}.description`)}
+              </p>
 
               <div className="mt-4 pt-3 border-t border-border/10 flex items-center gap-2">
                 <span className="text-[10px] font-medium text-muted-foreground/70 uppercase tracking-wider">
