@@ -54,28 +54,48 @@ type ResourceExtractor = (call: MCPToolCall) => string | null;
 
 const RESOURCE_EXTRACTORS: Array<{ pattern: RegExp; extractor: ResourceExtractor }> = [
   {
-    pattern: /^file:(write|delete|move)$/,
+    pattern: /^file:(write|delete|move|copy)$/,
     extractor: (call) => {
       const path = call.arguments?.path as string | undefined;
       return path ? `file:${path}` : null;
     },
   },
   {
-    pattern: /^lfcc:(update_block|delete_block)$/,
+    pattern: /^lfcc:(update_block|delete_block|insert_block)$/,
     extractor: (call) => {
       const docId = call.arguments?.docId as string | undefined;
       const blockId = call.arguments?.blockId as string | undefined;
-      return docId && blockId ? `lfcc:${docId}:${blockId}` : null;
+      return docId ? `lfcc:${docId}${blockId ? `:${blockId}` : ""}` : null;
     },
   },
   {
-    pattern: /^git:(commit|push|merge)$/,
-    extractor: () => "git:repository", // All git ops serialize
+    pattern: /^git:(commit|push|merge|rebase|checkout|pull)$/,
+    extractor: () => "git:repository", // Mutating git ops serialize on repo
   },
 ];
 
-// Tools that always serialize
-const SERIALIZED_PREFIXES = ["bash:", "git:"];
+/**
+ * Tools that always serialize (must execute one at a time).
+ *
+ * These tools have side effects that could conflict if run in parallel.
+ * Read-only tools like `git:status`, `git:log`, `file:read` are NOT here
+ * and can safely run in parallel.
+ *
+ * @example
+ * ```ts
+ * // Extend with custom serialized tools
+ * SERIALIZED_TOOLS.add('custom:dangerous-op');
+ * ```
+ */
+export const SERIALIZED_TOOLS = new Set([
+  "bash:execute",
+  "git:commit",
+  "git:push",
+  "git:merge",
+  "git:rebase",
+  "git:checkout",
+  "git:pull",
+]);
 
 // ============================================================================
 // Dependency Analyzer
@@ -173,7 +193,7 @@ export class DependencyAnalyzer {
       }
 
       const call = calls[i];
-      const isSerialized = SERIALIZED_PREFIXES.some((p) => call.name.startsWith(p));
+      const isSerialized = SERIALIZED_TOOLS.has(call.name);
 
       if (isSerialized) {
         this.addSerializedDependencies(i, node, graph);

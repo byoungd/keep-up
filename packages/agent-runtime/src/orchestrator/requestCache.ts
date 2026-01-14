@@ -122,9 +122,10 @@ export class RequestCache {
       return null;
     }
 
-    // Cache hit
+    // Cache hit - promote to end of Map for O(1) LRU
     entry.hitCount++;
     entry.lastAccessed = Date.now();
+    this.promoteEntry(key, entry);
     this.stats.hits++;
     this.updateHitRate();
 
@@ -294,23 +295,31 @@ export class RequestCache {
     }
   }
 
+  /**
+   * Promote entry to end of Map for LRU ordering.
+   *
+   * JavaScript Map maintains insertion order. By deleting and re-inserting,
+   * we move the entry to the "newest" position in iteration order.
+   * This makes eviction O(1) - we just grab the first key.
+   */
+  private promoteEntry(key: string, entry: CacheEntry): void {
+    this.cache.delete(key);
+    this.cache.set(key, entry);
+  }
+
+  /**
+   * Evict the least recently used entry.
+   *
+   * O(1) complexity: Map.keys().next() returns the first (oldest) key
+   * because we always promote accessed entries to the end via promoteEntry().
+   */
   private evictLRU(): void {
     if (this.cache.size === 0) {
       return;
     }
 
-    // Find least recently used entry
-    let lruKey: string | null = null;
-    let lruTime = Number.POSITIVE_INFINITY;
-
-    for (const [key, entry] of this.cache) {
-      if (entry.lastAccessed < lruTime) {
-        lruTime = entry.lastAccessed;
-        lruKey = key;
-      }
-    }
-
-    if (lruKey) {
+    const lruKey = this.cache.keys().next().value;
+    if (lruKey !== undefined) {
       this.cache.delete(lruKey);
       this.stats.evictions++;
     }

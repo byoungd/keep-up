@@ -91,12 +91,15 @@ export interface ProfilerConfig {
 
 /**
  * Performance profiler for measuring operation timings.
+ * Uses a fixed-size ring buffer for O(1) entry recording with no splice overhead.
  */
 export class Profiler {
-  private readonly entries: ProfileEntry[] = [];
+  private readonly entries: (ProfileEntry | null)[];
   private readonly config: Required<ProfilerConfig>;
   private readonly activeSpans = new Map<string, ProfileEntry>();
   private idCounter = 0;
+  private writeIndex = 0;
+  private entryWriteCount = 0; // Total entries written (for determining fill level)
 
   constructor(config: ProfilerConfig = { enabled: true }) {
     this.config = {
@@ -104,6 +107,8 @@ export class Profiler {
       maxEntries: config.maxEntries ?? 10000,
       categories: config.categories ?? [],
     };
+    // Pre-allocate ring buffer
+    this.entries = new Array(this.config.maxEntries).fill(null);
   }
 
   /**
@@ -224,9 +229,10 @@ export class Profiler {
    * Get statistics for a category.
    */
   getStats(category?: string): ProfileStats | undefined {
+    const allEntries = this.getEntriesInOrder();
     const entries = category
-      ? this.entries.filter((e) => e.category === category && e.durationMs !== undefined)
-      : this.entries.filter((e) => e.durationMs !== undefined);
+      ? allEntries.filter((e) => e.category === category && e.durationMs !== undefined)
+      : allEntries.filter((e) => e.durationMs !== undefined);
 
     if (entries.length === 0) {
       return undefined;
@@ -239,10 +245,11 @@ export class Profiler {
    * Generate a profile report.
    */
   getReport(name = "Profile Report"): ProfileReport {
+    const allEntries = this.getEntriesInOrder();
     const byCategory = new Map<string, ProfileEntry[]>();
     const byOperation = new Map<string, ProfileEntry[]>();
 
-    for (const entry of this.entries) {
+    for (const entry of allEntries) {
       if (entry.durationMs === undefined) {
         continue;
       }
@@ -259,8 +266,8 @@ export class Profiler {
       byOperation.set(opKey, opEntries);
     }
 
-    const startedAt = this.entries.length > 0 ? this.entries[0].startTime : Date.now();
-    const lastEntry = this.entries[this.entries.length - 1];
+    const startedAt = allEntries.length > 0 ? allEntries[0].startTime : Date.now();
+    const lastEntry = allEntries[allEntries.length - 1];
     const endedAt = lastEntry?.endTime;
 
     return {
@@ -270,7 +277,7 @@ export class Profiler {
       totalDurationMs: endedAt ? endedAt - startedAt : 0,
       byCategory: new Map([...byCategory.entries()].map(([k, v]) => [k, this.calculateStats(v)])),
       byOperation: new Map([...byOperation.entries()].map(([k, v]) => [k, this.calculateStats(v)])),
-      entries: [...this.entries],
+      entries: allEntries,
     };
   }
 
@@ -278,15 +285,53 @@ export class Profiler {
    * Clear all entries.
    */
   clear(): void {
-    this.entries.length = 0;
+    this.entries.fill(null);
+    this.writeIndex = 0;
+    this.entryWriteCount = 0;
     this.activeSpans.clear();
   }
 
   /**
-   * Get entry count.
+   * Get current entry count (capped at maxEntries).
    */
   get entryCount(): number {
-    return this.entries.length;
+    return Math.min(this.entryWriteCount, this.config.maxEntries);
+  }
+
+  /**
+   * Get all recorded entries in chronological order.
+   * Returns a copy of the entries array.
+   */
+  getEntries(): ProfileEntry[] {
+    return this.getEntriesInOrder();
+  }
+
+  /**
+   * Get all entries in chronological order.
+   * Handles ring buffer wrap-around correctly:
+   * - If buffer is not full: entries are at indices [0, entryCount)
+   * - If buffer is full: oldest entry is at writeIndex, newest at writeIndex-1
+   */
+  private getEntriesInOrder(): ProfileEntry[] {
+    const count = this.entryCount;
+    if (count === 0) {
+      return [];
+    }
+
+    const result: ProfileEntry[] = [];
+    const start =
+      this.entryWriteCount >= this.config.maxEntries
+        ? this.writeIndex // Buffer is full, oldest is at writeIndex
+        : 0; // Buffer not full, oldest is at 0
+
+    for (let i = 0; i < count; i++) {
+      const idx = (start + i) % this.config.maxEntries;
+      const entry = this.entries[idx];
+      if (entry) {
+        result.push(entry);
+      }
+    }
+    return result;
   }
 
   private recordEntry(entry: ProfileEntry): void {
@@ -294,12 +339,10 @@ export class Profiler {
       return;
     }
 
-    this.entries.push(entry);
-
-    // Trim if over limit
-    if (this.entries.length > this.config.maxEntries) {
-      this.entries.splice(0, this.entries.length - this.config.maxEntries);
-    }
+    // Ring buffer: overwrite at current position
+    this.entries[this.writeIndex] = entry;
+    this.writeIndex = (this.writeIndex + 1) % this.config.maxEntries;
+    this.entryWriteCount++;
   }
 
   private shouldRecord(category: string): boolean {

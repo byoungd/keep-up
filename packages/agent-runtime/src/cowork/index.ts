@@ -14,3 +14,5 @@ export * from "./availability";
 export * from "./injectionGuard";
 export * from "./taskRunner";
 export * from "./runtime";
+export * from "./vm";
+export * from "./planSync";

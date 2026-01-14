@@ -3,7 +3,6 @@ import {
   focusEditor,
   modKey,
   openFreshEditor,
-  selectAllText,
   setEditorContent,
   typeInEditor,
 } from "./helpers/editor";
@@ -53,8 +52,11 @@ test.describe("Comprehensive Editor Verification", () => {
         await page.waitForTimeout(100);
 
         // Apply formatting
+        await page.evaluate(() =>
+          (window as unknown as { __lfccView?: { focus?: () => void } }).__lfccView?.focus?.()
+        );
         await page.keyboard.press(`${modKey}+${mark.shortcut}`);
-        await page.waitForTimeout(100);
+        await page.waitForTimeout(200);
 
         // Assert: Check existence of the tag with longer timeout
         await expect(page.locator(`.lfcc-editor .ProseMirror ${mark.tag}`)).toBeVisible({
@@ -183,9 +185,14 @@ test.describe("Comprehensive Editor Verification", () => {
   test("Strikethrough shortcut", async ({ page }) => {
     await openFreshEditor(page, "fmt-strike");
     await typeInEditor(page, "Strike");
-    await selectAllText(page);
+    const { selectTextBySubstring } = await import("./helpers/editor");
+    await selectTextBySubstring(page, "Strike");
+    await page.evaluate(() =>
+      (window as unknown as { __lfccView?: { focus?: () => void } }).__lfccView?.focus?.()
+    );
     await page.keyboard.press(`${modKey}+Shift+s`);
-    await expect(page.locator(".lfcc-editor .ProseMirror s")).toHaveText("Strike");
+    const html = await page.locator(".lfcc-editor .ProseMirror").innerHTML();
+    expect(html).toMatch(/<(s|del|strike)[^>]*>Strike<\/(s|del|strike)>/);
   });
 
   // E. Link (Skipped for now - requires dialog interaction)

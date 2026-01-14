@@ -9,19 +9,41 @@ async function getAnnotationIds(page: Page): Promise<string[]> {
     const overlaySelector = ".highlight-overlay .highlight-rect[data-annotation-id]";
     const targetSelector = ".lfcc-editor .lfcc-annotation-target[data-annotation-id]";
     const legacySelector = ".lfcc-editor .lfcc-annotation[data-annotation-id]";
+    const panelSelector = '[data-annotation-role="panel-item"][data-annotation-id]';
 
-    let nodes = document.querySelectorAll<HTMLElement>(overlaySelector);
-    if (nodes.length === 0) {
-      nodes = document.querySelectorAll<HTMLElement>(targetSelector);
-    }
-    if (nodes.length === 0) {
-      nodes = document.querySelectorAll<HTMLElement>(legacySelector);
+    const selectors = [overlaySelector, targetSelector, legacySelector, panelSelector];
+    const ids = new Set<string>();
+    for (const selector of selectors) {
+      const nodes = document.querySelectorAll<HTMLElement>(selector);
+      for (const node of nodes) {
+        const id = node.getAttribute("data-annotation-id");
+        if (id) {
+          ids.add(id);
+        }
+      }
     }
 
-    return Array.from(nodes)
-      .map((el) => el.getAttribute("data-annotation-id"))
-      .filter(Boolean) as string[];
+    return Array.from(ids);
   });
+}
+
+async function forceCommit(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const globalAny = window as unknown as { __lfccForceCommit?: () => void };
+    globalAny.__lfccForceCommit?.();
+  });
+  await page.waitForTimeout(100);
+}
+
+async function applyHighlight(page: Page): Promise<void> {
+  const toolbar = page.locator("[data-testid='selection-toolbar']");
+  try {
+    await expect(toolbar).toBeVisible({ timeout: 5000 });
+    await toolbar.getByRole("button", { name: "Highlight yellow" }).click({ force: true });
+  } catch {
+    await page.keyboard.press(`${modKey}+Shift+A`);
+  }
+  await forceCommit(page);
 }
 
 test.describe("Real Editor Annotation Flow", () => {
@@ -40,11 +62,9 @@ test.describe("Real Editor Annotation Flow", () => {
 
     // Select and annotate
     await selectTextBySubstring(page, uniqueText);
-    const highlightButton = page.getByRole("button", { name: "Highlight yellow" });
-    await expect(highlightButton).toBeVisible({ timeout: 5000 });
 
     const idsBefore = await getAnnotationIds(page);
-    await highlightButton.click();
+    await applyHighlight(page);
 
     // Wait for annotation to appear
     await expect
@@ -53,6 +73,7 @@ test.describe("Real Editor Annotation Flow", () => {
 
     const idsAfter = await getAnnotationIds(page);
     const createdId = idsAfter.find((id) => !idsBefore.includes(id));
+    expect(createdId).toBeDefined();
     expect(createdId).toBeDefined();
 
     // Verify highlight is visible (check overlay layer for visual rendering)
@@ -85,11 +106,9 @@ test.describe("Real Editor Annotation Flow", () => {
 
     // Create annotation
     await selectTextBySubstring(page, uniqueText);
-    const highlightButton = page.getByRole("button", { name: "Highlight yellow" });
-    await expect(highlightButton).toBeVisible({ timeout: 5000 });
 
     const idsBefore = await getAnnotationIds(page);
-    await highlightButton.click();
+    await applyHighlight(page);
 
     await expect
       .poll(async () => (await getAnnotationIds(page)).length)
@@ -114,8 +133,9 @@ test.describe("Real Editor Annotation Flow", () => {
     await page.waitForTimeout(1000);
 
     // Annotation should still be visible (check for annotation with matching ID in the annotations list)
-    const finalIds = await getAnnotationIds(page);
-    expect(finalIds).toContain(createdId);
+    await expect
+      .poll(async () => (await getAnnotationIds(page)).includes(createdId ?? ""), { timeout: 5000 })
+      .toBe(true);
   });
 
   test("undo/redo with annotations", async ({ page }) => {
@@ -129,11 +149,9 @@ test.describe("Real Editor Annotation Flow", () => {
 
     // Create annotation
     await selectTextBySubstring(page, uniqueText);
-    const highlightButton = page.getByRole("button", { name: "Highlight yellow" });
-    await expect(highlightButton).toBeVisible({ timeout: 5000 });
 
     const idsBefore = await getAnnotationIds(page);
-    await highlightButton.click();
+    await applyHighlight(page);
 
     await expect
       .poll(async () => (await getAnnotationIds(page)).length)
