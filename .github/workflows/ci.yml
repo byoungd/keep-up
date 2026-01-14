@@ -66,7 +66,7 @@ jobs:
 
       - name: Archive build artifacts
         run: |
-          zip -r build-output.zip packages/*/dist apps/reader/.next/standalone apps/reader/.next/static apps/reader/public
+          zip -r build-output.zip packages/*/dist apps/reader/.next/standalone apps/reader/.next/static apps/reader/public apps/collab-server/dist
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
