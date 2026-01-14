@@ -77,7 +77,16 @@ test.describe("Essential Editor Tests", () => {
       await typeInEditor(page, "Line content here");
       await page.waitForTimeout(200);
 
-      // Get end cursor position
+      const editor = page.locator(".lfcc-editor .ProseMirror");
+      await editor.click();
+      await focusEditor(page);
+      await page.waitForTimeout(100);
+
+      const isMac = process.platform === "darwin";
+
+      // Ensure we're at line end first.
+      await editor.press(isMac ? "Meta+ArrowRight" : "End");
+      await page.waitForTimeout(100);
       const endPos = await page.evaluate(() => {
         const view = (
           window as unknown as { __lfccView?: { state?: { selection?: { from?: number } } } }
@@ -86,35 +95,15 @@ test.describe("Essential Editor Tests", () => {
       });
       expect(endPos).toBeGreaterThan(1);
 
-      // Focus and try Home key navigation
-      await focusEditor(page);
+      // Move to line start.
+      await editor.press(isMac ? "Meta+ArrowLeft" : "Home");
       await page.waitForTimeout(100);
-
-      // Try Home key first, then platform-specific fallback
-      await page.keyboard.press("Home");
-      await page.waitForTimeout(100);
-
-      // Check if cursor moved
-      let startPos = await page.evaluate(() => {
+      const startPos = await page.evaluate(() => {
         const view = (
           window as unknown as { __lfccView?: { state?: { selection?: { from?: number } } } }
         ).__lfccView;
         return view?.state?.selection?.from ?? -1;
       });
-
-      // If Home didn't work, try platform-specific key
-      if (startPos === endPos) {
-        if (process.platform === "darwin") {
-          await page.keyboard.press("Meta+ArrowLeft");
-        }
-        await page.waitForTimeout(100);
-        startPos = await page.evaluate(() => {
-          const view = (
-            window as unknown as { __lfccView?: { state?: { selection?: { from?: number } } } }
-          ).__lfccView;
-          return view?.state?.selection?.from ?? -1;
-        });
-      }
 
       // Verify cursor moved toward start (should be at or near position 1)
       // Note: In headless mode, exact position can vary; just verify it moved left

@@ -14,6 +14,8 @@
 
 import type { Node as PMNode } from "prosemirror-model";
 
+import { parseAttrs } from "../crdt/crdtSchema";
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -98,7 +100,14 @@ export function normalizeText(text: string): string {
 export function normalizeAttrs(attrs: Record<string, unknown>): Record<string, unknown> {
   const EXCLUDED_KEYS = new Set(["__internal", "__transient"]);
 
-  const entries = Object.entries(attrs)
+  const serialized =
+    typeof attrs.attrs === "string"
+      ? parseAttrs(attrs.attrs as string)
+      : ({} as Record<string, unknown>);
+  const merged = { ...serialized, ...attrs };
+  const { attrs: _serializedAttrs, ...cleaned } = merged;
+
+  const entries = Object.entries(cleaned)
     .filter(([key, value]) => {
       if (EXCLUDED_KEYS.has(key)) {
         return false;

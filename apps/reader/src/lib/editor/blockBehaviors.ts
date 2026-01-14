@@ -163,6 +163,7 @@ export const handleTab =
     if (dispatch) {
       const tr = state.tr.setNodeMarkup($from.before(), schema.nodes.paragraph, {
         ...parent.attrs,
+        attrs: cleanAttrsForListExit(parent.attrs.attrs),
         indent_level: currentIndent + 1,
       });
       dispatch(tr.scrollIntoView());
@@ -192,6 +193,7 @@ export const handleShiftTab =
         // Decrease indent
         const tr = state.tr.setNodeMarkup($from.before(), schema.nodes.paragraph, {
           ...parent.attrs,
+          attrs: cleanAttrsForListExit(parent.attrs.attrs),
           indent_level: currentIndent - 1,
         });
         dispatch(tr.scrollIntoView());
@@ -239,6 +241,7 @@ export const handleBackspaceInList =
         // Decrease indent
         const tr = state.tr.setNodeMarkup($from.before(), schema.nodes.paragraph, {
           ...parent.attrs,
+          attrs: cleanAttrsForListExit(parent.attrs.attrs),
           indent_level: currentIndent - 1,
         });
         dispatch(tr.scrollIntoView());

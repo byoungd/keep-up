@@ -321,6 +321,28 @@ function tryBatchTextUpdate(
   };
 }
 
+function hasAttributeChanges(before: PMNode, after: PMNode, touchedBlocks: string[]): boolean {
+  if (touchedBlocks.length === 0) {
+    return false;
+  }
+
+  const beforeBlocks = collectLeafTextBlocks(before);
+  const afterBlocks = collectLeafTextBlocks(after);
+
+  for (const blockId of touchedBlocks) {
+    const beforeNode = beforeBlocks.get(blockId);
+    const afterNode = afterBlocks.get(blockId);
+    if (!beforeNode || !afterNode) {
+      continue;
+    }
+    if (stableStringify(beforeNode.attrs) !== stableStringify(afterNode.attrs)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function tryReorderContainers(
   tr: Transaction,
   runtime: LoroRuntime,
@@ -420,15 +442,18 @@ export function applyPmTransactionToLoro(
   const dirtyInfo = computeDirtyInfo(tr);
   const opCodeSet = new Set(dirtyInfo.opCodes);
   if (isTextOnlyOps(dirtyInfo.opCodes)) {
-    const batchResult = tryBatchTextUpdate(
-      tr,
-      runtime,
-      originTag,
-      dirtyInfo.touchedBlocks,
-      dirtyInfo.opCodes
-    );
-    if (batchResult) {
-      return batchResult;
+    const attrChanged = hasAttributeChanges(tr.before, tr.doc, dirtyInfo.touchedBlocks);
+    if (!attrChanged) {
+      const batchResult = tryBatchTextUpdate(
+        tr,
+        runtime,
+        originTag,
+        dirtyInfo.touchedBlocks,
+        dirtyInfo.opCodes
+      );
+      if (batchResult) {
+        return batchResult;
+      }
     }
   }
   const isReorderCandidate = opCodeSet.has("OP_REORDER");

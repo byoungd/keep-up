@@ -10,6 +10,8 @@ import {
   joinUp,
   lift,
   selectParentNode,
+  selectTextblockEnd,
+  selectTextblockStart,
   setBlockType,
   toggleMark,
 } from "prosemirror-commands";
@@ -260,6 +262,24 @@ export const SHORTCUT_REGISTRY: ShortcutDefinition[] = [
     keys: ["Escape"],
     category: "navigation",
     staticCommand: selectParentNode,
+  },
+  {
+    id: "line-start",
+    label: "Line Start",
+    keys: ["Home", "Meta-ArrowLeft"],
+    category: "navigation",
+    staticCommand: selectTextblockStart,
+    macDisplay: "Home",
+    winDisplay: "Home",
+  },
+  {
+    id: "line-end",
+    label: "Line End",
+    keys: ["End", "Meta-ArrowRight"],
+    category: "navigation",
+    staticCommand: selectTextblockEnd,
+    macDisplay: "End",
+    winDisplay: "End",
   },
 
   // Block movement (handled by blockBehaviors.ts, registered here for UI display)

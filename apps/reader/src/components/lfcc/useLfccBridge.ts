@@ -498,6 +498,9 @@ function registerE2EHarness(
     __lfccView: EditorView;
     __lfccUndo: () => boolean;
     __lfccRedo: () => boolean;
+    __lfccSetUndoMergeInterval?: (intervalMs: number) => boolean;
+    __lfccUndoGroupStart?: () => boolean;
+    __lfccUndoGroupEnd?: () => boolean;
     __lfccSetContent: (text: string) => boolean;
     __lfccClearContent: () => boolean;
     __lfccForceCommit: () => void;
@@ -544,6 +547,38 @@ function registerE2EHarness(
   // P0-1: Expose undo state for E2E diagnostics
   Object.defineProperty(globalAny, "__lfccUndoState", {
     get: () => () => undoController?.getState() ?? "unknown",
+    configurable: true,
+  });
+  let undoMergeIntervalOverride = 500;
+  Object.defineProperty(globalAny, "__lfccSetUndoMergeInterval", {
+    get: () => (intervalMs: number) => {
+      if (runtime && !runtime.isDegraded()) {
+        undoMergeIntervalOverride = intervalMs;
+        runtime.undoManager.setMergeInterval(intervalMs);
+        return true;
+      }
+      return false;
+    },
+    configurable: true,
+  });
+  Object.defineProperty(globalAny, "__lfccUndoGroupStart", {
+    get: () => () => {
+      if (runtime && !runtime.isDegraded()) {
+        runtime.undoManager.groupStart();
+        return true;
+      }
+      return false;
+    },
+    configurable: true,
+  });
+  Object.defineProperty(globalAny, "__lfccUndoGroupEnd", {
+    get: () => () => {
+      if (runtime && !runtime.isDegraded()) {
+        runtime.undoManager.groupEnd();
+        return true;
+      }
+      return false;
+    },
     configurable: true,
   });
   Object.defineProperty(globalAny, "__lfccSetContent", {
@@ -629,15 +664,15 @@ function registerE2EHarness(
   });
 
   // E2E hook for forcing Loro commit - creates undo step boundary
-  // Uses a trick: temporarily set mergeInterval to 0 to force a new undo step
+  // Temporarily set mergeInterval to 0 for the commit, then restore it.
   Object.defineProperty(globalAny, "__lfccForceCommit", {
     get: () => (): void => {
       if (runtime && !runtime.isDegraded()) {
-        // Commit any pending changes first
+        const undoManager = runtime.undoManager;
+        const restoreInterval = undoMergeIntervalOverride;
+        undoManager.setMergeInterval(0);
         runtime.doc.commit({ origin: "e2e-force" });
-        // The mergeInterval is configured in LoroRuntime constructor
-        // and commits within that interval are grouped together.
-        // For E2E, we just ensure any pending changes are committed.
+        undoManager.setMergeInterval(restoreInterval);
       }
     },
     configurable: true,

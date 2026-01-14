@@ -1562,6 +1562,14 @@ export async function pressUndo(page: Page): Promise<void> {
       throw new Error("__lfccUndo hook not available");
     }
   });
+  await page.waitForFunction(() => {
+    const globalAny = window as unknown as { __lfccUndoState?: () => string };
+    if (!globalAny.__lfccUndoState) {
+      return true;
+    }
+    const state = globalAny.__lfccUndoState();
+    return state === "idle" || state === "unknown";
+  });
 }
 
 /**
@@ -1575,6 +1583,53 @@ export async function pressRedo(page: Page): Promise<void> {
     } else {
       throw new Error("__lfccRedo hook not available");
     }
+  });
+  await page.waitForFunction(() => {
+    const globalAny = window as unknown as { __lfccUndoState?: () => string };
+    if (!globalAny.__lfccUndoState) {
+      return true;
+    }
+    const state = globalAny.__lfccUndoState();
+    return state === "idle" || state === "unknown";
+  });
+}
+
+/**
+ * Set Loro UndoManager merge interval for deterministic undo steps in E2E.
+ */
+export async function setUndoMergeInterval(page: Page, intervalMs: number): Promise<void> {
+  await page.evaluate((interval) => {
+    const globalAny = window as unknown as { __lfccSetUndoMergeInterval?: (ms: number) => boolean };
+    if (!globalAny.__lfccSetUndoMergeInterval) {
+      throw new Error("__lfccSetUndoMergeInterval hook not available");
+    }
+    globalAny.__lfccSetUndoMergeInterval(interval);
+  }, intervalMs);
+}
+
+/**
+ * Start an explicit undo group to isolate a batch of operations.
+ */
+export async function startUndoGroup(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const globalAny = window as unknown as { __lfccUndoGroupStart?: () => boolean };
+    if (!globalAny.__lfccUndoGroupStart) {
+      throw new Error("__lfccUndoGroupStart hook not available");
+    }
+    globalAny.__lfccUndoGroupStart();
+  });
+}
+
+/**
+ * End the current undo group.
+ */
+export async function endUndoGroup(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const globalAny = window as unknown as { __lfccUndoGroupEnd?: () => boolean };
+    if (!globalAny.__lfccUndoGroupEnd) {
+      throw new Error("__lfccUndoGroupEnd hook not available");
+    }
+    globalAny.__lfccUndoGroupEnd();
   });
 }
 

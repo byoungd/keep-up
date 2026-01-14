@@ -82,7 +82,12 @@ export function SlashCommandMenu({ state, onSelectCommand, onQueryChange }: Slas
   return (
     <AnimatePresence>
       {state.active && (
-        <div ref={refs.setFloating} style={floatingStyles} className="z-50" {...getFloatingProps()}>
+        <div
+          ref={refs.setFloating}
+          style={floatingStyles}
+          className="z-popover"
+          {...getFloatingProps()}
+        >
           <motion.div {...transitions.popover}>
             <Command
               className="w-72 max-h-[320px] overflow-hidden rounded-xl border border-border/60 bg-popover/80 backdrop-blur-xl shadow-2xl flex flex-col ring-1 ring-white/10"

@@ -799,6 +799,13 @@ export function AIContextMenu({ state, onClose, bridge }: AIContextMenuProps) {
   });
 
   const { getFloatingProps } = useInteractions([]);
+  const setFloatingRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      refs.setFloating(node);
+      containerRef.current = node;
+    },
+    [refs]
+  );
 
   // Sync virtual reference
   const isOpen = state?.isOpen;
@@ -831,18 +838,13 @@ export function AIContextMenu({ state, onClose, bridge }: AIContextMenuProps) {
   const style: React.CSSProperties = {
     ...floatingStyles,
     maxWidth: mode === "conflict" || mode === "structural_preview" ? "500px" : "340px",
-    zIndex: 50,
   };
 
   return createPortal(
     <AnimatePresence>
       {state.isOpen && (
         <motion.div
-          ref={(node) => {
-            refs.setFloating(node);
-            // @ts-ignore
-            containerRef.current = node;
-          }}
+          ref={setFloatingRef}
           style={style}
           {...getFloatingProps()}
           initial={{ opacity: 0, scale: 0.95, y: -4 }}
@@ -924,8 +926,6 @@ export function AIContextMenu({ state, onClose, bridge }: AIContextMenuProps) {
                   placeholder="Ask AI regarding selection..."
                   value={customPrompt}
                   onChange={(e) => setCustomPrompt(e.target.value)}
-                  // biome-ignore lint/a11y/noAutofocus: Intended behavior
-                  autoFocus
                   aria-label="Custom AI prompt"
                 />
                 <button
