@@ -102,7 +102,9 @@ jobs:
       - name: Verify dist artifacts
         run: |
           echo "Checking packages/core/dist structure:"
-          ls -R packages/core/dist/ || echo "No dist folder!"
+          ls -R packages/core/dist/ || echo "No core dist folder!"
+          echo "Checking packages/lfcc-bridge/dist structure:"
+          ls -R packages/lfcc-bridge/dist/ || echo "No lfcc-bridge dist folder!"
           echo "Checking package.json:"
           cat packages/core/package.json
 
