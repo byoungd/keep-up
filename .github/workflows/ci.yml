@@ -66,7 +66,7 @@ jobs:
 
       - name: Archive build artifacts
         run: |
-          zip -r build-output.zip packages/*/dist apps/*/.next
+          zip -r build-output.zip packages/*/dist apps/reader/.next/standalone apps/reader/.next/static apps/reader/public
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -112,10 +112,10 @@ jobs:
           ls -R packages/core/dist/ || echo "No core dist folder!"
           echo "Checking packages/lfcc-bridge/dist structure:"
           ls -R packages/lfcc-bridge/dist/ || echo "No lfcc-bridge dist folder!"
-          echo "Checking apps/reader/.next structure:"
-          ls -d apps/reader/.next || echo "No reader .next folder!"
-          echo "Checking package.json:"
-          cat packages/core/package.json
+          echo "Checking apps/reader/.next/standalone structure:"
+          ls -d apps/reader/.next/standalone || echo "No reader standalone folder!"
+          echo "Checking apps/reader/.next/static structure:"
+          ls -d apps/reader/.next/static || echo "No reader static folder!"
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4

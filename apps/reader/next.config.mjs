@@ -10,6 +10,9 @@ const withBundleAnalyzer = bundleAnalyzer({
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Use standalone output for cleaner CI artifacts and production deployment
+  output: "standalone",
+
   transpilePackages: ["ai", "@ku0/shared"],
 
   // Optimize large package imports for better tree-shaking
