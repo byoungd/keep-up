@@ -661,85 +661,105 @@ export function useAIPanelController({
     [stream, model]
   );
 
-  const handleSend = React.useCallback(async () => {
-    const rawContent = input.trim();
-    const isBusy = attachments.some(
-      (att) => att.status === "processing" || att.status === "sending" || att.status === "error"
-    );
+  const sendPrompt = React.useCallback(
+    async (rawPrompt: string) => {
+      const rawContent = rawPrompt.trim();
+      const isBusy = attachments.some(
+        (att) => att.status === "processing" || att.status === "sending" || att.status === "error"
+      );
 
-    if (!rawContent || isLoading || isStreaming || isBusy || !ensureVisionSupported() || !facade) {
-      return;
-    }
+      if (
+        !rawContent ||
+        isLoading ||
+        isStreaming ||
+        isBusy ||
+        !ensureVisionSupported() ||
+        !facade
+      ) {
+        return;
+      }
 
-    // 1. Prepare Context & Content
-    const { contextBlock } = prepareContext();
-    const content = composePromptWithContext(rawContent, contextBlock);
-    const draftContent = rawContent;
+      // 1. Prepare Context & Content
+      const { contextBlock } = prepareContext();
+      const content = composePromptWithContext(rawContent, contextBlock);
+      const draftContent = rawContent;
 
-    // 2. Reset UI
-    setInput("");
-    resetState();
+      // 2. Reset UI
+      setInput("");
+      resetState();
 
-    // 3. Create Messages (Facade)
-    addMessage("user", content);
-    const messageId = createStreamingMessage({ model });
+      // 3. Create Messages (Facade)
+      addMessage("user", content);
+      const messageId = createStreamingMessage({ model });
 
-    // 4. Usage History
-    const previousHistory = rawMessages.map((b) => ({
-      role: b.role as "user" | "assistant",
-      content: b.text,
-    }));
+      // 4. Usage History
+      const previousHistory = rawMessages.map((b) => ({
+        role: b.role as "user" | "assistant",
+        content: b.text,
+      }));
 
-    // System prompt is local for now
-    const resolvedSystemPrompt = workflowPrompt;
+      // System prompt is local for now
+      const resolvedSystemPrompt = workflowPrompt;
 
-    // 5. Attachments
-    const attachmentPayload = prepareAttachments();
-    setAttachments((prev) =>
-      prev.map((att) => (att.status === "ready" ? { ...att, status: "sending" } : att))
-    );
+      // 5. Attachments
+      const attachmentPayload = prepareAttachments();
+      setAttachments((prev) =>
+        prev.map((att) => (att.status === "ready" ? { ...att, status: "sending" } : att))
+      );
 
-    const agentModeEnabled =
-      selectedCapability.supports.tools &&
-      selectedCapability.provider !== "gemini" &&
-      attachmentPayload.length === 0;
-    const streamMode = agentModeEnabled ? "agent" : "chat";
-    const eventHandler = streamMode === "agent" ? handleAgentEvent : undefined;
+      const agentModeEnabled =
+        selectedCapability.supports.tools &&
+        selectedCapability.provider !== "gemini" &&
+        attachmentPayload.length === 0;
+      const streamMode = agentModeEnabled ? "agent" : "chat";
+      const eventHandler = streamMode === "agent" ? handleAgentEvent : undefined;
 
-    // 6. Execute
-    await runStreamExecution(
-      content,
-      previousHistory,
-      messageId,
-      attachmentPayload,
-      draftContent,
+      // 6. Execute
+      await runStreamExecution(
+        content,
+        previousHistory,
+        messageId,
+        attachmentPayload,
+        draftContent,
+        workflow,
+        resolvedSystemPrompt ?? null,
+        streamMode,
+        eventHandler
+      );
+    },
+    [
+      attachments,
+      isLoading,
+      isStreaming,
+      ensureVisionSupported,
+      prepareContext,
+      prepareAttachments,
+      resetState,
+      facade,
+      rawMessages,
+      workflowPrompt,
+      addMessage,
+      createStreamingMessage,
+      setAttachments,
+      runStreamExecution,
       workflow,
-      resolvedSystemPrompt ?? null,
-      streamMode,
-      eventHandler
-    );
-  }, [
-    input,
-    isLoading,
-    isStreaming,
-    attachments,
-    ensureVisionSupported,
-    prepareContext,
-    prepareAttachments,
-    resetState,
-    facade,
-    rawMessages,
-    workflowPrompt,
-    addMessage,
-    createStreamingMessage,
-    setAttachments,
-    runStreamExecution,
-    workflow,
-    model,
-    selectedCapability.provider,
-    selectedCapability.supports.tools,
-    handleAgentEvent,
-  ]);
+      model,
+      selectedCapability.provider,
+      selectedCapability.supports.tools,
+      handleAgentEvent,
+    ]
+  );
+
+  const handleSend = React.useCallback(async () => {
+    await sendPrompt(input);
+  }, [sendPrompt, input]);
+
+  const runPrompt = React.useCallback(
+    async (prompt: string) => {
+      await sendPrompt(prompt);
+    },
+    [sendPrompt]
+  );
 
   const handleRunBackground = React.useCallback(async () => {
     const rawContent = input.trim();
@@ -947,6 +967,7 @@ export function useAIPanelController({
 
     // Actions
     handleSend,
+    runPrompt,
     handleRunBackground,
     handleAbort,
     handleClear,

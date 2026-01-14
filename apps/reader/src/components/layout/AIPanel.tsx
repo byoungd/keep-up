@@ -2,11 +2,13 @@
 import { Button } from "@/components/ui/Button";
 import { useAIPanelController } from "@/hooks/useAIPanelController";
 import { useAIPanelTranslations } from "@/hooks/useAIPanelTranslations";
+import { useProactiveSuggestions } from "@/hooks/useProactiveSuggestions";
 import { useReferenceHandler } from "@/hooks/useReferenceHandler";
 import type { LoroRuntime, SpanList } from "@ku0/lfcc-bridge";
 import { cn } from "@ku0/shared/utils";
 import type { EditorView } from "prosemirror-view";
 import * as React from "react";
+import { ProactiveSuggestionCard } from "../ai/ProactiveSuggestionCard";
 import { WorkflowSelector } from "../ai/WorkflowSelector";
 import { AIPanelHeader } from "./AIPanelHeader";
 import { ApprovalRequestCard } from "./ApprovalRequestCard";
@@ -71,6 +73,7 @@ export function AIPanel({
     projectContext,
     backgroundTasks,
     handleSend,
+    runPrompt,
     handleRunBackground,
     handleAbort,
     handleClear,
@@ -148,6 +151,8 @@ export function AIPanel({
         )}
       </div>
     ) : null;
+
+  const { suggestions: proactiveSuggestions } = useProactiveSuggestions();
 
   const contextStatus = contextPayload ? (
     <ContextStatusPanel
@@ -259,6 +264,26 @@ export function AIPanel({
         resolveReference={editorView ? resolveReference : undefined}
         onReferenceSelect={editorView ? handleReferenceSelect : undefined}
       />
+
+      {messages.length === 0 && !isLoading && proactiveSuggestions.length > 0 && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10 px-6">
+          <div className="w-full max-w-sm space-y-3 pointer-events-auto animate-in fade-in fill-mode-forwards duration-700 slide-in-from-bottom-8">
+            <h3 className="text-sm font-medium text-muted-foreground text-center mb-2">
+              {t("proactiveSuggestionsTitle")}
+            </h3>
+            {proactiveSuggestions.map((s) => (
+              <ProactiveSuggestionCard
+                key={s.id}
+                title={s.title}
+                description={s.description}
+                actionPrompt={s.actionPrompt}
+                icon={s.icon}
+                onSelect={runPrompt}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {pendingApproval && (
         <ApprovalRequestCard

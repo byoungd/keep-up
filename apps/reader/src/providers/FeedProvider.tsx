@@ -402,6 +402,10 @@ export function useFeedProvider() {
   return context;
 }
 
+export function useFeedProviderOptional(): FeedContextValue | null {
+  return React.useContext(FeedContext);
+}
+
 export function useFeedItems(filter = "all", options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: ["feed-items", filter],
