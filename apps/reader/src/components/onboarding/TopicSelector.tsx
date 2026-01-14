@@ -43,13 +43,10 @@ export function TopicSelector({ onSelect, isLoading }: TopicSelectorProps) {
     <div className="w-full max-w-4xl mx-auto p-6 flex flex-col items-center animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="text-center mb-8 space-y-2">
         <h2 className="text-2xl font-bold tracking-tight text-foreground">
-          {t("chooseTopicsTitle", { defaultMessage: "What defines your role?" })}
+          {t("chooseTopicsTitle")}
         </h2>
         <p className="text-muted-foreground text-sm max-w-md mx-auto">
-          {t("chooseTopicsSubtitle", {
-            defaultMessage:
-              "We'll curate a high-signal briefing for you based on your interests. No more feed management.",
-          })}
+          {t("chooseTopicsSubtitle")}
         </p>
       </div>
 
@@ -123,10 +120,10 @@ export function TopicSelector({ onSelect, isLoading }: TopicSelectorProps) {
         {isLoading ? (
           <>
             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            Setting up your briefing...
+            {t("settingUpBriefing")}
           </>
         ) : (
-          t("continue", { defaultMessage: "Create My Briefing" })
+          t("createMyBriefing")
         )}
       </Button>
     </div>

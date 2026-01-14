@@ -269,7 +269,7 @@ export function AIPanel({
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10 px-6">
           <div className="w-full max-w-sm space-y-3 pointer-events-auto animate-in fade-in fill-mode-forwards duration-700 slide-in-from-bottom-8">
             <h3 className="text-sm font-medium text-muted-foreground text-center mb-2">
-              Here are some updates for you
+              {t("proactiveSuggestionsTitle")}
             </h3>
             {proactiveSuggestions.map((s) => (
               <ProactiveSuggestionCard

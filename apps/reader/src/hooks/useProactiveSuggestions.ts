@@ -27,6 +27,21 @@ export function useProactiveSuggestions() {
   const feedSubscriptions = feedContext?.subscriptions;
   const [suggestions, setSuggestions] = React.useState<ProactiveSuggestion[]>([]);
 
+  // Refresh trigger to update time-based suggestions periodically
+  const [refreshTick, setRefreshTick] = React.useState(0);
+
+  React.useEffect(() => {
+    // Refresh every 30 minutes for time-based suggestions
+    const interval = setInterval(
+      () => {
+        setRefreshTick((t) => t + 1);
+      },
+      30 * 60 * 1000
+    );
+
+    return () => clearInterval(interval);
+  }, []);
+
   const subscriptions = React.useMemo<SubscriptionSummary[]>(() => {
     if (feedSubscriptions) {
       return feedSubscriptions.map((sub: FeedSubscription) => ({
@@ -49,6 +64,7 @@ export function useProactiveSuggestions() {
     return rssItems.some((item) => item.readState === "unread");
   }, [feedSubscriptions, rssItems]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refreshTick intentionally triggers periodic recalculation
   React.useEffect(() => {
     // Simple heuristic generation for now
     // Ideally this would check actual unread items and content clusters
@@ -110,7 +126,7 @@ export function useProactiveSuggestions() {
     }
 
     setSuggestions(generated.slice(0, 3)); // Limit to top 3
-  }, [hasUnread, subscriptions]);
+  }, [hasUnread, subscriptions, refreshTick]);
 
   return { suggestions };
 }

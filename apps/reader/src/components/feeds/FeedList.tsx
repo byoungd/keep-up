@@ -341,11 +341,8 @@ function FeedItemsList({
         }
       }
 
-      const promises = Array.from(feedsToAdd).map((url) =>
-        addFeed(url).catch((err) => console.log(`Skipped duplicate or error: ${url}`, err))
-      );
-
-      await Promise.all(promises);
+      // Use allSettled to handle duplicates gracefully without breaking the flow
+      await Promise.allSettled(Array.from(feedsToAdd).map((url) => addFeed(url)));
     } finally {
       setIsOnboarding(false);
     }

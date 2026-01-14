@@ -158,6 +158,10 @@
       }
     },
     "continue": "Continue",
+    "createMyBriefing": "Create My Briefing",
+    "settingUpBriefing": "Setting up your briefing...",
+    "chooseTopicsTitle": "What defines your role?",
+    "chooseTopicsSubtitle": "We'll curate a high-signal briefing for you based on your interests. No more feed management.",
     "back": "Back",
     "skipForNow": "Skip for now",
     "finishSetup": "Finish Setup",
@@ -474,7 +478,8 @@
     "providerHideKey": "Hide API key",
     "exportChat": "Export chat",
     "modelBackToModels": "Back to models",
-    "modelLegacyGroup": "Legacy Models"
+    "modelLegacyGroup": "Legacy Models",
+    "proactiveSuggestionsTitle": "Here are some updates for you"
   },
   "AppearanceMenu": {
     "title": "Display Settings",

@@ -146,6 +146,10 @@
       }
     },
     "continue": "继续",
+    "createMyBriefing": "创建我的简报",
+    "settingUpBriefing": "正在设置你的简报...",
+    "chooseTopicsTitle": "你的角色是什么？",
+    "chooseTopicsSubtitle": "我们将根据你的兴趣为你精选高质量简报。无需手动管理订阅源。",
     "back": "返回",
     "skipForNow": "先跳过",
     "finishSetup": "完成设置",
@@ -460,7 +464,8 @@
     "providerHideKey": "隐藏 API 密钥",
     "exportChat": "导出对话",
     "modelBackToModels": "返回模型列表",
-    "modelLegacyGroup": "传统模型"
+    "modelLegacyGroup": "传统模型",
+    "proactiveSuggestionsTitle": "这些更新可能对你有帮助"
   },
   "AppearanceMenu": {
     "title": "显示设置",
