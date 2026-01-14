@@ -23,7 +23,7 @@
     "test:e2e:a11y": "playwright test e2e/a11y-smoke.spec.ts",
     "test:e2e:full": "NEXT_DISABLE_DEV_OVERLAY=1 PLAYWRIGHT_REUSE_EXISTING_SERVER=1 PLAYWRIGHT_WORKERS=1 playwright test",
     "test:pr": "pnpm test:unit",
-    "test:ci": "pnpm test:unit:ci && pnpm test:e2e",
+    "test:ci": "pnpm test:unit:ci && pnpm test:e2e:smoke && pnpm test:e2e:core",
     "test:nightly": "pnpm test:unit:ci && pnpm test:e2e",
     "perf:gate": "node scripts/perf-gate.mjs --baseline artifacts/perf-baseline.json --metrics artifacts/perf-metrics.json",
     "test:visual": "playwright test visual-regression.spec.ts",

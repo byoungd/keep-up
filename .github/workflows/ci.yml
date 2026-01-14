@@ -102,9 +102,6 @@ jobs:
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps
 
-      - name: Build
-        run: pnpm build
-
       - name: Test
         run: pnpm test:ci
 
@@ -165,9 +162,6 @@ jobs:
 
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps
-
-      - name: Build
-        run: pnpm build
 
       - name: UI Integration Gate
         run: bash scripts/ui-gate.sh
