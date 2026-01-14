@@ -102,8 +102,9 @@ jobs:
       - name: Verify dist artifacts
         run: |
           echo "Checking packages/core/dist structure:"
-          ls -la packages/core/dist/ || echo "No dist folder!"
-          ls -la packages/core/dist/security/ || echo "No security folder!"
+          ls -R packages/core/dist/ || echo "No dist folder!"
+          echo "Checking package.json:"
+          cat packages/core/package.json
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4
