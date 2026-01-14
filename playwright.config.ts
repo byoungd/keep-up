@@ -75,7 +75,9 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: process.env.CI ? "pnpm start:reader" : devServerCommand,
+      command: process.env.CI
+        ? "node apps/reader/.next/standalone/apps/reader/server.js"
+        : devServerCommand,
       url: baseURL,
       reuseExistingServer,
       env: {
