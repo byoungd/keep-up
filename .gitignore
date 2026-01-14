@@ -144,6 +144,9 @@ task.md
 # lfcc
 .lfcc
 
+# Project Brain (local)
+.keep-up/
+
 # Agent (keep .agent, it contains project documentation)
 # Ignore only runtime/generated agent files
 .kiro/

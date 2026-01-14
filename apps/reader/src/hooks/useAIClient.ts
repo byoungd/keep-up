@@ -9,8 +9,11 @@
  * - Health status subscription
  */
 
+import type { AgentStreamEvent } from "@/lib/ai/agentStream";
 import {
   type AIClientError,
+  type AIConfirmationRequest,
+  type AIConfirmationResult,
   type AIServiceHealth,
   type AIStreamRequest,
   type AIStreamResult,
@@ -27,9 +30,13 @@ export interface UseAIClientState {
 }
 
 export interface UseAIClientActions {
-  stream: (request: Omit<AIStreamRequest, "signal">) => Promise<void>;
+  stream: (
+    request: Omit<AIStreamRequest, "signal">,
+    options?: { onEvent?: (event: AgentStreamEvent) => void }
+  ) => Promise<void>;
   abort: () => void;
   reset: () => void;
+  confirm: (request: AIConfirmationRequest) => Promise<AIConfirmationResult>;
 }
 
 export type UseAIClientReturn = UseAIClientState & UseAIClientActions;
@@ -62,49 +69,56 @@ export function useAIClient(): UseAIClientReturn {
     };
   }, []);
 
-  const stream = React.useCallback(async (request: Omit<AIStreamRequest, "signal">) => {
-    // Abort any existing request
-    abortControllerRef.current?.abort();
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
+  const stream = React.useCallback(
+    async (
+      request: Omit<AIStreamRequest, "signal">,
+      options?: { onEvent?: (event: AgentStreamEvent) => void }
+    ) => {
+      // Abort any existing request
+      abortControllerRef.current?.abort();
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
 
-    setState((prev) => ({
-      ...prev,
-      status: "streaming",
-      content: "",
-      error: null,
-      result: null,
-      health: aiClient.getHealth(),
-    }));
+      setState((prev) => ({
+        ...prev,
+        status: "streaming",
+        content: "",
+        error: null,
+        result: null,
+        health: aiClient.getHealth(),
+      }));
 
-    await aiClient.stream(
-      { ...request, signal: controller.signal },
-      {
-        onChunk: (_delta, accumulated) => {
-          setState((prev) => ({
-            ...prev,
-            content: accumulated,
-          }));
-        },
-        onDone: (result) => {
-          setState((prev) => ({
-            ...prev,
-            status: "done",
-            result,
-            health: aiClient.getHealth(),
-          }));
-        },
-        onError: (error) => {
-          setState((prev) => ({
-            ...prev,
-            status: "error",
-            error,
-            health: aiClient.getHealth(),
-          }));
-        },
-      }
-    );
-  }, []);
+      await aiClient.stream(
+        { ...request, signal: controller.signal },
+        {
+          onChunk: (_delta, accumulated) => {
+            setState((prev) => ({
+              ...prev,
+              content: accumulated,
+            }));
+          },
+          onDone: (result) => {
+            setState((prev) => ({
+              ...prev,
+              status: "done",
+              result,
+              health: aiClient.getHealth(),
+            }));
+          },
+          onError: (error) => {
+            setState((prev) => ({
+              ...prev,
+              status: "error",
+              error,
+              health: aiClient.getHealth(),
+            }));
+          },
+          onEvent: options?.onEvent,
+        }
+      );
+    },
+    []
+  );
 
   const abort = React.useCallback(() => {
     abortControllerRef.current?.abort();
@@ -120,11 +134,16 @@ export function useAIClient(): UseAIClientReturn {
     setState(initialState);
   }, []);
 
+  const confirm = React.useCallback((request: AIConfirmationRequest) => {
+    return aiClient.confirm(request);
+  }, []);
+
   return {
     ...state,
     stream,
     abort,
     reset,
+    confirm,
   };
 }
 

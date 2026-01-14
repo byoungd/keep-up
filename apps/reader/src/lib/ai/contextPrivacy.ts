@@ -15,11 +15,20 @@ export type ConsentDecisionInput = {
   disclosureAccepted: boolean;
 };
 
+export type ContextSectionLabel =
+  | "Selected Text"
+  | "Visible Content"
+  | "Project Tasks"
+  | "Project Plan"
+  | "Project Memory"
+  | "Project Docs";
+
 export type ContextSection = {
-  label: "Selected Text" | "Visible Content";
+  label: ContextSectionLabel;
   text: string;
   originalLength: number;
   truncated: boolean;
+  blockId?: string;
 };
 
 export type RedactionSummary = {
@@ -79,35 +88,100 @@ export function buildContextSections(options: {
   maxSelectedChars?: number;
   maxPageChars?: number;
   includePageContextWithSelection?: boolean;
+  extraSections?: Array<{
+    label: ContextSectionLabel;
+    text: string;
+    originalLength?: number;
+    truncated?: boolean;
+    blockId?: string;
+  }>;
+  maxExtraChars?: number;
 }): ContextSection[] {
   const sections: ContextSection[] = [];
-  const selectedRaw = options.selectedText?.trim();
-  const pageRaw = options.pageContext?.trim();
+  const selectedRaw = options.selectedText?.trim() ?? "";
+  const pageRaw = options.pageContext?.trim() ?? "";
   const maxSelectedChars = options.maxSelectedChars ?? DEFAULT_MAX_SELECTED_CHARS;
   const maxPageChars = options.maxPageChars ?? DEFAULT_MAX_PAGE_CHARS;
   const includePageContextWithSelection = options.includePageContextWithSelection ?? false;
 
-  if (selectedRaw) {
-    const clamped = clampText(selectedRaw, maxSelectedChars);
-    sections.push({
-      label: "Selected Text",
-      text: clamped.text,
-      originalLength: clamped.originalLength,
-      truncated: clamped.truncated,
-    });
-  }
-
-  if (pageRaw && (includePageContextWithSelection || !selectedRaw)) {
-    const clamped = clampText(pageRaw, maxPageChars);
-    sections.push({
-      label: "Visible Content",
-      text: clamped.text,
-      originalLength: clamped.originalLength,
-      truncated: clamped.truncated,
-    });
-  }
+  appendSelectedSection(sections, selectedRaw, maxSelectedChars);
+  appendPageSection(sections, pageRaw, selectedRaw, maxPageChars, includePageContextWithSelection);
+  appendExtraSections(sections, options.extraSections, options.maxExtraChars);
 
   return sections;
+}
+
+function appendSelectedSection(
+  sections: ContextSection[],
+  selectedRaw: string,
+  maxSelectedChars: number
+) {
+  if (!selectedRaw) {
+    return;
+  }
+  const clamped = clampText(selectedRaw, maxSelectedChars);
+  sections.push({
+    label: "Selected Text",
+    text: clamped.text,
+    originalLength: clamped.originalLength,
+    truncated: clamped.truncated,
+  });
+}
+
+function appendPageSection(
+  sections: ContextSection[],
+  pageRaw: string,
+  selectedRaw: string,
+  maxPageChars: number,
+  includePageContextWithSelection: boolean
+) {
+  if (!pageRaw) {
+    return;
+  }
+  if (!includePageContextWithSelection && selectedRaw) {
+    return;
+  }
+  const clamped = clampText(pageRaw, maxPageChars);
+  sections.push({
+    label: "Visible Content",
+    text: clamped.text,
+    originalLength: clamped.originalLength,
+    truncated: clamped.truncated,
+  });
+}
+
+function appendExtraSections(
+  sections: ContextSection[],
+  extraSections:
+    | Array<{
+        label: ContextSectionLabel;
+        text: string;
+        originalLength?: number;
+        truncated?: boolean;
+        blockId?: string;
+      }>
+    | undefined,
+  maxExtraChars?: number
+) {
+  if (!extraSections || extraSections.length === 0) {
+    return;
+  }
+  const maxChars = maxExtraChars ?? DEFAULT_MAX_PAGE_CHARS;
+  for (const extra of extraSections) {
+    const raw = extra.text.trim();
+    if (!raw) {
+      continue;
+    }
+    const clamped = clampText(raw, maxChars);
+    const originalLength = extra.originalLength ?? clamped.originalLength;
+    sections.push({
+      label: extra.label,
+      text: clamped.text,
+      originalLength,
+      truncated: extra.truncated ?? (clamped.truncated || originalLength > clamped.text.length),
+      blockId: extra.blockId,
+    });
+  }
 }
 
 export function redactSensitiveText(text: string): { text: string; summary: RedactionSummary } {
@@ -148,6 +222,14 @@ export function createContextPayload(options: {
   maxPageChars?: number;
   includePageContextWithSelection?: boolean;
   policy?: DataAccessPolicy;
+  extraSections?: Array<{
+    label: ContextSectionLabel;
+    text: string;
+    originalLength?: number;
+    truncated?: boolean;
+    blockId?: string;
+  }>;
+  maxExtraChars?: number;
 }): ContextPayload | null {
   const sections = buildContextSections(options);
   if (sections.length === 0) {
@@ -180,7 +262,7 @@ function buildPolicyChunks(sections: ContextSection[]): {
 } {
   const lookup = new Map<string, ContextSection>();
   const chunks: ContentChunk[] = sections.map((section, idx) => {
-    const blockId = section.label === "Selected Text" ? "selected" : `visible_${idx}`;
+    const blockId = section.blockId ?? getBlockIdForSection(section.label, idx);
     lookup.set(blockId, section);
     return {
       block_id: blockId,
@@ -189,6 +271,17 @@ function buildPolicyChunks(sections: ContextSection[]): {
     };
   });
   return { chunks, lookup };
+}
+
+function getBlockIdForSection(label: ContextSectionLabel, index: number): string {
+  if (label === "Selected Text") {
+    return "selected";
+  }
+  if (label === "Visible Content") {
+    return `visible_${index}`;
+  }
+  const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  return `extra_${slug}_${index}`;
 }
 
 function applyPolicyToSections(

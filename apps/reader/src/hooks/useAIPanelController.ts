@@ -7,15 +7,96 @@ import { useAttachments } from "@/hooks/useAttachments";
 import { useAutoScroll } from "@/hooks/useAutoScroll";
 import { useChatPersistence } from "@/hooks/useChatPersistence";
 import { useDocumentContent } from "@/hooks/useDocumentContent";
+import { useProjectContext } from "@/hooks/useProjectContext";
+import type { AgentStreamEvent } from "@/lib/ai/agentStream";
 import { composePromptWithContext, createContextPayload } from "@/lib/ai/contextPrivacy";
 import { MODEL_CAPABILITIES, getDefaultModel, normalizeModelId } from "@/lib/ai/models";
 import { buildReferenceAnchors } from "@/lib/ai/referenceAnchors";
 import { getWorkflowSystemPrompt } from "@/lib/ai/workflowPrompts";
 import { DEFAULT_POLICY_MANIFEST } from "@keepup/core";
-import type { LoroRuntime, SpanList } from "@keepup/lfcc-bridge";
+import type { AIContext, LoroRuntime, SpanList, ToolCallRecord } from "@keepup/lfcc-bridge";
 import { useTranslations } from "next-intl";
 import * as React from "react";
+import type { ExecutionStep } from "../components/layout/ExecutionSteps";
 import type { Message } from "../components/layout/MessageItem";
+
+function isToolResult(value: unknown): value is ExecutionStep["result"] {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const record = value as {
+    success?: unknown;
+    content?: unknown;
+    error?: unknown;
+  };
+  return typeof record.success === "boolean" && Array.isArray(record.content);
+}
+
+function mapToolCallToStep(call: ToolCallRecord, fallbackTime: number): ExecutionStep {
+  const result = isToolResult(call.result) ? call.result : undefined;
+  const errorMessage = call.error ? { code: "EXECUTION_FAILED", message: call.error } : undefined;
+  const status =
+    call.status ??
+    (result ? (result.success ? "success" : "error") : call.error ? "error" : "pending");
+
+  return {
+    id: call.id,
+    toolName: call.name,
+    arguments: call.arguments,
+    status,
+    result:
+      result ?? (errorMessage ? { success: false, content: [], error: errorMessage } : undefined),
+    startTime: call.startTime ?? fallbackTime,
+    endTime: call.endTime,
+    durationMs: call.durationMs,
+  };
+}
+
+function findLastIndex<T>(items: T[], predicate: (item: T) => boolean): number {
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    if (predicate(items[index])) {
+      return index;
+    }
+  }
+  return -1;
+}
+
+function resolveStreamErrorContent(
+  error: { message: string; code?: string },
+  abortReason: "user" | "timeout" | null,
+  t: (key: string, values?: Record<string, string>) => string
+): string {
+  if (error.code === "canceled" || abortReason === "user") {
+    return t("canceledByUser");
+  }
+
+  const fallback =
+    abortReason === "timeout" ? t("errorTimeout") : (error.message ?? t("errorFallback"));
+  return t("errorMessage", { message: fallback });
+}
+
+function mergeErrorContext(
+  aiContext: AIContext | undefined,
+  requestId?: string
+): AIContext | undefined {
+  if (!aiContext && !requestId) {
+    return undefined;
+  }
+  if (!aiContext) {
+    return requestId ? { requestId } : undefined;
+  }
+  return requestId ? { ...aiContext, requestId } : aiContext;
+}
+
+type PendingApproval = {
+  confirmationId: string;
+  toolName: string;
+  description: string;
+  arguments: Record<string, unknown>;
+  risk: "low" | "medium" | "high";
+  reason?: string;
+  riskTags?: string[];
+};
 
 export function useAIPanelController({
   docId,
@@ -47,8 +128,20 @@ export function useAIPanelController({
   // Computed messages for UI compatibility
   const messages = React.useMemo(() => {
     return rawMessages.map((b) => {
-      // Access meta via facade/block if needed, currently on attrs logic in blockToMessage
-      // But map to UI Message type
+      const executionSteps = b.aiContext?.toolCalls?.map((call) =>
+        mapToolCallToStep(call, b.createdAt)
+      );
+      const thinking = b.aiContext?.thinking
+        ? [
+            {
+              content: b.aiContext.thinking,
+              type: "reasoning" as const,
+              timestamp: b.updatedAt ?? b.createdAt,
+              complete: true,
+            },
+          ]
+        : undefined;
+
       return {
         id: b.id,
         role: b.role,
@@ -58,6 +151,8 @@ export function useAIPanelController({
         requestId: b.aiContext?.requestId,
         confidence: b.aiContext?.confidence,
         provenance: b.aiContext?.provenance,
+        executionSteps,
+        thinking,
         createdAt: b.createdAt,
       };
     }) as Message[];
@@ -129,6 +224,7 @@ export function useAIPanelController({
 
   // 5. Context & Privacy
   const { content: docContent } = useDocumentContent(docId ?? null);
+  const projectContext = useProjectContext();
   const dataAccessPolicy = React.useMemo(() => {
     const policy = DEFAULT_POLICY_MANIFEST.ai_native_policy?.data_access;
     if (!policy) {
@@ -143,14 +239,27 @@ export function useAIPanelController({
     };
   }, []);
 
+  const projectSections = React.useMemo(
+    () =>
+      projectContext.data?.sections.map((section) => ({
+        label: section.label,
+        text: section.text,
+        originalLength: section.originalLength,
+        truncated: section.truncated,
+        blockId: section.blockId,
+      })) ?? [],
+    [projectContext.data]
+  );
+
   const contextPayload = React.useMemo(
     () =>
       createContextPayload({
         selectedText,
         pageContext: pageContext || docContent || undefined,
+        extraSections: projectSections,
         policy: dataAccessPolicy,
       }),
-    [pageContext, selectedText, docContent, dataAccessPolicy]
+    [pageContext, selectedText, docContent, projectSections, dataAccessPolicy]
   );
 
   const consentCtrl = useAiContextConsent(docId);
@@ -159,14 +268,15 @@ export function useAIPanelController({
   // 6. Streaming Logic
   const abortReasonRef = React.useRef<"user" | "timeout" | null>(null);
 
-  const streamCallbacksRef = React.useRef<{
+  const streamContextRef = React.useRef<{
     messageId: string;
     draftContent: string;
+    aiContext: AIContext;
   } | null>(null);
 
   const handleStreamContentUpdate = React.useCallback(
     (content: string) => {
-      const ctx = streamCallbacksRef.current;
+      const ctx = streamContextRef.current;
       if (!ctx || !facade) {
         return;
       }
@@ -194,55 +304,51 @@ export function useAIPanelController({
         temperature?: number;
       };
     }) => {
-      if (streamCallbacksRef.current && facade) {
-        const { messageId } = streamCallbacksRef.current;
-
-        facade.finalizeMessage(messageId, {
+      if (streamContextRef.current && facade) {
+        const { messageId, aiContext } = streamContextRef.current;
+        const finalizedContext: AIContext = {
+          ...aiContext,
           model,
           requestId: result.requestId,
           agentId: result.agentId,
           confidence: result.confidence,
           provenance: result.provenance,
-        });
+        };
+
+        facade.finalizeMessage(messageId, finalizedContext);
 
         setAttachments([]);
       }
-      streamCallbacksRef.current = null;
+      streamContextRef.current = null;
     },
     [facade, setAttachments, model]
   );
 
   const handleStreamError = React.useCallback(
     (error: { message: string; code?: string; requestId?: string }) => {
-      if (streamCallbacksRef.current && facade) {
-        const { messageId, draftContent } = streamCallbacksRef.current;
-        const isCanceled = error.code === "canceled" || abortReasonRef.current === "user";
-        const fallback =
-          abortReasonRef.current === "timeout"
-            ? t("errorTimeout")
-            : (error.message ?? t("errorFallback"));
-
-        const errorContent = isCanceled
-          ? t("canceledByUser")
-          : t("errorMessage", { message: fallback });
-
-        facade.updateMessage({
-          messageId,
-          content: errorContent,
-          status: "error",
-          aiContext: error.requestId
-            ? {
-                requestId: error.requestId,
-              }
-            : undefined,
-        });
-
-        setInput(draftContent);
-        setAttachments((prev) =>
-          prev.map((att) => (att.status === "sending" ? { ...att, status: "ready" } : att))
-        );
+      const ctx = streamContextRef.current;
+      if (!ctx || !facade) {
+        streamContextRef.current = null;
+        abortReasonRef.current = null;
+        return;
       }
-      streamCallbacksRef.current = null;
+
+      const errorContent = resolveStreamErrorContent(error, abortReasonRef.current, t);
+      const nextContext = mergeErrorContext(ctx.aiContext, error.requestId);
+
+      facade.updateMessage({
+        messageId: ctx.messageId,
+        content: errorContent,
+        status: "error",
+        aiContext: nextContext,
+      });
+
+      setInput(ctx.draftContent);
+      setAttachments((prev) =>
+        prev.map((att) => (att.status === "sending" ? { ...att, status: "ready" } : att))
+      );
+
+      streamContextRef.current = null;
       abortReasonRef.current = null;
     },
     [facade, setAttachments, t]
@@ -256,10 +362,11 @@ export function useAIPanelController({
     stream,
     abort,
     reset: resetAIClient,
+    confirm,
   } = useAIClient();
 
   React.useEffect(() => {
-    if (!streamCallbacksRef.current) {
+    if (!streamContextRef.current) {
       return;
     }
 
@@ -296,9 +403,179 @@ export function useAIPanelController({
   const isStreaming = aiStatus === "streaming";
   const isLoading = isStreaming;
 
+  const [pendingApproval, setPendingApproval] = React.useState<PendingApproval | null>(null);
+  const [approvalBusy, setApprovalBusy] = React.useState(false);
+  const [approvalError, setApprovalError] = React.useState<string | null>(null);
+
+  const updateStreamingAiContext = React.useCallback(
+    (updater: (current: AIContext) => AIContext) => {
+      const ctx = streamContextRef.current;
+      if (!ctx || !facade) {
+        return;
+      }
+
+      const nextContext = updater(ctx.aiContext);
+      ctx.aiContext = nextContext;
+      facade.updateMessage({
+        messageId: ctx.messageId,
+        aiContext: nextContext,
+      });
+    },
+    [facade]
+  );
+
+  const updateToolCalls = React.useCallback(
+    (updater: (calls: ToolCallRecord[]) => ToolCallRecord[]) => {
+      updateStreamingAiContext((current) => {
+        const nextCalls = updater([...(current.toolCalls ?? [])]);
+        return {
+          ...current,
+          toolCalls: nextCalls,
+        };
+      });
+    },
+    [updateStreamingAiContext]
+  );
+
+  const createToolCallId = React.useCallback((prefix: string) => {
+    if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+      return crypto.randomUUID();
+    }
+    return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  }, []);
+
+  const handleAgentEvent = React.useCallback(
+    (event: AgentStreamEvent) => {
+      switch (event.type) {
+        case "thinking": {
+          const content =
+            typeof event.data === "object" && event.data && "content" in event.data
+              ? (event.data as { content?: unknown }).content
+              : undefined;
+          if (typeof content === "string" && content.trim()) {
+            updateStreamingAiContext((current) => ({
+              ...current,
+              thinking: current.thinking ? `${current.thinking}\n\n${content}` : content,
+            }));
+          }
+          break;
+        }
+        case "confirmation:required": {
+          const confirmationId = event.data.confirmation_id ?? createToolCallId("confirm");
+          setPendingApproval({
+            confirmationId,
+            toolName: event.data.toolName,
+            description: event.data.description,
+            arguments: event.data.arguments,
+            risk: event.data.risk,
+            reason: event.data.reason,
+            riskTags: event.data.riskTags,
+          });
+          setApprovalError(null);
+          updateToolCalls((calls) => {
+            calls.push({
+              id: confirmationId,
+              name: event.data.toolName,
+              arguments: event.data.arguments,
+              status: "pending",
+              startTime: event.timestamp,
+              confirmationId,
+            });
+            return calls;
+          });
+          break;
+        }
+        case "confirmation:received": {
+          setPendingApproval(null);
+          setApprovalBusy(false);
+          if (!event.data.confirmed) {
+            updateToolCalls((calls) => {
+              const index = findLastIndex(
+                calls,
+                (call) =>
+                  call.status === "pending" &&
+                  (event.data.confirmation_id
+                    ? call.confirmationId === event.data.confirmation_id
+                    : true)
+              );
+              if (index >= 0) {
+                calls[index] = {
+                  ...calls[index],
+                  status: "error",
+                  endTime: event.timestamp,
+                  durationMs: event.timestamp - (calls[index].startTime ?? event.timestamp),
+                  error: "User denied the operation",
+                  result: {
+                    success: false,
+                    content: [],
+                    error: { code: "PERMISSION_DENIED", message: "User denied the operation" },
+                  },
+                };
+              }
+              return calls;
+            });
+          }
+          break;
+        }
+        case "tool:calling": {
+          updateToolCalls((calls) => {
+            const index = findLastIndex(
+              calls,
+              (call) => call.name === event.data.toolName && call.status === "pending"
+            );
+            if (index >= 0) {
+              calls[index] = {
+                ...calls[index],
+                status: "executing",
+                startTime: calls[index].startTime ?? event.timestamp,
+              };
+              return calls;
+            }
+
+            calls.push({
+              id: createToolCallId("tool"),
+              name: event.data.toolName,
+              arguments: event.data.arguments,
+              status: "executing",
+              startTime: event.timestamp,
+            });
+            return calls;
+          });
+          break;
+        }
+        case "tool:result": {
+          updateToolCalls((calls) => {
+            const index = findLastIndex(
+              calls,
+              (call) => call.name === event.data.toolName && call.status !== "success"
+            );
+            if (index >= 0) {
+              const durationMs = event.timestamp - (calls[index].startTime ?? event.timestamp);
+              calls[index] = {
+                ...calls[index],
+                status: event.data.result.success ? "success" : "error",
+                result: event.data.result,
+                endTime: event.timestamp,
+                durationMs,
+              };
+            }
+            return calls;
+          });
+          break;
+        }
+        default:
+          break;
+      }
+    },
+    [createToolCallId, updateStreamingAiContext, updateToolCalls]
+  );
+
   const resetState = React.useCallback(() => {
     abortReasonRef.current = null;
-    streamCallbacksRef.current = null;
+    streamContextRef.current = null;
+    setPendingApproval(null);
+    setApprovalBusy(false);
+    setApprovalError(null);
   }, []);
 
   // --- Sub-actions ---
@@ -350,18 +627,28 @@ export function useAIPanelController({
       attachmentPayload: { type: "image"; url: string }[],
       draftContent: string,
       selectedWorkflow: string,
-      systemPrompt: string | null
+      systemPrompt: string | null,
+      mode: "chat" | "agent",
+      onEvent?: (event: AgentStreamEvent) => void
     ) => {
-      streamCallbacksRef.current = { messageId, draftContent };
+      streamContextRef.current = {
+        messageId,
+        draftContent,
+        aiContext: { model },
+      };
 
-      await stream({
-        prompt: content,
-        model,
-        history,
-        attachments: attachmentPayload,
-        workflow: selectedWorkflow as "tdd" | "refactoring" | "debugging" | "research" | "none",
-        systemPrompt: systemPrompt ?? undefined,
-      });
+      await stream(
+        {
+          prompt: content,
+          model,
+          history,
+          attachments: attachmentPayload,
+          workflow: selectedWorkflow as "tdd" | "refactoring" | "debugging" | "research" | "none",
+          systemPrompt: systemPrompt ?? undefined,
+          mode,
+        },
+        { onEvent }
+      );
     },
     [stream, model]
   );
@@ -404,6 +691,13 @@ export function useAIPanelController({
       prev.map((att) => (att.status === "ready" ? { ...att, status: "sending" } : att))
     );
 
+    const agentModeEnabled =
+      selectedCapability.supports.tools &&
+      selectedCapability.provider !== "gemini" &&
+      attachmentPayload.length === 0;
+    const streamMode = agentModeEnabled ? "agent" : "chat";
+    const eventHandler = streamMode === "agent" ? handleAgentEvent : undefined;
+
     // 6. Execute
     await runStreamExecution(
       content,
@@ -412,7 +706,9 @@ export function useAIPanelController({
       attachmentPayload,
       draftContent,
       workflow,
-      resolvedSystemPrompt ?? null
+      resolvedSystemPrompt ?? null,
+      streamMode,
+      eventHandler
     );
   }, [
     input,
@@ -432,13 +728,53 @@ export function useAIPanelController({
     runStreamExecution,
     workflow,
     model,
+    selectedCapability.provider,
+    selectedCapability.supports.tools,
+    handleAgentEvent,
   ]);
 
   const handleAbort = React.useCallback(() => {
     abortReasonRef.current = "user";
     abort();
+    setPendingApproval(null);
+    setApprovalBusy(false);
+    setApprovalError(null);
     handleStreamError({ message: t("canceledByUser"), code: "canceled" });
   }, [abort, handleStreamError, t]);
+
+  const handleApprovalDecision = React.useCallback(
+    async (confirmed: boolean) => {
+      if (!pendingApproval || approvalBusy) {
+        return;
+      }
+
+      setApprovalBusy(true);
+      setApprovalError(null);
+      try {
+        await confirm({
+          confirmationId: pendingApproval.confirmationId,
+          confirmed,
+        });
+        setPendingApproval(null);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Approval failed";
+        setApprovalError(message);
+      } finally {
+        setApprovalBusy(false);
+      }
+    },
+    [pendingApproval, approvalBusy, confirm]
+  );
+
+  const handleApprove = React.useCallback(
+    () => handleApprovalDecision(true),
+    [handleApprovalDecision]
+  );
+
+  const handleReject = React.useCallback(
+    () => handleApprovalDecision(false),
+    [handleApprovalDecision]
+  );
 
   const handleRetry = React.useCallback((_messageId: string) => {
     console.warn("Retry not yet fully supported in new architecture");
@@ -469,6 +805,15 @@ export function useAIPanelController({
     setInput(suggestion);
   }, []);
 
+  const handleUseTask = React.useCallback((title: string, openItems: string[]) => {
+    const focusItem = openItems[0];
+    const prompt = focusItem
+      ? `Start \"${title}\". Focus on: ${focusItem}`
+      : `Start \"${title}\". Propose the next actionable step.`;
+    setInput(prompt);
+    inputRef.current?.focus();
+  }, []);
+
   const handleCopyLastAnswer = React.useCallback(() => {
     const lastAssistant = [...rawMessages]
       .reverse()
@@ -494,6 +839,9 @@ export function useAIPanelController({
     setModel,
     workflow,
     setWorkflow,
+    pendingApproval,
+    approvalBusy,
+    approvalError,
 
     // Sub-controllers
     attachmentsCtrl,
@@ -505,6 +853,7 @@ export function useAIPanelController({
     contextPayload,
     selectedCapability,
     visionFallback,
+    projectContext,
 
     // Actions
     handleSend,
@@ -517,6 +866,9 @@ export function useAIPanelController({
     handleSuggestionClick,
     handleCopyLastAnswer,
     handleCopy,
+    handleUseTask,
+    handleApprove,
+    handleReject,
     exportHistory,
   };
 }

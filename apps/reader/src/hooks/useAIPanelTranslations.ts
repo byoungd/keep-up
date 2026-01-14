@@ -124,6 +124,37 @@ export function useAIPanelTranslations(selectedProvider: string) {
     [t, providerLabel]
   );
 
+  const projectContextTranslations = React.useMemo(
+    () => ({
+      title: t("projectContextTitle"),
+      subtitle: t("projectContextSubtitle"),
+      loading: t("projectContextLoading"),
+      empty: t("projectContextEmpty"),
+      refresh: t("projectContextRefresh"),
+      tasksLabel: t("projectContextTasksLabel"),
+      openItemsLabel: t("projectContextOpenItemsLabel"),
+      checklistLabel: t("projectContextChecklistLabel"),
+      useTask: t("projectContextUseTask"),
+      warningsLabel: t("projectContextWarningsLabel"),
+      updatedLabel: t("projectContextUpdatedLabel", { time: "{time}" }),
+    }),
+    [t]
+  );
+
+  const approvalTranslations = React.useMemo(
+    () => ({
+      title: t("approvalTitle"),
+      approve: t("approvalApprove"),
+      reject: t("approvalReject"),
+      riskLabel: t("approvalRiskLabel"),
+      reasonLabel: t("approvalReasonLabel"),
+      argumentsLabel: t("approvalArgumentsLabel"),
+      pendingLabel: t("approvalPendingLabel"),
+      errorLabel: t("approvalErrorLabel"),
+    }),
+    [t]
+  );
+
   return {
     t,
     statusLabels,
@@ -134,6 +165,8 @@ export function useAIPanelTranslations(selectedProvider: string) {
     attachmentsMeta,
     inputTranslations,
     contextStatusTranslations,
+    projectContextTranslations,
+    approvalTranslations,
     providerLabel,
   };
 }
