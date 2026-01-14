@@ -463,7 +463,19 @@ export class BridgeController {
       runtime: this.runtime,
       schema: this.adapter.schema,
       onDivergence: (result) => {
-        this.handleDivergence(result);
+        if (!this.view) {
+          this.handleDivergence(result);
+          return;
+        }
+        const analysis = this.divergenceDetector.analyzeDivergence(
+          this.view.state,
+          this.runtime.doc,
+          this.adapter.schema
+        );
+        this.handleDivergence({
+          ...result,
+          analysis,
+        });
       },
       onError: (error) => {
         this.onError?.(error);

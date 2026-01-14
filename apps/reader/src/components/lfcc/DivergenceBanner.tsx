@@ -16,16 +16,8 @@ export type DivergenceInfo = {
   editorChecksum: string;
   loroChecksum: string;
   reason?: string;
-  analysis?: {
-    blockCountMismatch: boolean;
-    textContentMismatch: boolean;
-    attributeMismatch: boolean;
-    orderMismatch: boolean;
-    divergedBlockIds: string[];
-    missingInEditor: string[];
-    missingInLoro: string[];
-  };
   detectedAt: number;
+  analysis?: import("@ku0/lfcc-bridge").DivergenceAnalysis;
 };
 
 interface DivergenceBannerProps {
@@ -191,20 +183,14 @@ export function useDivergenceState() {
   const [divergence, setDivergence] = React.useState<DivergenceInfo | null>(null);
 
   const handleDivergence = React.useCallback(
-    (result: {
-      diverged: boolean;
-      editorChecksum: string;
-      loroChecksum: string;
-      reason?: string;
-      analysis?: DivergenceInfo["analysis"];
-    }) => {
+    (result: import("@ku0/lfcc-bridge").DivergenceResult) => {
       if (result.diverged) {
         const next = {
           editorChecksum: result.editorChecksum,
           loroChecksum: result.loroChecksum,
           reason: result.reason,
-          analysis: result.analysis,
           detectedAt: Date.now(),
+          analysis: result.analysis,
         };
         setDivergence(next);
         useLfccDebugStore.getState().setDivergence(next);
