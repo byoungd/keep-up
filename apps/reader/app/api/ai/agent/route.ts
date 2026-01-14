@@ -1,3 +1,5 @@
+import * as path from "node:path";
+
 import {
   type CoworkSession,
   type OrchestratorEvent,

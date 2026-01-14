@@ -115,7 +115,10 @@ export function subscribeTaskEvents(handler: (event: TaskStreamEvent) => void): 
 }
 
 export function getTaskSnapshots(): TaskSnapshot[] {
-  return taskQueue.listTasks().map((task) => serializeTask(task));
+  return taskQueue
+    .listTasks()
+    .filter(isBackgroundTask)
+    .map((task) => serializeTask(task));
 }
 
 export function getTaskStats(): TaskQueueStats {
@@ -173,7 +176,11 @@ function ensureQueueListener() {
       return;
     }
 
-    const task = taskQueue.getTask(event.taskId);
+    if (!isStreamableTaskEvent(mapped.type)) {
+      return;
+    }
+
+    const task = taskQueue.getTask<BackgroundTaskPayload, BackgroundTaskResult>(event.taskId);
     const snapshot = task ? serializeTask(task) : undefined;
     emitTaskEvent({
       type: mapped.type,
@@ -219,6 +226,30 @@ function serializeTask(task: Task<BackgroundTaskPayload, BackgroundTaskResult>):
   };
 }
 
+function isBackgroundTask(
+  task: Task<unknown, unknown>
+): task is Task<BackgroundTaskPayload, BackgroundTaskResult> {
+  return task.type === "agent";
+}
+
+type StreamableTaskEventType = Exclude<
+  TaskStreamEvent["type"],
+  "task.snapshot" | "task.confirmation_required" | "task.confirmation_received"
+>;
+
+const STREAMABLE_TASK_EVENT_TYPES: ReadonlySet<StreamableTaskEventType> = new Set([
+  "task.queued",
+  "task.running",
+  "task.progress",
+  "task.completed",
+  "task.failed",
+  "task.cancelled",
+]);
+
+function isStreamableTaskEvent(type: string): type is StreamableTaskEventType {
+  return STREAMABLE_TASK_EVENT_TYPES.has(type as StreamableTaskEventType);
+}
+
 function mapStatus(status: Task<unknown>["status"]): TaskStatusSnapshot {
   if (status === "cancelled" || status === "timeout") {
     return "cancelled";
@@ -245,6 +276,7 @@ class CoworkAgentTaskExecutor
   async execute(payload: BackgroundTaskPayload, context: TaskExecutionContext) {
     const auditLogger = createAuditLogger();
     const registry = await createToolRegistryForWorkspace(payload.workspaceRoot);
+    // @ts-expect-error - provider types are compatible but not exported
     const llm = createAICoreAdapter(resolveProvider(payload.provider), { model: payload.modelId });
     const session = createCoworkSession(payload);
 

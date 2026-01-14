@@ -27,6 +27,8 @@ type TaskNotifications = {
   streamError: string;
 };
 
+type TaskEventWithId = Extract<TaskStreamEvent, { taskId: string }>;
+
 function sortTasks(tasks: TaskSnapshot[]): TaskSnapshot[] {
   return [...tasks].sort((a, b) => b.createdAt - a.createdAt);
 }
@@ -44,6 +46,10 @@ function extractTaskSnapshot(event: TaskStreamEvent): TaskSnapshot | null {
     return null;
   }
   return task as TaskSnapshot;
+}
+
+function isTaskEventWithId(event: TaskStreamEvent): event is TaskEventWithId {
+  return "taskId" in event;
 }
 
 export function useBackgroundTasks(notifications?: TaskNotifications) {
@@ -111,7 +117,7 @@ export function useBackgroundTasks(notifications?: TaskNotifications) {
   );
 
   const handleTaskUpdate = React.useCallback(
-    (event: TaskStreamEvent) => {
+    (event: TaskEventWithId) => {
       const snapshot = extractTaskSnapshot(event);
       if (snapshot) {
         upsertTask(snapshot);
@@ -147,7 +153,9 @@ export function useBackgroundTasks(notifications?: TaskNotifications) {
         handleConfirmationReceived(event);
         return;
       }
-      handleTaskUpdate(event);
+      if (isTaskEventWithId(event)) {
+        handleTaskUpdate(event);
+      }
     },
     [handleSnapshot, handleConfirmationRequired, handleConfirmationReceived, handleTaskUpdate]
   );
@@ -156,18 +164,49 @@ export function useBackgroundTasks(notifications?: TaskNotifications) {
     notifications?.streamError ?? "Unable to connect to background task stream.";
 
   React.useEffect(() => {
-    const source = new EventSource("/api/ai/agent/tasks/stream");
-    source.onmessage = (message) => {
-      const event = parseTaskStreamEvent(message.data);
-      if (event) {
-        handleEvent(event);
+    let active = true;
+    let source: EventSource | null = null;
+    let reconnectTimer: number | null = null;
+    let attempt = 0;
+
+    const connect = () => {
+      if (!active) {
+        return;
       }
+      if (reconnectTimer !== null) {
+        window.clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+      source = new EventSource("/api/ai/agent/tasks/stream");
+      source.onopen = () => {
+        attempt = 0;
+        setStreamError(null);
+      };
+      source.onmessage = (message) => {
+        const event = parseTaskStreamEvent(message.data);
+        if (event) {
+          handleEvent(event);
+        }
+      };
+      source.onerror = () => {
+        source?.close();
+        if (!active) {
+          return;
+        }
+        setStreamError(streamErrorMessage);
+        attempt += 1;
+        const delay = Math.min(30000, 1000 * 2 ** (attempt - 1));
+        reconnectTimer = window.setTimeout(connect, delay);
+      };
     };
-    source.onerror = () => {
-      setStreamError(streamErrorMessage);
-    };
+
+    connect();
     return () => {
-      source.close();
+      active = false;
+      if (reconnectTimer !== null) {
+        window.clearTimeout(reconnectTimer);
+      }
+      source?.close();
     };
   }, [handleEvent, streamErrorMessage]);
 
