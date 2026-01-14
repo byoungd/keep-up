@@ -761,7 +761,7 @@ function initBridge(
   >
 ) {
   const plugins = createPlugins(runtime, options, setSlashMenuState);
-  const adapter = new EditorAdapterPM({ plugins });
+  const adapter = new EditorAdapterPM({ plugins, schema: pmSchema });
 
   const bridge = new BridgeController({
     runtime: runtime as unknown as LoroRuntime,
