@@ -105,7 +105,9 @@ type BackgroundTaskResult = {
 
 const TASK_EVENT_NAME = "task-event";
 const taskEvents = new EventEmitter();
-const taskQueue = createTaskQueue();
+const DEFAULT_TASK_TIMEOUT_MS = 1000 * 60 * 30;
+// In-memory queue scoped to this process. Replace with a persistent adapter for multi-instance deployments.
+const taskQueue = createTaskQueue({ defaultTimeout: DEFAULT_TASK_TIMEOUT_MS });
 let queueListenerAttached = false;
 let executorRegistered = false;
 
