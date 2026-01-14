@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
+  createAnnotationFromSelection,
+  getAnnotationIds,
   selectRangeBetweenSubstrings,
   setEditorContent,
   waitForEditorReady,
@@ -20,9 +22,7 @@ test.describe("Annotation Edge Cases", () => {
   test("Splits annotation when a new block is inserted between parts", async ({ page }) => {
     // 1. Create annotation across P1 and P2
     await selectRangeBetweenSubstrings(page, "Paragraph One", "Paragraph Two");
-    const toolbar = page.locator("[data-testid='selection-toolbar']");
-    await expect(toolbar).toBeVisible();
-    await toolbar.getByRole("button", { name: "Highlight yellow" }).click({ force: true });
+    await createAnnotationFromSelection(page);
 
     // Verify 1 annotation ID
     const initialIds = await getUniqueAnnotationIds(page);
@@ -44,9 +44,7 @@ test.describe("Annotation Edge Cases", () => {
   test("Heals annotation when a middle block is deleted", async ({ page }) => {
     // 1. Create annotation across P1, P2, P3
     await selectRangeBetweenSubstrings(page, "Paragraph One", "Paragraph Three");
-    const toolbar = page.locator("[data-testid='selection-toolbar']");
-    await expect(toolbar).toBeVisible();
-    await toolbar.getByRole("button", { name: "Highlight yellow" }).click({ force: true });
+    await createAnnotationFromSelection(page);
 
     // Verify 1 annotation
     const initialIds = await getUniqueAnnotationIds(page);
@@ -85,9 +83,7 @@ test.describe("Annotation Edge Cases", () => {
   test("Heals annotation when the start block is deleted", async ({ page }) => {
     // 1. Create annotation across P1, P2, P3
     await selectRangeBetweenSubstrings(page, "Paragraph One", "Paragraph Three");
-    const toolbar = page.locator("[data-testid='selection-toolbar']");
-    await expect(toolbar).toBeVisible();
-    await toolbar.getByRole("button", { name: "Highlight yellow" }).click({ force: true });
+    await createAnnotationFromSelection(page);
 
     // Verify 1 annotation
     const initialIds = await getUniqueAnnotationIds(page);
@@ -128,9 +124,7 @@ test.describe("Annotation Edge Cases", () => {
   test("Heals annotation when the end block is deleted", async ({ page }) => {
     // 1. Create annotation across P1, P2, P3
     await selectRangeBetweenSubstrings(page, "Paragraph One", "Paragraph Three");
-    const toolbar = page.locator("[data-testid='selection-toolbar']");
-    await expect(toolbar).toBeVisible();
-    await toolbar.getByRole("button", { name: "Highlight yellow" }).click({ force: true });
+    await createAnnotationFromSelection(page);
 
     // 2. Delete P3 (the end block)
     await page.evaluate(() => {
@@ -167,9 +161,7 @@ test.describe("Annotation Edge Cases", () => {
   test("Handles merging of highlighted blocks (graceful degradation)", async ({ page }) => {
     // 1. Create annotation across P1, P2
     await selectRangeBetweenSubstrings(page, "Paragraph One", "Paragraph Two");
-    const toolbar = page.locator("[data-testid='selection-toolbar']");
-    await expect(toolbar).toBeVisible();
-    await toolbar.getByRole("button", { name: "Highlight yellow" }).click({ force: true });
+    await createAnnotationFromSelection(page);
 
     // 2. Merge P2 into P1 (Backspace at start of P2)
     await page.evaluate(() => {
@@ -222,14 +214,8 @@ test.describe("Annotation Edge Cases", () => {
 });
 
 async function getUniqueAnnotationIds(page: import("@playwright/test").Page) {
-  return await page.evaluate(() => {
-    const nodes = document.querySelectorAll(".lfcc-annotation");
-    const ids = new Set<string | null>();
-    for (const n of nodes) {
-      ids.add(n.getAttribute("data-annotation-id"));
-    }
-    return Array.from(ids);
-  });
+  const ids = await getAnnotationIds(page);
+  return Array.from(new Set(ids));
 }
 
 async function waitForAnnotationCount(

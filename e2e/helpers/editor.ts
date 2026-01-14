@@ -132,120 +132,89 @@ export async function selectFirstTextRange(page: Page, maxChars = 12): Promise<v
   }, maxChars);
 }
 
-export async function selectTextBySubstring(page: Page, needle: string): Promise<string> {
-  return await page.evaluate((target) => {
-    const root = document.querySelector(".lfcc-editor .ProseMirror");
-    if (!root) {
-      throw new Error("Editor not found");
-    }
-
-    // Use TreeWalker to find all text nodes
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
-
-    let textNode: Text | null = null;
-    let offsetInNode = -1;
-
-    while (walker.nextNode()) {
-      const node = walker.currentNode as Text;
-      const text = node.textContent || "";
-      const index = text.indexOf(target);
-
-      if (index !== -1) {
-        textNode = node;
-        offsetInNode = index;
-        break;
-      }
-    }
-
-    if (!textNode || offsetInNode === -1) {
-      throw new Error(`Text not found: "${target}"`);
-    }
-
-    // Create selection using the found text node
-    const range = document.createRange();
-    range.setStart(textNode, offsetInNode);
-    range.setEnd(textNode, offsetInNode + target.length);
-
-    const sel = window.getSelection();
-    sel?.removeAllRanges();
-    sel?.addRange(range);
-    document.dispatchEvent(new Event("selectionchange"));
-    document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
-
-    const lfccWindow = window as unknown as LfccWindow & {
-      pmTextSelection?: {
-        create?: (doc: import("prosemirror-model").Node, fromPos: number, toPos: number) => unknown;
-      };
-    };
-    const view = lfccWindow.__lfccView;
-    if (view?.state?.doc) {
-      try {
-        const fromPos = view.posAtDOM(textNode, offsetInNode);
-        const toPos = view.posAtDOM(textNode, offsetInNode + target.length);
-        const SelectionCtor = (lfccWindow.pmTextSelection ?? view.state.selection?.constructor) as {
-          create?: (
-            doc: import("prosemirror-model").Node,
-            fromPos: number,
-            toPos: number
-          ) => unknown;
-        };
-        if (SelectionCtor?.create) {
-          const selection = SelectionCtor.create(view.state.doc, fromPos, toPos);
-          view.dispatch(view.state.tr.setSelection(selection));
-        }
-      } catch {
-        // Ignore - fallback to DOM selection only
-      }
-      view.focus();
-    }
-
-    return target;
-  }, needle);
-}
-
-export async function selectRangeBetweenSubstrings(
+async function waitForSelectionInEditor(
   page: Page,
-  startNeedle: string,
-  endNeedle: string
-): Promise<string> {
-  return await page.evaluate(
-    ({ startNeedle: startToken, endNeedle: endToken }) => {
+  timeout = 2000,
+  requireBlockId = true
+): Promise<void> {
+  await page.waitForFunction(
+    (needsBlockId) => {
       const root = document.querySelector(".lfcc-editor .ProseMirror");
       if (!root) {
-        throw new Error("Editor not found");
+        return false;
       }
 
-      const findNode = (needle: string) => {
-        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-        let node = walker.nextNode() as Text | null;
-        while (node) {
-          const text = node.textContent ?? "";
-          const index = text.indexOf(needle);
-          if (index !== -1) {
-            return { node, index, length: needle.length };
+      const selection = window.getSelection();
+      const hasDomSelection = (() => {
+        if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+          return false;
+        }
+        const { anchorNode, focusNode } = selection;
+        if (!anchorNode || !focusNode) {
+          return false;
+        }
+        return root.contains(anchorNode) && root.contains(focusNode);
+      })();
+
+      const view = (window as unknown as { __lfccView?: import("prosemirror-view").EditorView })
+        .__lfccView;
+      const pmSelection = view?.state?.selection as { from?: number; to?: number } | undefined;
+      const hasPmSelection =
+        typeof pmSelection?.from === "number" &&
+        typeof pmSelection?.to === "number" &&
+        pmSelection.from !== pmSelection.to;
+
+      if (!hasDomSelection && !hasPmSelection) {
+        return false;
+      }
+      if (!needsBlockId) {
+        return true;
+      }
+
+      const findParentBlock = (node: Node | null) => {
+        let current: Node | null = node;
+        while (current) {
+          if (current instanceof HTMLElement && current.hasAttribute("data-block-id")) {
+            return current;
           }
-          node = walker.nextNode() as Text | null;
+          current = current.parentNode;
         }
         return null;
       };
 
-      const start = findNode(startToken);
-      const end = findNode(endToken);
-      if (!start || !end) {
-        throw new Error(`Missing range for \"${startToken}\" -> \"${endToken}\"`);
+      if (hasDomSelection && selection) {
+        const range = selection.getRangeAt(0);
+        const startBlock = findParentBlock(range.startContainer);
+        const endBlock = findParentBlock(range.endContainer);
+        if (startBlock && endBlock) {
+          return true;
+        }
       }
 
-      const range = document.createRange();
-      range.setStart(start.node, start.index);
-      range.setEnd(end.node, end.index + end.length);
-      const selection = window.getSelection();
-      selection?.removeAllRanges();
-      selection?.addRange(range);
-      document.dispatchEvent(new Event("selectionchange"));
-      document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+      if (hasPmSelection && view?.domAtPos) {
+        try {
+          const fromDom = view.domAtPos(pmSelection?.from ?? 0);
+          const toDom = view.domAtPos(pmSelection?.to ?? 0);
+          const startBlock = findParentBlock(fromDom.node);
+          const endBlock = findParentBlock(toDom.node);
+          return Boolean(startBlock && endBlock);
+        } catch {
+          return false;
+        }
+      }
 
-      const lfccWindow = window as unknown as {
-        __lfccView?: import("prosemirror-view").EditorView;
+      return false;
+    },
+    requireBlockId,
+    { timeout }
+  );
+}
+
+export async function selectTextBySubstring(page: Page, needle: string): Promise<string> {
+  await page.waitForSelector(".lfcc-editor [data-block-id]", { timeout: 2000 });
+  const performSelection = async () =>
+    page.evaluate((target) => {
+      const lfccWindow = window as unknown as LfccWindow & {
         pmTextSelection?: {
           create?: (
             doc: import("prosemirror-model").Node,
@@ -255,10 +224,29 @@ export async function selectRangeBetweenSubstrings(
         };
       };
       const view = lfccWindow.__lfccView;
-      if (view?.state?.doc) {
+
+      const selectViaProseMirror = () => {
+        if (!view?.state?.doc) {
+          return null;
+        }
+        let fromPos: number | null = null;
+        view.state.doc.descendants((node, pos) => {
+          if (!node.isText) {
+            return true;
+          }
+          const text = node.text ?? "";
+          const index = text.indexOf(target);
+          if (index !== -1) {
+            fromPos = pos + index;
+            return false;
+          }
+          return true;
+        });
+        if (fromPos === null) {
+          return null;
+        }
+        const toPos = fromPos + target.length;
         try {
-          const fromPos = view.posAtDOM(start.node, start.index);
-          const toPos = view.posAtDOM(end.node, end.index + end.length);
           const SelectionCtor = (lfccWindow.pmTextSelection ??
             view.state.selection?.constructor) as {
             create?: (
@@ -268,19 +256,288 @@ export async function selectRangeBetweenSubstrings(
             ) => unknown;
           };
           if (SelectionCtor?.create) {
-            const pmSelection = SelectionCtor.create(view.state.doc, fromPos, toPos);
-            view.dispatch(view.state.tr.setSelection(pmSelection));
+            const selection = SelectionCtor.create(view.state.doc, fromPos, toPos);
+            view.dispatch(view.state.tr.setSelection(selection));
           }
+          const fromDom = view.domAtPos(fromPos);
+          const toDom = view.domAtPos(toPos);
+          const range = document.createRange();
+          range.setStart(fromDom.node, fromDom.offset);
+          range.setEnd(toDom.node, toDom.offset);
+          const sel = window.getSelection();
+          sel?.removeAllRanges();
+          sel?.addRange(range);
+          document.dispatchEvent(new Event("selectionchange"));
+          document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+          view.focus();
         } catch {
-          // Ignore - DOM selection is still set for toolbar interactions
+          return null;
         }
-        view.focus();
-      }
+        return window.getSelection()?.toString() ?? target;
+      };
 
-      return selection?.toString() ?? "";
-    },
-    { startNeedle, endNeedle }
-  );
+      const selectViaDom = () => {
+        const root = document.querySelector(".lfcc-editor .ProseMirror");
+        if (!root) {
+          throw new Error("Editor not found");
+        }
+
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+        let textNode: Text | null = null;
+        let offsetInNode = -1;
+
+        while (walker.nextNode()) {
+          const node = walker.currentNode as Text;
+          const text = node.textContent || "";
+          const index = text.indexOf(target);
+
+          if (index !== -1) {
+            textNode = node;
+            offsetInNode = index;
+            break;
+          }
+        }
+
+        if (!textNode || offsetInNode === -1) {
+          throw new Error(`Text not found: "${target}"`);
+        }
+
+        const range = document.createRange();
+        range.setStart(textNode, offsetInNode);
+        range.setEnd(textNode, offsetInNode + target.length);
+
+        const sel = window.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+        document.dispatchEvent(new Event("selectionchange"));
+        document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+
+        if (view?.state?.doc) {
+          try {
+            const fromPos = view.posAtDOM(textNode, offsetInNode);
+            const toPos = view.posAtDOM(textNode, offsetInNode + target.length);
+            const SelectionCtor = (lfccWindow.pmTextSelection ??
+              view.state.selection?.constructor) as {
+              create?: (
+                doc: import("prosemirror-model").Node,
+                fromPos: number,
+                toPos: number
+              ) => unknown;
+            };
+            if (SelectionCtor?.create) {
+              const selection = SelectionCtor.create(view.state.doc, fromPos, toPos);
+              view.dispatch(view.state.tr.setSelection(selection));
+            }
+          } catch {
+            // Ignore - fallback to DOM selection only
+          }
+          view.focus();
+        }
+
+        return window.getSelection()?.toString() ?? target;
+      };
+
+      const pmSelectionText = selectViaProseMirror();
+      if (pmSelectionText !== null) {
+        return pmSelectionText;
+      }
+      return selectViaDom();
+    }, needle);
+
+  let selectedText = "";
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    selectedText = await performSelection();
+    try {
+      await waitForSelectionInEditor(page, 2000, false);
+      return selectedText;
+    } catch {
+      await page.waitForTimeout(50);
+    }
+  }
+
+  throw new Error(`Failed to set selection for "${needle}"`);
+}
+
+export async function selectRangeBetweenSubstrings(
+  page: Page,
+  startNeedle: string,
+  endNeedle: string
+): Promise<string> {
+  await page.waitForSelector(".lfcc-editor [data-block-id]", { timeout: 2000 });
+  const performSelection = async () =>
+    page.evaluate(
+      ({ startNeedle: startToken, endNeedle: endToken }) => {
+        const lfccWindow = window as unknown as {
+          __lfccView?: import("prosemirror-view").EditorView;
+          pmTextSelection?: {
+            create?: (
+              doc: import("prosemirror-model").Node,
+              fromPos: number,
+              toPos: number
+            ) => unknown;
+          };
+        };
+        const view = lfccWindow.__lfccView;
+
+        const selectViaProseMirror = () => {
+          if (!view?.state?.doc) {
+            return null;
+          }
+          const findInDoc = (needle: string) => {
+            let result: { pos: number; length: number } | null = null;
+            view.state.doc.descendants((node, pos) => {
+              if (!node.isText) {
+                return true;
+              }
+              const text = node.text ?? "";
+              const index = text.indexOf(needle);
+              if (index !== -1) {
+                result = { pos: pos + index, length: needle.length };
+                return false;
+              }
+              return true;
+            });
+            return result;
+          };
+
+          const start = findInDoc(startToken);
+          const end = findInDoc(endToken);
+          if (!start || !end) {
+            return null;
+          }
+          const fromPos = start.pos;
+          const toPos = end.pos + end.length;
+          if (fromPos >= toPos) {
+            return null;
+          }
+
+          try {
+            const SelectionCtor = (lfccWindow.pmTextSelection ??
+              view.state.selection?.constructor) as {
+              create?: (
+                doc: import("prosemirror-model").Node,
+                fromPos: number,
+                toPos: number
+              ) => unknown;
+            };
+            if (SelectionCtor?.create) {
+              const pmSelection = SelectionCtor.create(view.state.doc, fromPos, toPos);
+              view.dispatch(view.state.tr.setSelection(pmSelection));
+            }
+            const fromDom = view.domAtPos(fromPos);
+            const toDom = view.domAtPos(toPos);
+            const range = document.createRange();
+            range.setStart(fromDom.node, fromDom.offset);
+            range.setEnd(toDom.node, toDom.offset);
+            const selection = window.getSelection();
+            selection?.removeAllRanges();
+            selection?.addRange(range);
+            document.dispatchEvent(new Event("selectionchange"));
+            document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+          } catch {
+            return null;
+          }
+          view.focus();
+          const selection = window.getSelection();
+          return selection?.toString() ?? "";
+        };
+
+        const selectViaDom = () => {
+          const root = document.querySelector(".lfcc-editor .ProseMirror");
+          if (!root) {
+            throw new Error("Editor not found");
+          }
+
+          const findNode = (needle: string) => {
+            const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+            let node = walker.nextNode() as Text | null;
+            while (node) {
+              const text = node.textContent ?? "";
+              const index = text.indexOf(needle);
+              if (index !== -1) {
+                return { node, index, length: needle.length };
+              }
+              node = walker.nextNode() as Text | null;
+            }
+            return null;
+          };
+
+          const start = findNode(startToken);
+          const end = findNode(endToken);
+          if (!start || !end) {
+            throw new Error(`Missing range for \"${startToken}\" -> \"${endToken}\"`);
+          }
+
+          const range = document.createRange();
+          range.setStart(start.node, start.index);
+          range.setEnd(end.node, end.index + end.length);
+          const selection = window.getSelection();
+          selection?.removeAllRanges();
+          selection?.addRange(range);
+          document.dispatchEvent(new Event("selectionchange"));
+          document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+
+          if (view?.state?.doc) {
+            try {
+              const fromPos = view.posAtDOM(start.node, start.index);
+              const toPos = view.posAtDOM(end.node, end.index + end.length);
+              const SelectionCtor = (lfccWindow.pmTextSelection ??
+                view.state.selection?.constructor) as {
+                create?: (
+                  doc: import("prosemirror-model").Node,
+                  fromPos: number,
+                  toPos: number
+                ) => unknown;
+              };
+              if (SelectionCtor?.create) {
+                const pmSelection = SelectionCtor.create(view.state.doc, fromPos, toPos);
+                view.dispatch(view.state.tr.setSelection(pmSelection));
+              }
+            } catch {
+              // Ignore - DOM selection is still set for toolbar interactions
+            }
+            view.focus();
+          }
+
+          return selection?.toString() ?? "";
+        };
+
+        const pmSelectionText = selectViaProseMirror();
+        if (pmSelectionText !== null) {
+          return pmSelectionText;
+        }
+        return selectViaDom();
+      },
+      { startNeedle, endNeedle }
+    );
+
+  let selectedText = "";
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    selectedText = await performSelection();
+    try {
+      await waitForSelectionInEditor(page, 2000, false);
+      return selectedText;
+    } catch {
+      await page.waitForTimeout(50);
+    }
+  }
+
+  const editor = page.locator(".lfcc-editor .ProseMirror");
+  const startNode = editor.getByText(startNeedle, { exact: false }).first();
+  const endNode = editor.getByText(endNeedle, { exact: false }).first();
+  await startNode.scrollIntoViewIfNeeded();
+  await startNode.click({ position: { x: 2, y: 2 } });
+  await endNode.scrollIntoViewIfNeeded();
+  await endNode.click({ modifiers: ["Shift"] });
+  try {
+    await waitForSelectionInEditor(page, 2000, false);
+    selectedText = await page.evaluate(() => window.getSelection()?.toString() ?? "");
+    return selectedText;
+  } catch {
+    // fall through to error
+  }
+
+  throw new Error(`Failed to set selection for \"${startNeedle}\" -> \"${endNeedle}\"`);
 }
 
 export async function getAnnotationIds(page: Page): Promise<string[]> {
@@ -307,6 +564,30 @@ export async function getAnnotationIds(page: Page): Promise<string[]> {
     }
     return Array.from(new Set(ids));
   });
+}
+
+export async function createAnnotationFromSelection(page: Page, color = "yellow"): Promise<string> {
+  await waitForSelectionInEditor(page, 2000, false);
+  const idsBefore = await getAnnotationIds(page);
+
+  await page.evaluate((nextColor) => {
+    window.dispatchEvent(
+      new CustomEvent("lfcc-create-annotation", {
+        detail: { color: nextColor },
+      })
+    );
+  }, color);
+
+  await expect
+    .poll(async () => (await getAnnotationIds(page)).length, { timeout: 5000 })
+    .toBeGreaterThan(idsBefore.length);
+
+  const idsAfter = await getAnnotationIds(page);
+  const newId = idsAfter.find((id) => !idsBefore.includes(id));
+  if (!newId) {
+    throw new Error("Failed to create annotation");
+  }
+  return newId;
 }
 
 export async function getAnnotationTextById(page: Page, annotationId: string): Promise<string> {
