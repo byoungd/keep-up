@@ -65,6 +65,20 @@ describe("buildContextSections", () => {
     expect(sections).toHaveLength(1);
     expect(sections[0]?.label).toBe("Visible Content");
   });
+
+  it("includes extra sections with stable block ids", () => {
+    const sections = buildContextSections({
+      extraSections: [
+        {
+          label: "Project Tasks",
+          text: "Task context",
+          blockId: "project_tasks",
+        },
+      ],
+    });
+    expect(sections).toHaveLength(1);
+    expect(sections[0]?.blockId).toBe("project_tasks");
+  });
 });
 
 describe("redactSensitiveText", () => {
@@ -91,6 +105,22 @@ describe("createContextPayload", () => {
     expect(payload).not.toBeNull();
     expect(payload?.sections[0]?.text.length).toBeLessThanOrEqual(3);
     expect(payload?.sections[0]?.truncated).toBe(true);
+  });
+
+  it("uses block ids to filter extra sections", () => {
+    const payload = createContextPayload({
+      selectedText: "Selected",
+      extraSections: [{ label: "Project Tasks", text: "Task details", blockId: "project_tasks" }],
+      policy: {
+        max_context_chars: 8000,
+        redaction_strategy: "mask",
+        pii_handling: "mask",
+        allow_blocks: ["project_tasks"],
+      },
+    });
+    expect(payload).not.toBeNull();
+    expect(payload?.sections).toHaveLength(1);
+    expect(payload?.sections[0]?.label).toBe("Project Tasks");
   });
 });
 

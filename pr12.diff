@@ -1,0 +1,1324 @@
+diff --git a/packages/agent-runtime/src/__tests__/digestSynthesis.test.ts b/packages/agent-runtime/src/__tests__/digestSynthesis.test.ts
+new file mode 100644
+index 0000000..f3cb5a0
+--- /dev/null
++++ b/packages/agent-runtime/src/__tests__/digestSynthesis.test.ts
+@@ -0,0 +1,124 @@
++import { describe, expect, it } from "vitest";
++import {
++  type DigestSourceItem,
++  VerifierAgent,
++  createAgentManager,
++  createMockLLM,
++  createToolRegistry,
++  runDigestSynthesis,
++} from "../index";
++
++describe("Digest synthesis pipeline", () => {
++  it("produces verified digest cards with citations", async () => {
++    const llm = createMockLLM();
++    llm.addResponse("digestmap item-1", {
++      content: JSON.stringify({
++        summary: "Alpha launched a new battery on Tuesday.",
++        claims: ["Alpha launched a new battery on Tuesday."],
++        topics: ["battery", "energy"],
++        citations: [{ itemId: "item-1", evidence: "Alpha launched a new battery on Tuesday." }],
++      }),
++      finishReason: "stop",
++    });
++    llm.addResponse("digestreduce cluster-1", {
++      content: JSON.stringify({
++        title: "Battery launch",
++        summary: "Alpha launched a new battery on Tuesday.",
++        whyItMatters: ["It could improve energy storage."],
++        topics: ["battery"],
++        sourceItemIds: ["item-1"],
++        citations: [{ itemId: "item-1", evidence: "Alpha launched a new battery on Tuesday." }],
++      }),
++      finishReason: "stop",
++    });
++    llm.addResponse("verifyclaim", {
++      content: JSON.stringify({
++        verified: true,
++        evidence: "Alpha launched a new battery on Tuesday.",
++        sourceItemId: "item-1",
++      }),
++      finishReason: "stop",
++    });
++
++    const registry = createToolRegistry();
++    const manager = createAgentManager({ llm, registry });
++    const verifier = new VerifierAgent(manager);
++
++    const items: DigestSourceItem[] = [
++      {
++        id: "item-1",
++        title: "Alpha unveils new battery",
++        content: "Alpha launched a new battery on Tuesday. The product targets EVs.",
++        sourceName: "TechWire",
++      },
++    ];
++
++    const output = await runDigestSynthesis(
++      { items },
++      { agentManager: manager, verifier },
++      {
++        executeTool: async () => {
++          throw new Error("Tool execution not expected in this test");
++        },
++      }
++    );
++
++    expect(output.cards).toHaveLength(1);
++    expect(output.rejectedCards).toHaveLength(0);
++    expect(output.cards[0]?.verified).toBe(true);
++    expect(output.cards[0]?.citations[0]?.evidence).toContain("Alpha launched");
++    expect(output.cards[0]?.verification[0]?.verified).toBe(true);
++  });
++
++  it("rejects cards when no sources are available", async () => {
++    const llm = createMockLLM();
++    llm.addResponse("digestmap item-2", {
++      content: JSON.stringify({
++        summary: "Beta released a new SDK.",
++        claims: ["Beta released a new SDK."],
++        topics: ["sdk"],
++        citations: [{ itemId: "item-2", evidence: "Beta released a new SDK." }],
++      }),
++      finishReason: "stop",
++    });
++    llm.addResponse("digestreduce cluster-1", {
++      content: JSON.stringify({
++        title: "SDK release",
++        summary: "Beta released a new SDK.",
++        whyItMatters: ["Developers can ship faster."],
++        topics: ["sdk"],
++        sourceItemIds: ["missing-item"],
++        citations: [{ itemId: "missing-item", evidence: "Beta released a new SDK." }],
++      }),
++      finishReason: "stop",
++    });
++
++    const registry = createToolRegistry();
++    const manager = createAgentManager({ llm, registry });
++    const verifier = new VerifierAgent(manager);
++
++    const items: DigestSourceItem[] = [
++      {
++        id: "item-2",
++        title: "Beta SDK launch",
++        content: "Beta released a new SDK for developers.",
++        sourceName: "DevWire",
++      },
++    ];
++
++    const output = await runDigestSynthesis(
++      { items },
++      { agentManager: manager, verifier },
++      {
++        executeTool: async () => {
++          throw new Error("Tool execution not expected in this test");
++        },
++      }
++    );
++
++    expect(output.cards).toHaveLength(0);
++    expect(output.rejectedCards).toHaveLength(1);
++    expect(output.rejectedCards[0]?.verified).toBe(false);
++    expect(output.rejectedCards[0]?.verification[0]?.reason).toContain("No sources");
++  });
++});
+diff --git a/packages/agent-runtime/src/__tests__/verifierAgent.test.ts b/packages/agent-runtime/src/__tests__/verifierAgent.test.ts
+new file mode 100644
+index 0000000..aebf193
+--- /dev/null
++++ b/packages/agent-runtime/src/__tests__/verifierAgent.test.ts
+@@ -0,0 +1,33 @@
++import { describe, expect, it } from "vitest";
++import { VerifierAgent, createAgentManager, createMockLLM, createToolRegistry } from "../index";
++
++describe("VerifierAgent", () => {
++  it("fails closed when verifier output omits boolean flag", async () => {
++    const llm = createMockLLM();
++    llm.addResponse("verifyclaim", {
++      content: JSON.stringify({
++        evidence: "Alpha launched a new battery on Tuesday.",
++        sourceItemId: "item-1",
++      }),
++      finishReason: "stop",
++    });
++
++    const registry = createToolRegistry();
++    const manager = createAgentManager({ llm, registry });
++    const verifier = new VerifierAgent(manager);
++
++    const result = await verifier.verifyClaim({
++      claim: "Alpha launched a new battery on Tuesday.",
++      sources: [
++        {
++          id: "item-1",
++          title: "Alpha unveils new battery",
++          content: "Alpha launched a new battery on Tuesday. The product targets EVs.",
++        },
++      ],
++    });
++
++    expect(result.verified).toBe(false);
++    expect(result.reason).toContain("missing boolean");
++  });
++});
+diff --git a/packages/agent-runtime/src/agents/index.ts b/packages/agent-runtime/src/agents/index.ts
+index b1d5e0e..c695e63 100644
+--- a/packages/agent-runtime/src/agents/index.ts
++++ b/packages/agent-runtime/src/agents/index.ts
+@@ -21,3 +21,12 @@ export { AGENT_PROFILES, getAgentProfile, listAgentTypes } from "./profiles";
+ 
+ // Manager
+ export { AgentManager, createAgentManager } from "./manager";
++
++// Verifier
++export {
++  VerifierAgent,
++  type VerifierRequest,
++  type VerifierResult,
++  type VerifierSource,
++  type VerifierAgentConfig,
++} from "./verifier";
+diff --git a/packages/agent-runtime/src/agents/profiles.ts b/packages/agent-runtime/src/agents/profiles.ts
+index 9d6d718..0c418d1 100644
+--- a/packages/agent-runtime/src/agents/profiles.ts
++++ b/packages/agent-runtime/src/agents/profiles.ts
+@@ -177,6 +177,20 @@ You have access to file and execution tools. Focus on:
+ - Implementing fixes
+ - Verifying solutions`;
+ 
++const VERIFIER_SYSTEM_PROMPT = `You are a verification specialist.
++Your role is to check claims against provided source text and extract evidence.
++
++Guidelines:
++- Verify claims only when explicitly supported by the source
++- Quote evidence snippets verbatim from the source text
++- Return strict JSON output exactly matching the requested schema
++- If a claim is not supported, mark it unverified and leave evidence empty
++
++You have access to no tools. Focus on:
++- Careful claim verification
++- Evidence extraction
++- Strict JSON output`;
++
+ const DIGEST_SYSTEM_PROMPT = `You are a digest generation specialist.
+ Your role is to analyze content items, cluster them by semantic similarity,
+ and generate concise, grounded summaries.
+@@ -329,6 +343,17 @@ export const AGENT_PROFILES: Record<AgentType, AgentProfile> = {
+     maxTurns: 20,
+     requireConfirmation: false,
+   },
++
++  verifier: {
++    type: "verifier",
++    name: "Verifier Agent",
++    description: "Verifies claims against source text with evidence snippets",
++    allowedTools: [],
++    systemPrompt: withAgentsGuide(VERIFIER_SYSTEM_PROMPT),
++    securityPreset: "safe",
++    maxTurns: 15,
++    requireConfirmation: false,
++  },
+ };
+ 
+ /**
+diff --git a/packages/agent-runtime/src/agents/types.ts b/packages/agent-runtime/src/agents/types.ts
+index fe12a9d..33f7b4e 100644
+--- a/packages/agent-runtime/src/agents/types.ts
++++ b/packages/agent-runtime/src/agents/types.ts
+@@ -29,7 +29,8 @@ export type AgentType =
+   | "code-reviewer" // Code review specialist
+   | "implementer" // Implementation specialist
+   | "debugger" // Debugging specialist
+-  | "digest"; // Digest generation with semantic clustering
++  | "digest" // Digest generation with semantic clustering
++  | "verifier"; // Claim verification with evidence extraction
+ 
+ /**
+  * Agent profile containing configuration for a specific agent type.
+diff --git a/packages/agent-runtime/src/agents/verifier.ts b/packages/agent-runtime/src/agents/verifier.ts
+new file mode 100644
+index 0000000..22df85b
+--- /dev/null
++++ b/packages/agent-runtime/src/agents/verifier.ts
+@@ -0,0 +1,154 @@
++import { buildVerifierPrompt } from "@keepup/ai-core";
++import { parseJsonFromText } from "../utils/llmJson";
++import type { IAgentManager } from "./types";
++
++export interface VerifierSource {
++  id: string;
++  title?: string;
++  content: string;
++}
++
++export interface VerifierRequest {
++  claim: string;
++  sources: VerifierSource[];
++}
++
++export interface VerifierResult {
++  claim: string;
++  verified: boolean;
++  evidence: string;
++  sourceItemId?: string;
++  reason?: string;
++}
++
++export interface VerifierAgentConfig {
++  maxSourceChars: number;
++}
++
++const DEFAULT_CONFIG: VerifierAgentConfig = {
++  maxSourceChars: 4000,
++};
++
++export class VerifierAgent {
++  private readonly config: VerifierAgentConfig;
++
++  constructor(
++    private manager: IAgentManager,
++    config: Partial<VerifierAgentConfig> = {}
++  ) {
++    this.config = { ...DEFAULT_CONFIG, ...config };
++  }
++
++  async verifyClaim(request: VerifierRequest): Promise<VerifierResult> {
++    const task = this.buildTask(request);
++    const result = await this.manager.spawn({ type: "verifier", task });
++
++    if (!result.success) {
++      return {
++        claim: request.claim,
++        verified: false,
++        evidence: "",
++        reason: result.error ?? "Verifier agent failed",
++      };
++    }
++
++    try {
++      const parsed = parseJsonFromText<unknown>(result.output);
++      return this.parseVerifierResult(request.claim, parsed);
++    } catch (error) {
++      return {
++        claim: request.claim,
++        verified: false,
++        evidence: "",
++        reason: error instanceof Error ? error.message : "Failed to parse verifier output",
++      };
++    }
++  }
++
++  async verifyClaims(requests: VerifierRequest[]): Promise<VerifierResult[]> {
++    if (requests.length === 0) {
++      return [];
++    }
++
++    const tasks = requests.map((request) => ({
++      type: "verifier" as const,
++      task: this.buildTask(request),
++    }));
++
++    const results = await this.manager.spawnParallel(tasks);
++    return results.map((result, index) => {
++      const request = requests[index];
++      if (!request) {
++        return {
++          claim: "",
++          verified: false,
++          evidence: "",
++          reason: "Missing verifier request",
++        };
++      }
++
++      if (!result.success) {
++        return {
++          claim: request.claim,
++          verified: false,
++          evidence: "",
++          reason: result.error ?? "Verifier agent failed",
++        };
++      }
++
++      try {
++        const parsed = parseJsonFromText<unknown>(result.output);
++        return this.parseVerifierResult(request.claim, parsed);
++      } catch (error) {
++        return {
++          claim: request.claim,
++          verified: false,
++          evidence: "",
++          reason: error instanceof Error ? error.message : "Failed to parse verifier output",
++        };
++      }
++    });
++  }
++
++  private buildTask(request: VerifierRequest): string {
++    const sources = request.sources.map((source) => ({
++      ...source,
++      content: source.content.slice(0, this.config.maxSourceChars),
++    }));
++
++    return `VerifyClaim ${request.claim}\n${buildVerifierPrompt({
++      claim: request.claim,
++      sources,
++    })}`;
++  }
++
++  private parseVerifierResult(claim: string, parsed: unknown): VerifierResult {
++    if (!parsed || typeof parsed !== "object") {
++      return {
++        claim,
++        verified: false,
++        evidence: "",
++        reason: "Verifier output was not an object",
++      };
++    }
++
++    const record = parsed as Record<string, unknown>;
++    const verified = typeof record.verified === "boolean" ? record.verified : false;
++    const evidence = typeof record.evidence === "string" ? record.evidence : "";
++    const sourceItemId = typeof record.sourceItemId === "string" ? record.sourceItemId : undefined;
++    const reason =
++      typeof record.reason === "string"
++        ? record.reason
++        : typeof record.verified === "boolean"
++          ? undefined
++          : "Verifier output missing boolean 'verified'";
++
++    return {
++      claim,
++      verified,
++      evidence,
++      sourceItemId,
++      reason,
++    };
++  }
++}
+diff --git a/packages/agent-runtime/src/bridge/agentMapping.ts b/packages/agent-runtime/src/bridge/agentMapping.ts
+index 9f6c1ff..32e9b8c 100644
+--- a/packages/agent-runtime/src/bridge/agentMapping.ts
++++ b/packages/agent-runtime/src/bridge/agentMapping.ts
+@@ -41,6 +41,7 @@ const RUNTIME_TO_CORE_MAP: Record<RuntimeAgentType, CoreAgentType> = {
+   implementer: "writer",
+   debugger: "editor",
+   digest: "custom",
++  verifier: "reviewer",
+ };
+ 
+ /**
+@@ -58,6 +59,7 @@ const RUNTIME_CAPABILITIES: Record<RuntimeAgentType, AgentCapability[]> = {
+   implementer: ["generate_content", "modify_content", "restructure_document"],
+   debugger: ["modify_content"],
+   digest: ["generate_content", "add_annotations"],
++  verifier: ["add_annotations"],
+ };
+ 
+ // ============================================================================
+@@ -122,6 +124,7 @@ const VALID_RUNTIME_TYPES: RuntimeAgentType[] = [
+   "implementer",
+   "debugger",
+   "digest",
++  "verifier",
+ ];
+ 
+ /**
+diff --git a/packages/agent-runtime/src/pipeline/digestSynthesis.ts b/packages/agent-runtime/src/pipeline/digestSynthesis.ts
+new file mode 100644
+index 0000000..d7183e5
+--- /dev/null
++++ b/packages/agent-runtime/src/pipeline/digestSynthesis.ts
+@@ -0,0 +1,608 @@
++import { buildDigestMapPrompt, buildDigestReducePrompt } from "@keepup/ai-core";
++import type { IAgentManager } from "../agents/types";
++import { VerifierAgent } from "../agents/verifier";
++import type { MCPToolResult } from "../types";
++import { parseJsonFromText } from "../utils/llmJson";
++import { PipelineExecutor, createPipeline } from "./pipelineBuilder";
++import type { Pipeline, PipelineContext } from "./pipelineBuilder";
++
++export interface DigestSourceItem {
++  id: string;
++  title: string;
++  content: string;
++  sourceName?: string;
++  sourceUrl?: string;
++  publishedAt?: string;
++}
++
++export interface DigestCitation {
++  itemId: string;
++  evidence: string;
++}
++
++export interface DigestSummary {
++  itemId: string;
++  title: string;
++  summary: string;
++  claims: string[];
++  topics: string[];
++  citations: DigestCitation[];
++}
++
++export interface DigestCardDraft {
++  id: string;
++  title: string;
++  summary: string;
++  whyItMatters: string[];
++  topics: string[];
++  citations: DigestCitation[];
++  sourceItemIds: string[];
++}
++
++export interface DigestCard extends DigestCardDraft {
++  verified: boolean;
++  verification: Array<{
++    claim: string;
++    verified: boolean;
++    evidence: string;
++    sourceItemId?: string;
++    reason?: string;
++  }>;
++}
++
++export interface DigestMapFailure {
++  itemId: string;
++  reason: string;
++}
++
++export interface DigestReduceFailure {
++  clusterId: string;
++  reason: string;
++}
++
++export interface DigestSynthesisInput {
++  items?: DigestSourceItem[];
++  timeWindow?: string;
++  limit?: number;
++  includeRead?: boolean;
++}
++
++export interface DigestSynthesisOutput {
++  cards: DigestCard[];
++  rejectedCards: DigestCard[];
++  summaries: DigestSummary[];
++  rejectedSummaries: DigestMapFailure[];
++  rejectedClusters: DigestReduceFailure[];
++}
++
++export interface DigestSynthesisConfig {
++  maxSourceChars: number;
++  strictCitations: boolean;
++  maxClaimsPerCard: number;
++}
++
++export interface DigestSynthesisDependencies {
++  agentManager: IAgentManager;
++  verifier?: VerifierAgent;
++  config?: Partial<DigestSynthesisConfig>;
++}
++
++const DEFAULT_CONFIG: DigestSynthesisConfig = {
++  maxSourceChars: 4000,
++  strictCitations: true,
++  maxClaimsPerCard: 3,
++};
++
++interface DigestMapOutput {
++  summaries: DigestSummary[];
++  rejectedSummaries: DigestMapFailure[];
++  items: DigestSourceItem[];
++}
++
++interface DigestReduceOutput {
++  cards: DigestCardDraft[];
++  summaries: DigestSummary[];
++  rejectedSummaries: DigestMapFailure[];
++  rejectedClusters: DigestReduceFailure[];
++  items: DigestSourceItem[];
++}
++
++interface DigestCluster {
++  id: string;
++  summaries: DigestSummary[];
++  topics: string[];
++}
++
++export function createDigestSynthesisPipeline(): Pipeline {
++  return createPipeline("Digest Synthesis")
++    .id("digest_synthesis")
++    .description("Map-reduce digest synthesis with claim verification")
++    .transform("Resolve items", resolveItems)
++    .transform("Map summaries", mapSummaries)
++    .transform("Reduce clusters", reduceClusters)
++    .transform("Verify cards", verifyCards)
++    .build();
++}
++
++export async function runDigestSynthesis(
++  input: DigestSynthesisInput,
++  dependencies: DigestSynthesisDependencies,
++  context: {
++    executeTool: PipelineContext["executeTool"];
++    onProgress?: PipelineContext["onProgress"];
++    signal?: AbortSignal;
++  }
++): Promise<DigestSynthesisOutput> {
++  const pipeline = createDigestSynthesisPipeline();
++  const executor = new PipelineExecutor(context.executeTool);
++  const result = await executor.execute<DigestSynthesisInput, DigestSynthesisOutput>(
++    pipeline,
++    input,
++    {
++      metadata: {
++        agentManager: dependencies.agentManager,
++        verifier: dependencies.verifier,
++        digestConfig: dependencies.config,
++      },
++      onProgress: context.onProgress,
++      signal: context.signal,
++    }
++  );
++
++  if (!result.success) {
++    throw new Error(result.error?.message ?? "Digest synthesis failed");
++  }
++
++  return result.output;
++}
++
++async function resolveItems(
++  input: DigestSynthesisInput,
++  context: PipelineContext
++): Promise<DigestSourceItem[]> {
++  if (input.items && input.items.length > 0) {
++    return input.items;
++  }
++
++  const limit = input.limit ?? 50;
++  const timeWindow = input.timeWindow ?? "24h";
++  const includeRead = input.includeRead ?? false;
++
++  const toolResult = await context.executeTool("digest:fetchItems", {
++    limit,
++    timeWindow,
++    includeRead,
++  });
++
++  return parseFetchedItems(toolResult);
++}
++
++async function mapSummaries(
++  items: DigestSourceItem[],
++  context: PipelineContext
++): Promise<DigestMapOutput> {
++  const { agentManager, config } = getDependencies(context);
++  const { strictCitations, maxSourceChars } = config;
++
++  const tasks = items.map((item) => {
++    const sourceText = item.content.slice(0, maxSourceChars);
++    const prompt = buildDigestMapPrompt({
++      itemId: item.id,
++      title: item.title,
++      sourceText,
++      sourceName: item.sourceName,
++    });
++    return {
++      type: "digest" as const,
++      task: `DigestMap ${item.id}\n${prompt}`,
++    };
++  });
++
++  const results = await agentManager.spawnParallel(tasks);
++  const summaries: DigestSummary[] = [];
++  const rejectedSummaries: DigestMapFailure[] = [];
++
++  for (const [index, result] of results.entries()) {
++    const item = items[index];
++    if (!item) {
++      continue;
++    }
++    if (!result.success) {
++      rejectedSummaries.push({
++        itemId: item.id,
++        reason: result.error ?? "Digest map agent failed",
++      });
++      continue;
++    }
++
++    try {
++      const summary = parseMapSummary(result.output, item, config.maxClaimsPerCard);
++      if (strictCitations && summary.citations.length === 0) {
++        rejectedSummaries.push({
++          itemId: item.id,
++          reason: "No citations returned from map step",
++        });
++        continue;
++      }
++      summaries.push(summary);
++    } catch (error) {
++      rejectedSummaries.push({
++        itemId: item.id,
++        reason: error instanceof Error ? error.message : "Failed to parse map summary",
++      });
++    }
++  }
++
++  return { summaries, rejectedSummaries, items };
++}
++
++async function reduceClusters(
++  input: DigestMapOutput,
++  context: PipelineContext
++): Promise<DigestReduceOutput> {
++  const { agentManager, config } = getDependencies(context);
++  const clusters = clusterSummaries(input.summaries);
++  const tasks = clusters.map((cluster) => {
++    const prompt = buildDigestReducePrompt({
++      clusterId: cluster.id,
++      summaries: cluster.summaries.map((summary) => ({
++        itemId: summary.itemId,
++        title: summary.title,
++        summary: summary.summary,
++        topics: summary.topics,
++        citations: summary.citations,
++      })),
++    });
++    return {
++      type: "digest" as const,
++      task: `DigestReduce ${cluster.id}\n${prompt}`,
++    };
++  });
++
++  const results = await agentManager.spawnParallel(tasks);
++  const cards: DigestCardDraft[] = [];
++  const rejectedClusters: DigestReduceFailure[] = [];
++
++  for (const [index, result] of results.entries()) {
++    const cluster = clusters[index];
++    if (!cluster) {
++      continue;
++    }
++    if (!result.success) {
++      rejectedClusters.push({
++        clusterId: cluster.id,
++        reason: result.error ?? "Digest reduce agent failed",
++      });
++      continue;
++    }
++
++    try {
++      const draft = parseDigestCard(result.output, cluster);
++      if (config.strictCitations && draft.citations.length === 0) {
++        rejectedClusters.push({
++          clusterId: cluster.id,
++          reason: "No citations returned from reduce step",
++        });
++        continue;
++      }
++      cards.push(draft);
++    } catch (error) {
++      rejectedClusters.push({
++        clusterId: cluster.id,
++        reason: error instanceof Error ? error.message : "Failed to parse reduce output",
++      });
++    }
++  }
++
++  return {
++    cards,
++    summaries: input.summaries,
++    rejectedSummaries: input.rejectedSummaries,
++    rejectedClusters,
++    items: input.items,
++  };
++}
++
++async function verifyCards(
++  input: DigestReduceOutput,
++  context: PipelineContext
++): Promise<DigestSynthesisOutput> {
++  const { verifier, config } = getDependencies(context);
++  const verifiedCards: DigestCard[] = [];
++  const rejectedCards: DigestCard[] = [];
++
++  for (const draft of input.cards) {
++    const claims = extractClaims(draft.summary, config.maxClaimsPerCard);
++    const sources = draft.sourceItemIds
++      .map((id) => input.items.find((item) => item.id === id))
++      .filter((item): item is DigestSourceItem => Boolean(item))
++      .map((item) => ({
++        id: item.id,
++        title: item.title,
++        content: item.content.slice(0, config.maxSourceChars),
++      }));
++
++    if (sources.length === 0) {
++      rejectedCards.push({
++        ...draft,
++        verified: false,
++        verification: [
++          {
++            claim: "No sources available",
++            verified: false,
++            evidence: "",
++            reason: "No sources available for verification",
++          },
++        ],
++      });
++      continue;
++    }
++
++    const verificationRequests = claims.map((claim) => ({
++      claim,
++      sources,
++    }));
++
++    const verification = await verifier.verifyClaims(verificationRequests);
++    const verified = verification.every((result) => result.verified);
++    const mergedCitations = mergeCitations(draft.citations, verification);
++
++    const card: DigestCard = {
++      ...draft,
++      citations: mergedCitations,
++      verified,
++      verification,
++    };
++
++    if (verified && card.citations.length > 0) {
++      verifiedCards.push(card);
++    } else {
++      rejectedCards.push(card);
++    }
++  }
++
++  return {
++    cards: verifiedCards,
++    rejectedCards,
++    summaries: input.summaries,
++    rejectedSummaries: input.rejectedSummaries,
++    rejectedClusters: input.rejectedClusters,
++  };
++}
++
++function getDependencies(context: PipelineContext): {
++  agentManager: IAgentManager;
++  verifier: VerifierAgent;
++  config: DigestSynthesisConfig;
++} {
++  const metadata = context.metadata ?? {};
++  const agentManager = metadata.agentManager;
++  if (!isAgentManager(agentManager)) {
++    throw new Error("Digest synthesis requires agentManager in pipeline metadata");
++  }
++
++  const config = {
++    ...DEFAULT_CONFIG,
++    ...(metadata.digestConfig as Partial<DigestSynthesisConfig>),
++  };
++  const verifier =
++    metadata.verifier instanceof VerifierAgent
++      ? metadata.verifier
++      : new VerifierAgent(agentManager);
++
++  return { agentManager, verifier, config };
++}
++
++function parseFetchedItems(result: unknown): DigestSourceItem[] {
++  const toolResult = result as MCPToolResult;
++  const content = toolResult.content?.[0];
++  if (!content || content.type !== "text") {
++    throw new Error("Digest fetch tool returned no text content");
++  }
++
++  const parsed = parseJsonFromText<unknown>(content.text);
++  if (!Array.isArray(parsed)) {
++    throw new Error("Digest fetch tool returned invalid JSON");
++  }
++
++  return parsed.map(parseFetchedItem).filter((item): item is DigestSourceItem => Boolean(item));
++}
++
++function parseFetchedItem(entry: unknown): DigestSourceItem | null {
++  if (!isRecord(entry)) {
++    return null;
++  }
++
++  const id = readString(entry.id, "");
++  if (!id) {
++    return null;
++  }
++
++  const title = readString(entry.title, "Untitled");
++  const contentText = readString(entry.content, "") || readString(entry.snippet, "");
++  if (!contentText) {
++    return null;
++  }
++
++  const sourceName = readOptionalString(entry.source);
++  const sourceUrl = readOptionalString(entry.url);
++  const publishedAt = readOptionalString(entry.published);
++
++  return {
++    id,
++    title,
++    content: contentText,
++    sourceName,
++    sourceUrl,
++    publishedAt,
++  };
++}
++
++function parseMapSummary(output: string, item: DigestSourceItem, maxClaims: number): DigestSummary {
++  const parsed = parseJsonFromText<unknown>(output);
++  if (!isRecord(parsed)) {
++    throw new Error("Map summary output was not an object");
++  }
++
++  const summary = readString(parsed.summary, "");
++  const claims = readStringArray(parsed.claims);
++  const topics = readStringArray(parsed.topics);
++  const citations = readCitations(parsed.citations, item.id);
++
++  if (!summary) {
++    throw new Error("Map summary missing summary text");
++  }
++
++  return {
++    itemId: item.id,
++    title: item.title,
++    summary,
++    claims: claims.length > 0 ? claims : extractClaims(summary, maxClaims),
++    topics,
++    citations,
++  };
++}
++
++function parseDigestCard(output: string, cluster: DigestCluster): DigestCardDraft {
++  const parsed = parseJsonFromText<unknown>(output);
++  if (!isRecord(parsed)) {
++    throw new Error("Reduce output was not an object");
++  }
++
++  const title = readString(parsed.title, "Digest Summary");
++  const summary = readString(parsed.summary, "");
++  const whyItMatters = readStringArray(parsed.whyItMatters);
++  const topics = readStringArray(parsed.topics);
++  const fallbackSources = cluster.summaries.map((s) => s.itemId);
++  const sourceItemIdsRaw = readStringArray(parsed.sourceItemIds, fallbackSources);
++  const sourceItemIds = sourceItemIdsRaw.length > 0 ? sourceItemIdsRaw : fallbackSources;
++  const citations = readCitations(parsed.citations, sourceItemIds[0] ?? "");
++
++  if (!summary) {
++    throw new Error("Digest card missing summary text");
++  }
++
++  return {
++    id: cluster.id,
++    title,
++    summary,
++    whyItMatters,
++    topics,
++    citations,
++    sourceItemIds,
++  };
++}
++
++function clusterSummaries(summaries: DigestSummary[]): DigestCluster[] {
++  const clusters: DigestCluster[] = [];
++
++  for (const summary of summaries) {
++    const normalizedTopics = summary.topics.map(normalizeTopic).filter(Boolean);
++    let matched = clusters.find((cluster) =>
++      cluster.topics.some((topic) => normalizedTopics.includes(topic))
++    );
++
++    if (!matched) {
++      matched = {
++        id: `cluster-${clusters.length + 1}`,
++        summaries: [],
++        topics: normalizedTopics.length > 0 ? normalizedTopics : [normalizeTopic(summary.title)],
++      };
++      clusters.push(matched);
++    }
++
++    matched.summaries.push(summary);
++  }
++
++  return clusters;
++}
++
++function extractClaims(summary: string, maxClaims: number): string[] {
++  const parts = summary
++    .split(/[.!?]\s+/)
++    .map((part) => part.trim())
++    .filter(Boolean);
++  return parts.slice(0, maxClaims);
++}
++
++function mergeCitations(
++  citations: DigestCitation[],
++  verification: DigestCard["verification"]
++): DigestCitation[] {
++  const merged = [...citations];
++
++  for (const result of verification) {
++    if (!result.verified || !result.evidence) {
++      continue;
++    }
++    if (!result.sourceItemId) {
++      continue;
++    }
++    const itemId = result.sourceItemId;
++    if (
++      !merged.some(
++        (existing) => existing.itemId === itemId && existing.evidence === result.evidence
++      )
++    ) {
++      merged.push({ itemId, evidence: result.evidence });
++    }
++  }
++
++  return merged;
++}
++
++function normalizeTopic(topic: string): string {
++  return topic
++    .toLowerCase()
++    .replace(/[^a-z0-9]+/g, " ")
++    .trim();
++}
++
++function isAgentManager(value: unknown): value is IAgentManager {
++  return (
++    typeof value === "object" &&
++    value !== null &&
++    typeof (value as IAgentManager).spawn === "function" &&
++    typeof (value as IAgentManager).spawnParallel === "function"
++  );
++}
++
++function isRecord(value: unknown): value is Record<string, unknown> {
++  return typeof value === "object" && value !== null;
++}
++
++function readString(value: unknown, fallback: string): string {
++  return typeof value === "string" ? value : fallback;
++}
++
++function readOptionalString(value: unknown): string | undefined {
++  return typeof value === "string" ? value : undefined;
++}
++
++function readStringArray(value: unknown, fallback: string[] = []): string[] {
++  if (!Array.isArray(value)) {
++    return fallback;
++  }
++  return value.filter((entry): entry is string => typeof entry === "string");
++}
++
++function readCitations(value: unknown, fallbackItemId: string): DigestCitation[] {
++  if (!Array.isArray(value)) {
++    return [];
++  }
++
++  return value
++    .map((entry) => {
++      if (!entry || typeof entry !== "object") {
++        return null;
++      }
++      const record = entry as Record<string, unknown>;
++      const itemId = typeof record.itemId === "string" ? record.itemId : fallbackItemId;
++      const evidence = typeof record.evidence === "string" ? record.evidence : "";
++      if (!evidence) {
++        return null;
++      }
++      return { itemId, evidence };
++    })
++    .filter((citation): citation is DigestCitation => Boolean(citation));
++}
+diff --git a/packages/agent-runtime/src/pipeline/index.ts b/packages/agent-runtime/src/pipeline/index.ts
+index 869b9aa..256adea 100644
+--- a/packages/agent-runtime/src/pipeline/index.ts
++++ b/packages/agent-runtime/src/pipeline/index.ts
+@@ -23,3 +23,19 @@ export {
+   type PipelineResult,
+   type StepResult,
+ } from "./pipelineBuilder";
++
++export {
++  createDigestSynthesisPipeline,
++  runDigestSynthesis,
++  type DigestSynthesisInput,
++  type DigestSynthesisOutput,
++  type DigestSynthesisDependencies,
++  type DigestSynthesisConfig,
++  type DigestSourceItem,
++  type DigestSummary,
++  type DigestCard,
++  type DigestCardDraft,
++  type DigestCitation,
++  type DigestMapFailure,
++  type DigestReduceFailure,
++} from "./digestSynthesis";
+diff --git a/packages/agent-runtime/src/tools/digest/digestToolServer.ts b/packages/agent-runtime/src/tools/digest/digestToolServer.ts
+index 0ad5f39..c30c912 100644
+--- a/packages/agent-runtime/src/tools/digest/digestToolServer.ts
++++ b/packages/agent-runtime/src/tools/digest/digestToolServer.ts
+@@ -124,7 +124,9 @@ export class DigestToolServer extends BaseToolServer {
+         id: item.itemId,
+         title: item.title,
+         source: item.subscriptionId, // In real app, would map to source name
++        url: item.link ?? undefined,
+         published: item.publishedAt ? new Date(item.publishedAt).toISOString() : "Unknown",
++        content: item.contentHtml?.slice(0, 2000),
+         snippet: item.excerpt?.slice(0, 200),
+       }));
+ 
+diff --git a/packages/agent-runtime/src/utils/index.ts b/packages/agent-runtime/src/utils/index.ts
+index a5dda88..7ff84ac 100644
+--- a/packages/agent-runtime/src/utils/index.ts
++++ b/packages/agent-runtime/src/utils/index.ts
+@@ -91,3 +91,6 @@ export {
+   type BatchResult,
+   type DebounceConfig,
+ } from "./batch";
++
++// LLM response parsing
++export { parseJsonFromText } from "./llmJson";
+diff --git a/packages/agent-runtime/src/utils/llmJson.ts b/packages/agent-runtime/src/utils/llmJson.ts
+new file mode 100644
+index 0000000..00f451d
+--- /dev/null
++++ b/packages/agent-runtime/src/utils/llmJson.ts
+@@ -0,0 +1,36 @@
++export function parseJsonFromText<T>(text: string): T {
++  const jsonText = extractJsonPayload(text);
++  return JSON.parse(jsonText) as T;
++}
++
++function extractJsonPayload(text: string): string {
++  const trimmed = text.trim();
++  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
++    return trimmed;
++  }
++
++  const objectStart = trimmed.indexOf("{");
++  const arrayStart = trimmed.indexOf("[");
++  const start = pickStartIndex(objectStart, arrayStart);
++  if (start === -1) {
++    throw new Error("No JSON payload found in response");
++  }
++
++  const isObject = trimmed[start] === "{";
++  const end = trimmed.lastIndexOf(isObject ? "}" : "]");
++  if (end === -1 || end <= start) {
++    throw new Error("Incomplete JSON payload in response");
++  }
++
++  return trimmed.slice(start, end + 1);
++}
++
++function pickStartIndex(objectStart: number, arrayStart: number): number {
++  if (objectStart === -1) {
++    return arrayStart;
++  }
++  if (arrayStart === -1) {
++    return objectStart;
++  }
++  return Math.min(objectStart, arrayStart);
++}
+diff --git a/packages/agent-runtime/vitest.config.ts b/packages/agent-runtime/vitest.config.ts
+new file mode 100644
+index 0000000..ef29cc2
+--- /dev/null
++++ b/packages/agent-runtime/vitest.config.ts
+@@ -0,0 +1,28 @@
++import path from "node:path";
++import { defineConfig } from "vitest/config";
++
++export default defineConfig({
++  resolve: {
++    alias: {
++      "@keepup/ai-core": path.resolve(__dirname, "../ai-core/src/index.ts"),
++    },
++  },
++  test: {
++    include: resolveIncludes(),
++  },
++});
++
++function resolveIncludes(): string[] {
++  const includeEnv = process.env.VITEST_INCLUDE;
++  if (includeEnv) {
++    const parsed = includeEnv
++      .split(",")
++      .map((pattern) => pattern.trim())
++      .filter(Boolean);
++    if (parsed.length > 0) {
++      return parsed;
++    }
++  }
++
++  return ["src/**/*.test.ts"];
++}
+diff --git a/packages/ai-core/src/index.ts b/packages/ai-core/src/index.ts
+index 2f7bbac..2e3c460 100644
+--- a/packages/ai-core/src/index.ts
++++ b/packages/ai-core/src/index.ts
+@@ -196,6 +196,18 @@ export {
+   lazyFactory,
+ } from "./performance";
+ 
++// ============================================================================
++// Prompts - Shared Prompt Templates
++// ============================================================================
++export {
++  buildDigestMapPrompt,
++  buildDigestReducePrompt,
++  buildVerifierPrompt,
++  type DigestMapPromptInput,
++  type DigestReducePromptInput,
++  type VerifierPromptInput,
++} from "./prompts";
++
+ // ============================================================================
+ // Types - Branded Types & Validation
+ // ============================================================================
+diff --git a/packages/ai-core/src/prompts/digest.ts b/packages/ai-core/src/prompts/digest.ts
+new file mode 100644
+index 0000000..1e82744
+--- /dev/null
++++ b/packages/ai-core/src/prompts/digest.ts
+@@ -0,0 +1,111 @@
++export interface DigestMapPromptInput {
++  itemId: string;
++  title: string;
++  sourceText: string;
++  sourceName?: string;
++}
++
++export interface DigestReducePromptInput {
++  clusterId: string;
++  summaries: Array<{
++    itemId: string;
++    title: string;
++    summary: string;
++    topics: string[];
++    citations: Array<{ itemId: string; evidence: string }>;
++  }>;
++}
++
++export interface VerifierPromptInput {
++  claim: string;
++  sources: Array<{ id: string; title?: string; content: string }>;
++}
++
++const JSON_ONLY_NOTICE = "Return JSON only. Do not include markdown, commentary, or extra keys.";
++
++export function buildDigestMapPrompt(input: DigestMapPromptInput): string {
++  const sourceName = input.sourceName ?? "Unknown";
++  return [
++    "Summarize the source text into a grounded, factual summary with citations.",
++    "Output JSON with this exact schema:",
++    `{"summary":"...","claims":["..."],"topics":["..."],"citations":[{"itemId":"${input.itemId}","evidence":"..."}]}`,
++    "Rules:",
++    "- Each claim must be supported by an evidence snippet copied from the source.",
++    "- Citations must reference the provided itemId.",
++    "- Claims should be short, factual sentences (max 3).",
++    `- ${JSON_ONLY_NOTICE}`,
++    "",
++    `Item ID: ${input.itemId}`,
++    `Title: ${input.title}`,
++    `Source: ${sourceName}`,
++    "Source Text:",
++    "<<<",
++    input.sourceText,
++    ">>>",
++  ].join("\n");
++}
++
++export function buildDigestReducePrompt(input: DigestReducePromptInput): string {
++  const summaries = input.summaries
++    .map((summary, index) => {
++      const citations = summary.citations
++        .map((citation) => `- [${citation.itemId}] ${citation.evidence}`)
++        .join("\n");
++      return [
++        `Summary ${index + 1} (Item ${summary.itemId})`,
++        `Title: ${summary.title}`,
++        `Summary: ${summary.summary}`,
++        `Topics: ${summary.topics.join(", ") || "None"}`,
++        "Citations:",
++        citations || "- None",
++      ].join("\n");
++    })
++    .join("\n\n");
++
++  return [
++    "Synthesize the summaries into a single DigestCard focused on shared insights.",
++    "Output JSON with this exact schema:",
++    `{"title":"...","summary":"...","whyItMatters":["..."],"topics":["..."],"sourceItemIds":["..."],"citations":[{"itemId":"...","evidence":"..."}]}`,
++    "Rules:",
++    "- Preserve key facts and avoid speculation.",
++    "- Every claim in the summary must be supported by a citation.",
++    "- sourceItemIds must include all itemIds used in the card.",
++    `- ${JSON_ONLY_NOTICE}`,
++    "",
++    `Cluster ID: ${input.clusterId}`,
++    "Source Summaries:",
++    "<<<",
++    summaries,
++    ">>>",
++  ].join("\n");
++}
++
++export function buildVerifierPrompt(input: VerifierPromptInput): string {
++  const sources = input.sources
++    .map((source) => {
++      return [
++        `[SOURCE ${source.id}]`,
++        source.title ? `Title: ${source.title}` : "Title: Unknown",
++        "Content:",
++        source.content,
++      ].join("\n");
++    })
++    .join("\n\n");
++
++  return [
++    "Verify the claim against the provided sources.",
++    "Output JSON with this exact schema:",
++    '{"verified":true,"evidence":"...","sourceItemId":"..."}',
++    "Rules:",
++    "- verified is true only if the claim is explicitly supported by a source.",
++    "- evidence must be a verbatim snippet from the best matching source.",
++    "- sourceItemId must match the source label that contains the evidence.",
++    `- ${JSON_ONLY_NOTICE}`,
++    "",
++    `Claim: ${input.claim}`,
++    "Sources:",
++    "<<<",
++    sources,
++    ">>>",
++  ].join("\n");
++}
+diff --git a/packages/ai-core/src/prompts/index.ts b/packages/ai-core/src/prompts/index.ts
+new file mode 100644
+index 0000000..d7a2e1c
+--- /dev/null
++++ b/packages/ai-core/src/prompts/index.ts
+@@ -0,0 +1,8 @@
++export {
++  buildDigestMapPrompt,
++  buildDigestReducePrompt,
++  buildVerifierPrompt,
++  type DigestMapPromptInput,
++  type DigestReducePromptInput,
++  type VerifierPromptInput,
++} from "./digest";

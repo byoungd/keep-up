@@ -13,6 +13,7 @@ import { ContextStatusPanel } from "./ContextStatusPanel";
 import { InputArea } from "./InputArea";
 import { MessageList } from "./MessageList";
 import type { PanelPosition } from "./ModelSelector";
+import { ProjectContextPanel } from "./ProjectContextPanel";
 import { ReferenceDebugPanel } from "./ReferenceDebugPanel";
 
 interface AIPanelProps {
@@ -62,6 +63,7 @@ export function AIPanel({
     contextPayload,
     selectedCapability,
     visionFallback,
+    projectContext,
     handleSend,
     handleAbort,
     handleClear,
@@ -72,6 +74,7 @@ export function AIPanel({
     handleSuggestionClick,
     handleCopyLastAnswer,
     handleCopy,
+    handleUseTask,
     exportHistory,
     workflow,
     setWorkflow,
@@ -105,6 +108,7 @@ export function AIPanel({
     attachmentsMeta,
     inputTranslations,
     contextStatusTranslations,
+    projectContextTranslations,
     providerLabel,
   } = useAIPanelTranslations(selectedCapability.provider);
 
@@ -183,6 +187,17 @@ export function AIPanel({
       <div className="px-4 py-2 border-b border-border/50">
         <WorkflowSelector value={workflow} onChange={(w) => setWorkflow(w as typeof workflow)} />
       </div>
+
+      <ProjectContextPanel
+        tasks={projectContext.data?.tasks ?? []}
+        isLoading={projectContext.isLoading}
+        error={projectContext.error}
+        updatedAt={projectContext.data?.updatedAt}
+        warnings={projectContext.data?.warnings}
+        onUseTask={handleUseTask}
+        onRefresh={projectContext.refresh}
+        translations={projectContextTranslations}
+      />
 
       <MessageList
         messages={messages}

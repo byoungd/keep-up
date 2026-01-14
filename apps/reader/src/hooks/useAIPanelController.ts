@@ -7,6 +7,7 @@ import { useAttachments } from "@/hooks/useAttachments";
 import { useAutoScroll } from "@/hooks/useAutoScroll";
 import { useChatPersistence } from "@/hooks/useChatPersistence";
 import { useDocumentContent } from "@/hooks/useDocumentContent";
+import { useProjectContext } from "@/hooks/useProjectContext";
 import { composePromptWithContext, createContextPayload } from "@/lib/ai/contextPrivacy";
 import { MODEL_CAPABILITIES, getDefaultModel, normalizeModelId } from "@/lib/ai/models";
 import { buildReferenceAnchors } from "@/lib/ai/referenceAnchors";
@@ -129,6 +130,7 @@ export function useAIPanelController({
 
   // 5. Context & Privacy
   const { content: docContent } = useDocumentContent(docId ?? null);
+  const projectContext = useProjectContext();
   const dataAccessPolicy = React.useMemo(() => {
     const policy = DEFAULT_POLICY_MANIFEST.ai_native_policy?.data_access;
     if (!policy) {
@@ -143,14 +145,27 @@ export function useAIPanelController({
     };
   }, []);
 
+  const projectSections = React.useMemo(
+    () =>
+      projectContext.data?.sections.map((section) => ({
+        label: section.label,
+        text: section.text,
+        originalLength: section.originalLength,
+        truncated: section.truncated,
+        blockId: section.blockId,
+      })) ?? [],
+    [projectContext.data]
+  );
+
   const contextPayload = React.useMemo(
     () =>
       createContextPayload({
         selectedText,
         pageContext: pageContext || docContent || undefined,
+        extraSections: projectSections,
         policy: dataAccessPolicy,
       }),
-    [pageContext, selectedText, docContent, dataAccessPolicy]
+    [pageContext, selectedText, docContent, projectSections, dataAccessPolicy]
   );
 
   const consentCtrl = useAiContextConsent(docId);
@@ -469,6 +484,15 @@ export function useAIPanelController({
     setInput(suggestion);
   }, []);
 
+  const handleUseTask = React.useCallback((title: string, openItems: string[]) => {
+    const focusItem = openItems[0];
+    const prompt = focusItem
+      ? `Start \"${title}\". Focus on: ${focusItem}`
+      : `Start \"${title}\". Propose the next actionable step.`;
+    setInput(prompt);
+    inputRef.current?.focus();
+  }, []);
+
   const handleCopyLastAnswer = React.useCallback(() => {
     const lastAssistant = [...rawMessages]
       .reverse()
@@ -505,6 +529,7 @@ export function useAIPanelController({
     contextPayload,
     selectedCapability,
     visionFallback,
+    projectContext,
 
     // Actions
     handleSend,
@@ -517,6 +542,7 @@ export function useAIPanelController({
     handleSuggestionClick,
     handleCopyLastAnswer,
     handleCopy,
+    handleUseTask,
     exportHistory,
   };
 }
