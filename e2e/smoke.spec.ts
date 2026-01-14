@@ -15,18 +15,22 @@ test.describe("Smoke Tests", () => {
     ).toBeVisible();
   });
 
-  test("unread page loads with import CTA when empty", async ({ page }) => {
+  test("unread page loads with content or onboarding", async ({ page }) => {
     await page.goto("/unread");
 
     // Should show the page header
     await expect(page.getByRole("heading", { name: "Unread" })).toBeVisible();
 
-    // Should show either content list or empty state with import CTA
+    // Should show either:
+    // 1. Document list (returning user with content)
+    // 2. Import CTA (returning user, empty state)
+    // 3. Topic Selector onboarding (new user, no subscriptions)
     const importButton = page.getByRole("button", { name: /import/i });
     const documentList = page.locator("[data-testid='document-list']");
+    const topicSelector = page.getByRole("heading", { name: /choose your topics/i });
 
-    // Wait for either state to appear
-    await expect(importButton.or(documentList)).toBeVisible({ timeout: 10000 });
+    // Wait for any of these states to appear
+    await expect(importButton.or(documentList).or(topicSelector)).toBeVisible({ timeout: 10000 });
   });
 
   test("projects page loads without 404", async ({ page }) => {
@@ -69,32 +73,37 @@ test.describe("Smoke Tests", () => {
     // Wait for page to load
     await expect(page.getByRole("heading", { name: "Unread" })).toBeVisible();
 
-    // Try to find and click import button
+    // Try to find import button (may not exist if Topic Selector onboarding is shown)
     const importButton = page.getByRole("button", { name: /import/i });
 
-    // If import button exists (empty state), click it
-    if (await importButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await importButton.click();
-
-      // Import modal should appear
-      const modal = page.getByRole("dialog");
-      await expect(modal).toBeVisible({ timeout: 5000 });
-
-      // Switch to URL tab and attempt import (URL import disabled by default)
-      const urlTab = page.getByRole("tab", { name: /url/i });
-      if (await urlTab.isVisible({ timeout: 1000 }).catch(() => false)) {
-        await urlTab.click();
-      }
-
-      const urlInput = page.getByLabel(/url to import/i);
-      await urlInput.fill("https://example.com");
-      const submitButton = page.getByRole("button", { name: /import/i }).last();
-      await submitButton.click();
-
-      await expect(
-        page.getByText("URL import is temporarily unavailable. Paste text instead.")
-      ).toBeVisible();
+    // If import button exists (empty state without onboarding), click it
+    const importVisible = await importButton.isVisible({ timeout: 2000 }).catch(() => false);
+    if (!importVisible) {
+      // Skip test if onboarding is shown instead of import button
+      test.skip();
+      return;
     }
+
+    await importButton.click();
+
+    // Import modal should appear
+    const modal = page.getByRole("dialog");
+    await expect(modal).toBeVisible({ timeout: 5000 });
+
+    // Switch to URL tab and attempt import (URL import disabled by default)
+    const urlTab = page.getByRole("tab", { name: /url/i });
+    if (await urlTab.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await urlTab.click();
+    }
+
+    const urlInput = page.getByLabel(/url to import/i);
+    await urlInput.fill("https://example.com");
+    const submitButton = page.getByRole("button", { name: /import/i }).last();
+    await submitButton.click();
+
+    await expect(
+      page.getByText("URL import is temporarily unavailable. Paste text instead.")
+    ).toBeVisible();
 
     // Verify page is still functional (no crash)
     await expect(page.getByRole("heading", { name: "Unread" })).toBeVisible();
