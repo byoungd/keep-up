@@ -229,6 +229,7 @@ export async function POST(request: Request) {
       resolved.target.config.kind === "anthropic"
         ? createAnthropicClient(resolved.target.config)
         : createOpenAIProvider(resolved.target.config);
+    // @ts-expect-error - provider types are compatible but not exported
     const llm = createAICoreAdapter(provider, { model: resolved.target.modelId });
 
     const registry = createToolRegistry();
