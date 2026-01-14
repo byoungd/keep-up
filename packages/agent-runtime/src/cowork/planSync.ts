@@ -50,6 +50,12 @@ export class PlanSync {
     } catch {
       // File doesn't exist yet, start fresh
       this.tasks = [];
+      if (this.createIfMissing) {
+        const exists = await this.exists();
+        if (!exists) {
+          await this.save();
+        }
+      }
     }
   }
 
@@ -57,10 +63,7 @@ export class PlanSync {
    * Add or update a task in the plan.
    */
   async updateTask(task: PlanTask): Promise<void> {
-    const existingIndex = this.tasks.findIndex((t) => t.id === task.id);
-    if (existingIndex >= 0) {
-      this.tasks[existingIndex] = task;
-    } else {
+    if (!this.replaceTask(this.tasks, task)) {
       this.tasks.push(task);
     }
     await this.save();
@@ -70,7 +73,7 @@ export class PlanSync {
    * Mark a task as completed.
    */
   async completeTask(taskId: string): Promise<void> {
-    const task = this.tasks.find((t) => t.id === taskId);
+    const task = this.findTask(taskId, this.tasks);
     if (task) {
       task.status = "completed";
       await this.save();
@@ -81,7 +84,7 @@ export class PlanSync {
    * Mark a task as in progress.
    */
   async startTask(taskId: string): Promise<void> {
-    const task = this.tasks.find((t) => t.id === taskId);
+    const task = this.findTask(taskId, this.tasks);
     if (task) {
       task.status = "in_progress";
       await this.save();
@@ -92,7 +95,7 @@ export class PlanSync {
    * Mark a task as failed.
    */
   async failTask(taskId: string): Promise<void> {
-    const task = this.tasks.find((t) => t.id === taskId);
+    const task = this.findTask(taskId, this.tasks);
     if (task) {
       task.status = "failed";
       await this.save();
@@ -146,16 +149,34 @@ export class PlanSync {
   private parsePlan(content: string): PlanTask[] {
     const tasks: PlanTask[] = [];
     const lines = content.split("\n");
+    const stack: PlanTask[] = [];
 
     for (const line of lines) {
       const match = line.match(/^(\s*)- \[([ x/!])\] (.+)$/);
       if (match) {
+        const indent = match[1].replace(/\t/g, "  ").length;
+        const desiredDepth = Math.floor(indent / 2);
+        const depth = Math.min(desiredDepth, stack.length);
         const status = this.parseCheckbox(match[2]);
-        tasks.push({
+        const task: PlanTask = {
           id: this.generateId(match[3]),
           title: match[3],
           status,
-        });
+        };
+
+        if (depth === 0 || stack.length === 0) {
+          tasks.push(task);
+          stack.length = 0;
+          stack.push(task);
+        } else {
+          const parent = stack[depth - 1] ?? stack[stack.length - 1];
+          if (!parent.subtasks) {
+            parent.subtasks = [];
+          }
+          parent.subtasks.push(task);
+          stack.length = depth;
+          stack.push(task);
+        }
       }
     }
 
@@ -204,6 +225,48 @@ export class PlanSync {
     // Fallback to Node.js fs for non-VM environments
     const fs = await import("node:fs/promises");
     await fs.writeFile(this.planPath, content, "utf-8");
+  }
+
+  private async exists(): Promise<boolean> {
+    if (this.vmProvider) {
+      return this.vmProvider.exists(this.planPath);
+    }
+    const fs = await import("node:fs/promises");
+    try {
+      await fs.access(this.planPath);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private findTask(taskId: string, tasks: PlanTask[]): PlanTask | undefined {
+    for (const task of tasks) {
+      if (task.id === taskId) {
+        return task;
+      }
+      if (task.subtasks) {
+        const match = this.findTask(taskId, task.subtasks);
+        if (match) {
+          return match;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  private replaceTask(tasks: PlanTask[], updated: PlanTask): boolean {
+    for (let i = 0; i < tasks.length; i += 1) {
+      const task = tasks[i];
+      if (task.id === updated.id) {
+        tasks[i] = updated;
+        return true;
+      }
+      if (task.subtasks && this.replaceTask(task.subtasks, updated)) {
+        return true;
+      }
+    }
+    return false;
   }
 }
 
