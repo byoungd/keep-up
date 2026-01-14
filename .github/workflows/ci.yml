@@ -72,6 +72,7 @@ jobs:
             packages/*/dist
             apps/*/.next
           retention-days: 1
+          include-hidden-files: true
 
   # Tests - downloads build artifacts instead of rebuilding
   test:
@@ -105,6 +106,8 @@ jobs:
           ls -R packages/core/dist/ || echo "No core dist folder!"
           echo "Checking packages/lfcc-bridge/dist structure:"
           ls -R packages/lfcc-bridge/dist/ || echo "No lfcc-bridge dist folder!"
+          echo "Checking apps/reader/.next structure:"
+          ls -d apps/reader/.next || echo "No reader .next folder!"
           echo "Checking package.json:"
           cat packages/core/package.json
 
