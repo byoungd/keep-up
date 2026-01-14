@@ -9,7 +9,25 @@ export default [
   defineProject({
     resolve: {
       alias: {
+        "@keepup/agent-runtime": path.resolve(__dirname, "packages/agent-runtime/src/index.ts"),
+        "@keepup/ai-core": path.resolve(__dirname, "packages/ai-core/src/index.ts"),
+        "@keepup/app": path.resolve(__dirname, "packages/app/src/index.ts"),
+        "@keepup/bench": path.resolve(__dirname, "packages/bench/src/index.ts"),
+        "@keepup/collab-server-lib": path.resolve(__dirname, "packages/collab-server/src/index.ts"),
+        "@keepup/compat": path.resolve(__dirname, "packages/compat/src/index.ts"),
+        "@keepup/conformance-kit": path.resolve(__dirname, "packages/conformance-kit/src/index.ts"),
+        "@keepup/core": path.resolve(__dirname, "packages/core/src/index.ts"),
+        "@keepup/crypto": path.resolve(__dirname, "packages/crypto/src/index.ts"),
+        "@keepup/db": path.resolve(__dirname, "packages/db/src/index.ts"),
+        "@packages/ingest-file": path.resolve(__dirname, "packages/ingest/file/src/index.ts"),
+        "@packages/ingest-rss": path.resolve(__dirname, "packages/ingest/rss/src/index.ts"),
+        "@packages/ingest-youtube": path.resolve(__dirname, "packages/ingest-youtube/src/index.ts"),
         "@keepup/lfcc-bridge": lfccBridgeAlias,
+        "@keepup/overlay": path.resolve(__dirname, "packages/overlay/src/index.ts"),
+        "@keepup/shared": path.resolve(__dirname, "packages/shared/src/index.ts"),
+        "@keepup/token": path.resolve(__dirname, "packages/token/src/index.ts"),
+        "@keepup/translator": path.resolve(__dirname, "packages/translator/src/index.ts"),
+        "@keepup/tts": path.resolve(__dirname, "packages/tts/src/index.ts"),
       },
     },
     test: {
@@ -25,7 +43,25 @@ export default [
   defineProject({
     resolve: {
       alias: {
+        "@keepup/agent-runtime": path.resolve(__dirname, "packages/agent-runtime/src/index.ts"),
+        "@keepup/ai-core": path.resolve(__dirname, "packages/ai-core/src/index.ts"),
+        "@keepup/app": path.resolve(__dirname, "packages/app/src/index.ts"),
+        "@keepup/bench": path.resolve(__dirname, "packages/bench/src/index.ts"),
+        "@keepup/collab-server-lib": path.resolve(__dirname, "packages/collab-server/src/index.ts"),
+        "@keepup/compat": path.resolve(__dirname, "packages/compat/src/index.ts"),
+        "@keepup/conformance-kit": path.resolve(__dirname, "packages/conformance-kit/src/index.ts"),
+        "@keepup/core": path.resolve(__dirname, "packages/core/src/index.ts"),
+        "@keepup/crypto": path.resolve(__dirname, "packages/crypto/src/index.ts"),
+        "@keepup/db": path.resolve(__dirname, "packages/db/src/index.ts"),
+        "@packages/ingest-file": path.resolve(__dirname, "packages/ingest/file/src/index.ts"),
+        "@packages/ingest-rss": path.resolve(__dirname, "packages/ingest/rss/src/index.ts"),
+        "@packages/ingest-youtube": path.resolve(__dirname, "packages/ingest-youtube/src/index.ts"),
         "@keepup/lfcc-bridge": lfccBridgeAlias,
+        "@keepup/overlay": path.resolve(__dirname, "packages/overlay/src/index.ts"),
+        "@keepup/shared": path.resolve(__dirname, "packages/shared/src/index.ts"),
+        "@keepup/token": path.resolve(__dirname, "packages/token/src/index.ts"),
+        "@keepup/translator": path.resolve(__dirname, "packages/translator/src/index.ts"),
+        "@keepup/tts": path.resolve(__dirname, "packages/tts/src/index.ts"),
       },
     },
     test: {
@@ -41,7 +77,25 @@ export default [
   defineProject({
     resolve: {
       alias: {
+        "@keepup/agent-runtime": path.resolve(__dirname, "packages/agent-runtime/src/index.ts"),
+        "@keepup/ai-core": path.resolve(__dirname, "packages/ai-core/src/index.ts"),
+        "@keepup/app": path.resolve(__dirname, "packages/app/src/index.ts"),
+        "@keepup/bench": path.resolve(__dirname, "packages/bench/src/index.ts"),
+        "@keepup/collab-server-lib": path.resolve(__dirname, "packages/collab-server/src/index.ts"),
+        "@keepup/compat": path.resolve(__dirname, "packages/compat/src/index.ts"),
+        "@keepup/conformance-kit": path.resolve(__dirname, "packages/conformance-kit/src/index.ts"),
+        "@keepup/core": path.resolve(__dirname, "packages/core/src/index.ts"),
+        "@keepup/crypto": path.resolve(__dirname, "packages/crypto/src/index.ts"),
+        "@keepup/db": path.resolve(__dirname, "packages/db/src/index.ts"),
+        "@packages/ingest-file": path.resolve(__dirname, "packages/ingest/file/src/index.ts"),
+        "@packages/ingest-rss": path.resolve(__dirname, "packages/ingest/rss/src/index.ts"),
+        "@packages/ingest-youtube": path.resolve(__dirname, "packages/ingest-youtube/src/index.ts"),
         "@keepup/lfcc-bridge": lfccBridgeAlias,
+        "@keepup/overlay": path.resolve(__dirname, "packages/overlay/src/index.ts"),
+        "@keepup/shared": path.resolve(__dirname, "packages/shared/src/index.ts"),
+        "@keepup/token": path.resolve(__dirname, "packages/token/src/index.ts"),
+        "@keepup/translator": path.resolve(__dirname, "packages/translator/src/index.ts"),
+        "@keepup/tts": path.resolve(__dirname, "packages/tts/src/index.ts"),
       },
     },
     test: {
@@ -54,7 +108,25 @@ export default [
   defineProject({
     resolve: {
       alias: {
+        "@keepup/agent-runtime": path.resolve(__dirname, "packages/agent-runtime/src/index.ts"),
+        "@keepup/ai-core": path.resolve(__dirname, "packages/ai-core/src/index.ts"),
+        "@keepup/app": path.resolve(__dirname, "packages/app/src/index.ts"),
+        "@keepup/bench": path.resolve(__dirname, "packages/bench/src/index.ts"),
+        "@keepup/collab-server-lib": path.resolve(__dirname, "packages/collab-server/src/index.ts"),
+        "@keepup/compat": path.resolve(__dirname, "packages/compat/src/index.ts"),
+        "@keepup/conformance-kit": path.resolve(__dirname, "packages/conformance-kit/src/index.ts"),
+        "@keepup/core": path.resolve(__dirname, "packages/core/src/index.ts"),
+        "@keepup/crypto": path.resolve(__dirname, "packages/crypto/src/index.ts"),
+        "@keepup/db": path.resolve(__dirname, "packages/db/src/index.ts"),
+        "@packages/ingest-file": path.resolve(__dirname, "packages/ingest/file/src/index.ts"),
+        "@packages/ingest-rss": path.resolve(__dirname, "packages/ingest/rss/src/index.ts"),
+        "@packages/ingest-youtube": path.resolve(__dirname, "packages/ingest-youtube/src/index.ts"),
         "@keepup/lfcc-bridge": lfccBridgeAlias,
+        "@keepup/overlay": path.resolve(__dirname, "packages/overlay/src/index.ts"),
+        "@keepup/shared": path.resolve(__dirname, "packages/shared/src/index.ts"),
+        "@keepup/token": path.resolve(__dirname, "packages/token/src/index.ts"),
+        "@keepup/translator": path.resolve(__dirname, "packages/translator/src/index.ts"),
+        "@keepup/tts": path.resolve(__dirname, "packages/tts/src/index.ts"),
       },
     },
     test: {
