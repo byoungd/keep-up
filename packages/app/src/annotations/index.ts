@@ -14,12 +14,14 @@ export * from "./types";
 // Visual Spec
 export {
   ANIMATION,
+  ANNOTATION_HIGHLIGHT_COLORS,
   BORDER_STYLES,
   BORDER_WIDTHS,
   KIND_COLORS,
   STATUS_COLORS,
   STATUS_ICONS,
   STATUS_LABELS,
+  getAnnotationHighlightColor,
   generateAllCss,
   generateBadgeCss,
   generateCssVariables,
@@ -27,6 +29,7 @@ export {
   getBadgeStyle,
   getHighlightStyle,
   getKindColor,
+  type AnnotationHighlightColor,
 } from "./visualSpec";
 
 // Panel State
@@ -36,6 +39,7 @@ export {
   clearError,
   closePanel,
   filterAnnotations,
+  filterAnnotationsByStatuses,
   groupByThread,
   openPanel,
   processAnnotations,

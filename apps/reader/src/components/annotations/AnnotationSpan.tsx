@@ -1,12 +1,13 @@
 "use client";
 
 import type { AnnotationColor } from "@/lib/kernel/types";
+import { getAnnotationHighlightColor, getHighlightStyle } from "@keepup/app";
 import { cn } from "@keepup/shared/utils";
 import { StatusTooltip } from "./StatusTooltip";
 
 interface AnnotationSpanProps {
   children: React.ReactNode;
-  initialState?: "active" | "active_unverified" | "broken_grace" | "orphan";
+  initialState?: "active" | "active_unverified" | "broken_grace" | "active_partial" | "orphan";
   // Mock positioning or just wrapping text
   className?: string;
   /** Whether this annotation is focused/selected */
@@ -25,6 +26,11 @@ export function AnnotationSpan({
   isFocused = false,
   onClick,
 }: AnnotationSpanProps) {
+  type AnnotationSpanStyle = {
+    className: string;
+    style?: React.CSSProperties;
+  };
+
   // Base style with enhanced hover transitions
   const baseStyle = cn(
     "decoration-clone px-1 rounded-sm cursor-pointer select-text",
@@ -36,31 +42,63 @@ export function AnnotationSpan({
     "active:brightness-95 active:scale-[0.995]"
   );
 
-  // Color variants with interactive states
-  const colors = {
-    yellow: cn(
-      "bg-accent-amber/25 text-foreground underline decoration-accent-amber/40 decoration-1 underline-offset-4",
-      "hover:bg-accent-amber/35 hover:decoration-accent-amber/60"
-    ),
-    green: cn("bg-accent-emerald/25 text-foreground", "hover:bg-accent-emerald/35"),
-    red: cn("bg-accent-rose/25 text-foreground", "hover:bg-accent-rose/35"),
-    purple: cn("bg-accent-violet/25 text-foreground", "hover:bg-accent-violet/35"),
-  };
+  const activeHighlight = getHighlightStyle("active");
+  const unverifiedHighlight = getHighlightStyle("active_unverified");
+  const graceHighlight = getHighlightStyle("broken_grace");
+  const partialHighlight = getHighlightStyle("active_partial");
+  const activeColor = getAnnotationHighlightColor(color);
 
   // Focused state ring for keyboard navigation
   const focusedStyle = isFocused
     ? "ring-2 ring-primary/50 ring-offset-1 ring-offset-background"
     : "";
 
-  const styles = {
-    active: cn(baseStyle, colors[color], "box-decoration-clone", focusedStyle),
-    active_unverified:
-      "bg-transparent border-b-2 border-dotted border-accent-indigo/50 animate-pulse cursor-wait px-0",
-    broken_grace: "bg-transparent border-b-2 border-dashed border-accent-amber cursor-warning px-0",
-    orphan:
-      "text-muted-foreground line-through decoration-muted-foreground/60 opacity-60 bg-muted/40 dark:bg-muted/20 px-1 rounded-sm",
-    hidden: "bg-transparent",
-    deleted: "hidden",
+  const styles: Record<
+    NonNullable<AnnotationSpanProps["initialState"]> | "hidden" | "deleted",
+    AnnotationSpanStyle
+  > = {
+    active: {
+      className: cn(
+        baseStyle,
+        "text-foreground underline decoration-1 underline-offset-4",
+        "box-decoration-clone",
+        focusedStyle
+      ),
+      style: {
+        backgroundColor: activeColor,
+        borderBottom: `${activeHighlight.borderWidth} ${activeHighlight.borderStyle} ${activeHighlight.borderColor}`,
+      },
+    },
+    active_unverified: {
+      className: cn(
+        "bg-transparent border-b-2 border-dotted animate-pulse cursor-wait px-0",
+        baseStyle
+      ),
+      style: {
+        backgroundColor: unverifiedHighlight.backgroundColor,
+        borderBottom: `${unverifiedHighlight.borderWidth} ${unverifiedHighlight.borderStyle} ${unverifiedHighlight.borderColor}`,
+      },
+    },
+    broken_grace: {
+      className: cn("bg-transparent border-b-2 border-dashed cursor-warning px-0", baseStyle),
+      style: {
+        backgroundColor: graceHighlight.backgroundColor,
+        borderBottom: `${graceHighlight.borderWidth} ${graceHighlight.borderStyle} ${graceHighlight.borderColor}`,
+      },
+    },
+    active_partial: {
+      className: cn(baseStyle, "text-foreground", focusedStyle),
+      style: {
+        backgroundColor: partialHighlight.backgroundColor,
+        borderBottom: `${partialHighlight.borderWidth} ${partialHighlight.borderStyle} ${partialHighlight.borderColor}`,
+      },
+    },
+    orphan: {
+      className:
+        "text-muted-foreground line-through decoration-muted-foreground/60 opacity-60 bg-muted/40 dark:bg-muted/20 px-1 rounded-sm",
+    },
+    hidden: { className: "bg-transparent" },
+    deleted: { className: "hidden" },
   };
 
   const visualState = initialState;
@@ -82,17 +120,27 @@ export function AnnotationSpan({
       }
     : undefined;
 
-  if (visualState === "active_unverified" || visualState === "broken_grace") {
+  if (
+    visualState === "active_unverified" ||
+    visualState === "broken_grace" ||
+    visualState === "active_partial"
+  ) {
     return (
       <StatusTooltip state={visualState}>
-        <span className={cn(styles[visualState], className)}>{children}</span>
+        <span
+          className={cn(styles[visualState].className, className)}
+          style={styles[visualState].style}
+        >
+          {children}
+        </span>
       </StatusTooltip>
     );
   }
 
   return (
     <span
-      className={cn(styles[visualState], className)}
+      className={cn(styles[visualState].className, className)}
+      style={styles[visualState].style}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
       tabIndex={onClick ? 0 : undefined}

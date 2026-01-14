@@ -9,6 +9,7 @@ import {
   clearError,
   closePanel,
   filterAnnotations,
+  filterAnnotationsByStatuses,
   groupByThread,
   openPanel,
   processAnnotations,
@@ -190,6 +191,22 @@ describe("Filtering & Sorting", () => {
     it("should return all with 'all' filter", () => {
       const filtered = filterAnnotations(mockAnnotations, { status: "all", kind: "all" });
       expect(filtered.length).toBe(4);
+    });
+  });
+
+  describe("filterAnnotationsByStatuses", () => {
+    it("should filter by multiple statuses", () => {
+      const filtered = filterAnnotationsByStatuses(mockAnnotations, [
+        "active_unverified",
+        "broken_grace",
+      ]);
+      expect(filtered.length).toBe(2);
+      expect(filtered.map((item) => item.annotation_id)).toEqual(["a3", "a4"]);
+    });
+
+    it("should return empty for no statuses", () => {
+      const filtered = filterAnnotationsByStatuses(mockAnnotations, []);
+      expect(filtered.length).toBe(0);
     });
   });
 

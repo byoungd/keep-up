@@ -580,6 +580,9 @@ importers:
 
   packages/overlay:
     dependencies:
+      '@keepup/app':
+        specifier: workspace:*
+        version: link:../app
       '@keepup/core':
         specifier: workspace:*
         version: link:../core

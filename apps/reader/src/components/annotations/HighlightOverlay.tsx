@@ -30,6 +30,7 @@ import {
   cullToViewport,
 } from "@/lib/annotations/highlightGeometry";
 import { useAnnotationStore } from "@/lib/kernel/store";
+import { getAnnotationHighlightColor } from "@keepup/app";
 import * as React from "react";
 // Removed createPortal import as we now render inline
 
@@ -397,16 +398,6 @@ function getOpacityForState(state: AnnotationGeometry["state"]): number {
   }
 }
 
-// Pre-computed color map for O(1) lookup
-const HIGHLIGHT_COLORS: Record<string, string> = {
-  // Lighter "300" shades for multiply blend mode
-  yellow: "rgb(253, 224, 71)", // Yellow-300
-  green: "rgb(134, 239, 172)", // Green-300
-  red: "rgb(252, 165, 165)", // Red-300
-  purple: "rgb(216, 180, 254)", // Purple-300
-  blue: "rgb(147, 197, 253)", // Blue-300
-};
-
 function getHighlightColor(color: string): string {
-  return HIGHLIGHT_COLORS[color] ?? HIGHLIGHT_COLORS.yellow;
+  return getAnnotationHighlightColor(color);
 }

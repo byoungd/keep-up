@@ -5,6 +5,7 @@
  * Pure rendering functions for debug overlay sections
  */
 
+import { STATUS_COLORS } from "@keepup/app";
 import type {
   AnnotationsSectionData,
   DebugOverlayState,
@@ -145,12 +146,12 @@ export function generateDebugOverlayCss(): string {
   white-space: nowrap;
 }
 
-.lfcc-debug-value--active { color: #4caf50; }
-.lfcc-debug-value--partial { color: #ff9800; }
-.lfcc-debug-value--orphan { color: #f44336; }
-.lfcc-debug-value--unverified { color: #9c27b0; }
-.lfcc-debug-value--error { color: #f44336; }
-.lfcc-debug-value--success { color: #4caf50; }
+.lfcc-debug-value--active { color: ${STATUS_COLORS.active.badge}; }
+.lfcc-debug-value--partial { color: ${STATUS_COLORS.active_partial.badge}; }
+.lfcc-debug-value--orphan { color: ${STATUS_COLORS.orphan.badge}; }
+.lfcc-debug-value--unverified { color: ${STATUS_COLORS.active_unverified.badge}; }
+.lfcc-debug-value--error { color: ${STATUS_COLORS.orphan.badge}; }
+.lfcc-debug-value--success { color: ${STATUS_COLORS.active.badge}; }
 
 .lfcc-debug-table {
   width: 100%;

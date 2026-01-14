@@ -4,7 +4,7 @@ import { Tooltip } from "@/components/ui/Tooltip";
 import { AlertTriangle, Info } from "lucide-react";
 
 interface StatusTooltipProps {
-  state: "active_unverified" | "broken_grace";
+  state: "active_unverified" | "broken_grace" | "active_partial";
   children: React.ReactNode;
 }
 
@@ -23,6 +23,13 @@ export function StatusTooltip({ state, children }: StatusTooltipProps) {
       <span className="inline-flex items-center gap-2">
         <AlertTriangle className="h-4 w-4 text-accent-amber" />
         <span>Text context changed. Attempting recovery...</span>
+      </span>
+    );
+  } else if (state === "active_partial") {
+    content = (
+      <span className="inline-flex items-center gap-2">
+        <AlertTriangle className="h-4 w-4 text-accent-amber" />
+        <span>Some spans are missing or out of order.</span>
       </span>
     );
   }

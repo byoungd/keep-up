@@ -15,6 +15,7 @@ import { type UIComment, useCommentStore } from "@/lib/annotations/commentStore"
 import { formatDisplayState } from "@/lib/annotations/verification";
 import { getIssueDefinitionForAnnotationState } from "@/lib/issues/issues";
 import type { Annotation } from "@/lib/kernel/types";
+import { getBadgeStyle } from "@keepup/app";
 import type { DisplayAnnoState } from "@keepup/core";
 import { cn } from "@keepup/shared/utils";
 import {
@@ -34,16 +35,6 @@ const colorMap = {
   red: "bg-accent-rose/80",
   purple: "bg-accent-violet/80",
 };
-
-const STATUS_TONE: Record<DisplayAnnoState, string> = {
-  active: "bg-accent-emerald/12 text-accent-emerald dark:bg-accent-emerald/25",
-  active_partial: "bg-accent-amber/12 text-accent-amber dark:bg-accent-amber/25",
-  active_unverified: "bg-accent-indigo/12 text-accent-indigo dark:bg-accent-indigo/25",
-  broken_grace: "bg-accent-rose/12 text-accent-rose dark:bg-accent-rose/25",
-  orphan: "bg-surface-2/70 text-muted-foreground dark:bg-surface-2/40",
-};
-
-const DEFAULT_STATUS_TONE = "bg-surface-2/70 text-muted-foreground";
 
 type ChainPolicy = NonNullable<Annotation["chain"]>["policy"];
 
@@ -373,7 +364,7 @@ export function AnnotationListItem({
   const excerpt = formatExcerpt(annotation.content);
   const issue = getIssueDefinitionForAnnotationState(annotation.displayState);
   const helpMessage = issue?.summary;
-  const statusToneClass = STATUS_TONE[annotation.displayState] ?? DEFAULT_STATUS_TONE;
+  const badgeStyle = getBadgeStyle(annotation.displayState);
   const helpBadge = renderHelpBadge(helpMessage);
   const commentLabel = formatCommentLabel(comments.length);
   const verifiedLabel = formatVerifiedLabel(annotation.verified);
@@ -469,11 +460,12 @@ export function AnnotationListItem({
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs font-semibold text-foreground">Annotation</span>
               <span
-                className={cn(
-                  "rounded-full px-2 py-0.5 text-[10px] font-medium capitalize",
-                  statusToneClass
-                )}
+                className={cn("lfcc-badge", `lfcc-badge--${annotation.displayState}`)}
+                title={formatDisplayState(annotation.displayState)}
               >
+                <span className="lfcc-badge-icon" aria-hidden="true">
+                  {badgeStyle.icon}
+                </span>
                 {formatDisplayState(annotation.displayState)}
               </span>
               {issueBadge}

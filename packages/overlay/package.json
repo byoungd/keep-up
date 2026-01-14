@@ -12,6 +12,7 @@
     }
   },
   "dependencies": {
+    "@keepup/app": "workspace:*",
     "@keepup/core": "workspace:*"
   },
   "scripts": {

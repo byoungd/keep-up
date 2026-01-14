@@ -128,22 +128,22 @@
   }
 
   .lfcc-annotation--yellow {
-    --anno-bg: var(--color-highlight-yellow);
+    --anno-bg: var(--lfcc-annotation-yellow);
     --anno-shadow: hsl(46 90% 72%);
   }
 
   .lfcc-annotation--green {
-    --anno-bg: var(--color-highlight-green);
+    --anno-bg: var(--lfcc-annotation-green);
     --anno-shadow: hsl(142 50% 60%);
   }
 
   .lfcc-annotation--red {
-    --anno-bg: var(--color-highlight-red);
+    --anno-bg: var(--lfcc-annotation-red);
     --anno-shadow: hsl(0 75% 68%);
   }
 
   .lfcc-annotation--purple {
-    --anno-bg: var(--color-highlight-purple);
+    --anno-bg: var(--lfcc-annotation-purple);
     --anno-shadow: hsl(268 65% 72%);
   }
 

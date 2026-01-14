@@ -2,6 +2,7 @@
  * LFCC v0.9 RC - Annotation Visualizer Tests
  */
 
+import { STATUS_COLORS } from "@keepup/app";
 import { describe, expect, it } from "vitest";
 import {
   filterEventsByAnnotation,
@@ -131,23 +132,24 @@ describe("Annotation Visualizer", () => {
 
   describe("getStateColor", () => {
     it("should return correct colors", () => {
-      expect(getStateColor("active")).toBe("#4caf50");
-      expect(getStateColor("active_unverified")).toBe("#2196f3");
-      expect(getStateColor("broken_grace")).toBe("#ff9800");
-      expect(getStateColor("broken_partial")).toBe("#f44336");
-      expect(getStateColor("orphan")).toBe("#9e9e9e");
+      expect(getStateColor("active")).toBe(STATUS_COLORS.active.badge);
+      expect(getStateColor("active_unverified")).toBe(STATUS_COLORS.active_unverified.badge);
+      expect(getStateColor("broken_grace")).toBe(STATUS_COLORS.broken_grace.badge);
+      expect(getStateColor("active_partial")).toBe(STATUS_COLORS.active_partial.badge);
+      expect(getStateColor("broken_partial")).toBe(STATUS_COLORS.active_partial.badge);
+      expect(getStateColor("orphan")).toBe(STATUS_COLORS.orphan.badge);
     });
 
     it("should handle unknown states", () => {
-      expect(getStateColor("unknown")).toBe("#2196f3"); // defaults to unverified
+      expect(getStateColor("unknown")).toBe(STATUS_COLORS.active_unverified.badge);
     });
   });
 
   describe("formatStateLabel", () => {
     it("should format state labels", () => {
       expect(formatStateLabel("active")).toBe("Active");
-      expect(formatStateLabel("active_unverified")).toBe("Active Unverified");
-      expect(formatStateLabel("broken_grace")).toBe("Broken Grace");
+      expect(formatStateLabel("active_unverified")).toBe("Syncing");
+      expect(formatStateLabel("broken_grace")).toBe("Recovering");
     });
   });
 

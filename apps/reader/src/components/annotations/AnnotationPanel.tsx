@@ -11,6 +11,12 @@ import { Input } from "@/components/ui/Input";
 import { getIssueDefinition, getIssueDefinitionForAnnotationState } from "@/lib/issues/issues";
 import type { Annotation } from "@/lib/kernel/types";
 import type { DiagnosticsSyncSummary } from "@/lib/lfcc/diagnosticsBundle";
+import {
+  type AnnotationListItem as AnnotationPanelItem,
+  type AnnotationStatus,
+  filterAnnotations,
+  filterAnnotationsByStatuses,
+} from "@keepup/app";
 import type { DisplayAnnoState } from "@keepup/core";
 import { cn } from "@keepup/shared/utils";
 import { X } from "lucide-react";
@@ -90,6 +96,18 @@ const sortBySeverityAndPosition = (a: Annotation, b: Annotation): number => {
   return startA - startB;
 };
 
+function buildPanelListItem(annotation: Annotation): AnnotationPanelItem {
+  return {
+    annotation_id: annotation.id,
+    kind: annotation.chain?.policy?.kind ?? "highlight",
+    status: annotation.displayState as AnnotationStatus,
+    updated_at_ms: annotation.createdAtMs,
+    span_count: annotation.spans?.length ?? 0,
+    unresolved_gap_count: 0,
+    is_resolved: annotation.displayState === "active",
+  };
+}
+
 export function AnnotationPanel({
   annotations,
   onSelect,
@@ -122,17 +140,23 @@ export function AnnotationPanel({
     setMissingDismissed(false);
   }, [missingAnnotationId]);
 
+  const listItems = useMemo(() => annotations.map(buildPanelListItem), [annotations]);
+
   const filteredAnnotations = useMemo(() => {
-    let list: Annotation[];
-    if (filter === "all") {
-      list = annotations;
-    } else if (filter === "active") {
-      list = annotations.filter((a) => a.displayState === "active");
+    let list = annotations;
+
+    if (filter === "active") {
+      const filteredItems = filterAnnotations(listItems, { status: "active" });
+      const ids = new Set(filteredItems.map((item) => item.annotation_id));
+      list = annotations.filter((a) => ids.has(a.id));
     } else if (filter === "issues") {
-      list = annotations.filter((a) => issueStates.includes(a.displayState));
+      const filteredItems = filterAnnotationsByStatuses(
+        listItems,
+        issueStates as AnnotationStatus[]
+      );
+      const ids = new Set(filteredItems.map((item) => item.annotation_id));
+      list = annotations.filter((a) => ids.has(a.id));
       list = [...list].sort(sortBySeverityAndPosition);
-    } else {
-      list = annotations;
     }
 
     // Apply search filter
@@ -142,7 +166,7 @@ export function AnnotationPanel({
     }
 
     return list;
-  }, [annotations, filter, searchQuery]);
+  }, [annotations, filter, listItems, searchQuery]);
 
   const { focusedId, handleKeyDown, setFocusedId } = useKeyboardNav({
     items: filteredAnnotations,
@@ -181,8 +205,8 @@ export function AnnotationPanel({
   }, [filter, filteredAnnotations]);
 
   const issueCounts = useMemo(() => {
-    return annotations.filter((a) => issueStates.includes(a.displayState)).length;
-  }, [annotations]);
+    return filterAnnotationsByStatuses(listItems, issueStates as AnnotationStatus[]).length;
+  }, [listItems]);
 
   const missingActions = useMemo<IssueActionHandlers>(
     () => ({

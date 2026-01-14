@@ -5,6 +5,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ANIMATION,
+  ANNOTATION_HIGHLIGHT_COLORS,
   BORDER_STYLES,
   KIND_COLORS,
   STATUS_COLORS,
@@ -14,6 +15,7 @@ import {
   generateBadgeCss,
   generateCssVariables,
   generateHighlightCss,
+  getAnnotationHighlightColor,
   getBadgeStyle,
   getHighlightStyle,
   getKindColor,
@@ -112,6 +114,16 @@ describe("Visual Spec", () => {
     });
   });
 
+  describe("getAnnotationHighlightColor", () => {
+    it("should return highlight color token", () => {
+      expect(getAnnotationHighlightColor("yellow")).toBe(ANNOTATION_HIGHLIGHT_COLORS.yellow);
+    });
+
+    it("should return default for unknown color", () => {
+      expect(getAnnotationHighlightColor("unknown")).toBe(ANNOTATION_HIGHLIGHT_COLORS.yellow);
+    });
+  });
+
   describe("generateCssVariables", () => {
     it("should generate CSS variables", () => {
       const css = generateCssVariables();
@@ -119,6 +131,7 @@ describe("Visual Spec", () => {
       expect(css).toContain("--lfcc-active-primary");
       expect(css).toContain("--lfcc-orphan-badge");
       expect(css).toContain("--lfcc-kind-highlight");
+      expect(css).toContain("--lfcc-annotation-yellow");
     });
   });
 

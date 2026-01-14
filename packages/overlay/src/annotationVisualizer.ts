@@ -5,25 +5,21 @@
  * Visualizes annotation state machine state including grace tokens.
  */
 
+import type { AnnotationStatus } from "@keepup/app";
+import { STATUS_COLORS, STATUS_LABELS } from "@keepup/app";
 import type { AnnotationDisplayData, OverlayCssTokens, OverlayEvent } from "./types";
 import { DEFAULT_CSS_TOKENS } from "./types";
 
 /** Annotation state colors */
-export type StateColorMap = {
-  active: string;
-  active_unverified: string;
-  broken_grace: string;
-  broken_partial: string;
-  orphan: string;
-};
+export type StateColorMap = Record<AnnotationStatus, string>;
 
 /** Default state colors */
 export const DEFAULT_STATE_COLORS: StateColorMap = {
-  active: "#4caf50",
-  active_unverified: "#2196f3",
-  broken_grace: "#ff9800",
-  broken_partial: "#f44336",
-  orphan: "#9e9e9e",
+  active: STATUS_COLORS.active.badge,
+  active_unverified: STATUS_COLORS.active_unverified.badge,
+  broken_grace: STATUS_COLORS.broken_grace.badge,
+  active_partial: STATUS_COLORS.active_partial.badge,
+  orphan: STATUS_COLORS.orphan.badge,
 };
 
 /** Annotation visualizer render data */
@@ -112,6 +108,9 @@ export function renderAnnotationVisualizer(
  */
 export function getStateColor(state: string, colors: StateColorMap = DEFAULT_STATE_COLORS): string {
   const normalizedState = state.toLowerCase().replace(/-/g, "_");
+  if (normalizedState === "broken_partial") {
+    return colors.active_partial;
+  }
   return (colors as Record<string, string>)[normalizedState] ?? colors.active_unverified;
 }
 
@@ -119,7 +118,12 @@ export function getStateColor(state: string, colors: StateColorMap = DEFAULT_STA
  * Format state label for display
  */
 export function formatStateLabel(state: string): string {
-  return state
+  const normalizedState = state.toLowerCase().replace(/-/g, "_");
+  const label = STATUS_LABELS[normalizedState as AnnotationStatus];
+  if (label) {
+    return label;
+  }
+  return normalizedState
     .split("_")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");

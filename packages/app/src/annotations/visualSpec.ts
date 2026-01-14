@@ -55,6 +55,16 @@ export const KIND_COLORS = {
   default: "#f3f4f6",
 } as const;
 
+/** Annotation highlight color tokens (user-selected colors) */
+export const ANNOTATION_HIGHLIGHT_COLORS = {
+  yellow: "var(--lfcc-annotation-yellow)",
+  green: "var(--lfcc-annotation-green)",
+  red: "var(--lfcc-annotation-red)",
+  purple: "var(--lfcc-annotation-purple)",
+} as const;
+
+export type AnnotationHighlightColor = keyof typeof ANNOTATION_HIGHLIGHT_COLORS;
+
 // ============================================================================
 // Style Tokens
 // ============================================================================
@@ -161,6 +171,19 @@ export function getKindColor(kind: AnnotationKind): string {
 }
 
 /**
+ * Get highlight color token for annotation color selection
+ */
+export function getAnnotationHighlightColor(color?: string): string {
+  if (!color) {
+    return ANNOTATION_HIGHLIGHT_COLORS.yellow;
+  }
+  return (
+    ANNOTATION_HIGHLIGHT_COLORS[color as AnnotationHighlightColor] ??
+    ANNOTATION_HIGHLIGHT_COLORS.yellow
+  );
+}
+
+/**
  * Generate CSS variables for annotation styling
  */
 export function generateCssVariables(): string {
@@ -182,6 +205,12 @@ export function generateCssVariables(): string {
   // Animation
   lines.push(`  --lfcc-loading-delay: ${ANIMATION.loadingDelay}ms;`);
   lines.push(`  --lfcc-state-transition: ${ANIMATION.stateTransition}ms;`);
+
+  // Annotation highlight colors (align with app theme tokens)
+  lines.push("  --lfcc-annotation-yellow: var(--color-highlight-yellow);");
+  lines.push("  --lfcc-annotation-green: var(--color-highlight-green);");
+  lines.push("  --lfcc-annotation-red: var(--color-highlight-red);");
+  lines.push("  --lfcc-annotation-purple: var(--color-highlight-purple);");
 
   lines.push("}");
   return lines.join("\n");

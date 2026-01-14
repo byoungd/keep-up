@@ -145,6 +145,21 @@ export function filterAnnotations(
 }
 
 /**
+ * Filter annotations by a list of statuses
+ */
+export function filterAnnotationsByStatuses(
+  annotations: AnnotationListItem[],
+  statuses: AnnotationStatus[]
+): AnnotationListItem[] {
+  if (statuses.length === 0) {
+    return [];
+  }
+
+  const statusSet = new Set(statuses);
+  return annotations.filter((item) => statusSet.has(item.status));
+}
+
+/**
  * Sort annotations based on sort option
  */
 export function sortAnnotations(

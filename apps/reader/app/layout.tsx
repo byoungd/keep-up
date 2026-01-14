@@ -1,6 +1,7 @@
 import { Fraunces, JetBrains_Mono, Manrope } from "next/font/google";
 import type { ReactNode } from "react";
 import "./globals.css";
+import { LfccAnnotationStyles } from "@/components/annotations/LfccAnnotationStyles";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { cn } from "@keepup/shared/utils";
 
@@ -19,6 +20,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           "bg-background text-foreground antialiased font-sans"
         )}
       >
+        <LfccAnnotationStyles />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
