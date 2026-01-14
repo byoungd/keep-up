@@ -27,6 +27,20 @@ type ConfirmationMetadata = {
   arguments?: Record<string, unknown>;
 };
 
+export type PendingTaskConfirmation = {
+  confirmationId: string;
+  requestId: string;
+  createdAt: number;
+  expiresAt: number;
+  taskId: string;
+  toolName: string;
+  description: string;
+  arguments: Record<string, unknown>;
+  risk: "low" | "medium" | "high";
+  reason?: string;
+  riskTags?: string[];
+};
+
 type ConfirmationRecord = {
   confirmationId: string;
   requestId: string;
@@ -235,4 +249,33 @@ export async function resolvePendingConfirmation(options: {
 
   entry.resolve(options.confirmed);
   return { status: "resolved", requestId: entry.requestId };
+}
+
+export async function listPendingTaskConfirmations(): Promise<PendingTaskConfirmation[]> {
+  await ensureLoaded();
+  const now = Date.now();
+  const pending: PendingTaskConfirmation[] = [];
+  for (const [confirmationId, entry] of confirmations.entries()) {
+    if (entry.expiresAt <= now) {
+      continue;
+    }
+    const metadata = entry.metadata;
+    if (!metadata?.taskId) {
+      continue;
+    }
+    pending.push({
+      confirmationId,
+      requestId: entry.requestId,
+      createdAt: entry.createdAt,
+      expiresAt: entry.expiresAt,
+      taskId: metadata.taskId,
+      toolName: metadata.toolName ?? "tool",
+      description: metadata.description ?? "",
+      arguments: metadata.arguments ?? {},
+      risk: metadata.risk ?? "low",
+      reason: metadata.reason,
+      riskTags: metadata.riskTags,
+    });
+  }
+  return pending;
 }

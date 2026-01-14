@@ -26,7 +26,7 @@ import {
 import { createAnthropicClient, createOpenAIProvider } from "../providerClients";
 import type { ProviderConfig } from "../providerResolver";
 import { buildInitialState, buildSystemPrompt, resolveWorkspaceRoot } from "./agentShared";
-import { createPendingConfirmation } from "./confirmationStore";
+import { createPendingConfirmation, listPendingTaskConfirmations } from "./confirmationStore";
 import { getArchivedTaskSnapshots, recordTaskSnapshot } from "./taskStore";
 
 export type TaskStreamEvent =
@@ -242,6 +242,25 @@ export function getTaskEventHistorySince(eventId: number): {
     entries: taskEventHistory.filter((entry) => entry.id > eventId),
     hasGap,
   };
+}
+
+export async function getPendingConfirmationEvents(): Promise<TaskStreamEvent[]> {
+  const pending = await listPendingTaskConfirmations();
+  return pending.map((entry) => ({
+    type: "task.confirmation_required",
+    taskId: entry.taskId,
+    timestamp: entry.createdAt,
+    data: {
+      confirmation_id: entry.confirmationId,
+      toolName: entry.toolName,
+      description: entry.description,
+      arguments: entry.arguments,
+      risk: entry.risk,
+      reason: entry.reason,
+      riskTags: entry.riskTags,
+      request_id: entry.requestId,
+    },
+  }));
 }
 
 function ensureQueueListener() {

@@ -3,7 +3,11 @@ import { tmpdir } from "node:os";
 import * as path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createPendingConfirmation, resolvePendingConfirmation } from "../confirmationStore";
+import {
+  createPendingConfirmation,
+  listPendingTaskConfirmations,
+  resolvePendingConfirmation,
+} from "../confirmationStore";
 
 const createWorkspaceRoot = () =>
   path.join(tmpdir(), `keepup-confirmations-${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -60,5 +64,39 @@ describe("confirmationStore", () => {
     });
 
     expect(result.status).toBe("expired");
+  });
+
+  it("lists pending task confirmations for stream recovery", async () => {
+    const { confirmationId } = await createPendingConfirmation({
+      requestId: "req-3",
+      metadata: {
+        taskId: "task-123",
+        toolName: "write_file",
+        description: "Write README",
+        risk: "high",
+        arguments: { path: "README.md" },
+      },
+    });
+
+    await createPendingConfirmation({
+      requestId: "req-4",
+      metadata: {
+        toolName: "bash",
+        description: "No task metadata",
+        risk: "low",
+        arguments: { command: "ls" },
+      },
+    });
+
+    const pending = await listPendingTaskConfirmations();
+    expect(pending).toHaveLength(1);
+    expect(pending[0]).toMatchObject({
+      confirmationId,
+      requestId: "req-3",
+      taskId: "task-123",
+      toolName: "write_file",
+      risk: "high",
+    });
+    expect(pending[0]?.arguments).toEqual({ path: "README.md" });
   });
 });
