@@ -61,6 +61,7 @@ export function useBackgroundTasks(notifications?: TaskNotifications) {
   const [streamError, setStreamError] = React.useState<string | null>(null);
 
   const taskMapRef = React.useRef<Map<string, TaskSnapshot>>(new Map());
+  const lastEventIdRef = React.useRef<string | null>(null);
 
   const upsertTask = React.useCallback((task: TaskSnapshot) => {
     taskMapRef.current.set(task.taskId, task);
@@ -177,12 +178,19 @@ export function useBackgroundTasks(notifications?: TaskNotifications) {
         window.clearTimeout(reconnectTimer);
         reconnectTimer = null;
       }
-      source = new EventSource("/api/ai/agent/tasks/stream");
+      const url = new URL("/api/ai/agent/tasks/stream", window.location.origin);
+      if (lastEventIdRef.current) {
+        url.searchParams.set("lastEventId", lastEventIdRef.current);
+      }
+      source = new EventSource(url.toString());
       source.onopen = () => {
         attempt = 0;
         setStreamError(null);
       };
       source.onmessage = (message) => {
+        if (message.lastEventId) {
+          lastEventIdRef.current = message.lastEventId;
+        }
         const event = parseTaskStreamEvent(message.data);
         if (event) {
           handleEvent(event);
@@ -252,6 +260,20 @@ export function useBackgroundTasks(notifications?: TaskNotifications) {
     }
   }, []);
 
+  const pauseTask = React.useCallback(async (taskId: string) => {
+    const response = await fetch(`/api/ai/agent/tasks/${taskId}/pause`, { method: "POST" });
+    if (!response.ok) {
+      throw new Error("Failed to pause task");
+    }
+  }, []);
+
+  const resumeTask = React.useCallback(async (taskId: string) => {
+    const response = await fetch(`/api/ai/agent/tasks/${taskId}/resume`, { method: "POST" });
+    if (!response.ok) {
+      throw new Error("Failed to resume task");
+    }
+  }, []);
+
   const confirmApproval = React.useCallback(
     async (approval: TaskApprovalRequest, confirmed: boolean) => {
       if (approvalBusy) {
@@ -302,6 +324,8 @@ export function useBackgroundTasks(notifications?: TaskNotifications) {
     approvalError,
     enqueueTask,
     cancelTask,
+    pauseTask,
+    resumeTask,
     approveNext,
     rejectNext,
   };

@@ -1,6 +1,12 @@
 import type { CoworkTaskSummary, TaskQueueStats } from "@ku0/agent-runtime";
 
-export type TaskStatusSnapshot = "queued" | "running" | "completed" | "failed" | "cancelled";
+export type TaskStatusSnapshot =
+  | "queued"
+  | "paused"
+  | "running"
+  | "completed"
+  | "failed"
+  | "cancelled";
 
 export type TaskSnapshot = {
   taskId: string;
@@ -26,6 +32,7 @@ export type TaskStreamEvent =
   | {
       type:
         | "task.queued"
+        | "task.paused"
         | "task.running"
         | "task.progress"
         | "task.completed"

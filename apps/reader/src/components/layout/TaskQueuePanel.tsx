@@ -14,6 +14,7 @@ export interface TaskQueuePanelTranslations {
   queuedLabel: string;
   completedLabel: string;
   statusQueued: string;
+  statusPaused: string;
   statusRunning: string;
   statusCompleted: string;
   statusFailed: string;
@@ -27,6 +28,8 @@ export interface TaskQueuePanelTranslations {
   expand: string;
   collapse: string;
   cancelTask: string;
+  pauseTask: string;
+  resumeTask: string;
   updateTask: string;
   updateWalkthrough: string;
 }
@@ -36,6 +39,8 @@ export interface TaskQueuePanelProps {
   stats: TaskQueueStats | null;
   error?: string | null;
   onCancelTask: (taskId: string) => void;
+  onPauseTask: (taskId: string) => void;
+  onResumeTask: (taskId: string) => void;
   onUpdateTask: (task: TaskSnapshot) => void;
   onUpdateWalkthrough: (task: TaskSnapshot) => void;
   translations: TaskQueuePanelTranslations;
@@ -43,6 +48,7 @@ export interface TaskQueuePanelProps {
 
 const statusMeta: Record<TaskStatusSnapshot, { icon: React.ElementType; className: string }> = {
   queued: { icon: Pause, className: "text-muted-foreground bg-surface-2/60" },
+  paused: { icon: Pause, className: "text-muted-foreground bg-surface-2/60" },
   running: { icon: Loader2, className: "text-primary bg-primary/10" },
   completed: { icon: CheckCircle2, className: "text-emerald-600 bg-emerald-500/10" },
   failed: { icon: XCircle, className: "text-destructive bg-destructive/10" },
@@ -54,11 +60,38 @@ export function TaskQueuePanel({
   stats,
   error,
   onCancelTask,
+  onPauseTask,
+  onResumeTask,
   onUpdateTask,
   onUpdateWalkthrough,
   translations: t,
 }: TaskQueuePanelProps) {
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
+
+  const summaryCounts = React.useMemo(() => {
+    if (tasks.length === 0 && stats) {
+      return {
+        running: stats.running,
+        queued: stats.queued,
+        completed: stats.completed,
+      };
+    }
+    const counts = { running: 0, queued: 0, completed: 0 };
+    for (const task of tasks) {
+      if (task.status === "running") {
+        counts.running += 1;
+        continue;
+      }
+      if (task.status === "queued" || task.status === "paused") {
+        counts.queued += 1;
+        continue;
+      }
+      if (task.status === "completed") {
+        counts.completed += 1;
+      }
+    }
+    return counts;
+  }, [stats, tasks]);
 
   const toggleExpanded = React.useCallback((taskId: string) => {
     setExpanded((prev) => {
@@ -96,16 +129,16 @@ export function TaskQueuePanel({
             <div className="text-xs font-medium text-foreground">{t.title}</div>
             <div className="text-[10px] text-muted-foreground/70">{t.subtitle}</div>
           </div>
-          {stats && (
+          {(stats || tasks.length > 0) && (
             <div className="text-[10px] text-muted-foreground/70 flex items-center gap-2">
               <span>
-                {t.runningLabel}: {stats.running}
+                {t.runningLabel}: {summaryCounts.running}
               </span>
               <span>
-                {t.queuedLabel}: {stats.queued}
+                {t.queuedLabel}: {summaryCounts.queued}
               </span>
               <span>
-                {t.completedLabel}: {stats.completed}
+                {t.completedLabel}: {summaryCounts.completed}
               </span>
             </div>
           )}
@@ -120,6 +153,8 @@ export function TaskQueuePanel({
               isExpanded={expanded.has(task.taskId)}
               onToggle={toggleExpanded}
               onCancelTask={onCancelTask}
+              onPauseTask={onPauseTask}
+              onResumeTask={onResumeTask}
               onUpdateTask={onUpdateTask}
               onUpdateWalkthrough={onUpdateWalkthrough}
               translations={t}
@@ -136,6 +171,8 @@ function TaskQueueItem({
   isExpanded,
   onToggle,
   onCancelTask,
+  onPauseTask,
+  onResumeTask,
   onUpdateTask,
   onUpdateWalkthrough,
   translations: t,
@@ -144,6 +181,8 @@ function TaskQueueItem({
   isExpanded: boolean;
   onToggle: (taskId: string) => void;
   onCancelTask: (taskId: string) => void;
+  onPauseTask: (taskId: string) => void;
+  onResumeTask: (taskId: string) => void;
   onUpdateTask: (task: TaskSnapshot) => void;
   onUpdateWalkthrough: (task: TaskSnapshot) => void;
   translations: TaskQueuePanelTranslations;
@@ -151,7 +190,10 @@ function TaskQueueItem({
   const meta = statusMeta[task.status];
   const StatusIcon = meta.icon;
   const statusLabel = resolveStatusLabel(task.status, t);
-  const canCancel = task.status === "queued" || task.status === "running";
+  const canCancel =
+    task.status === "queued" || task.status === "running" || task.status === "paused";
+  const canPause = task.status === "queued";
+  const canResume = task.status === "paused";
   const canUpdate = task.status === "completed";
 
   return (
@@ -199,6 +241,24 @@ function TaskQueueItem({
               className="text-[10px] font-medium text-destructive hover:text-destructive/80"
             >
               {t.cancelTask}
+            </button>
+          )}
+          {canPause && (
+            <button
+              type="button"
+              onClick={() => onPauseTask(task.taskId)}
+              className="text-[10px] font-medium text-muted-foreground hover:text-foreground"
+            >
+              {t.pauseTask}
+            </button>
+          )}
+          {canResume && (
+            <button
+              type="button"
+              onClick={() => onResumeTask(task.taskId)}
+              className="text-[10px] font-medium text-muted-foreground hover:text-foreground"
+            >
+              {t.resumeTask}
             </button>
           )}
         </div>
@@ -336,6 +396,8 @@ function resolveStatusLabel(status: TaskStatusSnapshot, t: TaskQueuePanelTransla
   switch (status) {
     case "queued":
       return t.statusQueued;
+    case "paused":
+      return t.statusPaused;
     case "running":
       return t.statusRunning;
     case "completed":

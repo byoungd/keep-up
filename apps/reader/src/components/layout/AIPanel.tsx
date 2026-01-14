@@ -217,6 +217,8 @@ export function AIPanel({
         stats={backgroundTasks.stats}
         error={backgroundTasks.streamError}
         onCancelTask={backgroundTasks.cancelTask}
+        onPauseTask={backgroundTasks.pauseTask}
+        onResumeTask={backgroundTasks.resumeTask}
         onUpdateTask={(task) => handleUpdateTask(task.name)}
         onUpdateWalkthrough={(task) => handleUpdateWalkthrough(task.name)}
         translations={taskQueueTranslations}
