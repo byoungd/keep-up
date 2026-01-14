@@ -52,6 +52,8 @@ export default defineConfig({
     rollupOptions: {
       output: {
         entryFileNames: "db-worker.js",
+        chunkFileNames: "assets/[name]-[hash].js",
+        assetFileNames: "assets/[name]-[hash].[ext]",
       },
       // Prevent externalization of node built-ins, we want to shim or fail if used
       // But Vite externalizes them by default in browser build.
