@@ -183,3 +183,6 @@ build/
 
 *.txt
 *.log
+
+# Ignore tasks directory
+docs/tasks/
