@@ -217,6 +217,10 @@ export interface ToolCallRecord {
   result?: unknown;
   error?: string;
   durationMs?: number;
+  status?: "pending" | "executing" | "success" | "error";
+  startTime?: number;
+  endTime?: number;
+  confirmationId?: string;
 }
 
 /** AI context attached to assistant messages */

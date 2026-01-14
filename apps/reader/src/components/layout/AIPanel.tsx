@@ -9,6 +9,7 @@ import type { EditorView } from "prosemirror-view";
 import * as React from "react";
 import { WorkflowSelector } from "../ai/WorkflowSelector";
 import { AIPanelHeader } from "./AIPanelHeader";
+import { ApprovalRequestCard } from "./ApprovalRequestCard";
 import { ContextStatusPanel } from "./ContextStatusPanel";
 import { InputArea } from "./InputArea";
 import { MessageList } from "./MessageList";
@@ -56,6 +57,9 @@ export function AIPanel({
     isStreaming,
     model,
     setModel,
+    pendingApproval,
+    approvalBusy,
+    approvalError,
     attachmentsCtrl,
     consentCtrl,
     listRef,
@@ -75,6 +79,8 @@ export function AIPanel({
     handleCopyLastAnswer,
     handleCopy,
     handleUseTask,
+    handleApprove,
+    handleReject,
     exportHistory,
     workflow,
     setWorkflow,
@@ -109,6 +115,7 @@ export function AIPanel({
     inputTranslations,
     contextStatusTranslations,
     projectContextTranslations,
+    approvalTranslations,
     providerLabel,
   } = useAIPanelTranslations(selectedCapability.provider);
 
@@ -215,6 +222,17 @@ export function AIPanel({
         resolveReference={editorView ? resolveReference : undefined}
         onReferenceSelect={editorView ? handleReferenceSelect : undefined}
       />
+
+      {pendingApproval && (
+        <ApprovalRequestCard
+          request={pendingApproval}
+          isBusy={approvalBusy}
+          error={approvalError}
+          onApprove={handleApprove}
+          onReject={handleReject}
+          translations={approvalTranslations}
+        />
+      )}
 
       {referenceDebugPanel}
 

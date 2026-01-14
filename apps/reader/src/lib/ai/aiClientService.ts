@@ -14,6 +14,7 @@
 import { AIError, type AIErrorCode as CoreAIErrorCode } from "@keepup/ai-core";
 import { DEFAULT_POLICY_MANIFEST, generateRequestId } from "@keepup/core";
 
+import { type AgentStreamEvent, parseAgentStreamEvent } from "./agentStream";
 import { REQUEST_TIMEOUT_MS, SSE_DONE_MARKER } from "./constants";
 import { parseSseText } from "./streamUtils";
 
@@ -39,6 +40,7 @@ export interface AIStreamRequest {
   attachments?: Array<{ type: "image"; url: string }>;
   workflow?: "tdd" | "refactoring" | "debugging" | "research" | "none";
   systemPrompt?: string;
+  mode?: "chat" | "agent";
   requestId?: string;
   clientRequestId?: string;
   policyContext?: { policy_id?: string; redaction_profile?: string; data_access_profile?: string };
@@ -51,6 +53,7 @@ export interface AIStreamCallbacks {
   onChunk: (content: string, accumulated: string) => void;
   onDone: (result: AIStreamResult) => void;
   onError: (error: AIClientError) => void;
+  onEvent?: (event: AgentStreamEvent) => void;
 }
 
 export interface AIStreamResult {
@@ -90,6 +93,18 @@ export interface AIServiceHealth {
   };
   lastFailureAt: number | null;
   retryAfterMs: number | null;
+}
+
+export interface AIConfirmationRequest {
+  confirmationId: string;
+  confirmed: boolean;
+  requestId?: string;
+}
+
+export interface AIConfirmationResult {
+  confirmationId: string;
+  confirmed: boolean;
+  requestId?: string;
 }
 
 // ============================================================================
@@ -156,8 +171,18 @@ export class AIClientError extends Error {
 // Configuration
 // ============================================================================
 
-// AI chat API endpoint
+// AI API endpoints
 const API_ENDPOINT = "/api/ai/chat";
+const AGENT_ENDPOINT = "/api/ai/agent";
+const AGENT_CONFIRM_ENDPOINT = "/api/ai/agent/confirm";
+
+type NormalizedStreamRequest = AIStreamRequest & {
+  requestId: string;
+  clientRequestId: string;
+  policyContext: { policy_id?: string; redaction_profile?: string; data_access_profile?: string };
+  agentId: string;
+  mode: "chat" | "agent";
+};
 const DEFAULT_POLICY_CONTEXT = { policy_id: DEFAULT_POLICY_MANIFEST.policy_id };
 const DEFAULT_AGENT_ID = "reader-panel";
 
@@ -316,11 +341,63 @@ function combineSignals(
   return { signal: controller.signal, cleanup };
 }
 
+function normalizeStreamRequest(request: AIStreamRequest): NormalizedStreamRequest {
+  const requestId = request.requestId ?? generateRequestId();
+  return {
+    ...request,
+    requestId,
+    clientRequestId: request.clientRequestId ?? requestId,
+    policyContext: request.policyContext ?? DEFAULT_POLICY_CONTEXT,
+    agentId: request.agentId ?? DEFAULT_AGENT_ID,
+    mode: request.mode ?? "chat",
+  };
+}
+
+function buildStreamPayload(request: NormalizedStreamRequest): {
+  endpoint: string;
+  payload: Record<string, unknown>;
+} {
+  if (request.mode === "agent") {
+    return {
+      endpoint: AGENT_ENDPOINT,
+      payload: {
+        prompt: request.prompt,
+        model: request.model,
+        messages: request.history ?? [],
+        systemPrompt: request.systemPrompt,
+        request_id: request.requestId,
+        client_request_id: request.clientRequestId,
+        agent_id: request.agentId,
+        intent_id: request.intentId,
+      },
+    };
+  }
+
+  return {
+    endpoint: API_ENDPOINT,
+    payload: {
+      prompt: request.prompt,
+      model: request.model,
+      stream: true,
+      messages: request.history ?? [],
+      attachments: request.attachments,
+      workflow: request.workflow,
+      systemPrompt: request.systemPrompt,
+      request_id: request.requestId,
+      client_request_id: request.clientRequestId,
+      policy_context: request.policyContext,
+      agent_id: request.agentId,
+      intent_id: request.intentId,
+    },
+  };
+}
+
 function applyChunk(
   line: string,
   startedAt: number,
   state: StreamState,
-  onChunk: (delta: string, accumulated: string) => void
+  onChunk: (delta: string, accumulated: string) => void,
+  onEvent?: (event: AgentStreamEvent) => void
 ): void {
   const trimmed = line.trim();
   if (!trimmed.startsWith("data:")) {
@@ -329,6 +406,12 @@ function applyChunk(
 
   const payload = trimmed.slice(5).trim();
   if (!payload || payload === SSE_DONE_MARKER) {
+    return;
+  }
+
+  const agentEvent = parseAgentStreamEvent(payload);
+  if (agentEvent) {
+    onEvent?.(agentEvent);
     return;
   }
 
@@ -363,7 +446,8 @@ function applyChunk(
 async function readStream(
   body: ReadableStream<Uint8Array>,
   startedAt: number,
-  onChunk: (delta: string, accumulated: string) => void
+  onChunk: (delta: string, accumulated: string) => void,
+  onEvent?: (event: AgentStreamEvent) => void
 ): Promise<
   Pick<
     AIStreamResult,
@@ -385,12 +469,12 @@ async function readStream(
       const lines = buffer.split("\n");
       buffer = lines.pop() ?? "";
       for (const line of lines) {
-        applyChunk(line, startedAt, state, onChunk);
+        applyChunk(line, startedAt, state, onChunk, onEvent);
       }
     }
 
     if (buffer) {
-      applyChunk(buffer, startedAt, state, onChunk);
+      applyChunk(buffer, startedAt, state, onChunk, onEvent);
     }
   } finally {
     reader.releaseLock();
@@ -512,18 +596,52 @@ class AIClientService {
     }
   }
 
+  async confirm(request: AIConfirmationRequest): Promise<AIConfirmationResult> {
+    try {
+      const response = await fetch(AGENT_CONFIRM_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          confirmation_id: request.confirmationId,
+          confirmed: request.confirmed,
+          request_id: request.requestId,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorInfo = parseErrorPayload(await response.text());
+        const code = mapErrorCode(response.status, errorInfo.code);
+        throw new AIClientError(code, errorInfo.message, {
+          requestId: errorInfo.requestId ?? request.requestId,
+        });
+      }
+
+      const data = (await response.json()) as {
+        confirmation_id?: string;
+        confirmed?: boolean;
+        request_id?: string;
+      };
+
+      return {
+        confirmationId: data.confirmation_id ?? request.confirmationId,
+        confirmed: data.confirmed ?? request.confirmed,
+        requestId: data.request_id ?? request.requestId,
+      };
+    } catch (error) {
+      if (error instanceof AIClientError) {
+        throw error;
+      }
+      throw this.normalizeError(error);
+    }
+  }
+
   private async performStream(
     request: AIStreamRequest,
     callbacks: AIStreamCallbacks
   ): Promise<Omit<AIStreamResult, "attempts">> {
-    const requestId = request.requestId ?? generateRequestId();
-    const normalizedRequest: AIStreamRequest = {
-      ...request,
-      requestId,
-      clientRequestId: request.clientRequestId ?? requestId,
-      policyContext: request.policyContext ?? DEFAULT_POLICY_CONTEXT,
-      agentId: request.agentId ?? DEFAULT_AGENT_ID,
-    };
+    const normalizedRequest = normalizeStreamRequest(request);
 
     const startedAt = performance.now();
     const controller = new AbortController();
@@ -533,26 +651,15 @@ class AIClientService {
     const { signal, cleanup } = combineSignals(controller.signal, request.signal);
 
     try {
-      const response = await fetch(API_ENDPOINT, {
+      const { endpoint, payload } = buildStreamPayload(normalizedRequest);
+
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "x-model": normalizedRequest.model,
         },
-        body: JSON.stringify({
-          prompt: normalizedRequest.prompt,
-          model: normalizedRequest.model,
-          stream: true,
-          messages: normalizedRequest.history ?? [],
-          attachments: normalizedRequest.attachments,
-          workflow: normalizedRequest.workflow,
-          systemPrompt: normalizedRequest.systemPrompt,
-          request_id: normalizedRequest.requestId,
-          client_request_id: normalizedRequest.clientRequestId,
-          policy_context: normalizedRequest.policyContext,
-          agent_id: normalizedRequest.agentId,
-          intent_id: normalizedRequest.intentId,
-        }),
+        body: JSON.stringify(payload),
         signal,
       });
 
@@ -572,7 +679,12 @@ class AIClientService {
         });
       }
 
-      const streamData = await readStream(response.body, startedAt, callbacks.onChunk);
+      const streamData = await readStream(
+        response.body,
+        startedAt,
+        callbacks.onChunk,
+        callbacks.onEvent
+      );
 
       return {
         requestId: headerRequestId,

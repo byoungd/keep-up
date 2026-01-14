@@ -141,6 +141,20 @@ export function useAIPanelTranslations(selectedProvider: string) {
     [t]
   );
 
+  const approvalTranslations = React.useMemo(
+    () => ({
+      title: t("approvalTitle"),
+      approve: t("approvalApprove"),
+      reject: t("approvalReject"),
+      riskLabel: t("approvalRiskLabel"),
+      reasonLabel: t("approvalReasonLabel"),
+      argumentsLabel: t("approvalArgumentsLabel"),
+      pendingLabel: t("approvalPendingLabel"),
+      errorLabel: t("approvalErrorLabel"),
+    }),
+    [t]
+  );
+
   return {
     t,
     statusLabels,
@@ -152,6 +166,7 @@ export function useAIPanelTranslations(selectedProvider: string) {
     inputTranslations,
     contextStatusTranslations,
     projectContextTranslations,
+    approvalTranslations,
     providerLabel,
   };
 }
