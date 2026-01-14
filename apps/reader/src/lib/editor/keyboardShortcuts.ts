@@ -140,7 +140,7 @@ export const SHORTCUT_REGISTRY: ShortcutDefinition[] = [
   {
     id: "bold",
     label: "Bold",
-    keys: ["Mod-b", "Mod-B"],
+    keys: ["Mod-b", "Cmd-b"],
     category: "formatting",
     command: (schema) => (schema.marks.bold ? toggleMark(schema.marks.bold) : null),
     macDisplay: "⌘B",

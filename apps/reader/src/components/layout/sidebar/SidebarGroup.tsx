@@ -51,7 +51,12 @@ export const SidebarGroup = React.memo(function SidebarGroup({
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           )}
         >
-          <span className={cn("transition-transform duration-200", !collapsed && "rotate-90")}>
+          <span
+            className={cn(
+              "flex items-center justify-center h-3 w-3 shrink-0 transition-transform duration-200",
+              !collapsed && "rotate-90"
+            )}
+          >
             <ChevronRight className="h-3 w-3" />
           </span>
           <span>{label}</span>

@@ -1,7 +1,7 @@
 import { type Page, expect, test } from "@playwright/test";
 import {
+  createAnnotationFromSelection,
   focusEditor,
-  getAnnotationIds,
   getPointForSubstring,
   selectRangeBetweenSubstrings,
   selectTextBySubstring,
@@ -63,43 +63,12 @@ async function appendParagraphs(page: Page, lines: string[]): Promise<void> {
   }
 }
 
-async function clickHighlightButton(page: Page): Promise<void> {
-  const toolbar = page.locator("[data-testid='selection-toolbar']");
-  await expect(toolbar).toBeVisible({ timeout: 3000 });
-  await expect
-    .poll(
-      async () => {
-        try {
-          await toolbar.getByRole("button", { name: "Highlight yellow" }).click({ force: true });
-          return true;
-        } catch {
-          return false;
-        }
-      },
-      { timeout: 3000 }
-    )
-    .toBe(true);
-}
-
 async function createSingleBlockAnnotation(page: Page): Promise<string> {
-  const baselineIds = await getAnnotationIds(page);
   // Insert unique text to avoid existing seeded highlights.
   const unique = `HANDLE TEST ${Date.now()}`;
   await appendParagraphs(page, [unique]);
   await selectTextBySubstring(page, unique);
-
-  await clickHighlightButton(page);
-
-  await expect
-    .poll(async () => (await getAnnotationIds(page)).length)
-    .toBeGreaterThan(baselineIds.length);
-
-  const currentIds = await getAnnotationIds(page);
-  const annotationId = currentIds.find((id) => !baselineIds.includes(id));
-  if (!annotationId) {
-    throw new Error("Failed to create a new annotation");
-  }
-  return annotationId;
+  return await createAnnotationFromSelection(page);
 }
 
 async function getHandleCenter(
@@ -330,20 +299,9 @@ test.describe("Annotation Drag Preview", () => {
     const lineTwo = `Preview line two ${suffix}`;
     await appendParagraphs(page, [lineOne, lineTwo]);
 
-    const baselineIds = await getAnnotationIds(page);
     await selectRangeBetweenSubstrings(page, lineOne, lineTwo);
 
-    await clickHighlightButton(page);
-
-    await expect
-      .poll(async () => (await getAnnotationIds(page)).length)
-      .toBeGreaterThan(baselineIds.length);
-
-    const currentIds = await getAnnotationIds(page);
-    const annotationId = currentIds.find((id) => !baselineIds.includes(id));
-    if (!annotationId) {
-      throw new Error("Failed to create a new annotation");
-    }
+    const annotationId = await createAnnotationFromSelection(page);
 
     const annotation = page
       .locator(`.lfcc-editor .lfcc-annotation[data-annotation-id="${annotationId}"]`)

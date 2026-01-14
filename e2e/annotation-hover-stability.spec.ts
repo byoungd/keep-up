@@ -1,7 +1,7 @@
 import { type Page, expect, test } from "@playwright/test";
 import {
+  createAnnotationFromSelection,
   focusEditor,
-  getAnnotationIds,
   selectRangeBetweenSubstrings,
   waitForEditorReady,
 } from "./helpers/editor";
@@ -25,8 +25,6 @@ async function appendParagraphs(page: Page, lines: string[]): Promise<void> {
 }
 
 async function createMultiParagraphAnnotation(page: Page): Promise<string> {
-  const baselineIds = await getAnnotationIds(page);
-
   // Create multi-paragraph content
   const uniquePrefix = `HOVER_TEST_${Date.now()}`;
   const para1 = `${uniquePrefix}_PARA_1 First paragraph for hover test.`;
@@ -38,23 +36,7 @@ async function createMultiParagraphAnnotation(page: Page): Promise<string> {
   // Select across all three paragraphs
   await selectRangeBetweenSubstrings(page, `${uniquePrefix}_PARA_1`, `${uniquePrefix}_PARA_3`);
 
-  // Create highlight
-  const highlightButton = page.getByRole("button", { name: "Highlight yellow" });
-  await expect(highlightButton).toBeVisible({ timeout: 3000 });
-  await highlightButton.click({ force: true });
-
-  // Wait for annotation to be created
-  await expect
-    .poll(async () => (await getAnnotationIds(page)).length)
-    .toBeGreaterThan(baselineIds.length);
-
-  const currentIds = await getAnnotationIds(page);
-  const annotationId = currentIds.find((id) => !baselineIds.includes(id));
-  if (!annotationId) {
-    throw new Error("Failed to create multi-paragraph annotation");
-  }
-
-  return annotationId;
+  return await createAnnotationFromSelection(page);
 }
 
 test.describe("Annotation Hover Stability", () => {

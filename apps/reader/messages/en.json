@@ -191,7 +191,9 @@
     "projectIntro": "Project Intro",
     "appearanceTooltip": "Appearance & Theme",
     "toggleDocuments": "Toggle Documents ({shortcut})",
-    "toggleAi": "Toggle AI Companion ({shortcut})"
+    "toggleAi": "Toggle AI Companion ({shortcut})",
+    "collapse": "Collapse Sidebar",
+    "expand": "Expand Sidebar"
   },
   "LfccDemo": {
     "documentTitleFallback": "Untitled Document",

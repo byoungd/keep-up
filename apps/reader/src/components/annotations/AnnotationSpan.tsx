@@ -47,6 +47,9 @@ export function AnnotationSpan({
   const graceHighlight = getHighlightStyle("broken_grace");
   const partialHighlight = getHighlightStyle("active_partial");
   const activeColor = getAnnotationHighlightColor(color);
+  const activeBorder = `${activeHighlight.borderWidth} ${activeHighlight.borderStyle} ${activeColor}`;
+  const unverifiedBorder = `${unverifiedHighlight.borderWidth} ${unverifiedHighlight.borderStyle} ${activeColor}`;
+  const partialBorder = `${partialHighlight.borderWidth} ${partialHighlight.borderStyle} ${activeColor}`;
 
   // Focused state ring for keyboard navigation
   const focusedStyle = isFocused
@@ -66,7 +69,7 @@ export function AnnotationSpan({
       ),
       style: {
         backgroundColor: activeColor,
-        borderBottom: `${activeHighlight.borderWidth} ${activeHighlight.borderStyle} ${activeHighlight.borderColor}`,
+        borderBottom: activeBorder,
       },
     },
     active_unverified: {
@@ -75,8 +78,8 @@ export function AnnotationSpan({
         baseStyle
       ),
       style: {
-        backgroundColor: unverifiedHighlight.backgroundColor,
-        borderBottom: `${unverifiedHighlight.borderWidth} ${unverifiedHighlight.borderStyle} ${unverifiedHighlight.borderColor}`,
+        backgroundColor: activeColor,
+        borderBottom: unverifiedBorder,
       },
     },
     broken_grace: {
@@ -89,8 +92,8 @@ export function AnnotationSpan({
     active_partial: {
       className: cn(baseStyle, "text-foreground", focusedStyle),
       style: {
-        backgroundColor: partialHighlight.backgroundColor,
-        borderBottom: `${partialHighlight.borderWidth} ${partialHighlight.borderStyle} ${partialHighlight.borderColor}`,
+        backgroundColor: activeColor,
+        borderBottom: partialBorder,
       },
     },
     orphan: {
