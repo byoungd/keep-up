@@ -468,6 +468,9 @@ importers:
 
   packages/db:
     dependencies:
+      '@keepup/core':
+        specifier: workspace:*
+        version: link:../core
       '@keepup/lfcc-bridge':
         specifier: workspace:*
         version: link:../lfcc-bridge
