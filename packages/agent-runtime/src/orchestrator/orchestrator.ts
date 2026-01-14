@@ -1174,6 +1174,8 @@ export function createOrchestrator(
       registry,
       policy: options.toolExecution?.policy ?? createPermissionChecker(config.security),
       policyEngine: options.toolExecution?.policyEngine,
+      sandboxAdapter: options.toolExecution?.sandboxAdapter,
+      telemetryHandler: options.toolExecution?.telemetryHandler,
       audit: options.toolExecution?.audit ?? createAuditLogger(),
       telemetry: options.toolExecution?.telemetry ?? options.telemetry,
       rateLimiter: options.toolExecution?.rateLimiter,

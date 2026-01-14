@@ -5,6 +5,11 @@
  */
 
 import {
+  type ExecutionSandboxAdapter,
+  type ToolExecutionTelemetry,
+  createExecutionSandboxAdapter,
+} from "../sandbox";
+import {
   type IPermissionChecker,
   type ToolPolicyDecision,
   type ToolPolicyEngine,
@@ -49,6 +54,8 @@ export interface ToolExecutorConfig {
   registry: IToolRegistry;
   policy: IPermissionChecker;
   policyEngine?: ToolPolicyEngine;
+  sandboxAdapter?: ExecutionSandboxAdapter;
+  telemetryHandler?: (event: ToolExecutionTelemetry) => void;
   audit?: AuditLogger;
   telemetry?: TelemetryContext;
   rateLimiter?: ToolRateLimiter;
@@ -61,6 +68,8 @@ export interface ToolExecutorConfig {
 export interface ToolExecutionOptions {
   policy?: IPermissionChecker;
   policyEngine?: ToolPolicyEngine;
+  sandboxAdapter?: ExecutionSandboxAdapter;
+  telemetryHandler?: (event: ToolExecutionTelemetry) => void;
   audit?: AuditLogger;
   telemetry?: TelemetryContext;
   rateLimiter?: ToolRateLimiter;
@@ -75,6 +84,8 @@ export class ToolExecutionPipeline
 {
   private readonly registry: IToolRegistry;
   private readonly policyEngine: ToolPolicyEngine;
+  private readonly sandboxAdapter: ExecutionSandboxAdapter;
+  private readonly telemetryHandler?: (event: ToolExecutionTelemetry) => void;
   private readonly audit?: AuditLogger;
   private readonly telemetry?: TelemetryContext;
   private readonly rateLimiter?: ToolRateLimiter;
@@ -87,6 +98,8 @@ export class ToolExecutionPipeline
   constructor(config: ToolExecutorConfig) {
     this.registry = config.registry;
     this.policyEngine = config.policyEngine ?? createToolPolicyEngine(config.policy);
+    this.sandboxAdapter = config.sandboxAdapter ?? createExecutionSandboxAdapter();
+    this.telemetryHandler = config.telemetryHandler;
     this.audit = config.audit;
     this.telemetry = config.telemetry;
     this.rateLimiter = config.rateLimiter;
@@ -110,6 +123,20 @@ export class ToolExecutionPipeline
       );
       this.recordDenied(call, startTime, policyDecision.reason);
       this.recordToolMetric(call.name, "error");
+      this.emitSandboxTelemetry(call, executionContext, denied, startTime);
+      this.auditResult(call, executionContext, denied);
+      return denied;
+    }
+
+    const sandboxDecision = this.sandboxAdapter.preflight(call, executionContext);
+    if (!sandboxDecision.allowed) {
+      const denied = this.createErrorResult(
+        "SANDBOX_VIOLATION",
+        sandboxDecision.reason ?? "Sandbox policy violation"
+      );
+      this.recordToolMetric(call.name, "error");
+      this.recordDuration(call.name, startTime);
+      this.emitSandboxTelemetry(call, executionContext, denied, startTime);
       this.auditResult(call, executionContext, denied);
       return denied;
     }
@@ -122,6 +149,7 @@ export class ToolExecutionPipeline
       );
       this.recordToolMetric(call.name, "error");
       this.recordDuration(call.name, startTime);
+      this.emitSandboxTelemetry(call, executionContext, limited, startTime);
       this.auditResult(call, executionContext, limited);
       return limited;
     }
@@ -132,6 +160,7 @@ export class ToolExecutionPipeline
       if (cached) {
         this.recordToolMetric(call.name, "success");
         this.recordDuration(call.name, startTime);
+        this.emitSandboxTelemetry(call, executionContext, cached, startTime);
         return cached;
       }
     }
@@ -147,6 +176,7 @@ export class ToolExecutionPipeline
         this.cache.set(call.name, call.arguments, result);
       }
 
+      this.emitSandboxTelemetry(call, executionContext, result, startTime);
       this.auditResult(call, executionContext, result);
       return result;
     } catch (error) {
@@ -154,6 +184,7 @@ export class ToolExecutionPipeline
       const exceptionResult = this.createErrorResult("EXECUTION_FAILED", message);
       this.recordToolMetric(call.name, "exception");
       this.recordDuration(call.name, startTime);
+      this.emitSandboxTelemetry(call, executionContext, exceptionResult, startTime);
       this.auditResult(call, executionContext, exceptionResult);
       return exceptionResult;
     }
@@ -219,6 +250,21 @@ export class ToolExecutionPipeline
       context,
       taskNodeId: context.taskNodeId,
     });
+  }
+
+  private emitSandboxTelemetry(
+    call: MCPToolCall,
+    context: ToolContext,
+    result: MCPToolResult,
+    startTime: number
+  ): void {
+    if (!this.telemetryHandler) {
+      return;
+    }
+
+    const durationMs = Date.now() - startTime;
+    const telemetry = this.sandboxAdapter.postflight(call, context, result, durationMs);
+    this.telemetryHandler(telemetry);
   }
 
   private applyContextOverrides(context: ToolContext): ToolContext {

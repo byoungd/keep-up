@@ -81,6 +81,8 @@ export function createCoworkToolExecutor(
   return createToolExecutor({
     registry,
     policy,
+    sandboxAdapter: config.sandboxAdapter,
+    telemetryHandler: config.telemetryHandler,
     audit: config.audit,
     telemetry: config.telemetry,
     rateLimiter: config.rateLimiter,

@@ -19,6 +19,7 @@ import {
   type ToolExecutorConfig,
   createToolExecutor,
 } from "../executor";
+import type { ExecutionSandboxAdapter, ToolExecutionTelemetry } from "../sandbox";
 import type { IPermissionChecker } from "../security";
 import type { IMetricsRecorder, TelemetryContext } from "../telemetry";
 import type { IToolRegistry } from "../tools/mcp/registry";
@@ -757,6 +758,60 @@ describe("ToolExecutionPipeline", () => {
       const result = await pipeline.execute(call, contextWithSignal);
 
       expect(result.success).toBe(true);
+    });
+
+    it("should block execution when sandbox adapter denies", async () => {
+      registry.setTools([createMockTool("test_tool")]);
+
+      const sandboxAdapter: ExecutionSandboxAdapter = {
+        preflight: () => ({
+          allowed: false,
+          sandboxed: true,
+          reason: "sandbox denied",
+        }),
+        postflight: (call, context, _result, durationMs) => ({
+          toolName: call.name,
+          durationMs,
+          sandboxed: context.security.sandbox.type !== "none",
+        }),
+      };
+
+      pipeline = new ToolExecutionPipeline({
+        registry,
+        policy,
+        sandboxAdapter,
+      });
+
+      const result = await pipeline.execute(createMockCall("test_tool"), createMockContext());
+
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe("SANDBOX_VIOLATION");
+    });
+
+    it("should emit sandbox telemetry when configured", async () => {
+      registry.setTools([createMockTool("test_tool")]);
+
+      const events: ToolExecutionTelemetry[] = [];
+      const sandboxAdapter: ExecutionSandboxAdapter = {
+        preflight: () => ({ allowed: true, sandboxed: false }),
+        postflight: (call, _context, _result, durationMs) => ({
+          toolName: call.name,
+          durationMs,
+          sandboxed: false,
+        }),
+      };
+
+      pipeline = new ToolExecutionPipeline({
+        registry,
+        policy,
+        sandboxAdapter,
+        telemetryHandler: (event) => events.push(event),
+      });
+
+      await pipeline.execute(createMockCall("test_tool"), createMockContext());
+
+      expect(events).toHaveLength(1);
+      expect(events[0]?.toolName).toBe("test_tool");
     });
   });
 
