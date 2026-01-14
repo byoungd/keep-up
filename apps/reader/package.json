@@ -19,6 +19,7 @@
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "@floating-ui/react": "^0.27.16",
     "@google/generative-ai": "^0.24.1",
     "@handlewithcare/react-prosemirror": "^2.7.0",
     "@keepup/agent-runtime": "workspace:*",

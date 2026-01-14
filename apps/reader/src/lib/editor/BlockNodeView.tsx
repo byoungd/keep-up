@@ -53,14 +53,17 @@ function ListMarker({
           <button
             type="button"
             onClick={onToggleTask}
-            className={`${baseClasses} w-4 h-4 rounded border flex items-center justify-center hover:border-primary transition-colors ${
+            className={`${baseClasses} w-4 h-4 rounded border flex items-center justify-center hover:border-primary transition-all active:scale-90 duration-200 ${
               taskChecked
                 ? "bg-primary border-primary text-primary-foreground"
-                : "border-muted-foreground/40"
+                : "border-muted-foreground/40 hover:bg-muted/10"
             }`}
             aria-label={taskChecked ? "Mark as incomplete" : "Mark as complete"}
           >
-            {taskChecked && <Check className="w-3 h-3" />}
+            <Check
+              className={`w-3 h-3 transition-opacity duration-200 ${taskChecked ? "opacity-100" : "opacity-0"}`}
+              strokeWidth={3}
+            />
           </button>
 
           {/* Agent Execute Button - Only show if not checked */}

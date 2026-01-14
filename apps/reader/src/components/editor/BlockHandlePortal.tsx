@@ -10,6 +10,8 @@ import { useLfccEditorContext } from "../lfcc/LfccEditorContext";
 import { BlockContextMenu, type BlockContextMenuAction } from "./BlockContextMenu";
 import { BlockHoverGutter } from "./BlockHoverGutter";
 
+const HOVER_DELAY_MS = 150;
+
 type Props = {
   state: BlockHandleState | null;
 };
@@ -27,6 +29,37 @@ export function BlockHandlePortal({ state }: Props) {
   const context = useLfccEditorContext();
   const view = context?.view;
   const [rect, setRect] = useState<DOMRect | null>(null);
+
+  // Buffer state to prevent flickering and creating a "hover tunnel"
+  // We active hold the state for a few ms if it goes null
+  const [delayedState, setDelayedState] = useState<BlockHandleState | null>(state);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    // If we have an active state, update immediately and clear any hide timer
+    if (state?.active) {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      setDelayedState(state);
+    } else {
+      // If state went inactive, wait a bit before hiding
+      // This allows moving mouse from block to handle without it disappearing?
+      // Actually, the plugin usually keeps it active if hovering handle?
+      // If the plugin handles that, we just need to smooth out gaps.
+      if (!timeoutRef.current) {
+        timeoutRef.current = setTimeout(() => {
+          setDelayedState(null);
+          timeoutRef.current = null;
+        }, HOVER_DELAY_MS);
+      }
+    }
+  }, [state]);
+
+  const activeState = state?.active ? state : delayedState;
+  const isActive = !!activeState?.active && !!activeState?.pos;
+
   const [menuState, setMenuState] = useState<MenuState>({
     open: false,
     x: 0,
@@ -47,13 +80,13 @@ export function BlockHandlePortal({ state }: Props) {
     transform: _transform,
     isDragging,
   } = useDraggable({
-    id: state?.blockId ? `block:${state.blockId}` : "temp-drag",
+    id: activeState?.blockId ? `block:${activeState.blockId}` : "temp-drag",
     data: {
-      blockId: state?.blockId,
-      originalPos: state?.pos,
+      blockId: activeState?.blockId,
+      originalPos: activeState?.pos,
       type: "block",
     },
-    disabled: !state?.blockId,
+    disabled: !activeState?.blockId,
   });
 
   // Ensure client-side only for portal
@@ -64,15 +97,15 @@ export function BlockHandlePortal({ state }: Props) {
 
   // Update rect when state changes or on scroll
   useEffect(() => {
-    if (!view || !state?.active || state.pos === null) {
+    if (!view || !isActive || activeState?.pos === null || activeState?.pos === undefined) {
       setRect(null);
       return;
     }
 
     const updatePosition = () => {
       try {
-        const pos = state.pos;
-        if (pos === null) {
+        const pos = activeState.pos;
+        if (pos === null || pos === undefined) {
           return;
         }
         const dom = view.nodeDOM(pos);
@@ -95,16 +128,16 @@ export function BlockHandlePortal({ state }: Props) {
     return () => {
       window.removeEventListener("scroll", updatePosition, { capture: true });
     };
-  }, [view, state?.active, state?.pos]);
+  }, [view, isActive, activeState?.pos]);
 
   useEffect(() => {
-    if (state?.blockId) {
-      lastBlockIdRef.current = state.blockId;
+    if (activeState?.blockId) {
+      lastBlockIdRef.current = activeState.blockId;
     }
-    if (state?.pos !== null && state?.pos !== undefined) {
-      lastPosRef.current = state.pos;
+    if (activeState?.pos !== null && activeState?.pos !== undefined) {
+      lastPosRef.current = activeState.pos;
     }
-  }, [state?.blockId, state?.pos]);
+  }, [activeState?.blockId, activeState?.pos]);
 
   // Toast timeout
   useEffect(() => {
@@ -121,7 +154,7 @@ export function BlockHandlePortal({ state }: Props) {
   // Hide when text is selected (selection toolbar takes precedence)
   const hasTextSelection = view && !view.state.selection.empty;
 
-  const canShowHandle = !!view && !!state?.active && !!rect && !hasTextSelection;
+  const canShowHandle = !!view && isActive && !!rect && !hasTextSelection;
   const canShowMenu = !!view && menuState.open && !!menuState.blockId;
   const canShowToast = !!toastMessage;
 
@@ -136,11 +169,11 @@ export function BlockHandlePortal({ state }: Props) {
     if (!view) {
       return null;
     }
-    const blockId = state?.blockId ?? lastBlockIdRef.current;
+    const blockId = activeState?.blockId ?? lastBlockIdRef.current;
     if (!blockId) {
       return null;
     }
-    let pos = state?.pos ?? lastPosRef.current;
+    let pos = activeState?.pos ?? lastPosRef.current;
     if (pos === null || pos === undefined) {
       let foundPos: number | null = null;
       view.state.doc.descendants((node, nodePos) => {
@@ -170,13 +203,13 @@ export function BlockHandlePortal({ state }: Props) {
   };
 
   const handleInsertClick = () => {
-    if (!view || state?.pos === null || state?.pos === undefined) {
+    if (!view || activeState?.pos === null || activeState?.pos === undefined) {
       return;
     }
     // Insert paragraph after
-    const node = view.state.doc.nodeAt(state.pos);
+    const node = view.state.doc.nodeAt(activeState.pos);
     if (node) {
-      const endPos = state.pos + node.nodeSize;
+      const endPos = activeState.pos + node.nodeSize;
       const tr = view.state.tr.insert(endPos, view.state.schema.nodes.paragraph.create());
       tr.setSelection(TextSelection.create(tr.doc, endPos + 1));
       view.dispatch(tr);
@@ -326,9 +359,17 @@ export function BlockHandlePortal({ state }: Props) {
                 transition={{ duration: 0.15, ease: "easeOut" }}
                 className="z-[9999] pointer-events-auto flex justify-start"
                 data-lfcc-block-handle-root="true"
+                onMouseEnter={() => {
+                  // Keep delayed state active if user hovers the handle itself
+                  if (activeState && timeoutRef.current) {
+                    clearTimeout(timeoutRef.current);
+                    timeoutRef.current = null;
+                    setDelayedState(activeState);
+                  }
+                }}
               >
                 <BlockHoverGutter
-                  blockId={state?.blockId ?? undefined}
+                  blockId={activeState?.blockId ?? undefined}
                   onBlockClick={handleBlockClick}
                   onDragStart={undefined} // Handled by dnd-kit listeners
                   onInsertClick={handleInsertClick}
