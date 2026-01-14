@@ -189,3 +189,4 @@ build/
 
 # Ignore tasks directory
 docs/tasks/
+apps/reader/public/
