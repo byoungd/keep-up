@@ -22,9 +22,12 @@ import {
   getEditorText,
   modKey,
   openFreshEditor,
+  pressRedo,
+  pressUndo,
   selectAllText,
   selectTextBySubstring,
   setEditorContent,
+  setUndoMergeInterval,
   typeInEditor,
 } from "./helpers/editor";
 
@@ -442,22 +445,32 @@ test.describe("Essential Editor Tests", () => {
 
     test("new edit clears redo stack", async ({ page }) => {
       await openFreshEditor(page, "redo-cleared");
+      await setUndoMergeInterval(page, 0);
       await setEditorContent(page, "First");
-      await page.waitForTimeout(300);
-      await focusEditor(page);
-      await page.keyboard.type(" Second");
-      await page.waitForTimeout(300);
-      await focusEditor(page);
-      await page.keyboard.press(`${modKey}+z`); // Undo "Second"
-      await focusEditor(page);
-      await page.keyboard.type(" NewEdit"); // This should clear redo
+      await selectTextBySubstring(page, "First");
+      await collapseSelection(page);
+      await page.keyboard.insertText(" Second");
+      await expect
+        .poll(async () => await getEditorText(page), { timeout: 3000 })
+        .toContain("First Second");
 
-      await focusEditor(page);
-      await page.keyboard.press(`${modKey}+Shift+z`); // Try to redo
-      const text = await getEditorText(page);
-      // "Second" should NOT come back since redo was cleared
-      expect(text).toContain("NewEdit");
-      expect(text).not.toContain("Second");
+      await pressUndo(page);
+      await expect
+        .poll(async () => await getEditorText(page), { timeout: 3000 })
+        .toContain("First");
+
+      await selectTextBySubstring(page, "First");
+      await collapseSelection(page);
+      await page.keyboard.insertText(" NewEdit"); // This should clear redo
+
+      await pressRedo(page); // Try to redo
+      await expect
+        .poll(async () => await getEditorText(page), { timeout: 3000 })
+        .toContain("NewEdit");
+      await expect
+        .poll(async () => await getEditorText(page), { timeout: 3000 })
+        .not.toContain("Second");
+      await setUndoMergeInterval(page, 500);
     });
   });
 
