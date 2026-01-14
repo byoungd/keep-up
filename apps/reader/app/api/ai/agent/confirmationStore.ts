@@ -216,7 +216,7 @@ export async function resolvePendingConfirmation(options: {
   confirmed: boolean;
   requestId?: string;
 }): Promise<
-  | { status: "resolved"; requestId: string }
+  | { status: "resolved"; requestId: string; confirmed: boolean }
   | { status: "not_found" }
   | { status: "request_mismatch"; requestId: string }
   | { status: "expired"; requestId: string }
@@ -232,12 +232,17 @@ export async function resolvePendingConfirmation(options: {
       return { status: "request_mismatch", requestId: record.requestId };
     }
     if (record.status === "resolved") {
-      return { status: "resolved", requestId: record.requestId };
+      return {
+        status: "resolved",
+        requestId: record.requestId,
+        confirmed: record.confirmed === true,
+      };
     }
-    confirmationLog.set(record.confirmationId, {
-      ...record,
-      status: "expired",
-    });
+    if (record.status === "expired") {
+      return { status: "expired", requestId: record.requestId };
+    }
+    const expiredRecord = { ...record, status: "expired" as const };
+    confirmationLog.set(record.confirmationId, expiredRecord);
     pruneLog(Date.now());
     void scheduleWrite();
     return { status: "expired", requestId: record.requestId };
@@ -248,7 +253,7 @@ export async function resolvePendingConfirmation(options: {
   }
 
   entry.resolve(options.confirmed);
-  return { status: "resolved", requestId: entry.requestId };
+  return { status: "resolved", requestId: entry.requestId, confirmed: options.confirmed };
 }
 
 export async function listPendingTaskConfirmations(): Promise<PendingTaskConfirmation[]> {

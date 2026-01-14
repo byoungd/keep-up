@@ -501,12 +501,13 @@ function attachOrchestratorEvents(
   });
 
   orchestrator.setConfirmationHandler(async (confirmation) => {
+    const formattedDescription = formatTaskDescription(taskName, confirmation.description);
     const { confirmationId, promise } = await createPendingConfirmation({
       requestId,
       metadata: {
         taskId: context.taskId,
         toolName: confirmation.toolName,
-        description: confirmation.description,
+        description: formattedDescription,
         risk: confirmation.risk,
         reason: confirmation.reason,
         riskTags: confirmation.riskTags,
@@ -519,7 +520,7 @@ function attachOrchestratorEvents(
       timestamp: Date.now(),
       data: {
         ...confirmation,
-        description: formatTaskDescription(taskName, confirmation.description),
+        description: formattedDescription,
         confirmation_id: confirmationId,
         request_id: requestId,
       },

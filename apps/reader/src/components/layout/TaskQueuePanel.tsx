@@ -68,6 +68,31 @@ export function TaskQueuePanel({
 }: TaskQueuePanelProps) {
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
 
+  const summaryCounts = React.useMemo(() => {
+    if (tasks.length === 0 && stats) {
+      return {
+        running: stats.running,
+        queued: stats.queued,
+        completed: stats.completed,
+      };
+    }
+    const counts = { running: 0, queued: 0, completed: 0 };
+    for (const task of tasks) {
+      if (task.status === "running") {
+        counts.running += 1;
+        continue;
+      }
+      if (task.status === "queued" || task.status === "paused") {
+        counts.queued += 1;
+        continue;
+      }
+      if (task.status === "completed") {
+        counts.completed += 1;
+      }
+    }
+    return counts;
+  }, [stats, tasks]);
+
   const toggleExpanded = React.useCallback((taskId: string) => {
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -104,16 +129,16 @@ export function TaskQueuePanel({
             <div className="text-xs font-medium text-foreground">{t.title}</div>
             <div className="text-[10px] text-muted-foreground/70">{t.subtitle}</div>
           </div>
-          {stats && (
+          {(stats || tasks.length > 0) && (
             <div className="text-[10px] text-muted-foreground/70 flex items-center gap-2">
               <span>
-                {t.runningLabel}: {stats.running}
+                {t.runningLabel}: {summaryCounts.running}
               </span>
               <span>
-                {t.queuedLabel}: {stats.queued}
+                {t.queuedLabel}: {summaryCounts.queued}
               </span>
               <span>
-                {t.completedLabel}: {stats.completed}
+                {t.completedLabel}: {summaryCounts.completed}
               </span>
             </div>
           )}

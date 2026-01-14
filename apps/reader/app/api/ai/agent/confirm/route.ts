@@ -50,7 +50,7 @@ export async function POST(request: Request) {
     {
       success: true,
       confirmation_id: confirmationId,
-      confirmed,
+      confirmed: result.confirmed,
       request_id: result.requestId,
     },
     { requestId: result.requestId }

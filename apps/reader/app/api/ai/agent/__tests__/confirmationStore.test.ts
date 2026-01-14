@@ -36,6 +36,9 @@ describe("confirmationStore", () => {
     });
 
     expect(result.status).toBe("resolved");
+    if (result.status === "resolved") {
+      expect(result.confirmed).toBe(true);
+    }
     await expect(promise).resolves.toBe(true);
   });
 
@@ -66,9 +69,29 @@ describe("confirmationStore", () => {
     expect(result.status).toBe("expired");
   });
 
+  it("returns stored decisions for resolved confirmations", async () => {
+    const { confirmationId } = await createPendingConfirmation({ requestId: "req-3" });
+    const first = await resolvePendingConfirmation({
+      confirmationId,
+      confirmed: true,
+      requestId: "req-3",
+    });
+    const second = await resolvePendingConfirmation({
+      confirmationId,
+      confirmed: false,
+      requestId: "req-3",
+    });
+
+    expect(first.status).toBe("resolved");
+    expect(second.status).toBe("resolved");
+    if (second.status === "resolved") {
+      expect(second.confirmed).toBe(true);
+    }
+  });
+
   it("lists pending task confirmations for stream recovery", async () => {
     const { confirmationId } = await createPendingConfirmation({
-      requestId: "req-3",
+      requestId: "req-4",
       metadata: {
         taskId: "task-123",
         toolName: "write_file",
@@ -79,7 +102,7 @@ describe("confirmationStore", () => {
     });
 
     await createPendingConfirmation({
-      requestId: "req-4",
+      requestId: "req-5",
       metadata: {
         toolName: "bash",
         description: "No task metadata",
@@ -92,7 +115,7 @@ describe("confirmationStore", () => {
     expect(pending).toHaveLength(1);
     expect(pending[0]).toMatchObject({
       confirmationId,
-      requestId: "req-3",
+      requestId: "req-4",
       taskId: "task-123",
       toolName: "write_file",
       risk: "high",
