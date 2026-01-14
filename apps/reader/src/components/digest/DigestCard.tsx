@@ -62,6 +62,7 @@ export function DigestCard({
             size="icon"
             className="shrink-0 -mr-2 text-muted-foreground/50 hover:text-primary hover:bg-primary/5 transition-colors"
             onClick={() => setIsPinModalOpen(true)}
+            aria-label={t("pinToBrief")}
           >
             <Pin className="h-4 w-4" />
           </Button>

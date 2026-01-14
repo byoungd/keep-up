@@ -29,8 +29,8 @@ export default function App() {
 
   React.useEffect(() => {
     // Show onboarding if no subscriptions and hydrated
-    if (hydrated && subscriptions.length === 0) {
-      setShowOnboarding(true);
+    if (hydrated) {
+      setShowOnboarding(subscriptions.length === 0);
     }
   }, [hydrated, subscriptions.length]);
 

@@ -3,7 +3,7 @@
 import { cn } from "@keepup/shared/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, Check, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export interface OnboardingFlowProps {
   onComplete: (data: OnboardingData) => void;
@@ -56,13 +56,11 @@ export function OnboardingFlow({ onComplete, className }: OnboardingFlowProps) {
 
   const [completionProgress, setCompletionProgress] = useState(0);
 
-  const handleNext = () => {
-    if (step === "topics") {
-      setStep("sources");
-    } else if (step === "sources") {
-      setStep("completing");
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (step === "completing") {
       let progress = 0;
-      const interval = setInterval(() => {
+      interval = setInterval(() => {
         progress += 2; // Slower, smoother progress
         setCompletionProgress(progress);
         if (progress >= 100) {
@@ -72,6 +70,15 @@ export function OnboardingFlow({ onComplete, className }: OnboardingFlowProps) {
           }, 800);
         }
       }, 30);
+    }
+    return () => clearInterval(interval);
+  }, [step, onComplete, selectedTopics, selectedBundles]);
+
+  const handleNext = () => {
+    if (step === "topics") {
+      setStep("sources");
+    } else if (step === "sources") {
+      setStep("completing");
     }
   };
 
