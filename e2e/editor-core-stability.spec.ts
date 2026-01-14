@@ -16,6 +16,7 @@ import {
   endUndoGroup,
   focusEditor,
   getAnnotationIds,
+  getCursorInfo,
   getEditorText,
   modKey,
   openFreshEditor,
@@ -513,7 +514,7 @@ test.describe("Selection Stability", () => {
     await page.keyboard.press("ArrowLeft", { delay: 100 });
     await page.waitForTimeout(100);
     await page.keyboard.press("ArrowLeft", { delay: 100 });
-    await page.waitForTimeout(100);
+    await expect.poll(async () => (await getCursorInfo(page)).offset, { timeout: 3000 }).toBe(1);
 
     // Type X - should appear between A and B, result: AXBC
     await page.keyboard.type("X");
@@ -686,7 +687,7 @@ test.describe("Edge Cases", () => {
 
     // Type a very long line (500+ characters)
     const longText = "A".repeat(500);
-    await page.keyboard.type(longText, { delay: 1 });
+    await page.keyboard.insertText(longText);
 
     const text = await getEditorText(page);
     expect(text.length).toBeGreaterThanOrEqual(500);

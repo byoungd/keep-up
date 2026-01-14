@@ -1,5 +1,6 @@
+import { LFCC_STRUCTURAL_META } from "@ku0/lfcc-bridge";
 import type { Schema } from "prosemirror-model";
-import { type EditorState, Plugin, TextSelection } from "prosemirror-state";
+import { type EditorState, Plugin, TextSelection, type Transaction } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";
 
 // Type for input rule handlers
@@ -10,6 +11,8 @@ type InputRuleHandler = (
   textBefore: string,
   pos: number
 ) => boolean;
+
+const markStructural = (tr: Transaction): Transaction => tr.setMeta(LFCC_STRUCTURAL_META, true);
 
 /** Run a series of input rule handlers, returning true on first match */
 function runInputRules(
@@ -93,6 +96,7 @@ function handleHeading(
     const start = pos - headingMatch[0].length;
     const tr = state.tr.delete(start, pos);
     tr.setBlockType(start, start, schema.nodes.heading, { level });
+    markStructural(tr);
     view.dispatch(tr);
     return true;
   }
@@ -129,6 +133,7 @@ function handleHorizontalRule(
     tr = tr.insert(insertPos, paragraphType.create());
     tr = tr.setSelection(TextSelection.create(tr.doc, insertPos + 1));
   }
+  markStructural(tr);
   view.dispatch(tr.scrollIntoView());
   return true;
 }
@@ -162,6 +167,7 @@ function handleTaskList(
         task_checked: isChecked,
       });
 
+      markStructural(tr);
       view.dispatch(tr);
       return true;
     }
@@ -188,6 +194,7 @@ function handleTaskList(
         task_checked: isChecked,
       });
 
+      markStructural(tr);
       view.dispatch(tr);
       return true;
     }
@@ -222,6 +229,7 @@ function handleList(
         indent_level: node.attrs.indent_level || 0,
       });
 
+      markStructural(tr);
       view.dispatch(tr);
       return true;
     }
@@ -255,6 +263,7 @@ function handleOrderedList(
         indent_level: node.attrs.indent_level || 0,
       });
 
+      markStructural(tr);
       view.dispatch(tr);
       return true;
     }
@@ -281,6 +290,7 @@ function handleBlockquote(
       if (range) {
         try {
           tr.wrap(range, [{ type: nodeType }]);
+          markStructural(tr);
           view.dispatch(tr);
           return true;
         } catch {
@@ -305,6 +315,7 @@ function handleCodeBlock(
     const start = pos - codeMatch[0].length;
     const tr = state.tr.delete(start, pos);
     tr.setBlockType(start, start, schema.nodes.code_block);
+    markStructural(tr);
     view.dispatch(tr);
     return true;
   }

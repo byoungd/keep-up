@@ -652,6 +652,25 @@ export async function dismissNextJsOverlay(page: Page): Promise<void> {
   }
 }
 
+export async function disableBlockingOverlays(page: Page): Promise<void> {
+  await page.addStyleTag({
+    content:
+      "nextjs-portal, [data-nextjs-dev-overlay], #__nextjs-error-overlay__ { pointer-events: none !important; }",
+  });
+  await page.evaluate(() => {
+    const alerts = document.querySelectorAll<HTMLElement>('[role="alert"]');
+    for (const alert of alerts) {
+      alert.style.pointerEvents = "none";
+    }
+    const overlays = document.querySelectorAll<HTMLElement>(
+      "nextjs-portal, [data-nextjs-dev-overlay], #__nextjs-error-overlay__"
+    );
+    for (const overlay of overlays) {
+      overlay.style.pointerEvents = "none";
+    }
+  });
+}
+
 export async function focusEditor(page: Page): Promise<void> {
   await dismissNextJsOverlay(page);
   const focusResult = await page.evaluate(() => {
@@ -1124,6 +1143,8 @@ export async function openFreshEditor(
 
   await page.goto(url);
   await waitForEditorReady(page);
+  await dismissNextJsOverlay(page);
+  await disableBlockingOverlays(page);
 
   // Give DB and Loro runtime a moment to settle with the new unique name and doc ID
   await page.waitForTimeout(1000);

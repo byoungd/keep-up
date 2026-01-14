@@ -20,6 +20,15 @@ export type DivergenceSummary = {
   editorChecksum: string;
   loroChecksum: string;
   reason?: string;
+  analysis?: {
+    blockCountMismatch: boolean;
+    textContentMismatch: boolean;
+    attributeMismatch: boolean;
+    orderMismatch: boolean;
+    divergedBlockIds: string[];
+    missingInEditor: string[];
+    missingInLoro: string[];
+  };
   detectedAt: number;
 };
 

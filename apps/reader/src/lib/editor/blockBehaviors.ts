@@ -1,7 +1,7 @@
-import { type LoroRuntime, nextBlockId } from "@ku0/lfcc-bridge";
+import { LFCC_STRUCTURAL_META, type LoroRuntime, nextBlockId } from "@ku0/lfcc-bridge";
 import { chainCommands, deleteSelection, exitCode, joinBackward } from "prosemirror-commands";
 import { keymap } from "prosemirror-keymap";
-import type { Command, Plugin } from "prosemirror-state";
+import type { Command, Plugin, Transaction } from "prosemirror-state";
 import { Selection, TextSelection } from "prosemirror-state";
 
 type ListType = "bullet" | "ordered" | "task" | null;
@@ -15,6 +15,8 @@ function isListBlock(attrs: Record<string, unknown>): boolean {
 
 /** Max indent level allowed */
 const MAX_INDENT = 6;
+
+const markStructural = (tr: Transaction): Transaction => tr.setMeta(LFCC_STRUCTURAL_META, true);
 
 /**
  * Clean list-related properties from the serialized attrs JSON string.
@@ -74,6 +76,7 @@ export const handleEnter =
           // Use Selection.near() to find valid cursor position in the modified document
           const $pos = tr.doc.resolve(blockStart + 1);
           tr = tr.setSelection(Selection.near($pos));
+          markStructural(tr);
           dispatch(tr.scrollIntoView());
         }
         return true;
@@ -103,6 +106,7 @@ export const handleEnter =
         const $newBlockStart = tr.doc.resolve(splitPos + 1);
         tr = tr.setSelection(TextSelection.near($newBlockStart, 1));
 
+        markStructural(tr);
         dispatch(tr.scrollIntoView());
       }
       return true;
@@ -166,6 +170,7 @@ export const handleTab =
         attrs: cleanAttrsForListExit(parent.attrs.attrs),
         indent_level: currentIndent + 1,
       });
+      markStructural(tr);
       dispatch(tr.scrollIntoView());
     }
     return true;
@@ -196,6 +201,7 @@ export const handleShiftTab =
           attrs: cleanAttrsForListExit(parent.attrs.attrs),
           indent_level: currentIndent - 1,
         });
+        markStructural(tr);
         dispatch(tr.scrollIntoView());
       } else {
         // Already at indent 0, exit list
@@ -206,6 +212,7 @@ export const handleShiftTab =
           indent_level: 0,
           task_checked: false,
         });
+        markStructural(tr);
         dispatch(tr.scrollIntoView());
       }
     }
@@ -244,6 +251,7 @@ export const handleBackspaceInList =
           attrs: cleanAttrsForListExit(parent.attrs.attrs),
           indent_level: currentIndent - 1,
         });
+        markStructural(tr);
         dispatch(tr.scrollIntoView());
       } else {
         // Exit list
@@ -254,6 +262,7 @@ export const handleBackspaceInList =
           indent_level: 0,
           task_checked: false,
         });
+        markStructural(tr);
         dispatch(tr.scrollIntoView());
       }
     }

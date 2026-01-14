@@ -16,6 +16,15 @@ export type DivergenceInfo = {
   editorChecksum: string;
   loroChecksum: string;
   reason?: string;
+  analysis?: {
+    blockCountMismatch: boolean;
+    textContentMismatch: boolean;
+    attributeMismatch: boolean;
+    orderMismatch: boolean;
+    divergedBlockIds: string[];
+    missingInEditor: string[];
+    missingInLoro: string[];
+  };
   detectedAt: number;
 };
 
@@ -160,6 +169,7 @@ export function DivergenceBanner({
                   editorChecksum: info.editorChecksum,
                   loroChecksum: info.loroChecksum,
                   reason: info.reason,
+                  analysis: info.analysis,
                   detectedAt: new Date(info.detectedAt).toISOString(),
                 },
                 null,
@@ -186,12 +196,14 @@ export function useDivergenceState() {
       editorChecksum: string;
       loroChecksum: string;
       reason?: string;
+      analysis?: DivergenceInfo["analysis"];
     }) => {
       if (result.diverged) {
         const next = {
           editorChecksum: result.editorChecksum,
           loroChecksum: result.loroChecksum,
           reason: result.reason,
+          analysis: result.analysis,
           detectedAt: Date.now(),
         };
         setDivergence(next);

@@ -359,6 +359,13 @@ function attrsFromPmNode(node: PMNode): string {
   if (typeof rawAttrs.attrs === "string") {
     baseAttrs = parseAttrs(rawAttrs.attrs);
   }
+  const {
+    list_type: _serializedListType,
+    indent_level: _serializedIndentLevel,
+    task_checked: _serializedTaskChecked,
+    ...baseWithoutListAttrs
+  } = baseAttrs;
+  baseAttrs = baseWithoutListAttrs;
 
   // Extract non-standard attrs (excluding block_id and attrs)
   const { block_id, attrs, list_type, indent_level, task_checked, ...rest } = rawAttrs as Record<
@@ -376,10 +383,6 @@ function attrsFromPmNode(node: PMNode): string {
   if (typeof indent_level === "number" && indent_level > 0) {
     mergedAttrs.indent_level = indent_level;
   }
-  if (list_type === "task" && task_checked === true) {
-    mergedAttrs.task_checked = true;
-  }
-
   if (list_type === "task" && task_checked === true) {
     mergedAttrs.task_checked = true;
   }

@@ -10,7 +10,7 @@ const withBundleAnalyzer = bundleAnalyzer({
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  transpilePackages: ["ai"],
+  transpilePackages: ["ai", "@ku0/shared"],
 
   // Optimize large package imports for better tree-shaking
   experimental: {
