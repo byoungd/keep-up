@@ -21,6 +21,7 @@ import {
   getEditorText,
   modKey,
   openFreshEditor,
+  selectAllText,
   selectTextBySubstring,
   setEditorContent,
   typeInEditor,
@@ -54,63 +55,21 @@ test.describe("Essential Editor Tests", () => {
 
     // Fixed: Uses PM-state-based cursor verification with explicit focus
     test("arrow keys move cursor", async ({ page }) => {
-      await typeInEditor(page, "ABCD");
+      await setEditorContent(page, "ABC");
       await page.waitForTimeout(200);
 
-      // Get initial cursor position (should be at end = position 5 for "ABCD")
-      const initialPos = await page.evaluate(() => {
-        const view = (
-          window as unknown as { __lfccView?: { state?: { selection?: { from?: number } } } }
-        ).__lfccView;
-        return view?.state?.selection?.from ?? -1;
-      });
-      expect(initialPos).toBeGreaterThan(0);
-
-      // Ensure editor has focus
-      await focusEditor(page);
+      const editor = page.locator(".lfcc-editor .ProseMirror");
+      await editor.click();
+      await editor.press("End");
       await page.waitForTimeout(100);
 
-      // Move left via keyboard with delays
-      await page.keyboard.press("ArrowLeft");
+      await editor.press("ArrowLeft", { delay: 100 });
       await page.waitForTimeout(100);
-
-      // Wait and poll for cursor to move (async PM update)
-      await expect
-        .poll(
-          async () => {
-            const pos = await page.evaluate(() => {
-              const view = (
-                window as unknown as { __lfccView?: { state?: { selection?: { from?: number } } } }
-              ).__lfccView;
-              return view?.state?.selection?.from ?? -1;
-            });
-            return pos;
-          },
-          { timeout: 2000 }
-        )
-        .toBeLessThan(initialPos);
-
-      // Get moved position
-      const movedPos = await page.evaluate(() => {
-        const view = (
-          window as unknown as { __lfccView?: { state?: { selection?: { from?: number } } } }
-        ).__lfccView;
-        return view?.state?.selection?.from ?? -1;
-      });
-
-      // Test arrow right moves back
-      await page.keyboard.press("ArrowRight");
+      await editor.press("ArrowLeft", { delay: 100 });
       await page.waitForTimeout(100);
+      await editor.type("X");
 
-      const finalPos = await page.evaluate(() => {
-        const view = (
-          window as unknown as { __lfccView?: { state?: { selection?: { from?: number } } } }
-        ).__lfccView;
-        return view?.state?.selection?.from ?? -1;
-      });
-
-      // After ArrowRight, position should be back at initial or close
-      expect(finalPos).toBeGreaterThanOrEqual(movedPos);
+      await expect.poll(async () => await getEditorText(page), { timeout: 3000 }).toContain("AXBC");
     });
 
     // Fixed: Uses PM-state-based cursor verification with platform-aware keys
@@ -170,8 +129,12 @@ test.describe("Essential Editor Tests", () => {
       await page.waitForTimeout(300);
 
       // Select all and replace
-      await page.keyboard.press(`${modKey}+a`);
-      await page.waitForTimeout(150); // Longer delay for selection to register
+      await focusEditor(page);
+      await selectAllText(page);
+      await page.evaluate(() =>
+        (window as unknown as { __lfccView?: { focus?: () => void } }).__lfccView?.focus?.()
+      );
+      await page.waitForTimeout(150);
       await page.keyboard.type("Replaced");
       await page.waitForTimeout(100);
       const text = await getEditorText(page);

@@ -272,15 +272,16 @@ test.describe("Toolbar Accessibility", () => {
     const toolbar = await getToolbar(page);
     await expect(toolbar).toBeVisible({ timeout: 5000 });
 
-    const buttons = toolbar.locator("button");
-    const count = await buttons.count();
+    await page.waitForTimeout(100);
+    const buttonInfo = await toolbar.locator("button").evaluateAll((nodes) =>
+      nodes.map((node) => ({
+        name: node.getAttribute("aria-label") ?? "",
+        text: node.textContent ?? "",
+      }))
+    );
 
-    for (let i = 0; i < count; i++) {
-      const button = buttons.nth(i);
-      const name = await button.getAttribute("aria-label");
-      const text = await button.textContent();
-      const hasAccessibleName =
-        (name && name.trim().length > 0) || (text && text.trim().length > 0);
+    for (const { name, text } of buttonInfo) {
+      const hasAccessibleName = name.trim().length > 0 || text.trim().length > 0;
       expect(hasAccessibleName).toBe(true);
     }
   });

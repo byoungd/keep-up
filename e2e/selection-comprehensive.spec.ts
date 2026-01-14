@@ -4,6 +4,7 @@ import {
   getEditorText,
   modKey,
   openFreshEditor,
+  selectAllText,
   selectTextBySubstring,
   typeInEditor,
 } from "./helpers/editor";
@@ -29,7 +30,10 @@ test.describe("Selection Comprehensive", () => {
     await page.keyboard.press("Enter");
     await typeInEditor(page, "Second paragraph");
 
-    await page.keyboard.press(`${modKey}+a`);
+    await selectAllText(page);
+    await page.evaluate(() =>
+      (window as unknown as { __lfccView?: { focus?: () => void } }).__lfccView?.focus?.()
+    );
     await page.waitForTimeout(200);
 
     // Type to replace - proves selection worked
@@ -68,6 +72,11 @@ test.describe("Selection Comprehensive", () => {
     await firstBlock.click({ clickCount: 3 });
     await page.waitForTimeout(200);
 
+    const selectionText = await page.evaluate(() => window.getSelection()?.toString().trim() ?? "");
+    if (!selectionText) {
+      await selectTextBySubstring(page, "First paragraph content");
+    }
+
     // Type to replace selection
     await page.keyboard.type("REPLACED");
     const text = await getEditorText(page);
@@ -94,7 +103,11 @@ test.describe("Selection Comprehensive", () => {
     await typeInEditor(page, "Replace me");
     await page.waitForTimeout(200);
 
-    await page.keyboard.press(`${modKey}+a`);
+    await selectAllText(page);
+    await page.evaluate(() =>
+      (window as unknown as { __lfccView?: { focus?: () => void } }).__lfccView?.focus?.()
+    );
+    await page.waitForTimeout(100);
     await page.keyboard.type("X");
     await page.waitForTimeout(200);
 

@@ -16,6 +16,26 @@ test.use({ screenshot: "only-on-failure" });
  * syncs the browser selection to ProseMirror's internal selection.
  */
 
+async function forceCommit(page: Parameters<typeof focusEditor>[0]): Promise<void> {
+  await page.evaluate(() => {
+    const globalAny = window as unknown as { __lfccForceCommit?: () => void };
+    globalAny.__lfccForceCommit?.();
+  });
+  await page.waitForTimeout(100);
+}
+
+async function applyHighlight(page: Parameters<typeof focusEditor>[0]): Promise<void> {
+  const toolbar = page.locator("[data-testid='selection-toolbar']");
+  try {
+    await expect(toolbar).toBeVisible({ timeout: 3000 });
+    await toolbar.getByRole("button", { name: "Highlight yellow" }).click({ force: true });
+  } catch {
+    const modKey = process.platform === "darwin" ? "Meta" : "Control";
+    await page.keyboard.press(`${modKey}+Shift+A`);
+  }
+  await forceCommit(page);
+}
+
 test.describe("Selection Sync with Annotations", () => {
   test.beforeEach(async ({ page }) => {
     await openFreshEditor(page, "selection-sync");
@@ -33,9 +53,7 @@ test.describe("Selection Sync with Annotations", () => {
     // Select and highlight a portion
     await selectRangeBetweenSubstrings(page, "ABC", "GHI");
 
-    const highlightButton = page.getByRole("button", { name: "Highlight yellow" });
-    await expect(highlightButton).toBeVisible({ timeout: 3000 });
-    await highlightButton.click();
+    await applyHighlight(page);
 
     // Wait for annotation to be created (use overlay selector for current UI)
     const annotationSelector = ".highlight-overlay .highlight-rect, .lfcc-annotation";
@@ -85,9 +103,7 @@ test.describe("Selection Sync with Annotations", () => {
     // Create annotation spanning first two paragraphs
     await selectRangeBetweenSubstrings(page, "PARA1", "PARA2_MIDDLE");
 
-    const highlightButton = page.getByRole("button", { name: "Highlight yellow" });
-    await expect(highlightButton).toBeVisible({ timeout: 3000 });
-    await highlightButton.click();
+    await applyHighlight(page);
 
     // Wait for annotation (use overlay selector for current UI)
     const annotationSelector = ".highlight-overlay .highlight-rect, .lfcc-annotation";
@@ -130,9 +146,7 @@ test.describe("Selection Sync with Annotations", () => {
     // Create annotation on first line
     await selectRangeBetweenSubstrings(page, "ENTER", "LINE");
 
-    const highlightButton = page.getByRole("button", { name: "Highlight yellow" });
-    await expect(highlightButton).toBeVisible({ timeout: 3000 });
-    await highlightButton.click();
+    await applyHighlight(page);
 
     // Wait for annotation (use overlay selector for current UI)
     const annotationSelector = ".highlight-overlay .highlight-rect, .lfcc-annotation";

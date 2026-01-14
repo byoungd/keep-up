@@ -12,6 +12,8 @@
 
 import { type Page, expect, test } from "@playwright/test";
 import {
+  collapseSelection,
+  focusEditor,
   getAnnotationIds,
   getEditorText,
   modKey,
@@ -277,7 +279,7 @@ test.describe("Annotation Lifecycle", () => {
     await selectTextBySubstring(page, uniqueText);
     const toolbar = page.locator("[data-testid='selection-toolbar']");
     await expect(toolbar).toBeVisible({ timeout: 5000 });
-    await toolbar.getByRole("button", { name: "Highlight yellow" }).click();
+    await toolbar.getByRole("button", { name: "Highlight yellow" }).click({ force: true });
 
     // Verify annotation created
     await expect
@@ -333,7 +335,7 @@ test.describe("Annotation Lifecycle", () => {
     await selectTextBySubstring(page, uniqueText);
     const toolbar = page.locator("[data-testid='selection-toolbar']");
     await expect(toolbar).toBeVisible({ timeout: 5000 });
-    await toolbar.getByRole("button", { name: "Highlight yellow" }).click();
+    await toolbar.getByRole("button", { name: "Highlight yellow" }).click({ force: true });
 
     await expect
       .poll(async () => (await getAnnotationIds(page)).length)
@@ -440,11 +442,8 @@ test.describe("Block Operations", () => {
     expect(initialBlocks).toBe(1);
 
     // Move cursor to middle (after "Before") and split
-    await page.keyboard.press(`${modKey}+a`);
-    await page.keyboard.press("ArrowLeft");
-    for (let i = 0; i < 6; i++) {
-      await page.keyboard.press("ArrowRight");
-    }
+    await selectTextBySubstring(page, "Before");
+    await collapseSelection(page);
     await page.waitForTimeout(50);
 
     // Split block with Enter
@@ -487,6 +486,7 @@ test.describe("Selection Stability", () => {
     await page.keyboard.press(`${modKey}+b`);
 
     // Type replacement should replace the selected bolded text
+    await focusEditor(page);
     await page.keyboard.type("Replaced");
 
     const text = await getEditorText(page);

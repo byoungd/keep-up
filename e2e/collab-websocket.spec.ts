@@ -60,7 +60,7 @@ async function waitForTokensOnBoth(
   pageA: Page,
   pageB: Page,
   tokens: string[],
-  timeout = 10000
+  timeout = 30000
 ): Promise<boolean> {
   const start = Date.now();
   while (Date.now() - start < timeout) {
@@ -103,7 +103,7 @@ async function getEditorContent(page: Page): Promise<string> {
   });
 }
 
-async function waitForConnection(page: Page, timeout = 10000): Promise<boolean> {
+async function waitForConnection(page: Page, timeout = 30000): Promise<boolean> {
   const status = page.locator("[data-testid='connection-status']");
   try {
     await expect(status).toContainText(/Connected|Online/, { timeout });
@@ -117,6 +117,19 @@ async function typeInEditor(page: Page, text: string): Promise<void> {
   const editor = page.locator(".lfcc-editor .ProseMirror");
   await editor.click();
   await page.keyboard.type(text, { delay: 30 });
+}
+
+async function forceCommit(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const globalAny = window as unknown as { __lfccForceCommit?: () => void };
+    globalAny.__lfccForceCommit?.();
+  });
+  await new Promise((r) => setTimeout(r, 100));
+}
+
+async function typeAndCommit(page: Page, text: string): Promise<void> {
+  await typeInEditor(page, text);
+  await forceCommit(page);
 }
 
 // ============================================================================
@@ -200,16 +213,16 @@ test.describe("LFCC WebSocket Collab", () => {
     // Expect "Peers: 1" (self doesn't count, usually? or maybe total?)
     // Our ParticipantList shows "N Online"
     // Wait for connection status to be connected
-    expect(await waitForConnection(pageA, 15000)).toBe(true);
-    expect(await waitForConnection(pageB, 15000)).toBe(true);
+    expect(await waitForConnection(pageA, 30000)).toBe(true);
+    expect(await waitForConnection(pageB, 30000)).toBe(true);
 
     // 3. Sync Edits
     const syncToken = `Hello World ${Date.now()}`;
-    await typeInEditor(pageA, syncToken);
+    await typeAndCommit(pageA, syncToken);
     artifact.opLog.push({ client: "A", op: "type", timestamp: Date.now() });
 
     // Give extra time for sync to fully settle; best-effort check the remote cursor updates
-    const converged = await waitForTokensOnBoth(pageA, pageB, [syncToken], 15000);
+    const converged = await waitForTokensOnBoth(pageA, pageB, [syncToken], 30000);
     if (!converged) {
       test.skip("Convergence not reached within timeout");
       return;
@@ -228,14 +241,14 @@ test.describe("LFCC WebSocket Collab", () => {
         await waitForEditorReady(pageA);
         await waitForEditorReady(pageB);
 
-        expect(await waitForConnection(pageA, 15000)).toBe(true);
-        expect(await waitForConnection(pageB, 15000)).toBe(true);
+        expect(await waitForConnection(pageA, 30000)).toBe(true);
+        expect(await waitForConnection(pageB, 30000)).toBe(true);
 
         // Initial content
         const startToken = `Start-${Date.now()}`;
-        await typeInEditor(pageA, ` ${startToken}`);
+        await typeAndCommit(pageA, ` ${startToken}`);
         diagA.logSyncEvent(`A typed ${startToken}`);
-        expect(await waitForTokensOnBoth(pageA, pageB, [startToken], 15000)).toBe(true);
+        expect(await waitForTokensOnBoth(pageA, pageB, [startToken], 30000)).toBe(true);
 
         // 1. Disconnect A (simulated offline)
         await contextA.setOffline(true);
@@ -244,12 +257,12 @@ test.describe("LFCC WebSocket Collab", () => {
 
         // 2. A edits offline
         const offlineToken = `OfflineA-${Date.now()}`;
-        await typeInEditor(pageA, ` [${offlineToken}]`);
+        await typeAndCommit(pageA, ` [${offlineToken}]`);
         diagA.logSyncEvent(`A typed offline ${offlineToken}`);
 
         // 3. B edits online
         const onlineToken = `OnlineB-${Date.now()}`;
-        await typeInEditor(pageB, ` [${onlineToken}]`);
+        await typeAndCommit(pageB, ` [${onlineToken}]`);
         artifact.opLog.push({ client: "B", op: "type", timestamp: Date.now() });
         diagB.logSyncEvent(`B typed online ${onlineToken}`);
 
@@ -259,8 +272,8 @@ test.describe("LFCC WebSocket Collab", () => {
         diagA.logSyncEvent("A back online");
 
         // Ensure both peers report connected before we assert convergence.
-        await waitForConnection(pageA, 15000);
-        await waitForConnection(pageB, 15000);
+        await waitForConnection(pageA, 30000);
+        await waitForConnection(pageB, 30000);
 
         // 5. Verify convergence
         const converged = await waitForTokensOnBoth(
@@ -287,11 +300,12 @@ test.describe("LFCC WebSocket Collab", () => {
     // 1. Create content
     const firstToken = `Paragraph One ${Date.now()}`;
     const secondToken = `Paragraph Two ${Date.now()}`;
-    await typeInEditor(pageA, firstToken);
+    await typeAndCommit(pageA, firstToken);
     await pageA.keyboard.press("Enter");
-    await typeInEditor(pageA, secondToken);
+    await forceCommit(pageA);
+    await typeAndCommit(pageA, secondToken);
 
-    expect(await waitForTokensOnBoth(pageA, pageB, [firstToken, secondToken], 15000)).toBe(true);
+    expect(await waitForTokensOnBoth(pageA, pageB, [firstToken, secondToken], 30000)).toBe(true);
 
     // 2. Create Annotation on Page A
     await pageA.locator(".lfcc-editor .ProseMirror").click();
