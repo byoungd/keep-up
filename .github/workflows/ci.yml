@@ -133,14 +133,16 @@ jobs:
         run: |
           TARBALL_NAME="$(pnpm -C packages/core pack | tail -n 1)"
           TARBALL_PATH="packages/core/${TARBALL_NAME}"
-          tar -tf "${TARBALL_PATH}" | grep -q "package/README.md"
-          tar -tf "${TARBALL_PATH}" | grep -q "package/dist/index.js"
-          tar -tf "${TARBALL_PATH}" | grep -q "package/dist/index.d.ts"
-          if tar -tf "${TARBALL_PATH}" | grep -q "__tests__"; then
+          TARBALL_LIST="$(mktemp)"
+          tar -tf "${TARBALL_PATH}" > "${TARBALL_LIST}"
+          grep -q "package/README.md" "${TARBALL_LIST}"
+          grep -q "package/dist/index.js" "${TARBALL_LIST}"
+          grep -q "package/dist/index.d.ts" "${TARBALL_LIST}"
+          if grep -q "__tests__" "${TARBALL_LIST}"; then
             echo "Tarball includes __tests__ (unexpected)"
             exit 1
           fi
-          rm -f "${TARBALL_PATH}"
+          rm -f "${TARBALL_LIST}" "${TARBALL_PATH}"
 
   ui_gate:
     runs-on: ubuntu-latest
