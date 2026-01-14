@@ -42,6 +42,7 @@ function createPingServer(): MCPToolServer {
         name: "ping",
         description: "Ping the runtime",
         inputSchema: { type: "object", properties: {}, required: [] },
+        annotations: { requiresConfirmation: true, readOnly: false },
       },
     ],
     callTool: async () => ({
@@ -69,5 +70,28 @@ describe("AgentOrchestrator task graph", () => {
     expect(nodes).toHaveLength(1);
     expect(nodes[0]?.type).toBe("tool_call");
     expect(nodes[0]?.status).toBe("completed");
+  });
+
+  it("attaches task node ids to confirmation requests", async () => {
+    const registry = createToolRegistry({ enforceQualifiedNames: false });
+    await registry.register(createPingServer());
+
+    const graph = createTaskGraphStore();
+    const orchestrator = createOrchestrator(new OneShotToolLLM(), registry, {
+      security: createSecurityPolicy("balanced"),
+      components: { taskGraph: graph },
+    });
+
+    let requestTaskNodeId: string | undefined;
+    orchestrator.setConfirmationHandler(async (request) => {
+      requestTaskNodeId = request.taskNodeId;
+      return false;
+    });
+
+    await orchestrator.run("Run ping with confirmation");
+
+    expect(requestTaskNodeId).toBeDefined();
+    const nodes = graph.listNodes();
+    expect(nodes[0]?.status).toBe("failed");
   });
 });

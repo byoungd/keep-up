@@ -5,8 +5,9 @@
 import { describe, expect, it } from "vitest";
 import { createCoworkToolExecutor } from "../cowork/factory";
 import type { CoworkSession } from "../cowork/types";
+import { createSecurityPolicy } from "../security";
 import { createToolRegistry } from "../tools/mcp/registry";
-import type { MCPToolServer } from "../types";
+import type { MCPToolServer, ToolContext } from "../types";
 
 function createFileServer(): MCPToolServer {
   return {
@@ -51,13 +52,19 @@ describe("Cowork factories", () => {
 
     const executor = createCoworkToolExecutor(registry, { session });
     const resolver = executor as unknown as {
-      requiresConfirmation: (call: { name: string; arguments: Record<string, unknown> }) => boolean;
+      requiresConfirmation: (
+        call: { name: string; arguments: Record<string, unknown> },
+        context: ToolContext
+      ) => boolean;
     };
 
-    const requiresConfirmation = resolver.requiresConfirmation({
-      name: "file:write",
-      arguments: { path: "/workspace/docs/readme.md" },
-    });
+    const requiresConfirmation = resolver.requiresConfirmation(
+      {
+        name: "file:write",
+        arguments: { path: "/workspace/docs/readme.md" },
+      },
+      { security: createSecurityPolicy("balanced") }
+    );
 
     expect(requiresConfirmation).toBe(true);
   });

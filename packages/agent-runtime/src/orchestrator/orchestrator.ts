@@ -775,6 +775,8 @@ export class AgentOrchestrator {
   }
 
   private handleDeniedToolCall(call: MCPToolCall, toolSpan?: SpanContext): void {
+    const taskNodeId = this.taskGraphToolCalls.get(call);
+    this.updateTaskGraphStatus(taskNodeId, "failed");
     this.addToolResult(call.name, {
       success: false,
       content: [{ type: "text", text: "User denied the operation" }],
@@ -801,7 +803,7 @@ export class AgentOrchestrator {
       });
     }
 
-    const context = this.createToolContext();
+    const context = this.createToolContext(call);
     let result = this.toolExecutor
       ? await this.toolExecutor.execute(call, context)
       : await this.registry.callTool(call, context);
@@ -853,7 +855,7 @@ export class AgentOrchestrator {
 
   private requiresConfirmation(call: MCPToolCall): boolean {
     if (this.toolExecutor && isToolConfirmationResolver(this.toolExecutor)) {
-      return this.toolExecutor.requiresConfirmation(call, this.createToolContext());
+      return this.toolExecutor.requiresConfirmation(call, this.createToolContext(call));
     }
 
     const tools = this.registry.listTools();
@@ -863,7 +865,7 @@ export class AgentOrchestrator {
 
   private getConfirmationDetails(call: MCPToolCall): { reason?: string; riskTags?: string[] } {
     if (this.toolExecutor && isToolConfirmationDetailsProvider(this.toolExecutor)) {
-      const details = this.toolExecutor.getConfirmationDetails(call, this.createToolContext());
+      const details = this.toolExecutor.getConfirmationDetails(call, this.createToolContext(call));
       return {
         reason: details.reason,
         riskTags: details.riskTags,
@@ -879,6 +881,7 @@ export class AgentOrchestrator {
       return false;
     }
 
+    const taskNodeId = this.ensureTaskGraphToolNode(call, "blocked");
     const confirmationDetails = this.getConfirmationDetails(call);
     const request: ConfirmationRequest = {
       toolName: call.name,
@@ -887,6 +890,7 @@ export class AgentOrchestrator {
       risk: this.assessRisk(call),
       reason: confirmationDetails.reason,
       riskTags: confirmationDetails.riskTags,
+      taskNodeId,
     };
 
     this.state.status = "waiting_confirmation";
@@ -923,11 +927,12 @@ export class AgentOrchestrator {
     this.recordMessage(toolMessage);
   }
 
-  private createToolContext(): ToolContext {
+  private createToolContext(call?: MCPToolCall): ToolContext {
     return {
       userId: undefined, // Set from session
       docId: undefined, // Set from context
       correlationId: this.currentRunId,
+      taskNodeId: call ? this.taskGraphToolCalls.get(call) : undefined,
       security: this.config.security,
       signal: this.abortController?.signal,
     };
@@ -1168,6 +1173,7 @@ export function createOrchestrator(
     createToolExecutor({
       registry,
       policy: options.toolExecution?.policy ?? createPermissionChecker(config.security),
+      policyEngine: options.toolExecution?.policyEngine,
       audit: options.toolExecution?.audit ?? createAuditLogger(),
       telemetry: options.toolExecution?.telemetry ?? options.telemetry,
       rateLimiter: options.toolExecution?.rateLimiter,

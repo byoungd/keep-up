@@ -9,9 +9,12 @@ import type {
   AuditEntry,
   AuditFilter,
   AuditLogger,
+  MCPTool,
+  MCPToolCall,
   ResourceLimits,
   SandboxConfig,
   SecurityPolicy,
+  ToolContext,
   ToolPermissions,
 } from "../types";
 import { SECURITY_PRESETS, type SecurityPreset } from "../types";
@@ -164,6 +167,58 @@ export class PermissionChecker implements IPermissionChecker {
         return { allowed: false, reason: "Unknown permission level" };
     }
   }
+}
+
+// ============================================================================
+// Tool Policy Engine
+// ============================================================================
+
+export interface ToolPolicyContext {
+  call: MCPToolCall;
+  tool: string;
+  operation: string;
+  resource?: string;
+  toolDefinition?: MCPTool;
+  context: ToolContext;
+  taskNodeId?: string;
+}
+
+export interface ToolPolicyDecision {
+  allowed: boolean;
+  requiresConfirmation: boolean;
+  reason?: string;
+  riskTags?: string[];
+}
+
+export interface ToolPolicyEngine {
+  evaluate(context: ToolPolicyContext): ToolPolicyDecision;
+}
+
+export class PermissionPolicyEngine implements ToolPolicyEngine {
+  private readonly checker: IPermissionChecker;
+
+  constructor(checker: IPermissionChecker) {
+    this.checker = checker;
+  }
+
+  evaluate(context: ToolPolicyContext): ToolPolicyDecision {
+    const result = this.checker.check({
+      tool: context.tool,
+      operation: context.operation,
+      resource: context.resource,
+    });
+
+    return {
+      allowed: result.allowed,
+      requiresConfirmation: result.requiresConfirmation ?? false,
+      reason: result.reason,
+      riskTags: result.riskTags,
+    };
+  }
+}
+
+export function createToolPolicyEngine(checker: IPermissionChecker): ToolPolicyEngine {
+  return new PermissionPolicyEngine(checker);
 }
 
 // ============================================================================

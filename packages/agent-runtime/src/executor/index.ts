@@ -4,7 +4,12 @@
  * Centralizes policy checks, auditing, rate limiting, caching, retry, and telemetry.
  */
 
-import type { IPermissionChecker, PermissionResult } from "../security";
+import {
+  type IPermissionChecker,
+  type ToolPolicyDecision,
+  type ToolPolicyEngine,
+  createToolPolicyEngine,
+} from "../security";
 import { AGENT_METRICS } from "../telemetry";
 import type { TelemetryContext } from "../telemetry";
 import type { IToolRegistry } from "../tools/mcp/registry";
@@ -43,6 +48,7 @@ export type CachePredicate = (tool: MCPTool | undefined, call: MCPToolCall) => b
 export interface ToolExecutorConfig {
   registry: IToolRegistry;
   policy: IPermissionChecker;
+  policyEngine?: ToolPolicyEngine;
   audit?: AuditLogger;
   telemetry?: TelemetryContext;
   rateLimiter?: ToolRateLimiter;
@@ -54,6 +60,7 @@ export interface ToolExecutorConfig {
 
 export interface ToolExecutionOptions {
   policy?: IPermissionChecker;
+  policyEngine?: ToolPolicyEngine;
   audit?: AuditLogger;
   telemetry?: TelemetryContext;
   rateLimiter?: ToolRateLimiter;
@@ -67,7 +74,7 @@ export class ToolExecutionPipeline
   implements ToolExecutor, ToolConfirmationResolver, ToolConfirmationDetailsProvider
 {
   private readonly registry: IToolRegistry;
-  private readonly policy: IPermissionChecker;
+  private readonly policyEngine: ToolPolicyEngine;
   private readonly audit?: AuditLogger;
   private readonly telemetry?: TelemetryContext;
   private readonly rateLimiter?: ToolRateLimiter;
@@ -79,7 +86,7 @@ export class ToolExecutionPipeline
 
   constructor(config: ToolExecutorConfig) {
     this.registry = config.registry;
-    this.policy = config.policy;
+    this.policyEngine = config.policyEngine ?? createToolPolicyEngine(config.policy);
     this.audit = config.audit;
     this.telemetry = config.telemetry;
     this.rateLimiter = config.rateLimiter;
@@ -95,13 +102,13 @@ export class ToolExecutionPipeline
     this.recordToolMetric(call.name, "started");
 
     const tool = this.resolveTool(call.name);
-    const policyResult = this.checkPolicy(call, tool, executionContext);
-    if (!policyResult.allowed) {
+    const policyDecision = this.evaluatePolicy(call, tool, executionContext);
+    if (!policyDecision.allowed) {
       const denied = this.createErrorResult(
         "PERMISSION_DENIED",
-        policyResult.reason ?? "Permission denied"
+        policyDecision.reason ?? "Permission denied"
       );
-      this.recordDenied(call, startTime, policyResult.reason);
+      this.recordDenied(call, startTime, policyDecision.reason);
       this.recordToolMetric(call.name, "error");
       this.auditResult(call, executionContext, denied);
       return denied;
@@ -152,32 +159,32 @@ export class ToolExecutionPipeline
     }
   }
 
-  requiresConfirmation(call: MCPToolCall, _context: ToolContext): boolean {
+  requiresConfirmation(call: MCPToolCall, context: ToolContext): boolean {
     const tool = this.resolveTool(call.name);
-    const policyResult = this.checkPolicyResult(call);
+    const policyDecision = this.evaluatePolicy(call, tool, context);
 
-    if (!policyResult.allowed) {
+    if (!policyDecision.allowed) {
       return false;
     }
 
-    if (policyResult.requiresConfirmation) {
+    if (policyDecision.requiresConfirmation) {
       return true;
     }
 
     return tool?.annotations?.requiresConfirmation ?? false;
   }
 
-  getConfirmationDetails(call: MCPToolCall, _context: ToolContext): ToolConfirmationDetails {
+  getConfirmationDetails(call: MCPToolCall, context: ToolContext): ToolConfirmationDetails {
     const tool = this.resolveTool(call.name);
-    const policyResult = this.checkPolicyResult(call);
+    const policyDecision = this.evaluatePolicy(call, tool, context);
     const requiresConfirmation =
-      policyResult.allowed &&
-      (policyResult.requiresConfirmation || tool?.annotations?.requiresConfirmation === true);
+      policyDecision.allowed &&
+      (policyDecision.requiresConfirmation || tool?.annotations?.requiresConfirmation === true);
 
     return {
       requiresConfirmation,
-      reason: policyResult.reason,
-      riskTags: policyResult.riskTags,
+      reason: policyDecision.reason,
+      riskTags: policyDecision.riskTags,
     };
   }
 
@@ -195,24 +202,23 @@ export class ToolExecutionPipeline
     return tool;
   }
 
-  private checkPolicy(
+  private evaluatePolicy(
     call: MCPToolCall,
-    _tool: MCPTool | undefined,
-    _context: ToolContext
-  ): { allowed: boolean; reason?: string } {
-    const result = this.checkPolicyResult(call);
-    if (!result.allowed) {
-      return { allowed: false, reason: result.reason };
-    }
-
-    return { allowed: true };
-  }
-
-  private checkPolicyResult(call: MCPToolCall): PermissionResult {
-    const { tool, operation } = this.parseToolName(call.name);
+    tool: MCPTool | undefined,
+    context: ToolContext
+  ): ToolPolicyDecision {
+    const { tool: toolName, operation } = this.parseToolName(call.name);
     const resource = this.extractResource(call);
 
-    return this.policy.check({ tool, operation, resource });
+    return this.policyEngine.evaluate({
+      call,
+      tool: toolName,
+      operation,
+      resource,
+      toolDefinition: tool,
+      context,
+      taskNodeId: context.taskNodeId,
+    });
   }
 
   private applyContextOverrides(context: ToolContext): ToolContext {

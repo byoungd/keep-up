@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 import { ToolExecutionPipeline } from "../executor";
-import { createPermissionChecker } from "../security";
+import { type ToolPolicyEngine, createPermissionChecker } from "../security";
 import { createToolRegistry } from "../tools/mcp/registry";
 import type { MCPToolServer, ToolContext } from "../types";
 import { SECURITY_PRESETS } from "../types";
@@ -69,5 +69,28 @@ describe("ToolExecutionPipeline requiresConfirmation", () => {
     expect(details.requiresConfirmation).toBe(true);
     expect(details.reason).toBe("cowork-policy");
     expect(details.riskTags).toEqual(["overwrite"]);
+  });
+
+  it("prefers policy engine decisions when provided", async () => {
+    const registry = createToolRegistry({ enforceQualifiedNames: false });
+    await registry.register(createFileServer());
+
+    const policy = createPermissionChecker({ ...SECURITY_PRESETS.balanced });
+    const policyEngine: ToolPolicyEngine = {
+      evaluate: () => ({
+        allowed: false,
+        requiresConfirmation: false,
+        reason: "blocked",
+      }),
+    };
+
+    const executor = new ToolExecutionPipeline({ registry, policy, policyEngine });
+    const result = await executor.execute(
+      { name: "file:write", arguments: { path: "/workspace/output.txt" } },
+      { security: { ...SECURITY_PRESETS.balanced } }
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error?.code).toBe("PERMISSION_DENIED");
   });
 });

@@ -120,6 +120,8 @@ export interface ToolContext {
   docId?: string;
   /** Correlation ID for tracing */
   correlationId?: string;
+  /** Task graph node ID for tool call tracking */
+  taskNodeId?: string;
   /** Security policy in effect */
   security: SecurityPolicy;
   /** Abort signal for cancellation */
@@ -391,6 +393,7 @@ export interface ConfirmationRequest {
   risk: "low" | "medium" | "high";
   reason?: string;
   riskTags?: string[];
+  taskNodeId?: string;
 }
 
 /** Confirmation handler callback */
