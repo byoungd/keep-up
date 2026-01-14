@@ -26,6 +26,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@keepup/core": "workspace:*",
     "@packages/ingest-rss": "workspace:^",
     "@packages/ingest-youtube": "workspace:^",
     "@keepup/lfcc-bridge": "workspace:*",

@@ -1,4 +1,5 @@
 import type { Doc } from "@keepup/core";
+import type { RetryOptions } from "./retry";
 
 export interface RSSIngestOptions {
   /**
@@ -11,6 +12,11 @@ export interface RSSIngestOptions {
    * User agent string to use for fetching.
    */
   userAgent?: string;
+
+  /**
+   * Retry policy for feed fetches.
+   */
+  retry?: RetryOptions;
 }
 
 export interface RSSItem {

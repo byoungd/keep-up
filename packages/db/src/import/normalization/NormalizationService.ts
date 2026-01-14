@@ -16,60 +16,64 @@ import { type Token, type Tokens, lexer } from "marked";
 import type { IngestResult } from "../types";
 import type { ContentResult } from "./types";
 
+export function normalizeIngestResult(result: IngestResult): ContentResult {
+  // 1. Create Loro document
+  const doc = new LoroDoc();
+
+  // 2. Populate content as paragraph blocks
+  const text = result.contentMarkdown ?? result.contentHtml ?? "";
+  const blocks = contentToBlocks(doc, text);
+  if (blocks.length === 0) {
+    blocks.push({
+      id: nextBlockId(doc),
+      type: "paragraph",
+      attrs: serializeAttrs({}),
+      text: "",
+      children: [],
+    });
+  }
+  writeBlockTree(doc, blocks);
+
+  // 3. Store metadata in the Loro meta map
+  const metadata = getMetaMap(doc);
+  if (result.author) {
+    metadata.set("author", result.author);
+  }
+  if (result.publishedAt) {
+    metadata.set("publishedAt", result.publishedAt);
+  }
+  if (result.canonicalUrl) {
+    metadata.set("sourceUrl", result.canonicalUrl);
+  }
+  metadata.set("title", result.title);
+  metadata.set("importedAt", Date.now());
+
+  // 4. Encode state as snapshot bytes
+  const crdtUpdate = doc.export({ mode: "snapshot" });
+
+  // 5. Prepare text content for search (strip markdown/html tags ideally)
+  // For this MVP, we just use the raw text
+  const textContent = text;
+
+  return {
+    title: result.title,
+    textContent,
+    crdtUpdate,
+    metadata: {
+      author: result.author,
+      publishedAt: result.publishedAt,
+      sourceUrl: result.canonicalUrl,
+      ...result.rawMetadata,
+    },
+  };
+}
+
 export class NormalizationService {
   /**
    * Normalize ingested content into a storage-ready result.
    */
   public normalize(result: IngestResult): ContentResult {
-    // 1. Create Loro document
-    const doc = new LoroDoc();
-
-    // 2. Populate content as paragraph blocks
-    const text = result.contentMarkdown ?? result.contentHtml ?? "";
-    const blocks = contentToBlocks(doc, text);
-    if (blocks.length === 0) {
-      blocks.push({
-        id: nextBlockId(doc),
-        type: "paragraph",
-        attrs: serializeAttrs({}),
-        text: "",
-        children: [],
-      });
-    }
-    writeBlockTree(doc, blocks);
-
-    // 3. Store metadata in the Loro meta map
-    const metadata = getMetaMap(doc);
-    if (result.author) {
-      metadata.set("author", result.author);
-    }
-    if (result.publishedAt) {
-      metadata.set("publishedAt", result.publishedAt);
-    }
-    if (result.canonicalUrl) {
-      metadata.set("sourceUrl", result.canonicalUrl);
-    }
-    metadata.set("title", result.title);
-    metadata.set("importedAt", Date.now());
-
-    // 4. Encode state as snapshot bytes
-    const crdtUpdate = doc.export({ mode: "snapshot" });
-
-    // 5. Prepare text content for search (strip markdown/html tags ideally)
-    // For this MVP, we just use the raw text
-    const textContent = text;
-
-    return {
-      title: result.title,
-      textContent,
-      crdtUpdate,
-      metadata: {
-        author: result.author,
-        publishedAt: result.publishedAt,
-        sourceUrl: result.canonicalUrl,
-        ...result.rawMetadata,
-      },
-    };
+    return normalizeIngestResult(result);
   }
 }
 

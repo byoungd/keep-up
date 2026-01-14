@@ -119,5 +119,50 @@ describe("Ingestors", () => {
       expect(onProgress).toHaveBeenCalledWith(100);
       expect(mockFetch).toHaveBeenCalledWith("https://example.com/article", expect.any(Object));
     });
+
+    it("retries RSS content fetches", async () => {
+      vi.useFakeTimers();
+      const mockDb = {} as DbDriver;
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 500,
+          statusText: "Server Error",
+          headers: { get: () => null },
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          statusText: "OK",
+          headers: { get: () => "text/html" },
+          arrayBuffer: async () =>
+            new TextEncoder().encode(
+              "<html><head><title>Retry</title></head><body>OK</body></html>"
+            ).buffer,
+        });
+      const originalFetch = global.fetch;
+      global.fetch = mockFetch;
+
+      try {
+        const ingestor = createRssIngestor({
+          db: mockDb,
+          storeAsset: false,
+          retryOptions: { maxRetries: 1, initialDelay: 10, maxDelay: 10, backoffFactor: 1 },
+        });
+        const onProgress = vi.fn();
+        const sourceRef = createRssSourceRef("item-789", "feed-456", "https://example.com/retry");
+
+        const promise = ingestor(sourceRef, onProgress);
+        await vi.runAllTimersAsync();
+        const result = await promise;
+
+        expect(result.title).toBe("Retry");
+        expect(mockFetch).toHaveBeenCalledTimes(2);
+      } finally {
+        vi.useRealTimers();
+        global.fetch = originalFetch;
+      }
+    });
   });
 });

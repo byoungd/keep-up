@@ -37,7 +37,8 @@ export type LogCategory =
   | "gateway"
   | "persistence"
   | "presence"
-  | "undo";
+  | "undo"
+  | "ingest";
 
 /** Structured log entry */
 export type LogEntry = {

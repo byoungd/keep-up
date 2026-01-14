@@ -4,6 +4,7 @@
  * Imports content from RSS items by fetching their linked content.
  */
 
+import { type RetryOptions, withRetry } from "@packages/ingest-rss";
 import type { DbDriver } from "../../driver/types";
 import { computeHash, getAssetStore } from "../AssetStore";
 import type { IngestResult, IngestorFn } from "../types";
@@ -31,7 +32,16 @@ export interface RssIngestorConfig {
   timeoutMs?: number;
   /** Whether to store raw content in AssetStore (default: true) */
   storeAsset?: boolean;
+  /** Retry policy for content fetches */
+  retryOptions?: RetryOptions;
 }
+
+const DEFAULT_RSS_ITEM_RETRY: RetryOptions = {
+  maxRetries: 2,
+  initialDelay: 1200,
+  maxDelay: 6000,
+  backoffFactor: 2,
+};
 
 /**
  * Parse RSS sourceRef into components
@@ -53,6 +63,21 @@ function parseRssSourceRef(sourceRef: string): {
   };
 }
 
+function parseRetryAfter(header: string | null): number | undefined {
+  if (!header) {
+    return undefined;
+  }
+  const seconds = Number(header);
+  if (!Number.isNaN(seconds)) {
+    return Math.max(0, seconds * 1000);
+  }
+  const dateMs = Date.parse(header);
+  if (!Number.isNaN(dateMs)) {
+    return Math.max(0, dateMs - Date.now());
+  }
+  return undefined;
+}
+
 /**
  * Create an RSS ingestor function.
  * sourceRef format: rss:<itemGuid>:<feedId>:<contentUrl>
@@ -60,6 +85,14 @@ function parseRssSourceRef(sourceRef: string): {
 export function createRssIngestor(config: RssIngestorConfig): IngestorFn {
   const timeoutMs = config.timeoutMs ?? 30000;
   const storeAsset = config.storeAsset ?? true;
+  const { onRetry, ...retryOverrides } = config.retryOptions ?? {};
+  const retryPolicy: RetryOptions = {
+    ...DEFAULT_RSS_ITEM_RETRY,
+    ...retryOverrides,
+    onRetry: (attempt, error, delay) => {
+      onRetry?.(attempt, error, delay);
+    },
+  };
 
   return async (sourceRef: string, onProgress): Promise<IngestResult> => {
     onProgress(10);
@@ -68,32 +101,48 @@ export function createRssIngestor(config: RssIngestorConfig): IngestorFn {
 
     onProgress(20);
 
-    // Fetch content from the URL
+    // Fetch content from the URL with retry policy
     let response: Response;
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+      response = await withRetry(async () => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+          let nextResponse: Response;
+          if (config.fetchProxyUrl) {
+            nextResponse = await fetch(config.fetchProxyUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ url: contentUrl }),
+              signal: controller.signal,
+            });
+          } else {
+            nextResponse = await fetch(contentUrl, { signal: controller.signal });
+          }
 
-      if (config.fetchProxyUrl) {
-        response = await fetch(config.fetchProxyUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url: contentUrl }),
-          signal: controller.signal,
-        });
-      } else {
-        response = await fetch(contentUrl, { signal: controller.signal });
-      }
+          if (!nextResponse.ok) {
+            const retryAfterMs = parseRetryAfter(nextResponse.headers.get("Retry-After"));
+            const error = new Error(`HTTP ${nextResponse.status}: ${nextResponse.statusText}`);
+            const errorWithMeta = error as Error & {
+              status?: number;
+              retryAfterMs?: number;
+            };
+            errorWithMeta.status = nextResponse.status;
+            if (retryAfterMs !== undefined) {
+              errorWithMeta.retryAfterMs = retryAfterMs;
+            }
+            throw error;
+          }
 
-      clearTimeout(timeoutId);
+          return nextResponse;
+        } finally {
+          clearTimeout(timeoutId);
+        }
+      }, retryPolicy);
     } catch (err) {
       throw new Error(
         `Failed to fetch RSS content: ${err instanceof Error ? err.message : String(err)}`
       );
-    }
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
     onProgress(50);

@@ -5,6 +5,7 @@
  * Works with the worker-based SQLite driver.
  */
 
+import type { RetryOptions } from "@packages/ingest-rss";
 import type { DbDriver, FeedItemRow } from "../driver/types";
 import type { FeedProvider, RssFeedSubscription, RssItemInfo } from "./RssPollingScheduler";
 
@@ -23,6 +24,8 @@ export interface SqliteFeedProviderConfig {
   defaultPollIntervalMs?: number;
   /** Timeout for feed fetches in milliseconds */
   fetchTimeoutMs?: number;
+  /** Retry policy for feed fetches */
+  fetchRetryOptions?: RetryOptions;
 }
 
 /**
@@ -45,12 +48,14 @@ export class SqliteFeedProvider implements FeedProvider {
   private proxyUrl?: string;
   private defaultPollIntervalMs: number;
   private fetchTimeoutMs: number;
+  private fetchRetryOptions?: RetryOptions;
 
   constructor(config: SqliteFeedProviderConfig) {
     this.db = config.db;
     this.proxyUrl = config.proxyUrl;
     this.defaultPollIntervalMs = config.defaultPollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
     this.fetchTimeoutMs = config.fetchTimeoutMs ?? 30000;
+    this.fetchRetryOptions = config.fetchRetryOptions;
   }
 
   /**
@@ -76,11 +81,12 @@ export class SqliteFeedProvider implements FeedProvider {
     const { RSSIngestor } = await import("@packages/ingest-rss");
 
     const ingestor = new RSSIngestor();
-    const result = await ingestor.fetchFeedEnhanced(
+    const result = await ingestor.fetchFeedItems(
       { url: feedUrl },
       {
         timeout: this.fetchTimeoutMs,
         proxyUrl: this.proxyUrl,
+        retry: this.fetchRetryOptions,
       }
     );
 
@@ -90,10 +96,10 @@ export class SqliteFeedProvider implements FeedProvider {
     }
 
     return result.items.map((item) => ({
-      guid: item.raw.guid || item.raw.link || `${feedUrl}-${Date.now()}`,
-      title: item.raw.title || "Untitled",
-      link: item.raw.link || feedUrl,
-      pubDate: item.raw.pubDate ? new Date(item.raw.pubDate).getTime() : null,
+      guid: item.guid || item.link || `${feedUrl}-${Date.now()}`,
+      title: item.title || "Untitled",
+      link: item.link || feedUrl,
+      pubDate: item.pubDate ? new Date(item.pubDate).getTime() : null,
     }));
   }
 

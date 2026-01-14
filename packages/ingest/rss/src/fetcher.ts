@@ -1,3 +1,4 @@
+import { observability } from "@keepup/core";
 import { type RetryOptions, withRetry } from "./retry";
 import type { FeedSource, RSSIngestOptions } from "./types";
 
@@ -8,6 +9,34 @@ const DEFAULT_RETRY_OPTIONS: RetryOptions = {
   maxDelay: 6000,
   backoffFactor: 2,
 };
+
+const logger = observability.getLogger();
+
+function toError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+function buildRetryOptions(
+  options: RetryOptions | undefined,
+  context: Record<string, unknown>
+): RetryOptions {
+  const merged: RetryOptions = { ...DEFAULT_RETRY_OPTIONS, ...options };
+  const originalOnRetry = options?.onRetry;
+
+  return {
+    ...merged,
+    onRetry: (attempt, error, delay) => {
+      originalOnRetry?.(attempt, error, delay);
+      const err = toError(error);
+      logger.warn("ingest", "RSS fetch retry scheduled", {
+        ...context,
+        attempt,
+        delayMs: delay,
+        error: err.message,
+      });
+    },
+  };
+}
 
 function parseRetryAfter(header: string | null): number | undefined {
   if (!header) {
@@ -187,11 +216,14 @@ export class RSSFetcher {
       }
     };
 
-    if (options.retry) {
-      return withRetry(fetchFn, options.retry);
-    }
-
-    return withRetry(fetchFn, DEFAULT_RETRY_OPTIONS);
+    return withRetry(
+      fetchFn,
+      buildRetryOptions(options.retry, {
+        stage: "fetch",
+        sourceUrl: source.url,
+        viaProxy: Boolean(options.proxyUrl),
+      })
+    );
   }
 
   private static buildHeaders(

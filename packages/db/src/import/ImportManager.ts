@@ -4,8 +4,9 @@
  * Coordinates import jobs with queue management, concurrency control, and retry logic.
  */
 
+import { observability } from "@keepup/core";
 import type { DbDriver, ImportJobRow, ImportJobStatus, ImportSourceType } from "../driver/types";
-import { NormalizationService } from "./normalization";
+import { normalizeIngestResult } from "./normalization";
 import type { ContentResult } from "./normalization/types";
 import type {
   CreateImportJobInput,
@@ -14,6 +15,29 @@ import type {
   IngestResult,
   IngestorFn,
 } from "./types";
+
+const logger = observability.getLogger();
+
+type IngestStage = "fetch" | "normalize" | "save";
+type StageStatus = "start" | "success" | "failure";
+
+function toError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+function logIngestStage(
+  stage: IngestStage,
+  status: StageStatus,
+  data: Record<string, unknown>,
+  error?: Error
+): void {
+  const message = `Import ${stage} ${status}`;
+  if (status === "failure") {
+    logger.error("ingest", message, error, data);
+    return;
+  }
+  logger.info("ingest", message, data);
+}
 
 /** Generate a unique job ID */
 function generateJobId(): string {
@@ -317,6 +341,12 @@ export class ImportManager {
       return;
     }
 
+    const logContext = {
+      jobId,
+      sourceType: job.sourceType,
+      sourceRef: job.sourceRef,
+    };
+
     try {
       // Update status to ingesting
       await this.updateStatus(jobId, "ingesting");
@@ -331,7 +361,25 @@ export class ImportManager {
         this.emit("onJobProgress", jobId, progress);
       };
 
-      const result = await ingestor(job.sourceRef, onProgress);
+      logIngestStage("fetch", "start", { ...logContext, stage: "fetch" });
+      const ingestStart = Date.now();
+      let result: IngestResult;
+      try {
+        result = await ingestor(job.sourceRef, onProgress);
+      } catch (error) {
+        logIngestStage(
+          "fetch",
+          "failure",
+          { ...logContext, stage: "fetch", durationMs: Date.now() - ingestStart },
+          toError(error)
+        );
+        throw error;
+      }
+      logIngestStage("fetch", "success", {
+        ...logContext,
+        stage: "fetch",
+        durationMs: Date.now() - ingestStart,
+      });
 
       // Check for cancellation after ingest
       if (this.isCancelled(jobId)) {
@@ -342,7 +390,7 @@ export class ImportManager {
       await this.updateStatus(jobId, "normalizing");
 
       // Store result
-      const documentId = await this.storeResult(job, result);
+      const documentId = await this.storeResult(job, result, logContext);
 
       // Check for cancellation after store
       if (this.isCancelled(jobId)) {
@@ -409,36 +457,78 @@ export class ImportManager {
   /**
    * Store ingested content as a document.
    */
-  private async storeResult(job: ImportJobRow, result: IngestResult): Promise<string> {
-    const normalizer = new NormalizationService();
-    const contentResult = normalizer.normalize(result);
+  private async storeResult(
+    job: ImportJobRow,
+    result: IngestResult,
+    logContext: Record<string, unknown>
+  ): Promise<string> {
+    const normalizeContext = { ...logContext, stage: "normalize" };
+    logIngestStage("normalize", "start", normalizeContext);
+    const normalizeStart = Date.now();
+    let contentResult: ContentResult;
+    try {
+      contentResult = normalizeIngestResult(result);
+    } catch (error) {
+      logIngestStage(
+        "normalize",
+        "failure",
+        { ...normalizeContext, durationMs: Date.now() - normalizeStart },
+        toError(error)
+      );
+      throw error;
+    }
+    logIngestStage("normalize", "success", {
+      ...normalizeContext,
+      durationMs: Date.now() - normalizeStart,
+      title: contentResult.title,
+    });
+
+    const saveContext = { ...logContext, stage: "save" };
+    logIngestStage("save", "start", saveContext);
+    const saveStart = Date.now();
     const docId = await deriveImportDocumentId(job, contentResult);
 
-    await this.db.transaction(async (tx) => {
-      // 1. Create document metadata
-      await tx.upsertDocument({
-        docId,
-        title: contentResult.title,
-        activePolicyId: null,
-        headFrontier: null, // Initial frontier will be computed by client or sync
-        savedAt: null,
+    try {
+      await this.db.transaction(async (tx) => {
+        // 1. Create document metadata
+        await tx.upsertDocument({
+          docId,
+          title: contentResult.title,
+          activePolicyId: null,
+          headFrontier: null, // Initial frontier will be computed by client or sync
+          savedAt: null,
+        });
+
+        // 2. Append CRDT update
+        // We use a generated actor ID for the import process
+        const actorId = `import_${job.jobId.slice(-8)}`;
+
+        await tx.appendUpdate({
+          docId,
+          actorId,
+          seq: 1, // Initial sequence number
+          lamport: 1,
+          update: contentResult.crdtUpdate,
+          receivedAt: Date.now(),
+          source: "local", // It is a local import
+        });
+
+        // 3. Store any annotations (optional - if ingestor provided them, though currently it doesn't)
       });
+    } catch (error) {
+      logIngestStage(
+        "save",
+        "failure",
+        { ...saveContext, durationMs: Date.now() - saveStart },
+        toError(error)
+      );
+      throw error;
+    }
 
-      // 2. Append CRDT update
-      // We use a generated actor ID for the import process
-      const actorId = `import_${job.jobId.slice(-8)}`;
-
-      await tx.appendUpdate({
-        docId,
-        actorId,
-        seq: 1, // Initial sequence number
-        lamport: 1,
-        update: contentResult.crdtUpdate,
-        receivedAt: Date.now(),
-        source: "local", // It is a local import
-      });
-
-      // 3. Store any annotations (optional - if ingestor provided them, though currently it doesn't)
+    logIngestStage("save", "success", {
+      ...saveContext,
+      durationMs: Date.now() - saveStart,
+      docId,
     });
 
     return docId;

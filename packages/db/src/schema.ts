@@ -153,6 +153,7 @@ CREATE TABLE IF NOT EXISTS feed_items (
 );
 CREATE INDEX IF NOT EXISTS idx_feed_items_subscription ON feed_items (subscription_id, published_at DESC);
 CREATE INDEX IF NOT EXISTS idx_feed_items_read_state ON feed_items (read_state, published_at DESC);
+CREATE INDEX IF NOT EXISTS idx_feed_items_read_state_subscription ON feed_items (read_state, subscription_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_feed_items_guid ON feed_items (subscription_id, guid);
 
 -- Import Jobs (for content import pipeline)
@@ -654,6 +655,14 @@ async function migrateV10ToV11(execSql: ExecSql): Promise<void> {
   await execSql("PRAGMA user_version = 11;");
 }
 
+async function migrateV11ToV12(execSql: ExecSql): Promise<void> {
+  await execSql(`
+    CREATE INDEX IF NOT EXISTS idx_feed_items_read_state_subscription
+      ON feed_items (read_state, subscription_id);
+  `);
+  await execSql("PRAGMA user_version = 12;");
+}
+
 // Migration registry: version → migration function
 const MIGRATIONS: Array<{ from: number; to: number; fn: (exec: ExecSql) => Promise<void> }> = [
   { from: 1, to: 2, fn: migrateV1ToV2 },
@@ -666,6 +675,7 @@ const MIGRATIONS: Array<{ from: number; to: number; fn: (exec: ExecSql) => Promi
   { from: 8, to: 9, fn: migrateV8ToV9 },
   { from: 9, to: 10, fn: migrateV9ToV10 },
   { from: 10, to: 11, fn: migrateV10ToV11 },
+  { from: 11, to: 12, fn: migrateV11ToV12 },
 ];
 
 /**
@@ -689,4 +699,4 @@ export async function runMigrations(currentVersion: number, execSql: ExecSql): P
   }
 }
 
-export const CURRENT_SCHEMA_VERSION = 11;
+export const CURRENT_SCHEMA_VERSION = 12;

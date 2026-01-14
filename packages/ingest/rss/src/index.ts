@@ -1,5 +1,6 @@
-import { dedupeRssItems } from "./deduper";
-import { RSSFetcher } from "./fetcher";
+import { observability } from "@keepup/core";
+import { type DuplicateEntry, dedupeRssItems, dedupeRssItemsByStableId } from "./deduper";
+import { type FetchResult, RSSFetcher } from "./fetcher";
 import type { RSSIngestReport } from "./ingestReport";
 import { RSSMapper } from "./mapper";
 import { RSSNormalizer } from "./normalizer";
@@ -48,7 +49,43 @@ export interface EnhancedIngestResult {
   modified: boolean;
 }
 
+export interface FeedItemsFetchResult {
+  items: RSSItem[];
+  duplicates: DuplicateEntry[];
+  /** ETag for conditional requests */
+  etag?: string;
+  /** Last-Modified for conditional requests */
+  lastModified?: string;
+  /** Whether feed was modified since last fetch */
+  modified: boolean;
+  /** Fetch duration in milliseconds */
+  durationMs?: number;
+}
+
 const FULL_TEXT_CONCURRENCY = 3;
+
+const logger = observability.getLogger();
+
+type IngestStage = "fetch" | "parse" | "normalize";
+type StageStatus = "start" | "success" | "failure";
+
+function toError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+function logStage(
+  stage: IngestStage,
+  status: StageStatus,
+  data: Record<string, unknown>,
+  error?: Error
+): void {
+  const message = `RSS ingest ${stage} ${status}`;
+  if (status === "failure") {
+    logger.error("ingest", message, error, data);
+    return;
+  }
+  logger.info("ingest", message, data);
+}
 
 function getItemContent(item: RSSItem): string {
   return item["content:encoded"] || item.content || item.description || "";
@@ -146,6 +183,62 @@ export class RSSIngestor {
     this.parser = new RSSParser();
   }
 
+  private async fetchAndParse(
+    source: FeedSource,
+    options: EnhancedIngestOptions = {}
+  ): Promise<{ fetchResult: FetchResult; items: RSSItem[] }> {
+    const { proxyUrl, ...fetchOptions } = options;
+    const fetchContext = { stage: "fetch", sourceUrl: source.url };
+
+    logStage("fetch", "start", fetchContext);
+    const fetchStart = Date.now();
+    let fetchResult: FetchResult;
+    try {
+      fetchResult = await RSSFetcher.fetchWithConditional(source, {
+        ...fetchOptions,
+        proxyUrl,
+      });
+    } catch (error) {
+      logStage(
+        "fetch",
+        "failure",
+        { ...fetchContext, durationMs: Date.now() - fetchStart },
+        toError(error)
+      );
+      throw error;
+    }
+    logStage("fetch", "success", {
+      ...fetchContext,
+      durationMs: Date.now() - fetchStart,
+      modified: fetchResult.modified,
+    });
+
+    if (!fetchResult.modified) {
+      return { fetchResult, items: [] };
+    }
+
+    const parseContext = { stage: "parse", sourceUrl: source.url };
+    logStage("parse", "start", parseContext);
+    const parseStart = Date.now();
+    try {
+      const items = await this.parser.parse(fetchResult.content);
+      logStage("parse", "success", {
+        ...parseContext,
+        durationMs: Date.now() - parseStart,
+        itemCount: items.length,
+      });
+      return { fetchResult, items };
+    } catch (error) {
+      logStage(
+        "parse",
+        "failure",
+        { ...parseContext, durationMs: Date.now() - parseStart },
+        toError(error)
+      );
+      throw error;
+    }
+  }
+
   /**
    * Fetches and parses a feed, returning normalized items (Doc + Blocks).
    *
@@ -153,10 +246,68 @@ export class RSSIngestor {
    * Direct Doc/Block creation bypasses atomic ingestion guarantees.
    */
   async fetchFeed(source: FeedSource, options: RSSIngestOptions = {}): Promise<IngestResult[]> {
-    const xml = await RSSFetcher.fetch(source, options);
-    const items = await this.parser.parse(xml);
+    const fetchContext = { stage: "fetch", sourceUrl: source.url };
+    logStage("fetch", "start", fetchContext);
+    const fetchStart = Date.now();
+    let xml: string;
+    try {
+      xml = await RSSFetcher.fetch(source, options);
+    } catch (error) {
+      logStage(
+        "fetch",
+        "failure",
+        { ...fetchContext, durationMs: Date.now() - fetchStart },
+        toError(error)
+      );
+      throw error;
+    }
+    logStage("fetch", "success", {
+      ...fetchContext,
+      durationMs: Date.now() - fetchStart,
+      modified: true,
+    });
 
-    return items.map((item) => RSSMapper.mapItemToDoc(item, source));
+    const parseContext = { stage: "parse", sourceUrl: source.url };
+    logStage("parse", "start", parseContext);
+    const parseStart = Date.now();
+    let items: RSSItem[];
+    try {
+      items = await this.parser.parse(xml);
+    } catch (error) {
+      logStage(
+        "parse",
+        "failure",
+        { ...parseContext, durationMs: Date.now() - parseStart },
+        toError(error)
+      );
+      throw error;
+    }
+    logStage("parse", "success", {
+      ...parseContext,
+      durationMs: Date.now() - parseStart,
+      itemCount: items.length,
+    });
+
+    const normalizeContext = { stage: "normalize", sourceUrl: source.url };
+    logStage("normalize", "start", normalizeContext);
+    const normalizeStart = Date.now();
+    try {
+      const results = items.map((item) => RSSMapper.mapItemToDoc(item, source));
+      logStage("normalize", "success", {
+        ...normalizeContext,
+        durationMs: Date.now() - normalizeStart,
+        itemCount: results.length,
+      });
+      return results;
+    } catch (error) {
+      logStage(
+        "normalize",
+        "failure",
+        { ...normalizeContext, durationMs: Date.now() - normalizeStart },
+        toError(error)
+      );
+      throw error;
+    }
   }
 
   /**
@@ -177,13 +328,11 @@ export class RSSIngestor {
       ...fetchOptions
     } = options;
 
-    // Fetch with conditional request support (pass proxyUrl for CORS bypass)
-    const fetchResult = await RSSFetcher.fetchWithConditional(source, {
+    const { fetchResult, items } = await this.fetchAndParse(source, {
       ...fetchOptions,
       proxyUrl,
     });
 
-    // If not modified, return empty result with cache headers
     if (!fetchResult.modified) {
       return {
         items: [],
@@ -193,8 +342,6 @@ export class RSSIngestor {
       };
     }
 
-    // Parse the feed
-    const items = await this.parser.parse(fetchResult.content);
     if (shouldFetch) {
       await hydrateItemsWithFullText(
         items,
@@ -203,13 +350,85 @@ export class RSSIngestor {
         proxyUrl
       );
     }
-    const results = items.map((item) => RSSMapper.mapItemToDoc(item, source));
+
+    const normalizeContext = { stage: "normalize", sourceUrl: source.url };
+    logStage("normalize", "start", normalizeContext);
+    const normalizeStart = Date.now();
+    let results: IngestResult[];
+    try {
+      results = items.map((item) => RSSMapper.mapItemToDoc(item, source));
+    } catch (error) {
+      logStage(
+        "normalize",
+        "failure",
+        { ...normalizeContext, durationMs: Date.now() - normalizeStart },
+        toError(error)
+      );
+      throw error;
+    }
+    logStage("normalize", "success", {
+      ...normalizeContext,
+      durationMs: Date.now() - normalizeStart,
+      itemCount: results.length,
+    });
 
     return {
       items: results,
       etag: fetchResult.etag,
       lastModified: fetchResult.lastModified,
       modified: true,
+    };
+  }
+
+  /**
+   * Fetch feed and return raw RSS items with fast dedupe.
+   */
+  async fetchFeedItems(
+    source: FeedSource,
+    options: EnhancedIngestOptions & { dedupe?: boolean } = {}
+  ): Promise<FeedItemsFetchResult> {
+    const {
+      fetchFullText: shouldFetch,
+      snippetThreshold = 500,
+      proxyUrl,
+      dedupe = true,
+      ...fetchOptions
+    } = options;
+
+    const { fetchResult, items } = await this.fetchAndParse(source, {
+      ...fetchOptions,
+      proxyUrl,
+    });
+
+    if (!fetchResult.modified) {
+      return {
+        items: [],
+        duplicates: [],
+        etag: fetchResult.etag,
+        lastModified: fetchResult.lastModified,
+        modified: false,
+        durationMs: fetchResult.durationMs,
+      };
+    }
+
+    const dedupeResult = dedupe ? dedupeRssItemsByStableId(items) : { items, duplicates: [] };
+
+    if (shouldFetch) {
+      await hydrateItemsWithFullText(
+        dedupeResult.items,
+        snippetThreshold,
+        fetchOptions.timeout ?? 15000,
+        proxyUrl
+      );
+    }
+
+    return {
+      items: dedupeResult.items,
+      duplicates: dedupeResult.duplicates,
+      etag: fetchResult.etag,
+      lastModified: fetchResult.lastModified,
+      modified: true,
+      durationMs: fetchResult.durationMs,
     };
   }
 
@@ -227,9 +446,32 @@ export class RSSIngestor {
    */
   async fetchFeedForIngestion(source: FeedSource, options: RSSIngestOptions = {}) {
     const { RSSAtomicAdapter } = await import("./atomicAdapter");
-    const xml = await RSSFetcher.fetch(source, options);
-    const items = await this.parser.parse(xml);
-    return RSSAtomicAdapter.toIngestionMetaBatch(items, source);
+    const { fetchResult, items } = await this.fetchAndParse(source, options);
+
+    if (!fetchResult.modified) {
+      return [];
+    }
+
+    const normalizeContext = { stage: "normalize", sourceUrl: source.url };
+    logStage("normalize", "start", normalizeContext);
+    const normalizeStart = Date.now();
+    try {
+      const metas = RSSAtomicAdapter.toIngestionMetaBatch(items, source);
+      logStage("normalize", "success", {
+        ...normalizeContext,
+        durationMs: Date.now() - normalizeStart,
+        itemCount: metas.length,
+      });
+      return metas;
+    } catch (error) {
+      logStage(
+        "normalize",
+        "failure",
+        { ...normalizeContext, durationMs: Date.now() - normalizeStart },
+        toError(error)
+      );
+      throw error;
+    }
   }
 
   /**
@@ -240,9 +482,17 @@ export class RSSIngestor {
     options: EnhancedIngestOptions & { dedupe?: boolean } = {}
   ): Promise<RSSIngestReport> {
     const { RSSAtomicAdapter } = await import("./atomicAdapter");
-    const { dedupe = true, ...rest } = options;
-
-    const fetchResult = await RSSFetcher.fetchWithConditional(source, rest);
+    const {
+      dedupe = true,
+      fetchFullText,
+      snippetThreshold = 500,
+      proxyUrl,
+      ...fetchOptions
+    } = options;
+    const { fetchResult, items } = await this.fetchAndParse(source, {
+      ...fetchOptions,
+      proxyUrl,
+    });
 
     if (!fetchResult.modified) {
       const emptyStats = computeRssStatsFromItems([]);
@@ -264,18 +514,38 @@ export class RSSIngestor {
       };
     }
 
-    const items = await this.parser.parse(fetchResult.content);
-    if (rest.fetchFullText) {
+    if (fetchFullText) {
       await hydrateItemsWithFullText(
         items,
-        rest.snippetThreshold ?? 500,
-        rest.timeout ?? 15000,
-        rest.proxyUrl
+        snippetThreshold,
+        fetchOptions.timeout ?? 15000,
+        proxyUrl
       );
     }
     const dedupeResult = dedupe ? dedupeRssItems(items) : { items, duplicates: [] };
-    const mappedItems = dedupeResult.items.map((item) => RSSMapper.mapItemToDoc(item, source));
-    const metas = RSSAtomicAdapter.toIngestionMetaBatch(dedupeResult.items, source);
+    const normalizeContext = { stage: "normalize", sourceUrl: source.url };
+    logStage("normalize", "start", normalizeContext);
+    const normalizeStart = Date.now();
+    let mappedItems: IngestResult[];
+    let metas: ReturnType<typeof RSSAtomicAdapter.toIngestionMetaBatch>;
+    try {
+      mappedItems = dedupeResult.items.map((item) => RSSMapper.mapItemToDoc(item, source));
+      metas = RSSAtomicAdapter.toIngestionMetaBatch(dedupeResult.items, source);
+    } catch (error) {
+      logStage(
+        "normalize",
+        "failure",
+        { ...normalizeContext, durationMs: Date.now() - normalizeStart },
+        toError(error)
+      );
+      throw error;
+    }
+    logStage("normalize", "success", {
+      ...normalizeContext,
+      durationMs: Date.now() - normalizeStart,
+      itemCount: mappedItems.length,
+      dedupedCount: dedupeResult.items.length,
+    });
     const rawStats = computeRssStatsFromItems(items);
     const dedupedStats = computeRssStatsFromItems(dedupeResult.items);
 

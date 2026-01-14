@@ -5,6 +5,7 @@
  * Uses the ImportManager to process new RSS items.
  */
 
+import { observability } from "@keepup/core";
 import type { DbDriver } from "../driver/types";
 import type { ImportManager } from "./ImportManager";
 import { createRssSourceRef } from "./ingestors/rssIngestor";
@@ -44,6 +45,8 @@ export interface FeedProvider {
   isItemImported(feedId: string, itemGuid: string): Promise<boolean>;
   /** Mark an item as imported */
   markItemImported(feedId: string, itemGuid: string, jobId: string): Promise<void>;
+  /** Mark a feed as errored */
+  markFeedError(feedId: string, errorMessage: string): Promise<void>;
 }
 
 /**
@@ -77,6 +80,8 @@ export class RssPollingScheduler {
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
   private isRunning = false;
   private isPaused = false;
+
+  private readonly logger = observability.getLogger();
 
   constructor(config: RssPollingSchedulerConfig) {
     this.db = config.db;
@@ -180,8 +185,6 @@ export class RssPollingScheduler {
       for (const result of results) {
         if (result.status === "fulfilled") {
           totalEnqueued += result.value;
-        } else {
-          console.warn("[RssPollingScheduler] Feed poll failed:", result.reason);
         }
       }
     }
@@ -224,8 +227,14 @@ export class RssPollingScheduler {
 
       return enqueued;
     } catch (err) {
-      console.error(`[RssPollingScheduler] Failed to poll feed ${feed.feedId}:`, err);
-      throw err;
+      const error = err instanceof Error ? err : new Error(String(err));
+      await this.feedProvider.markFeedError(feed.feedId, error.message);
+      this.logger.error("ingest", "RSS poll failed", error, {
+        stage: "fetch",
+        feedId: feed.feedId,
+        feedUrl: feed.feedUrl,
+      });
+      return 0;
     }
   }
 }

@@ -20,6 +20,45 @@ export interface DedupedItems {
   duplicates: DuplicateEntry[];
 }
 
+/**
+ * Fast dedupe using only stable IDs (guid/url hash).
+ * Intended for pre-normalization filtering.
+ */
+export function dedupeRssItemsByStableId(items: RSSItem[]): DedupedItems {
+  const stableMap = new Map<string, RSSItem>();
+  const duplicates: DuplicateEntry[] = [];
+
+  for (const item of items) {
+    const stableId = buildStableId(item);
+    if (!stableId) {
+      const fallbackKey = `fallback:${stableMap.size}`;
+      stableMap.set(fallbackKey, item);
+      continue;
+    }
+
+    const existing = stableMap.get(stableId);
+    if (existing) {
+      const kept = preferByScore(existing, item);
+      const dropped = kept === existing ? item : existing;
+      stableMap.set(stableId, kept);
+      duplicates.push({
+        reason: "stable_id",
+        key: stableId,
+        kept,
+        dropped,
+      });
+      continue;
+    }
+
+    stableMap.set(stableId, item);
+  }
+
+  return {
+    items: Array.from(stableMap.values()),
+    duplicates,
+  };
+}
+
 interface CandidateKey {
   stableId?: string;
   titleContentKey?: string;
