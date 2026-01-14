@@ -1,9 +1,0 @@
-- Use Unix basics, file system and a command line interface (Bash).
-- All tools and sub-agents should share the same file system to read and write each other's work.
-- Use code generation for non-coding tasks, like analyzing data or chaining tool calls.
-- Verification is critical, Make the agent run a script or check for errors before finishing a task.
-- Use sub-agents to handle specific tasks and return only the final answer to avoid confusing the main agent.
-- Avoid loading huge files into the context. Write scripts/commands to search and extract only the specific data needed.
-- Reading the agent's traces to understand exactly why and where it made a mistake.
-- Avoid semantic search for precise data. A query for structured data is often more reliable.
-- Design your agent to handle errors by reading error messages.
