@@ -61,6 +61,11 @@ export function createInputRulesPlugin(schema: Schema) {
           return false;
         }
 
+        // GUARDRAIL: Do not trigger input rules inside code blocks
+        if ($from.parent.type.name === "code_block") {
+          return false;
+        }
+
         const textBefore = $from.parent.textBetween(
           Math.max(0, $from.parentOffset - 10), // Look back 10 chars is enough for our rules
           $from.parentOffset,

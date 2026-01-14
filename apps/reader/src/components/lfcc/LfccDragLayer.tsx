@@ -409,7 +409,7 @@ export function LfccDragLayer({ children }: { children: React.ReactNode }) {
             {/* Drop indicator - subtle style */}
             {dropIndicator && (
               <>
-                {/* The main line - subtle gray */}
+                {/* The main line - Vivid Blue with Glow */}
                 <div
                   className="pointer-events-none z-9999"
                   style={{
@@ -418,20 +418,23 @@ export function LfccDragLayer({ children }: { children: React.ReactNode }) {
                     top: dropIndicator.y - 1,
                     width: dropIndicator.width,
                     height: 2,
-                    background: "var(--color-border, #e2e8f0)",
+                    background: "#3b82f6", // Vivid blue (Linear-like)
+                    boxShadow: "0 0 4px #3b82f6", // Glow effect
                     borderRadius: 1,
                   }}
                 />
-                {/* Left anchor dot */}
+                {/* Left anchor dot - Matching Blue */}
                 <div
                   className="pointer-events-none z-9999"
                   style={{
                     position: "fixed",
-                    left: dropIndicator.x - 4,
-                    top: dropIndicator.y - 3,
-                    width: 6,
-                    height: 6,
-                    background: "var(--color-border, #e2e8f0)",
+                    left: dropIndicator.x - 5, // Slightly larger offset
+                    top: dropIndicator.y - 3.5,
+                    width: 7, // Slightly larger dot
+                    height: 7,
+                    background: "#3b82f6",
+                    boxShadow: "0 0 4px #3b82f6",
+                    border: "1px solid white", // crisp edge
                     borderRadius: "50%",
                   }}
                 />
