@@ -1,9 +1,15 @@
 import { expect, test } from "@playwright/test";
 import {
+  endUndoGroup,
   focusEditor,
+  getEditorText,
   modKey,
   openFreshEditor,
+  pressRedo,
+  pressUndo,
   setEditorContent,
+  setUndoMergeInterval,
+  startUndoGroup,
   typeInEditor,
 } from "./helpers/editor";
 
@@ -202,33 +208,26 @@ test.describe("Comprehensive Editor Verification", () => {
   test.describe("Undo/Redo Integration", () => {
     test("Robust 3-step undo/redo", async ({ page }) => {
       await openFreshEditor(page, "undo-redo-robust");
+      await setUndoMergeInterval(page, 0);
 
       await setEditorContent(page, "Base");
-      await expect(page.locator(".lfcc-editor .ProseMirror")).toContainText("Base");
-      await page.waitForTimeout(500);
+      await expect.poll(() => getEditorText(page), { timeout: 3000 }).toContain("Base");
 
       await focusEditor(page);
+      await startUndoGroup(page);
       await page.keyboard.press("Enter");
-      await page.waitForTimeout(300);
-      await page.keyboard.type("Added", { delay: 50 });
-      await page.waitForTimeout(800); // Ensure Loro commits the change
+      await page.keyboard.type("Added", { delay: 30 });
+      await endUndoGroup(page);
 
-      await expect(page.locator(".lfcc-editor .ProseMirror")).toContainText("Base");
-      await expect(page.locator(".lfcc-editor .ProseMirror")).toContainText("Added");
+      await expect.poll(() => getEditorText(page), { timeout: 5000 }).toContain("Added");
 
-      // Undo
-      await focusEditor(page);
-      await page.keyboard.press(`${modKey}+z`);
-      await page.waitForTimeout(500); // Wait for undo
-      await expect(page.locator(".lfcc-editor .ProseMirror")).toContainText("Base");
-      await expect(page.locator(".lfcc-editor .ProseMirror")).not.toContainText("Added");
+      await pressUndo(page);
+      await expect.poll(() => getEditorText(page), { timeout: 5000 }).not.toContain("Added");
 
-      // Redo
-      await focusEditor(page);
-      await page.keyboard.press(`${modKey}+Shift+z`);
-      await page.waitForTimeout(500); // Wait for redo
-      await expect(page.locator(".lfcc-editor .ProseMirror")).toContainText("Base");
-      await expect(page.locator(".lfcc-editor .ProseMirror")).toContainText("Added");
+      await pressRedo(page);
+      await expect.poll(() => getEditorText(page), { timeout: 5000 }).toContain("Added");
+
+      await setUndoMergeInterval(page, 500);
     });
   });
 
