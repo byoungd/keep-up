@@ -46,6 +46,11 @@ export default [
       ],
       exclude: defaultExclude,
       environment: "node",
+      server: {
+        deps: {
+          inline: [/@ku0\/.*/],
+        },
+      },
     },
   }),
   defineProject({
@@ -88,6 +93,11 @@ export default [
       coverage: {
         reporter: ["text", "json", "html"],
       },
+      server: {
+        deps: {
+          inline: [/@ku0\/.*/],
+        },
+      },
     },
   }),
   defineProject({
@@ -127,6 +137,11 @@ export default [
       include: ["packages/app/src/**/*.test.ts"],
       exclude: defaultExclude,
       environment: "jsdom",
+      server: {
+        deps: {
+          inline: [/@ku0\/.*/],
+        },
+      },
     },
   }),
   defineProject({
@@ -171,6 +186,11 @@ export default [
         "packages/agent-runtime/src/**/*.test.ts",
       ],
       exclude: defaultExclude,
+      server: {
+        deps: {
+          inline: [/@ku0\/.*/],
+        },
+      },
     },
   }),
 ];
