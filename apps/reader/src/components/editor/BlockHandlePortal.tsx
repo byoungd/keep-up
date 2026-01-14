@@ -55,10 +55,18 @@ export function BlockHandlePortal({ state }: Props) {
         }, HOVER_DELAY_MS);
       }
     }
+
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
   }, [state]);
 
   const activeState = state?.active ? state : delayedState;
-  const isActive = !!activeState?.active && !!activeState?.pos;
+  const isActive =
+    !!activeState?.active && activeState?.pos !== null && activeState?.pos !== undefined;
 
   const [menuState, setMenuState] = useState<MenuState>({
     open: false,
