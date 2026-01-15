@@ -128,9 +128,12 @@ export {
 // State Machine
 export {
   AgentStateMachine,
+  InvalidTransitionError,
   createAgentStateMachine,
   type IAgentStateMachine,
   type AgentStatus,
   type AgentStateEvent,
   type AgentStateTransition,
+  type AgentStateMachineConfig,
+  type TransitionHandler,
 } from "./stateMachine";
