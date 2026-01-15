@@ -13,6 +13,7 @@ export { SettingsModal } from "./components/layout/sidebar/SettingsModal";
 export type {
   SidebarItemRenderProps,
   SidebarItemRenderer,
+  SidebarNewAction,
 } from "./components/layout/sidebar/types";
 
 // Context & Hooks
@@ -97,6 +98,8 @@ export { ListSection } from "./components/ui/ListSection";
 export type { ListSectionProps } from "./components/ui/ListSection";
 export { LoadingState, PageLoadingState, InlineLoadingState } from "./components/ui/LoadingState";
 export type { LoadingStateProps } from "./components/ui/LoadingState";
+export { ArtifactPreviewPane } from "./components/ui/ArtifactPreviewPane";
+export type { ArtifactPreviewPaneProps } from "./components/ui/ArtifactPreviewPane";
 export { Panel, PanelHeader, PanelFooter, PanelTitle, PanelContent } from "./components/ui/Panel";
 export { RailTabs, RailTabPanel } from "./components/ui/RailTabs";
 export type { RailTab, RailTabsProps, RailTabPanelProps } from "./components/ui/RailTabs";
@@ -121,3 +124,4 @@ export type { TooltipProps } from "./components/ui/Tooltip";
 
 export type { PanelPosition } from "./components/chat/ModelSelector";
 export type { Message, MessageStatus } from "./components/chat/MessageItem";
+export type { AgentTask, ArtifactItem, ActiveTask, TaskStep } from "./components/chat/types";

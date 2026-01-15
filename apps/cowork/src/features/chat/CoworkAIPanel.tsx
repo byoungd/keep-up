@@ -1,13 +1,15 @@
 "use client";
 
 import { AIPanel as ShellAIPanel, useReaderShell } from "@ku0/shell";
+import type { ArtifactItem } from "@ku0/shell";
 import { useCoworkAIPanelController } from "./useCoworkAIPanelController";
 
 export interface CoworkAIPanelProps {
   onClose?: () => void;
+  onPreviewArtifact?: (item: ArtifactItem) => void;
 }
 
-export function CoworkAIPanel({ onClose }: CoworkAIPanelProps) {
+export function CoworkAIPanel({ onClose, onPreviewArtifact }: CoworkAIPanelProps) {
   const { aiPanel } = useReaderShell();
   const ctrl = useCoworkAIPanelController();
 
@@ -29,8 +31,16 @@ export function CoworkAIPanel({ onClose }: CoworkAIPanelProps) {
     onRemoveAttachment,
     fileInputRef,
     onFileChange,
+    statusMessage,
+    tasks,
   } = ctrl;
-  const panelPosition = aiPanel.position === "left" ? "left" : "right";
+  const panelPosition = aiPanel.position;
+
+  const contextStatus = statusMessage ? (
+    <div className="text-[11px] font-medium text-destructive flex items-center gap-2 px-2 py-1.5 rounded-lg bg-destructive/5 border border-destructive/10">
+      {statusMessage}
+    </div>
+  ) : null;
 
   // Simplified translations for Cowork for now
   const translations = {
@@ -90,6 +100,8 @@ export function CoworkAIPanel({ onClose }: CoworkAIPanelProps) {
       title={translations.title}
       model={model}
       setModel={setModel}
+      models={filteredModels}
+      onSelectModel={setModel}
       filteredModels={filteredModels}
       isStreaming={isStreaming}
       isLoading={isLoading}
@@ -103,7 +115,10 @@ export function CoworkAIPanel({ onClose }: CoworkAIPanelProps) {
         /* TODO */
       }}
       onCopyLast={() => {
-        /* TODO */
+        const last = messages[messages.length - 1];
+        if (last?.content) {
+          navigator.clipboard.writeText(last.content);
+        }
       }}
       onExport={() => {
         /* TODO */
@@ -123,8 +138,10 @@ export function CoworkAIPanel({ onClose }: CoworkAIPanelProps) {
       onQuote={() => {
         /* TODO */
       }}
-      onCopy={() => {
-        /* TODO */
+      onCopy={(content) => {
+        if (content) {
+          navigator.clipboard.writeText(content);
+        }
       }}
       onRetry={() => {
         /* TODO */
@@ -148,6 +165,9 @@ export function CoworkAIPanel({ onClose }: CoworkAIPanelProps) {
       inputRef={inputRef}
       onFileChange={onFileChange}
       inputTranslations={translations}
+      contextStatus={contextStatus}
+      onPreviewArtifact={onPreviewArtifact}
+      tasks={tasks}
     />
   );
 }
