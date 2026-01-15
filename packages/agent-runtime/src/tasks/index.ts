@@ -37,11 +37,15 @@ export type {
   TaskGraphNodeInput,
   TaskGraphNodeUpdate,
   TaskGraphSnapshot,
+  TaskGraphStats,
   TaskNodeStatus,
   TaskNodeType,
+  EvictionHandler,
 } from "./taskGraph";
 export {
   TaskGraphStore,
+  NodeNotFoundError,
+  InvalidStatusTransitionError,
   createTaskGraphStore,
   createTaskGraphStoreFromSnapshot,
 } from "./taskGraph";
