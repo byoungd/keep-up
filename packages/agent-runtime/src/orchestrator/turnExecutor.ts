@@ -60,6 +60,8 @@ export interface TurnOutcome {
   readonly error?: string;
   /** Performance metrics for the turn */
   readonly metrics: TurnMetrics;
+  /** Compressed message history used for the request */
+  readonly compressedMessages?: AgentMessage[];
 }
 
 /**
@@ -198,21 +200,24 @@ export class TurnExecutor implements ITurnExecutor {
       // Step 6: Determine outcome
       metrics.totalTimeMs = performance.now() - turnStart;
 
+      const outcomeBase = {
+        response,
+        assistantMessage,
+        metrics,
+        compressedMessages: compressionResult.messages,
+      };
+
       if (this.isComplete(response)) {
         return {
           type: "complete",
-          response,
-          assistantMessage,
-          metrics,
+          ...outcomeBase,
         };
       }
 
       return {
         type: "tool_use",
-        response,
-        assistantMessage,
+        ...outcomeBase,
         toolCalls: response.toolCalls,
-        metrics,
       };
     } catch (err) {
       metrics.totalTimeMs = performance.now() - turnStart;
@@ -325,7 +330,12 @@ export class TurnExecutor implements ITurnExecutor {
   }
 
   private isComplete(response: AgentLLMResponse): boolean {
-    return response.finishReason === "stop" || !response.toolCalls?.length;
+    // If tool calls are present, it is not complete regardless of finishReason
+    if (response.toolCalls && response.toolCalls.length > 0) {
+      return false;
+    }
+    // Otherwise rely on finish reason "stop"
+    return response.finishReason === "stop";
   }
 
   private buildErrorOutcome(err: unknown, metrics: TurnMetrics): TurnOutcome {
