@@ -112,3 +112,25 @@ export {
   type ErrorHook,
   type CompleteHook,
 } from "./hooks";
+
+// Turn Executor (extracted from orchestrator)
+export {
+  TurnExecutor,
+  createTurnExecutor,
+  type ITurnExecutor,
+  type TurnOutcome,
+  type TurnOutcomeType,
+  type TurnMetrics,
+  type TurnExecutorDependencies,
+  type TurnExecutorConfig,
+} from "./turnExecutor";
+
+// State Machine
+export {
+  AgentStateMachine,
+  createAgentStateMachine,
+  type IAgentStateMachine,
+  type AgentStatus,
+  type AgentStateEvent,
+  type AgentStateTransition,
+} from "./stateMachine";
