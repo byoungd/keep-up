@@ -68,7 +68,7 @@ export function createCoworkPermissionChecker(
 
 export interface CoworkToolExecutorConfig
   extends CoworkRuntimeConfig,
-    Omit<ToolExecutionOptions, "policy"> {}
+    Omit<ToolExecutionOptions, "policy" | "policyEngine"> {}
 
 export function createCoworkToolExecutor(
   registry: IToolRegistry,
