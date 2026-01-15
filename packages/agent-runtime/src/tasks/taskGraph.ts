@@ -79,6 +79,7 @@ export type TaskGraphEventType =
  */
 export interface TaskGraphEvent {
   readonly id: string;
+  readonly sequenceId: number;
   readonly nodeId: string;
   readonly type: TaskGraphEventType;
   readonly timestamp: string;
@@ -219,6 +220,7 @@ export class TaskGraphStore {
   private evictedNodeCount = 0;
   private compactionCount = 0;
   private eventsSinceCompaction = 0;
+  private nextSequenceId = 1;
 
   constructor(config: TaskGraphConfig = {}) {
     this.now = config.now ?? DEFAULT_CONFIG.now;
@@ -415,6 +417,10 @@ export class TaskGraphStore {
     this.checkpoint = snapshot.checkpoint ? { ...snapshot.checkpoint } : undefined;
     this.evictedNodeCount = snapshot.stats?.evictedNodeCount ?? 0;
     this.compactionCount = snapshot.stats?.compactionCount ?? 0;
+
+    // Restore nextSequenceId based on max sequence in events
+    const maxSeq = this.events.reduce((max, e) => Math.max(max, e.sequenceId), 0);
+    this.nextSequenceId = maxSeq + 1;
   }
 
   /** Register a handler to be called when nodes are evicted */
@@ -439,6 +445,7 @@ export class TaskGraphStore {
   ): TaskGraphEvent {
     const event: TaskGraphEvent = {
       id: this.idFactory(),
+      sequenceId: this.nextSequenceId++,
       nodeId,
       type,
       timestamp: this.now(),
@@ -542,6 +549,7 @@ export class TaskGraphStore {
     // Record compaction event
     this.events.push({
       id: this.idFactory(),
+      sequenceId: this.nextSequenceId++,
       nodeId: "",
       type: "compaction",
       timestamp: this.now(),

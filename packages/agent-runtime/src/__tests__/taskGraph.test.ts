@@ -245,6 +245,46 @@ describe("TaskGraphStore", () => {
     });
   });
 
+  describe("event sequencing", () => {
+    it("assigns monotonically increasing sequenceIds", () => {
+      const graph = createTaskGraphStore({
+        idFactory: createIdFactory("n"),
+        now: fixedNow,
+      });
+      const node1 = graph.createNode({ type: "plan", title: "Test 1" });
+      graph.createNode({ type: "tool_call", title: "Test 2" });
+      graph.updateNodeStatus(node1.id, "running");
+
+      const events = graph.listEvents();
+      expect(events.length).toBeGreaterThan(0);
+
+      let lastSeq = 0;
+      for (const event of events) {
+        expect(event.sequenceId).toBeGreaterThan(lastSeq);
+        lastSeq = event.sequenceId;
+      }
+    });
+
+    it("restores sequence counter from snapshot", () => {
+      const graph = createTaskGraphStore({
+        idFactory: createIdFactory("n"),
+        now: fixedNow,
+      });
+      graph.createNode({ type: "plan", title: "Test 1" });
+
+      const snapshot = graph.getSnapshot();
+      const lastSeq = snapshot.events[snapshot.events.length - 1].sequenceId;
+
+      const restored = createTaskGraphStoreFromSnapshot(snapshot);
+      restored.createNode({ type: "plan", title: "Test 2" });
+
+      const newEvents = restored.listEvents();
+      const lastNewEvent = newEvents[newEvents.length - 1];
+
+      expect(lastNewEvent.sequenceId).toBe(lastSeq + 1);
+    });
+  });
+
   describe("stats", () => {
     it("tracks node, edge, and event counts", () => {
       const graph = createTaskGraphStore({
