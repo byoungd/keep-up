@@ -110,31 +110,75 @@ export function BlockHandlePortal({ state }: Props) {
       return;
     }
 
-    const updatePosition = () => {
+    let rafId: number | null = null;
+    let observedElement: Element | null = null;
+    let resizeObserver: ResizeObserver | null = null;
+
+    const getDomInfo = (): { dom: Element; rect: DOMRect } | null => {
       try {
         const pos = activeState.pos;
         if (pos === null || pos === undefined) {
-          return;
+          return null;
         }
         const dom = view.nodeDOM(pos);
-        if (dom instanceof Element) {
-          const domRect = dom.getBoundingClientRect();
-          setRect(domRect);
-        } else {
-          setRect(null);
+        if (!(dom instanceof Element)) {
+          return null;
         }
+        return { dom, rect: dom.getBoundingClientRect() };
       } catch {
-        // block might be gone
-        setRect(null);
+        return null;
       }
     };
 
-    updatePosition();
+    const ensureObserver = (dom: Element) => {
+      if (typeof ResizeObserver === "undefined") {
+        return;
+      }
+      if (!resizeObserver) {
+        resizeObserver = new ResizeObserver(() => scheduleUpdate());
+      }
+      if (observedElement !== dom) {
+        resizeObserver.disconnect();
+        resizeObserver.observe(dom);
+        observedElement = dom;
+      }
+    };
 
-    // Listen to scroll to update position
-    window.addEventListener("scroll", updatePosition, { capture: true, passive: true });
+    const updatePosition = () => {
+      if (view.isDestroyed) {
+        return;
+      }
+      const info = getDomInfo();
+      if (!info) {
+        setRect(null);
+        return;
+      }
+      setRect(info.rect);
+      ensureObserver(info.dom);
+    };
+
+    const scheduleUpdate = () => {
+      if (rafId !== null) {
+        return;
+      }
+      rafId = window.requestAnimationFrame(() => {
+        rafId = null;
+        updatePosition();
+      });
+    };
+
+    scheduleUpdate();
+
+    // Listen to scroll/resize to update position
+    window.addEventListener("scroll", scheduleUpdate, { capture: true, passive: true });
+    window.addEventListener("resize", scheduleUpdate, { passive: true });
     return () => {
-      window.removeEventListener("scroll", updatePosition, { capture: true });
+      if (rafId !== null) {
+        window.cancelAnimationFrame(rafId);
+      }
+      resizeObserver?.disconnect();
+      window.removeEventListener("scroll", scheduleUpdate, { capture: true });
+      window.removeEventListener("resize", scheduleUpdate);
     };
   }, [view, isActive, activeState?.pos]);
 

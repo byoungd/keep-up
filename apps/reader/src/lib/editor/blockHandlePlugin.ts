@@ -1,4 +1,5 @@
 import { getHandleTargetFromCoords } from "@/lib/blocks/blockTargeting";
+import { LFCC_STRUCTURAL_META } from "@ku0/lfcc-bridge";
 import type { Node } from "prosemirror-model";
 import { Plugin, PluginKey } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";
@@ -113,6 +114,11 @@ export function createBlockHandlePlugin({ onStateChange }: BlockHandlePluginOpti
             return false;
           }
 
+          const current = blockHandleKey.getState(view.state);
+          if (!current?.active) {
+            return false;
+          }
+
           // Otherwise, clear state
           const tr = view.state.tr.setMeta(blockHandleKey, {
             active: false,
@@ -163,6 +169,8 @@ export function createBlockHandlePlugin({ onStateChange }: BlockHandlePluginOpti
         const mappedInsertPos = tr.mapping.map(targetPos);
 
         tr.insert(mappedInsertPos, srcNode); // Re-insert same node (same ID attributes)
+        tr.setMeta(LFCC_STRUCTURAL_META, true);
+        tr.setMeta("movedBlockId", srcNode.attrs.block_id);
 
         view.dispatch(tr);
         view.focus();
