@@ -109,6 +109,31 @@ function findBlockAtPos(
   return null;
 }
 
+function resolveBlockPosFromDom(view: EditorView, el: Element, blockId: string): number | null {
+  try {
+    const pos = view.posAtDOM(el, 0);
+    const target = findBlockAtPos(view, pos);
+    if (!target || target.blockId !== blockId) {
+      return null;
+    }
+    return target.blockPos;
+  } catch {
+    return null;
+  }
+}
+
+function resolveBlockPosByScan(view: EditorView, blockId: string): number | null {
+  let containerPos: number | null = null;
+  view.state.doc.descendants((node, nodePos) => {
+    if (node.attrs.block_id === blockId) {
+      containerPos = nodePos;
+      return false;
+    }
+    return true;
+  });
+  return containerPos;
+}
+
 /**
  * Main targeting function: resolves the handle target based on policy.
  *
@@ -144,16 +169,9 @@ export function findHandleTarget(
   const container = findAncestorContainer(leafBlock.el, editorRoot);
 
   if (container) {
-    // Find the container's position in the document
-    // We need to walk the document to find it
-    let containerPos: number | null = null;
-    view.state.doc.descendants((node, nodePos) => {
-      if (node.attrs.block_id === container.blockId) {
-        containerPos = nodePos;
-        return false; // Stop searching
-      }
-      return true;
-    });
+    const containerPos =
+      resolveBlockPosFromDom(view, container.el, container.blockId) ??
+      resolveBlockPosByScan(view, container.blockId);
 
     if (containerPos !== null) {
       return {

@@ -85,7 +85,7 @@ export function SlashCommandMenu({ state, onSelectCommand, onQueryChange }: Slas
         <div
           ref={refs.setFloating}
           style={floatingStyles}
-          className="z-popover"
+          className="z-9999 pointer-events-auto"
           {...getFloatingProps()}
         >
           <motion.div {...transitions.popover}>
