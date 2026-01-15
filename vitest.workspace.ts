@@ -2,7 +2,14 @@ import path from "node:path";
 
 import { defineProject } from "vitest/config";
 
-const defaultExclude = ["**/node_modules/**", "**/dist/**"];
+const defaultExclude = [
+  "**/node_modules/**",
+  "**/dist/**",
+  "**/coverage/**",
+  "**/.turbo/**",
+  "**/.next/**",
+  "**/.out/**",
+];
 
 // Define aliases as an array to ensure subpaths are matched before their parent packages
 // preventing shadowing issues (e.g. @ku0/core shadowing @ku0/core/security)

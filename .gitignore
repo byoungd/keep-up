@@ -159,7 +159,6 @@ task.md
 storybook-static/
 
 # IDE and Editor caches
-.vscode/settings.json
 .vscode/.history/
 .vscode/launch.json
 .vscode/extensions.json
