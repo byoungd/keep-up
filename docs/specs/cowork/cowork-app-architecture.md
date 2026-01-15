@@ -1,76 +1,175 @@
-# Cowork Application Architecture
+# Cowork App Architecture
+
+> **apps/cowork** — Local-first agentic task execution with transparent approvals.
+
+## Architecture Goals
+
+| Goal | Rationale |
+|------|--------|
+| **Local-first** | UI and runtime separated; no external dependencies for core flows |
+| **Deterministic** | Auditable task execution aligned to Cowork policy DSL |
+| **Fast** | Resilient SSE streaming; sub-second state hydration |
+| **Portable** | Modular structure for desktop packaging (Tauri-ready) |
+
+---
 
 ## System Overview
-The Cowork application provides a resilient, multi-agent environment for collaborative AI tasks. It leverages a structured event-driven architecture to ensure consistency and recovery across distributed components.
+
+```mermaid
+flowchart LR
+    subgraph Client
+        UI["UI Shell<br/>(React 19 + TanStack)"]
+    end
+    subgraph Server
+        BFF["BFF API<br/>(Bun + Hono)"]
+        AR["Agent Runtime<br/>(packages/agent-runtime)"]
+        State[("Persistence<br/>(.keep-up/state)")]
+    end
+    UI -- REST + SSE --> BFF
+    BFF -- orchestrate --> AR
+    BFF -- read/write --> State
+    AR -- tools + policy --> State
+```
 
 ---
 
-## 1. Event Streaming & Resilience
+## Core Components
 
-### 1.1 Durable SSE Resume
-The application uses Server-Sent Events (SSE) for real-time updates. To ensure reliability across client refreshes or server restarts, a durable event store is implemented.
+### 1. UI Shell (`apps/cowork/src`)
 
-**Durable Event Store Schema:**
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | UUID | Primary key for the event |
-| `sequenceId` | BigInt | Strictly increasing sequence number for ordering |
-| `type` | String | Event type (e.g., `message.created`, `artifact.updated`) |
-| `payload` | JSONB | Structured event data |
-| `sessionId` | UUID | Scope of the event |
-| `createdAt` | DateTime | Persistence timestamp |
+| Responsibility | Implementation |
+|---------------|----------------|
+| Routing | TanStack Router (file-based) |
+| Data fetching | TanStack Query with SSE sync |
+| Artifact rendering | Card components with apply/approve actions |
+| Approval UX | Modal + inline confirmation tied to TaskGraph node IDs |
 
-**Reliability Mechanism:**
-- **Sequence IDs**: All events are assigned a strictly increasing `sequenceId`.
-- **Last-Event-ID**: Clients include the `Last-Event-ID` header in the SSE connection request.
-- **Server Replay**: On reconnection, the server queries the durable store for events where `sequenceId > Last-Event-ID` and replays them to the client.
-- **Refresh Resilience**: The sequence ID is stored in the browser's `localStorage` to persist across full page reloads.
+### 2. BFF API (`apps/cowork/server`)
+
+| Responsibility | Implementation |
+|---------------|----------------|
+| Local server | Bun + Hono (or Bun native `Bun.serve`) |
+| Endpoints | Session, task, approval, artifact CRUD |
+| Streaming | SSE with `Last-Event-ID` resume support |
+
+### 3. Agent Runtime Bridge
+
+- Delegates to **`packages/agent-runtime`** for orchestration.
+- Enforces **Cowork policy DSL** confirmation gates.
+- Emits **TaskGraph** events consumed by UI via SSE.
+
+### 4. Persistence Layer
+
+- **Primary**: `.keep-up/state` (JSON/SQLite) for sessions, tasks, approvals.
+- **Optional**: `packages/db` integration for durable cross-session metadata.
+
+## Proposed App Structure
+```
+apps/cowork/
+  src/
+    app/
+      routes/
+      layouts/
+      providers/
+    features/
+      chat/
+      tasks/
+      artifacts/
+      approvals/
+      workspace/
+    components/
+    hooks/
+    api/
+    state/
+    styles/
+  server/
+    index.ts
+    routes/
+    services/
+  tests/
+    unit/
+    e2e/
+```
+
+## Routing Map (TanStack Router)
+- /: landing + session list
+- /sessions/:id: chat + task workspace
+- /sessions/:id/artifacts: artifact gallery
+- /sessions/:id/logs: task logs + timeline
+- /settings: workspace, models, policy preferences
+
+## Data Flow (Task Execution)
+1. User submits task prompt.
+2. UI calls BFF `/api/sessions/:id/tasks`.
+3. BFF invokes `agent-runtime` with Cowork policy context.
+4. TaskGraph events stream over SSE.
+5. UI updates task timeline and renders artifacts.
+6. Approval actions post back to `/api/approvals/:id`.
+
+## API Surface (Initial)
+- POST /api/workspaces
+- GET /api/workspaces
+- POST /api/sessions
+- GET /api/sessions/:id
+- POST /api/sessions/:id/messages
+- POST /api/sessions/:id/tasks
+- GET /api/sessions/:id/stream (SSE)
+- POST /api/approvals/:id
+- GET /api/artifacts/:id
+
+## State Management
+
+```mermaid
+flowchart TB
+    SSE[SSE Stream] --> ES[(Event Store)]
+    ES --> TQ[TanStack Query Cache]
+    TQ --> UI[React Components]
+    UI -- mutations --> BFF[BFF API]
+    BFF -- invalidate --> TQ
+```
+
+- **TanStack Query**: cache + invalidation for REST endpoints.
+- **Event Store**: lightweight in-memory buffer for SSE TaskGraph events.
+- **Derived Selectors**: UI subscribes to TaskGraph nodes with memoized selectors.
 
 ---
 
-## 2. API Design
+## Offline & Resilience
 
-### 2.1 Core API Surface
-The API provides singleton access for specific operations and list/query endpoints for session hydration.
+| Scenario | Mitigation |
+|----------|------------|
+| SSE disconnect | `Last-Event-ID` header resumes from last received event |
+| Browser refresh | Persist task snapshots + approvals in `.keep-up/state` |
+| Stale sessions | TTL-based cleanup (default: 7 days) |
 
-- `POST /api/approvals/:id`: Resolve a pending confirmation.
-- `GET /api/artifacts/:id`: Retrieve a specific artifact.
+## Testing Strategy
 
-### 2.2 Hydration & Query Endpoints
-To hydrate the UI on reload or session resume, the following list endpoints are provided:
+| Layer | Tool | Scope |
+|-------|------|-------|
+| Unit | Vitest (Bun) | Services, hooks, utilities |
+| Component | Vitest + Testing Library | UI components in isolation |
+| E2E | Playwright | Smoke + cowork-specific flows only |
 
-- `GET /api/artifacts?sessionId=:id`: List all artifacts for a given session.
-- `GET /api/approvals?status=pending&sessionId=:id`: List all outstanding approvals.
-- `GET /api/events?after=:sequenceId&sessionId=:id`: Query historical events.
-
----
-
-## 3. Data Model & Concept Representation
-
-### 3.1 Threaded Context
-Messages and tasks support hierarchical threading to maintain context.
-- `parentMessageId`: References the triggering message for a response thread.
-- `rootMessageId`: Tracks the original query in a long conversation.
-
-### 3.2 Task Execution Phases
-Task nodes include an explicit `phase` field to represent progress:
-- `planning`: Agent is decomposing the task.
-- `executing`: Active tool use or computation.
-- `verifying`: Validating the result.
-- `finalizing`: Wrapping up and reporting.
+> [!TIP]
+> Avoid full E2E suite during development; run targeted specs via `/e2e-test` workflow.
 
 ---
 
-## 4. Testing Strategy
+## Security & Safety
 
-### 4.1 Targeted Risk Areas
-Testing must focus on recovery and concurrency edge cases:
-
-- **SSE Resume**: Verify that a client reconnecting with a `Last-Event-ID` receives only missing events without duplicates.
-- **Approval Recovery**: Test that pending approvals survive server restarts and can still be resolved by the client.
-- **Multi-Agent Concurrency**: Validate state consistency when multiple agents attempt to update the same artifact or task node simultaneously.
+| Constraint | Enforcement |
+|-----------|-------------|
+| File access | Cowork policy DSL scopes paths per session |
+| Tool execution | Confirmation gates tied to TaskGraph node IDs |
+| Memory isolation | No cross-session memory in cowork mode |
+| Document mutation | AI Envelope dry-run pipeline required |
 
 ---
 
-## Part 5: Persistence Schema (DRAFT)
-Events are persisted to a lightweight SQL store (e.g., SQLite/Postgres) with the schema defined in Section 1.1.
+## Risks & Mitigations
+
+| Risk | Mitigation |
+|------|------------|
+| Long-running task instability | TaskGraph replay + SSE resume |
+| Permission fatigue | Bundle approvals by risk tier; cache grants |
+| Tool latency | Cache context; optimize startup pipelines |
