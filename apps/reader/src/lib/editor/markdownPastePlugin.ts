@@ -90,46 +90,77 @@ function isRichHtml(html: string): boolean {
  * Check if text looks like markdown content.
  * We look for common markdown patterns.
  */
-function looksLikeMarkdown(text: string): boolean {
+export function looksLikeMarkdown(text: string): boolean {
   const lines = text.split("\n");
+  const nonEmptyLines = lines.filter((line) => line.trim().length > 0);
 
-  // Patterns that indicate markdown
-  const patterns = [
-    /^#{1,6}\s+.+/, // Headings: # Title
-    /^\s*[-*+]\s+.+/, // Unordered list: - item
-    /^\s*\d+\.\s+.+/, // Ordered list: 1. item
-    /^\s*>\s+.+/, // Blockquote: > text
-    /^\s*```/, // Code block: ```
-    /\*\*.+\*\*/, // Bold: **text**
-    /\*.+\*/, // Italic: *text*
-    /__.+__/, // Bold: __text__
-    /_.+_/, // Italic: _text_
-    /~~.+~~/, // Strikethrough: ~~text~~
-    /`[^`]+`/, // Inline code: `code`
-    /\[.+\]\(.+\)/, // Link: [text](url)
-    /!\[.*\]\(.+\)/, // Image: ![alt](url)
-  ];
-
-  let matchCount = 0;
-
-  for (const line of lines) {
-    for (const pattern of patterns) {
-      if (pattern.test(line)) {
-        matchCount++;
-        if (matchCount >= 2) {
-          return true;
-        }
-        break; // Only count one pattern per line
-      }
+  if (nonEmptyLines.length === 1) {
+    const singleLine = nonEmptyLines[0];
+    if (matchesAnyPattern(singleLine, SINGLE_LINE_PATTERNS)) {
+      return true;
     }
   }
 
+  const matchCount = countMarkdownMatches(nonEmptyLines, MARKDOWN_PATTERNS);
+  if (matchCount >= 2) {
+    return true;
+  }
+
   // If the text has multiple paragraphs and at least one pattern, consider it markdown
-  if (matchCount >= 1 && lines.length > 3) {
+  if (matchCount >= 1 && nonEmptyLines.length > 3) {
     return true;
   }
 
   return false;
+}
+
+const SINGLE_LINE_PATTERNS = [
+  /^#{1,6}\s+.+/, // Headings: # Title
+  /^\s*```/, // Code block fence
+  /^\s*[-*+]\s+\[[ xX]\]\s+.+/, // Task list
+  /^\s*[-*+]\s+.+/, // Unordered list
+  /^\s*\d+\.\s+.+/, // Ordered list
+  /^\s*>\s+.+/, // Blockquote
+];
+
+const MARKDOWN_PATTERNS = [
+  /^#{1,6}\s+.+/, // Headings: # Title
+  /^\s*[-*+]\s+.+/, // Unordered list: - item
+  /^\s*\d+\.\s+.+/, // Ordered list: 1. item
+  /^\s*>\s+.+/, // Blockquote: > text
+  /^\s*```/, // Code block: ```
+  /\*\*.+\*\*/, // Bold: **text**
+  /\*.+\*/, // Italic: *text*
+  /__.+__/, // Bold: __text__
+  /_.+_/, // Italic: _text_
+  /~~.+~~/, // Strikethrough: ~~text~~
+  /`[^`]+`/, // Inline code: `code`
+  /\[.+\]\(.+\)/, // Link: [text](url)
+  /!\[.*\]\(.+\)/, // Image: ![alt](url)
+];
+
+function matchesAnyPattern(line: string, patterns: RegExp[]): boolean {
+  for (const pattern of patterns) {
+    if (pattern.test(line)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function countMarkdownMatches(lines: string[], patterns: RegExp[]): number {
+  let matchCount = 0;
+
+  for (const line of lines) {
+    if (matchesAnyPattern(line, patterns)) {
+      matchCount++;
+      if (matchCount >= 2) {
+        return matchCount;
+      }
+    }
+  }
+
+  return matchCount;
 }
 
 /**

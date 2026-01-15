@@ -189,3 +189,6 @@ build/
 
 # Ignore tasks directory
 docs/tasks/
+apps/reader/public/db-worker.js
+apps/reader/public/sqlite3.wasm
+apps/reader/public/assets/
