@@ -66,3 +66,12 @@ export {
   createTokenStreamReader,
   createTokenStreamWriter,
 } from "./tokenStreamer";
+
+// Streaming Cache
+export {
+  StreamingCache,
+  createStreamingCache,
+  type IStreamingCache,
+  type StreamingCacheConfig,
+  type StreamingCacheStats,
+} from "./streamingCache";

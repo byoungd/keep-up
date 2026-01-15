@@ -136,7 +136,14 @@ export * from "./telemetry";
 // ============================================================================
 // Agents
 // ============================================================================
-export * from "./agents";
+export {
+  createAgentManager,
+  AGENT_PROFILES,
+  getAgentProfile,
+  listAgentTypes,
+  AgentManager,
+  VerifierAgent,
+} from "./agents";
 
 // ============================================================================
 // Context
@@ -208,7 +215,15 @@ export * from "./pipeline";
 // ============================================================================
 // Logging
 // ============================================================================
-export * from "./logging";
+export {
+  Logger,
+  ConsoleTransport,
+  MemoryTransport,
+  getLogger,
+  configureLogger,
+  createLogger,
+  type LoggerConfig,
+} from "./logging";
 
 // ============================================================================
 // Reasoning (Extended Thinking)
@@ -250,109 +265,3 @@ export { createWebSearchToolServer } from "./tools/web/webSearchServer";
 export { createGitToolServer } from "./tools/git/gitServer";
 export { createOrchestrator } from "./orchestrator/orchestrator";
 export { createAICoreAdapter, createMockLLM } from "./orchestrator/aiCoreAdapter";
-export {
-  createPermissionChecker,
-  createAuditLogger,
-  createSecurityPolicy,
-  securityPolicy,
-  SecurityPolicyBuilder,
-} from "./security";
-
-// Security presets
-export { SECURITY_PRESETS } from "./types";
-
-// Telemetry factories
-export {
-  createTelemetryContext,
-  InMemoryMetricsCollector,
-  InMemoryTracer,
-  measureAsync,
-  traced,
-  attachTelemetryToEventBus,
-  AGENT_METRICS,
-} from "./telemetry";
-
-// Agent factories
-export { createAgentManager, AGENT_PROFILES, getAgentProfile, listAgentTypes } from "./agents";
-
-// Context factories
-export { createContextManager } from "./context";
-
-// Utility factories
-export {
-  retry,
-  withRetry,
-  createCircuitBreaker,
-  createCache,
-  createToolResultCache,
-  executeParallel,
-  executeWithDependencies,
-  createRateLimiter,
-  createToolRateLimiter,
-  createResourcePool,
-} from "./utils";
-
-// Event bus factories
-export {
-  createEventBus,
-  getGlobalEventBus,
-  resetGlobalEventBus,
-} from "./events";
-
-// Checkpoint factories
-export {
-  createCheckpointManager,
-  createInMemoryCheckpointStorage,
-} from "./checkpoint";
-
-// Quota factories
-export {
-  createQuotaManager,
-  createTieredQuotaManager,
-  QUOTA_PRESETS,
-} from "./quota";
-
-// Streaming factories
-export {
-  createStreamWriter,
-  collectStream,
-  collectText,
-  createTokenStreamWriter,
-  createTokenStreamReader,
-  createStreamPair,
-} from "./streaming";
-
-// Reasoning factories
-export {
-  createThinkingEngine,
-  createQuickThinkingEngine,
-  createDeepThinkingEngine,
-  withReasoning,
-  reasoningWrapper,
-} from "./reasoning";
-
-// Memory factories
-export {
-  createMemoryManager,
-  createInMemoryStore,
-  createVectorIndex,
-  createMockEmbeddingProvider,
-} from "./memory";
-
-// Task queue factories
-export { createTaskQueue, createPriorityHeap } from "./tasks";
-
-// Pipeline factories
-export {
-  createPipeline,
-  createPipelineExecutor,
-  createSequentialPipeline,
-} from "./pipeline";
-
-// Logging factories
-export {
-  createLogger,
-  getLogger,
-  configureLogger,
-  createMemoryTransport,
-} from "./logging";

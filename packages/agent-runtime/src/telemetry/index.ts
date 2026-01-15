@@ -567,3 +567,19 @@ export {
   type ProfileReport,
   type ProfilerConfig,
 } from "./profiler";
+
+// Structured Logger
+export {
+  StructuredLogger,
+  LogBuffer,
+  createStructuredLogger,
+  createNoopLogger,
+  consoleHandler,
+  jsonHandler,
+  type LogLevel,
+  type LogEntry,
+  type LogHandler,
+  type AgentLogContext,
+  type IStructuredLogger,
+  type StructuredLoggerConfig,
+} from "./structuredLogger";

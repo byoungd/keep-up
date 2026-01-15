@@ -22,7 +22,7 @@ import {
   type ToolExecutor,
   createToolExecutor,
 } from "../executor";
-import type { KnowledgeMatchResult, KnowledgeRegistry } from "../knowledge";
+import type { KnowledgeRegistry } from "../knowledge";
 import { AGENTS_GUIDE_PROMPT } from "../prompts/agentGuidelines";
 import { createAuditLogger, createPermissionChecker } from "../security";
 import type { SessionState } from "../session";
@@ -58,6 +58,7 @@ import {
   createPlanningEngine,
 } from "./planning";
 import { type RequestCache, createRequestCache } from "./requestCache";
+import { type ITurnExecutor, createTurnExecutor } from "./turnExecutor";
 
 // ============================================================================
 // LLM Interface (for dependency injection)
@@ -165,6 +166,7 @@ export class AgentOrchestrator {
   private readonly requestCache: RequestCache;
   private readonly dependencyAnalyzer: DependencyAnalyzer;
   private readonly planningEngine: PlanningEngine;
+  private readonly turnExecutor: ITurnExecutor;
   private readonly toolExecutor?: ToolExecutor;
   private readonly eventBus?: RuntimeEventBus;
   private readonly sessionState?: SessionState;
@@ -238,12 +240,19 @@ export class AgentOrchestrator {
         autoExecuteLowRisk: config.planning?.autoExecuteLowRisk,
       });
 
-    // Initialize intent registry for AI edit tracking
-    this.intentRegistry = components.intentRegistry ?? createIntentRegistry();
-
     // Initialize knowledge registry for scoped knowledge injection
+    this.intentRegistry = components.intentRegistry ?? createIntentRegistry();
     this.knowledgeRegistry = components.knowledgeRegistry;
     this.taskGraph = components.taskGraph;
+
+    this.turnExecutor = createTurnExecutor({
+      llm: this.llm,
+      messageCompressor: this.messageCompressor,
+      requestCache: this.requestCache,
+      knowledgeRegistry: this.knowledgeRegistry,
+      metrics: this.metrics,
+      getToolDefinitions: () => this.getToolDefinitions(),
+    });
   }
 
   /**
@@ -451,114 +460,41 @@ export class AgentOrchestrator {
     }
 
     try {
-      // Compress message history if needed
-      const compressionStart = performance.now();
-      const compressedResult = this.messageCompressor.compress(this.state.messages);
-      const messagesToUse = compressedResult.messages;
+      const outcome = await this.turnExecutor.execute(this.state, turnSpan);
 
-      if (compressedResult.compressionRatio > 0) {
-        this.metrics?.observe(
-          AGENT_METRICS.messageCompressionRatio.name,
-          compressedResult.compressionRatio
-        );
-        this.metrics?.observe(
-          AGENT_METRICS.messageCompressionTime.name,
-          performance.now() - compressionStart
-        );
-        turnSpan?.setAttribute("compression.ratio", compressedResult.compressionRatio);
-        turnSpan?.setAttribute("compression.removed", compressedResult.removedCount);
+      // Emit thinking event (TurnExecutor doesn't emit events)
+      if (outcome.response?.content) {
+        this.emit("thinking", { content: outcome.response.content });
       }
 
-      // Match relevant knowledge based on current context
-      let knowledgeContent: string | undefined;
-      if (this.knowledgeRegistry) {
-        const latestUserMessage = this.getLatestUserMessage();
-        const knowledgeResult: KnowledgeMatchResult | undefined = latestUserMessage
-          ? this.knowledgeRegistry.match({
-              query: latestUserMessage,
-              agentType: this.config.name,
-              maxItems: 5,
-            })
-          : undefined;
-
-        if (knowledgeResult && knowledgeResult.items.length > 0) {
-          knowledgeContent = knowledgeResult.formattedContent;
-          turnSpan?.setAttribute("knowledge.matched", knowledgeResult.items.length);
-        }
+      // Update state with used messages and new assistant message
+      if (outcome.compressedMessages && outcome.assistantMessage) {
+        // Create new history from compressed messages + new assistant message
+        this.state.messages = [...outcome.compressedMessages, outcome.assistantMessage];
+        this.recordMessage(outcome.assistantMessage);
       }
 
-      // Build system prompt with optional knowledge injection
-      const baseSystemPrompt = this.config.systemPrompt ?? AGENTS_GUIDE_PROMPT;
-      const systemPrompt = knowledgeContent
-        ? `${baseSystemPrompt}\n\n## Relevant Knowledge\n\n${knowledgeContent}`
-        : baseSystemPrompt;
-
-      // Get LLM response with caching
-      const tools = this.getToolDefinitions();
-      const request: AgentLLMRequest = {
-        messages: messagesToUse,
-        tools,
-        systemPrompt,
-        temperature: 0.7,
-      };
-
-      // Check cache
-      let response: AgentLLMResponse;
-      const cacheStart = performance.now();
-      const cached = this.requestCache.get(request);
-
-      if (cached) {
-        response = cached;
-        this.metrics?.increment(AGENT_METRICS.requestCacheHits.name);
-        turnSpan?.setAttribute("cache.hit", true);
-      } else {
-        response = await this.llm.complete(request);
-        this.requestCache.set(request, response);
-        this.metrics?.increment(AGENT_METRICS.requestCacheMisses.name);
-        turnSpan?.setAttribute("cache.hit", false);
-      }
-
-      this.metrics?.observe(AGENT_METRICS.requestCacheTime.name, performance.now() - cacheStart);
-
-      this.emit("thinking", { content: response.content });
-
-      // Add assistant message to compressed messages
-      const assistantMessage: AgentMessage = {
-        role: "assistant",
-        content: response.content,
-        toolCalls: response.toolCalls,
-      };
-      messagesToUse.push(assistantMessage);
-
-      // Update state with compressed messages if compression occurred
-      if (compressedResult.compressionRatio > 0) {
-        this.state.messages = messagesToUse;
-      } else {
-        // No compression, just add normally
-        this.state.messages.push(assistantMessage);
-      }
-      this.recordMessage(assistantMessage);
-
-      // Handle based on finish reason
-      if (response.finishReason === "stop" || !response.toolCalls?.length) {
+      // Handle outcome
+      if (outcome.type === "complete") {
         this.state.status = "complete";
-        this.emit("complete", { content: response.content });
+        this.emit("complete", { content: outcome.response?.content });
         this.metrics?.increment(AGENT_METRICS.turnsTotal.name, { status: "complete" });
         turnSpan?.setStatus("ok");
         return;
       }
 
-      // Execute tool calls
-      if (response.toolCalls && response.toolCalls.length > 0) {
+      if (outcome.type === "tool_use" && outcome.toolCalls) {
         this.state.status = "executing";
-        const shouldExecute = await this.maybeCreatePlan(response.toolCalls);
+        const shouldExecute = await this.maybeCreatePlan(outcome.toolCalls);
         if (!shouldExecute) {
           this.emit("turn:end", { turn: this.state.turn });
           this.metrics?.increment(AGENT_METRICS.turnsTotal.name, { status: "success" });
           turnSpan?.setStatus("ok");
           return;
         }
-        await this.executeToolCalls(response.toolCalls, turnSpan);
+        await this.executeToolCalls(outcome.toolCalls, turnSpan);
+      } else if (outcome.type === "error") {
+        throw new Error(outcome.error ?? "Unknown execution error");
       }
 
       this.emit("turn:end", { turn: this.state.turn });

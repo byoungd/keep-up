@@ -38,7 +38,7 @@ function findAriaCheckboxElement(item: HTMLElement): HTMLElement | null {
     if (LIST_CONTAINER_TAGS.has(child.tagName)) {
       continue;
     }
-    if (child.getAttribute("role") === "checkbox") {
+    if (child instanceof HTMLElement && child.getAttribute("role") === "checkbox") {
       return child;
     }
     const nested = child.querySelector(TASK_ARIA_CHECKBOX_SELECTOR);
