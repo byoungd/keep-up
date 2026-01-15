@@ -24,8 +24,14 @@ import {
 } from "../executor";
 import type { KnowledgeRegistry } from "../knowledge";
 import { AGENTS_GUIDE_PROMPT } from "../prompts/agentGuidelines";
-import { createAuditLogger, createPermissionChecker } from "../security";
+import { createAuditLogger, createPermissionChecker, createToolPolicyEngine } from "../security";
 import type { SessionState } from "../session";
+import { createSkillPolicyGuard } from "../skills/skillPolicyGuard";
+import type { SkillPromptAdapter } from "../skills/skillPromptAdapter";
+import { createSkillPromptAdapter } from "../skills/skillPromptAdapter";
+import type { SkillRegistry } from "../skills/skillRegistry";
+import type { SkillSession } from "../skills/skillSession";
+import { createSkillSession } from "../skills/skillSession";
 import type { TaskGraphStore, TaskNodeStatus } from "../tasks/taskGraph";
 import type { IMetricsCollector, ITracer, SpanContext, TelemetryContext } from "../telemetry";
 import { AGENT_METRICS } from "../telemetry";
@@ -145,6 +151,12 @@ export interface OrchestratorComponents {
   intentRegistry?: IntentRegistry;
   /** Knowledge registry for scoped knowledge injection */
   knowledgeRegistry?: KnowledgeRegistry;
+  /** Skill registry for Agent Skills */
+  skillRegistry?: SkillRegistry;
+  /** Skill session tracking active skills */
+  skillSession?: SkillSession;
+  /** Skill prompt adapter for available skills injection */
+  skillPromptAdapter?: SkillPromptAdapter;
   /** Optional task graph for event-sourced task tracking */
   taskGraph?: TaskGraphStore;
 }
@@ -174,6 +186,9 @@ export class AgentOrchestrator {
   private readonly toolDiscovery?: ToolDiscoveryEngine;
   private readonly intentRegistry?: IntentRegistry;
   private readonly knowledgeRegistry?: KnowledgeRegistry;
+  private readonly skillRegistry?: SkillRegistry;
+  private readonly skillSession?: SkillSession;
+  private readonly skillPromptAdapter?: SkillPromptAdapter;
   private readonly taskGraph?: TaskGraphStore;
   private currentRunId?: string;
   private readonly taskGraphToolCalls = new WeakMap<MCPToolCall, string>();
@@ -243,6 +258,9 @@ export class AgentOrchestrator {
     // Initialize knowledge registry for scoped knowledge injection
     this.intentRegistry = components.intentRegistry ?? createIntentRegistry();
     this.knowledgeRegistry = components.knowledgeRegistry;
+    this.skillRegistry = components.skillRegistry;
+    this.skillSession = components.skillSession;
+    this.skillPromptAdapter = components.skillPromptAdapter;
     this.taskGraph = components.taskGraph;
 
     this.turnExecutor = createTurnExecutor({
@@ -250,6 +268,8 @@ export class AgentOrchestrator {
       messageCompressor: this.messageCompressor,
       requestCache: this.requestCache,
       knowledgeRegistry: this.knowledgeRegistry,
+      skillRegistry: this.skillRegistry,
+      skillPromptAdapter: this.skillPromptAdapter,
       metrics: this.metrics,
       getToolDefinitions: () => this.getToolDefinitions(),
     });
@@ -865,11 +885,17 @@ export class AgentOrchestrator {
   private createToolContext(call?: MCPToolCall): ToolContext {
     return {
       userId: undefined, // Set from session
+      sessionId: this.sessionState?.id,
       docId: undefined, // Set from context
       correlationId: this.currentRunId,
       taskNodeId: call ? this.taskGraphToolCalls.get(call) : undefined,
       security: this.config.security,
       signal: this.abortController?.signal,
+      skills: this.skillSession
+        ? {
+            activeSkills: this.skillSession.getActiveSkills(),
+          }
+        : undefined,
     };
   }
 
@@ -1067,6 +1093,11 @@ export interface CreateOrchestratorOptions {
   planApprovalHandler?: PlanApprovalHandler;
   recovery?: { enabled?: boolean };
   toolDiscovery?: { enabled?: boolean; maxResults?: number; minScore?: number };
+  skills?: {
+    registry?: SkillRegistry;
+    session?: SkillSession;
+    promptAdapter?: SkillPromptAdapter;
+  };
 }
 
 /**
@@ -1080,50 +1111,31 @@ export function createOrchestrator(
   // Resolve parallel execution config
   const parallelExecution = resolveParallelConfig(options.parallelExecution);
 
-  const config: AgentConfig = {
-    name: options.name ?? "agent",
-    systemPrompt: options.systemPrompt ?? DEFAULT_SYSTEM_PROMPT,
-    security: options.security ?? DEFAULT_SECURITY,
-    toolServers: [],
-    maxTurns: options.maxTurns ?? 50,
-    requireConfirmation: options.requireConfirmation ?? true,
-    parallelExecution,
-    planning: {
-      enabled: options.planning?.enabled ?? false,
-      requireApproval: options.planning?.requireApproval ?? false,
-      maxRefinements: options.planning?.maxRefinements,
-      planningTimeoutMs: options.planning?.planningTimeoutMs,
-      autoExecuteLowRisk: options.planning?.autoExecuteLowRisk,
-    },
-    recovery: { enabled: options.recovery?.enabled ?? false },
-    toolDiscovery: {
-      enabled: options.toolDiscovery?.enabled ?? false,
-      maxResults: options.toolDiscovery?.maxResults,
-      minScore: options.toolDiscovery?.minScore,
-    },
-  };
+  const config = buildAgentConfig(options, parallelExecution);
 
-  const toolExecutor =
-    options.components?.toolExecutor ??
-    createToolExecutor({
-      registry,
-      policy: options.toolExecution?.policy ?? createPermissionChecker(config.security),
-      policyEngine: options.toolExecution?.policyEngine,
-      sandboxAdapter: options.toolExecution?.sandboxAdapter,
-      telemetryHandler: options.toolExecution?.telemetryHandler,
-      audit: options.toolExecution?.audit ?? createAuditLogger(),
-      telemetry: options.toolExecution?.telemetry ?? options.telemetry,
-      rateLimiter: options.toolExecution?.rateLimiter,
-      cache: options.toolExecution?.cache,
-      retryOptions: options.toolExecution?.retryOptions,
-      cachePredicate: options.toolExecution?.cachePredicate,
-      contextOverrides: options.toolExecution?.contextOverrides,
-    });
+  const permissionChecker =
+    options.toolExecution?.policy ?? createPermissionChecker(config.security);
+  const auditLogger = options.toolExecution?.audit ?? createAuditLogger();
+  const { skillRegistry, skillSession, skillPromptAdapter } = resolveSkillComponents(
+    options,
+    auditLogger
+  );
+  const policyEngine = resolvePolicyEngine(options, permissionChecker, skillRegistry);
+  const toolExecutor = resolveToolExecutor(
+    options,
+    registry,
+    permissionChecker,
+    policyEngine,
+    auditLogger
+  );
 
   const components: OrchestratorComponents = {
     ...options.components,
     toolExecutor,
     eventBus: options.eventBus ?? options.components?.eventBus,
+    skillRegistry,
+    skillSession,
+    skillPromptAdapter,
   };
 
   const orchestrator = new AgentOrchestrator(config, llm, registry, options.telemetry, components);
@@ -1131,6 +1143,102 @@ export function createOrchestrator(
     orchestrator.setPlanApprovalHandler(options.planApprovalHandler);
   }
   return orchestrator;
+}
+
+function buildAgentConfig(
+  options: CreateOrchestratorOptions,
+  parallelExecution: ParallelExecutionConfig
+): AgentConfig {
+  return {
+    name: options.name ?? "agent",
+    systemPrompt: options.systemPrompt ?? DEFAULT_SYSTEM_PROMPT,
+    security: options.security ?? DEFAULT_SECURITY,
+    toolServers: [],
+    maxTurns: options.maxTurns ?? 50,
+    requireConfirmation: options.requireConfirmation ?? true,
+    parallelExecution,
+    planning: buildPlanningConfig(options.planning),
+    recovery: { enabled: options.recovery?.enabled ?? false },
+    toolDiscovery: buildToolDiscoveryConfig(options.toolDiscovery),
+  };
+}
+
+function buildPlanningConfig(
+  planning: CreateOrchestratorOptions["planning"]
+): AgentConfig["planning"] {
+  return {
+    enabled: planning?.enabled ?? false,
+    requireApproval: planning?.requireApproval ?? false,
+    maxRefinements: planning?.maxRefinements,
+    planningTimeoutMs: planning?.planningTimeoutMs,
+    autoExecuteLowRisk: planning?.autoExecuteLowRisk,
+  };
+}
+
+function buildToolDiscoveryConfig(
+  toolDiscovery: CreateOrchestratorOptions["toolDiscovery"]
+): AgentConfig["toolDiscovery"] {
+  return {
+    enabled: toolDiscovery?.enabled ?? false,
+    maxResults: toolDiscovery?.maxResults,
+    minScore: toolDiscovery?.minScore,
+  };
+}
+
+function resolveSkillComponents(
+  options: CreateOrchestratorOptions,
+  auditLogger: ReturnType<typeof createAuditLogger>
+): {
+  skillRegistry?: SkillRegistry;
+  skillSession?: SkillSession;
+  skillPromptAdapter?: SkillPromptAdapter;
+} {
+  const skillRegistry = options.skills?.registry ?? options.components?.skillRegistry;
+  const skillSession =
+    options.skills?.session ??
+    options.components?.skillSession ??
+    (skillRegistry ? createSkillSession(skillRegistry, auditLogger) : undefined);
+  const skillPromptAdapter =
+    options.skills?.promptAdapter ??
+    options.components?.skillPromptAdapter ??
+    (skillRegistry ? createSkillPromptAdapter() : undefined);
+  return { skillRegistry, skillSession, skillPromptAdapter };
+}
+
+function resolvePolicyEngine(
+  options: CreateOrchestratorOptions,
+  permissionChecker: ReturnType<typeof createPermissionChecker>,
+  skillRegistry: SkillRegistry | undefined
+) {
+  const basePolicyEngine =
+    options.toolExecution?.policyEngine ?? createToolPolicyEngine(permissionChecker);
+  return skillRegistry ? createSkillPolicyGuard(basePolicyEngine, skillRegistry) : basePolicyEngine;
+}
+
+function resolveToolExecutor(
+  options: CreateOrchestratorOptions,
+  registry: IToolRegistry,
+  permissionChecker: ReturnType<typeof createPermissionChecker>,
+  policyEngine: ReturnType<typeof resolvePolicyEngine>,
+  auditLogger: ReturnType<typeof createAuditLogger>
+): ToolExecutor {
+  if (options.components?.toolExecutor) {
+    return options.components.toolExecutor;
+  }
+  return createToolExecutor({
+    registry,
+    policy: permissionChecker,
+    policyEngine,
+    sandboxAdapter: options.toolExecution?.sandboxAdapter,
+    telemetryHandler: options.toolExecution?.telemetryHandler,
+    audit: auditLogger,
+    telemetry: options.toolExecution?.telemetry ?? options.telemetry,
+    rateLimiter: options.toolExecution?.rateLimiter,
+    cache: options.toolExecution?.cache,
+    retryOptions: options.toolExecution?.retryOptions,
+    cachePredicate: options.toolExecution?.cachePredicate,
+    contextOverrides: options.toolExecution?.contextOverrides,
+  });
 }
 
 function resolveParallelConfig(

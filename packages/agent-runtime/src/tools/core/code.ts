@@ -232,6 +232,10 @@ export class CodeToolServer extends BaseToolServer {
               type: "number",
               description: "Timeout in milliseconds (default: 30000)",
             },
+            cwd: {
+              type: "string",
+              description: "Working directory for code execution",
+            },
           },
           required: ["language", "code"],
         },
@@ -272,6 +276,7 @@ export class CodeToolServer extends BaseToolServer {
     const language = args.language as string;
     const code = args.code as string;
     const timeout = (args.timeout as number) ?? context.security.limits.maxExecutionTimeMs;
+    const cwd = typeof args.cwd === "string" ? args.cwd : undefined;
 
     // Check permissions
     if (context.security.permissions.code === "disabled") {
@@ -301,6 +306,7 @@ export class CodeToolServer extends BaseToolServer {
       timeoutMs: timeout,
       maxOutputBytes: context.security.limits.maxOutputBytes,
       signal: context.signal,
+      cwd,
     });
 
     // Audit result

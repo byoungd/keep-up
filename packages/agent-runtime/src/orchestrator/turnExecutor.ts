@@ -24,6 +24,8 @@
 
 import type { KnowledgeMatchResult, KnowledgeRegistry } from "../knowledge";
 import { AGENTS_GUIDE_PROMPT } from "../prompts/agentGuidelines";
+import { SkillPromptAdapter, type SkillPromptOptions } from "../skills/skillPromptAdapter";
+import type { SkillRegistry } from "../skills/skillRegistry";
 import { AGENT_METRICS } from "../telemetry";
 import type { IMetricsCollector, SpanContext } from "../telemetry";
 import type { AgentMessage, AgentState, MCPToolCall } from "../types";
@@ -95,6 +97,10 @@ export interface TurnExecutorDependencies {
   readonly requestCache: RequestCache;
   /** Optional knowledge registry for context injection */
   readonly knowledgeRegistry?: KnowledgeRegistry;
+  /** Optional skill registry for available skills prompt injection */
+  readonly skillRegistry?: SkillRegistry;
+  /** Optional skill prompt adapter */
+  readonly skillPromptAdapter?: SkillPromptAdapter;
   /** Optional metrics collector for observability */
   readonly metrics?: IMetricsCollector;
   /** Function to retrieve available tool definitions */
@@ -113,6 +119,8 @@ export interface TurnExecutorConfig {
   readonly temperature?: number;
   /** Maximum tokens for LLM response */
   readonly maxTokens?: number;
+  /** Optional prompt formatting overrides for skills */
+  readonly skillPrompt?: SkillPromptOptions;
 }
 
 /**
@@ -187,7 +195,8 @@ export class TurnExecutor implements ITurnExecutor {
       metrics.knowledgeMatched = knowledgeContent ? 1 : 0;
 
       // Step 3: Build LLM request
-      const request = this.buildRequest(compressionResult.messages, knowledgeContent);
+      const skillPrompt = this.buildSkillPrompt();
+      const request = this.buildRequest(compressionResult.messages, knowledgeContent, skillPrompt);
 
       // Step 4: Get LLM response (with caching)
       const { response, cacheHit, cacheTimeMs } = await this.getResponse(request, span);
@@ -278,11 +287,20 @@ export class TurnExecutor implements ITurnExecutor {
     return undefined;
   }
 
-  private buildRequest(messages: AgentMessage[], knowledgeContent?: string): AgentLLMRequest {
+  private buildRequest(
+    messages: AgentMessage[],
+    knowledgeContent?: string,
+    skillPrompt?: string
+  ): AgentLLMRequest {
     const basePrompt = this.config.systemPrompt ?? AGENTS_GUIDE_PROMPT;
-    const systemPrompt = knowledgeContent
-      ? `${basePrompt}\n\n## Relevant Knowledge\n\n${knowledgeContent}`
-      : basePrompt;
+    const promptParts = [basePrompt];
+    if (skillPrompt) {
+      promptParts.push(skillPrompt);
+    }
+    if (knowledgeContent) {
+      promptParts.push(`## Relevant Knowledge\n\n${knowledgeContent}`);
+    }
+    const systemPrompt = promptParts.join("\n\n");
 
     return {
       messages,
@@ -355,6 +373,20 @@ export class TurnExecutor implements ITurnExecutor {
       }
     }
     return undefined;
+  }
+
+  private buildSkillPrompt(): string | undefined {
+    if (!this.deps.skillRegistry) {
+      return undefined;
+    }
+
+    const adapter = this.deps.skillPromptAdapter ?? new SkillPromptAdapter();
+    const skills = this.deps.skillRegistry.list();
+    if (skills.length === 0) {
+      return undefined;
+    }
+
+    return adapter.formatAvailableSkills(skills, this.config.skillPrompt);
   }
 }
 

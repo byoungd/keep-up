@@ -5,6 +5,7 @@
  * Enables logging, caching, rate limiting, metrics, and custom transformations.
  */
 
+import { getLogger } from "../logging/logger.js";
 import type { MCPToolCall, MCPToolResult, ToolContext } from "../types";
 
 // ============================================================================
@@ -69,7 +70,9 @@ export function loggingMiddleware(
     logger?: (message: string, data?: unknown) => void;
   } = {}
 ): ToolMiddleware {
-  const log = options.logger ?? console.log;
+  const structuredLogger = getLogger("tool-middleware");
+  const log =
+    options.logger ?? ((msg: string, data?: unknown) => structuredLogger.info(msg, { data }));
   const logInput = options.logInput ?? true;
   const logOutput = options.logOutput ?? true;
 

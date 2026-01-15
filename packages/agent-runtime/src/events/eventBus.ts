@@ -5,6 +5,10 @@
  * Supports wildcard subscriptions, async handlers, and event replay.
  */
 
+import { getLogger } from "../logging/logger.js";
+
+const logger = getLogger("event-bus");
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -491,7 +495,10 @@ export class EventBus {
       if (result instanceof Promise) {
         result
           .catch((error) => {
-            console.error(`[EventBus] Handler error for ${event.type}:`, error);
+            logger.error(`Handler error for ${event.type}`, error as Error, {
+              eventType: event.type,
+              pattern: record.pattern,
+            });
           })
           .finally(() => {
             this.pendingHandlers--;
@@ -501,7 +508,10 @@ export class EventBus {
       }
     } catch (error) {
       this.pendingHandlers--;
-      console.error(`[EventBus] Handler error for ${event.type}:`, error);
+      logger.error(`Handler error for ${event.type}`, error as Error, {
+        eventType: event.type,
+        pattern: record.pattern,
+      });
     }
   }
 

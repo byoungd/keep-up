@@ -11,6 +11,10 @@
  * - Backpressure handling
  */
 
+import { getLogger } from "../logging/logger.js";
+
+const logger = getLogger("resource-pool");
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -272,7 +276,7 @@ export class ResourcePool<T> {
       try {
         await this.config.cleanup(pooled.resource);
       } catch (error) {
-        console.error("[ResourcePool] Cleanup error:", error);
+        logger.error("Cleanup error", error as Error);
       }
     }
     this.stats.totalDestroyed++;

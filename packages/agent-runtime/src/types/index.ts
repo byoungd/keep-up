@@ -116,6 +116,8 @@ export interface MCPToolServer {
 export interface ToolContext {
   /** Current user ID */
   userId?: string;
+  /** Current session ID */
+  sessionId?: string;
   /** Current document ID (for LFCC tools) */
   docId?: string;
   /** Correlation ID for tracing */
@@ -130,12 +132,49 @@ export interface ToolContext {
   audit?: AuditLogger;
   /** Cowork execution context */
   cowork?: CoworkToolContext;
+  /** Skill execution context */
+  skills?: SkillToolContext;
 }
 
 export interface CoworkToolContext {
   session: CoworkSession;
   policyEngine: CoworkPolicyEngine;
   caseInsensitivePaths?: boolean;
+}
+
+// ============================================================================
+// Skill Types
+// ============================================================================
+
+export type SkillSource = "builtin" | "org" | "user" | "third_party";
+
+export interface SkillIndexEntry {
+  skillId: string;
+  name: string;
+  description: string;
+  source: SkillSource;
+  path: string;
+  skillFile: string;
+  hash: string;
+  lastModified: string;
+  metadata?: Record<string, string>;
+  license?: string;
+  compatibility?: string;
+  allowedTools?: string[];
+  originUrl?: string;
+}
+
+export interface SkillActivation {
+  skillId: string;
+  hash: string;
+  source: SkillSource;
+  sessionId: string;
+  taskId?: string;
+  activatedAt: string;
+}
+
+export interface SkillToolContext {
+  activeSkills: SkillActivation[];
 }
 
 // ============================================================================

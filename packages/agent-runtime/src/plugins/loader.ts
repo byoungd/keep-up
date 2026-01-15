@@ -4,6 +4,7 @@
  * Loads and manages plugin lifecycle with security boundaries.
  */
 
+import { getLogger } from "../logging/logger.js";
 import type {
   AgentContribution,
   AgentFactory,
@@ -487,11 +488,13 @@ interface HookRegistration {
 // ============================================================================
 
 function createConsoleLogger(prefix: string): PluginLogger {
+  const logger = getLogger(prefix);
   return {
-    debug: (msg, ...args) => console.debug(`[${prefix}] ${msg}`, ...args),
-    info: (msg, ...args) => console.info(`[${prefix}] ${msg}`, ...args),
-    warn: (msg, ...args) => console.warn(`[${prefix}] ${msg}`, ...args),
-    error: (msg, ...args) => console.error(`[${prefix}] ${msg}`, ...args),
+    debug: (msg, ...args) => logger.debug(`${msg}`, { args }),
+    info: (msg, ...args) => logger.info(`${msg}`, { args }),
+    warn: (msg, ...args) => logger.warn(`${msg}`, { args }),
+    error: (msg, ...args) =>
+      logger.error(`${msg}`, args[0] instanceof Error ? args[0] : undefined, { args }),
   };
 }
 

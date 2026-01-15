@@ -140,6 +140,62 @@ const code = createCodeToolServer();
 // Supports: python, javascript, typescript, ruby, go, rust, bash
 ```
 
+## Agent Skills
+
+Agent Skills provide progressive, on-demand procedural guidance using `SKILL.md` folders.
+
+```typescript
+import {
+  createAuditLogger,
+  createPermissionChecker,
+  createSkillPolicyGuard,
+  createSkillRegistry,
+  createSkillToolServer,
+  createToolPolicyEngine,
+  createToolExecutor,
+  createToolRegistry,
+  createOrchestrator,
+  securityPolicy,
+} from '@ku0/agent-runtime';
+
+const registry = createToolRegistry();
+const security = securityPolicy().fromPreset('balanced').build();
+const permissionChecker = createPermissionChecker(security);
+const audit = createAuditLogger();
+
+const skillRegistry = createSkillRegistry({
+  roots: [
+    { path: '/path/to/builtin-skills', source: 'builtin' },
+    { path: '/path/to/user-skills', source: 'user' },
+  ],
+  cachePath: '/path/to/.keep-up/skills/cache.json',
+  // Optional: override spec defaults (non-standard).
+  // validation: { compatibilityMaxLength: 500 },
+});
+await skillRegistry.discover();
+
+const policyEngine = createSkillPolicyGuard(
+  createToolPolicyEngine(permissionChecker),
+  skillRegistry
+);
+const toolExecutor = createToolExecutor({
+  registry,
+  policy: permissionChecker,
+  policyEngine,
+  audit,
+});
+
+await registry.register(
+  createSkillToolServer({ registry: skillRegistry, executor: toolExecutor })
+);
+
+const agent = createOrchestrator(llm, registry, {
+  security,
+  skills: { registry: skillRegistry },
+  components: { toolExecutor },
+});
+```
+
 ### Subagent Tool Server
 
 Spawn focused subagents for parallel or staged workflows:
