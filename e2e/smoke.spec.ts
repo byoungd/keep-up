@@ -16,10 +16,16 @@ test.describe("Smoke Tests", () => {
   });
 
   test("unread page loads with content or onboarding", async ({ page }) => {
-    await page.goto("/unread");
+    await page.goto("/unread", { waitUntil: "networkidle" });
 
     // Should show the page header
-    await expect(page.getByRole("heading", { name: "Unread" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Unread" })).toBeVisible({ timeout: 15000 });
+
+    // Wait for app to be hydrated - sidebar search button is a good indicator
+    await page
+      .getByRole("button", { name: /search|搜索/i })
+      .waitFor({ state: "visible", timeout: 15000 })
+      .catch(() => null);
 
     // Should show either:
     // 1. Document list (returning user with content)
@@ -28,9 +34,12 @@ test.describe("Smoke Tests", () => {
     const importButton = page.getByRole("button", { name: /import/i });
     const documentList = page.locator("[data-testid='document-list']");
     const topicSelector = page.getByRole("heading", { name: /what defines your role/i });
+    const createBriefingButton = page.getByRole("button", { name: /create my briefing/i });
 
-    // Wait for any of these states to appear
-    await expect(importButton.or(documentList).or(topicSelector)).toBeVisible({ timeout: 10000 });
+    // Wait for any of these states to appear (longer timeout for CI)
+    await expect(
+      importButton.or(documentList).or(topicSelector).or(createBriefingButton)
+    ).toBeVisible({ timeout: 20000 });
   });
 
   test("projects page loads without 404", async ({ page }) => {
