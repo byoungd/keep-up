@@ -1,7 +1,7 @@
+import type { MessageStatus } from "@ku0/shell";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 import type { ContextStatusTranslations } from "../components/layout/ContextStatusPanel";
-import type { MessageStatus } from "../components/layout/MessageItem";
 
 const PROVIDER_LABELS: Record<string, string> = {
   gemini: "Gemini",

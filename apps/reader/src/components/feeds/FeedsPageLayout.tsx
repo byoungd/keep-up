@@ -7,7 +7,7 @@ import {
   FeedList,
   FeedListHeader,
 } from "@/components/feeds";
-import { AppShell } from "@/components/layout/AppShell";
+import { ReaderShellLayout } from "@/components/layout/ReaderShellLayout";
 import { useFeedNavigation } from "@/hooks/useFeedNavigation";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { FeedProvider, useFeedItems } from "@/providers/FeedProvider";
@@ -43,7 +43,7 @@ function FeedsPageContent({ initialFilter }: FeedsPageLayoutProps) {
   const effectiveDesktop = hydrated && isDesktop;
 
   return (
-    <AppShell
+    <ReaderShellLayout
       isDesktop={effectiveDesktop}
       rightPanel={<FeedItemPreview item={selectedItem} onClose={() => setSelectedItemId(null)} />}
     >
@@ -59,7 +59,7 @@ function FeedsPageContent({ initialFilter }: FeedsPageLayoutProps) {
         />
       </main>
       <AddFeedModal open={showAddModal} onClose={() => setShowAddModal(false)} />
-    </AppShell>
+    </ReaderShellLayout>
   );
 }
 

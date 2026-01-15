@@ -1,7 +1,7 @@
 import { type ReferenceAnchor, resolveReferenceInState } from "@/lib/ai/referenceAnchors";
+import type { Message } from "@ku0/shell";
 import type { EditorView } from "prosemirror-view";
 import * as React from "react";
-import type { Message } from "./MessageItem";
 
 interface ReferenceDebugPanelProps {
   editorView?: EditorView | null;

@@ -2,7 +2,7 @@
 
 import { CollabStatusBanner, PresenceIndicator } from "@/components/collab";
 import { AIPanel } from "@/components/layout/AIPanel";
-import { AppShell } from "@/components/layout/AppShell";
+import { ReaderShellLayout } from "@/components/layout/ReaderShellLayout";
 import { ArticleRenderer } from "@/components/reader/ArticleRenderer";
 import { ReaderPageSkeleton } from "@/components/ui/skeletons";
 import { useAIPanelState } from "@/context/PanelStateContext";
@@ -142,7 +142,10 @@ export default function ReaderPage() {
   const showCollabUI = collab.state !== "disabled";
 
   return (
-    <AppShell rightPanel={<AIPanel onClose={() => setShowAI(false)} />}>
+    <ReaderShellLayout
+      docId={docId ?? undefined}
+      rightPanel={<AIPanel onClose={() => setShowAI(false)} />}
+    >
       <main className="flex-1 flex flex-col min-w-0 h-full reader-surface">
         {/* Collaboration status banner (shown when not connected and collab enabled) */}
         {showCollabUI && collab.state !== "connected" && (
@@ -186,6 +189,6 @@ export default function ReaderPage() {
           />
         )}
       </main>
-    </AppShell>
+    </ReaderShellLayout>
   );
 }

@@ -1,0 +1,214 @@
+/* Utility Animations */
+@layer utilities {
+  .animate-in {
+    animation-name: enter;
+    animation-duration: var(--tw-duration, var(--duration-normal));
+    animation-timing-function: var(--tw-ease, var(--ease-out-expo));
+    animation-fill-mode: both;
+  }
+
+  .animate-out {
+    animation-name: exit;
+    animation-duration: var(--tw-duration, var(--duration-normal));
+    animation-timing-function: var(--tw-ease, var(--ease-in-out));
+    animation-fill-mode: both;
+  }
+
+  .fade-in,
+  .fade-in-0 {
+    --tw-enter-opacity: 0;
+  }
+
+  .fade-out-0 {
+    --tw-exit-opacity: 0;
+  }
+
+  .zoom-in-95 {
+    --tw-enter-scale: 0.95;
+  }
+
+  .zoom-in-50 {
+    --tw-enter-scale: 0.5;
+  }
+
+  .zoom-out-95 {
+    --tw-exit-scale: 0.95;
+  }
+
+  .slide-in-from-top-1 {
+    --tw-enter-translate-y: -0.25rem;
+  }
+
+  .slide-in-from-top-2 {
+    --tw-enter-translate-y: -0.5rem;
+  }
+
+  .slide-in-from-bottom-2 {
+    --tw-enter-translate-y: 0.5rem;
+  }
+
+  .slide-in-from-bottom-4 {
+    --tw-enter-translate-y: 1rem;
+  }
+
+  .slide-in-from-left-2 {
+    --tw-enter-translate-x: -0.5rem;
+  }
+
+  .slide-in-from-right-2 {
+    --tw-enter-translate-x: 0.5rem;
+  }
+
+  .slide-in-from-left {
+    --tw-enter-translate-x: -100%;
+  }
+
+  .slide-in-from-right {
+    --tw-enter-translate-x: 100%;
+  }
+
+  .slide-in-from-top {
+    --tw-enter-translate-y: -100%;
+  }
+
+  .slide-in-from-bottom {
+    --tw-enter-translate-y: 100%;
+  }
+
+  @keyframes enter {
+    from {
+      opacity: var(--tw-enter-opacity, 1);
+      transform: translate3d(var(--tw-enter-translate-x, 0), var(--tw-enter-translate-y, 0), 0)
+        scale(var(--tw-enter-scale, 1));
+    }
+
+    to {
+      opacity: 1;
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+  }
+
+  @keyframes exit {
+    from {
+      opacity: 1;
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+
+    to {
+      opacity: var(--tw-exit-opacity, 1);
+      transform: translate3d(var(--tw-exit-translate-x, 0), var(--tw-exit-translate-y, 0), 0)
+        scale(var(--tw-exit-scale, 1));
+    }
+  }
+
+  .animate-in-fade-slide {
+    animation: enter-fade-slide var(--duration-normal) var(--ease-out-expo) forwards;
+  }
+
+  @keyframes enter-fade-slide {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* AI Panel Animations */
+  .ai-thinking-pulse {
+    animation: ai-thinking-pulse 2s var(--ease-smooth) infinite;
+  }
+
+  @keyframes ai-thinking-pulse {
+    0%,
+    100% {
+      opacity: 0.6;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.02);
+    }
+  }
+
+  .ai-message-enter {
+    animation: ai-message-enter var(--duration-normal) var(--ease-spring) forwards;
+  }
+
+  @keyframes ai-message-enter {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .ai-button-press:active {
+    transform: scale(0.96);
+    transition: transform 0.1s ease;
+  }
+
+  .ai-gradient-shimmer {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.1) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: ai-shimmer 1.5s linear infinite;
+  }
+
+  @keyframes ai-shimmer {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
+
+  /* Smooth focus ring for AI inputs */
+  .ai-focus-ring:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--color-background), 0 0 0 4px var(--color-primary);
+    transition: box-shadow var(--duration-fast) var(--ease-smooth);
+  }
+
+  @keyframes block-move-flash {
+    0% {
+      background-color: hsl(214 90% 68% / 0.25);
+      box-shadow: 0 0 0 2px hsl(214 90% 68% / 0.15);
+    }
+    100% {
+      background-color: transparent;
+      box-shadow: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-in,
+    .animate-out,
+    .animate-in-fade-slide,
+    .ai-thinking-pulse,
+    .ai-message-enter,
+    .ai-gradient-shimmer,
+    .animate-pulse,
+    .animate-ping,
+    .animate-spin {
+      animation-duration: 1ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0ms !important;
+    }
+
+    .ai-button-press:active {
+      transform: none;
+    }
+  }
+}

@@ -14,7 +14,7 @@ import { AIContextMenu } from "@/components/editor/AIContextMenu";
 import { BlockHandlePortal } from "@/components/editor/BlockHandlePortal";
 import { SlashMenuPortal } from "@/components/editor/SlashMenuPortal";
 import { ExportDialog } from "@/components/export/ExportDialog";
-import { AppShell } from "@/components/layout/AppShell";
+import { ReaderShellLayout } from "@/components/layout/ReaderShellLayout";
 import { SplitPaneLayout } from "@/components/layout/SplitPaneLayout";
 import { LfccDebugOverlay } from "@/components/lfcc/DebugOverlay/LfccDebugOverlay";
 import { DivergenceBanner, useDivergenceState } from "@/components/lfcc/DivergenceBanner";
@@ -468,8 +468,9 @@ function EditorPageContent() {
       <LfccEditorProvider value={contextValue}>
         <LfccDragLayer>
           <SelectionToolbar failClosedState={failClosedState} isReadOnly={effectiveReadOnly} />
-          <AppShell
+          <ReaderShellLayout
             isDesktop={effectiveDesktop}
+            docId={docId}
             rightPanel={
               <AIPanel
                 onClose={() => undefined}
@@ -530,7 +531,7 @@ function EditorPageContent() {
                 editorPanel
               )}
             </div>
-          </AppShell>
+          </ReaderShellLayout>
           <SlashMenuPortal />
           <BlockHandlePortal state={blockHandleState} />
           <AIContextMenu state={aiMenuState} onClose={closeAIMenu} bridge={bridge} />

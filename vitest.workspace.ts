@@ -171,4 +171,20 @@ export default [
       },
     },
   }),
+  defineProject({
+    resolve: {
+      alias: aliases,
+    },
+    test: {
+      name: "cowork-server",
+      include: ["apps/cowork/server/**/*.test.ts"],
+      exclude: defaultExclude,
+      environment: "node",
+      server: {
+        deps: {
+          inline: [/@ku0\/.*/],
+        },
+      },
+    },
+  }),
 ];

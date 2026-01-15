@@ -1,0 +1,15 @@
+{
+  "name": "@ku0/design-system",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    "./core.css": "./src/core.css",
+    "./tailwind": "./src/tailwind.ts",
+    "./tailwind.config": "./src/tailwind.config.ts",
+    "./tokens": "./src/tokens.ts"
+  },
+  "devDependencies": {
+    "tailwindcss": "^4.1.18"
+  }
+}

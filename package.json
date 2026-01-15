@@ -4,7 +4,8 @@
   "type": "module",
   "packageManager": "pnpm@10.28.0",
   "scripts": {
-    "dev": "turbo run dev --filter=@ku0/reader",
+    "dev": "turbo run dev --filter=@ku0/cowork",
+    "dev:cowork": "turbo run dev --filter=@ku0/cowork",
     "dev:reader": "turbo run dev --filter=@ku0/reader",
     "dev:desktop": "concurrently -k -n web,desktop \"pnpm dev:reader\" \"pnpm --filter @ku0/desktop dev\"",
     "build": "turbo run build",
@@ -69,6 +70,7 @@
       "prosemirror-model": "1.25.4",
       "prosemirror-state": "1.4.4",
       "prosemirror-view": "1.41.4"
-    }
+    },
+    "onlyBuiltDependencies": ["@parcel/watcher", "@sentry/cli", "sharp"]
   }
 }

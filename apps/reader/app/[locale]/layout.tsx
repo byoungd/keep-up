@@ -10,9 +10,9 @@ import { KeyboardShortcutsProvider } from "@/context/KeyboardShortcutsContext";
 // Reusing fonts and styles from root layout
 import { PanelStateProvider } from "@/context/PanelStateContext";
 import { ProviderConfigProvider } from "@/context/ProviderConfigContext";
-import { ReaderPreferencesProvider } from "@/context/ReaderPreferencesContext";
 import { RssStoreProvider } from "@/lib/rss";
 import { ReactQueryProvider } from "@/providers/ReactQueryProvider";
+import { ReaderPreferencesProvider } from "@ku0/shell";
 import { LazyMotion, domAnimation } from "framer-motion";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages } from "next-intl/server";

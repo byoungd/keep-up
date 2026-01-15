@@ -14,8 +14,8 @@ globals.css (@theme) --> tailwind.config.ts --> Component (via Tailwind utilitie
           --> tokens.ts (for JS/TS logic)
 ```
 
-1.  **Definition**: `apps/reader/app/globals.css` defines strict CSS variables using Tailwind v4's `@theme` directive (e.g., `--color-primary`, `--radius-md`, `--duration-fast`).
-2.  **Mapping**: `apps/reader/tailwind.config.ts` extends the theme by mapping utilities (e.g., `bg-primary`, `rounded-lg`, `duration-fast`) to these CSS variables.
+1.  **Definition**: `packages/design-system/src/core.css` defines strict CSS variables using Tailwind v4's `@theme` directive (e.g., `--color-primary`, `--radius-md`, `--duration-fast`) and is imported by app globals after `@import "tailwindcss"`.
+2.  **Mapping**: App Tailwind configs import `@ku0/design-system/tailwind` to map utilities (e.g., `bg-primary`, `rounded-lg`, `duration-fast`) to these CSS variables.
 3.  **Consumption**: Components use Tailwind utility classes. For TypeScript logic, import from `@/styles/tokens.ts`.
 
 **Why CSS Variables?**
@@ -82,7 +82,8 @@ const animationStyle = {
 
 | File | Purpose |
 | :--- | :--- |
-| `app/globals.css` | CSS variable definitions, base styles, animations |
+| `packages/design-system/src/core.css` | Shared CSS variables, base styles, animations (imported after `tailwindcss`) |
+| `apps/reader/app/globals.css` | Imports shared core + editor-specific styles |
 | `tailwind.config.ts` | Maps CSS vars to Tailwind utilities |
 | `src/styles/tokens.ts` | TypeScript-safe token constants |
 | `src/lib/utils.ts` | `cn()` helper function |

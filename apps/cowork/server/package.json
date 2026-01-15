@@ -1,0 +1,8 @@
+{
+  "name": "@ku0/cowork-server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "COWORK_SERVER_START=true bun --watch index.ts"
+  }
+}

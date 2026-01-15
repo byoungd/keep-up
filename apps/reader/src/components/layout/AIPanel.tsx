@@ -1,21 +1,19 @@
 "use client";
 import { Button } from "@/components/ui/Button";
+import { useAIPanelState } from "@/context/PanelStateContext";
 import { useAIPanelController } from "@/hooks/useAIPanelController";
 import { useAIPanelTranslations } from "@/hooks/useAIPanelTranslations";
 import { useProactiveSuggestions } from "@/hooks/useProactiveSuggestions";
 import { useReferenceHandler } from "@/hooks/useReferenceHandler";
+import { AI_PROMPTS } from "@/lib/ai/prompts";
 import type { LoroRuntime, SpanList } from "@ku0/lfcc-bridge";
-import { cn } from "@ku0/shared/utils";
+import { type PanelPosition, AIPanel as ShellAIPanel } from "@ku0/shell";
 import type { EditorView } from "prosemirror-view";
 import * as React from "react";
 import { ProactiveSuggestionCard } from "../ai/ProactiveSuggestionCard";
 import { WorkflowSelector } from "../ai/WorkflowSelector";
-import { AIPanelHeader } from "./AIPanelHeader";
 import { ApprovalRequestCard } from "./ApprovalRequestCard";
 import { ContextStatusPanel } from "./ContextStatusPanel";
-import { InputArea } from "./InputArea";
-import { MessageList } from "./MessageList";
-import type { PanelPosition } from "./ModelSelector";
 import { ProjectContextPanel } from "./ProjectContextPanel";
 import { ReferenceDebugPanel } from "./ReferenceDebugPanel";
 import { TaskQueuePanel } from "./TaskQueuePanel";
@@ -40,8 +38,8 @@ export function AIPanel({
   selectionSpans,
   runtime,
   editorView,
-  panelPosition = "right",
-}: AIPanelProps) {
+  panelPosition,
+}: AIPanelProps): React.ReactNode {
   // Controller handles all chat lifecycle logic
   const ctrl = useAIPanelController({
     docId,
@@ -50,6 +48,9 @@ export function AIPanel({
     selectionSpans,
     runtime,
   });
+  const { position } = useAIPanelState();
+  const resolvedPanelPosition: PanelPosition =
+    panelPosition ?? (position === "left" ? "left" : "right");
 
   const {
     messages,
@@ -174,153 +175,144 @@ export function AIPanel({
   const referenceDebugPanel = <ReferenceDebugPanel editorView={editorView} messages={messages} />;
 
   return (
-    <aside
-      className={cn(
-        "ai-panel h-full flex flex-col font-sans text-foreground",
-        // Standard shadow for depth
-        "shadow-xl",
-        // Gradient background (top lighter, bottom slightly darker)
-        "bg-gradient-to-b from-surface-0/80 via-surface-0/85 to-surface-0/92",
-        "backdrop-blur-xl",
-        // Entry animation
-        "animate-in fade-in slide-in-from-right duration-500 ease-out-expo"
-      )}
-      aria-label="AI assistant panel"
-    >
-      <AIPanelHeader
-        title={t("title")}
-        model={model}
-        setModel={setModel}
-        filteredModels={filteredModels}
-        isStreaming={isStreaming}
-        isLoading={isLoading}
-        onClose={onClose}
-        onClear={handleClear}
-        onCopyLast={handleCopyLastAnswer}
-        onExport={exportHistory}
-        translations={headerTranslations}
-        panelPosition={panelPosition}
-      />
-
-      <div className="px-4 py-2 border-b border-border/50">
-        <WorkflowSelector value={workflow} onChange={(w) => setWorkflow(w as typeof workflow)} />
-      </div>
-
-      <ProjectContextPanel
-        tasks={projectContext.data?.tasks ?? []}
-        isLoading={projectContext.isLoading}
-        error={projectContext.error}
-        updatedAt={projectContext.data?.updatedAt}
-        warnings={projectContext.data?.warnings}
-        onUseTask={handleUseTask}
-        onRefresh={projectContext.refresh}
-        translations={projectContextTranslations}
-      />
-
-      <TaskQueuePanel
-        tasks={backgroundTasks.tasks}
-        stats={backgroundTasks.stats}
-        error={backgroundTasks.streamError}
-        onCancelTask={backgroundTasks.cancelTask}
-        onPauseTask={backgroundTasks.pauseTask}
-        onResumeTask={backgroundTasks.resumeTask}
-        onUpdateTask={(task) => handleUpdateTask(task.name)}
-        onUpdateWalkthrough={(task) => handleUpdateWalkthrough(task.name)}
-        translations={taskQueueTranslations}
-      />
-
-      {backgroundTasks.pendingApproval && (
-        <ApprovalRequestCard
-          request={{
-            confirmationId: backgroundTasks.pendingApproval.confirmationId,
-            toolName: backgroundTasks.pendingApproval.toolName,
-            description: backgroundTasks.pendingApproval.description,
-            arguments: backgroundTasks.pendingApproval.arguments,
-            risk: backgroundTasks.pendingApproval.risk,
-            reason: backgroundTasks.pendingApproval.reason,
-            riskTags: backgroundTasks.pendingApproval.riskTags,
-          }}
-          isBusy={backgroundTasks.approvalBusy}
-          error={backgroundTasks.approvalError}
-          onApprove={backgroundTasks.approveNext}
-          onReject={backgroundTasks.rejectNext}
-          translations={approvalTranslations}
-        />
-      )}
-
-      <MessageList
-        messages={messages}
-        suggestions={suggestions}
-        isLoading={isLoading}
-        isStreaming={isStreaming}
-        listRef={listRef}
-        onEdit={handleEdit}
-        onBranch={handleBranch}
-        onQuote={handleQuote}
-        onCopy={handleCopy}
-        onRetry={handleRetry}
-        onSuggestionClick={handleSuggestionClick}
-        translations={messageListTranslations}
-        resolveReference={editorView ? resolveReference : undefined}
-        onReferenceSelect={editorView ? handleReferenceSelect : undefined}
-      />
-
-      {messages.length === 0 && !isLoading && proactiveSuggestions.length > 0 && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10 px-6">
-          <div className="w-full max-w-sm space-y-3 pointer-events-auto animate-in fade-in fill-mode-forwards duration-700 slide-in-from-bottom-8">
-            <h3 className="text-sm font-medium text-muted-foreground text-center mb-2">
-              {t("proactiveSuggestionsTitle")}
-            </h3>
-            {proactiveSuggestions.map((s) => (
-              <ProactiveSuggestionCard
-                key={s.id}
-                title={s.title}
-                description={s.description}
-                actionPrompt={s.actionPrompt}
-                icon={s.icon}
-                onSelect={runPrompt}
-              />
-            ))}
+    <ShellAIPanel
+      // Header Props
+      title={t("title")}
+      model={model}
+      setModel={setModel}
+      filteredModels={filteredModels}
+      isStreaming={isStreaming}
+      isLoading={isLoading}
+      onClose={onClose}
+      onClear={handleClear}
+      onCopyLast={handleCopyLastAnswer}
+      onExport={exportHistory}
+      headerTranslations={headerTranslations}
+      panelPosition={resolvedPanelPosition}
+      // Configuration
+      prompts={AI_PROMPTS}
+      // Slots
+      topContent={
+        <>
+          <div className="px-4 py-2 border-b border-border/50">
+            <WorkflowSelector
+              value={workflow}
+              onChange={(w) => setWorkflow(w as typeof workflow)}
+            />
           </div>
-        </div>
-      )}
 
-      {pendingApproval && (
-        <ApprovalRequestCard
-          request={pendingApproval}
-          isBusy={approvalBusy}
-          error={approvalError}
-          onApprove={handleApprove}
-          onReject={handleReject}
-          translations={approvalTranslations}
-        />
-      )}
+          <ProjectContextPanel
+            tasks={projectContext.data?.tasks ?? []}
+            isLoading={projectContext.isLoading}
+            error={projectContext.error}
+            updatedAt={projectContext.data?.updatedAt}
+            warnings={projectContext.data?.warnings}
+            onUseTask={handleUseTask}
+            onRefresh={projectContext.refresh}
+            translations={projectContextTranslations}
+          />
 
-      {referenceDebugPanel}
+          <TaskQueuePanel
+            tasks={backgroundTasks.tasks}
+            stats={backgroundTasks.stats}
+            error={backgroundTasks.streamError}
+            onCancelTask={backgroundTasks.cancelTask}
+            onPauseTask={backgroundTasks.pauseTask}
+            onResumeTask={backgroundTasks.resumeTask}
+            onUpdateTask={(task) => handleUpdateTask(task.name)}
+            onUpdateWalkthrough={(task) => handleUpdateWalkthrough(task.name)}
+            translations={taskQueueTranslations}
+          />
 
-      <InputArea
-        input={input}
-        setInput={setInput}
-        onSend={handleSend}
-        onRunBackground={handleRunBackground}
-        onAbort={handleAbort}
-        isLoading={isLoading}
-        isStreaming={isStreaming}
-        attachments={attachments}
-        onAddAttachment={handleAddAttachmentClick}
-        onRemoveAttachment={handleRemoveAttachment}
-        fileInputRef={fileInputRef}
-        inputRef={inputRef}
-        onFileChange={handleAttachmentFiles}
-        translations={{
-          ...inputTranslations,
-          attachmentsMeta: attachmentsMeta(attachments.length),
-        }}
-        contextStatus={contextStatus}
-        visionGuard={visionGuard}
-        attachmentError={attachmentError ?? undefined}
-        isAttachmentBusy={isAttachmentBusy || attachmentError !== null}
-      />
-    </aside>
+          {backgroundTasks.pendingApproval && (
+            <ApprovalRequestCard
+              request={{
+                confirmationId: backgroundTasks.pendingApproval.confirmationId,
+                toolName: backgroundTasks.pendingApproval.toolName,
+                description: backgroundTasks.pendingApproval.description,
+                arguments: backgroundTasks.pendingApproval.arguments,
+                risk: backgroundTasks.pendingApproval.risk,
+                reason: backgroundTasks.pendingApproval.reason,
+                riskTags: backgroundTasks.pendingApproval.riskTags,
+              }}
+              isBusy={backgroundTasks.approvalBusy}
+              error={backgroundTasks.approvalError}
+              onApprove={backgroundTasks.approveNext}
+              onReject={backgroundTasks.rejectNext}
+              translations={approvalTranslations}
+            />
+          )}
+        </>
+      }
+      overlayContent={
+        <>
+          {messages.length === 0 && !isLoading && proactiveSuggestions.length > 0 && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10 px-6">
+              <div className="w-full max-w-sm space-y-3 pointer-events-auto animate-in fade-in fill-mode-forwards duration-700 slide-in-from-bottom-8">
+                <h3 className="text-sm font-medium text-muted-foreground text-center mb-2">
+                  {t("proactiveSuggestionsTitle")}
+                </h3>
+                {proactiveSuggestions.map((s) => (
+                  <ProactiveSuggestionCard
+                    key={s.id}
+                    title={s.title}
+                    description={s.description}
+                    actionPrompt={s.actionPrompt}
+                    icon={s.icon}
+                    onSelect={runPrompt}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {pendingApproval && (
+            <ApprovalRequestCard
+              request={pendingApproval}
+              isBusy={approvalBusy}
+              error={approvalError}
+              onApprove={handleApprove}
+              onReject={handleReject}
+              translations={approvalTranslations}
+            />
+          )}
+
+          {referenceDebugPanel}
+        </>
+      }
+      // MessageList Props
+      messages={messages}
+      suggestions={suggestions}
+      listRef={listRef}
+      onEdit={handleEdit}
+      onBranch={handleBranch}
+      onQuote={handleQuote}
+      onCopy={handleCopy}
+      onRetry={handleRetry}
+      onSuggestionClick={handleSuggestionClick}
+      messageListTranslations={messageListTranslations}
+      resolveReference={editorView ? resolveReference : undefined}
+      onReferenceSelect={editorView ? handleReferenceSelect : undefined}
+      // InputArea Props
+      input={input}
+      setInput={setInput}
+      onSend={handleSend}
+      onRunBackground={handleRunBackground}
+      onAbort={handleAbort}
+      attachments={attachments}
+      onAddAttachment={handleAddAttachmentClick}
+      onRemoveAttachment={handleRemoveAttachment}
+      fileInputRef={fileInputRef}
+      inputRef={inputRef}
+      onFileChange={handleAttachmentFiles}
+      inputTranslations={{
+        ...inputTranslations,
+        attachmentsMeta: attachmentsMeta(attachments.length),
+      }}
+      contextStatus={contextStatus}
+      visionGuard={visionGuard}
+      attachmentError={attachmentError ?? undefined}
+      isAttachmentBusy={isAttachmentBusy}
+    />
   );
 }

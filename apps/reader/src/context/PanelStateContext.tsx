@@ -4,11 +4,18 @@ import * as React from "react";
 
 const STORAGE_KEY = "ui-panel-state-v2";
 
+const AI_PANEL_POSITIONS = ["main", "left", "right"] as const;
+export type AIPanelPosition = (typeof AI_PANEL_POSITIONS)[number];
+
+const isAIPanelPosition = (value: unknown): value is AIPanelPosition =>
+  AI_PANEL_POSITIONS.includes(value as AIPanelPosition);
+
 interface PanelState {
   sidebarCollapsed: boolean;
   aiPanelVisible: boolean;
   sidebarWidth: number;
   aiPanelWidth: number;
+  aiPanelPosition: AIPanelPosition;
   aiRequest: {
     prompt?: string;
     context?: string;
@@ -21,6 +28,7 @@ const DEFAULT_STATE: PanelState = {
   aiPanelVisible: true,
   sidebarWidth: 260,
   aiPanelWidth: 450,
+  aiPanelPosition: "right",
   aiRequest: null,
 };
 
@@ -30,6 +38,7 @@ interface PanelStateContextValue extends PanelState {
   setAIPanelVisible: (visible: boolean) => void;
   setSidebarWidth: (width: number) => void;
   setAIPanelWidth: (width: number) => void;
+  setAIPanelPosition: (position: AIPanelPosition) => void;
   setAIRequest: (request: PanelState["aiRequest"]) => void;
   toggleSidebar: () => void;
   toggleAIPanel: () => void;
@@ -63,6 +72,9 @@ export function PanelStateProvider({ children, initialState }: PanelStateProvide
     aiPanelVisible: initialState?.aiPanelVisible ?? DEFAULT_STATE.aiPanelVisible,
     sidebarWidth: initialState?.sidebarWidth ?? DEFAULT_STATE.sidebarWidth,
     aiPanelWidth: initialState?.aiPanelWidth ?? DEFAULT_STATE.aiPanelWidth,
+    aiPanelPosition: isAIPanelPosition(initialState?.aiPanelPosition)
+      ? initialState.aiPanelPosition
+      : DEFAULT_STATE.aiPanelPosition,
     aiRequest: null,
     // If we have initial state from server, we are effectively hydrated for layout purposes
     isHydrated: !!initialState,
@@ -97,9 +109,16 @@ export function PanelStateProvider({ children, initialState }: PanelStateProvide
       aiPanelVisible: state.aiPanelVisible,
       sidebarWidth: state.sidebarWidth,
       aiPanelWidth: state.aiPanelWidth,
+      aiPanelPosition: state.aiPanelPosition,
     });
     setCookie(STORAGE_KEY, cookieValue);
-  }, [state.sidebarCollapsed, state.aiPanelVisible, state.sidebarWidth, state.aiPanelWidth]);
+  }, [
+    state.sidebarCollapsed,
+    state.aiPanelVisible,
+    state.sidebarWidth,
+    state.aiPanelWidth,
+    state.aiPanelPosition,
+  ]);
 
   const setSidebarCollapsed = React.useCallback((collapsed: boolean) => {
     setState((prev) => ({ ...prev, sidebarCollapsed: collapsed }));
@@ -115,6 +134,10 @@ export function PanelStateProvider({ children, initialState }: PanelStateProvide
 
   const setAIPanelWidth = React.useCallback((width: number) => {
     setState((prev) => ({ ...prev, aiPanelWidth: width }));
+  }, []);
+
+  const setAIPanelPosition = React.useCallback((position: AIPanelPosition) => {
+    setState((prev) => ({ ...prev, aiPanelPosition: position }));
   }, []);
 
   const setAIRequest = React.useCallback((request: PanelState["aiRequest"]) => {
@@ -150,11 +173,13 @@ export function PanelStateProvider({ children, initialState }: PanelStateProvide
       aiPanelVisible: state.aiPanelVisible,
       sidebarWidth: state.sidebarWidth,
       aiPanelWidth: state.aiPanelWidth,
+      aiPanelPosition: state.aiPanelPosition,
       aiRequest: state.aiRequest,
       setSidebarCollapsed,
       setAIPanelVisible,
       setSidebarWidth,
       setAIPanelWidth,
+      setAIPanelPosition,
       setAIRequest,
       toggleSidebar,
       toggleAIPanel,
@@ -165,6 +190,7 @@ export function PanelStateProvider({ children, initialState }: PanelStateProvide
       setAIPanelVisible,
       setSidebarWidth,
       setAIPanelWidth,
+      setAIPanelPosition,
       setAIRequest,
       toggleSidebar,
       toggleAIPanel,
@@ -216,6 +242,8 @@ export function useAIPanelState() {
     toggleAIPanel,
     aiPanelWidth,
     setAIPanelWidth,
+    aiPanelPosition,
+    setAIPanelPosition,
     aiRequest,
     setAIRequest,
   } = usePanelState();
@@ -224,6 +252,8 @@ export function useAIPanelState() {
     isHydrated,
     width: aiPanelWidth,
     setWidth: setAIPanelWidth,
+    position: aiPanelPosition,
+    setPosition: setAIPanelPosition,
     setVisible: setAIPanelVisible,
     toggle: toggleAIPanel,
     aiRequest,

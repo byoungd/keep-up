@@ -1,6 +1,5 @@
 "use client";
 
-import type { Message } from "@/components/layout/MessageItem";
 import { createNumericPeerId, isValidLoroPeerId } from "@/lib/loroPeerId";
 import {
   type AIContext,
@@ -10,6 +9,7 @@ import {
   createDocumentFacade,
   createLoroRuntime,
 } from "@ku0/lfcc-bridge";
+import type { Message } from "@ku0/shell";
 import * as React from "react";
 
 const STORAGE_KEY = "ai-chat-loro-v1";

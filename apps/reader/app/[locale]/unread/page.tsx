@@ -3,7 +3,7 @@
 import { DocumentList } from "@/components/documents/DocumentList";
 import { PendingImportList } from "@/components/documents/PendingImportList";
 import { AIPanel } from "@/components/layout/AIPanel";
-import { AppShell } from "@/components/layout/AppShell";
+import { ReaderShellLayout } from "@/components/layout/ReaderShellLayout";
 import { Button } from "@/components/ui/Button";
 import { useImportContextOptional } from "@/context/ImportContext";
 import { useAIPanelState } from "@/context/PanelStateContext";
@@ -34,7 +34,7 @@ export default function UnreadPage() {
   const isEmpty = !loading && documents.length === 0 && !hasPending;
 
   return (
-    <AppShell rightPanel={<AIPanel onClose={() => setShowAI(false)} />}>
+    <ReaderShellLayout rightPanel={<AIPanel onClose={() => setShowAI(false)} />}>
       <main className="flex-1 flex flex-col min-w-0 h-full">
         {/* Header */}
         <header className="flex items-center justify-between px-6 py-4 border-b border-border">
@@ -91,6 +91,6 @@ export default function UnreadPage() {
           </div>
         )}
       </main>
-    </AppShell>
+    </ReaderShellLayout>
   );
 }

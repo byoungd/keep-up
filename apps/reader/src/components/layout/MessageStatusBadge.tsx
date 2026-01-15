@@ -1,9 +1,9 @@
 "use client";
 
 import { cn } from "@ku0/shared/utils";
+import type { MessageStatus } from "@ku0/shell";
 import { AlertTriangle, CheckCircle2, Square } from "lucide-react";
 import type * as React from "react";
-import type { MessageStatus } from "./MessageItem";
 
 const STATUS_META: Record<MessageStatus, { className: string; icon: React.ReactNode }> = {
   streaming: {

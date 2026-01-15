@@ -1,9 +1,5 @@
-import type {
-  SidebarGroupUserConfig,
-  SidebarItemUserConfig,
-  SidebarUserConfig,
-} from "@/lib/sidebar";
-import { DEFAULT_BADGE_STYLE, DEFAULT_SIDEBAR_GROUPS } from "@/lib/sidebar/defaults";
+import type { SidebarGroupUserConfig, SidebarItemUserConfig, SidebarUserConfig } from "@ku0/shell";
+import { DEFAULT_BADGE_STYLE, DEFAULT_COLLAPSE_MODE, DEFAULT_SIDEBAR_GROUPS } from "@ku0/shell";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
@@ -31,7 +27,7 @@ function buildDefaultConfig(): SidebarUserConfig {
   return {
     version: CURRENT_CONFIG_VERSION,
     badgeStyle: DEFAULT_BADGE_STYLE,
-    collapseMode: "peek",
+    collapseMode: DEFAULT_COLLAPSE_MODE,
     groups,
     items,
   };

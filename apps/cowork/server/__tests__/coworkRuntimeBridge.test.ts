@@ -1,0 +1,76 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import type { CoworkSession } from "@ku0/agent-runtime";
+import { describe, expect, it } from "vitest";
+import { CoworkRuntimeBridge } from "../runtime/coworkRuntime";
+import { ApprovalStore } from "../storage/approvalStore";
+
+async function createApprovalStore() {
+  const dir = await mkdtemp(join(tmpdir(), "cowork-approval-"));
+  const store = new ApprovalStore(join(dir, "approvals.json"));
+  return { store, dir };
+}
+
+function createSession(): CoworkSession {
+  return {
+    sessionId: "session-1",
+    userId: "user-1",
+    deviceId: "device-1",
+    platform: "macos",
+    mode: "cowork",
+    grants: [
+      {
+        id: "grant-1",
+        rootPath: "/workspace",
+        allowCreate: true,
+        allowWrite: true,
+        allowDelete: true,
+      },
+    ],
+    connectors: [],
+    createdAt: Date.now(),
+  };
+}
+
+describe("CoworkRuntimeBridge", () => {
+  it("requires approval for file writes outside output roots", async () => {
+    const { store, dir } = await createApprovalStore();
+    const runtime = new CoworkRuntimeBridge(store);
+    const session = createSession();
+
+    const result = await runtime.checkAction(session, {
+      kind: "file",
+      path: "/workspace/note.md",
+      intent: "write",
+    });
+
+    expect(result.status).toBe("approval_required");
+    if (result.status === "approval_required") {
+      expect(result.approval.status).toBe("pending");
+    }
+
+    const approvals = await store.getAll();
+    expect(approvals.length).toBe(1);
+
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it("allows file reads within grants", async () => {
+    const { store, dir } = await createApprovalStore();
+    const runtime = new CoworkRuntimeBridge(store);
+    const session = createSession();
+
+    const result = await runtime.checkAction(session, {
+      kind: "file",
+      path: "/workspace/readme.md",
+      intent: "read",
+    });
+
+    expect(result.status).toBe("allowed");
+    const approvals = await store.getAll();
+    expect(approvals.length).toBe(0);
+
+    await rm(dir, { recursive: true, force: true });
+  });
+});

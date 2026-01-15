@@ -444,7 +444,6 @@ export class AgentOrchestrator {
     );
   }
 
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: orchestration turn logic with multiple phases
   private async executeTurn(): Promise<void> {
     this.state.turn++;
     this.state.status = "thinking";

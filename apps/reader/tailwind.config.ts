@@ -1,125 +1,16 @@
+import sharedConfig from "@ku0/design-system/tailwind.config";
 import type { Config } from "tailwindcss";
 
 const config: Config = {
-  darkMode: "class",
+  presets: [sharedConfig],
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
+    "../../packages/shell/src/**/*.{ts,tsx}",
+    "../../packages/shared/src/**/*.{ts,tsx}",
   ],
-  theme: {
-    container: {
-      center: true,
-      padding: "2rem",
-      screens: {
-        "2xl": "1400px",
-      },
-    },
-    extend: {
-      colors: {
-        border: "var(--color-border)",
-        input: "var(--color-input)",
-        ring: "var(--color-ring)",
-        background: "var(--color-background)",
-        foreground: "var(--color-foreground)",
-        primary: {
-          DEFAULT: "var(--color-primary)",
-          foreground: "var(--color-primary-foreground)",
-        },
-        secondary: {
-          DEFAULT: "var(--color-secondary)",
-          foreground: "var(--color-secondary-foreground)",
-        },
-        destructive: {
-          DEFAULT: "var(--color-destructive)",
-          foreground: "var(--color-destructive-foreground)",
-        },
-        success: {
-          DEFAULT: "var(--color-success)",
-          foreground: "var(--color-success-foreground)",
-        },
-        warning: {
-          DEFAULT: "var(--color-warning)",
-          foreground: "var(--color-warning-foreground)",
-        },
-        info: {
-          DEFAULT: "var(--color-info)",
-          foreground: "var(--color-info-foreground)",
-        },
-        error: {
-          DEFAULT: "var(--color-error)",
-          foreground: "var(--color-error-foreground)",
-        },
-        muted: {
-          DEFAULT: "var(--color-muted)",
-          foreground: "var(--color-muted-foreground)",
-        },
-        accent: {
-          DEFAULT: "var(--color-accent)",
-          foreground: "var(--color-accent-foreground)",
-          amber: "var(--color-accent-amber)",
-          emerald: "var(--color-accent-emerald)",
-          violet: "var(--color-accent-violet)",
-          indigo: "var(--color-accent-indigo)",
-          cyan: "var(--color-accent-cyan)",
-          rose: "var(--color-accent-rose)",
-        },
-        popover: {
-          DEFAULT: "var(--color-popover)",
-          foreground: "var(--color-popover-foreground)",
-        },
-        card: {
-          DEFAULT: "var(--color-card)",
-          foreground: "var(--color-card-foreground)",
-        },
-        surface: {
-          0: "var(--color-surface-0)",
-          1: "var(--color-surface-1)",
-          2: "var(--color-surface-2)",
-          3: "var(--color-surface-3)",
-          elevated: "var(--color-surface-elevated)",
-        },
-      },
-      borderRadius: {
-        lg: "var(--radius-lg)",
-        md: "var(--radius-md)",
-        sm: "var(--radius-sm)",
-        xl: "var(--radius-xl)",
-        "2xl": "var(--radius-2xl)",
-        "3xl": "var(--radius-3xl)",
-        DEFAULT: "var(--radius)",
-      },
-      transitionDuration: {
-        fast: "var(--duration-fast)",
-        normal: "var(--duration-normal)",
-        slow: "var(--duration-slow)",
-      },
-      transitionTimingFunction: {
-        spring: "var(--ease-spring)",
-        smooth: "var(--ease-smooth)",
-        "out-expo": "var(--ease-out-expo)",
-        "in-out": "var(--ease-in-out)",
-      },
-      zIndex: {
-        60: "60",
-        100: "100",
-        200: "200",
-        300: "300",
-        400: "400",
-        500: "500",
-        600: "600",
-        1000: "1000",
-        9999: "9999",
-        overlay: "100",
-        modal: "200",
-        popover: "300",
-        tooltip: "400",
-        toast: "500",
-        drag: "600",
-      },
-    },
-  },
-  plugins: [],
 };
 export default config;

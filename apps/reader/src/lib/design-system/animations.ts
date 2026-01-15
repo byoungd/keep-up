@@ -3,7 +3,7 @@
  * Use these for consistent animations across the app.
  */
 
-import { transitionDuration } from "@/styles/tokens";
+import { transitionDuration } from "@ku0/design-system/tokens";
 import type { Variants } from "framer-motion";
 
 const toSeconds = (duration: string): number => {

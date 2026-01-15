@@ -3,8 +3,8 @@
 import { AnnotationSpan } from "@/components/annotations/AnnotationSpan";
 import { SelectionToolbar } from "@/components/annotations/SelectionToolbar";
 import { AIPanel } from "@/components/layout/AIPanel";
-import { AppShell } from "@/components/layout/AppShell";
 import { OnboardingFlow } from "@/components/layout/OnboardingFlow";
+import { ReaderShellLayout } from "@/components/layout/ReaderShellLayout";
 import { PolicyDegradationBanner } from "@/components/lfcc/PolicyDegradationBanner";
 import { ArticleRenderer } from "@/components/reader/ArticleRenderer";
 import { KeyboardShortcutsProvider } from "@/context/KeyboardShortcutsContext";
@@ -109,7 +109,7 @@ export default function App() {
   return (
     <KeyboardShortcutsProvider>
       <SelectionToolbar />
-      <AppShell
+      <ReaderShellLayout
         isDesktop={effectiveDesktop}
         rightPanel={<AIPanel onClose={() => undefined} />} // AppShell handles the close callback injection
       >
@@ -117,7 +117,7 @@ export default function App() {
           {degraded && <PolicyDegradationBanner reasons={reasons} onDismiss={clear} />}
           <div className="flex-1 overflow-auto">{article}</div>
         </div>
-      </AppShell>
+      </ReaderShellLayout>
     </KeyboardShortcutsProvider>
   );
 }

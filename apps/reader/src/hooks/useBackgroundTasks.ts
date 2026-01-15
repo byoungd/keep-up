@@ -117,6 +117,12 @@ export function useBackgroundTasks(notifications?: TaskNotifications) {
     [removeApproval]
   );
 
+  // Use a ref for notifications to avoid reconnecting the stream when callbacks change
+  const notificationsRef = React.useRef(notifications);
+  React.useEffect(() => {
+    notificationsRef.current = notifications;
+  }, [notifications]);
+
   const handleTaskUpdate = React.useCallback(
     (event: TaskEventWithId) => {
       const snapshot = extractTaskSnapshot(event);
@@ -124,20 +130,21 @@ export function useBackgroundTasks(notifications?: TaskNotifications) {
         upsertTask(snapshot);
       }
 
-      if (!notifications) {
+      const currentNotifications = notificationsRef.current;
+      if (!currentNotifications) {
         return;
       }
 
       const taskName = snapshot?.name ?? event.taskId;
       if (event.type === "task.completed") {
-        notifier.success(notifications.completed(taskName));
+        notifier.success(currentNotifications.completed(taskName));
       } else if (event.type === "task.failed") {
-        notifier.error(new Error(notifications.failed(taskName)));
+        notifier.error(new Error(currentNotifications.failed(taskName)));
       } else if (event.type === "task.cancelled") {
-        notifier.warning(notifications.cancelled(taskName));
+        notifier.warning(currentNotifications.cancelled(taskName));
       }
     },
-    [notifications, upsertTask]
+    [upsertTask]
   );
 
   const handleEvent = React.useCallback(
@@ -161,7 +168,7 @@ export function useBackgroundTasks(notifications?: TaskNotifications) {
     [handleSnapshot, handleConfirmationRequired, handleConfirmationReceived, handleTaskUpdate]
   );
 
-  const streamErrorMessage =
+  const _streamErrorMessage =
     notifications?.streamError ?? "Unable to connect to background task stream.";
 
   React.useEffect(() => {
@@ -201,7 +208,9 @@ export function useBackgroundTasks(notifications?: TaskNotifications) {
         if (!active) {
           return;
         }
-        setStreamError(streamErrorMessage);
+        const msg =
+          notificationsRef.current?.streamError ?? "Unable to connect to background task stream.";
+        setStreamError(msg);
         attempt += 1;
         const delay = Math.min(30000, 1000 * 2 ** (attempt - 1));
         reconnectTimer = window.setTimeout(connect, delay);
@@ -216,7 +225,7 @@ export function useBackgroundTasks(notifications?: TaskNotifications) {
       }
       source?.close();
     };
-  }, [handleEvent, streamErrorMessage]);
+  }, [handleEvent]);
 
   const enqueueTask = React.useCallback(
     async (payload: {

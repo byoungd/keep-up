@@ -32,8 +32,11 @@
     "@ku0/lfcc-bridge": "workspace:*",
     "@ku0/overlay": "workspace:*",
     "@ku0/shared": "workspace:*",
+    "@ku0/shell": "workspace:*",
     "@ku0/token": "workspace:*",
     "@ku0/translator": "workspace:*",
+
+    "@ku0/design-system": "workspace:*",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-dropdown-menu": "^2.1.16",
     "@radix-ui/react-focus-scope": "^1.1.8",

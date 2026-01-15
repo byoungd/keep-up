@@ -2,7 +2,7 @@
 
 import { DigestView } from "@/components/digest/DigestView";
 import { AIPanel } from "@/components/layout/AIPanel";
-import { AppShell } from "@/components/layout/AppShell";
+import { ReaderShellLayout } from "@/components/layout/ReaderShellLayout";
 import { useAIPanelState } from "@/context/PanelStateContext";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import * as React from "react";
@@ -20,13 +20,13 @@ export default function DigestPage() {
   const { setVisible } = useAIPanelState();
 
   return (
-    <AppShell
+    <ReaderShellLayout
       isDesktop={effectiveDesktop}
       rightPanel={<AIPanel onClose={() => setVisible(false)} />}
     >
       <main className="flex-1 overflow-y-auto min-w-0 bg-background">
         <DigestView />
       </main>
-    </AppShell>
+    </ReaderShellLayout>
   );
 }

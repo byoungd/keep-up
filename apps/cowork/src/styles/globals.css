@@ -1,0 +1,6 @@
+@import "tailwindcss";
+@import "@ku0/design-system/core.css";
+@import "./base.css";
+@import "./animations.css";
+
+@config "../../tailwind.config.ts";

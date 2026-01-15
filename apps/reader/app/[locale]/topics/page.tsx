@@ -1,7 +1,7 @@
 "use client";
 
 import { AIPanel } from "@/components/layout/AIPanel";
-import { AppShell } from "@/components/layout/AppShell";
+import { ReaderShellLayout } from "@/components/layout/ReaderShellLayout";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useAIPanelState } from "@/context/PanelStateContext";
@@ -87,7 +87,7 @@ export default function TopicsPage() {
   };
 
   return (
-    <AppShell isDesktop rightPanel={<AIPanel onClose={() => setVisible(false)} />}>
+    <ReaderShellLayout isDesktop rightPanel={<AIPanel onClose={() => setVisible(false)} />}>
       <main className="flex-1 overflow-y-auto min-w-0 bg-background">
         <div className="max-w-4xl mx-auto px-6 py-10 space-y-8">
           {/* Header */}
@@ -212,6 +212,6 @@ export default function TopicsPage() {
           )}
         </div>
       </main>
-    </AppShell>
+    </ReaderShellLayout>
   );
 }

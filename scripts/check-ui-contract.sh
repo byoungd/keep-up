@@ -78,11 +78,11 @@ report_violations() {
 report_violations \
   "Direct loro-crdt imports found" \
   "from ['\"]loro-crdt['\"]" \
-  "Use @keepup/lfcc-bridge instead. See docs/architecture/UI_CONTRACT.md"
+  "Use @ku0/lfcc-bridge instead. See docs/architecture/UI_CONTRACT.md"
 
 report_violations \
   "Internal CRDT imports found" \
-  "from ['\"]@keepup/lfcc-bridge/crdt" \
+  "from ['\"]@ku0/lfcc-bridge/crdt" \
   "Use DocumentFacade or BridgeController instead."
 
 report_violations \

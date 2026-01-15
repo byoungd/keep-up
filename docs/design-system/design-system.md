@@ -1,10 +1,10 @@
 # Design System
 
-This document catalogs the Reader app's component library and design tokens.
+This document catalogs the shared component library and design tokens.
 
 ## Design Tokens
 
-Defined in `apps/reader/app/globals.css`:
+Defined in `packages/design-system/src/theme.css` (consumed via `@ku0/design-system/core.css`):
 
 ### Colors
 | Token | Light | Dark | Usage |

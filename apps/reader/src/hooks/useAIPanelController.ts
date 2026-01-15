@@ -16,10 +16,10 @@ import { buildReferenceAnchors } from "@/lib/ai/referenceAnchors";
 import { getWorkflowSystemPrompt } from "@/lib/ai/workflowPrompts";
 import { DEFAULT_POLICY_MANIFEST } from "@ku0/core";
 import type { AIContext, LoroRuntime, SpanList, ToolCallRecord } from "@ku0/lfcc-bridge";
+import type { Message } from "@ku0/shell";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 import type { ExecutionStep } from "../components/layout/ExecutionSteps";
-import type { Message } from "../components/layout/MessageItem";
 
 function isToolResult(value: unknown): value is ExecutionStep["result"] {
   if (!value || typeof value !== "object") {

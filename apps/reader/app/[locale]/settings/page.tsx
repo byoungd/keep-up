@@ -1,7 +1,7 @@
 "use client";
 
 import { ModelLanesSettings, ProviderSettings } from "@/components/ai";
-import { AppShell } from "@/components/layout/AppShell";
+import { ReaderShellLayout } from "@/components/layout/ReaderShellLayout";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import * as React from "react";
 
@@ -16,7 +16,7 @@ export default function SettingsPage() {
   const effectiveDesktop = hydrated && isDesktop;
 
   return (
-    <AppShell isDesktop={effectiveDesktop}>
+    <ReaderShellLayout isDesktop={effectiveDesktop}>
       <main className="flex-1 overflow-y-auto min-w-0 bg-background p-6">
         <div className="max-w-2xl mx-auto space-y-10">
           <div>
@@ -33,6 +33,6 @@ export default function SettingsPage() {
           </section>
         </div>
       </main>
-    </AppShell>
+    </ReaderShellLayout>
   );
 }

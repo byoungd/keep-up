@@ -58,7 +58,7 @@ export function createBlockMoveAnimationPlugin(): Plugin {
     clearRemovalTimer(blockId);
     removalTimers.set(
       blockId,
-      window.setTimeout(() => {
+      setTimeout(() => {
         if (!view || view.isDestroyed) {
           return;
         }
