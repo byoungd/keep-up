@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
 import { defineConfig } from "@playwright/test";
 
 const DEFAULT_PORT = 3000;
@@ -47,6 +49,30 @@ const devServerCommand = useWebpackDev
 
 const collabServerEnabled = process.env.CI || process.env.PLAYWRIGHT_COLLAB_SERVER === "1";
 
+const resolveStandaloneServer = () => {
+  const standaloneRoot = path.join(process.cwd(), "apps/reader/.next/standalone");
+  const candidates = [
+    {
+      cwd: standaloneRoot,
+      serverPath: path.join(standaloneRoot, "server.js"),
+    },
+    {
+      cwd: path.join(standaloneRoot, "apps/reader"),
+      serverPath: path.join(standaloneRoot, "apps/reader/server.js"),
+    },
+  ];
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate.serverPath)) {
+      return candidate;
+    }
+  }
+
+  return candidates[0];
+};
+
+const standaloneServer = resolveStandaloneServer();
+
 export default defineConfig({
   testDir: "e2e",
   /* Maximum time one test can run for. */
@@ -75,11 +101,10 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: process.env.CI
-        ? "node apps/reader/.next/standalone/apps/reader/server.js"
-        : devServerCommand,
+      command: process.env.CI ? "node server.js" : devServerCommand,
       url: baseURL,
       reuseExistingServer,
+      cwd: process.env.CI ? standaloneServer.cwd : undefined,
       env: {
         PORT: readerPort,
         NEXT_DISABLE_DEV_OVERLAY: "1",
