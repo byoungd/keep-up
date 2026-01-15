@@ -136,7 +136,14 @@ export * from "./telemetry";
 // ============================================================================
 // Agents
 // ============================================================================
-export * from "./agents";
+export {
+  createAgentManager,
+  AGENT_PROFILES,
+  getAgentProfile,
+  listAgentTypes,
+  AgentManager,
+  VerifierAgent,
+} from "./agents";
 
 // ============================================================================
 // Context
@@ -208,7 +215,15 @@ export * from "./pipeline";
 // ============================================================================
 // Logging
 // ============================================================================
-export * from "./logging";
+export {
+  Logger,
+  ConsoleTransport,
+  MemoryTransport,
+  getLogger,
+  configureLogger,
+  createLogger,
+  type LoggerConfig,
+} from "./logging";
 
 // ============================================================================
 // Reasoning (Extended Thinking)
@@ -271,9 +286,6 @@ export {
   attachTelemetryToEventBus,
   AGENT_METRICS,
 } from "./telemetry";
-
-// Agent factories
-export { createAgentManager, AGENT_PROFILES, getAgentProfile, listAgentTypes } from "./agents";
 
 // Context factories
 export { createContextManager } from "./context";
@@ -348,11 +360,3 @@ export {
   createPipelineExecutor,
   createSequentialPipeline,
 } from "./pipeline";
-
-// Logging factories
-export {
-  createLogger,
-  getLogger,
-  configureLogger,
-  createMemoryTransport,
-} from "./logging";
