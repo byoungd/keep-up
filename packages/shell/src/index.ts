@@ -132,4 +132,5 @@ export type {
   ArtifactItem,
   ActiveTask,
   TaskStep,
+  ActionItem,
 } from "./components/chat/types";

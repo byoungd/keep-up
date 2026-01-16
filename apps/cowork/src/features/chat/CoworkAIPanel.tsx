@@ -26,6 +26,7 @@ export function CoworkAIPanel({ onClose, onPreviewArtifact }: CoworkAIPanelProps
     filteredModels,
     handleSend,
     handleAbort,
+    handleTaskAction,
     attachments,
     onAddAttachment,
     onRemoveAttachment,
@@ -161,6 +162,7 @@ export function CoworkAIPanel({ onClose, onPreviewArtifact }: CoworkAIPanelProps
         /* TODO */
       }}
       onAbort={handleAbort}
+      onTaskAction={handleTaskAction}
       attachments={attachments}
       onAddAttachment={onAddAttachment}
       onRemoveAttachment={onRemoveAttachment}

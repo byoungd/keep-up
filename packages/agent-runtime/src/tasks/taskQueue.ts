@@ -6,6 +6,7 @@
 
 import { type PriorityHeap, createPriorityHeap } from "./priorityHeap";
 import type {
+  CancelReason,
   CompleteHandler,
   ITaskExecutor,
   ITaskQueue,
@@ -109,7 +110,7 @@ export class TaskQueue implements ITaskQueue {
   /**
    * Cancel a task.
    */
-  async cancel(taskId: string): Promise<boolean> {
+  async cancel(taskId: string, reason: CancelReason = "user_cancelled"): Promise<boolean> {
     const task = this.tasks.get(taskId);
     if (!task) {
       return false;
@@ -127,16 +128,18 @@ export class TaskQueue implements ITaskQueue {
       task.status === "paused"
     ) {
       task.status = "cancelled";
+      task.cancelReason = reason;
       task.completedAt = Date.now();
+      task.error = this.formatCancelMessage(reason);
 
       // Remove from heap
       this.heap.remove(taskId);
 
-      this.emit("task:cancelled", taskId, { task });
+      this.emit("task:cancelled", taskId, { task, reason });
       this.notifyComplete(taskId, {
         taskId,
         success: false,
-        error: "Task cancelled",
+        error: task.error,
         durationMs: task.completedAt - (task.startedAt ?? task.createdAt),
         retries: task.retryCount,
       });
@@ -145,6 +148,32 @@ export class TaskQueue implements ITaskQueue {
     }
 
     return false;
+  }
+
+  /**
+   * Format a human-readable cancellation message.
+   */
+  private formatCancelMessage(reason: CancelReason): string {
+    switch (reason) {
+      case "user_cancelled":
+        return "Task was cancelled by user";
+      case "approval_timeout":
+        return "Task cancelled: confirmation request timed out";
+      case "approval_rejected":
+        return "Task cancelled: user rejected the confirmation";
+      case "execution_timeout":
+        return "Task cancelled: execution exceeded timeout limit";
+      case "signal_aborted":
+        return "Task cancelled: abort signal received";
+      case "queue_full":
+        return "Task cancelled: queue capacity exceeded";
+      case "executor_missing":
+        return "Task cancelled: no executor registered for this task type";
+      case "parent_cancelled":
+        return "Task cancelled: parent task was cancelled";
+      default:
+        return "Task was cancelled";
+    }
   }
 
   /**
@@ -537,10 +566,29 @@ export class TaskQueue implements ITaskQueue {
       const errorMessage = error instanceof Error ? error.message : String(error);
 
       if ((task.status as TaskStatus) === "timeout") {
-        task.error = "Task timed out";
+        task.cancelReason = "execution_timeout";
+        task.error = this.formatCancelMessage("execution_timeout");
         this.emit("task:timeout", taskId, { task });
+        this.notifyComplete(taskId, {
+          taskId,
+          success: false,
+          error: task.error,
+          durationMs: task.startedAt !== undefined ? Date.now() - task.startedAt : 0,
+          retries: task.retryCount,
+        });
       } else if (abortController.signal.aborted && (task.status as TaskStatus) !== "cancelled") {
         task.status = "cancelled";
+        task.cancelReason = "signal_aborted";
+        task.error = this.formatCancelMessage("signal_aborted");
+        task.completedAt = Date.now();
+        this.emit("task:cancelled", taskId, { task, reason: "signal_aborted" });
+        this.notifyComplete(taskId, {
+          taskId,
+          success: false,
+          error: task.error,
+          durationMs: task.startedAt !== undefined ? task.completedAt - task.startedAt : 0,
+          retries: task.retryCount,
+        });
       } else {
         // Check for retry
         if (this.config.retry.enabled && task.retryCount < task.maxRetries) {

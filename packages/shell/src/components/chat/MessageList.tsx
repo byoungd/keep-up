@@ -55,6 +55,10 @@ export interface MessageListProps {
   resolveReference?: (anchor: ReferenceAnchor) => ReferenceRange;
   onReferenceSelect?: (anchor: ReferenceAnchor) => void;
   onPreviewArtifact?: (item: ArtifactItem) => void;
+  onTaskAction?: (
+    action: "approve" | "reject",
+    metadata: { approvalId: string; toolName: string; args: Record<string, unknown> }
+  ) => Promise<void>;
   isMain?: boolean;
 }
 
@@ -74,6 +78,7 @@ export function MessageList({
   resolveReference,
   onReferenceSelect,
   onPreviewArtifact,
+  onTaskAction,
   isMain = false,
 }: MessageListProps) {
   const loadingState = useAILoadingState(isLoading, isStreaming, messages);
@@ -101,9 +106,8 @@ export function MessageList({
   // Render a single message item (memoized callback)
   const renderMessage = React.useCallback(
     (m: Message) => (
-      <div className={cn(isMain && "max-w-3xl mx-auto w-full")}>
+      <div key={m.id} className={cn(isMain && "max-w-3xl mx-auto w-full")}>
         <MessageItem
-          key={m.id}
           message={m}
           onEdit={onEdit}
           onBranch={onBranch}
@@ -114,6 +118,7 @@ export function MessageList({
           resolveReference={resolveReference}
           onReferenceSelect={onReferenceSelect}
           onPreviewArtifact={onPreviewArtifact}
+          onTaskAction={onTaskAction}
         />
       </div>
     ),
@@ -127,6 +132,7 @@ export function MessageList({
       resolveReference,
       onReferenceSelect,
       onPreviewArtifact,
+      onTaskAction,
       isMain,
     ]
   );
@@ -207,6 +213,7 @@ export function MessageList({
                       resolveReference={resolveReference}
                       onReferenceSelect={onReferenceSelect}
                       onPreviewArtifact={onPreviewArtifact}
+                      onTaskAction={onTaskAction}
                     />
                   </div>
                 </div>

@@ -1,4 +1,23 @@
 /**
+ * Represents a single action/tool call within a step.
+ */
+export interface ActionItem {
+  id: string;
+  label: string;
+  toolName?: string;
+  args?: Record<string, unknown>;
+  status: "pending" | "running" | "completed" | "failed";
+  icon?: string;
+  startTime?: number;
+  durationMs?: number;
+  result?: {
+    success: boolean;
+    content?: string;
+    error?: string;
+  };
+}
+
+/**
  * Represents a single step within an agent task.
  */
 export interface TaskStep {
@@ -8,6 +27,8 @@ export interface TaskStep {
   duration?: string;
   startedAt?: string;
   completedAt?: string;
+  /** Structured actions/tool calls performed in this step */
+  actions?: ActionItem[];
 }
 
 /**
@@ -59,6 +80,14 @@ export interface AgentTask {
   completedAt?: string;
   // Error info
   error?: string;
+
+  // Integrated Confirmation
+  approvalMetadata?: {
+    approvalId: string;
+    toolName: string;
+    args: Record<string, unknown>;
+    riskLevel?: "low" | "medium" | "high";
+  };
 
   // Manus UI Spec (2.1.1)
   goal?: string; // Task Goal Header

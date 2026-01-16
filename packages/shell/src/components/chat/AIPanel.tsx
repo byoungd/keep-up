@@ -41,6 +41,10 @@ export interface AIPanelProps
   onClose: () => void;
   // External Preview Handler (e.g., for Right Rail -> Main area preview)
   onPreviewArtifact?: (item: ArtifactItem) => void;
+  onTaskAction?: (
+    action: "approve" | "reject",
+    metadata: { approvalId: string; toolName: string; args: Record<string, unknown> }
+  ) => Promise<void>;
 
   // Agent Runtime task data
   /** Real-time agent tasks to display in TaskProgressWidget */
@@ -106,6 +110,7 @@ export function AIPanel({
   className,
   prompts,
   onPreviewArtifact,
+  onTaskAction,
   tasks,
   showHeader = true,
 }: AIPanelProps) {
@@ -184,6 +189,7 @@ export function AIPanel({
             resolveReference={resolveReference}
             onReferenceSelect={onReferenceSelect}
             onPreviewArtifact={onPreviewArtifact}
+            onTaskAction={onTaskAction}
             isMain={panelPosition === "main"}
           />
 

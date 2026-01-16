@@ -27,6 +27,20 @@ export type TaskStatus =
   | "timeout";
 
 /**
+ * Reason for task cancellation.
+ * Provides context for why a task was cancelled.
+ */
+export type CancelReason =
+  | "user_cancelled" // User explicitly cancelled the task
+  | "approval_timeout" // Waiting for confirmation timed out
+  | "approval_rejected" // User rejected the confirmation
+  | "execution_timeout" // Task execution exceeded timeout
+  | "signal_aborted" // AbortSignal was triggered
+  | "queue_full" // Queue was full, task rejected
+  | "executor_missing" // No executor registered for task type
+  | "parent_cancelled"; // Parent task was cancelled
+
+/**
  * Task type.
  */
 export type TaskType = "agent" | "tool" | "pipeline" | "custom";
@@ -150,6 +164,9 @@ export interface Task<TPayload = unknown, TResult = unknown> {
 
   /** Error (if failed) */
   error?: string;
+
+  /** Reason for cancellation (if cancelled) */
+  cancelReason?: CancelReason;
 
   /** Retry count */
   retryCount: number;

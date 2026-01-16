@@ -34,6 +34,10 @@ export interface MessageItemProps {
   resolveReference?: (anchor: ReferenceAnchor) => ReferenceRange;
   onReferenceSelect?: (anchor: ReferenceAnchor) => void;
   onPreviewArtifact?: (artifact: ArtifactItem) => void;
+  onTaskAction?: (
+    action: "approve" | "reject",
+    metadata: { approvalId: string; toolName: string; args: Record<string, unknown> }
+  ) => Promise<void>;
 }
 
 /**
@@ -97,6 +101,7 @@ const MessageContent = ({
   isUser,
   isStreaming,
   onPreviewArtifact,
+  onTaskAction,
 }: {
   message: Message;
   displayContent: string;
@@ -105,6 +110,10 @@ const MessageContent = ({
   isUser: boolean;
   isStreaming: boolean;
   onPreviewArtifact?: (artifact: ArtifactItem) => void;
+  onTaskAction?: (
+    action: "approve" | "reject",
+    metadata: { approvalId: string; toolName: string; args: Record<string, unknown> }
+  ) => Promise<void>;
 }) => {
   if (message.type === "info") {
     return <InfoMessage content={message.content} />;
@@ -129,7 +138,11 @@ const MessageContent = ({
   }
   if (message.type === "task_stream" && message.metadata?.task) {
     return (
-      <TaskStreamMessage task={message.metadata.task as AgentTask} onPreview={onPreviewArtifact} />
+      <TaskStreamMessage
+        task={message.metadata.task as AgentTask}
+        onPreview={onPreviewArtifact}
+        onAction={onTaskAction}
+      />
     );
   }
   if (showBubble) {
@@ -149,6 +162,7 @@ export const MessageItem = React.memo(function MessageItem({
   resolveReference,
   onReferenceSelect,
   onPreviewArtifact,
+  onTaskAction,
 }: MessageItemProps) {
   const isUser = message.role === "user";
   const isStreaming = message.status === "streaming";
@@ -190,6 +204,7 @@ export const MessageItem = React.memo(function MessageItem({
           isUser={isUser}
           isStreaming={isStreaming}
           onPreviewArtifact={onPreviewArtifact}
+          onTaskAction={onTaskAction}
         />
         {!isUser && message.fallbackNotice && message.type !== "task_stream" && (
           <div className="mt-2 text-[11px] text-amber-600/90">{message.fallbackNotice}</div>

@@ -6,6 +6,7 @@
 
 // Types
 export type {
+  CancelReason,
   CompleteHandler,
   ITaskExecutor,
   ITaskQueue,

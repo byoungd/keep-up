@@ -28,7 +28,7 @@ export function useCoworkAIPanelController() {
   const pendingMessageRef = useRef<{ content: string; mode: "chat" | "task" } | null>(null);
 
   // Use unified session hook
-  const { messages, sendMessage, isSending, isLoading } = useChatSession(sessionId);
+  const { messages, sendMessage, sendAction, isSending, isLoading } = useChatSession(sessionId);
 
   // Helper to ensure we have a valid session before sending
   const ensureActiveSession = useCallback(
@@ -85,6 +85,15 @@ export function useCoworkAIPanelController() {
     []
   );
 
+  const prepareSession = useCallback(
+    async (content: string) => {
+      const derivedTitle = generateTaskTitle(content);
+      const sessionTitle = derivedTitle === "New Task" ? "Untitled Session" : derivedTitle;
+      return ensureActiveSession(sessionTitle);
+    },
+    [ensureActiveSession]
+  );
+
   const handleSend = useCallback(async () => {
     const content = input.trim();
     if (!content || isSending) {
@@ -104,9 +113,7 @@ export function useCoworkAIPanelController() {
         return;
       }
 
-      const derivedTitle = generateTaskTitle(resolvedContent);
-      const sessionTitle = derivedTitle === "New Task" ? "Untitled Session" : derivedTitle;
-      const targetSessionId = await ensureActiveSession(sessionTitle);
+      const targetSessionId = await prepareSession(resolvedContent);
 
       if (targetSessionId !== sessionId) {
         pendingMessageRef.current = { content: resolvedContent, mode };
@@ -117,7 +124,12 @@ export function useCoworkAIPanelController() {
         return;
       }
 
+      if (mode === "task") {
+        setStatusMessage("Initiating task...");
+      }
+
       await sendMessage(resolvedContent, mode, { modelId: model });
+      setStatusMessage(null);
     } catch (err) {
       console.error("Failed to send message:", err);
       setInput(content);
@@ -129,7 +141,7 @@ export function useCoworkAIPanelController() {
     input,
     isSending,
     sessionId,
-    ensureActiveSession,
+    prepareSession,
     navigate,
     sendMessage,
     model,
@@ -171,7 +183,7 @@ export function useCoworkAIPanelController() {
     handleAbort: () => {
       /* Not implemented yet */
     },
-    pendingApproval: null,
+    handleTaskAction: sendAction,
     approvalBusy: false,
     approvalError: null,
     attachments: [],

@@ -1,6 +1,11 @@
 import type { Message } from "@ku0/shell";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { createTask, getChatHistory, sendChatMessage } from "../../../api/coworkApi";
+import {
+  createTask,
+  getChatHistory,
+  resolveApproval,
+  sendChatMessage,
+} from "../../../api/coworkApi";
 import { useWorkspace } from "../../../app/providers/WorkspaceProvider";
 import { useTaskStream } from "../../tasks/hooks/useTaskStream";
 import { projectGraphToMessages } from "../utils/taskProjection";
@@ -179,6 +184,21 @@ export function useChatSession(sessionId: string | undefined) {
     []
   );
 
+  const sendAction = useCallback(
+    async (type: "approve" | "reject", metadata: { approvalId: string }) => {
+      const status = type === "approve" ? "approved" : "rejected";
+      await resolveApproval(metadata.approvalId, status);
+
+      // Optimistically update history if there's an "ask" message for this approval
+      setHistoryMessages((prev) =>
+        prev.map((m) =>
+          m.metadata?.approvalId === metadata.approvalId ? { ...m, status: "done" as const } : m
+        )
+      );
+    },
+    []
+  );
+
   const sendMessage = useCallback(
     async (content: string, type: "chat" | "task" = "chat", options?: { modelId?: string }) => {
       if (!sessionId || !content.trim()) {
@@ -236,6 +256,7 @@ export function useChatSession(sessionId: string | undefined) {
   return {
     messages,
     sendMessage,
+    sendAction,
     isSending,
     isLoading: isLoadingHistory || isSending,
     isConnected,

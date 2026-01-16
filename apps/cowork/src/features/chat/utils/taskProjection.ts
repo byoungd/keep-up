@@ -1,4 +1,4 @@
-import type { AgentTask, ArtifactItem, Message, TaskStep } from "@ku0/shell";
+import type { ActionItem, AgentTask, ArtifactItem, Message, TaskStep } from "@ku0/shell";
 import type {
   ArtifactPayload,
   PlanUpdateNode,
@@ -70,31 +70,7 @@ function processTaskStatusNode(
     timestamp = Date.now();
   }
 
-  const prompt = (node.prompt ?? "").trim();
-  const normalizedPrompt = prompt.toLowerCase();
-
-  if (prompt && !context.promptedTaskIds.has(node.taskId)) {
-    if (!context.normalizedPrompts.has(normalizedPrompt)) {
-      messages.push({
-        id: `user-prompt-${node.taskId}`,
-        role: "user",
-        content: prompt,
-        createdAt: timestamp - 1,
-        status: "done",
-        type: "text",
-      });
-      context.normalizedPrompts.add(normalizedPrompt);
-    }
-    context.promptedTaskIds.add(node.taskId);
-  }
-
-  const matchingUser = prompt
-    ? messages.find((m) => m.role === "user" && m.content.trim().toLowerCase() === normalizedPrompt)
-    : undefined;
-
-  if (matchingUser && matchingUser.createdAt >= timestamp) {
-    timestamp = matchingUser.createdAt + 1;
-  }
+  handleUserPrompt(node, messages, context);
 
   const msg = getOrCreateTaskMessage(node.taskId, timestamp, messages, context.taskMessageMap);
   if (msg.createdAt < timestamp) {
@@ -104,8 +80,54 @@ function processTaskStatusNode(
   const agentTask = buildAgentTaskFromGraph(node, graph);
   msg.status =
     agentTask.status === "running" ? "streaming" : agentTask.status === "failed" ? "error" : "done";
+
+  // Handle integrated approval if task is paused
+  if (agentTask.status === "paused") {
+    injectApprovalMetadata(agentTask, graph, node.taskId);
+  }
+
   msg.type = "task_stream";
   msg.metadata = { ...msg.metadata, task: agentTask };
+}
+
+function handleUserPrompt(node: TaskStatusNode, messages: Message[], context: ProjectionContext) {
+  const prompt = (node.prompt ?? "").trim();
+  const normalizedPrompt = prompt.toLowerCase();
+  let timestamp = new Date(node.timestamp).getTime();
+  if (Number.isNaN(timestamp)) {
+    timestamp = Date.now();
+  }
+
+  if (!context.normalizedPrompts.has(normalizedPrompt)) {
+    messages.push({
+      id: `user-prompt-${node.taskId}`,
+      role: "user",
+      content: prompt,
+      createdAt: timestamp - 1,
+      status: "done",
+      type: "text",
+    });
+    context.normalizedPrompts.add(normalizedPrompt);
+  }
+  context.promptedTaskIds.add(node.taskId);
+}
+
+function injectApprovalMetadata(agentTask: AgentTask, graph: TaskGraph, taskId: string) {
+  const approvalNode = graph.nodes.find(
+    (n) =>
+      n.type === "tool_call" &&
+      (n as ToolCallNode).taskId === taskId &&
+      (n as ToolCallNode).requiresApproval
+  ) as ToolCallNode | undefined;
+
+  if (approvalNode?.approvalId) {
+    agentTask.approvalMetadata = {
+      approvalId: approvalNode.approvalId,
+      toolName: approvalNode.toolName,
+      args: approvalNode.args,
+      riskLevel: approvalNode.riskLevel,
+    };
+  }
 }
 
 function processToolCallNode(node: ToolCallNode, messages: Message[]) {
@@ -182,7 +204,7 @@ function buildAgentTaskFromGraph(taskNode: TaskStatusNode, graph: TaskGraph): Ag
   const { taskId, title, status, modelId, providerId, fallbackNotice } = taskNode;
   const taskCount = graph.nodes.filter((node) => node.type === "task_status").length;
   const scopedNodes = filterNodesForTask(graph.nodes, taskId, taskCount);
-  // Extract Steps
+  // Extract Steps & Actions
   const planNodes = scopedNodes.filter((n) => n.type === "plan_update") as PlanUpdateNode[];
   const validPlans = planNodes.filter((n) => n.plan.type === "plan");
   const latestPlan = validPlans[validPlans.length - 1];
@@ -193,6 +215,7 @@ function buildAgentTaskFromGraph(taskNode: TaskStatusNode, graph: TaskGraph): Ag
       id: s.id,
       label: s.label,
       status: mapStepStatus(s.status),
+      actions: extractActionsForStep(scopedNodes, s.id),
     }));
   }
 
@@ -200,11 +223,10 @@ function buildAgentTaskFromGraph(taskNode: TaskStatusNode, graph: TaskGraph): Ag
     steps = buildFallbackSteps(status, scopedNodes);
   }
 
-  // Extract Artifacts & Thoughts
+  // Extract Artifacts
   const allArtifacts = extractArtifactsFromGraph(graph.artifacts);
   const artifacts =
     taskCount <= 1 ? allArtifacts : allArtifacts.filter((artifact) => artifact.id.includes(taskId));
-  const thoughts = extractThoughts(scopedNodes);
 
   const progress =
     steps.length > 0
@@ -218,11 +240,29 @@ function buildAgentTaskFromGraph(taskNode: TaskStatusNode, graph: TaskGraph): Ag
     progress,
     steps,
     artifacts,
-    thoughts,
     modelId,
     providerId,
     fallbackNotice,
   };
+}
+
+function extractActionsForStep(nodes: TaskGraph["nodes"], stepId: string): ActionItem[] {
+  return nodes
+    .filter((n) => n.taskId === stepId && (n.type === "tool_call" || n.type === "tool_output"))
+    .map((n): ActionItem | null => {
+      if (n.type === "tool_call") {
+        return {
+          id: n.id,
+          label: `Calling ${n.toolName}`,
+          toolName: n.toolName,
+          args: n.args as Record<string, unknown>,
+          status: "running" as const,
+          startTime: new Date(n.timestamp).getTime(),
+        } as ActionItem;
+      }
+      return null;
+    })
+    .filter((a): a is ActionItem => a !== null);
 }
 
 function mapStepStatus(status: string): TaskStep["status"] {
@@ -285,24 +325,6 @@ function buildActivitySteps(nodes: TaskGraph["nodes"], status: string): TaskStep
       status: isActive ? "running" : "completed",
     };
   });
-}
-
-function extractThoughts(nodes: TaskGraph["nodes"]): string[] {
-  return nodes
-    .filter((node) => node.type === "tool_call" || node.type === "tool_output")
-    .map((node) => {
-      if (node.type === "tool_bind") {
-        return `Bind: ${node.toolName}`;
-      }
-      if (node.type === "tool_call") {
-        return `Running tool: ${node.toolName}`;
-      }
-      if (node.type === "tool_output") {
-        return "Tool finished";
-      }
-      return "";
-    })
-    .filter((label) => label.length > 0);
 }
 
 function filterNodesForTask(
