@@ -14,8 +14,11 @@
  * - Standardized error handling
  */
 
-import { getLangfuseClient } from "../observability/langfuseClient";
-import { ProviderRouter, type ProviderRouterConfig } from "../providers/providerRouter";
+import {
+  ProviderRouter,
+  type ProviderRouterConfig,
+  type ProviderStreamChunk,
+} from "../providers/providerRouter";
 import { TokenTracker } from "../providers/tokenTracker";
 import type { Message, TokenUsage } from "../providers/types";
 import type { LLMProvider } from "../providers/types";
@@ -29,6 +32,7 @@ import {
 import { type ObservabilityContext, createObservability } from "../resilience/observability";
 import type { ResiliencePipelineConfig } from "../resilience/pipeline";
 import { GatewayError, type GatewayErrorCode, fromProviderError } from "./errors";
+import { type GatewayTelemetryAdapter, createNoopGatewayTelemetryAdapter } from "./telemetry";
 import { type TraceContext, createTraceContext } from "./traceContext";
 
 // ============================================================================
@@ -72,6 +76,9 @@ export interface UnifiedGatewayConfig {
 
   /** Observability configuration */
   observability?: ObservabilityContext;
+
+  /** Optional generation telemetry adapter (e.g., Langfuse) */
+  telemetryAdapter?: GatewayTelemetryAdapter;
 
   /** Telemetry hook for external monitoring */
   onTelemetry?: (event: GatewayTelemetryEvent) => void;
@@ -213,6 +220,12 @@ interface RequestContext {
   startTime: number;
 }
 
+interface StreamProcessingState {
+  accumulated: string;
+  totalUsage: TokenUsage;
+  activeProvider?: string;
+}
+
 // ============================================================================
 // Gateway Implementation
 // ============================================================================
@@ -229,6 +242,7 @@ export class UnifiedAIGateway {
   private readonly tokenTracker: TokenTracker;
   private readonly healthAggregator;
   private readonly observability: ObservabilityContext;
+  private readonly telemetryAdapter: GatewayTelemetryAdapter;
   private readonly startTime: number;
 
   private totalRequests = 0;
@@ -249,6 +263,7 @@ export class UnifiedAIGateway {
 
     // Initialize observability
     this.observability = config.observability ?? createObservability({ prefix: "[AIGateway]" });
+    this.telemetryAdapter = config.telemetryAdapter ?? createNoopGatewayTelemetryAdapter();
 
     // Initialize router
     const routerConfig: ProviderRouterConfig = {
@@ -317,18 +332,17 @@ export class UnifiedAIGateway {
    */
   async complete(messages: Message[], options: GatewayRequestOptions): Promise<GatewayResponse> {
     const context = this.createContext(options);
-    const langfuse = getLangfuseClient();
 
     // Create generation trace
-    const generation = langfuse?.generation({
+    const generation = this.telemetryAdapter.startGeneration({
       name: "gateway.complete",
       model: context.model,
       input: messages,
       metadata: {
         ...options.metadata,
-        provider: context.model.split("/")[0], // heuristic
         requestId: context.requestId,
         userId: options.userId,
+        docId: options.docId,
       },
     });
 
@@ -341,10 +355,10 @@ export class UnifiedAIGateway {
       // Check rate limits
       this.checkRateLimit(options.userId);
 
-      const response = await this.observability.recordOperation(
+      const routed = await this.observability.recordOperation(
         "gateway.complete",
         async () => {
-          const result = await this.router.complete({
+          const result = await this.router.completeWithProvider({
             model: context.model,
             messages,
             temperature: options.temperature,
@@ -355,14 +369,16 @@ export class UnifiedAIGateway {
         },
         { userId: options.userId, model: context.model }
       );
+      const response = routed.response;
+      context.provider = routed.provider;
 
       // Track usage
-      this.trackUsage(context, response.usage);
+      this.trackUsage(context, response.usage, "completion");
 
       const latencyMs = Date.now() - context.startTime;
       this.totalLatencyMs += latencyMs;
 
-      // Update Langfuse generation
+      // Update generation telemetry
       generation?.end({
         output: response.content,
         usage: {
@@ -373,7 +389,7 @@ export class UnifiedAIGateway {
         model: response.model,
         metadata: {
           latencyMs,
-          provider: this.router.getProviderNames()[0], // Use fallback or derive from model
+          provider: routed.provider,
           finishReason: response.finishReason,
         },
       });
@@ -385,7 +401,7 @@ export class UnifiedAIGateway {
         traceId: context.trace.traceId,
         requestId: context.requestId,
         userId: options.userId,
-        provider: response.model.split("/")[0],
+        provider: routed.provider,
         model: response.model,
         durationMs: latencyMs,
         tokenUsage: response.usage,
@@ -394,7 +410,7 @@ export class UnifiedAIGateway {
       return {
         content: response.content,
         model: response.model,
-        provider: this.router.getProviderNames()[0],
+        provider: routed.provider,
         usage: response.usage,
         latencyMs,
         traceId: context.trace.traceId,
@@ -402,7 +418,7 @@ export class UnifiedAIGateway {
         finishReason: response.finishReason ?? "stop",
       };
     } catch (error) {
-      // Log error to Langfuse
+      // Log error to telemetry adapter
       generation?.end({
         statusMessage: error instanceof Error ? error.message : String(error),
         level: "ERROR",
@@ -419,10 +435,9 @@ export class UnifiedAIGateway {
     options: GatewayStreamOptions
   ): AsyncIterable<GatewayStreamChunk> {
     const context = this.createContext(options);
-    const langfuse = getLangfuseClient();
 
     // Create generation trace for stream
-    const generation = langfuse?.generation({
+    const generation = this.telemetryAdapter.startGeneration({
       name: "gateway.stream",
       model: context.model,
       input: messages,
@@ -430,6 +445,7 @@ export class UnifiedAIGateway {
         ...options.metadata,
         requestId: context.requestId,
         userId: options.userId,
+        docId: options.docId,
       },
     });
 
@@ -442,14 +458,8 @@ export class UnifiedAIGateway {
       // Check rate limits
       this.checkRateLimit(options.userId);
 
-      let accumulated = "";
-      let totalUsage: TokenUsage = {
-        inputTokens: 0,
-        outputTokens: 0,
-        totalTokens: 0,
-      };
-
-      const providerStream = this.router.stream({
+      const streamState = this.createStreamState();
+      const providerStream = this.router.streamWithProvider({
         model: context.model,
         messages,
         temperature: options.temperature,
@@ -457,53 +467,31 @@ export class UnifiedAIGateway {
         timeoutMs: options.timeoutMs,
       });
 
-      for await (const chunk of providerStream) {
-        if (chunk.type === "content" && chunk.content) {
-          accumulated += chunk.content;
-          const streamChunk: GatewayStreamChunk = {
-            type: "content",
-            content: chunk.content,
-            accumulated,
-          };
-          options.onChunk?.(streamChunk);
-          yield streamChunk;
-        } else if (chunk.type === "usage" && chunk.usage) {
-          totalUsage = chunk.usage;
-          const usageChunk: GatewayStreamChunk = {
-            type: "usage",
-            usage: chunk.usage,
-          };
-          options.onUsage?.(chunk.usage);
-          yield usageChunk;
-        } else if (chunk.type === "error") {
-          const errorChunk: GatewayStreamChunk = {
-            type: "error",
-            error: chunk.error,
-          };
-          yield errorChunk;
-          throw new GatewayError("PROVIDER_ERROR", chunk.error ?? "Stream error", {
-            traceId: context.trace.traceId,
-            requestId: context.requestId,
-          });
-        }
-      }
+      const result = yield* this.consumeProviderStream(
+        providerStream,
+        streamState,
+        options,
+        context
+      );
+      context.provider = result.activeProvider;
 
       // Track usage
-      this.trackUsage(context, totalUsage);
+      this.trackUsage(context, result.totalUsage, "streaming");
 
       const latencyMs = Date.now() - context.startTime;
       this.totalLatencyMs += latencyMs;
 
-      // Update Langfuse generation
+      // Update generation telemetry
       generation?.end({
-        output: accumulated,
+        output: result.accumulated,
         usage: {
-          input: totalUsage.inputTokens,
-          output: totalUsage.outputTokens,
-          total: totalUsage.totalTokens,
+          input: result.totalUsage.inputTokens,
+          output: result.totalUsage.outputTokens,
+          total: result.totalUsage.totalTokens,
         },
         metadata: {
           latencyMs,
+          provider: result.activeProvider,
           finishReason: "stop", // Streaming usually ends with stop or explicit done. We assume stop here if successful.
         },
       });
@@ -516,8 +504,9 @@ export class UnifiedAIGateway {
         requestId: context.requestId,
         userId: options.userId,
         model: context.model,
+        provider: result.activeProvider,
         durationMs: latencyMs,
-        tokenUsage: totalUsage,
+        tokenUsage: result.totalUsage,
       });
 
       yield { type: "done" };
@@ -525,6 +514,9 @@ export class UnifiedAIGateway {
       generation?.end({
         statusMessage: error instanceof Error ? error.message : String(error),
         level: "ERROR",
+        metadata: {
+          provider: context.provider,
+        },
       });
       this.handleStreamError(error, context, options);
       yield {
@@ -669,14 +661,18 @@ export class UnifiedAIGateway {
     }
   }
 
-  private trackUsage(context: RequestContext, usage: TokenUsage): void {
+  private trackUsage(
+    context: RequestContext,
+    usage: TokenUsage,
+    requestType: "completion" | "streaming" | "embedding"
+  ): void {
     this.tokenTracker.record({
       requestId: context.requestId,
       userId: context.userId,
       model: context.model,
       provider: context.provider ?? "unknown",
       usage,
-      requestType: "completion",
+      requestType,
     });
   }
 
@@ -691,7 +687,7 @@ export class UnifiedAIGateway {
       error instanceof GatewayError
         ? error
         : error instanceof Error
-          ? fromProviderError(error, "unknown", {
+          ? fromProviderError(error, context.provider ?? "unknown", {
               traceId: context.trace.traceId,
               requestId: context.requestId,
               model: context.model,
@@ -708,6 +704,7 @@ export class UnifiedAIGateway {
       requestId: context.requestId,
       userId: options.userId,
       model: context.model,
+      provider: context.provider,
       durationMs: Date.now() - context.startTime,
       error: {
         code: gatewayError.code,
@@ -731,7 +728,7 @@ export class UnifiedAIGateway {
       error instanceof GatewayError
         ? error
         : error instanceof Error
-          ? fromProviderError(error, "unknown", {
+          ? fromProviderError(error, context.provider ?? "unknown", {
               traceId: context.trace.traceId,
               requestId: context.requestId,
               model: context.model,
@@ -748,6 +745,7 @@ export class UnifiedAIGateway {
       requestId: context.requestId,
       userId: options.userId,
       model: context.model,
+      provider: context.provider,
       durationMs: Date.now() - context.startTime,
       error: {
         code: gatewayError.code,
@@ -760,6 +758,85 @@ export class UnifiedAIGateway {
 
   private emitTelemetry(event: GatewayTelemetryEvent): void {
     this.config.onTelemetry?.(event);
+  }
+
+  private createStreamState(): StreamProcessingState {
+    return {
+      accumulated: "",
+      totalUsage: {
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
+      },
+    };
+  }
+
+  private async *consumeProviderStream(
+    providerStream: AsyncIterable<ProviderStreamChunk>,
+    state: StreamProcessingState,
+    options: GatewayStreamOptions,
+    context: RequestContext
+  ): AsyncGenerator<GatewayStreamChunk, StreamProcessingState> {
+    for await (const chunk of providerStream) {
+      const result = this.handleProviderChunk(chunk, state, options, context);
+      if (result.streamChunk) {
+        yield result.streamChunk;
+      }
+      if (result.error) {
+        throw result.error;
+      }
+    }
+    return state;
+  }
+
+  private handleProviderChunk(
+    chunk: ProviderStreamChunk,
+    state: StreamProcessingState,
+    options: GatewayStreamOptions,
+    context: RequestContext
+  ): { streamChunk?: GatewayStreamChunk; error?: GatewayError } {
+    if (chunk.provider) {
+      state.activeProvider = chunk.provider;
+      context.provider = chunk.provider;
+    }
+
+    if (chunk.type === "content" && chunk.content) {
+      state.accumulated += chunk.content;
+      const streamChunk: GatewayStreamChunk = {
+        type: "content",
+        content: chunk.content,
+        accumulated: state.accumulated,
+      };
+      options.onChunk?.(streamChunk);
+      return { streamChunk };
+    }
+
+    if (chunk.type === "usage" && chunk.usage) {
+      state.totalUsage = chunk.usage;
+      const streamChunk: GatewayStreamChunk = {
+        type: "usage",
+        usage: chunk.usage,
+      };
+      options.onUsage?.(chunk.usage);
+      return { streamChunk };
+    }
+
+    if (chunk.type === "error") {
+      const streamChunk: GatewayStreamChunk = {
+        type: "error",
+        error: chunk.error,
+      };
+      return {
+        streamChunk,
+        error: new GatewayError("PROVIDER_ERROR", chunk.error ?? "Stream error", {
+          traceId: context.trace.traceId,
+          requestId: context.requestId,
+          provider: context.provider,
+        }),
+      };
+    }
+
+    return {};
   }
 }
 

@@ -15,6 +15,7 @@ export type {
   HistoryEntry,
   ModelContextLimits,
   TokenBudget,
+  TokenCounter,
 } from "./types";
 
 export {

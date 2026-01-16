@@ -51,6 +51,8 @@ export {
   type ProviderCandidate,
   type ProviderSelector,
   type ProviderLogger,
+  type ProviderRoutedResponse,
+  type ProviderStreamChunk,
   // Token tracking
   TokenTracker,
   type ModelPricing,
@@ -416,6 +418,15 @@ export {
   toHttpStatus,
   formatErrorResponse,
   type GatewayErrorResponse,
+  // Telemetry adapters
+  type GatewayTelemetryAdapter,
+  type GatewayTelemetryGeneration,
+  type GatewayGenerationStart,
+  type GatewayGenerationResult,
+  type GatewayGenerationUsage,
+  type GatewayTelemetryLevel,
+  createNoopGatewayTelemetryAdapter,
+  createLangfuseGatewayTelemetryAdapter,
 } from "./gateway";
 
 // ============================================================================

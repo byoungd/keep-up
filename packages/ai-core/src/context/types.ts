@@ -144,6 +144,12 @@ export interface TokenBudget {
   remaining: number;
 }
 
+/** Token counter interface for accurate token estimation */
+export interface TokenCounter {
+  /** Count tokens for a text payload */
+  countTokens: (text: string) => number;
+}
+
 /** Context window configuration */
 export interface ContextWindowConfig {
   /** Model to use */
@@ -154,6 +160,8 @@ export interface ContextWindowConfig {
   outputReserve?: number;
   /** Segment budget overrides (as percentage of available) */
   segmentBudgets?: Partial<Record<ContextSegmentType, number>>;
+  /** Optional token counter override */
+  tokenCounter?: TokenCounter;
 }
 
 /** Built context ready for LLM */

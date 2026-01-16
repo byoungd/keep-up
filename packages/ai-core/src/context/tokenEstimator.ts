@@ -5,6 +5,8 @@
  * Uses heuristics for speed with optional tiktoken for precision.
  */
 
+import type { TokenCounter } from "./types";
+
 /**
  * Character to token ratio by language/content type.
  * These are empirically derived averages.
@@ -117,13 +119,17 @@ function applyAdjustments(text: string, baseEstimate: number): number {
 /**
  * Estimate tokens for an array of messages.
  */
-export function estimateMessagesTokens(messages: Array<{ role: string; content: string }>): number {
+export function estimateMessagesTokens(
+  messages: Array<{ role: string; content: string }>,
+  tokenCounter?: TokenCounter
+): number {
+  const countTokens = tokenCounter?.countTokens ?? estimateTokens;
   let total = 0;
 
   for (const msg of messages) {
     // Each message has overhead (~4 tokens for role, formatting)
     total += 4;
-    total += estimateTokens(msg.content);
+    total += countTokens(msg.content);
   }
 
   // Add final overhead for message boundary
@@ -146,10 +152,12 @@ export function truncateToTokens(
   options: {
     from?: "start" | "end" | "middle";
     ellipsis?: string;
+    tokenCounter?: TokenCounter;
   } = {}
 ): string {
-  const { from = "end", ellipsis = "..." } = options;
-  const currentTokens = estimateTokens(text);
+  const { from = "end", ellipsis = "...", tokenCounter } = options;
+  const countTokens = tokenCounter?.countTokens ?? estimateTokens;
+  const currentTokens = countTokens(text);
 
   if (currentTokens <= maxTokens) {
     return text;
@@ -157,7 +165,7 @@ export function truncateToTokens(
 
   // Calculate target character count
   const ratio = text.length / currentTokens;
-  const ellipsisTokens = estimateTokens(ellipsis);
+  const ellipsisTokens = countTokens(ellipsis);
   const targetTokens = maxTokens - ellipsisTokens;
   const targetChars = Math.floor(targetTokens * ratio);
 
@@ -193,11 +201,13 @@ export function splitIntoChunks(
   options: {
     overlap?: number; // Token overlap between chunks
     splitOn?: RegExp; // Preferred split points
+    tokenCounter?: TokenCounter;
   } = {}
 ): string[] {
-  const { overlap = 0, splitOn = /\n\n|\n|\.(?=\s)/ } = options;
+  const { overlap = 0, splitOn = /\n\n|\n|\.(?=\s)/, tokenCounter } = options;
+  const countTokens = tokenCounter?.countTokens ?? estimateTokens;
 
-  const totalTokens = estimateTokens(text);
+  const totalTokens = countTokens(text);
   if (totalTokens <= maxTokensPerChunk) {
     return [text];
   }
@@ -208,7 +218,7 @@ export function splitIntoChunks(
   let currentTokens = 0;
 
   for (const segment of segments) {
-    const segmentTokens = estimateTokens(segment);
+    const segmentTokens = countTokens(segment);
 
     if (currentTokens + segmentTokens > maxTokensPerChunk && currentChunk) {
       // Save current chunk
@@ -216,9 +226,12 @@ export function splitIntoChunks(
 
       // Start new chunk with overlap
       if (overlap > 0) {
-        const overlapText = truncateToTokens(currentChunk, overlap, { from: "start" });
+        const overlapText = truncateToTokens(currentChunk, overlap, {
+          from: "start",
+          tokenCounter,
+        });
         currentChunk = `${overlapText} ${segment}`;
-        currentTokens = estimateTokens(currentChunk);
+        currentTokens = countTokens(currentChunk);
       } else {
         currentChunk = segment;
         currentTokens = segmentTokens;

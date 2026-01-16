@@ -12,6 +12,7 @@ import {
   type DocumentContextOptions,
   type HistoryEntry,
   SEGMENT_PRIORITY,
+  type TokenCounter,
 } from "./types";
 
 /** Document context builder configuration */
@@ -24,6 +25,8 @@ export interface DocumentContextBuilderConfig {
   linesAfter?: number;
   /** Whether to include document structure hints */
   includeStructure?: boolean;
+  /** Optional token counter override */
+  tokenCounter?: TokenCounter;
 }
 
 /** Built document context */
@@ -54,6 +57,7 @@ export interface DocumentContext {
  */
 export class DocumentContextBuilder {
   private readonly config: Required<DocumentContextBuilderConfig>;
+  private readonly tokenCounter: TokenCounter;
 
   constructor(config: DocumentContextBuilderConfig = {}) {
     this.config = {
@@ -61,7 +65,9 @@ export class DocumentContextBuilder {
       linesBefore: config.linesBefore ?? 50,
       linesAfter: config.linesAfter ?? 20,
       includeStructure: config.includeStructure ?? true,
+      tokenCounter: config.tokenCounter,
     };
+    this.tokenCounter = config.tokenCounter ?? { countTokens: estimateTokens };
   }
 
   /**
@@ -86,12 +92,14 @@ export class DocumentContextBuilder {
     const truncatedPrefix = truncateToTokens(prefix, prefixBudget, {
       from: "start",
       ellipsis: "[...]\n",
+      tokenCounter: this.tokenCounter,
     });
 
     // Truncate from the end for suffix
     const truncatedSuffix = truncateToTokens(suffix, suffixBudget, {
       from: "end",
       ellipsis: "\n[...]",
+      tokenCounter: this.tokenCounter,
     });
 
     const cursorInfo = this.calculateCursorInfo(content, cursorPosition);
@@ -100,7 +108,7 @@ export class DocumentContextBuilder {
       prefix: truncatedPrefix,
       suffix: truncatedSuffix,
       title: options.title,
-      tokenCount: estimateTokens(truncatedPrefix) + estimateTokens(truncatedSuffix),
+      tokenCount: this.countTokens(truncatedPrefix) + this.countTokens(truncatedSuffix),
       cursorInfo,
     };
   }
@@ -121,7 +129,7 @@ export class DocumentContextBuilder {
     const selectedText = content.slice(selection.start, selection.end);
 
     // Allocate: 20% prefix, 60% selection, 20% suffix
-    const selectionTokens = estimateTokens(selectedText);
+    const selectionTokens = this.countTokens(selectedText);
     const selectionBudget = Math.floor(budget * 0.6);
     const contextBudget = budget - Math.min(selectionTokens, selectionBudget);
     const prefixBudget = Math.floor(contextBudget * 0.5);
@@ -133,11 +141,13 @@ export class DocumentContextBuilder {
     const truncatedPrefix = truncateToTokens(prefix, prefixBudget, {
       from: "start",
       ellipsis: "[...]\n",
+      tokenCounter: this.tokenCounter,
     });
 
     const truncatedSuffix = truncateToTokens(suffix, suffixBudget, {
       from: "end",
       ellipsis: "\n[...]",
+      tokenCounter: this.tokenCounter,
     });
 
     const truncatedSelection =
@@ -145,6 +155,7 @@ export class DocumentContextBuilder {
         ? truncateToTokens(selectedText, selectionBudget, {
             from: "middle",
             ellipsis: "\n[...selection truncated...]\n",
+            tokenCounter: this.tokenCounter,
           })
         : selectedText;
 
@@ -154,9 +165,9 @@ export class DocumentContextBuilder {
       selection: truncatedSelection,
       title: options.title,
       tokenCount:
-        estimateTokens(truncatedPrefix) +
-        estimateTokens(truncatedSelection) +
-        estimateTokens(truncatedSuffix),
+        this.countTokens(truncatedPrefix) +
+        this.countTokens(truncatedSelection) +
+        this.countTokens(truncatedSuffix),
       cursorInfo: this.calculateCursorInfo(content, selection.start),
     };
   }
@@ -190,7 +201,7 @@ export class DocumentContextBuilder {
     return {
       type: segmentType,
       content,
-      tokenCount: estimateTokens(content),
+      tokenCount: this.countTokens(content),
       priority: SEGMENT_PRIORITY[segmentType],
       canTruncate: true,
       minTokens: 100,
@@ -215,7 +226,7 @@ export class DocumentContextBuilder {
 
     for (const entry of reversedHistory) {
       const entryContent = `${entry.role}: ${entry.content}\n\n`;
-      const entryTokens = entry.tokenCount ?? estimateTokens(entryContent);
+      const entryTokens = entry.tokenCount ?? this.countTokens(entryContent);
 
       if (tokenCount + entryTokens > maxTokens) {
         break;
@@ -254,7 +265,7 @@ export class DocumentContextBuilder {
     return {
       type: "system",
       content: systemPrompt,
-      tokenCount: estimateTokens(systemPrompt),
+      tokenCount: this.countTokens(systemPrompt),
       priority: SEGMENT_PRIORITY.system,
       canTruncate: options.canTruncate ?? false,
       minTokens: 100,
@@ -268,7 +279,7 @@ export class DocumentContextBuilder {
     return {
       type: "instructions",
       content: instructions,
-      tokenCount: estimateTokens(instructions),
+      tokenCount: this.countTokens(instructions),
       priority: SEGMENT_PRIORITY.instructions,
       canTruncate: false, // User instructions should not be truncated
     };
@@ -282,12 +293,12 @@ export class DocumentContextBuilder {
     maxTokens: number
   ): ContextSegment {
     let content = "## References\n\n";
-    let tokenCount = estimateTokens(content);
+    let tokenCount = this.countTokens(content);
     let includedCount = 0;
 
     for (const ref of references) {
       const refContent = `### ${ref.title}\n${ref.content}\n${ref.source ? `Source: ${ref.source}\n` : ""}\n`;
-      const refTokens = estimateTokens(refContent);
+      const refTokens = this.countTokens(refContent);
 
       if (tokenCount + refTokens > maxTokens) {
         // Try to include truncated version
@@ -296,9 +307,10 @@ export class DocumentContextBuilder {
           const truncated = truncateToTokens(ref.content, remaining, {
             from: "end",
             ellipsis: "...",
+            tokenCounter: this.tokenCounter,
           });
           content += `### ${ref.title}\n${truncated}\n\n`;
-          tokenCount += estimateTokens(`### ${ref.title}\n${truncated}\n\n`);
+          tokenCount += this.countTokens(`### ${ref.title}\n${truncated}\n\n`);
           includedCount++;
         }
         break;
@@ -321,6 +333,10 @@ export class DocumentContextBuilder {
         totalCount: references.length,
       },
     };
+  }
+
+  private countTokens(text: string): number {
+    return this.tokenCounter.countTokens(text);
   }
 
   /**

@@ -18,6 +18,7 @@ import {
   MODEL_CONTEXT_LIMITS,
   SEGMENT_PRIORITY,
   type TokenBudget,
+  type TokenCounter,
 } from "./types";
 
 /** Default segment budget percentages (of available context) */
@@ -40,6 +41,7 @@ const DEFAULT_SEGMENT_BUDGETS: Record<ContextSegmentType, number> = {
 export class ContextWindowManager {
   private readonly config: Required<ContextWindowConfig>;
   private readonly segmentBudgets: Record<ContextSegmentType, number>;
+  private readonly tokenCounter: TokenCounter;
 
   constructor(config: ContextWindowConfig) {
     const modelLimits = MODEL_CONTEXT_LIMITS[config.model] ?? DEFAULT_CONTEXT_LIMITS;
@@ -49,7 +51,10 @@ export class ContextWindowManager {
       maxTokens: config.maxTokens ?? modelLimits.maxContextTokens,
       outputReserve: config.outputReserve ?? modelLimits.recommendedOutputReserve,
       segmentBudgets: config.segmentBudgets ?? {},
+      tokenCounter: config.tokenCounter,
     };
+
+    this.tokenCounter = config.tokenCounter ?? { countTokens: estimateTokens };
 
     // Merge custom budgets with defaults
     this.segmentBudgets = {
@@ -240,7 +245,7 @@ export class ContextWindowManager {
     return {
       type,
       content,
-      tokenCount: estimateTokens(content),
+      tokenCount: this.tokenCounter.countTokens(content),
       priority: options.priority ?? SEGMENT_PRIORITY[type],
       canTruncate: options.canTruncate ?? true,
       minTokens: options.minTokens,
@@ -255,12 +260,13 @@ export class ContextWindowManager {
     const truncatedContent = truncateToTokens(segment.content, maxTokens, {
       from: "end",
       ellipsis: "\n[...truncated...]",
+      tokenCounter: this.tokenCounter,
     });
 
     return {
       ...segment,
       content: truncatedContent,
-      tokenCount: estimateTokens(truncatedContent),
+      tokenCount: this.tokenCounter.countTokens(truncatedContent),
     };
   }
 

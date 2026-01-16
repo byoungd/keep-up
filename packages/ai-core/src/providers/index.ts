@@ -46,6 +46,8 @@ export {
   type ProviderCandidate,
   type ProviderSelector,
   type ProviderLogger,
+  type ProviderRoutedResponse,
+  type ProviderStreamChunk,
 } from "./providerRouter";
 
 // Token tracking

@@ -47,3 +47,15 @@ export {
   formatErrorResponse,
   type GatewayErrorResponse,
 } from "./errors";
+
+export {
+  type GatewayTelemetryAdapter,
+  type GatewayTelemetryGeneration,
+  type GatewayGenerationStart,
+  type GatewayGenerationResult,
+  type GatewayGenerationUsage,
+  type GatewayTelemetryLevel,
+  createNoopGatewayTelemetryAdapter,
+} from "./telemetry";
+
+export { createLangfuseGatewayTelemetryAdapter } from "./langfuseTelemetry";

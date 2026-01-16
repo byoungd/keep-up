@@ -19,6 +19,15 @@ import type {
 /** Provider operation types */
 export type ProviderOperation = "complete" | "stream" | "embed";
 
+/** Provider response annotated with the selected provider */
+export interface ProviderRoutedResponse<T> {
+  provider: string;
+  response: T;
+}
+
+/** Stream chunk annotated with the selected provider */
+export type ProviderStreamChunk = StreamChunk & { provider: string };
+
 /** Provider candidate for routing */
 export interface ProviderCandidate {
   provider: LLMProvider;
@@ -188,6 +197,16 @@ export class ProviderRouter {
    * Route a completion request to the best available provider.
    */
   async complete(request: CompletionRequest): Promise<CompletionResponse> {
+    const result = await this.completeWithProvider(request);
+    return result.response;
+  }
+
+  /**
+   * Route a completion request and return the selected provider.
+   */
+  async completeWithProvider(
+    request: CompletionRequest
+  ): Promise<ProviderRoutedResponse<CompletionResponse>> {
     const providers = this.getOrderedProviders("complete", request);
 
     for (const state of providers) {
@@ -198,7 +217,7 @@ export class ProviderRouter {
       try {
         const response = await state.provider.complete(request);
         this.recordSuccess(state);
-        return response;
+        return { provider: state.provider.name, response };
       } catch (error) {
         this.recordFailure(state);
 
@@ -221,40 +240,87 @@ export class ProviderRouter {
    * Route a streaming request to the best available provider.
    */
   async *stream(request: CompletionRequest): AsyncIterable<StreamChunk> {
+    for await (const chunk of this.streamWithProvider(request)) {
+      const { provider: _provider, ...rest } = chunk;
+      yield rest;
+    }
+  }
+
+  /**
+   * Route a streaming request and return chunks annotated with provider.
+   */
+  async *streamWithProvider(request: CompletionRequest): AsyncIterable<ProviderStreamChunk> {
     const providers = this.getOrderedProviders("stream", request);
-    let lastError: Error | null = null;
+    const result = yield* this.streamWithFallback(providers, request);
+
+    if (result.completed) {
+      return;
+    }
+
+    yield {
+      type: "error",
+      error: result.lastError?.message ?? "All providers failed or are unhealthy",
+      provider: result.lastProvider ?? "unknown",
+    };
+  }
+
+  private async *streamWithFallback(
+    providers: ProviderState[],
+    request: CompletionRequest
+  ): AsyncGenerator<
+    ProviderStreamChunk,
+    { completed: boolean; lastError?: Error; lastProvider?: string }
+  > {
+    let lastError: Error | undefined;
+    let lastProvider: string | undefined;
 
     for (const state of providers) {
       if (this.shouldSkipProvider(state)) {
         continue;
       }
 
-      try {
-        const outcome = { hasYielded: false, sawError: false };
-        yield* this.streamFromProvider(state, request, outcome);
+      lastProvider = state.provider.name;
+      const attempt = yield* this.streamAttempt(state, request);
+      if (attempt.completed) {
+        return { completed: true, lastProvider };
+      }
 
-        if (this.finalizeStreamOutcome(outcome, state)) {
-          return;
-        }
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-        this.recordFailure(state);
-
-        if (!this.config.enableFallback) {
-          throw error;
-        }
-
-        this.logger.warn?.("Provider stream failed, trying fallback", {
-          provider: state.provider.name,
-          error: lastError.message,
-        });
+      if (attempt.error) {
+        lastError = attempt.error;
       }
     }
 
-    yield {
-      type: "error",
-      error: lastError?.message ?? "All providers failed or are unhealthy",
-    };
+    return { completed: false, lastError, lastProvider };
+  }
+
+  private async *streamAttempt(
+    state: ProviderState,
+    request: CompletionRequest
+  ): AsyncGenerator<ProviderStreamChunk, { completed: boolean; error?: Error }> {
+    const outcome = { hasYielded: false, sawError: false };
+
+    try {
+      for await (const chunk of this.streamFromProvider(state, request, outcome)) {
+        yield { ...chunk, provider: state.provider.name };
+      }
+
+      const completed = this.finalizeStreamOutcome(outcome, state);
+      return { completed };
+    } catch (error) {
+      const lastError = error instanceof Error ? error : new Error(String(error));
+      this.recordFailure(state);
+
+      if (!this.config.enableFallback) {
+        throw error;
+      }
+
+      this.logger.warn?.("Provider stream failed, trying fallback", {
+        provider: state.provider.name,
+        error: lastError.message,
+      });
+
+      return { completed: false, error: lastError };
+    }
   }
 
   /**
@@ -262,6 +328,17 @@ export class ProviderRouter {
    * Note: Not all providers support embeddings.
    */
   async embed(request: EmbeddingRequest): Promise<EmbeddingResponse> {
+    const result = await this.embedWithProvider(request);
+    return result.response;
+  }
+
+  /**
+   * Route an embedding request and return the selected provider.
+   * Note: Not all providers support embeddings.
+   */
+  async embedWithProvider(
+    request: EmbeddingRequest
+  ): Promise<ProviderRoutedResponse<EmbeddingResponse>> {
     const providers = this.getOrderedProviders("embed", request);
 
     for (const state of providers) {
@@ -272,7 +349,7 @@ export class ProviderRouter {
       try {
         const response = await state.provider.embed(request);
         this.recordSuccess(state);
-        return response;
+        return { provider: state.provider.name, response };
       } catch (error) {
         // Check if this is a "not supported" error vs a transient failure
         if (this.isNotSupportedError(error)) {
