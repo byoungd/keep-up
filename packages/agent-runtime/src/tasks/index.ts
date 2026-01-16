@@ -33,6 +33,8 @@ export type {
   TaskGraphConfig,
   TaskGraphEdge,
   TaskGraphEvent,
+  TaskGraphEventContext,
+  TaskGraphEventMeta,
   TaskGraphEventType,
   TaskGraphNode,
   TaskGraphNodeInput,

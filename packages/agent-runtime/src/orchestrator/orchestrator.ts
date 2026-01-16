@@ -32,7 +32,7 @@ import { createSkillPromptAdapter } from "../skills/skillPromptAdapter";
 import type { SkillRegistry } from "../skills/skillRegistry";
 import type { SkillSession } from "../skills/skillSession";
 import { createSkillSession } from "../skills/skillSession";
-import type { TaskGraphStore, TaskNodeStatus } from "../tasks/taskGraph";
+import { type TaskGraphStore, type TaskNodeStatus, createTaskGraphStore } from "../tasks/taskGraph";
 import type { IMetricsCollector, ITracer, SpanContext, TelemetryContext } from "../telemetry";
 import { AGENT_METRICS } from "../telemetry";
 import {
@@ -201,6 +201,7 @@ export class AgentOrchestrator {
   private readonly skillPromptAdapter?: SkillPromptAdapter;
   private readonly taskGraph?: TaskGraphStore;
   private currentRunId?: string;
+  private currentPlanNodeId?: string;
   private readonly taskGraphToolCalls = new WeakMap<MCPToolCall, string>();
 
   private state: AgentState;
@@ -308,6 +309,8 @@ export class AgentOrchestrator {
   private async runWithId(userMessage: string, runId: string): Promise<AgentState> {
     this.abortController = new AbortController();
     this.currentRunId = runId;
+    this.taskGraph?.setEventContext({ correlationId: runId, source: this.config.name });
+    this.currentPlanNodeId = this.createPlanNode(userMessage);
 
     // Add user message
     const userMsg: AgentMessage = { role: "user", content: userMessage };
@@ -321,6 +324,7 @@ export class AgentOrchestrator {
         await this.executeTurn();
       }
     } finally {
+      this.finalizePlanNode();
       this.metrics?.gauge(AGENT_METRICS.activeAgents.name, 0, {});
     }
 
@@ -1016,6 +1020,41 @@ export class AgentOrchestrator {
   private generateRunId(): string {
     return `run_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
   }
+
+  private createPlanNode(userMessage: string): string | undefined {
+    if (!this.taskGraph) {
+      return undefined;
+    }
+
+    const node = this.taskGraph.createNode({
+      type: "plan",
+      title: userMessage,
+      status: "running",
+    });
+
+    return node.id;
+  }
+
+  private finalizePlanNode(): void {
+    if (!this.currentPlanNodeId) {
+      return;
+    }
+
+    const status = this.state.status;
+    if (status === "error") {
+      this.updateTaskGraphStatus(this.currentPlanNodeId, "failed");
+      return;
+    }
+
+    if (status === "waiting_confirmation") {
+      this.updateTaskGraphStatus(this.currentPlanNodeId, "blocked");
+      return;
+    }
+
+    if (status === "complete") {
+      this.updateTaskGraphStatus(this.currentPlanNodeId, "completed");
+    }
+  }
 }
 
 function isToolConfirmationResolver(
@@ -1156,6 +1195,7 @@ export function createOrchestrator(
     auditLogger
   );
 
+  const taskGraph = options.components?.taskGraph ?? createTaskGraphStore();
   const components: OrchestratorComponents = {
     ...options.components,
     toolExecutor,
@@ -1163,6 +1203,7 @@ export function createOrchestrator(
     skillRegistry,
     skillSession,
     skillPromptAdapter,
+    taskGraph,
   };
 
   const orchestrator = new AgentOrchestrator(config, llm, registry, options.telemetry, components);

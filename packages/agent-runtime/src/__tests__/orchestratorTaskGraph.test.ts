@@ -67,9 +67,11 @@ describe("AgentOrchestrator task graph", () => {
     await orchestrator.run("Run ping");
 
     const nodes = graph.listNodes();
-    expect(nodes).toHaveLength(1);
-    expect(nodes[0]?.type).toBe("tool_call");
-    expect(nodes[0]?.status).toBe("completed");
+    expect(nodes).toHaveLength(2);
+    const planNode = nodes.find((node) => node.type === "plan");
+    const toolNode = nodes.find((node) => node.type === "tool_call");
+    expect(planNode?.status).toBe("completed");
+    expect(toolNode?.status).toBe("completed");
   });
 
   it("attaches task node ids to confirmation requests", async () => {
@@ -92,6 +94,7 @@ describe("AgentOrchestrator task graph", () => {
 
     expect(requestTaskNodeId).toBeDefined();
     const nodes = graph.listNodes();
-    expect(nodes[0]?.status).toBe("failed");
+    const toolNode = nodes.find((node) => node.type === "tool_call");
+    expect(toolNode?.status).toBe("failed");
   });
 });

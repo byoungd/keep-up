@@ -220,8 +220,9 @@ export function useChatSession(sessionId: string | undefined) {
           await handleSendChat(sessionId, content, tempId, options?.modelId);
         }
       } catch (err) {
+        const errorDetail = err instanceof Error ? err.message : "Unknown error";
         console.error("Failed to send message:", err);
-        setError("Failed to send message");
+        setError(`Failed to send message: ${errorDetail}`);
         setHistoryMessages((prev) =>
           prev.map((m) =>
             m.id === tempId || (m.role === "assistant" && m.status === "streaming")

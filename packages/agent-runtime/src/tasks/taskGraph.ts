@@ -80,10 +80,29 @@ export type TaskGraphEventType =
 export interface TaskGraphEvent {
   readonly id: string;
   readonly sequenceId: number;
+  readonly eventVersion: number;
   readonly nodeId: string;
   readonly type: TaskGraphEventType;
   readonly timestamp: string;
+  readonly correlationId?: string;
+  readonly source?: string;
+  readonly idempotencyKey?: string;
   readonly payload: Readonly<Record<string, unknown>>;
+}
+
+/**
+ * Shared event context applied to all events in a run.
+ */
+export interface TaskGraphEventContext {
+  readonly correlationId?: string;
+  readonly source?: string;
+}
+
+/**
+ * Per-event metadata overrides.
+ */
+export interface TaskGraphEventMeta extends TaskGraphEventContext {
+  readonly idempotencyKey?: string;
 }
 
 /**
@@ -115,6 +134,10 @@ export interface TaskGraphStats {
 export interface TaskGraphConfig {
   /** Graph ID (auto-generated if not provided) */
   readonly graphId?: string;
+  /** Event schema version (default: 1) */
+  readonly eventVersion?: number;
+  /** Shared event context for correlation */
+  readonly eventContext?: TaskGraphEventContext;
   /** Maximum number of nodes to keep (default: 10000) */
   readonly maxNodes?: number;
   /** Maximum number of events to keep (default: 50000) */
@@ -155,6 +178,7 @@ export type EvictionHandler = (node: TaskGraphNode) => void;
 const DEFAULT_MAX_NODES = 10000;
 const DEFAULT_MAX_EVENTS = 50000;
 const DEFAULT_COMPACTION_THRESHOLD = 1000;
+const DEFAULT_EVENT_VERSION = 1;
 
 const DEFAULT_CONFIG: Required<Pick<TaskGraphConfig, "now" | "idFactory">> = {
   now: () => new Date().toISOString(),
@@ -207,9 +231,11 @@ export class TaskGraphStore {
   private readonly graphId: string;
   private readonly now: () => string;
   private readonly idFactory: () => string;
+  private readonly eventVersion: number;
   private readonly maxNodes: number;
   private readonly maxEvents: number;
   private readonly compactionThreshold: number;
+  private eventContext: TaskGraphEventContext;
 
   private readonly nodes = new Map<string, TaskGraphNode>();
   private readonly edges: TaskGraphEdge[] = [];
@@ -226,6 +252,8 @@ export class TaskGraphStore {
     this.now = config.now ?? DEFAULT_CONFIG.now;
     this.idFactory = config.idFactory ?? DEFAULT_CONFIG.idFactory;
     this.graphId = config.graphId ?? this.idFactory();
+    this.eventVersion = config.eventVersion ?? DEFAULT_EVENT_VERSION;
+    this.eventContext = { ...config.eventContext };
     this.maxNodes = config.maxNodes ?? DEFAULT_MAX_NODES;
     this.maxEvents = config.maxEvents ?? DEFAULT_MAX_EVENTS;
     this.compactionThreshold = config.compactionThreshold ?? DEFAULT_COMPACTION_THRESHOLD;
@@ -411,7 +439,12 @@ export class TaskGraphStore {
     }
 
     for (const event of snapshot.events) {
-      this.events.push(cloneEvent(event));
+      this.events.push(
+        cloneEvent({
+          ...event,
+          eventVersion: event.eventVersion ?? this.eventVersion,
+        })
+      );
     }
 
     this.checkpoint = snapshot.checkpoint ? { ...snapshot.checkpoint } : undefined;
@@ -429,6 +462,11 @@ export class TaskGraphStore {
     return () => this.evictionHandlers.delete(handler);
   }
 
+  /** Update shared event context for future events */
+  setEventContext(context: TaskGraphEventContext): void {
+    this.eventContext = { ...this.eventContext, ...context };
+  }
+
   /** Manually trigger compaction */
   compact(): number {
     return this.performCompaction();
@@ -441,14 +479,19 @@ export class TaskGraphStore {
   private recordEvent(
     nodeId: string,
     type: TaskGraphEventType,
-    payload: Record<string, unknown>
+    payload: Record<string, unknown>,
+    meta: TaskGraphEventMeta = {}
   ): TaskGraphEvent {
     const event: TaskGraphEvent = {
       id: this.idFactory(),
       sequenceId: this.nextSequenceId++,
+      eventVersion: this.eventVersion,
       nodeId,
       type,
       timestamp: this.now(),
+      correlationId: meta.correlationId ?? this.eventContext.correlationId,
+      source: meta.source ?? this.eventContext.source,
+      idempotencyKey: meta.idempotencyKey,
       payload,
     };
     this.events.push(event);
@@ -550,9 +593,12 @@ export class TaskGraphStore {
     this.events.push({
       id: this.idFactory(),
       sequenceId: this.nextSequenceId++,
+      eventVersion: this.eventVersion,
       nodeId: "",
       type: "compaction",
       timestamp: this.now(),
+      correlationId: this.eventContext.correlationId,
+      source: this.eventContext.source,
       payload: { removedCount: removed.length },
     });
 

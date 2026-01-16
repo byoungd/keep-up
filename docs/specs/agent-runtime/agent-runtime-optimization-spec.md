@@ -16,6 +16,8 @@ Keep-Up agent-runtime already supports Cowork-aligned behaviors, policy gating, 
 - Improve artifact quality (documents, presentations, reports) with structured delivery.
 - Enable parallel subtask orchestration with clear progress and mid-task steering.
 - Keep the runtime model-agnostic and connector-agnostic while enforcing safety.
+- Reduce coupling by isolating kernel, cognition, execution, artifact, and adapter planes with stable interfaces.
+- Make TaskGraph + event log the single source of truth for task state and artifacts.
 
 ## Non-Goals
 - Replacing LFCC/Loro or editor invariants.
@@ -35,6 +37,9 @@ Keep-Up agent-runtime already supports Cowork-aligned behaviors, policy gating, 
 - Artifact: Structured output with a versioned schema and validation.
 - Policy decision: Allow/deny outcome with risk tags and approval requirements.
 - Execution sandbox: Isolated environment for tool calls with scoped resources.
+- ContextFrame: Deterministic, tiered context snapshot assembled for LLM requests.
+- ExecutionDecision: Policy + sandbox gating result for a tool call.
+- ToolExecutionRecord: Normalized telemetry record for a tool execution.
 
 ## External Product Signals
 These signals are used to extract capabilities and risk controls rather than UI details.
@@ -76,6 +81,17 @@ Source: https://www.cursor.com/features
 - Least-privilege access: file and connector scopes are explicit and time-bounded.
 - Traceable and resumable: task graphs produce replayable event logs.
 - Idempotent tooling: all tool calls must be safe to retry via idempotency keys.
+- Kernel-first state: TaskGraph + event log are the only source of task state.
+- Plane isolation: cognition is side-effect free; execution is the side-effect boundary; adapters are replaceable.
+
+## Decoupling Strategy (Kernel + Planes)
+- Runtime Kernel: TaskGraph + EventLog + snapshotting; owns task state and replay.
+- Turn Controller: thin state machine that delegates and emits events.
+- Cognition Plane: planning, reasoning, memory, and context frame assembly; no side effects.
+- Execution Plane: policy, approvals, sandbox, rate limiting, tool execution; emits execution records.
+- Artifact Plane: schema validation, storage, and emission of deliverables.
+- Adapter Plane: MCP, LSP, Terminal, Web, Skills; replaceable via stable interfaces.
+- All cross-plane interactions are via interfaces and events, not direct data mutation.
 
 ## Target Capabilities
 1. Task lifecycle: Plan -> Subtasks -> Execute -> Review -> Summary.
@@ -85,66 +101,80 @@ Source: https://www.cursor.com/features
 5. Safety pipeline: prompt injection detection, sandbox enforcement, audit logs.
 6. Multi-model routing with policy constraints and cost controls.
 7. Deterministic event log replay and resumable task state.
+8. Streaming progress events with partial tool results and resumable streams.
 
 ## Architecture Overview
-1. Planner builds a TaskGraph and emits a PlanCard artifact.
-2. Orchestrator schedules nodes, spawns subagents, and tracks progress.
-3. PolicyEngine evaluates each tool call with task, scope, and risk context.
-4. ExecutionSandboxAdapter executes tool calls and emits structured telemetry.
-5. ArtifactRegistry validates, versions, and stores structured outputs.
-6. ContextManager assembles tiered context frames with redaction.
-7. ModelRouter selects models based on policy, cost, and capability.
+```
+Client/UI
+  -> Runtime API
+     -> TaskGraph Kernel + EventLog
+        -> Turn Controller
+           -> Cognition Plane (planning, reasoning, memory, context frame)
+           -> Execution Plane (policy, approvals, sandbox, tools)
+           -> Artifact Plane (validation, storage, emit)
+           -> Adapter Plane (MCP, LSP, Terminal, Web, Skills)
+```
+
+The Kernel is the single source of truth. All task state transitions and deliverables emit events
+that are replayable and auditable.
 
 ## Proposed Architecture Optimizations
 
-### 1) Task Graph Kernel
+### 1) Runtime Kernel (TaskGraph + Event Log)
 Current pain: orchestration is spread across task runner, queue, and orchestration flows.  
 Optimization:
-- Introduce a canonical `TaskGraph` with nodes for plan, subtask, tool_call, artifact, review, summary.
-- Event-sourced log records node creation, transitions, tool results, and artifacts.
-- Enforce allowed status transitions and idempotent retries using stable node ids.
-- Provide snapshotting for fast resume without replaying the full log.
+- Make TaskGraph + EventLog mandatory for every run (not optional).
+- Version events with correlation id, source, and idempotency key.
+- Enforce allowed status transitions with stable node ids.
+- Snapshot and compact the log for fast resume and bounded storage.
 
-### 2) Policy + Permission Unification
-Current pain: policy checks are applied per-tool but not tied to task state.  
+### 2) Turn Controller Decomposition
+Current pain: orchestrator mixes decision logic, policy checks, and execution.  
 Optimization:
-- Centralize evaluation in `PolicyEngine` with decision context: task, node, tool, file path, connector, risk tag.
-- Emit policy decisions as events with reason codes and required approvals.
-- Tie approvals to `TaskGraph` node ids for deterministic replays and auditing.
+- Keep a thin Turn Controller state machine.
+- Delegate cognition and execution through interfaces (dependency inversion).
+- Emit every state transition as a TaskGraph event.
 
-### 3) Execution Sandbox Envelope
-Current pain: tool execution isolation is partial and not uniform.  
+### 3) Unified Execution Plane
+Current pain: policy, sandbox, approvals, and telemetry are scattered.  
 Optimization:
-- Standardize on `ExecutionSandboxAdapter` for all tool calls.
-- Enforce path allowlist, connector allowlist, environment allowlist, and network policy.
-- Emit structured telemetry: command, duration, exit status, affected paths, and sandbox violations.
+- ToolExecutionService runs: policy -> sandbox -> rate limit -> execute -> audit.
+- Emit ExecutionDecision + ToolExecutionRecord for each tool call.
+- Bind approvals to TaskGraph node ids with explicit reason codes.
 
-### 4) Artifact System
+### 4) Artifact Pipeline
 Current pain: outputs are delivered as unstructured messages.  
 Optimization:
-- Define a registry of versioned artifact schemas (JSON + typed TS definitions).
-- Artifacts store references to source task nodes and tool calls.
-- Validate artifacts before UI rendering; invalid artifacts are quarantined with diagnostics.
+- ArtifactRegistry is first-class with versioned schemas.
+- Validate before UI rendering; quarantine invalid artifacts with diagnostics.
+- Link artifacts to TaskGraph nodes and tool calls for lineage.
 
-### 5) Memory + Context Layers
+### 5) Context Frame + Memory Layers
 Current pain: context is not consistently tiered.  
 Optimization:
-- `ShortTermContext` (task/session).
-- `ProjectContext` (task.md, implementation_plan.md, docs/tasks, brain).
-- `NoCrossSessionMemory` for Cowork mode.
-- Token budgeter with priority and redaction tiers.
+- Introduce a ContextFrame builder with tiered sources and token budgets.
+- Deterministic ordering, redaction, and source attribution.
+- Cowork mode defaults to no cross-session memory.
 
-### 6) Multi-Model Router
+### 6) Model Routing + Cost Control
 Current pain: model selection is ad hoc.  
 Optimization:
-- Policy-driven model routing based on task class, risk, and budget.
-- Fallback and retry policy with structured telemetry and reason codes.
+- ModelRouter is called per turn with task class, risk, and budget.
+- Emit routing decisions and fallback events with reason codes.
 
-### 7) Subagent Orchestration
-Current pain: parallel work not first-class.  
+### 7) Subagent Contracts with Hard Scopes
+Current pain: scope is soft and only enforced in orchestration.  
 Optimization:
-- Orchestrator spawns subagent tasks with bounded scopes.
-- Each subagent gets isolated context and an explicit output contract.
+- Subagent contract declares allowed tools, file scope, network scope, and output artifact type.
+- Enforce scope in PolicyEngine + Sandbox, not just in orchestration.
+- Subagent outputs are stored as artifacts linked to parent TaskGraph nodes.
+
+### 8) Streaming + Progress Plane
+Current pain: streaming is inconsistent and lacks partial tool progress.  
+Optimization:
+- Stream typed events (token, tool progress, artifact preview).
+- Backpressure + checkpoint-based resume for long tasks.
+- "No dead air" placeholder after 2s without tokens.
 
 ## Data Model and Interface Sketches
 
@@ -176,6 +206,8 @@ export interface TaskGraphEdge {
 
 export interface TaskGraphEvent {
   id: string;
+  sequenceId: number;
+  eventVersion: number;
   nodeId: string;
   type:
     | "node_created"
@@ -189,6 +221,9 @@ export interface TaskGraphEvent {
     | "artifact_emitted"
     | "policy_decision";
   timestamp: string;
+  correlationId?: string;
+  source?: string;
+  idempotencyKey?: string;
   payload: Record<string, unknown>;
 }
 
@@ -215,22 +250,48 @@ export interface PolicyContext {
 export interface PolicyDecision {
   decisionId: string;
   allowed: boolean;
-  reason: string;
-  riskTags: string[];
+  requiresConfirmation: boolean;
+  reason?: string;
+  riskTags?: string[];
   requiredApprovals?: string[];
 }
 ```
 
-### Execution Sandbox Result
+### Execution Decision + Record
 ```ts
-export interface SandboxExecutionResult {
-  command: string;
-  exitCode: number;
+export interface ExecutionDecision {
+  decisionId: string;
+  allowed: boolean;
+  requiresConfirmation: boolean;
+  reason?: string;
+  riskTags?: string[];
+  sandboxed: boolean;
+}
+
+export interface ToolExecutionRecord {
+  toolCallId: string;
+  toolName: string;
+  status: "started" | "completed" | "failed";
   durationMs: number;
-  stdout?: string;
-  stderr?: string;
   affectedPaths?: string[];
-  violation?: string;
+  policyDecisionId?: string;
+  sandboxed: boolean;
+  error?: string;
+}
+```
+
+### Context Frame
+```ts
+export interface ContextFrame {
+  frameId: string;
+  sources: {
+    shortTerm: string[];
+    project: string[];
+    memory: string[];
+    tools: string[];
+  };
+  redactions: string[];
+  tokenBudget: { maxTokens: number; usedTokens: number };
 }
 ```
 
@@ -260,6 +321,7 @@ export interface ModelRouteDecision {
   reason: string;
   fallbackModels: string[];
   budget: { maxTokens: number; maxCostUsd?: number };
+  taskNodeId?: string;
 }
 ```
 
@@ -270,22 +332,26 @@ export interface SubagentContract {
   scope: { filePaths: string[]; connectors: string[]; network: "none" | "restricted" | "full" };
   objective: string;
   outputArtifactType: "ReportCard" | "ChecklistCard" | "DiffCard";
+  allowedTools?: string[];
+  timeBudgetMs?: number;
+  maxTokens?: number;
 }
 ```
 
 ## Data Flow (High-Level)
-1. Request enters with scope and policy context.
-2. Planner produces TaskGraph nodes and artifacts (PlanCard).
-3. Orchestrator schedules parallel subtask nodes.
+1. Request enters, Kernel creates TaskGraph root + PlanCard.
+2. Turn Controller builds a ContextFrame and requests a ModelRoute decision.
+3. LLM response yields tool calls; Execution Plane emits ExecutionDecision + ToolExecutionRecord.
 4. Tool calls execute via sandbox adapter with policy enforcement.
 5. AI edits use the AI Envelope and dry-run pipeline before application.
 6. Artifacts are validated, stored, and emitted to UI.
-7. Summary node compiles audit log and final outputs.
+7. Summary node compiles audit log, artifacts, and final outputs from the event log.
 
 ## Failure Handling and Recovery
 - Policy denial creates a blocked node with required approvals attached.
 - Sandbox violations fail the node and emit a violation event with diagnostics.
 - Tool failures mark nodes failed; retry uses idempotency keys and backoff.
+- Event log replay uses checkpoints to resume without re-running side effects.
 - AI Envelope conflicts (409) trigger rebase and re-evaluation of preconditions.
 - Artifact validation failures quarantine artifacts and surface diagnostics.
 
@@ -300,15 +366,18 @@ export interface SubagentContract {
 - Task completion rate, failure rate, and retry counts.
 - Time-to-first-artifact and time-to-final-summary.
 - Policy denial reasons and approval latency.
+- Context frame token budget usage and redaction counts.
 - Tool error rate by type and affected path.
+- Model routing fallback rate and decision latency.
 - Sandbox violations and recovery rate.
 
 ## Rollout Plan
-- Phase 0: Instrument current runtime to emit TaskGraph-compatible events.
-- Phase 1: Implement TaskGraph kernel and event replay with snapshots.
-- Phase 2: Centralize PolicyEngine and sandbox adapter telemetry.
-- Phase 3: Artifact registry with validation and UI consumption.
-- Phase 4: Model router with budget enforcement and fallback policies.
+- Phase 0: Instrument current runtime to emit TaskGraph-compatible events with correlation ids.
+- Phase 1: Make TaskGraph kernel default; extract Turn Controller from orchestrator.
+- Phase 2: Implement Unified Execution Plane (policy + sandbox + approvals + audit).
+- Phase 3: Introduce ContextFrame builder and memory gating.
+- Phase 4: Promote Artifact Pipeline + streaming progress events to first-class.
+- Phase 5: Integrate Model Router and enforce subagent contracts with hard scopes.
 
 ## Risks and Mitigations
 - Policy fatigue if approvals are too frequent; mitigate with scope bundles and caching.
@@ -323,9 +392,11 @@ export interface SubagentContract {
 - Which context sources are allowed in Cowork mode by default?
 
 ## Acceptance Criteria
-- TaskGraph kernel with replayable events and snapshotting is implemented.
-- Policy decisions are unified across tools with visible reasons and risk tags.
-- Artifact registry supports Plan/Diff/Report/Checklist with validation.
-- Sandbox adapter enforces path allowlists and logs execution telemetry.
-- Model router enforces budgets and emits routing decisions.
+- TaskGraph kernel is the default path with replayable events and snapshotting.
+- Unified Execution Plane emits ExecutionDecision + ToolExecutionRecord for each call.
+- Policy decisions are visible with reasons, risk tags, and approval linkage.
+- Artifact registry supports Plan/Diff/Report/Checklist with validation and quarantine.
+- ContextFrame builder enforces tiered sources, token budgets, and redaction.
+- Model router enforces budgets and emits routing decisions and fallbacks.
+- Subagent contracts are enforced at policy + sandbox boundaries.
 - AI edits use the AI Envelope and dry-run pipeline consistently.

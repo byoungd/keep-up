@@ -725,6 +725,8 @@ export function useTaskStream(sessionId: string) {
 
   useEffect(() => {
     let retryTimeout: ReturnType<typeof setTimeout> | undefined;
+    let retryCount = 0;
+    const MAX_RETRY_DELAY = 30000; // 30 seconds max
 
     const requestReader = async (
       lastEventId: string | null | undefined,
@@ -744,6 +746,7 @@ export function useTaskStream(sessionId: string) {
       }
       setIsPollingFallback(false);
       setIsConnected(true);
+      retryCount = 0; // Reset on successful connection
       return response.body.getReader();
     };
 
@@ -753,7 +756,10 @@ export function useTaskStream(sessionId: string) {
     };
 
     const scheduleReconnect = () => {
-      retryTimeout = setTimeout(() => connect(lastEventIdRef.current), config.sseReconnectDelay);
+      // Exponential backoff: delay = base * 2^retryCount, capped at MAX_RETRY_DELAY
+      const delay = Math.min(config.sseReconnectDelay * 2 ** retryCount, MAX_RETRY_DELAY);
+      retryCount++;
+      retryTimeout = setTimeout(() => connect(lastEventIdRef.current), delay);
     };
 
     const runStream = async (
