@@ -177,8 +177,14 @@ export class RuntimeKernel implements Kernel {
     };
   }
 
-  private resolveSkillOptions(): KernelConfig["skills"] | undefined {
-    return this.config.orchestrator?.skills ?? this.config.skills;
+  private resolveSkillOptions(): CreateOrchestratorOptions["skills"] | undefined {
+    // Prefer explicit orchestrator skills config, fall back to kernel skills config
+    const orchestratorSkills = this.config.orchestrator?.skills;
+    if (orchestratorSkills) {
+      return orchestratorSkills;
+    }
+    // Convert kernel skills config to orchestrator skills config format
+    return this.config.skills;
   }
 
   private wrapOrchestratorEvent(event: OrchestratorEvent): RuntimeEvent<OrchestratorEvent> {

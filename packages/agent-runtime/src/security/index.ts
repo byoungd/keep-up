@@ -431,14 +431,14 @@ export class SecurityPolicyBuilder {
 /**
  * Create a permission checker with the given policy.
  */
-export function createPermissionChecker(policy: SecurityPolicy): PermissionChecker {
+export function createPermissionChecker(policy: SecurityPolicy): IPermissionChecker {
   return new PermissionChecker(policy);
 }
 
 /**
  * Create an in-memory audit logger.
  */
-export function createAuditLogger(maxEntries?: number): InMemoryAuditLogger {
+export function createAuditLogger(maxEntries?: number): AuditLogger {
   return new InMemoryAuditLogger(maxEntries);
 }
 

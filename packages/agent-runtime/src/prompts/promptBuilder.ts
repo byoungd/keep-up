@@ -30,6 +30,10 @@ export interface PromptContext {
   workflow?: string;
   /** Additional context */
   metadata?: Record<string, unknown>;
+  /** Working directory */
+  workingDirectory?: string;
+  /** Agent memory (facts, scratchpad, progress) */
+  memory?: AgentMemory;
 }
 
 /**
@@ -57,38 +61,35 @@ export interface BuiltPrompt {
   systemPrompt: string;
   /** Prompt sections for tracking */
   sections: {
-    core: string;
-    taskSpecific: string;
-    toolGuidance: string;
-    phaseGuidance: string;
-    examples?: string;
+    agentConfiguration: string;
+    taskContext: string;
+    memory: string;
+    tools: string;
+    responseFormat: string;
   };
   /** Estimated token count */
   estimatedTokens: number;
 }
 
+/**
+ * Memory context for the agent.
+ */
+export interface AgentMemory {
+  /** Facts learned during execution */
+  facts: string[];
+  /** Unstructured notes/scratchpad */
+  scratchpad: string;
+  /** Progress tracking */
+  progress?: {
+    completedSteps: string[];
+    pendingSteps: string[];
+    currentObjective: string;
+  };
+}
+
 // ============================================================================
 // Prompt Templates
 // ============================================================================
-
-/**
- * Core agent identity and principles.
- */
-const CORE_PROMPT = `You are an expert AI coding assistant with deep knowledge of software engineering best practices.
-
-Core Principles:
-- Think step-by-step before acting
-- Prefer incremental, testable changes over large rewrites
-- Always verify your work through testing
-- Communicate clearly about what you're doing and why
-- Ask for clarification when requirements are ambiguous
-
-Constraints:
-- You can only interact through the provided tools
-- Always respect file permissions and security policies
-- Provide helpful error messages when things go wrong
-
-${AGENTS_GUIDE_PROMPT}`;
 
 /**
  * Task-specific guidance.
@@ -213,33 +214,176 @@ export class PromptBuilder {
   }
 
   /**
-   * Build a complete prompt for the given context.
+   * Build a complete prompt for the given context using XML structure.
    */
   build(context: PromptContext): BuiltPrompt {
     const sections = {
-      core: CORE_PROMPT,
-      taskSpecific: this.buildTaskSpecificSection(context),
-      toolGuidance: this.buildToolGuidanceSection(context),
-      phaseGuidance: this.buildPhaseGuidanceSection(context),
-      examples: this.buildExamplesSection(context),
+      agentConfiguration: this.buildAgentConfigSection(context),
+      taskContext: this.buildTaskContextSection(context),
+      memory: this.buildMemorySection(context),
+      tools: this.buildToolsSection(context),
+      responseFormat: this.buildResponseFormatSection(context),
     };
 
-    // Combine all sections
+    // Combine all sections into XML-structured prompt
     const systemPrompt = [
-      sections.core,
-      sections.taskSpecific,
-      sections.toolGuidance,
-      sections.phaseGuidance,
-      sections.examples,
+      sections.agentConfiguration,
+      sections.taskContext,
+      sections.memory,
+      sections.tools,
+      sections.responseFormat,
     ]
       .filter(Boolean)
-      .join("\n\n---\n\n");
+      .join("\n\n");
 
     return {
       systemPrompt,
       sections,
       estimatedTokens: this.estimateTokens(systemPrompt),
     };
+  }
+
+  /**
+   * Build agent configuration section (XML).
+   */
+  private buildAgentConfigSection(context: PromptContext): string {
+    const taskType = context.taskType ?? this.inferTaskType(context.task);
+    const taskGuidance = TASK_PROMPTS[taskType];
+    const phaseGuidance = PHASE_PROMPTS[context.phase];
+
+    return `<agent_configuration>
+<role>
+You are an expert AI coding assistant with deep knowledge of software engineering best practices.
+</role>
+
+<core_principles>
+- Think step-by-step before acting
+- Prefer incremental, testable changes over large rewrites
+- Always verify your work through testing
+- Communicate clearly about what you're doing and why
+- Ask for clarification when requirements are ambiguous
+</core_principles>
+
+<constraints>
+- You can only interact through the provided tools
+- Always respect file permissions and security policies
+- Provide helpful error messages when things go wrong
+</constraints>
+
+<operating_guidance>
+${AGENTS_GUIDE_PROMPT}
+</operating_guidance>
+
+<task_type_guidance type="${taskType}">
+${taskGuidance}
+</task_type_guidance>
+
+<phase_guidance phase="${context.phase}">
+${phaseGuidance}
+</phase_guidance>
+</agent_configuration>`;
+  }
+
+  /**
+   * Build task context section (XML).
+   */
+  private buildTaskContextSection(context: PromptContext): string {
+    const workflow = context.workflow ? `\n<workflow>${context.workflow}</workflow>` : "";
+    const workingDir = context.workingDirectory
+      ? `\n<working_directory>${context.workingDirectory}</working_directory>`
+      : "";
+
+    return `<task_context>
+<user_request>
+${context.task}
+</user_request>
+<current_phase>${context.phase.toUpperCase()}</current_phase>${workingDir}${workflow}
+</task_context>`;
+  }
+
+  /**
+   * Build memory section (XML).
+   */
+  private buildMemorySection(context: PromptContext): string {
+    const memory = context.memory;
+    if (!memory) {
+      return "<memory />";
+    }
+
+    const factsContent =
+      memory.facts.length > 0 ? memory.facts.map((f) => `  <fact>${f}</fact>`).join("\n") : "";
+
+    const progressContent = memory.progress
+      ? `\n<progress>
+  <current_objective>${memory.progress.currentObjective}</current_objective>
+  <completed_steps>\n${memory.progress.completedSteps.map((s) => `    <step>${s}</step>`).join("\n")}\n  </completed_steps>
+  <pending_steps>\n${memory.progress.pendingSteps.map((s) => `    <step>${s}</step>`).join("\n")}\n  </pending_steps>
+</progress>`
+      : "";
+
+    return `<memory>
+<facts>
+${factsContent}
+</facts>
+<scratchpad>
+${memory.scratchpad || "(empty)"}
+</scratchpad>${progressContent}
+</memory>`;
+  }
+
+  /**
+   * Build tools section (XML).
+   */
+  private buildToolsSection(context: PromptContext): string {
+    if (context.tools.length === 0) {
+      return "<tools />";
+    }
+
+    const toolDefs = context.tools
+      .map((tool) => `  <tool name="${tool.name}">${tool.description}</tool>`)
+      .join("\n");
+
+    // Add error-specific guidance if there are recent errors
+    const errorGuidance =
+      context.recentErrors && context.recentErrors.length > 0
+        ? `\n<recent_issues>\n${context.recentErrors.map((e) => `  <issue>${e}</issue>`).join("\n")}\n</recent_issues>`
+        : "";
+
+    // Add tool examples if available
+    const relevantExamples = this.getRelevantToolExamples(context.tools);
+    const examplesContent =
+      relevantExamples.length > 0
+        ? `\n<tool_examples>\n${relevantExamples.join("\n")}\n</tool_examples>`
+        : "";
+
+    return `<tools>
+<tool_definitions>
+${toolDefs}
+</tool_definitions>
+<guidelines>
+- Use just-in-time retrieval: Do not load full files unless necessary
+- Use grep/find to locate relevant code before reading entire files
+- Extract only the snippets you need
+- Update your scratchpad/memory with important findings
+</guidelines>${errorGuidance}${examplesContent}
+</tools>`;
+  }
+
+  /**
+   * Build response format section (XML).
+   */
+  private buildResponseFormatSection(context: PromptContext): string {
+    const example = this.buildExamplesSection(context) || "";
+
+    return `<response_format>
+<guidelines>
+- Think through your approach before taking action
+- Execute tools systematically
+- Report progress clearly
+- If stuck, update scratchpad with observations before trying alternatives
+</guidelines>
+${example ? `<example_workflow>\n${example}\n</example_workflow>` : ""}
+</response_format>`;
   }
 
   /**

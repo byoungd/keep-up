@@ -39,6 +39,16 @@ export interface AgentContext {
 
   /** Tool results cache */
   resultCache: Map<string, CachedResult>;
+
+  /** Unstructured persistent notes (scratchpad/NOTES.md) */
+  scratchpad: string;
+
+  /** Structured progress tracking */
+  progress: {
+    completedSteps: string[];
+    pendingSteps: string[];
+    currentObjective: string;
+  };
 }
 
 /**
@@ -109,6 +119,12 @@ export class ContextManager {
       facts: [],
       touchedFiles: new Set(),
       resultCache: new Map(),
+      scratchpad: "",
+      progress: {
+        completedSteps: [],
+        pendingSteps: [],
+        currentObjective: "",
+      },
     };
 
     // Inherit from parent if specified
@@ -123,6 +139,9 @@ export class ContextManager {
         for (const file of parent.touchedFiles) {
           context.touchedFiles.add(file);
         }
+        // Inherit scratchpad and progress
+        context.scratchpad = parent.scratchpad;
+        context.progress = { ...parent.progress };
       }
     }
 
@@ -161,6 +180,60 @@ export class ContextManager {
     const context = this.contexts.get(contextId);
     if (context) {
       context.touchedFiles.add(filePath);
+    }
+  }
+
+  /**
+   * Update the scratchpad (append or replace).
+   */
+  updateScratchpad(
+    contextId: string,
+    content: string,
+    mode: "append" | "replace" = "replace"
+  ): void {
+    const context = this.contexts.get(contextId);
+    if (context) {
+      if (mode === "append") {
+        context.scratchpad = context.scratchpad ? `${context.scratchpad}\n${content}` : content;
+      } else {
+        context.scratchpad = content;
+      }
+    }
+  }
+
+  /**
+   * Update progress tracking.
+   */
+  updateProgress(
+    contextId: string,
+    update: Partial<{ completedSteps: string[]; pendingSteps: string[]; currentObjective: string }>
+  ): void {
+    const context = this.contexts.get(contextId);
+    if (context) {
+      if (update.completedSteps !== undefined) {
+        context.progress.completedSteps = update.completedSteps;
+      }
+      if (update.pendingSteps !== undefined) {
+        context.progress.pendingSteps = update.pendingSteps;
+      }
+      if (update.currentObjective !== undefined) {
+        context.progress.currentObjective = update.currentObjective;
+      }
+    }
+  }
+
+  /**
+   * Mark a step as completed and move to next.
+   */
+  completeStep(contextId: string, stepName: string): void {
+    const context = this.contexts.get(contextId);
+    if (context) {
+      // Add to completed if not already there
+      if (!context.progress.completedSteps.includes(stepName)) {
+        context.progress.completedSteps.push(stepName);
+      }
+      // Remove from pending if present
+      context.progress.pendingSteps = context.progress.pendingSteps.filter((s) => s !== stepName);
     }
   }
 

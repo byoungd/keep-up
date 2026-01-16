@@ -22,3 +22,13 @@ export {
   type ContextBuildResult,
   type TieredContextConfig,
 } from "./contextBuilder";
+
+export {
+  ContextCompactor,
+  createContextCompactor,
+  type Message,
+  type ToolCall,
+  type ToolResult,
+  type CompactionOptions,
+  type CompactionResult,
+} from "./ContextCompactor";
