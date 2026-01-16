@@ -7,7 +7,10 @@ export interface CoworkServerConfig {
 }
 
 function parseStorageMode(value?: string): StorageMode {
-  return value === "sqlite" ? "sqlite" : "json";
+  if (value === "sqlite" || value === "d1") {
+    return value;
+  }
+  return "json";
 }
 
 export const serverConfig: CoworkServerConfig = {

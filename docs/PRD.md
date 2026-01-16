@@ -19,7 +19,7 @@ The product is **AI-native** (assistant + commands embedded in the reading/edito
 - **Parallel multi-LLM execution** for verification/consensus
 - **LFCC-based local-first collaborative documents** for “Living Briefs” (team co-editing, offline-first, deterministic merging)
 
-**Immediate focus (per latest audit/status):** restore the core reading loop (import persistence + Reader entry + Topics/Projects routes), ship an **RSS-driven Digest MVP**, and **upgrade AIPanel to a Cowork Partner** (Project-aware, Agentic, and Artifact-driven).
+**Immediate focus (per latest audit/status):** restore the core reading loop (import persistence + Reader entry + Topics/Projects routes), ship an **RSS-driven Digest MVP**, and **upgrade AIPanel to an Open Cowork Wrapper** (wrapping *any* AI provider with Project-aware, Agentic, and Artifact-driven capabilities).
 
 ---
 
@@ -44,7 +44,7 @@ Technical users face:
 2. **Ship Daily/Weekly Digest MVP:** high-signal summaries from RSS/URL ingestion with evidence links/citations.
 3. **Enable trust:** enforce grounding (citations) for digest outputs and “Ask KU0” answers.
 4. **Enable compounding knowledge:** create and maintain **Living Briefs** (LFCC local-first docs) that agents can update as suggestions.
-5. **Establish Cowork Paradigm:** shift AIPanel from a passive "Coding Assistant" to a proactive **"AI Partner"** that shares project context (Memory), executes complex tasks (Autonomy), and collaborates via structured objects (Artifacts).
+5. **Establish Open Cowork Paradigm:** shift AIPanel into a **Universal AI Wrapper** that allows users to cowork with *any* AI provider (OpenAI, Anthropic, Local, etc.) within a unified, safe, and context-aware environment.
 
 ### 3.2 Non-goals (initial releases)
 - Being a general “tech news” portal for everyone.
@@ -232,8 +232,8 @@ Each digest card must include:
 
 ---
 
-### FR7 — BYOK (Bring Your Own Key) (P1)
-**Requirement:** Users can bring their own LLM provider keys and manage budgets/policies.
+### FR7 — Model Independence (Open Wrap) (P1)
+**Requirement:** Users can plug *any* AI provider (cloud or local) into the Cowork environment. Keep Up acts as the "Open Wrapper" providing the context, tools, and UI around the raw model.
 
 **Acceptance criteria**
 - Add/remove keys; encrypted storage at rest.
@@ -267,7 +267,7 @@ Each digest card must include:
 ---
 
 ### FR10 — Cowork (AI Partner) (P1)
-**Requirement:** AI acts as a proactively collaborating partner with shared context and agency, not just a reactive chat bot.
+**Requirement:** The application wraps the chosen AI model to provide "Partner" capabilities (context, memory, autonomy) regardless of the underlying provider.
 
 **Acceptance criteria**
 - **Project Awareness (Memory):** AI can read and understand `docs/tasks/*.md` and global project structure. Conversations persist and build upon previous decisions.

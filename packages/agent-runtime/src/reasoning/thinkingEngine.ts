@@ -5,6 +5,7 @@
  * Manages reasoning chains, reflection, and self-correction.
  */
 
+import { countTokens } from "../utils/tokenCounter";
 import {
   ReasoningChainBuilder as ChainBuilder,
   type ReasoningChainBuilder,
@@ -75,7 +76,7 @@ export class ThinkingEngine implements IThinkingEngine {
 
     // Check budget
     const remainingBudget = builder.remainingBudget;
-    const estimatedTokens = Math.ceil(step.content.length / 4);
+    const estimatedTokens = countTokens(step.content);
 
     if (estimatedTokens > remainingBudget) {
       this.emit("budget:exceeded", chainId, {

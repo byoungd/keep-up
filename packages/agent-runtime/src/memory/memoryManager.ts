@@ -5,6 +5,7 @@
  * automatic consolidation, and event emission.
  */
 
+import { countTokens } from "../utils/tokenCounter";
 import { InMemoryStore, createInMemoryStore } from "./memoryStore";
 import type {
   ConsolidationResult,
@@ -415,7 +416,7 @@ function generateSessionId(): string {
 }
 
 function estimateTokens(text: string): number {
-  return Math.ceil(text.length / 4);
+  return countTokens(text);
 }
 
 // ============================================================================

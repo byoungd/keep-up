@@ -5,6 +5,7 @@
  * Provides structured access to reasoning steps with validation.
  */
 
+import { countTokens } from "../utils/tokenCounter";
 import type {
   ChainAnalysis,
   ReasoningChain,
@@ -445,7 +446,7 @@ function generateChainId(): string {
  * Uses a simple heuristic: ~4 characters per token.
  */
 function estimateTokens(text: string): number {
-  return Math.ceil(text.length / 4);
+  return countTokens(text);
 }
 
 /**

@@ -1,5 +1,10 @@
 import type { CoworkProject, CoworkSession, CoworkTask } from "@ku0/agent-runtime";
-import type { CoworkApproval, CoworkSettings } from "./types";
+import type {
+  AgentStateCheckpointRecord,
+  CoworkApproval,
+  CoworkArtifactRecord,
+  CoworkSettings,
+} from "./types";
 
 export interface SessionStoreLike {
   getAll(): Promise<CoworkSession[]>;
@@ -31,6 +36,13 @@ export interface ApprovalStoreLike {
   ): Promise<CoworkApproval | null>;
 }
 
+export interface AgentStateCheckpointStoreLike {
+  getAll(): Promise<AgentStateCheckpointRecord[]>;
+  getById(checkpointId: string): Promise<AgentStateCheckpointRecord | null>;
+  getBySession(sessionId: string): Promise<AgentStateCheckpointRecord[]>;
+  create(record: AgentStateCheckpointRecord): Promise<AgentStateCheckpointRecord>;
+}
+
 export interface ConfigStoreLike {
   get(): Promise<CoworkSettings>;
   set(next: CoworkSettings): Promise<CoworkSettings>;
@@ -48,10 +60,21 @@ export interface ProjectStoreLike {
   delete(projectId: string): Promise<boolean>;
 }
 
+export interface ArtifactStoreLike {
+  getAll(): Promise<CoworkArtifactRecord[]>;
+  getById(artifactId: string): Promise<CoworkArtifactRecord | null>;
+  getBySession(sessionId: string): Promise<CoworkArtifactRecord[]>;
+  getByTask(taskId: string): Promise<CoworkArtifactRecord[]>;
+  upsert(artifact: CoworkArtifactRecord): Promise<CoworkArtifactRecord>;
+  delete(artifactId: string): Promise<boolean>;
+}
+
 export interface StorageLayer {
   sessionStore: SessionStoreLike;
   taskStore: TaskStoreLike;
+  artifactStore: ArtifactStoreLike;
   approvalStore: ApprovalStoreLike;
+  agentStateStore: AgentStateCheckpointStoreLike;
   configStore: ConfigStoreLike;
   projectStore: ProjectStoreLike;
 }

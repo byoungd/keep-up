@@ -15,7 +15,7 @@ Build a dedicated Cowork application targeting the UX bar set by **Claude Cowork
 | 1 | Best-in-class cowork UX: plan → execute → review → summarize with full visibility |
 | 2 | Chat + task-mode workflows with first-class artifacts (plan, diff, checklist, report) |
 | 3 | Enforce Cowork safety: scoped file access, confirmation gates, deterministic execution |
-| 4 | Modern stack: TanStack Router + Query, Vitest, Bun |
+| 4 | Modern stack: TanStack Router + Query, Vitest, Node/Edge |
 | 5 | Keep-Up standards: Loro-only CRDT, a11y compliance, deterministic LFCC pipelines |
 
 ---
@@ -93,7 +93,7 @@ flowchart LR
 ## Tech Stack
 - UI: React 19, TanStack Router, TanStack Query, TanStack Virtual.
 - Styling: Tailwind v4 with shared tokens from `packages/app`.
-- Runtime: Bun for local server and tooling execution.
+- Runtime: Node/Edge for server execution, Bun optional for local dev speed.
 - Testing: Vitest for unit/component tests; Playwright for targeted e2e.
 - TypeScript-only code, no `any`, no `var`.
 

@@ -6,6 +6,7 @@
  */
 
 import type { MCPTool } from "../types";
+import { countTokens } from "../utils/tokenCounter";
 import { AGENTS_GUIDE_PROMPT } from "./agentGuidelines";
 
 // ============================================================================
@@ -511,7 +512,7 @@ ${example ? `<example_workflow>\n${example}\n</example_workflow>` : ""}
    * Estimate token count (rough approximation).
    */
   private estimateTokens(text: string): number {
-    return Math.ceil(text.length / 4);
+    return countTokens(text);
   }
 }
 

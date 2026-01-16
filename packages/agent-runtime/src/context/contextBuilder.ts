@@ -4,6 +4,8 @@
  * Builds prioritized context frames under a token budget.
  */
 
+import { countTokens } from "../utils/tokenCounter";
+
 export type ContextTier = "short_term" | "project" | "redacted";
 
 export interface ContextItem {
@@ -44,7 +46,7 @@ export class TieredContextBuilder {
 
   constructor(config: TieredContextConfig) {
     this.maxTokens = config.maxTokens;
-    this.estimateTokens = config.estimateTokens ?? ((text) => Math.ceil(text.length / 4));
+    this.estimateTokens = config.estimateTokens ?? ((text) => countTokens(text));
   }
 
   build(items: ContextItem[], budget?: ContextBudget): ContextBuildResult {

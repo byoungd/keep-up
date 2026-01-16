@@ -13,6 +13,7 @@ export type ApiResult<T> = {
   project?: CoworkProject;
   settings?: CoworkSettings;
   result?: ToolCheckResult;
+  artifacts?: CoworkArtifact[];
 } & T;
 
 export type CoworkApprovalStatus = "pending" | "approved" | "rejected";
@@ -20,6 +21,7 @@ export type CoworkApprovalStatus = "pending" | "approved" | "rejected";
 export type CoworkApproval = {
   approvalId: string;
   sessionId: string;
+  taskId?: string;
   action: string;
   riskTags: CoworkRiskTag[];
   reason?: string;
@@ -34,6 +36,20 @@ export type CoworkSettings = {
   geminiKey?: string;
   defaultModel?: string;
   theme?: "light" | "dark";
+};
+
+export type CoworkArtifact = {
+  artifactId: string;
+  sessionId: string;
+  taskId?: string;
+  title: string;
+  type: "diff" | "plan" | "markdown";
+  artifact: unknown;
+  sourcePath?: string;
+  createdAt: number;
+  updatedAt: number;
+  sessionTitle?: string;
+  taskTitle?: string;
 };
 
 export type CreateSessionPayload = {
@@ -242,6 +258,16 @@ export async function getChatHistory(sessionId: string): Promise<ChatMessage[]> 
 export async function listApprovals(sessionId: string): Promise<CoworkApproval[]> {
   const data = await fetchJson<ApiResult<unknown>>(`/api/sessions/${sessionId}/approvals`);
   return data.approvals ?? [];
+}
+
+export async function listSessionArtifacts(sessionId: string): Promise<CoworkArtifact[]> {
+  const data = await fetchJson<ApiResult<unknown>>(`/api/sessions/${sessionId}/artifacts`);
+  return data.artifacts ?? [];
+}
+
+export async function listLibraryArtifacts(): Promise<CoworkArtifact[]> {
+  const data = await fetchJson<ApiResult<unknown>>("/api/library/artifacts");
+  return data.artifacts ?? [];
 }
 
 export async function resolveApproval(approvalId: string, status: "approved" | "rejected") {

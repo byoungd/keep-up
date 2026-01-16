@@ -17,7 +17,6 @@ import {
 } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 import { MessageBubble } from "./MessageBubble";
-import { ModelBadge } from "./ModelBadge";
 import type { AgentTask, ArtifactItem, TaskStep } from "./types";
 
 interface TaskStreamMessageProps {
@@ -154,12 +153,6 @@ function TaskHeader({
           </div>
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-          <ModelBadge
-            modelId={task.modelId}
-            providerId={task.providerId}
-            fallbackNotice={task.fallbackNotice}
-            size="sm"
-          />
           {progressLabel && <span className="tabular-nums">{progressLabel}</span>}
         </div>
       </div>

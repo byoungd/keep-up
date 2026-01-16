@@ -123,6 +123,13 @@ function processToolCallNode(node: ToolCallNode, messages: Message[]) {
     toolTime = Date.now();
   }
 
+  if (node.taskId) {
+    const taskMessage = messages.find((message) => message.metadata?.task?.id === node.taskId);
+    if (taskMessage?.createdAt) {
+      toolTime = Math.max(toolTime, taskMessage.createdAt + 1);
+    }
+  }
+
   messages.push({
     id: askId,
     role: "assistant",

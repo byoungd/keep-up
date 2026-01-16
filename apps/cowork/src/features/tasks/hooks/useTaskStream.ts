@@ -2,12 +2,15 @@ import type { CoworkRiskTag, CoworkTask, CoworkTaskStatus } from "@ku0/agent-run
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   type CoworkApproval,
+  type CoworkArtifact,
   listApprovals,
+  listSessionArtifacts,
   listTasks,
   resolveApproval,
 } from "../../../api/coworkApi";
 import { apiUrl, config } from "../../../lib/config";
 import {
+  type ArtifactPayload,
   ArtifactPayloadSchema,
   PlanStepSchema,
   RiskLevel,
@@ -144,16 +147,24 @@ export function useTaskStream(sessionId: string) {
         return;
       }
       try {
-        const [tasks, approvals] = await Promise.all([
+        const [tasks, approvals, artifacts] = await Promise.all([
           listTasks(sessionId),
           listApprovals(sessionId),
+          listSessionArtifacts(sessionId),
         ]);
         if (isActiveRef && !isActiveRef.current) {
           return;
         }
 
         setGraph((prev) =>
-          deriveInitialState(prev, tasks, approvals, taskTitleRef.current, taskPromptRef.current)
+          deriveInitialState(
+            prev,
+            tasks,
+            approvals,
+            artifacts,
+            taskTitleRef.current,
+            taskPromptRef.current
+          )
         );
       } catch (error) {
         if (!isActiveRef || isActiveRef.current) {
@@ -548,10 +559,26 @@ export function useTaskStream(sessionId: string) {
     return title ?? (taskId ? `Task ${taskId.slice(0, 8)}` : "Task");
   }
 
+  function buildArtifactMap(
+    existing: Record<string, ArtifactPayload>,
+    records: CoworkArtifact[]
+  ): Record<string, ArtifactPayload> {
+    const next = { ...existing };
+    for (const record of records) {
+      const parsed = ArtifactPayloadSchema.safeParse(record.artifact);
+      if (!parsed.success) {
+        continue;
+      }
+      next[record.artifactId] = parsed.data;
+    }
+    return next;
+  }
+
   function deriveInitialState(
     prev: TaskGraph,
     tasks: CoworkTask[],
     approvals: CoworkApproval[],
+    artifacts: CoworkArtifact[],
     taskTitles: Map<string, string>,
     taskPrompts: Map<string, string>
   ): TaskGraph {
@@ -570,6 +597,7 @@ export function useTaskStream(sessionId: string) {
       requiresApproval: true,
       approvalId: approval.approvalId,
       riskLevel: mapRiskLevel(approval.riskTags),
+      taskId: approval.taskId,
       timestamp: new Date(approval.createdAt).toISOString(),
     }));
 
@@ -582,10 +610,12 @@ export function useTaskStream(sessionId: string) {
       (acc, node) => upsertNode(acc, node),
       nonStatusNodes
     );
+    const nextArtifacts = buildArtifactMap(prev.artifacts, artifacts);
 
     return {
       ...prev,
       status: mappedStatus ?? prev.status,
+      artifacts: nextArtifacts,
       nodes: approvalNodes.reduce<TaskNode[]>(
         (acc, node) => appendNode(acc, node),
         mergedStatusNodes

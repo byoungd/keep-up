@@ -45,6 +45,8 @@ export {
   type DependencyAnalysis,
 } from "./dependencyAnalyzer";
 
+export { SmartToolScheduler } from "./smartToolScheduler";
+
 // AI Core Adapter (Edge-safe)
 export {
   AICoreProviderAdapter,

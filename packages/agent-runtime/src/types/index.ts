@@ -416,6 +416,8 @@ export interface AgentState {
   status: "idle" | "thinking" | "executing" | "waiting_confirmation" | "complete" | "error";
   /** Error if any */
   error?: string;
+  /** Optional checkpoint identifier for persisted state */
+  checkpointId?: string;
 }
 
 /** Agent message types */

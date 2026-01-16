@@ -4,8 +4,9 @@
   "type": "module",
   "packageManager": "pnpm@10.28.0",
   "scripts": {
-    "dev": "turbo run dev --filter=@ku0/cowork",
+    "dev": "concurrently -k -n cowork,cowork-server -c blue,green \"pnpm dev:cowork\" \"pnpm -C apps/cowork/server dev\"",
     "dev:cowork": "turbo run dev --filter=@ku0/cowork",
+    "cowork:serve": "pnpm -C apps/cowork build && pnpm -C apps/cowork/server start",
     "build": "turbo run build",
     "test": "pnpm test:unit",
     "test:unit": "vitest run",
@@ -43,18 +44,8 @@
     "typescript": "^5.7.2",
     "vitest": "^4.0.0"
   },
-  "dependencies": {
-    "framer-motion": "^12.23.26",
-    "prosemirror-dropcursor": "^1.8.2",
-    "prosemirror-inputrules": "^1.5.1",
-    "prosemirror-schema-list": "^1.5.1"
-  },
+
   "pnpm": {
-    "overrides": {
-      "prosemirror-model": "1.25.4",
-      "prosemirror-state": "1.4.4",
-      "prosemirror-view": "1.41.4"
-    },
     "onlyBuiltDependencies": ["@parcel/watcher", "@sentry/cli", "sharp"]
   }
 }

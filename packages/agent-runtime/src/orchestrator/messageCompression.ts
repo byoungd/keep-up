@@ -11,7 +11,8 @@
  * - Configurable compression strategies
  */
 
-import type { AgentMessage } from "../types";
+import type { AgentMessage, MCPToolResult } from "../types";
+import { countTokens } from "../utils/tokenCounter";
 
 // ============================================================================
 // Types
@@ -102,7 +103,7 @@ const DEFAULT_CONFIG: CompressionConfig = {
   minMessages: 5,
   preserveCount: 3,
   enableSummarization: false,
-  estimateTokens: (text) => Math.ceil(text.length / 4),
+  estimateTokens: (text) => countTokens(text),
 };
 
 // ============================================================================
@@ -115,9 +116,9 @@ const DEFAULT_CONFIG: CompressionConfig = {
  * Compresses conversation history to fit within token limits.
  */
 export class MessageCompressor {
-  private readonly config: CompressionConfig;
-  private readonly tokenCache = new Map<string, number>();
-  private summarizer?: ISummarizer;
+  protected readonly config: CompressionConfig;
+  protected readonly tokenCache = new Map<string, number>();
+  protected summarizer?: ISummarizer;
 
   constructor(config: Partial<CompressionConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -568,6 +569,154 @@ export class MessageCompressor {
    */
   clearCache(): void {
     this.tokenCache.clear();
+  }
+}
+
+/**
+ * Smart Message History Compressor
+ *
+ * Extends basic compression with semantic awareness and intelligent tool result handling.
+ */
+export class SmartMessageCompressor extends MessageCompressor {
+  private readonly maxToolResultTokens: number;
+
+  constructor(config: Partial<CompressionConfig & { maxToolResultTokens?: number }> = {}) {
+    super(config);
+    this.maxToolResultTokens = config.maxToolResultTokens ?? 500;
+  }
+
+  /**
+   * Intelligently compress tool results.
+   */
+  compressToolResult(result: MCPToolResult): MCPToolResult {
+    if (result.success && result.content.length > 0) {
+      const compressedContent = result.content.map((item) => {
+        if (item.type === "text" && item.text) {
+          const tokens = this.config.estimateTokens(item.text);
+          if (tokens > this.maxToolResultTokens) {
+            return {
+              ...item,
+              type: "text" as const,
+              text: this.summarizeText(item.text, this.maxToolResultTokens),
+            };
+          }
+        }
+        return item;
+      });
+
+      return {
+        ...result,
+        content: compressedContent,
+      };
+    }
+    return result;
+  }
+
+  /**
+   * Improve token estimation for structured data.
+   */
+  override estimateMessageTokens(message: AgentMessage): number {
+    if (message.role === "tool" && message.result) {
+      // For tool results, use accurate tokens for JSON
+      const resultText = JSON.stringify(message.result);
+      return countTokens(resultText);
+    }
+    return super.estimateMessageTokens(message);
+  }
+
+  /**
+   * Summarize long text content while preserving structure hints.
+   */
+  private summarizeText(text: string, maxTokens: number): string {
+    const maxChars = maxTokens * 3.5;
+    if (text.length <= maxChars) {
+      return text;
+    }
+
+    try {
+      // If it looks like JSON, try to summarize it structurally
+      if (text.trim().startsWith("{") || text.trim().startsWith("[")) {
+        const parsed = JSON.parse(text);
+        const summarized = this.summarizeJson(parsed);
+        const summarizedText = JSON.stringify(summarized, null, 2);
+        if (summarizedText.length <= maxChars) {
+          return summarizedText;
+        }
+      }
+    } catch {
+      // Fallback to simple truncation
+    }
+
+    const head = text.substring(0, Math.floor(maxChars * 0.6));
+    const tail = text.substring(text.length - Math.floor(maxChars * 0.3));
+    return `${head}\n... [Content truncated, ${text.length - head.length - tail.length} characters removed] ...\n${tail}`;
+  }
+
+  /**
+   * Summarize JSON objects by keeping keys and truncating/summarizing values.
+   */
+  private summarizeJson(obj: unknown): unknown {
+    if (Array.isArray(obj)) {
+      return this.summarizeArray(obj);
+    }
+
+    if (typeof obj === "object" && obj !== null) {
+      return this.summarizeObject(obj as Record<string, unknown>);
+    }
+
+    return obj;
+  }
+
+  private summarizeArray(arr: unknown[]): unknown {
+    if (arr.length > 10) {
+      return [
+        ...arr.slice(0, 5).map((i) => this.summarizeJson(i)),
+        `... and ${arr.length - 5} more items`,
+      ];
+    }
+    return arr.map((i) => this.summarizeJson(i));
+  }
+
+  private summarizeObject(obj: Record<string, unknown>): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
+    const entries = Object.entries(obj);
+
+    for (const [key, value] of entries) {
+      // Always preserve status/error/id fields if present
+      if (this.isCriticalField(key)) {
+        result[key] = value;
+        continue;
+      }
+
+      result[key] = this.summarizeValue(value);
+    }
+    return result;
+  }
+
+  private isCriticalField(key: string): boolean {
+    const criticalFields = [
+      "status",
+      "error",
+      "id",
+      "success",
+      "type",
+      "name",
+      "code",
+      "message",
+      "path",
+      "url",
+    ];
+    return criticalFields.includes(key.toLowerCase());
+  }
+
+  private summarizeValue(value: unknown): unknown {
+    if (typeof value === "string" && value.length > 200) {
+      return `${value.substring(0, 100)}... [truncated]`;
+    }
+    if (typeof value === "object" && value !== null) {
+      return "[Object/Array]";
+    }
+    return value;
   }
 }
 

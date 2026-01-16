@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { formatZodError, jsonError, readJsonBody } from "../http";
 import { settingsPatchSchema } from "../schemas";
-import type { ConfigStoreLike } from "../storage";
+import type { ConfigStoreLike } from "../storage/contracts";
 
 interface SettingsRouteDeps {
   config: ConfigStoreLike;

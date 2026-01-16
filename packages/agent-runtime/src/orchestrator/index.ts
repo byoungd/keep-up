@@ -55,6 +55,8 @@ export {
   type DependencyAnalysis,
 } from "./dependencyAnalyzer";
 
+export { SmartToolScheduler } from "./smartToolScheduler";
+
 // Consensus Orchestration
 export {
   ConsensusOrchestrator,

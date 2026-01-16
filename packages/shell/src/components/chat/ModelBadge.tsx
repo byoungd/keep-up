@@ -8,7 +8,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   openai: "OpenAI",
   anthropic: "Anthropic",
   claude: "Anthropic",
-  gemini: "Google",
+  gemini: "Gemini",
 };
 
 function formatProviderLabel(providerId?: string): string | undefined {
@@ -34,10 +34,12 @@ export function ModelBadge({
   className?: string;
 }) {
   const resolved = getModelCapability(modelId);
-  const providerLabel = formatProviderLabel(providerId ?? resolved?.provider);
+  const resolvedProvider = providerId ?? resolved?.provider;
+  const providerLabel = formatProviderLabel(resolvedProvider);
   const modelLabel = resolved?.label ?? modelId;
+  const showProviderLabel = !modelLabel && providerLabel;
 
-  if (!providerLabel && !modelLabel) {
+  if (!showProviderLabel && !modelLabel) {
     return null;
   }
 
@@ -51,8 +53,8 @@ export function ModelBadge({
       )}
       title={fallbackNotice}
     >
-      {providerLabel && <span className="font-medium">{providerLabel}</span>}
-      {providerLabel && modelLabel && <span className="opacity-50">•</span>}
+      {showProviderLabel && <span className="font-medium">{providerLabel}</span>}
+      {showProviderLabel && modelLabel && <span className="opacity-50">•</span>}
       {modelLabel && <span className="truncate max-w-[160px]">{modelLabel}</span>}
       {fallbackNotice && <AlertTriangle className="h-3 w-3 text-amber-500" aria-hidden="true" />}
     </span>

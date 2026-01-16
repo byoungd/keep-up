@@ -10,9 +10,12 @@ import {
 } from "@ku0/agent-runtime";
 import { describe, expect, it } from "vitest";
 import { CoworkTaskRuntime } from "../runtime/coworkTaskRuntime";
+import { createAgentStateCheckpointStore } from "../storage/agentStateStore";
 import { createApprovalStore } from "../storage/approvalStore";
+import { createArtifactStore } from "../storage/artifactStore";
 import { createConfigStore } from "../storage/configStore";
 import type { StorageLayer } from "../storage/contracts";
+import { createProjectStore } from "../storage/projectStore";
 import { createSessionStore } from "../storage/sessionStore";
 import { createTaskStore } from "../storage/taskStore";
 import { SessionEventHub } from "../streaming/eventHub";
@@ -22,8 +25,11 @@ async function createStorageLayer() {
   const storage: StorageLayer = {
     sessionStore: createSessionStore(join(dir, "sessions.json")),
     taskStore: createTaskStore(join(dir, "tasks.json")),
+    artifactStore: createArtifactStore(join(dir, "artifacts.json")),
     approvalStore: createApprovalStore(join(dir, "approvals.json")),
+    agentStateStore: createAgentStateCheckpointStore(join(dir, "agent_state.json")),
     configStore: createConfigStore(join(dir, "settings.json")),
+    projectStore: createProjectStore(join(dir, "projects.json")),
   };
   return { storage, dir };
 }
@@ -63,6 +69,17 @@ async function waitForStatus(
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
   throw new Error(`Timed out waiting for status ${status}`);
+}
+
+async function waitForArtifacts(storage: StorageLayer, taskId: string, attempts = 200) {
+  for (let i = 0; i < attempts; i++) {
+    const artifacts = await storage.artifactStore.getByTask(taskId);
+    if (artifacts.length > 0) {
+      return artifacts;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  throw new Error("Timed out waiting for artifacts");
 }
 
 describe("CoworkTaskRuntime", () => {
@@ -108,6 +125,56 @@ describe("CoworkTaskRuntime", () => {
     }
   });
 
+  it("persists summary artifacts for completed tasks", async () => {
+    const { storage, dir } = await createStorageLayer();
+    try {
+      const eventHub = new SessionEventHub();
+      const rootPath = await realpath(dir);
+      const session = createSession(rootPath);
+      await storage.sessionStore.create(session);
+
+      let runtimeRef: ReturnType<typeof createCoworkRuntime> | undefined;
+      const runtime = new CoworkTaskRuntime({
+        storage,
+        events: eventHub,
+        runtimeFactory: async (seed) => {
+          const llm = createMockLLM();
+          llm.setDefaultResponse({ content: "All done.", finishReason: "stop" });
+          const registry = createToolRegistry();
+          const runtimeInstance = createCoworkRuntime({
+            llm,
+            registry,
+            cowork: { session: seed },
+            taskQueueConfig: { maxConcurrent: 1 },
+          });
+          runtimeRef = runtimeInstance;
+          return runtimeInstance;
+        },
+      });
+
+      const task = await runtime.enqueueTask(session, { prompt: "Say hello" });
+
+      if (!runtimeRef) {
+        throw new Error("Runtime not created");
+      }
+
+      await runtimeRef.waitForTask(task.taskId);
+
+      const artifacts = await waitForArtifacts(storage, task.taskId);
+      const summary = artifacts.find(
+        (artifact) => artifact.artifactId === `summary-${task.taskId}`
+      );
+      expect(summary).toBeDefined();
+      expect(summary?.type).toBe("markdown");
+      expect(summary?.title).toBe("Summary");
+      if (summary?.artifact.type === "markdown") {
+        expect(summary.artifact.content).toContain("All done.");
+      }
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it("creates an approval and proceeds after resolution", async () => {
     const { storage, dir } = await createStorageLayer();
     try {
@@ -130,6 +197,10 @@ describe("CoworkTaskRuntime", () => {
                 {
                   name: "file:write",
                   arguments: { path: filePath, content: "hello" },
+                },
+                {
+                  name: "file:delete",
+                  arguments: { path: filePath },
                 },
               ],
             },
@@ -179,9 +250,9 @@ describe("CoworkTaskRuntime", () => {
       }
 
       await withTimeout(waitForStatus(storage, task.taskId, "completed"), 4000, "task status");
+      await waitForArtifacts(storage, task.taskId);
 
-      const contents = await readFile(join(rootPath, "note.txt"), "utf-8");
-      expect(contents).toBe("hello");
+      await expect(readFile(join(rootPath, "note.txt"), "utf-8")).rejects.toThrow();
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

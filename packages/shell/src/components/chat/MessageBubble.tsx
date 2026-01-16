@@ -201,7 +201,8 @@ export const MessageBubble = React.memo(function MessageBubble({
 
   return (
     <div className={cn(containerClass, "max-w-[70ch] text-[14.5px] leading-[1.65]", className)}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+      {/* biome-ignore lint/suspicious/noExplicitAny: Components type mismatch in ReactMarkdown */}
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components as any}>
         {content}
       </ReactMarkdown>
       {isStreaming && <TypingCursor />}

@@ -1,12 +1,12 @@
 # Design Standards
 
-> Linear-level UI/UX quality standards for Keep-Up Reader.
+> Linear-level UI/UX quality standards for Keep-Up.
 
 ---
 
 ## Project Context
 
-Keep-Up Reader uses:
+Keep-Up uses:
 - **React 19** with Server Components
 - **Tailwind CSS v4** for styling
 - **Framer Motion** for animations (except in ProseMirror editor components)

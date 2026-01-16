@@ -31,8 +31,8 @@ export async function createSqliteApprovalStore(): Promise<SqliteApprovalStore> 
 
   const insertStmt = db.prepare(`
     INSERT OR REPLACE INTO approvals
-    (approval_id, session_id, action, risk_tags, reason, status, created_at, resolved_at)
-    VALUES ($approvalId, $sessionId, $action, $riskTags, $reason, $status, $createdAt, $resolvedAt)
+    (approval_id, session_id, task_id, action, risk_tags, reason, status, created_at, resolved_at)
+    VALUES ($approvalId, $sessionId, $taskId, $action, $riskTags, $reason, $status, $createdAt, $resolvedAt)
   `);
 
   const selectAllStmt = db.prepare(`
@@ -50,6 +50,7 @@ export async function createSqliteApprovalStore(): Promise<SqliteApprovalStore> 
   const updateStmt = db.prepare(`
     UPDATE approvals
     SET session_id = $sessionId,
+        task_id = $taskId,
         action = $action,
         risk_tags = $riskTags,
         reason = $reason,
@@ -63,6 +64,7 @@ export async function createSqliteApprovalStore(): Promise<SqliteApprovalStore> 
     return {
       approvalId: row.approval_id as string,
       sessionId: row.session_id as string,
+      taskId: row.task_id ? (row.task_id as string) : undefined,
       action: row.action as string,
       riskTags: parseRiskTags(row.risk_tags as string),
       reason: row.reason ? (row.reason as string) : undefined,
@@ -96,6 +98,7 @@ export async function createSqliteApprovalStore(): Promise<SqliteApprovalStore> 
       insertStmt.run({
         $approvalId: approval.approvalId,
         $sessionId: approval.sessionId,
+        $taskId: approval.taskId ?? null,
         $action: approval.action,
         $riskTags: JSON.stringify(approval.riskTags ?? []),
         $reason: approval.reason ?? null,
@@ -119,6 +122,7 @@ export async function createSqliteApprovalStore(): Promise<SqliteApprovalStore> 
       updateStmt.run({
         $approvalId: updated.approvalId,
         $sessionId: updated.sessionId,
+        $taskId: updated.taskId ?? null,
         $action: updated.action,
         $riskTags: JSON.stringify(updated.riskTags ?? []),
         $reason: updated.reason ?? null,

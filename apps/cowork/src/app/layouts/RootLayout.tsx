@@ -2,12 +2,17 @@ import {
   AppShell,
   ReaderPreferencesProvider,
   ReaderShellProvider,
+  type SidebarGroupRenderProps,
   TooltipProvider,
 } from "@ku0/shell";
+import type { ArtifactItem } from "@ku0/shell";
 import { Link, Outlet, useLocation, useRouter } from "@tanstack/react-router";
+import { Sparkles } from "lucide-react";
 import React from "react";
+import { CoworkSidebarSections } from "../../components/sidebar/CoworkSidebarSections";
 import { COWORK_SIDEBAR_CONFIG_KEY, COWORK_SIDEBAR_GROUPS } from "../../config/sidebar";
 import { CoworkAIPanel } from "../../features/chat/CoworkAIPanel";
+import { ContextPanel, type ContextPanelTab } from "../../features/context/ContextPanel";
 
 function resolveI18nArgs(
   defaultValueOrValues?: string | Record<string, string | number>,
@@ -43,29 +48,45 @@ export function RootLayout() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
   const [sidebarWidth, setSidebarWidth] = React.useState(240);
 
-  // AI Panel State
+  // Auxiliary Panel State
   const [isHydrated, setIsHydrated] = React.useState(false);
-  const [isAIPanelVisible, setIsAIPanelVisible] = React.useState(false);
-  const [aiPanelWidth, setAIPanelWidth] = React.useState(400);
-  const [aiPanelPosition, setAIPanelPosition] = React.useState<"main" | "left" | "right">("right");
+  const [isAuxPanelVisible, setIsAuxPanelVisible] = React.useState(false);
+  const [auxPanelWidth, setAuxPanelWidth] = React.useState(420);
+  const [auxPanelPosition, setAuxPanelPosition] = React.useState<"left" | "right">("right");
+  const [contextTab, setContextTab] = React.useState<ContextPanelTab>("artifacts");
+
+  // Preview State
+  const [previewArtifact, setPreviewArtifact] = React.useState<ArtifactItem | null>(null);
+
+  // Handlers for preview
+  const handlePreviewArtifact = React.useCallback((item: ArtifactItem) => {
+    setPreviewArtifact(item);
+    setContextTab("preview");
+    setIsAuxPanelVisible(true);
+  }, []);
+
+  const handleClosePreview = React.useCallback(() => {
+    setPreviewArtifact(null);
+    setContextTab((prev) => (prev === "preview" ? "artifacts" : prev));
+  }, []);
 
   // Load state from localStorage on mount
   React.useEffect(() => {
-    const storedVisible = localStorage.getItem("cowork-ai-panel-visible");
-    const storedWidth = localStorage.getItem("cowork-ai-panel-width");
-    const storedPosition = localStorage.getItem("cowork-ai-panel-position");
+    const storedVisible = localStorage.getItem("cowork-aux-panel-visible");
+    const storedWidth = localStorage.getItem("cowork-aux-panel-width");
+    const storedPosition = localStorage.getItem("cowork-aux-panel-position");
 
     if (storedVisible) {
-      setIsAIPanelVisible(storedVisible === "true");
+      setIsAuxPanelVisible(storedVisible === "true");
     }
     if (storedWidth) {
       const parsed = Number.parseInt(storedWidth, 10);
       if (!Number.isNaN(parsed) && parsed > 0) {
-        setAIPanelWidth(parsed);
+        setAuxPanelWidth(parsed);
       }
     }
-    if (storedPosition && ["main", "left", "right"].includes(storedPosition)) {
-      setAIPanelPosition(storedPosition as "main" | "left" | "right");
+    if (storedPosition && ["left", "right"].includes(storedPosition)) {
+      setAuxPanelPosition(storedPosition as "left" | "right");
     }
     setIsHydrated(true);
   }, []);
@@ -73,21 +94,21 @@ export function RootLayout() {
   // Persist state changes
   React.useEffect(() => {
     if (isHydrated) {
-      localStorage.setItem("cowork-ai-panel-visible", String(isAIPanelVisible));
+      localStorage.setItem("cowork-aux-panel-visible", String(isAuxPanelVisible));
     }
-  }, [isAIPanelVisible, isHydrated]);
+  }, [isAuxPanelVisible, isHydrated]);
 
   React.useEffect(() => {
     if (isHydrated) {
-      localStorage.setItem("cowork-ai-panel-width", String(aiPanelWidth));
+      localStorage.setItem("cowork-aux-panel-width", String(auxPanelWidth));
     }
-  }, [aiPanelWidth, isHydrated]);
+  }, [auxPanelWidth, isHydrated]);
 
   React.useEffect(() => {
     if (isHydrated) {
-      localStorage.setItem("cowork-ai-panel-position", aiPanelPosition);
+      localStorage.setItem("cowork-aux-panel-position", auxPanelPosition);
     }
-  }, [aiPanelPosition, isHydrated]);
+  }, [auxPanelPosition, isHydrated]);
 
   const shellContextValue = React.useMemo(
     () => ({
@@ -106,13 +127,31 @@ export function RootLayout() {
       locale: "en",
       createDocument: async () => "new-doc-id", // Placeholder
       aiPanel: {
-        isVisible: isAIPanelVisible,
-        toggle: () => setIsAIPanelVisible((prev) => !prev),
-        setVisible: setIsAIPanelVisible,
-        width: aiPanelWidth,
-        setWidth: setAIPanelWidth,
-        position: aiPanelPosition,
-        setPosition: setAIPanelPosition,
+        isVisible: true,
+        toggle: () => {
+          /* AI panel is always on */
+        },
+        setVisible: () => {
+          /* AI panel is always on */
+        },
+        width: 0,
+        setWidth: () => {
+          /* Locked */
+        },
+        position: "main" as const,
+        setPosition: () => {
+          /* Locked */
+        },
+        isHydrated: true,
+      },
+      auxPanel: {
+        isVisible: isAuxPanelVisible,
+        toggle: () => setIsAuxPanelVisible((prev) => !prev),
+        setVisible: setIsAuxPanelVisible,
+        width: auxPanelWidth,
+        setWidth: setAuxPanelWidth,
+        position: auxPanelPosition,
+        setPosition: setAuxPanelPosition,
         isHydrated,
       },
       sidebar: {
@@ -180,13 +219,14 @@ export function RootLayout() {
             "Settings.canvasWarm": "Warm",
             "Settings.canvasSepia": "Sepia",
             "Settings.canvasDark": "Dark",
-            "Settings.aiPanelPosition": "AI Panel",
-            "Settings.aiPanelMain": "Main",
-            "Settings.aiPanelMainDesc": "Show in the primary workspace",
+            "Settings.aiPanelPosition": "Context Panel",
             "Settings.aiPanelLeftRail": "Left",
-            "Settings.aiPanelLeftRailDesc": "Dock beside the sidebar",
+            "Settings.aiPanelLeftRailDesc": "Dock on the left side",
             "Settings.aiPanelRightRail": "Right",
             "Settings.aiPanelRightRailDesc": "Dock on the right side",
+
+            // Header
+            "Header.toggleContext": "Toggle Context Panel (⌘+2)",
           };
           const resolved = dictionary[key] ?? defaultValue ?? key.split(".").pop() ?? key;
           return interpolate(resolved, values);
@@ -196,13 +236,41 @@ export function RootLayout() {
     [
       isSidebarCollapsed,
       sidebarWidth,
-      isAIPanelVisible,
-      aiPanelWidth,
-      aiPanelPosition,
+      isAuxPanelVisible,
+      auxPanelWidth,
+      auxPanelPosition,
       router,
       location.pathname,
       isHydrated,
     ]
+  );
+
+  const contextPanel = (
+    <ContextPanel
+      activeTab={contextTab}
+      onTabChange={setContextTab}
+      previewArtifact={previewArtifact}
+      onClosePreview={handleClosePreview}
+      position={auxPanelPosition}
+    />
+  );
+
+  // AI Panel with preview callback
+  const aiPanelElement = <CoworkAIPanel onPreviewArtifact={handlePreviewArtifact} />;
+
+  const renderSidebarGroup = React.useCallback(
+    ({ group, defaultGroup }: SidebarGroupRenderProps) => {
+      if (group.id !== "primary") {
+        return defaultGroup;
+      }
+      return (
+        <div className="space-y-4">
+          {defaultGroup}
+          <CoworkSidebarSections />
+        </div>
+      );
+    },
+    []
   );
 
   return (
@@ -215,7 +283,21 @@ export function RootLayout() {
         }}
       >
         <ReaderPreferencesProvider>
-          <AppShell rightPanel={<CoworkAIPanel />} appName="KeepUp">
+          <AppShell
+            rightPanel={aiPanelElement}
+            auxPanel={contextPanel}
+            appName="KeepUp"
+            sidebarProps={{
+              showSearch: false,
+              renderGroup: renderSidebarGroup,
+              newAction: {
+                label: "New Session",
+                ariaLabel: "New Session",
+                icon: Sparkles,
+                onClick: () => router.navigate({ to: "/new-session" }),
+              },
+            }}
+          >
             <Outlet />
           </AppShell>
         </ReaderPreferencesProvider>

@@ -155,6 +155,21 @@ export function SettingsPage() {
               disabled={state.isSaving}
             />
           </div>
+          <div className="space-y-2">
+            <label htmlFor="gemini-key" className="text-xs font-medium text-muted-foreground">
+              Gemini API Key
+            </label>
+            <input
+              id="gemini-key"
+              aria-label="Gemini API key"
+              type="password"
+              className="text-input"
+              placeholder="AIza..."
+              value={state.data.geminiKey ?? ""}
+              onChange={(event) => handleUpdate({ geminiKey: event.target.value })}
+              disabled={state.isSaving}
+            />
+          </div>
         </div>
       </section>
 
@@ -174,6 +189,8 @@ export function SettingsPage() {
           <option value="claude-3.7">Claude 3.7 Sonnet</option>
           <option value="o4-mini">O4 Mini</option>
           <option value="deepseek-r1">DeepSeek R1</option>
+          <option value="gemini-3-pro-high">Gemini 3 Pro High</option>
+          <option value="gemini-3-flash">Gemini 3 Flash</option>
         </select>
       </section>
 

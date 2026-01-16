@@ -5,7 +5,7 @@ This roadmap breaks down the Cowork app (`apps/cowork`) into three parallel deve
 ## Track 1: [Agent Core](task-core-infra.md) (Core & Infrastructure)
 **Focus**: Backend stability, persistence, and agent-runtime orchestration.
 
-- [x] Initialize Bun + Hono server in `apps/cowork/server`.
+- [x] Initialize Hono server in `apps/cowork/server`.
 - [x] Implement `.keep-up/state` persistence (Sessions, Tasks, Approvals).
 - [x] Set up SSE (Server-Sent Events) for TaskGraph event streaming.
 - [x] Integrate with `packages/agent-runtime` for tool execution.

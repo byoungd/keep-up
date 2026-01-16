@@ -34,7 +34,7 @@ function createSession(): CoworkSession {
 }
 
 describe("CoworkRuntimeBridge", () => {
-  it("requires approval for file writes outside output roots", async () => {
+  it("allows file writes within grants without approval", async () => {
     const { store, dir } = await createApprovalStore();
     const runtime = new CoworkRuntimeBridge(store);
     const session = createSession();
@@ -45,13 +45,9 @@ describe("CoworkRuntimeBridge", () => {
       intent: "write",
     });
 
-    expect(result.status).toBe("approval_required");
-    if (result.status === "approval_required") {
-      expect(result.approval.status).toBe("pending");
-    }
-
+    expect(result.status).toBe("allowed");
     const approvals = await store.getAll();
-    expect(approvals.length).toBe(1);
+    expect(approvals.length).toBe(0);
 
     await rm(dir, { recursive: true, force: true });
   });
@@ -70,6 +66,24 @@ describe("CoworkRuntimeBridge", () => {
     expect(result.status).toBe("allowed");
     const approvals = await store.getAll();
     expect(approvals.length).toBe(0);
+
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it("requires approval for deletes", async () => {
+    const { store, dir } = await createApprovalStore();
+    const runtime = new CoworkRuntimeBridge(store);
+    const session = createSession();
+
+    const result = await runtime.checkAction(session, {
+      kind: "file",
+      path: "/workspace/old.md",
+      intent: "delete",
+    });
+
+    expect(result.status).toBe("approval_required");
+    const approvals = await store.getAll();
+    expect(approvals.length).toBe(1);
 
     await rm(dir, { recursive: true, force: true });
   });

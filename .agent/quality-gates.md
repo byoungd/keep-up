@@ -2,9 +2,9 @@
 
 > Linear-level quality through automated gates, agent collaboration, and strict standards.
 
-## Project: Keep-Up Reader
+## Project: Keep-Up
 
-This framework applies to the Keep-Up Reader monorepo (`@ku0/*`, `@ku0/*` packages).
+This framework applies to the Keep-Up monorepo (`@ku0/*`, `@ku0/*` packages).
 
 ## Overview
 
@@ -117,17 +117,13 @@ test:
   - coverage threshold: 70% (core), 50% (ui)
 ```
 
-### 3.3 Category E2E (Based on Changed Files)
+### 3.3 Test Strategy
 
-| Changed Path | Test Category |
-|--------------|---------------|
-| `editor/`, `schema/`, `marks/` | `test:e2e:core` |
-| `block/`, `NodeView/` | `test:e2e:blocks` |
-| `collab/`, `sync/`, `WebSocket/` | `test:e2e:collab` |
-| `annotation/`, `highlight/` | `test:e2e:annotations` |
-| `import/`, `AI/`, `persistence/` | `test:e2e:features` |
-| `page/`, `layout/`, `navigation/` | `test:e2e:smoke` |
-| `a11y/`, accessibility updates | `test:e2e:a11y` |
+| Focus | Approach |
+|-------|----------|
+| Unit Logic | `vitest run` |
+| UI Components | Component Tests (Vitest) |
+| Integration | `scripts/ui-gate.sh` (mocked backend) |
 
 ### 3.4 UI Integration Gate
 ```bash
@@ -148,9 +144,10 @@ pnpm --filter @ku0/core test
 
 **Trigger**: Before release/tag
 
-### 4.1 Full E2E Suite
+### 4.1 Release Testing
 ```bash
-PLAYWRIGHT_WORKERS=1 pnpm test:e2e:full
+pnpm test:unit:ci
+# Full E2E suite is on apps/reader branch
 ```
 
 ### 4.2 Performance Gate
@@ -185,7 +182,7 @@ pnpm test:visual
 |---------|-------------|--------|
 | `packages/core` | 70% | 85% |
 | `packages/lfcc-bridge` | 60% | 75% |
-| `apps/reader` | 50% | 65% |
+| `apps/cowork` | 30% | 50% |
 
 ### Performance Budgets
 | Metric | Budget | Critical |
@@ -241,13 +238,13 @@ main:
 
 2. **PR Gate Failure**
    - Check CI logs for specific failure
-   - Run targeted tests locally: `pnpm test:e2e:<category>`
-   - Reproduce with: `scripts/ui-gate.sh`
+   - Run targeted tests locally: `pnpm test:unit`
+   - Reproduce with: unit test watch mode
 
 3. **Release Gate Failure**
    - Performance: Run `pnpm perf:baseline` to update baseline if justified
    - Visual: Update snapshots with `pnpm test:visual:update` if intentional
-   - E2E: Debug with `PLAYWRIGHT_WORKERS=1` for stability
+   - Release: Ensure unit/integration tests pass on main branch
 
 ### Override Policy
 - **Never bypass** commit hooks without Tech Lead approval

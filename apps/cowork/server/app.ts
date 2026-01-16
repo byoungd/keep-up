@@ -3,6 +3,7 @@ import { cors } from "hono/cors";
 import { jsonError } from "./http";
 import { serverLogger } from "./logger";
 import { createApprovalRoutes } from "./routes/approvals";
+import { createArtifactRoutes } from "./routes/artifacts";
 import { createChatRoutes } from "./routes/chat";
 import { createProjectRoutes } from "./routes/projects";
 import { createSessionRoutes } from "./routes/sessions";
@@ -48,6 +49,15 @@ export function createCoworkApp(deps: CoworkAppDeps) {
       taskStore: deps.storage.taskStore,
       events: eventHub,
       taskRuntime,
+    })
+  );
+
+  app.route(
+    "/api",
+    createArtifactRoutes({
+      artifactStore: deps.storage.artifactStore,
+      sessionStore: deps.storage.sessionStore,
+      taskStore: deps.storage.taskStore,
     })
   );
 

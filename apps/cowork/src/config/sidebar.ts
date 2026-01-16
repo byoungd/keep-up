@@ -1,44 +1,45 @@
 import type { SidebarGroupDefinition } from "@ku0/shell";
-import { MessageSquare, Settings, Sparkles } from "lucide-react";
+import { Library, Search, SquarePen } from "lucide-react";
 
 export const COWORK_SIDEBAR_GROUPS: SidebarGroupDefinition[] = [
   {
-    id: "main",
-    label: "Main",
+    id: "pinned",
+    label: "Pinned",
     collapsible: false,
     defaultCollapsed: false,
     items: [
       {
-        id: "chat",
-        label: "Chat",
-        icon: MessageSquare,
-        route: "/",
+        id: "new-session",
+        label: "New task",
+        icon: SquarePen,
+        route: "/new-session",
         defaultVisibility: "ALWAYS",
         locked: true,
       },
       {
-        id: "settings",
-        label: "Settings",
-        icon: Settings,
-        route: "/settings",
+        id: "search",
+        label: "Search",
+        icon: Search,
+        route: "/search",
         defaultVisibility: "ALWAYS",
+        locked: true,
+      },
+      {
+        id: "library",
+        label: "Library",
+        icon: Library,
+        route: "/library",
+        defaultVisibility: "ALWAYS",
+        locked: true,
       },
     ],
   },
   {
-    id: "workspace",
-    label: "Workspace",
-    collapsible: true,
+    id: "primary",
+    label: "Primary",
+    collapsible: false,
     defaultCollapsed: false,
-    items: [
-      {
-        id: "new-session",
-        label: "New Session",
-        icon: Sparkles,
-        route: "/new-session",
-        defaultVisibility: "ALWAYS",
-      },
-    ],
+    items: [],
   },
 ];
 

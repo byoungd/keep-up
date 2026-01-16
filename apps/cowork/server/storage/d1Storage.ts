@@ -1,13 +1,20 @@
 import type { CoworkProject, CoworkSession, CoworkTask } from "@ku0/agent-runtime";
 import type {
+  AgentStateCheckpointStoreLike,
   ApprovalStoreLike,
+  ArtifactStoreLike,
   ConfigStoreLike,
   ProjectStoreLike,
   SessionStoreLike,
   StorageLayer,
   TaskStoreLike,
 } from "./contracts";
-import type { CoworkApproval, CoworkSettings } from "./types";
+import type {
+  AgentStateCheckpointRecord,
+  CoworkApproval,
+  CoworkArtifactRecord,
+  CoworkSettings,
+} from "./types";
 
 export interface D1PreparedStatement {
   bind(...values: unknown[]): D1PreparedStatement;
@@ -57,9 +64,29 @@ async function ensureSchema(db: D1Database): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_tasks_session ON tasks(session_id)
     `,
     `
+      CREATE TABLE IF NOT EXISTS artifacts (
+        artifact_id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        task_id TEXT,
+        title TEXT NOT NULL,
+        type TEXT NOT NULL,
+        artifact TEXT NOT NULL,
+        source_path TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    `,
+    `
+      CREATE INDEX IF NOT EXISTS idx_artifacts_session ON artifacts(session_id)
+    `,
+    `
+      CREATE INDEX IF NOT EXISTS idx_artifacts_task ON artifacts(task_id)
+    `,
+    `
       CREATE TABLE IF NOT EXISTS approvals (
         approval_id TEXT PRIMARY KEY,
         session_id TEXT NOT NULL,
+        task_id TEXT,
         action TEXT NOT NULL,
         risk_tags TEXT NOT NULL DEFAULT '[]',
         reason TEXT,
@@ -70,6 +97,22 @@ async function ensureSchema(db: D1Database): Promise<void> {
     `,
     `
       CREATE INDEX IF NOT EXISTS idx_approvals_session ON approvals(session_id)
+    `,
+    `
+      CREATE INDEX IF NOT EXISTS idx_approvals_task ON approvals(task_id)
+    `,
+    `
+      CREATE TABLE IF NOT EXISTS agent_state_checkpoints (
+        checkpoint_id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        state TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    `,
+    `
+      CREATE INDEX IF NOT EXISTS idx_agent_state_checkpoints_session
+      ON agent_state_checkpoints(session_id)
     `,
     `
       CREATE TABLE IF NOT EXISTS settings (
@@ -192,12 +235,48 @@ function rowToApproval(row: Record<string, unknown>): CoworkApproval {
   return {
     approvalId: String(row.approval_id),
     sessionId: String(row.session_id),
+    taskId: row.task_id ? String(row.task_id) : undefined,
     action: String(row.action),
     riskTags: parseRiskTags(String(row.risk_tags ?? "[]")),
     reason: row.reason ? String(row.reason) : undefined,
     status: row.status as CoworkApproval["status"],
     createdAt: Number(row.created_at),
     resolvedAt: row.resolved_at ? Number(row.resolved_at) : undefined,
+  };
+}
+
+function parseArtifactPayload(raw: unknown): CoworkArtifactRecord["artifact"] {
+  if (typeof raw !== "string") {
+    return { type: "markdown", content: "" };
+  }
+  try {
+    return JSON.parse(raw) as CoworkArtifactRecord["artifact"];
+  } catch {
+    return { type: "markdown", content: "" };
+  }
+}
+
+function rowToArtifact(row: Record<string, unknown>): CoworkArtifactRecord {
+  return {
+    artifactId: String(row.artifact_id),
+    sessionId: String(row.session_id),
+    taskId: row.task_id ? String(row.task_id) : undefined,
+    title: String(row.title),
+    type: row.type as CoworkArtifactRecord["type"],
+    artifact: parseArtifactPayload(row.artifact),
+    sourcePath: row.source_path ? String(row.source_path) : undefined,
+    createdAt: Number(row.created_at),
+    updatedAt: Number(row.updated_at),
+  };
+}
+
+function rowToAgentStateCheckpoint(row: Record<string, unknown>): AgentStateCheckpointRecord {
+  return {
+    checkpointId: String(row.checkpoint_id),
+    sessionId: String(row.session_id),
+    state: JSON.parse(String(row.state)) as AgentStateCheckpointRecord["state"],
+    createdAt: Number(row.created_at),
+    updatedAt: Number(row.updated_at),
   };
 }
 
@@ -274,6 +353,53 @@ async function createD1SessionStore(db: D1Database): Promise<SessionStoreLike> {
   };
 }
 
+async function createD1AgentStateStore(db: D1Database): Promise<AgentStateCheckpointStoreLike> {
+  return {
+    async getAll(): Promise<AgentStateCheckpointRecord[]> {
+      const result = await prepare(
+        db,
+        "SELECT * FROM agent_state_checkpoints ORDER BY created_at ASC"
+      ).all();
+      return result.results.map(rowToAgentStateCheckpoint);
+    },
+
+    async getById(checkpointId: string): Promise<AgentStateCheckpointRecord | null> {
+      const row = await prepare(
+        db,
+        "SELECT * FROM agent_state_checkpoints WHERE checkpoint_id = ?",
+        [checkpointId]
+      ).first();
+      return row ? rowToAgentStateCheckpoint(row) : null;
+    },
+
+    async getBySession(sessionId: string): Promise<AgentStateCheckpointRecord[]> {
+      const result = await prepare(
+        db,
+        "SELECT * FROM agent_state_checkpoints WHERE session_id = ? ORDER BY created_at ASC",
+        [sessionId]
+      ).all();
+      return result.results.map(rowToAgentStateCheckpoint);
+    },
+
+    async create(record: AgentStateCheckpointRecord): Promise<AgentStateCheckpointRecord> {
+      await prepare(
+        db,
+        `INSERT INTO agent_state_checkpoints
+          (checkpoint_id, session_id, state, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?)`,
+        [
+          record.checkpointId,
+          record.sessionId,
+          JSON.stringify(record.state),
+          record.createdAt,
+          record.updatedAt,
+        ]
+      ).run();
+      return record;
+    },
+  };
+}
+
 async function createD1TaskStore(db: D1Database): Promise<TaskStoreLike> {
   return {
     async getAll(): Promise<CoworkTask[]> {
@@ -335,6 +461,76 @@ async function createD1TaskStore(db: D1Database): Promise<TaskStoreLike> {
   };
 }
 
+async function createD1ArtifactStore(db: D1Database): Promise<ArtifactStoreLike> {
+  return {
+    async getAll(): Promise<CoworkArtifactRecord[]> {
+      const result = await prepare(db, "SELECT * FROM artifacts ORDER BY created_at DESC").all();
+      return result.results.map(rowToArtifact);
+    },
+
+    async getById(artifactId: string): Promise<CoworkArtifactRecord | null> {
+      const row = await prepare(db, "SELECT * FROM artifacts WHERE artifact_id = ?", [
+        artifactId,
+      ]).first();
+      return row ? rowToArtifact(row) : null;
+    },
+
+    async getBySession(sessionId: string): Promise<CoworkArtifactRecord[]> {
+      const result = await prepare(
+        db,
+        "SELECT * FROM artifacts WHERE session_id = ? ORDER BY created_at DESC",
+        [sessionId]
+      ).all();
+      return result.results.map(rowToArtifact);
+    },
+
+    async getByTask(taskId: string): Promise<CoworkArtifactRecord[]> {
+      const result = await prepare(
+        db,
+        "SELECT * FROM artifacts WHERE task_id = ? ORDER BY created_at DESC",
+        [taskId]
+      ).all();
+      return result.results.map(rowToArtifact);
+    },
+
+    async upsert(artifact: CoworkArtifactRecord): Promise<CoworkArtifactRecord> {
+      await prepare(
+        db,
+        `INSERT INTO artifacts
+          (artifact_id, session_id, task_id, title, type, artifact, source_path, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(artifact_id) DO UPDATE SET
+            session_id = excluded.session_id,
+            task_id = excluded.task_id,
+            title = excluded.title,
+            type = excluded.type,
+            artifact = excluded.artifact,
+            source_path = excluded.source_path,
+            updated_at = excluded.updated_at`,
+        [
+          artifact.artifactId,
+          artifact.sessionId,
+          artifact.taskId ?? null,
+          artifact.title,
+          artifact.type,
+          JSON.stringify(artifact.artifact),
+          artifact.sourcePath ?? null,
+          artifact.createdAt,
+          artifact.updatedAt,
+        ]
+      ).run();
+      return artifact;
+    },
+
+    async delete(artifactId: string): Promise<boolean> {
+      const result = await prepare(db, "DELETE FROM artifacts WHERE artifact_id = ?", [
+        artifactId,
+      ]).run();
+      return (result.changes ?? 0) > 0;
+    },
+  };
+}
+
 async function createD1ApprovalStore(db: D1Database): Promise<ApprovalStoreLike> {
   return {
     async getAll(): Promise<CoworkApproval[]> {
@@ -362,11 +558,12 @@ async function createD1ApprovalStore(db: D1Database): Promise<ApprovalStoreLike>
       await prepare(
         db,
         `INSERT OR REPLACE INTO approvals
-          (approval_id, session_id, action, risk_tags, reason, status, created_at, resolved_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          (approval_id, session_id, task_id, action, risk_tags, reason, status, created_at, resolved_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           approval.approvalId,
           approval.sessionId,
+          approval.taskId ?? null,
           approval.action,
           JSON.stringify(approval.riskTags ?? []),
           approval.reason ?? null,
@@ -392,10 +589,11 @@ async function createD1ApprovalStore(db: D1Database): Promise<ApprovalStoreLike>
       await prepare(
         db,
         `UPDATE approvals
-          SET session_id = ?, action = ?, risk_tags = ?, reason = ?, status = ?, created_at = ?, resolved_at = ?
+          SET session_id = ?, task_id = ?, action = ?, risk_tags = ?, reason = ?, status = ?, created_at = ?, resolved_at = ?
           WHERE approval_id = ?`,
         [
           updated.sessionId,
+          updated.taskId ?? null,
           updated.action,
           JSON.stringify(updated.riskTags ?? []),
           updated.reason ?? null,
@@ -544,10 +742,20 @@ async function createD1ProjectStore(db: D1Database): Promise<ProjectStoreLike> {
 
 export async function createD1StorageLayer(db: D1Database): Promise<StorageLayer> {
   await ensureSchema(db);
-  const [sessionStore, taskStore, approvalStore, configStore, projectStore] = await Promise.all([
+  const [
+    sessionStore,
+    taskStore,
+    artifactStore,
+    approvalStore,
+    agentStateStore,
+    configStore,
+    projectStore,
+  ] = await Promise.all([
     createD1SessionStore(db),
     createD1TaskStore(db),
+    createD1ArtifactStore(db),
     createD1ApprovalStore(db),
+    createD1AgentStateStore(db),
     createD1ConfigStore(db),
     createD1ProjectStore(db),
   ]);
@@ -555,7 +763,9 @@ export async function createD1StorageLayer(db: D1Database): Promise<StorageLayer
   return {
     sessionStore,
     taskStore,
+    artifactStore,
     approvalStore,
+    agentStateStore,
     configStore,
     projectStore,
   };

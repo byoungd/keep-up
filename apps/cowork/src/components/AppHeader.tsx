@@ -13,10 +13,6 @@ export function AppHeader() {
     <header className="glass-panel shell-header">
       <div className="flex items-center gap-3">
         <div className="h-9 w-9 rounded-full bg-[radial-gradient(circle_at_top,#34d399,transparent_60%)] shadow-glow" />
-        <div>
-          <p className="text-sm font-semibold tracking-tight text-foreground">Cowork Agent UI</p>
-          <p className="text-xs text-muted-foreground">Model: Atlas v0.1</p>
-        </div>
       </div>
       <div className="flex items-center gap-3">
         <span

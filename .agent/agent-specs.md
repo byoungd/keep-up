@@ -6,7 +6,7 @@
 
 ## Runtime Infrastructure
 
-The **`@ku0/agent-runtime`** package (`packages/agent-runtime/`) provides the foundational infrastructure for AI agents in Keep-Up Reader:
+The **`@ku0/agent-runtime`** package (`packages/agent-runtime/`) provides the foundational infrastructure for AI agents in Keep-Up:
 
 ```
 packages/agent-runtime/src/
@@ -333,7 +333,7 @@ You are the QA Agent. Your responsibilities:
    - Test on multiple browsers/devices
 
 2. **Regression Testing**
-   - Run targeted E2E tests
+   - Run targeted Unit/Integration tests
    - Verify related features unaffected
    - Check performance baseline
 
@@ -346,31 +346,19 @@ You are the QA Agent. Your responsibilities:
 4. **Test Category Selection**
    | Changed Area | Test Command |
    |--------------|--------------|
-   | Editor | `pnpm test:e2e:core` |
-   | Blocks | `pnpm test:e2e:blocks` |
-   | Collab | `pnpm test:e2e:collab` |
-   | Annotations | `pnpm test:e2e:annotations` |
-   | Features | `pnpm test:e2e:features` |
-   | Smoke | `pnpm test:e2e:smoke` |
-   | A11y | `pnpm test:e2e:a11y` |
+   - Execute `walkthrough.md` steps
+   - Verify feature works as specified
+   - Check edge cases and error states
+   - Test on local dev environment
 ```
 
 ### Test Commands
 ```bash
 # Quick sanity check
-pnpm test:e2e:smoke
-pnpm test:e2e:a11y
-
-# Category-specific
-pnpm test:e2e:core        # Editor, formatting, selection
-pnpm test:e2e:blocks      # Block menu, drag-drop
-pnpm test:e2e:collab      # WebSocket, multi-client
-pnpm test:e2e:annotations # Highlights, comments
-pnpm test:e2e:features    # Import, AI, persistence
-pnpm test:e2e:a11y        # Accessibility smoke
+pnpm test:unit
 
 # Full suite (release only)
-PLAYWRIGHT_WORKERS=1 pnpm test:e2e:full
+pnpm test:unit:ci
 ```
 
 ---
@@ -458,9 +446,9 @@ pnpm biome check --write --staged
 ### Release (Full quality gate)
 ```bash
 # All gates must pass
+# All gates must pass
 pnpm typecheck
 pnpm lint
 pnpm test:unit
-pnpm test:e2e:full
 pnpm perf:gate
 ```

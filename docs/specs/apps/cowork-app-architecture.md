@@ -21,7 +21,7 @@ flowchart LR
         UI["UI Shell<br/>(React 19 + TanStack)"]
     end
     subgraph Server
-        BFF["BFF API<br/>(Bun + Hono)"]
+        BFF["BFF API<br/>(Hono + Node/Edge)"]
         AR["Agent Runtime<br/>(packages/agent-runtime)"]
         State[("Persistence<br/>(.keep-up/state)")]
     end
@@ -48,7 +48,7 @@ flowchart LR
 
 | Responsibility | Implementation |
 |---------------|----------------|
-| Local server | Bun + Hono (or Bun native `Bun.serve`) |
+| Local server | Hono on Node or Edge runtimes |
 | Endpoints | Session, task, approval, artifact CRUD |
 | Streaming | SSE with `Last-Event-ID` resume support |
 
@@ -62,6 +62,7 @@ flowchart LR
 
 - **Primary**: `.keep-up/state` (JSON/SQLite) for sessions, tasks, approvals.
 - **Optional**: `packages/db` integration for durable cross-session metadata.
+- **Edge**: D1 (Cloudflare) or platform storage adapters for sessions/tasks/approvals.
 
 ## Proposed App Structure
 ```
@@ -146,7 +147,7 @@ flowchart TB
 
 | Layer | Tool | Scope |
 |-------|------|-------|
-| Unit | Vitest (Bun) | Services, hooks, utilities |
+| Unit | Vitest (Node) | Services, hooks, utilities |
 | Component | Vitest + Testing Library | UI components in isolation |
 | E2E | Playwright | Smoke + cowork-specific flows only |
 

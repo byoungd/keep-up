@@ -7,6 +7,7 @@ import {
   type CoworkTask,
   type CoworkTaskStatus,
   type CoworkTaskSummary,
+  type TaskType,
   createAICoreAdapter,
   createBashToolServer,
   createCodeToolServer,
@@ -25,14 +26,17 @@ import {
   OpenAIProvider,
   ProviderRouter,
   type StreamChunk,
+  TokenTracker,
   type Tool,
   getModelCapability,
   normalizeModelId,
   resolveProviderFromEnv,
 } from "@ku0/ai-core";
+import { ApprovalService } from "../services/approvalService";
 import type { StorageLayer } from "../storage/contracts";
-import type { CoworkApproval, CoworkSettings } from "../storage/types";
+import type { CoworkApproval, CoworkArtifactPayload, CoworkSettings } from "../storage/types";
 import { COWORK_EVENTS, type SessionEventHub } from "../streaming/eventHub";
+import { SmartProviderRouter } from "./smartProviderRouter";
 import { createWebSearchProvider } from "./webSearchProvider";
 
 type Logger = Pick<Console, "info" | "warn" | "error">;
@@ -57,11 +61,13 @@ type RuntimeFactory = (
 
 const RISK_TAGS = new Set<CoworkRiskTag>(["delete", "overwrite", "network", "connector", "batch"]);
 const noop = () => undefined;
+const tokenTracker = new TokenTracker();
 
 export class CoworkTaskRuntime {
   private readonly storage: StorageLayer;
   private readonly events: SessionEventHub;
   private readonly logger: Logger;
+  private readonly approvalService: ApprovalService;
   private readonly runtimes = new Map<string, SessionRuntime>();
   private readonly runtimeFactory?: RuntimeFactory;
   private taskWriteQueue: Promise<void> = Promise.resolve();
@@ -71,18 +77,20 @@ export class CoworkTaskRuntime {
     events: SessionEventHub;
     logger?: Logger;
     runtimeFactory?: RuntimeFactory;
+    approvalService?: ApprovalService;
   }) {
     this.storage = deps.storage;
     this.events = deps.events;
     this.logger = deps.logger ?? console;
     this.runtimeFactory = deps.runtimeFactory;
+    this.approvalService = deps.approvalService ?? new ApprovalService();
   }
 
   async enqueueTask(
     session: CoworkSession,
     payload: { prompt: string; title?: string; modelId?: string }
   ) {
-    const runtime = await this.getOrCreateRuntime(session);
+    const runtime = await this.getOrCreateRuntime(session, { prompt: payload.prompt });
     const taskId = await runtime.runtime.enqueueTask(payload.prompt, payload.title);
     const now = Date.now();
     const task: CoworkTask = {
@@ -127,12 +135,17 @@ export class CoworkTaskRuntime {
     this.events.publish(updated.sessionId, COWORK_EVENTS.APPROVAL_RESOLVED, {
       approvalId: updated.approvalId,
       status: updated.status,
+      taskId: updated.taskId,
     });
+    this.approvalService.resolveApproval(approvalId, status);
 
     return updated;
   }
 
-  private async getOrCreateRuntime(session: CoworkSession): Promise<SessionRuntime> {
+  private async getOrCreateRuntime(
+    session: CoworkSession,
+    selectionHint?: { prompt?: string }
+  ): Promise<SessionRuntime> {
     const existing = this.runtimes.get(session.sessionId);
     const settings = await this.storage.configStore.get();
     const requestedModel = normalizeModelId(settings.defaultModel ?? undefined) ?? null;
@@ -148,7 +161,7 @@ export class CoworkTaskRuntime {
 
     const runtimeCore = this.runtimeFactory
       ? { runtime: await this.runtimeFactory(session, settings), providerInfo: null }
-      : await this.createRuntimeCore(session, settings);
+      : await this.createRuntimeCore(session, settings, selectionHint);
     const created = this.attachRuntime(session, runtimeCore.runtime);
     created.modelId = runtimeCore.providerInfo?.modelId ?? requestedModel;
     created.providerId = runtimeCore.providerInfo?.providerId ?? null;
@@ -159,7 +172,8 @@ export class CoworkTaskRuntime {
 
   private async createRuntimeCore(
     session: CoworkSession,
-    settings: CoworkSettings
+    settings: CoworkSettings,
+    selectionHint?: { prompt?: string }
   ): Promise<{
     runtime: ReturnType<typeof createCoworkRuntime>;
     providerInfo: {
@@ -170,7 +184,8 @@ export class CoworkTaskRuntime {
   }> {
     const { provider, model, providerId, fallbackNotice } = createCoworkProvider(
       settings,
-      this.logger
+      this.logger,
+      selectionHint
     );
     const llm = createAICoreAdapter(provider, { model });
 
@@ -238,6 +253,7 @@ export class CoworkTaskRuntime {
     const approval = {
       approvalId,
       sessionId: runtime.sessionId,
+      taskId: runtime.activeTaskId ?? undefined,
       action: request.description,
       riskTags: normalizeRiskTags(request.riskTags),
       reason: request.reason,
@@ -312,6 +328,12 @@ export class CoworkTaskRuntime {
       outputArtifacts.length > 0 ? null : (fallbackContent ?? reportContent)
     );
     if (content) {
+      await this.persistArtifact(runtime.sessionId, {
+        artifactId: `summary-${taskId}`,
+        artifact: { type: "markdown", content },
+        taskId,
+        title: "Summary",
+      });
       this.events.publish(runtime.sessionId, COWORK_EVENTS.AGENT_ARTIFACT, {
         id: `summary-${taskId}`,
         artifact: { type: "markdown", content },
@@ -319,6 +341,13 @@ export class CoworkTaskRuntime {
       });
     }
     for (const artifact of outputArtifacts) {
+      await this.persistArtifact(runtime.sessionId, {
+        artifactId: artifact.id,
+        artifact: artifact.artifact,
+        taskId,
+        title: artifact.title,
+        sourcePath: artifact.path,
+      });
       this.events.publish(runtime.sessionId, COWORK_EVENTS.AGENT_ARTIFACT, {
         ...artifact,
         taskId: taskId,
@@ -494,27 +523,49 @@ export class CoworkTaskRuntime {
     return next;
   }
 
+  private async persistArtifact(
+    sessionId: string,
+    data: {
+      artifactId: string;
+      artifact: CoworkArtifactPayload;
+      taskId?: string;
+      title?: string;
+      sourcePath?: string;
+    }
+  ): Promise<void> {
+    await this.enqueueTaskWrite(async () => {
+      const existing = await this.storage.artifactStore.getById(data.artifactId);
+      const now = Date.now();
+      const record = {
+        artifactId: data.artifactId,
+        sessionId,
+        taskId: data.taskId,
+        title: data.title ?? deriveArtifactTitle(data.artifactId, data.artifact),
+        type: data.artifact.type,
+        artifact: data.artifact,
+        sourcePath: data.sourcePath,
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now,
+      };
+      await this.storage.artifactStore.upsert(record);
+    });
+  }
+
   private async waitForApprovalDecision(
     sessionId: string,
     approvalId: string
   ): Promise<"approved" | "rejected"> {
-    const intervalMs = 200;
-    while (true) {
-      const approval = await this.storage.approvalStore.getById(approvalId);
-      if (!approval) {
-        this.logger.warn("Approval missing, defaulting to rejected", { approvalId, sessionId });
-        return "rejected";
-      }
-      if (approval.status !== "pending") {
-        return approval.status;
-      }
-      await delay(intervalMs);
+    const decision = await this.approvalService.waitForDecision(approvalId);
+    const approval = await this.storage.approvalStore.getById(approvalId);
+    if (!approval) {
+      this.logger.warn("Approval missing, defaulting to rejected", { approvalId, sessionId });
+      return "rejected";
     }
+    if (approval.status === "pending") {
+      await this.resolveApproval(approvalId, decision);
+    }
+    return decision;
   }
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function resolveProviders(settings: CoworkSettings): LLMProvider[] {
@@ -540,34 +591,38 @@ function resolveProviders(settings: CoworkSettings): LLMProvider[] {
   return providers;
 }
 
-function createCoworkProvider(settings: CoworkSettings, logger: Logger) {
+type CoworkProviderId = "openai" | "anthropic" | "gemini";
+
+function createCoworkProvider(
+  settings: CoworkSettings,
+  logger: Logger,
+  selectionHint?: { prompt?: string }
+) {
   const providers = resolveProviders(settings);
 
-  if (providers.length === 0) {
-    throw new Error("No AI provider configured. Add an API key in settings or env.");
-  }
+  ensureProviders(providers);
 
-  const requestedModel = normalizeModelId(settings.defaultModel ?? undefined);
-  const preferred = resolvePreferredProvider(requestedModel);
-  const primary =
-    preferred && providers.some((provider) => provider.name === preferred)
-      ? preferred
-      : providers[0].name;
-  const fallbackOrder = providers
-    .map((provider) => provider.name)
-    .filter((name) => name !== primary);
-  const fallbackNotice =
-    requestedModel && preferred && preferred !== primary
-      ? `Requested provider ${preferred} unavailable. Using ${primary} instead.`
-      : undefined;
+  const requestedModel = normalizeModelId(settings.defaultModel ?? undefined) ?? null;
+  const preferred = resolvePreferredProvider(requestedModel ?? undefined);
+  const availableProviders = providers.map((provider) => ({
+    providerId: provider.name as CoworkProviderId,
+    defaultModel: provider.defaultModel,
+  }));
 
-  if (requestedModel && preferred && preferred !== primary) {
-    logger.warn("Requested model provider not available, falling back.", {
-      requestedModel,
+  const { selectedModel, selectedProvider } = selectModelAndProvider({
+    requestedModel,
+    preferred,
+    selectionHint,
+    availableProviders,
+  });
+  const { primary, fallbackOrder, fallbackNotice, selectedProviderAvailable } =
+    resolveProviderFallback({
+      providers,
       preferred,
-      primary,
+      requestedModel,
+      selectedProvider,
+      logger,
     });
-  }
 
   const router = new ProviderRouter({
     primaryProvider: primary,
@@ -581,11 +636,92 @@ function createCoworkProvider(settings: CoworkSettings, logger: Logger) {
 
   router.startHealthChecks();
 
+  const resolvedModel =
+    selectedProviderAvailable && selectedModel
+      ? selectedModel
+      : (providers.find((provider) => provider.name === primary)?.defaultModel ?? "");
+
   return {
     provider: createProviderAdapter(router, "cowork"),
-    model: requestedModel ?? providers.find((provider) => provider.name === primary)?.defaultModel,
+    model: resolvedModel,
     providerId: primary,
     fallbackNotice,
+  };
+}
+
+function ensureProviders(providers: LLMProvider[]): void {
+  if (providers.length === 0) {
+    throw new Error("No AI provider configured. Add an API key in settings or env.");
+  }
+}
+
+function selectModelAndProvider(options: {
+  requestedModel: string | null;
+  preferred: CoworkProviderId | undefined;
+  selectionHint?: { prompt?: string };
+  availableProviders: Array<{ providerId: CoworkProviderId; defaultModel: string }>;
+}): { selectedModel: string | null; selectedProvider: CoworkProviderId | null } {
+  let selectedModel = options.requestedModel;
+  let selectedProvider = options.preferred ?? null;
+
+  if (!selectedModel && options.selectionHint?.prompt) {
+    const taskType = inferTaskType(options.selectionHint.prompt);
+    const estimatedInputTokens = estimateTokens(options.selectionHint.prompt);
+    const estimatedOutputTokens = Math.max(128, Math.round(estimatedInputTokens * 0.6));
+    const smartRouter = new SmartProviderRouter(options.availableProviders);
+    const selection = smartRouter.selectProvider({
+      taskType,
+      estimatedInputTokens,
+      estimatedOutputTokens,
+    });
+    selectedModel = normalizeModelId(selection.modelId) ?? selection.modelId;
+    selectedProvider = selection.providerId;
+  }
+
+  return { selectedModel, selectedProvider };
+}
+
+function resolveProviderFallback(options: {
+  providers: LLMProvider[];
+  preferred: CoworkProviderId | undefined;
+  requestedModel: string | null;
+  selectedProvider: CoworkProviderId | null;
+  logger: Logger;
+}): {
+  primary: CoworkProviderId;
+  fallbackOrder: CoworkProviderId[];
+  fallbackNotice?: string;
+  selectedProviderAvailable: boolean;
+} {
+  const providerNames = options.providers.map((provider) => provider.name as CoworkProviderId);
+  const selectedProviderAvailable = Boolean(
+    options.selectedProvider && providerNames.includes(options.selectedProvider)
+  );
+  const primary = selectedProviderAvailable
+    ? options.selectedProvider
+    : (providerNames[0] ?? "openai");
+  const fallbackOrder = providerNames.filter((name) => name !== primary);
+  const requestedProviderAvailable = Boolean(
+    options.preferred && providerNames.includes(options.preferred)
+  );
+  const fallbackNotice =
+    options.requestedModel && options.preferred && !requestedProviderAvailable
+      ? `Requested provider ${options.preferred} unavailable. Using ${primary} instead.`
+      : undefined;
+
+  if (options.requestedModel && options.preferred && !requestedProviderAvailable) {
+    options.logger.warn("Requested model provider not available, falling back.", {
+      requestedModel: options.requestedModel,
+      preferred: options.preferred,
+      primary,
+    });
+  }
+
+  return {
+    primary,
+    fallbackOrder,
+    fallbackNotice,
+    selectedProviderAvailable,
   };
 }
 
@@ -728,6 +864,33 @@ function resolvePreferredProvider(
   return undefined;
 }
 
+function inferTaskType(prompt: string): TaskType {
+  const task = prompt.toLowerCase();
+  if (/(implement|add|create|build)/.test(task)) {
+    return "code_implementation";
+  }
+  if (/(refactor|clean|improve|optimi[sz]e|reorganize)/.test(task)) {
+    return "refactoring";
+  }
+  if (/(fix|bug|error|issue|debug)/.test(task)) {
+    return "debugging";
+  }
+  if (/(test|spec|coverage)/.test(task)) {
+    return "testing";
+  }
+  if (/(research|investigate|analy[sz]e|explore|report)/.test(task)) {
+    return "research";
+  }
+  if (/(document|comment|readme|guide|manual)/.test(task)) {
+    return "documentation";
+  }
+  return "general";
+}
+
+function estimateTokens(text: string): number {
+  return tokenTracker.countTokens(text, "gpt-4o");
+}
+
 function collectOutputRoots(session: CoworkSession): string[] {
   const roots: string[] = [];
   for (const grant of session.grants) {
@@ -805,8 +968,20 @@ async function buildOutputArtifacts(
   summary: CoworkTaskSummary,
   roots: string[],
   taskId: string
-): Promise<Array<{ id: string; artifact: { type: "markdown"; content: string } }>> {
-  const artifacts: Array<{ id: string; artifact: { type: "markdown"; content: string } }> = [];
+): Promise<
+  Array<{
+    id: string;
+    artifact: { type: "markdown"; content: string };
+    path: string;
+    title: string;
+  }>
+> {
+  const artifacts: Array<{
+    id: string;
+    artifact: { type: "markdown"; content: string };
+    path: string;
+    title: string;
+  }> = [];
   const candidates = collectCandidateArtifactPaths(summary);
 
   for (const filePath of candidates) {
@@ -823,10 +998,25 @@ async function buildOutputArtifacts(
     artifacts.push({
       id: buildArtifactId(taskId, filePath),
       artifact: { type: "markdown", content },
+      path: filePath,
+      title: basename(filePath),
     });
   }
 
   return artifacts;
+}
+
+function deriveArtifactTitle(artifactId: string, artifact: CoworkArtifactPayload): string {
+  if (artifact.type === "diff") {
+    return artifact.file || "Diff";
+  }
+  if (artifact.type === "plan") {
+    return "Plan";
+  }
+  if (artifactId.startsWith("summary-")) {
+    return "Summary";
+  }
+  return "Report";
 }
 
 function normalizeRiskTags(tags?: string[]): CoworkRiskTag[] {

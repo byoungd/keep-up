@@ -1,8 +1,9 @@
 import { Hono } from "hono";
 import { formatZodError, jsonError, readJsonBody } from "../http";
 import type { CoworkRuntimeBridge } from "../runtime/coworkRuntime";
+import type { CoworkTaskRuntime } from "../runtime/coworkTaskRuntime";
 import { approvalDecisionSchema, toolCheckSchema } from "../schemas";
-import type { ApprovalStoreLike, SessionStoreLike } from "../storage";
+import type { ApprovalStoreLike, SessionStoreLike } from "../storage/contracts";
 import { COWORK_EVENTS, type SessionEventHub } from "../streaming/eventHub";
 
 interface ApprovalRouteDeps {
@@ -10,6 +11,7 @@ interface ApprovalRouteDeps {
   sessions: SessionStoreLike;
   events: SessionEventHub;
   runtime: CoworkRuntimeBridge;
+  taskRuntime?: CoworkTaskRuntime;
 }
 
 export function createApprovalRoutes(deps: ApprovalRouteDeps) {
@@ -61,11 +63,13 @@ export function createApprovalRoutes(deps: ApprovalRouteDeps) {
       return jsonError(c, 400, "Invalid approval decision", formatZodError(parsed.error));
     }
 
-    const updated = await deps.approvals.update(approvalId, (approval) => ({
-      ...approval,
-      status: parsed.data.status,
-      resolvedAt: Date.now(),
-    }));
+    const updated = deps.taskRuntime
+      ? await deps.taskRuntime.resolveApproval(approvalId, parsed.data.status)
+      : await deps.approvals.update(approvalId, (approval) => ({
+          ...approval,
+          status: parsed.data.status,
+          resolvedAt: Date.now(),
+        }));
 
     if (!updated) {
       return jsonError(c, 404, "Approval not found");
@@ -76,10 +80,13 @@ export function createApprovalRoutes(deps: ApprovalRouteDeps) {
       approvalId: updated.approvalId,
       status: updated.status,
     });
-    deps.events.publish(updated.sessionId, COWORK_EVENTS.APPROVAL_RESOLVED, {
-      approvalId: updated.approvalId,
-      status: updated.status,
-    });
+    if (!deps.taskRuntime) {
+      deps.events.publish(updated.sessionId, COWORK_EVENTS.APPROVAL_RESOLVED, {
+        approvalId: updated.approvalId,
+        status: updated.status,
+        taskId: updated.taskId,
+      });
+    }
 
     return c.json({ ok: true, approval: updated });
   });

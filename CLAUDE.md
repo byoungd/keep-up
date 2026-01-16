@@ -1,9 +1,9 @@
-# Keep-Up Reader - Claude Code Configuration
+# Keep-Up - Claude Code Configuration
 
 ## Project Overview
 
-**Name**: Keep-Up Reader
-**Stack**: TypeScript, Next.js 15, React 19, pnpm monorepo, Turbo
+**Name**: Keep-Up
+**Stack**: TypeScript, React 19, pnpm monorepo, Turbo, Vite (Cowork)
 **Core**: LFCC (Local-First Collaboration Contract) editor with Loro CRDT
 **Namespace**: `@ku0/*`, `@ku0/*`
 
@@ -11,13 +11,9 @@
 
 | Command | Purpose |
 |---------|---------|
-| `pnpm dev` | Start dev server (reader app) |
-| `pnpm dev:desktop` | Start reader + desktop app |
+| `pnpm dev:cowork` | Start cowork app (vite) |
 | `pnpm build` | Build all packages |
 | `pnpm test:unit` | Run unit tests (vitest) |
-| `pnpm test:e2e:smoke` | Quick E2E sanity check |
-| `pnpm test:e2e:core` | Editor/selection E2E tests |
-| `pnpm test:e2e:collab` | Collaboration E2E tests |
 | `pnpm lint` | Run biome + turbo lint |
 | `pnpm typecheck` | TypeScript type check |
 | `pnpm biome check --write` | Format & auto-fix |
@@ -47,7 +43,7 @@
 
 ```
 apps/
-├── reader/              # Next.js 15 web application
+├── cowork/              # Vite React collaboration app
 ├── collab-server/       # WebSocket collaboration server
 └── desktop/             # Desktop app (Tauri/Electron wrapper)
 
@@ -70,7 +66,6 @@ packages/
 ├── bench/               # Performance benchmarks
 └── compat/              # Compatibility tests (IME, mobile)
 
-e2e/                     # Playwright E2E tests
 docs/                    # Product specs & documentation
 ```
 
@@ -93,14 +88,5 @@ docs/                    # Product specs & documentation
 
 ## E2E Testing Strategy
 
-**Never run full E2E suite during development.** Use targeted tests:
-
-| Changed Area | Command |
-|--------------|---------|
-| Editor, formatting, selection | `pnpm test:e2e:core` |
-| Block NodeView, drag-drop | `pnpm test:e2e:blocks` |
-| Collab, WebSocket, sync | `pnpm test:e2e:collab` |
-| Annotations, highlights | `pnpm test:e2e:annotations` |
-| Import, AI, persistence | `pnpm test:e2e:features` |
-| Quick sanity check | `pnpm test:e2e:smoke` |
-| Accessibility | `pnpm test:e2e:a11y` |
+**Targeted tests only.** Full E2E suite is currently migrated to `apps/reader` branch.
+Use unit and integration tests (Vitest) for verification.

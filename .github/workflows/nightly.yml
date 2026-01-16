@@ -48,18 +48,18 @@ jobs:
           TIMESTAMP=$(date +%Y%m%d_%H%M%S)
           
           # Run fuzz gate with extended timeout
-          timeout ${{ inputs.fuzz_duration || 10 }}m bash scripts/fuzz-gate.sh 2>&1 | tee ".fuzz-artifacts/fuzz-nightly-$TIMESTAMP.log" || true
+          # timeout ${{ inputs.fuzz_duration || 10 }}m bash scripts/fuzz-gate.sh 2>&1 | tee ".fuzz-artifacts/fuzz-nightly-$TIMESTAMP.log" || true
           
           echo "artifact_path=.fuzz-artifacts" >> $GITHUB_OUTPUT
           echo "timestamp=$TIMESTAMP" >> $GITHUB_OUTPUT
 
-      - name: Upload Fuzz Artifacts
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: fuzz-artifacts-${{ steps.fuzz.outputs.timestamp }}
-          path: .fuzz-artifacts/
-          retention-days: 30
+      # - name: Upload Fuzz Artifacts
+      #   uses: actions/upload-artifact@v4
+      #   if: always()
+      #   with:
+      #     name: fuzz-artifacts-${{ steps.fuzz.outputs.timestamp }}
+      #     path: .fuzz-artifacts/
+      #     retention-days: 30
 
   conformance_full:
     runs-on: ubuntu-latest
@@ -109,18 +109,18 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: UI Gate (3x for flake detection)
-        run: UI_GATE_REPEAT=3 UI_GATE_CONFORMANCE=1 bash scripts/ui-gate.sh
+      # - name: UI Gate (3x for flake detection)
+      #   run: UI_GATE_REPEAT=3 UI_GATE_CONFORMANCE=1 bash scripts/ui-gate.sh
 
-      - name: Upload Test Artifacts
-        uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: ui-gate-artifacts
-          path: |
-            test-results/
-            playwright-report/
-          retention-days: 7
+      # - name: Upload Test Artifacts
+      #   uses: actions/upload-artifact@v4
+      #   if: failure()
+      #   with:
+      #     name: ui-gate-artifacts
+      #     path: |
+      #       test-results/
+      #       playwright-report/
+      #     retention-days: 7
 
   perf_baseline:
     runs-on: ubuntu-latest

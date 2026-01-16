@@ -12,6 +12,8 @@ interface CoworkConfig {
   sseReconnectDelay: number;
   /** Session list polling interval in milliseconds (0 to disable) */
   sessionPollInterval: number;
+  /** Task polling interval when SSE is unavailable */
+  taskPollInterval: number;
 }
 
 function getConfig(): CoworkConfig {
@@ -22,6 +24,7 @@ function getConfig(): CoworkConfig {
     devTools: isDev,
     sseReconnectDelay: 3000,
     sessionPollInterval: isDev ? 5000 : 10000,
+    taskPollInterval: isDev ? 4000 : 8000,
   };
 }
 

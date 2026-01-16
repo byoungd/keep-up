@@ -1,6 +1,6 @@
 /**
  * SQLite-based storage layer for Cowork.
- * Uses Bun's built-in SQLite for zero-dependency persistence.
+ * Uses better-sqlite3 for portable Node.js persistence.
  *
  * Benefits over JSON files:
  * - Atomic transactions
@@ -9,9 +9,9 @@
  * - Better performance at scale
  */
 
-import { Database } from "bun:sqlite";
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
+import Database from "better-sqlite3";
 import { resolveStateDir } from "./statePaths";
 
 let db: Database | null = null;
@@ -70,9 +70,33 @@ function initSchema(database: Database): void {
   `);
 
   database.run(`
+    CREATE TABLE IF NOT EXISTS artifacts (
+      artifact_id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      task_id TEXT,
+      title TEXT NOT NULL,
+      type TEXT NOT NULL,
+      artifact TEXT NOT NULL,
+      source_path TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      FOREIGN KEY (session_id) REFERENCES sessions(session_id)
+    )
+  `);
+
+  database.run(`
+    CREATE INDEX IF NOT EXISTS idx_artifacts_session ON artifacts(session_id)
+  `);
+
+  database.run(`
+    CREATE INDEX IF NOT EXISTS idx_artifacts_task ON artifacts(task_id)
+  `);
+
+  database.run(`
     CREATE TABLE IF NOT EXISTS approvals (
       approval_id TEXT PRIMARY KEY,
       session_id TEXT NOT NULL,
+      task_id TEXT,
       action TEXT NOT NULL,
       risk_tags TEXT NOT NULL DEFAULT '[]',
       reason TEXT,
@@ -86,6 +110,50 @@ function initSchema(database: Database): void {
   database.run(`
     CREATE INDEX IF NOT EXISTS idx_approvals_session ON approvals(session_id)
   `);
+
+  database.run(`
+    CREATE INDEX IF NOT EXISTS idx_approvals_task ON approvals(task_id)
+  `);
+
+  database.run(`
+    CREATE TABLE IF NOT EXISTS agent_state_checkpoints (
+      checkpoint_id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      state TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      FOREIGN KEY (session_id) REFERENCES sessions(session_id)
+    )
+  `);
+
+  database.run(`
+    CREATE INDEX IF NOT EXISTS idx_agent_state_checkpoints_session
+    ON agent_state_checkpoints(session_id)
+  `);
+
+  database.run(`
+    CREATE TABLE IF NOT EXISTS projects (
+      project_id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT,
+      path_hint TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      metadata TEXT DEFAULT '{}'
+    )
+  `);
+
+  try {
+    database.run("ALTER TABLE sessions ADD COLUMN project_id TEXT");
+  } catch {
+    // Column likely exists
+  }
+
+  try {
+    database.run("ALTER TABLE approvals ADD COLUMN task_id TEXT");
+  } catch {
+    // Column likely exists
+  }
 
   database.run(`
     CREATE TABLE IF NOT EXISTS settings (

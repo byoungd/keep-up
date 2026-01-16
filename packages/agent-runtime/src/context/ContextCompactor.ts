@@ -7,6 +7,7 @@
  * @see https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents
  */
 
+import { countTokens } from "../utils/tokenCounter";
 import type { AgentContext, ContextManager } from "./contextManager.js";
 
 // ============================================================================
@@ -195,15 +196,15 @@ Do NOT include redundant tool outputs or verbose explanations.`;
   estimateTokens(messages: Message[]): number {
     let total = 0;
     for (const msg of messages) {
-      total += Math.ceil(msg.content.length / 4);
+      total += countTokens(msg.content);
       if (msg.toolCalls) {
         for (const call of msg.toolCalls) {
-          total += Math.ceil(JSON.stringify(call.arguments).length / 4);
+          total += countTokens(JSON.stringify(call.arguments));
         }
       }
       if (msg.toolResults) {
         for (const result of msg.toolResults) {
-          total += Math.ceil(JSON.stringify(result.result).length / 4);
+          total += countTokens(JSON.stringify(result.result));
         }
       }
     }

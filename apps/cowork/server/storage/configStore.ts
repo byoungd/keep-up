@@ -39,7 +39,7 @@ export class ConfigStore {
 
   private async write(payload: CoworkSettings): Promise<void> {
     await mkdir(dirname(this.filePath), { recursive: true });
-    const tempPath = `${this.filePath}.${Date.now()}.tmp`;
+    const tempPath = `${this.filePath}.${Date.now()}-${Math.random().toString(36).slice(2, 8)}.tmp`;
     await writeFile(tempPath, JSON.stringify(payload, null, 2), "utf-8");
     await rename(tempPath, this.filePath);
   }

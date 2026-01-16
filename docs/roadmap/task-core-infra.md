@@ -6,7 +6,7 @@ Build the **backend foundation** for `apps/cowork`. This agent owns the server p
 
 ## 🧱 Boundaries & Scope
 - **IN SCOPE**:
-  - `apps/cowork/server/*` (Hono/Bun server).
+  - `apps/cowork/server/*` (Hono server for Node/Edge runtimes).
   - Persistence layer interactions (`.keep-up/state`).
   - `packages/agent-runtime` integration.
   - API Schema definitions (shared types).
@@ -40,7 +40,7 @@ Build the **backend foundation** for `apps/cowork`. This agent owns the server p
    - buffer last 100 events in memory to support `Last-Event-ID` re-connection without gaps.
 
 ## ✅ Definition of Done
-- [ ] Server starts via `bun run dev` on port 3000 (proxied by Vite later).
+- [ ] Server starts via `pnpm -C apps/cowork/server dev` on port 3000 (proxied by Vite later).
 - [ ] `curl localhost:3000/api/health` returns 200 OK.
 - [ ] Creating a session via POST returns 201 and persists to disk.
 - [ ] SSE endpoint connects and pushes a "hello" event.

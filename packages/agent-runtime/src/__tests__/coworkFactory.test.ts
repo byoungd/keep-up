@@ -20,13 +20,19 @@ function createFileServer(): MCPToolServer {
         inputSchema: { type: "object", properties: {}, required: [] },
         annotations: { requiresConfirmation: false, readOnly: false },
       },
+      {
+        name: "delete",
+        description: "Delete file",
+        inputSchema: { type: "object", properties: {}, required: [] },
+        annotations: { requiresConfirmation: false, readOnly: false },
+      },
     ],
     callTool: async () => ({ success: true, content: [] }),
   };
 }
 
 describe("Cowork factories", () => {
-  it("uses Cowork policy to require confirmation", async () => {
+  it("applies Cowork policy confirmation rules", async () => {
     const registry = createToolRegistry({ enforceQualifiedNames: false });
     await registry.register(createFileServer());
 
@@ -58,14 +64,22 @@ describe("Cowork factories", () => {
       ) => boolean;
     };
 
-    const requiresConfirmation = resolver.requiresConfirmation(
+    const writeRequiresConfirmation = resolver.requiresConfirmation(
       {
         name: "file:write",
         arguments: { path: "/workspace/docs/readme.md" },
       },
       { security: createSecurityPolicy("balanced") }
     );
+    const deleteRequiresConfirmation = resolver.requiresConfirmation(
+      {
+        name: "file:delete",
+        arguments: { path: "/workspace/docs/readme.md" },
+      },
+      { security: createSecurityPolicy("balanced") }
+    );
 
-    expect(requiresConfirmation).toBe(true);
+    expect(writeRequiresConfirmation).toBe(false);
+    expect(deleteRequiresConfirmation).toBe(true);
   });
 });

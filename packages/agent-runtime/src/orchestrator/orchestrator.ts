@@ -53,10 +53,13 @@ import type {
   ParallelExecutionConfig,
   SecurityPolicy,
   ToolContext,
+  ToolError,
 } from "../types";
+import { countTokens } from "../utils/tokenCounter";
 import { type DependencyAnalyzer, createDependencyAnalyzer } from "./dependencyAnalyzer";
 import { type ErrorRecoveryEngine, createErrorRecoveryEngine } from "./errorRecovery";
-import { type MessageCompressor, createMessageCompressor } from "./messageCompression";
+import { BackpressureEventStream } from "./eventStream";
+import { type MessageCompressor, SmartMessageCompressor } from "./messageCompression";
 import {
   type ExecutionPlan,
   type PlanApprovalHandler,
@@ -64,6 +67,8 @@ import {
   createPlanningEngine,
 } from "./planning";
 import { type RequestCache, createRequestCache } from "./requestCache";
+import { SmartToolScheduler } from "./smartToolScheduler";
+import { ToolResultCache } from "./toolResultCache";
 import { type ITurnExecutor, createTurnExecutor } from "./turnExecutor";
 
 // ============================================================================
@@ -141,6 +146,7 @@ export interface OrchestratorComponents {
   messageCompressor?: MessageCompressor;
   requestCache?: RequestCache;
   dependencyAnalyzer?: DependencyAnalyzer;
+  toolScheduler?: SmartToolScheduler;
   planningEngine?: PlanningEngine;
   toolExecutor?: ToolExecutor;
   eventBus?: RuntimeEventBus;
@@ -159,6 +165,8 @@ export interface OrchestratorComponents {
   skillPromptAdapter?: SkillPromptAdapter;
   /** Optional task graph for event-sourced task tracking */
   taskGraph?: TaskGraphStore;
+  /** Optional tool result cache */
+  toolResultCache?: ToolResultCache;
 }
 
 // ============================================================================
@@ -176,7 +184,9 @@ export class AgentOrchestrator {
   // Performance optimizations
   private readonly messageCompressor: MessageCompressor;
   private readonly requestCache: RequestCache;
+  private readonly toolResultCache: ToolResultCache;
   private readonly dependencyAnalyzer: DependencyAnalyzer;
+  private readonly toolScheduler: SmartToolScheduler;
   private readonly planningEngine: PlanningEngine;
   private readonly turnExecutor: ITurnExecutor;
   private readonly toolExecutor?: ToolExecutor;
@@ -228,12 +238,15 @@ export class AgentOrchestrator {
     // Initialize performance optimizations
     this.messageCompressor =
       components.messageCompressor ??
-      createMessageCompressor({
+      new SmartMessageCompressor({
         maxTokens: 8000,
         strategy: "hybrid",
         preserveCount: 3,
-        estimateTokens: (text) => Math.ceil(text.length / 4),
+        estimateTokens: (text: string) => countTokens(text),
+        maxToolResultTokens: 500,
       });
+
+    this.toolResultCache = components.toolResultCache ?? new ToolResultCache();
 
     this.requestCache =
       components.requestCache ??
@@ -244,6 +257,9 @@ export class AgentOrchestrator {
       });
 
     this.dependencyAnalyzer = components.dependencyAnalyzer ?? createDependencyAnalyzer();
+    this.toolScheduler =
+      components.toolScheduler ??
+      new SmartToolScheduler({ dependencyAnalyzer: this.dependencyAnalyzer });
 
     this.planningEngine =
       components.planningEngine ??
@@ -316,48 +332,22 @@ export class AgentOrchestrator {
    * Yields events as they occur during execution.
    */
   async *runStream(userMessage: string): AsyncGenerator<OrchestratorEvent, AgentState, void> {
-    const events: OrchestratorEvent[] = [];
-    let resolveNext: ((event: OrchestratorEvent) => void) | null = null;
+    const stream = new BackpressureEventStream<OrchestratorEvent>({
+      highWaterMark: 100,
+    });
 
     // Capture events
     const unsubscribe = this.on((event) => {
-      if (resolveNext) {
-        resolveNext(event);
-        resolveNext = null;
-      } else {
-        events.push(event);
-      }
+      stream.push(event);
     });
 
     // Start execution in background
     const runPromise = this.run(userMessage);
+    runPromise.finally(() => stream.close());
 
     try {
       // Yield events as they come
-      while (this.state.status !== "complete" && this.state.status !== "error") {
-        if (events.length > 0) {
-          const event = events.shift();
-          if (event) {
-            yield event;
-          }
-        } else {
-          // Wait for next event or completion
-          const nextEvent = await Promise.race([
-            new Promise<OrchestratorEvent>((resolve) => {
-              resolveNext = resolve;
-            }),
-            runPromise.then(() => null as OrchestratorEvent | null),
-          ]);
-          if (nextEvent) {
-            yield nextEvent;
-          }
-        }
-      }
-
-      // Yield remaining events
-      for (const event of events) {
-        yield event;
-      }
+      yield* stream.consume();
 
       return await runPromise;
     } finally {
@@ -551,14 +541,16 @@ export class AgentOrchestrator {
 
     // Analyze dependencies and group independent calls
     const groups = this.analyzeToolDependencies(toolCalls, parentSpan);
+    const scheduledGroups = this.toolScheduler.scheduleGroups(groups);
 
     // Execute groups sequentially, but calls within each group in parallel
-    for (const group of groups) {
+    for (const group of scheduledGroups) {
       if (group.length === 1) {
         await this.executeSingleToolCall(group[0], parentSpan);
       } else {
         // Execute group in parallel with concurrency limit
-        await this.executeParallelToolCalls(group, parallelConfig.maxConcurrent, parentSpan);
+        const maxConcurrent = Math.min(parallelConfig.maxConcurrent, group.length);
+        await this.executeParallelToolCalls(group, maxConcurrent, parentSpan);
       }
     }
   }
@@ -746,6 +738,7 @@ export class AgentOrchestrator {
   ): Promise<void> {
     const taskNodeId = this.ensureTaskGraphToolNode(call, "running");
     this.emit("tool:calling", { toolName: call.name, arguments: call.arguments });
+
     if (!this.toolExecutor) {
       this.metrics?.increment(AGENT_METRICS.toolCallsTotal.name, {
         tool_name: call.name,
@@ -754,30 +747,66 @@ export class AgentOrchestrator {
     }
 
     const context = this.createToolContext(call);
-    let result = this.toolExecutor
-      ? await this.toolExecutor.execute(call, context)
-      : await this.registry.callTool(call, context);
-
-    if (!result.success && result.error && this.errorRecoveryEngine) {
-      const recovery = await this.errorRecoveryEngine.recover(
-        call,
-        result.error,
-        async (retryCall) =>
-          this.toolExecutor
-            ? this.toolExecutor.execute(retryCall, context)
-            : this.registry.callTool(retryCall, context)
-      );
-
-      if (recovery.recovered && recovery.result) {
-        result = recovery.result;
-      }
-    }
+    const result = await this.getToolResultWithCache(call, context);
 
     this.emit("tool:result", { toolName: call.name, result });
     this.addToolResult(call.name, result);
     this.updateTaskGraphStatus(taskNodeId, result.success ? "completed" : "failed");
 
-    // Record metrics when no executor is provided
+    this.recordToolMetrics(call, result, toolStart);
+    this.toolScheduler.recordExecution(call.name, Date.now() - toolStart);
+
+    toolSpan?.setAttribute("result.success", result.success);
+    toolSpan?.setStatus(result.success ? "ok" : "error", result.error?.message);
+  }
+
+  private async getToolResultWithCache(
+    call: MCPToolCall,
+    context: ToolContext
+  ): Promise<MCPToolResult> {
+    // Try cache first
+    let result = this.toolResultCache.get(call);
+    if (result) {
+      this.emit("tool:result", { toolName: call.name, result, cached: true });
+      return result;
+    }
+
+    result = await this.executeToolCall(call, context);
+
+    if (!result.success && result.error && this.errorRecoveryEngine) {
+      result = await this.attemptRecovery(call, result.error, context);
+    }
+
+    // Cache the result
+    this.toolResultCache.set(call, result);
+    return result;
+  }
+
+  private async executeToolCall(call: MCPToolCall, context: ToolContext): Promise<MCPToolResult> {
+    return this.toolExecutor
+      ? await this.toolExecutor.execute(call, context)
+      : await this.registry.callTool(call, context);
+  }
+
+  private async attemptRecovery(
+    call: MCPToolCall,
+    error: ToolError,
+    context: ToolContext
+  ): Promise<MCPToolResult> {
+    if (!this.errorRecoveryEngine) {
+      return { success: false, content: [], error };
+    }
+
+    const recovery = await this.errorRecoveryEngine.recover(call, error, async (retryCall) =>
+      this.executeToolCall(retryCall, context)
+    );
+
+    return recovery.recovered && recovery.result
+      ? recovery.result
+      : { success: false, content: [], error };
+  }
+
+  private recordToolMetrics(call: MCPToolCall, result: MCPToolResult, toolStart: number): void {
     if (!this.toolExecutor) {
       const status = result.success ? "success" : "error";
       this.metrics?.increment(AGENT_METRICS.toolCallsTotal.name, { tool_name: call.name, status });
@@ -785,9 +814,6 @@ export class AgentOrchestrator {
         tool_name: call.name,
       });
     }
-
-    toolSpan?.setAttribute("result.success", result.success);
-    toolSpan?.setStatus(result.success ? "ok" : "error", result.error?.message);
   }
 
   private recordToolException(call: MCPToolCall, err: unknown, toolSpan?: SpanContext): void {
@@ -868,10 +894,16 @@ export class AgentOrchestrator {
   }
 
   private addToolResult(toolName: string, result: MCPToolResult): void {
+    // Compress tool result if using SmartMessageCompressor
+    const processedResult =
+      this.messageCompressor instanceof SmartMessageCompressor
+        ? this.messageCompressor.compressToolResult(result)
+        : result;
+
     const toolMessage: AgentMessage = {
       role: "tool",
       toolName,
-      result,
+      result: processedResult,
     };
     this.state.messages.push(toolMessage);
     this.recordMessage(toolMessage);

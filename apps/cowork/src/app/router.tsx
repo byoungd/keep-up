@@ -2,6 +2,9 @@ import { QueryClient } from "@tanstack/react-query";
 import { createRootRoute, createRoute, createRouter } from "@tanstack/react-router";
 import { RootLayout } from "./layouts/RootLayout";
 import { HomeRoute } from "./routes/HomeRoute";
+import { LibraryRoute } from "./routes/LibraryRoute";
+import { NewSessionRoute } from "./routes/NewSessionRoute";
+import { SearchRoute } from "./routes/SearchRoute";
 import { SessionRoute } from "./routes/SessionRoute";
 import { SettingsRoute } from "./routes/SettingsRoute";
 
@@ -23,13 +26,38 @@ const sessionRoute = createRoute({
   component: SessionRoute,
 });
 
+const newSessionRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/new-session",
+  component: NewSessionRoute,
+});
+
+const searchRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/search",
+  component: SearchRoute,
+});
+
+const libraryRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/library",
+  component: LibraryRoute,
+});
+
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/settings",
   component: SettingsRoute,
 });
 
-const routeTree = rootRoute.addChildren([indexRoute, sessionRoute, settingsRoute]);
+const routeTree = rootRoute.addChildren([
+  indexRoute,
+  sessionRoute,
+  newSessionRoute,
+  searchRoute,
+  libraryRoute,
+  settingsRoute,
+]);
 
 export const router = createRouter({
   routeTree,
