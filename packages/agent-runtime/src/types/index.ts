@@ -473,6 +473,19 @@ export interface ToolExecutionRecord {
   error?: string;
 }
 
+/** Structured context frame for LLM requests */
+export interface ContextFrame {
+  frameId: string;
+  sources: {
+    shortTerm: string[];
+    project: string[];
+    memory: string[];
+    tools: string[];
+  };
+  redactions: string[];
+  tokenBudget: { maxTokens: number; usedTokens: number };
+}
+
 /** Detailed token usage statistics */
 export interface TokenUsageStats {
   /** Input tokens consumed */

@@ -7,6 +7,7 @@
 import { countTokens } from "../utils/tokenCounter";
 
 export type ContextTier = "short_term" | "project" | "redacted";
+export type ContextSourceType = "shortTerm" | "project" | "memory" | "tools";
 
 export interface ContextItem {
   id: string;
@@ -15,6 +16,7 @@ export interface ContextItem {
   priority?: number;
   tokens?: number;
   source?: string;
+  sourceType?: ContextSourceType;
   redacted?: boolean;
 }
 

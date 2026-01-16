@@ -4,6 +4,8 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+import { ContextFrameBuilder } from "../context";
+import type { ContextItem } from "../context";
 import type { AgentLLMResponse, IAgentLLM } from "../orchestrator/orchestrator";
 import type { TurnExecutorDependencies } from "../orchestrator/turnExecutor";
 import { createTurnExecutor } from "../orchestrator/turnExecutor";
@@ -202,6 +204,42 @@ describe("TurnExecutor", () => {
       expect(completeFn).toHaveBeenCalledWith(
         expect.objectContaining({
           systemPrompt: expect.stringContaining("## Relevant Knowledge"),
+        })
+      );
+    });
+  });
+
+  describe("context frame", () => {
+    it("injects context frame content into system prompt", async () => {
+      const completeFn = vi.fn().mockResolvedValue({
+        content: "Test",
+        finishReason: "stop",
+      } satisfies AgentLLMResponse);
+
+      const builder = new ContextFrameBuilder({ maxTokens: 100, frameIdFactory: () => "frame-1" });
+      const items: ContextItem[] = [
+        { id: "short-1", tier: "short_term", content: "Recent context" },
+      ];
+
+      const deps = createMockDeps({
+        llm: { complete: completeFn } as unknown as IAgentLLM,
+        contextFrameBuilder: builder,
+        getContextItems: () => items,
+      });
+      const executor = createTurnExecutor(deps);
+      const state: AgentState = {
+        ...createMockState(),
+        messages: [
+          { role: "system", content: "System prompt" },
+          { role: "user", content: "User query" },
+        ],
+      };
+
+      await executor.execute(state);
+
+      expect(completeFn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          systemPrompt: expect.stringContaining("## Context Frame"),
         })
       );
     });

@@ -22,6 +22,7 @@
  * @module orchestrator/turnExecutor
  */
 
+import type { ContextFrameBuilder, ContextFrameOutput, ContextItem } from "../context";
 import type { KnowledgeMatchResult, KnowledgeRegistry } from "../knowledge";
 import { AGENTS_GUIDE_PROMPT } from "../prompts/agentGuidelines";
 import { SkillPromptAdapter, type SkillPromptOptions } from "../skills/skillPromptAdapter";
@@ -95,6 +96,10 @@ export interface TurnExecutorDependencies {
   readonly messageCompressor: MessageCompressor;
   /** Request cache for response deduplication */
   readonly requestCache: RequestCache;
+  /** Optional context frame builder */
+  readonly contextFrameBuilder?: ContextFrameBuilder;
+  /** Optional context items provider */
+  readonly getContextItems?: () => ContextItem[];
   /** Optional knowledge registry for context injection */
   readonly knowledgeRegistry?: KnowledgeRegistry;
   /** Optional skill registry for available skills prompt injection */
@@ -195,8 +200,14 @@ export class TurnExecutor implements ITurnExecutor {
       metrics.knowledgeMatched = knowledgeContent ? 1 : 0;
 
       // Step 3: Build LLM request
+      const contextFrame = this.buildContextFrame();
       const skillPrompt = this.buildSkillPrompt();
-      const request = this.buildRequest(compressionResult.messages, knowledgeContent, skillPrompt);
+      const request = this.buildRequest(
+        compressionResult.messages,
+        knowledgeContent,
+        skillPrompt,
+        contextFrame?.content
+      );
 
       // Step 4: Get LLM response (with caching)
       const { response, cacheHit, cacheTimeMs } = await this.getResponse(request, span);
@@ -287,15 +298,34 @@ export class TurnExecutor implements ITurnExecutor {
     return undefined;
   }
 
+  private buildContextFrame(): ContextFrameOutput | undefined {
+    if (!this.deps.contextFrameBuilder || !this.deps.getContextItems) {
+      return undefined;
+    }
+    try {
+      const items = this.deps.getContextItems();
+      if (items.length === 0) {
+        return undefined;
+      }
+      return this.deps.contextFrameBuilder.build(items);
+    } catch {
+      return undefined;
+    }
+  }
+
   private buildRequest(
     messages: AgentMessage[],
     knowledgeContent?: string,
-    skillPrompt?: string
+    skillPrompt?: string,
+    contextFrameContent?: string
   ): AgentLLMRequest {
     const basePrompt = this.config.systemPrompt ?? AGENTS_GUIDE_PROMPT;
     const promptParts = [basePrompt];
     if (skillPrompt) {
       promptParts.push(skillPrompt);
+    }
+    if (contextFrameContent) {
+      promptParts.push(`## Context Frame\n\n${contextFrameContent}`);
     }
     if (knowledgeContent) {
       promptParts.push(`## Relevant Knowledge\n\n${knowledgeContent}`);

@@ -14,6 +14,7 @@
 
 import type { IntentRegistry } from "@ku0/core";
 import { createIntentRegistry } from "@ku0/core";
+import type { ContextFrameBuilder, ContextItem } from "../context";
 import type { RuntimeEventBus } from "../events/eventBus";
 import {
   type ToolConfirmationDetailsProvider,
@@ -158,6 +159,10 @@ export interface OrchestratorComponents {
   intentRegistry?: IntentRegistry;
   /** Knowledge registry for scoped knowledge injection */
   knowledgeRegistry?: KnowledgeRegistry;
+  /** Optional context frame builder */
+  contextFrameBuilder?: ContextFrameBuilder;
+  /** Optional provider for context items */
+  contextItemsProvider?: () => ContextItem[];
   /** Skill registry for Agent Skills */
   skillRegistry?: SkillRegistry;
   /** Skill session tracking active skills */
@@ -286,6 +291,8 @@ export class AgentOrchestrator {
       messageCompressor: this.messageCompressor,
       requestCache: this.requestCache,
       knowledgeRegistry: this.knowledgeRegistry,
+      contextFrameBuilder: components.contextFrameBuilder,
+      getContextItems: components.contextItemsProvider,
       skillRegistry: this.skillRegistry,
       skillPromptAdapter: this.skillPromptAdapter,
       metrics: this.metrics,

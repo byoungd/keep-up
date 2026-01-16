@@ -18,10 +18,17 @@ export {
   TieredContextBuilder,
   type ContextItem,
   type ContextTier,
+  type ContextSourceType,
   type ContextBudget,
   type ContextBuildResult,
   type TieredContextConfig,
 } from "./contextBuilder";
+
+export {
+  ContextFrameBuilder,
+  type ContextFrameOutput,
+  type ContextFrameBuilderConfig,
+} from "./contextFrame";
 
 export {
   ContextCompactor,
