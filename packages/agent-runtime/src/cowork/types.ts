@@ -17,6 +17,9 @@ export interface CoworkSession {
   connectors: CoworkConnectorGrant[];
   createdAt: number;
   expiresAt?: number;
+  endedAt?: number;
+  title?: string;
+  projectId?: string;
 }
 
 export interface CoworkFolderGrant {
@@ -51,6 +54,9 @@ export interface CoworkTask {
   title: string;
   prompt: string;
   status: CoworkTaskStatus;
+  modelId?: string;
+  providerId?: string;
+  fallbackNotice?: string;
   plan?: CoworkTaskPlan;
   createdAt: number;
   updatedAt: number;
@@ -100,4 +106,14 @@ export interface CoworkActionLogEntry {
   timestamp: number;
   action: string;
   details: string;
+}
+
+export interface CoworkProject {
+  projectId: string;
+  name: string;
+  description?: string;
+  pathHint?: string;
+  createdAt: number;
+  updatedAt: number;
+  metadata?: Record<string, unknown>;
 }

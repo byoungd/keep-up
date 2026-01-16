@@ -11,6 +11,15 @@ export type Session = {
   workspaceId: string;
   title: string;
   createdAt: number;
+  projectId?: string;
+};
+
+export type Project = {
+  id: string;
+  name: string;
+  description?: string;
+  instructions?: string;
+  createdAt: number;
 };
 
 export type WorkspaceSelection = {

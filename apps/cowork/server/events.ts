@@ -7,6 +7,7 @@ export const COWORK_EVENTS = {
   // Session lifecycle
   SESSION_CREATED: "session.created",
   SESSION_ENDED: "session.ended",
+  SESSION_DELETED: "session.deleted",
 
   // Task lifecycle
   TASK_CREATED: "task.created",
@@ -40,15 +41,26 @@ export interface CoworkEventPayloads {
     sessionId: string;
     endedAt: number;
   };
+  [COWORK_EVENTS.SESSION_DELETED]: {
+    sessionId: string;
+  };
   [COWORK_EVENTS.TASK_CREATED]: {
     taskId: string;
     status: string;
     title: string;
+    prompt?: string;
+    modelId?: string;
+    providerId?: string;
+    fallbackNotice?: string;
   };
   [COWORK_EVENTS.TASK_UPDATED]: {
     taskId: string;
     status: string;
     title: string;
+    prompt?: string;
+    modelId?: string;
+    providerId?: string;
+    fallbackNotice?: string;
   };
   [COWORK_EVENTS.TASK_COMPLETED]: {
     taskId: string;
@@ -63,13 +75,16 @@ export interface CoworkEventPayloads {
     action: string;
     riskTags: string[];
     reason?: string;
+    taskId?: string;
   };
   [COWORK_EVENTS.APPROVAL_RESOLVED]: {
     approvalId: string;
     status: "approved" | "rejected";
+    taskId?: string;
   };
   [COWORK_EVENTS.AGENT_THINK]: {
     content: string;
+    taskId?: string;
   };
   [COWORK_EVENTS.AGENT_TOOL_CALL]: {
     tool: string;
@@ -77,19 +92,23 @@ export interface CoworkEventPayloads {
     requiresApproval?: boolean;
     approvalId?: string;
     riskLevel?: string;
+    taskId?: string;
   };
   [COWORK_EVENTS.AGENT_TOOL_RESULT]: {
     callId: string;
     result: unknown;
     isError?: boolean;
+    taskId?: string;
   };
   [COWORK_EVENTS.AGENT_PLAN]: {
     artifactId: string;
     plan: unknown;
+    taskId?: string;
   };
   [COWORK_EVENTS.AGENT_ARTIFACT]: {
     id: string;
     artifact: unknown;
+    taskId?: string;
   };
 }
 

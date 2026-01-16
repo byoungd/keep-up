@@ -30,6 +30,10 @@ export class SessionStore {
   ): Promise<CoworkSession | null> {
     return this.store.update(sessionId, updater);
   }
+
+  delete(sessionId: string): Promise<boolean> {
+    return this.store.delete(sessionId);
+  }
 }
 
 export function createSessionStore(filePath: string): SessionStore {

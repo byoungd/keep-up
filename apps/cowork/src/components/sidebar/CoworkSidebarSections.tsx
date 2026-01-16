@@ -9,6 +9,9 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
   Input,
   Tooltip,
@@ -18,7 +21,6 @@ import {
   Brain,
   Check,
   ChevronDown,
-  ChevronRight,
   ExternalLink,
   Folder,
   FolderPlus,
@@ -35,57 +37,7 @@ import { useWorkspace } from "../../app/providers/WorkspaceProvider";
 
 type TaskFilter = "all" | "favorites" | "scheduled";
 
-type ProjectItem = {
-  id: string;
-  name: string;
-  instructions?: string;
-  createdAt: number;
-};
-
-const PROJECTS_STORAGE_KEY = "cowork-projects-v1";
-const ACTIVE_PROJECT_KEY = "cowork-active-project-v1";
 const FAVORITES_STORAGE_KEY = "cowork-task-favorites-v1";
-
-function readProjects(): ProjectItem[] {
-  if (typeof window === "undefined") {
-    return [];
-  }
-  try {
-    const stored = window.localStorage.getItem(PROJECTS_STORAGE_KEY);
-    if (!stored) {
-      return [];
-    }
-    const parsed = JSON.parse(stored) as ProjectItem[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeProjects(projects: ProjectItem[]): void {
-  if (typeof window === "undefined") {
-    return;
-  }
-  window.localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(projects));
-}
-
-function readActiveProject(): string | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-  return window.localStorage.getItem(ACTIVE_PROJECT_KEY);
-}
-
-function writeActiveProject(projectId: string | null): void {
-  if (typeof window === "undefined") {
-    return;
-  }
-  if (projectId) {
-    window.localStorage.setItem(ACTIVE_PROJECT_KEY, projectId);
-  } else {
-    window.localStorage.removeItem(ACTIVE_PROJECT_KEY);
-  }
-}
 
 function readFavorites(): string[] {
   if (typeof window === "undefined") {
@@ -109,11 +61,18 @@ function writeFavorites(favorites: Set<string>): void {
 
 export function CoworkSidebarSections() {
   const { router, components } = useReaderShell();
-  const { sessions } = useWorkspace();
+  const {
+    sessions,
+    projects,
+    activeProjectId,
+    setActiveProject,
+    createProject,
+    moveSessionToProject,
+    renameSession,
+    deleteSession,
+  } = useWorkspace();
   const { Link } = components;
 
-  const [projects, setProjects] = React.useState<ProjectItem[]>([]);
-  const [activeProjectId, setActiveProjectId] = React.useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [projectName, setProjectName] = React.useState("");
   const [projectInstructions, setProjectInstructions] = React.useState("");
@@ -123,8 +82,6 @@ export function CoworkSidebarSections() {
   const [favoriteIds, setFavoriteIds] = React.useState<Set<string>>(new Set());
 
   React.useEffect(() => {
-    setProjects(readProjects());
-    setActiveProjectId(readActiveProject());
     setFavoriteIds(new Set(readFavorites()));
   }, []);
 
@@ -133,62 +90,83 @@ export function CoworkSidebarSections() {
     [projects]
   );
 
+  const activeProject = React.useMemo(() => {
+    return projects.find((p) => p.id === activeProjectId) ?? null;
+  }, [projects, activeProjectId]);
+
   const sortedSessions = React.useMemo(
     () => [...sessions].sort((a, b) => b.createdAt - a.createdAt),
     [sessions]
   );
 
   const filteredSessions = React.useMemo(() => {
+    let filtered = sortedSessions;
+
+    // Filter by project if active
+    if (activeProjectId) {
+      filtered = filtered.filter((s) => s.projectId === activeProjectId);
+    } else {
+      // If no project selected, maybe show unassigned or all?
+      // Usually "Tasks" section shows everything unless filtered.
+      // Or if a project IS selected, we ONLY show project tasks?
+      // Let's assume selecting a project filters the main list.
+      // But if user wants to see "All Tasks", they deselect project?
+      // The previous UI had separate sections.
+      // If activeProjectId is set, we probably want to show tasks for that project only.
+      // But we need a way to deselect project.
+    }
+
     if (taskFilter === "favorites") {
-      return sortedSessions.filter((session) => favoriteIds.has(session.id));
+      filtered = filtered.filter((session) => favoriteIds.has(session.id));
     }
     if (taskFilter === "scheduled") {
+      // Not implemented
       return [];
     }
-    return sortedSessions;
-  }, [favoriteIds, sortedSessions, taskFilter]);
 
-  const handleCreateProject = React.useCallback(() => {
+    return filtered;
+  }, [favoriteIds, sortedSessions, taskFilter, activeProjectId]);
+
+  const handleCreateProject = React.useCallback(async () => {
     const trimmedName = projectName.trim();
     if (!trimmedName) {
       return;
     }
-    const newProject: ProjectItem = {
-      id: crypto.randomUUID(),
-      name: trimmedName,
-      instructions: projectInstructions.trim() || undefined,
-      createdAt: Date.now(),
-    };
-    const next = [newProject, ...projects];
-    setProjects(next);
-    writeProjects(next);
-    setActiveProjectId(newProject.id);
-    writeActiveProject(newProject.id);
-    setProjectName("");
-    setProjectInstructions("");
-    setIsDialogOpen(false);
-  }, [projectInstructions, projectName, projects]);
 
-  const handleSelectProject = React.useCallback((projectId: string) => {
-    setActiveProjectId(projectId);
-    writeActiveProject(projectId);
-  }, []);
+    try {
+      await createProject(trimmedName, projectInstructions.trim() || undefined);
+      setProjectName("");
+      setProjectInstructions("");
+      setIsDialogOpen(false);
+    } catch (err) {
+      console.error("Failed to create project", err);
+    }
+  }, [projectInstructions, projectName, createProject]);
 
-  const toggleFavorite = React.useCallback(
-    (sessionId: string) => {
-      setFavoriteIds((prev) => {
-        const next = new Set(prev);
-        if (next.has(sessionId)) {
-          next.delete(sessionId);
-        } else {
-          next.add(sessionId);
-        }
-        writeFavorites(next);
-        return next;
-      });
+  const handleSelectProject = React.useCallback(
+    (projectId: string) => {
+      // Toggle if clicking same project? Or just select?
+      if (activeProjectId === projectId) {
+        setActiveProject(null); // Deselect
+      } else {
+        setActiveProject(projectId);
+      }
     },
-    [setFavoriteIds]
+    [activeProjectId, setActiveProject]
   );
+
+  const toggleFavorite = React.useCallback((sessionId: string) => {
+    setFavoriteIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(sessionId)) {
+        next.delete(sessionId);
+      } else {
+        next.add(sessionId);
+      }
+      writeFavorites(next);
+      return next;
+    });
+  }, []);
 
   const handleOpenInNewTab = React.useCallback((sessionId: string) => {
     if (typeof window === "undefined") {
@@ -196,6 +174,41 @@ export function CoworkSidebarSections() {
     }
     window.open(`/sessions/${sessionId}`, "_blank", "noopener,noreferrer");
   }, []);
+
+  const handleMoveToProject = React.useCallback(
+    async (sessionId: string, projectId: string | null) => {
+      try {
+        await moveSessionToProject(sessionId, projectId);
+      } catch (err) {
+        console.error("Failed to move session", err);
+      }
+    },
+    [moveSessionToProject]
+  );
+
+  const handleDeleteSession = React.useCallback(
+    async (sessionId: string) => {
+      if (window.confirm("Are you sure you want to delete this session?")) {
+        try {
+          await deleteSession(sessionId);
+        } catch (e) {
+          console.error("Failed to delete", e);
+        }
+      }
+    },
+    [deleteSession]
+  );
+
+  const handleRenamePrompt = React.useCallback(
+    (sessionId: string) => {
+      const s = sessions.find((x) => x.id === sessionId);
+      const newName = window.prompt("Enter new session name", s?.title);
+      if (newName) {
+        renameSession(sessionId, newName);
+      }
+    },
+    [sessions, renameSession]
+  );
 
   const handlePlaceholderAction = React.useCallback(() => {
     /* TODO */
@@ -285,6 +298,12 @@ export function CoworkSidebarSections() {
             onClick={() => setIsTasksExpanded((prev) => !prev)}
           >
             <span>
+              {activeProjectId ? (
+                <span className="flex items-center gap-1">
+                  {activeProject?.name ?? "Project"}
+                  <span className="text-muted-foreground/50 mx-1">/</span>
+                </span>
+              ) : null}
               {taskFilter === "favorites"
                 ? "Favorites"
                 : taskFilter === "scheduled"
@@ -346,7 +365,9 @@ export function CoworkSidebarSections() {
           aria-hidden={!isTasksExpanded}
         >
           {filteredSessions.length === 0 ? (
-            <div className="px-3 py-2 text-[11px] text-muted-foreground/70">No tasks.</div>
+            <div className="px-3 py-2 text-[11px] text-muted-foreground/70">
+              {activeProjectId ? "No tasks in this project." : "No tasks."}
+            </div>
           ) : (
             filteredSessions.map((session) => {
               const isActive = activeSessionId === session.id;
@@ -378,7 +399,7 @@ export function CoworkSidebarSections() {
                         className={cn(
                           "absolute right-2 top-1/2 h-6 w-6 -translate-y-1/2 rounded-md",
                           "text-muted-foreground hover:text-foreground",
-                          "bg-surface-2 shadow-sm border border-border/20", // Added solid background and subtle border
+                          "bg-surface-2 shadow-sm border border-border/20",
                           "transition-opacity opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto",
                           "focus-visible:opacity-100 focus-visible:pointer-events-auto",
                           "data-[state=open]:opacity-100 data-[state=open]:pointer-events-auto data-[state=open]:bg-surface-3"
@@ -402,7 +423,7 @@ export function CoworkSidebarSections() {
                         <span>Share</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onSelect={handlePlaceholderAction}
+                        onSelect={() => handleRenamePrompt(session.id)}
                         className="gap-3 rounded-lg px-3 py-2 text-sm"
                       >
                         <PencilLine className="h-4 w-4" aria-hidden="true" />
@@ -425,17 +446,50 @@ export function CoworkSidebarSections() {
                         <ExternalLink className="h-4 w-4" aria-hidden="true" />
                         <span>Open in new tab</span>
                       </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onSelect={handlePlaceholderAction}
-                        className="gap-3 rounded-lg px-3 py-2 text-sm"
-                      >
-                        <Folder className="h-4 w-4" aria-hidden="true" />
-                        <span>Move to project</span>
-                        <ChevronRight className="ml-auto h-3 w-3 text-muted-foreground" />
-                      </DropdownMenuItem>
+
+                      <DropdownMenuSub>
+                        <DropdownMenuSubTrigger className="gap-3 rounded-lg px-3 py-2 text-sm">
+                          <Folder className="h-4 w-4" />
+                          <span>Move to project</span>
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent className="w-56 rounded-xl p-2">
+                          {sortedProjects.length === 0 ? (
+                            <DropdownMenuItem disabled>
+                              <span className="text-muted-foreground">No projects</span>
+                            </DropdownMenuItem>
+                          ) : (
+                            <>
+                              {sortedProjects.map((project) => (
+                                <DropdownMenuItem
+                                  key={project.id}
+                                  onSelect={() => handleMoveToProject(session.id, project.id)}
+                                  className="gap-3 rounded-lg px-3 py-2 text-sm"
+                                >
+                                  <span>{project.name}</span>
+                                  {session.projectId === project.id && (
+                                    <Check className="ml-auto h-4 w-4" />
+                                  )}
+                                </DropdownMenuItem>
+                              ))}
+                              {session.projectId && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onSelect={() => handleMoveToProject(session.id, null)}
+                                    className="gap-3 rounded-lg px-3 py-2 text-sm"
+                                  >
+                                    <span>Remove from project</span>
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                            </>
+                          )}
+                        </DropdownMenuSubContent>
+                      </DropdownMenuSub>
+
                       <DropdownMenuSeparator className="mx-2" />
                       <DropdownMenuItem
-                        onSelect={handlePlaceholderAction}
+                        onSelect={() => handleDeleteSession(session.id)}
                         className="gap-3 rounded-lg px-3 py-2 text-sm text-destructive focus:text-destructive"
                       >
                         <Trash2 className="h-4 w-4" aria-hidden="true" />

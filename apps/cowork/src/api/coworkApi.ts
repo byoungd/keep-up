@@ -1,4 +1,4 @@
-import type { CoworkRiskTag, CoworkSession, CoworkTask } from "@ku0/agent-runtime";
+import type { CoworkProject, CoworkRiskTag, CoworkSession, CoworkTask } from "@ku0/agent-runtime";
 import { apiUrl } from "../lib/config";
 
 export type ApiResult<T> = {
@@ -9,6 +9,8 @@ export type ApiResult<T> = {
   tasks?: CoworkTask[];
   approvals?: CoworkApproval[];
   approval?: CoworkApproval;
+  projects?: CoworkProject[];
+  project?: CoworkProject;
   settings?: CoworkSettings;
   result?: ToolCheckResult;
 } & T;
@@ -29,6 +31,7 @@ export type CoworkApproval = {
 export type CoworkSettings = {
   openAiKey?: string;
   anthropicKey?: string;
+  geminiKey?: string;
   defaultModel?: string;
   theme?: "light" | "dark";
 };
@@ -36,6 +39,7 @@ export type CoworkSettings = {
 export type CreateSessionPayload = {
   userId?: string;
   deviceId?: string;
+  title?: string;
   grants?: Array<{
     id?: string;
     rootPath: string;
@@ -55,6 +59,7 @@ export type CreateSessionPayload = {
 export type CreateTaskPayload = {
   title?: string;
   prompt: string;
+  modelId?: string;
 };
 
 export type ToolCheckRequest =
@@ -137,6 +142,103 @@ export async function createTask(
   return data.task;
 }
 
+export type ChatMessage = {
+  id: string;
+  sessionId: string;
+  role: "user" | "assistant";
+  content: string;
+  createdAt: number;
+  modelId?: string;
+  providerId?: string;
+  fallbackNotice?: string;
+};
+
+export type SendChatPayload = {
+  content: string;
+};
+
+export type ChatStreamMeta = {
+  modelId?: string;
+  providerId?: string;
+  fallbackNotice?: string;
+};
+
+/**
+ * Send a chat message (lightweight, no task creation)
+ * Returns streamed response chunks via callback
+ */
+export async function sendChatMessage(
+  sessionId: string,
+  payload: SendChatPayload,
+  onChunk?: (chunk: string) => void,
+  onMeta?: (meta: ChatStreamMeta) => void
+): Promise<ChatMessage> {
+  const response = await fetch(apiUrl(`/api/sessions/${sessionId}/chat`), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    // Try to parse error as JSON, but handle case where it's not JSON
+    try {
+      const error = (await response.json()) as { error?: { message?: string } };
+      throw new Error(error.error?.message ?? "Chat request failed");
+    } catch {
+      throw new Error("Chat request failed");
+    }
+  }
+
+  const modelId = response.headers.get("x-cowork-model") ?? undefined;
+  const providerId = response.headers.get("x-cowork-provider") ?? undefined;
+  const fallbackNotice = response.headers.get("x-cowork-fallback") ?? undefined;
+  if (onMeta) {
+    onMeta({ modelId, providerId, fallbackNotice });
+  }
+
+  // Server always returns streaming text response
+  if (!response.body) {
+    throw new Error("No response body");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let fullContent = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    const chunk = decoder.decode(value, { stream: true });
+    fullContent += chunk;
+    if (onChunk) {
+      onChunk(chunk);
+    }
+  }
+
+  return {
+    id: crypto.randomUUID(),
+    sessionId,
+    role: "assistant",
+    content: fullContent,
+    createdAt: Date.now(),
+    modelId,
+    providerId,
+    fallbackNotice,
+  };
+}
+
+/**
+ * Get chat history for a session
+ */
+export async function getChatHistory(sessionId: string): Promise<ChatMessage[]> {
+  const data = await fetchJson<ApiResult<{ messages?: ChatMessage[] }>>(
+    `/api/sessions/${sessionId}/chat`
+  );
+  return data.messages ?? [];
+}
+
 export async function listApprovals(sessionId: string): Promise<CoworkApproval[]> {
   const data = await fetchJson<ApiResult<unknown>>(`/api/sessions/${sessionId}/approvals`);
   return data.approvals ?? [];
@@ -181,4 +283,55 @@ export async function checkTool(
     throw new Error("Tool check result not returned");
   }
   return data.result as ToolCheckResult;
+}
+
+export async function listProjects(): Promise<CoworkProject[]> {
+  const data = await fetchJson<ApiResult<unknown>>("/api/projects");
+  return data.projects ?? [];
+}
+
+export async function createProject(payload: {
+  name: string;
+  description?: string;
+  pathHint?: string;
+  metadata?: Record<string, unknown>;
+}): Promise<CoworkProject> {
+  const data = await fetchJson<ApiResult<unknown>>("/api/projects", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!data.project) {
+    throw new Error("Project not returned");
+  }
+  return data.project;
+}
+
+export async function getProject(projectId: string): Promise<CoworkProject> {
+  const data = await fetchJson<ApiResult<unknown>>(`/api/projects/${projectId}`);
+  if (!data.project) {
+    throw new Error("Project not found");
+  }
+  return data.project;
+}
+
+export async function updateSession(
+  sessionId: string,
+  payload: { title?: string; projectId?: string | null; endedAt?: number }
+): Promise<CoworkSession> {
+  const data = await fetchJson<ApiResult<unknown>>(`/api/sessions/${sessionId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!data.session) {
+    throw new Error("Session not returned");
+  }
+  return data.session;
+}
+
+export async function deleteSession(sessionId: string): Promise<void> {
+  await fetchJson<{ ok: boolean }>(`/api/sessions/${sessionId}`, {
+    method: "DELETE",
+  });
 }

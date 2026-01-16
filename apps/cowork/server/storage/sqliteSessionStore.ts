@@ -21,8 +21,8 @@ export async function createSqliteSessionStore(): Promise<SqliteSessionStore> {
   const db = await getDatabase();
 
   const insertStmt = db.prepare(`
-    INSERT INTO sessions (session_id, user_id, device_id, platform, mode, grants, connectors, created_at)
-    VALUES ($sessionId, $userId, $deviceId, $platform, $mode, $grants, $connectors, $createdAt)
+    INSERT INTO sessions (session_id, user_id, device_id, platform, mode, grants, connectors, created_at, project_id)
+    VALUES ($sessionId, $userId, $deviceId, $platform, $mode, $grants, $connectors, $createdAt, $projectId)
   `);
 
   const selectAllStmt = db.prepare(`
@@ -36,7 +36,7 @@ export async function createSqliteSessionStore(): Promise<SqliteSessionStore> {
   const updateStmt = db.prepare(`
     UPDATE sessions
     SET user_id = $userId, device_id = $deviceId, platform = $platform,
-        mode = $mode, grants = $grants, connectors = $connectors, ended_at = $endedAt
+        mode = $mode, grants = $grants, connectors = $connectors, ended_at = $endedAt, project_id = $projectId
     WHERE session_id = $sessionId
   `);
 
@@ -54,6 +54,7 @@ export async function createSqliteSessionStore(): Promise<SqliteSessionStore> {
       grants: JSON.parse(row.grants as string),
       connectors: JSON.parse(row.connectors as string),
       createdAt: row.created_at as number,
+      projectId: (row.project_id as string) || undefined,
     };
   }
 
@@ -82,6 +83,7 @@ export async function createSqliteSessionStore(): Promise<SqliteSessionStore> {
         $grants: JSON.stringify(session.grants),
         $connectors: JSON.stringify(session.connectors),
         $createdAt: session.createdAt,
+        $projectId: session.projectId || null,
       });
       return session;
     },
@@ -104,7 +106,8 @@ export async function createSqliteSessionStore(): Promise<SqliteSessionStore> {
         $mode: updated.mode,
         $grants: JSON.stringify(updated.grants),
         $connectors: JSON.stringify(updated.connectors),
-        $endedAt: null,
+        $endedAt: updated.endedAt || null,
+        $projectId: updated.projectId || null,
       });
       return updated;
     },

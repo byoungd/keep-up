@@ -21,11 +21,26 @@ export const createSessionSchema = z.object({
   deviceId: z.string().min(1).optional(),
   grants: z.array(folderGrantSchema).optional().default([]),
   connectors: z.array(connectorGrantSchema).optional().default([]),
+  title: z.string().min(1).optional(),
+});
+
+export const updateSessionSchema = z.object({
+  title: z.string().min(1).optional(),
+  projectId: z.string().nullable().optional(), // Nullable to remove from project
+  endedAt: z.number().optional(),
+});
+
+export const createProjectSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().min(1).optional(),
+  pathHint: z.string().min(1).optional(),
+  metadata: z.record(z.unknown()).optional(),
 });
 
 export const createTaskSchema = z.object({
   title: z.string().min(1).optional(),
   prompt: z.string().min(1),
+  modelId: z.string().min(1).optional(),
 });
 
 export const updateTaskStatusSchema = z.object({
@@ -49,6 +64,7 @@ export const settingsPatchSchema = z
   .object({
     openAiKey: z.string().min(1).optional(),
     anthropicKey: z.string().min(1).optional(),
+    geminiKey: z.string().min(1).optional(),
     defaultModel: z.string().min(1).optional(),
     theme: z.enum(["light", "dark"]).optional(),
   })
