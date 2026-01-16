@@ -181,6 +181,18 @@ export function useTaskStream(sessionId: string) {
     const cached = loadGraphFromStorage(sessionId);
     if (cached && cached.nodes.length > 0) {
       setGraph(cached);
+      // Populate seenEventIds from cached nodes to prevent duplicate filtering
+      // We extract base IDs from node IDs (e.g., "call-xyz" -> "xyz", "task-abc" -> "abc")
+      const seenIds = new Set<string>();
+      for (const node of cached.nodes) {
+        seenIds.add(node.id);
+        // Also add the base event ID (strip prefixes used in node generation)
+        const baseId = node.id.replace(/^(task-|call-|out-|think-|plan-|event-|approval-)/, "");
+        if (baseId !== node.id) {
+          seenIds.add(baseId);
+        }
+      }
+      seenEventIdsRef.current = seenIds;
     } else {
       setGraph({
         sessionId,
@@ -188,9 +200,9 @@ export function useTaskStream(sessionId: string) {
         nodes: [],
         artifacts: {},
       });
+      seenEventIdsRef.current = new Set();
     }
     lastEventIdRef.current = null;
-    seenEventIdsRef.current = new Set();
     taskTitleRef.current.clear();
     taskPromptRef.current.clear();
   }, [sessionId]);
