@@ -152,16 +152,17 @@ export function TaskStreamMessage({ task, onPreview, onAction }: TaskStreamMessa
 
 function useTaskState(task: AgentTask) {
   const steps = task.steps ?? [];
+  const artifacts = task.artifacts ?? [];
   const resolvedSteps = steps.length > 0 ? steps : [buildFallbackStep(task.status, task.id)];
   const displaySteps = useMemo(() => normalizeSteps(resolvedSteps), [resolvedSteps]);
 
   const deliverables = useMemo(
-    () => task.artifacts.filter((artifact) => artifact.type !== "plan"),
-    [task.artifacts]
+    () => artifacts.filter((artifact) => artifact.type !== "plan"),
+    [artifacts]
   );
   const plans = useMemo(
-    () => task.artifacts.filter((artifact) => artifact.type === "plan"),
-    [task.artifacts]
+    () => artifacts.filter((artifact) => artifact.type === "plan"),
+    [artifacts]
   );
 
   const report = deliverables.find((artifact) => artifact.type === "report");
