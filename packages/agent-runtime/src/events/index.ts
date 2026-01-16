@@ -23,5 +23,6 @@ export {
   type ToolEvents,
   type PluginEvents,
   type SystemEvents,
+  type ExecutionEvents,
   type RuntimeEventMap,
 } from "./eventBus";

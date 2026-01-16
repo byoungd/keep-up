@@ -38,8 +38,8 @@ export interface ToolExecutor {
 }
 
 export interface ToolExecutionObserver {
-  onDecision?: (decision: ExecutionDecision) => void;
-  onRecord?: (record: ToolExecutionRecord) => void;
+  onDecision?: (decision: ExecutionDecision, context: ToolContext) => void;
+  onRecord?: (record: ToolExecutionRecord, context: ToolContext) => void;
 }
 
 export interface ToolConfirmationResolver extends ToolExecutor {
@@ -162,7 +162,8 @@ export class ToolExecutionPipeline
             affectedPaths: sandboxDecision.affectedPaths,
             policyDecisionId: decisionId,
             sandboxed: sandboxDecision.sandboxed,
-          })
+          }),
+          executionContext
         );
         this.recordToolMetric(call.name, "success");
         this.recordDuration(call.name, startTime);
@@ -189,7 +190,8 @@ export class ToolExecutionPipeline
           policyDecisionId: decisionId,
           sandboxed: sandboxDecision.sandboxed,
           error: result.success ? undefined : result.error?.message,
-        })
+        }),
+        executionContext
       );
 
       if (cacheable && this.cache && result.success) {
@@ -215,7 +217,8 @@ export class ToolExecutionPipeline
           policyDecisionId: decisionId,
           sandboxed: sandboxDecision.sandboxed,
           error: message,
-        })
+        }),
+        executionContext
       );
       this.emitSandboxTelemetry(call, executionContext, exceptionResult, startTime);
       this.auditResult(call, executionContext, exceptionResult);
@@ -330,7 +333,7 @@ export class ToolExecutionPipeline
         riskTags: policyDecision.riskTags,
         sandboxed: context.security.sandbox.type !== "none",
       });
-      this.emitDecision(decision);
+      this.emitDecision(decision, context);
 
       const denied = this.createErrorResult(
         "PERMISSION_DENIED",
@@ -346,7 +349,8 @@ export class ToolExecutionPipeline
           policyDecisionId: decisionId,
           sandboxed: decision.sandboxed,
           error: denied.error?.message ?? "Permission denied",
-        })
+        }),
+        context
       );
       this.recordDenied(call, startTime, policyDecision.reason);
       this.recordToolMetric(call.name, "error");
@@ -369,7 +373,7 @@ export class ToolExecutionPipeline
         sandboxed: sandboxDecision.sandboxed,
         affectedPaths: sandboxDecision.affectedPaths,
       });
-      this.emitDecision(decision);
+      this.emitDecision(decision, context);
 
       const denied = this.createErrorResult(
         "SANDBOX_VIOLATION",
@@ -386,7 +390,8 @@ export class ToolExecutionPipeline
           policyDecisionId: decisionId,
           sandboxed: sandboxDecision.sandboxed,
           error: denied.error?.message ?? "Sandbox policy violation",
-        })
+        }),
+        context
       );
       this.recordToolMetric(call.name, "error");
       this.recordDuration(call.name, startTime);
@@ -407,7 +412,7 @@ export class ToolExecutionPipeline
       sandboxed: sandboxDecision.sandboxed,
       affectedPaths: sandboxDecision.affectedPaths,
     });
-    this.emitDecision(executionDecision);
+    this.emitDecision(executionDecision, context);
 
     const rateResult = this.checkRateLimit(call, context);
     if (!rateResult.allowed) {
@@ -426,7 +431,8 @@ export class ToolExecutionPipeline
           policyDecisionId: decisionId,
           sandboxed: sandboxDecision.sandboxed,
           error: limited.error?.message ?? "Rate limited",
-        })
+        }),
+        context
       );
       this.recordToolMetric(call.name, "error");
       this.recordDuration(call.name, startTime);
@@ -445,7 +451,8 @@ export class ToolExecutionPipeline
         affectedPaths: sandboxDecision.affectedPaths,
         policyDecisionId: decisionId,
         sandboxed: sandboxDecision.sandboxed,
-      })
+      }),
+      context
     );
 
     return { ok: true, sandboxDecision };
@@ -516,23 +523,23 @@ export class ToolExecutionPipeline
     this.recordDuration(call.name, startTime);
   }
 
-  private emitDecision(decision: ExecutionDecision): void {
+  private emitDecision(decision: ExecutionDecision, context: ToolContext): void {
     if (!this.executionObserver?.onDecision) {
       return;
     }
     try {
-      this.executionObserver.onDecision(decision);
+      this.executionObserver.onDecision(decision, context);
     } catch {
       // Ignore observer errors to avoid breaking execution.
     }
   }
 
-  private emitRecord(record: ToolExecutionRecord): void {
+  private emitRecord(record: ToolExecutionRecord, context: ToolContext): void {
     if (!this.executionObserver?.onRecord) {
       return;
     }
     try {
-      this.executionObserver.onRecord(record);
+      this.executionObserver.onRecord(record, context);
     } catch {
       // Ignore observer errors to avoid breaking execution.
     }

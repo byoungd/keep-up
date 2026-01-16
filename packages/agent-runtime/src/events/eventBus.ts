@@ -6,6 +6,7 @@
  */
 
 import { getLogger } from "../logging/logger.js";
+import type { ExecutionDecision, ToolExecutionRecord } from "../types";
 
 const logger = getLogger("event-bus");
 
@@ -191,8 +192,19 @@ export interface SystemEvents {
   "system:checkpoint": { checkpointId: string };
 }
 
+/** Execution plane events */
+export interface ExecutionEvents {
+  "execution:decision": ExecutionDecision;
+  "execution:record": ToolExecutionRecord;
+}
+
 /** Combined event map */
-export interface RuntimeEventMap extends AgentEvents, ToolEvents, PluginEvents, SystemEvents {
+export interface RuntimeEventMap
+  extends AgentEvents,
+    ToolEvents,
+    PluginEvents,
+    SystemEvents,
+    ExecutionEvents {
   // Allow custom events with string index
   [key: string]: unknown;
 }

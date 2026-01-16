@@ -1194,10 +1194,12 @@ export function createOrchestrator(
     options,
     auditLogger
   );
+  const eventBus = options.eventBus ?? options.components?.eventBus;
   const taskGraph = options.components?.taskGraph ?? createTaskGraphStore();
   const executionObserver = mergeExecutionObservers(
     options.toolExecution?.executionObserver,
-    taskGraph ? createTaskGraphExecutionObserver(taskGraph) : undefined
+    taskGraph ? createTaskGraphExecutionObserver(taskGraph) : undefined,
+    eventBus ? createEventBusExecutionObserver(eventBus, config.name) : undefined
   );
   const toolExecution = { ...(options.toolExecution ?? {}), executionObserver };
   const policyEngine = resolvePolicyEngine(options, permissionChecker, skillRegistry);
@@ -1212,7 +1214,7 @@ export function createOrchestrator(
   const components: OrchestratorComponents = {
     ...options.components,
     toolExecutor,
-    eventBus: options.eventBus ?? options.components?.eventBus,
+    eventBus,
     skillRegistry,
     skillSession,
     skillPromptAdapter,
@@ -1340,23 +1342,22 @@ function resolveParallelConfig(
 }
 
 function mergeExecutionObservers(
-  primary?: ToolExecutionObserver,
-  secondary?: ToolExecutionObserver
+  ...observers: Array<ToolExecutionObserver | undefined>
 ): ToolExecutionObserver | undefined {
-  if (!primary) {
-    return secondary;
-  }
-  if (!secondary) {
-    return primary;
+  const active = observers.filter(Boolean) as ToolExecutionObserver[];
+  if (active.length === 0) {
+    return undefined;
   }
   return {
-    onDecision: (decision) => {
-      primary.onDecision?.(decision);
-      secondary.onDecision?.(decision);
+    onDecision: (decision, context) => {
+      for (const observer of active) {
+        observer.onDecision?.(decision, context);
+      }
     },
-    onRecord: (record) => {
-      primary.onRecord?.(record);
-      secondary.onRecord?.(record);
+    onRecord: (record, context) => {
+      for (const observer of active) {
+        observer.onRecord?.(record, context);
+      }
     },
   };
 }
@@ -1389,6 +1390,28 @@ function createTaskGraphExecutionObserver(taskGraph: TaskGraphStore): ToolExecut
           idempotencyKey: record.toolCallId,
         }
       );
+    },
+  };
+}
+
+function createEventBusExecutionObserver(
+  eventBus: RuntimeEventBus,
+  source: string
+): ToolExecutionObserver {
+  return {
+    onDecision: (decision, context) => {
+      eventBus.emit("execution:decision", decision, {
+        source,
+        correlationId: context.correlationId,
+        priority: "normal",
+      });
+    },
+    onRecord: (record, context) => {
+      eventBus.emit("execution:record", record, {
+        source,
+        correlationId: context.correlationId,
+        priority: "normal",
+      });
     },
   };
 }
