@@ -16,13 +16,13 @@ export interface MCPTool {
   /** Optional annotations for UI/security hints */
   annotations?: {
     /** Tool category for grouping */
-    category?: "core" | "knowledge" | "external";
+    category?: "core" | "knowledge" | "external" | "communication";
     /** Whether tool requires confirmation */
     requiresConfirmation?: boolean;
     /** Whether tool can modify state */
     readOnly?: boolean;
     /** Estimated execution time hint */
-    estimatedDuration?: "fast" | "medium" | "slow";
+    estimatedDuration?: "instant" | "fast" | "medium" | "slow";
   };
 }
 
@@ -90,7 +90,8 @@ export type ToolErrorCode =
   | "CONFLICT"
   | "DRYRUN_REJECTED"
   | "RETRY_EXHAUSTED"
-  | "VALIDATION_ERROR";
+  | "VALIDATION_ERROR"
+  | "DUPLICATE_FAILED_ACTION"; // Manus spec: prevent repeating exact same failed action
 
 // ============================================================================
 // Tool Server Interface (MCP Server)

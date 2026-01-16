@@ -30,6 +30,7 @@ export { BaseLLMProvider } from "./baseProvider";
 // Provider implementations
 export { OpenAIProvider, type OpenAIConfig } from "./openaiProvider";
 export { AnthropicProvider, type AnthropicConfig } from "./anthropicProvider";
+export { GeminiProvider, type GeminiConfig } from "./geminiProvider";
 export {
   ResilientProvider,
   createResilientProvider,

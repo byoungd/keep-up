@@ -3,6 +3,13 @@
  *
  * Implements intelligent error recovery with retry strategies and fallbacks.
  * Based on Claude Code Agent best practices for handling transient failures.
+ *
+ * Three-Attempt Principle (Manus Spec):
+ * 1. Diagnosis - Analyze the error message and context
+ * 2. Fix/Alternative - Attempt to fix the issue or use a different tool
+ * 3. Escalation - After three consecutive failures, escalate to user via message(type="ask")
+ *
+ * CRITICAL: The agent is strictly forbidden from repeating the exact same failed action.
  */
 
 import type { MCPToolCall, MCPToolResult, ToolError } from "../types";
@@ -150,9 +157,41 @@ export class ErrorRecoveryEngine {
   private strategies: RecoveryStrategy[];
   private errorHistory: ErrorHistoryEntry[] = [];
   private readonly maxHistorySize = 100;
+  private failedActionSignatures = new Set<string>();
 
   constructor(strategies: RecoveryStrategy[] = DEFAULT_STRATEGIES) {
     this.strategies = [...strategies];
+  }
+
+  /**
+   * Check if an action has already failed (to prevent repeating exact same action).
+   * Implements the Manus spec requirement: "strictly forbidden from repeating the exact same failed action."
+   */
+  private hasActionFailed(toolCall: MCPToolCall): boolean {
+    const signature = this.getActionSignature(toolCall);
+    return this.failedActionSignatures.has(signature);
+  }
+
+  /**
+   * Record a failed action signature.
+   */
+  private recordFailedAction(toolCall: MCPToolCall): void {
+    const signature = this.getActionSignature(toolCall);
+    this.failedActionSignatures.add(signature);
+  }
+
+  /**
+   * Create a signature for a tool call (for deduplication).
+   */
+  private getActionSignature(toolCall: MCPToolCall): string {
+    return `${toolCall.name}::${JSON.stringify(toolCall.arguments)}`;
+  }
+
+  /**
+   * Clear failed action history (e.g., when starting a new task).
+   */
+  clearFailedActions(): void {
+    this.failedActionSignatures.clear();
   }
 
   /**
@@ -164,6 +203,7 @@ export class ErrorRecoveryEngine {
 
   /**
    * Attempt to recover from an error.
+   * Implements the Three-Attempt Principle from Manus spec.
    */
   async recover(
     toolCall: MCPToolCall,
@@ -172,6 +212,21 @@ export class ErrorRecoveryEngine {
   ): Promise<RecoveryResult> {
     const strategy = this.matchStrategy(initialError);
     const category = this.categorizeError(initialError);
+
+    // Check if this exact action has already failed (prevent repeating same action)
+    if (this.hasActionFailed(toolCall)) {
+      return {
+        recovered: false,
+        error: {
+          code: "DUPLICATE_FAILED_ACTION",
+          message: `This exact action has already failed. Please try a different approach. Original error: ${initialError.message}`,
+        },
+        attempts: 0,
+      };
+    }
+
+    // Record the failed action
+    this.recordFailedAction(toolCall);
 
     // Record error
     this.recordError({

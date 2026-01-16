@@ -4,18 +4,41 @@
  * Provides tools for creating, managing, and tracking execution plans.
  * Designed for use by the constrained plan agent.
  *
+ * Updated to support Manus spec phase-based tracking:
+ * - Plans are structured as phases (not just steps)
+ * - Current phase tracking for UI progress visualization
+ * - Phase completion status
+ *
  * Tools:
  * - plan:save - Save/update the current plan
  * - plan:load - Load the current plan
  * - plan:list - List plan history
  * - plan:status - Get current plan execution status
  * - plan:step - Update a step's status
+ * - plan:advance - Advance to next phase
+ * - plan:update - Update plan (for refinements)
  */
 
 import { type PlanPersistence, createPlanPersistence } from "../../orchestrator/planPersistence";
 import type { ExecutionPlan, PlanStep } from "../../orchestrator/planning";
 import type { MCPToolResult, ToolContext } from "../../types";
 import { BaseToolServer, errorResult, textResult } from "../mcp/baseServer";
+
+// ============================================================================
+// Extended Plan Types for Phase Support
+// ============================================================================
+
+/**
+ * Phase in a plan (Manus spec concept).
+ */
+export interface PlanPhase {
+  id: string;
+  name: string;
+  description: string;
+  steps: PlanStep[];
+  status: "pending" | "in_progress" | "completed" | "failed";
+  order: number;
+}
 
 // ============================================================================
 // Plan Tool Server
@@ -206,6 +229,75 @@ export class PlanToolServer extends BaseToolServer {
         },
       },
       this.handleArchive.bind(this)
+    );
+
+    // plan:advance - Advance to next phase (Manus spec)
+    this.registerTool(
+      {
+        name: "advance",
+        description: "Advance to the next phase in the plan",
+        inputSchema: {
+          type: "object",
+          properties: {
+            phase_id: {
+              type: "string",
+              description: "ID of the phase to advance to (optional, defaults to next)",
+            },
+          },
+          required: [],
+        },
+        annotations: {
+          category: "core",
+          requiresConfirmation: false,
+          readOnly: false,
+          estimatedDuration: "fast",
+        },
+      },
+      this.handleAdvance.bind(this)
+    );
+
+    // plan:update - Update plan with refinements
+    this.registerTool(
+      {
+        name: "update",
+        description: "Update the current plan with refinements or changes",
+        inputSchema: {
+          type: "object",
+          properties: {
+            goal: {
+              type: "string",
+              description: "Updated goal (optional)",
+            },
+            add_steps: {
+              type: "array",
+              description: "New steps to add",
+              items: {
+                type: "object",
+                properties: {
+                  description: { type: "string" },
+                  tools: { type: "array", items: { type: "string" } },
+                  expectedOutcome: { type: "string" },
+                  insertAfter: { type: "number", description: "Insert after step number" },
+                },
+                required: ["description"],
+              },
+            },
+            remove_steps: {
+              type: "array",
+              items: { type: "number" },
+              description: "Step numbers to remove",
+            },
+          },
+          required: [],
+        },
+        annotations: {
+          category: "core",
+          requiresConfirmation: false,
+          readOnly: false,
+          estimatedDuration: "fast",
+        },
+      },
+      this.handleUpdate.bind(this)
     );
   }
 
@@ -419,6 +511,112 @@ export class PlanToolServer extends BaseToolServer {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return errorResult("EXECUTION_FAILED", `Failed to archive plan: ${message}`);
+    }
+  }
+
+  private async handleAdvance(
+    args: Record<string, unknown>,
+    _context: ToolContext
+  ): Promise<MCPToolResult> {
+    try {
+      const _phase_id = args.phase_id as string | undefined;
+      const plan = await this.persistence.loadCurrent();
+
+      if (!plan) {
+        return errorResult("RESOURCE_NOT_FOUND", "No active plan found.");
+      }
+
+      // For now, we'll track phase advancement via step status
+      // In a full implementation, you'd extend ExecutionPlan to include phases
+      const executing = plan.steps.find((s) => s.status === "executing");
+      if (executing) {
+        executing.status = "complete";
+      }
+
+      // Find next pending step and mark as executing
+      const nextStep = plan.steps.find((s) => s.status === "pending");
+      if (nextStep) {
+        nextStep.status = "executing";
+        await this.persistence.saveCurrent(plan);
+        return textResult(`Advanced to step ${nextStep.order}: ${nextStep.description}`);
+      }
+
+      return textResult("All steps completed. Plan finished.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return errorResult("EXECUTION_FAILED", `Failed to advance phase: ${message}`);
+    }
+  }
+
+  private async handleUpdate(
+    args: Record<string, unknown>,
+    _context: ToolContext
+  ): Promise<MCPToolResult> {
+    try {
+      const goal = args.goal as string | undefined;
+      const add_steps = args.add_steps as
+        | Array<{
+            description: string;
+            tools?: string[];
+            expectedOutcome?: string;
+            insertAfter?: number;
+          }>
+        | undefined;
+      const remove_steps = args.remove_steps as number[] | undefined;
+
+      const plan = await this.persistence.loadCurrent();
+
+      if (!plan) {
+        return errorResult("RESOURCE_NOT_FOUND", "No active plan found.");
+      }
+
+      // Update goal if provided
+      if (goal) {
+        plan.goal = goal;
+      }
+
+      // Remove steps
+      if (remove_steps && remove_steps.length > 0) {
+        plan.steps = plan.steps.filter((s) => !remove_steps.includes(s.order));
+        // Renumber remaining steps
+        plan.steps.forEach((s, index) => {
+          s.order = index + 1;
+        });
+      }
+
+      // Add steps
+      if (add_steps && add_steps.length > 0) {
+        for (const newStep of add_steps) {
+          const insertAfter = newStep.insertAfter ?? plan.steps.length;
+          const step: PlanStep = {
+            id: `step_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
+            order: insertAfter + 1,
+            description: newStep.description,
+            tools: newStep.tools ?? [],
+            expectedOutcome: newStep.expectedOutcome ?? "",
+            dependencies: [],
+            parallelizable: false,
+            status: "pending",
+          };
+
+          // Insert at position
+          plan.steps.splice(insertAfter, 0, step);
+        }
+
+        // Renumber all steps
+        plan.steps.forEach((s, index) => {
+          s.order = index + 1;
+        });
+      }
+
+      await this.persistence.saveCurrent(plan);
+
+      return textResult(
+        `Plan updated successfully!\nGoal: ${plan.goal}\nSteps: ${plan.steps.length}`
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return errorResult("EXECUTION_FAILED", `Failed to update plan: ${message}`);
     }
   }
 

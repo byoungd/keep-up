@@ -38,6 +38,8 @@ export {
   type OpenAIConfig,
   AnthropicProvider,
   type AnthropicConfig,
+  GeminiProvider,
+  type GeminiConfig,
   ResilientProvider,
   createResilientProvider,
   type ResilientProviderConfig,

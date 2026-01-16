@@ -86,6 +86,10 @@ export interface AICoreAdapterOptions {
 export class AICoreProviderAdapter implements IAgentLLM {
   private readonly provider: AICoreProvider;
   private readonly options: AICoreAdapterOptions;
+  private toolNameMap: {
+    originalToSanitized: Map<string, string>;
+    sanitizedToOriginal: Map<string, string>;
+  } | null = null;
 
   constructor(provider: AICoreProvider, options: AICoreAdapterOptions = {}) {
     this.provider = provider;
@@ -111,7 +115,9 @@ export class AICoreProviderAdapter implements IAgentLLM {
     const messages = request.messages.map((msg) => this.convertMessage(msg));
 
     // Convert tools to ai-core format
-    const tools = request.tools?.map((tool) => this.convertTool(tool));
+    const toolNameMap = this.buildToolNameMap(request.tools ?? []);
+    const tools = request.tools?.map((tool) => this.convertTool(tool, toolNameMap));
+    this.toolNameMap = toolNameMap;
 
     return {
       model: this.options.model,
@@ -154,17 +160,9 @@ export class AICoreProviderAdapter implements IAgentLLM {
     }
   }
 
-  private convertTool(tool: AgentToolDefinition): AICoreToolDefinition {
-    return {
-      name: tool.name,
-      description: tool.description,
-      inputSchema: tool.inputSchema,
-    };
-  }
-
   private convertResponse(response: AICoreCompletionResponse): AgentLLMResponse {
     const toolCalls: MCPToolCall[] | undefined = response.toolCalls?.map((tc) => ({
-      name: tc.name,
+      name: this.mapToolNameToOriginal(tc.name),
       arguments: tc.arguments,
     }));
 
@@ -190,13 +188,63 @@ export class AICoreProviderAdapter implements IAgentLLM {
       return {
         type: "tool_call",
         toolCall: {
-          name: chunk.toolCall.name,
+          name: this.mapToolNameToOriginal(chunk.toolCall.name),
           arguments: chunk.toolCall.arguments,
         },
       };
     }
     return { type: "done" };
   }
+
+  private convertTool(
+    tool: AgentToolDefinition,
+    toolNameMap: {
+      originalToSanitized: Map<string, string>;
+      sanitizedToOriginal: Map<string, string>;
+    }
+  ): AICoreToolDefinition {
+    return {
+      name: toolNameMap.originalToSanitized.get(tool.name) ?? tool.name,
+      description: tool.description,
+      inputSchema: tool.inputSchema,
+    };
+  }
+
+  private buildToolNameMap(tools: AgentToolDefinition[]): {
+    originalToSanitized: Map<string, string>;
+    sanitizedToOriginal: Map<string, string>;
+  } {
+    const originalToSanitized = new Map<string, string>();
+    const sanitizedToOriginal = new Map<string, string>();
+    const used = new Set<string>();
+
+    for (const tool of tools) {
+      const base = sanitizeToolName(tool.name);
+      let candidate = base;
+      let index = 1;
+      while (used.has(candidate)) {
+        candidate = `${base}_${index}`;
+        index += 1;
+      }
+      used.add(candidate);
+      originalToSanitized.set(tool.name, candidate);
+      sanitizedToOriginal.set(candidate, tool.name);
+    }
+
+    return { originalToSanitized, sanitizedToOriginal };
+  }
+
+  private mapToolNameToOriginal(name: string): string {
+    return this.toolNameMap?.sanitizedToOriginal.get(name) ?? name;
+  }
+}
+
+function sanitizeToolName(name: string): string {
+  const sanitized = name.replace(/[^a-zA-Z0-9_-]/g, "_");
+  if (!sanitized) {
+    return "tool";
+  }
+  return sanitized.slice(0, 128);
 }
 
 // ============================================================================

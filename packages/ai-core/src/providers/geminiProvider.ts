@@ -1,9 +1,10 @@
 /**
- * OpenAI Provider
+ * Gemini Provider
  *
- * LLM provider implementation for OpenAI API (GPT-4, GPT-3.5, etc.)
+ * OpenAI-compatible provider implementation for Google Gemini models.
  */
 
+import { MODEL_CATALOG } from "../catalog/models";
 import { BaseLLMProvider } from "./baseProvider";
 import type {
   CompletionRequest,
@@ -17,11 +18,9 @@ import type {
   Tool,
 } from "./types";
 
-export interface OpenAIConfig extends ProviderConfig {
-  organizationId?: string;
-}
+export interface GeminiConfig extends ProviderConfig {}
 
-interface OpenAICompletionResponse {
+interface GeminiCompletionResponse {
   id: string;
   model: string;
   choices: Array<{
@@ -37,31 +36,28 @@ interface OpenAICompletionResponse {
     };
     finish_reason: string;
   }>;
-  usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
+  usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
 }
 
-interface OpenAIEmbeddingResponse {
-  data: Array<{ index: number; embedding: number[] }>;
-  model: string;
-  usage: { prompt_tokens: number; total_tokens: number };
-}
-
-const OPENAI_MODELS = ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo"] as const;
+const GEMINI_MODELS = MODEL_CATALOG.filter((model) => model.provider === "gemini").map(
+  (model) => model.id
+);
+const GEMINI_DEFAULT_MODEL =
+  MODEL_CATALOG.find((model) => model.provider === "gemini" && model.default)?.id ??
+  GEMINI_MODELS[0] ??
+  "gemini-3-flash";
 const STREAM_DONE_MARKER = "[" + "DONE" + "]";
 
-export class OpenAIProvider extends BaseLLMProvider {
-  readonly name = "openai";
-  readonly models = [...OPENAI_MODELS];
-  readonly defaultModel = "gpt-4o-mini";
-  readonly defaultEmbeddingModel = "text-embedding-3-small";
+export class GeminiProvider extends BaseLLMProvider {
+  readonly name = "gemini";
+  readonly models = GEMINI_MODELS;
+  readonly defaultModel = GEMINI_DEFAULT_MODEL;
 
   private readonly baseUrl: string;
-  private readonly organizationId?: string;
 
-  constructor(config: OpenAIConfig) {
+  constructor(config: GeminiConfig) {
     super(config);
-    this.baseUrl = config.baseUrl || "https://api.openai.com/v1";
-    this.organizationId = config.organizationId;
+    this.baseUrl = config.baseUrl || "https://generativelanguage.googleapis.com/v1beta/openai";
   }
 
   async complete(request: CompletionRequest): Promise<CompletionResponse> {
@@ -88,9 +84,9 @@ export class OpenAIProvider extends BaseLLMProvider {
       const res = await fetch(`${this.baseUrl}/chat/completions`, init);
       if (!res.ok) {
         const errorText = await res.text();
-        throw new Error(`OpenAI API error (${res.status}): ${errorText}`);
+        throw new Error(`Gemini API error (${res.status}): ${errorText}`);
       }
-      const response = (await res.json()) as OpenAICompletionResponse;
+      const response = (await res.json()) as GeminiCompletionResponse;
 
       const latencyMs = performance.now() - start;
       const usage = response.usage
@@ -114,6 +110,7 @@ export class OpenAIProvider extends BaseLLMProvider {
         .filter(
           (toolCall): toolCall is { id: string; name: string; arguments: string } => !!toolCall
         );
+
       return {
         content: choice?.message.content ?? "",
         toolCalls: toolCalls && toolCalls.length > 0 ? toolCalls : undefined,
@@ -180,7 +177,7 @@ export class OpenAIProvider extends BaseLLMProvider {
     const res = await fetch(`${this.baseUrl}/chat/completions`, init);
     if (!res.ok) {
       const errorText = await res.text();
-      throw new Error(`OpenAI API error (${res.status}): ${errorText}`);
+      throw new Error(`Gemini API error (${res.status}): ${errorText}`);
     }
     return res;
   }
@@ -291,69 +288,32 @@ export class OpenAIProvider extends BaseLLMProvider {
     }
   }
 
-  async embed(request: EmbeddingRequest): Promise<EmbeddingResponse> {
-    const start = performance.now();
-
-    try {
-      const signal = this.resolveTimeoutSignal(undefined, request.signal);
-      const init: RequestInit = {
-        method: "POST",
-        headers: this.getHeaders(),
-        body: JSON.stringify({
-          model: request.model || this.defaultEmbeddingModel,
-          input: request.texts,
-          dimensions: request.dimensions,
-        }),
-      };
-      init.signal = signal;
-
-      const res = await fetch(`${this.baseUrl}/embeddings`, init);
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(`OpenAI API error (${res.status}): ${errorText}`);
-      }
-      const response = (await res.json()) as OpenAIEmbeddingResponse;
-
-      const latencyMs = performance.now() - start;
-      const embeddings = response.data.sort((a, b) => a.index - b.index).map((d) => d.embedding);
-      this.trackSuccess(response.usage.prompt_tokens, 0, latencyMs);
-
-      return {
-        embeddings,
-        usage: {
-          inputTokens: response.usage.prompt_tokens,
-          outputTokens: 0,
-          totalTokens: response.usage.total_tokens,
-        },
-        model: response.model,
-      };
-    } catch (error) {
-      this.trackFailure();
-      throw error;
-    }
+  async embed(_request: EmbeddingRequest): Promise<EmbeddingResponse> {
+    throw new Error("Gemini embeddings are not supported in this provider.");
   }
 
   protected async performHealthCheck(): Promise<void> {
-    const res = await fetch(`${this.baseUrl}/models`, {
-      method: "GET",
+    const res = await fetch(`${this.baseUrl}/chat/completions`, {
+      method: "POST",
       headers: this.getHeaders(),
-      signal: this.createTimeoutSignal(5000),
+      body: JSON.stringify({
+        model: this.defaultModel,
+        max_tokens: 1,
+        messages: [{ role: "user", content: "hi" }],
+      }),
+      signal: this.createTimeoutSignal(10000),
     });
-    if (!res.ok) {
+
+    if (!res.ok && res.status !== 400) {
       throw new Error(`Health check failed: ${res.status}`);
     }
   }
 
   protected getHeaders(): Record<string, string> {
-    const headers: Record<string, string> = {
+    return {
       "Content-Type": "application/json",
       Authorization: `Bearer ${this.config.apiKey}`,
     };
-    if (this.organizationId) {
-      headers["OpenAI-Organization"] = this.organizationId;
-    }
-    return headers;
   }
 
   protected formatMessages(messages: Message[]): Array<{ role: string; content: string }> {

@@ -137,3 +137,27 @@ export {
   type AgentStateMachineConfig,
   type TransitionHandler,
 } from "./stateMachine";
+
+// Agent Loop (Manus Spec)
+export {
+  AgentLoopStateMachine,
+  createAgentLoopStateMachine,
+  type AgentLoopPhase,
+  type PerceptionContext,
+  type ThinkingResult,
+  type ToolDecision,
+  type Observation,
+  type AgentLoopCycle,
+  type AgentLoopState,
+  type AgentLoopConfig,
+} from "./agentLoop";
+
+// Single-Step Execution Enforcer (Manus Spec)
+export {
+  SingleStepEnforcer,
+  createSingleStepEnforcer,
+  createSingleStepMiddleware,
+  type SingleStepValidationResult,
+  type SingleStepPolicy,
+  type SingleStepMiddleware,
+} from "./singleStepEnforcer";

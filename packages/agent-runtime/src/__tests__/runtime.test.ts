@@ -327,7 +327,6 @@ describe("AgentOrchestrator", () => {
     await agent.run("Test");
 
     expect(events).toContain("turn:start");
-    expect(events).toContain("thinking");
     expect(events).toContain("complete");
   });
 

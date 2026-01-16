@@ -481,11 +481,6 @@ export class AgentOrchestrator {
     try {
       const outcome = await this.turnExecutor.execute(this.state, turnSpan);
 
-      // Emit thinking event (TurnExecutor doesn't emit events)
-      if (outcome.response?.content) {
-        this.emit("thinking", { content: outcome.response.content });
-      }
-
       // Update state with used messages and new assistant message
       if (outcome.compressedMessages && outcome.assistantMessage) {
         // Create new history from compressed messages + new assistant message

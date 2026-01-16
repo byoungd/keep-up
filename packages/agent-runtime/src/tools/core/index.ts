@@ -27,7 +27,7 @@ export {
   type CodeExecuteResult,
 } from "./code";
 export { TodoToolServer, createTodoToolServer, type TodoItem } from "./todo";
-export { PlanToolServer, createPlanToolServer } from "./plan";
+export { PlanToolServer, createPlanToolServer, type PlanPhase } from "./plan";
 export {
   ScratchToolServer,
   createScratchToolServer,
@@ -41,3 +41,14 @@ export {
   type TaskStore,
 } from "./task";
 export { SubagentToolServer, createSubagentToolServer } from "./subagent";
+export {
+  MessageToolServer,
+  createMessageToolServer,
+  type MessageType,
+  type SuggestedAction,
+  type MessageInfoArgs,
+  type MessageAskArgs,
+  type MessageResultArgs,
+  type MessageArgs,
+  type MessageEvent,
+} from "./message";
