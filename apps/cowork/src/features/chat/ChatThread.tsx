@@ -1,321 +1,177 @@
-import React from "react";
-import { createTask } from "../../api/coworkApi";
-import { useWorkspace } from "../../app/providers/WorkspaceProvider";
-import { useTaskStream } from "../tasks/hooks/useTaskStream";
-import { type ArtifactPayload, type TaskNode, TaskStatus } from "../tasks/types";
-import { ChatComposer } from "./ChatComposer";
-import { ChatMessageList } from "./ChatMessageList";
-import type { ChatMessage } from "./types";
-
-function buildInitialMessages(workspaceName: string | null): ChatMessage[] {
-  return [
-    {
-      id: crypto.randomUUID(),
-      role: "assistant",
-      content: `Session ready${workspaceName ? ` for ${workspaceName}` : ""}. Ask me to plan or execute a task.`,
-      createdAt: Date.now(),
-      status: "sent",
-    },
-  ];
-}
-
-function createSystemMessage(content: string, id?: string): ChatMessage {
-  return {
-    id: id ?? crypto.randomUUID(),
-    role: "assistant",
-    content,
-    createdAt: Date.now(),
-    status: "sent",
-  };
-}
-
-/** Maps TaskStatus to user-friendly message */
-function getStatusMessage(
-  status: TaskStatus,
-  taskTitle?: string,
-  failureReason?: string
-): string | null {
-  const label = taskTitle ?? "Task";
-  switch (status) {
-    case TaskStatus.PLANNING:
-      return `${label}: Planning...`;
-    case TaskStatus.RUNNING:
-      return `${label}: Running...`;
-    case TaskStatus.AWAITING_APPROVAL:
-      return `${label}: Awaiting approval`;
-    case TaskStatus.COMPLETED:
-      return `${label}: Completed ✓`;
-    case TaskStatus.FAILED:
-      return failureReason ? `${label}: Failed — ${failureReason}` : `${label}: Failed`;
-    default:
-      return null;
-  }
-}
-
-/** Generate message for artifact updates */
-function getArtifactMessage(artifactId: string, artifact: ArtifactPayload): string {
-  switch (artifact.type) {
-    case "plan":
-      return `Plan updated (${artifact.steps.length} steps)`;
-    case "diff":
-      return `Diff ready: ${artifact.file}`;
-    case "markdown":
-      return "Report ready";
-    default:
-      return `Artifact ready: ${artifactId}`;
-  }
-}
-
-/** Extract task info from stream nodes */
-type TaskInfo = {
-  taskId: string;
-  title: string;
-  status: TaskStatus;
-  failureReason?: string;
-};
-
-/** Parse status text into TaskStatus enum */
-function parseStatusText(statusText: string): TaskStatus | null {
-  if (statusText.includes("planning") || statusText.includes("queued")) {
-    return TaskStatus.PLANNING;
-  }
-  if (statusText.includes("ready")) {
-    return TaskStatus.PLANNING;
-  }
-  if (statusText.includes("running")) {
-    return TaskStatus.RUNNING;
-  }
-  if (statusText.includes("awaiting") || statusText.includes("approval")) {
-    return TaskStatus.AWAITING_APPROVAL;
-  }
-  if (statusText.includes("completed")) {
-    return TaskStatus.COMPLETED;
-  }
-  if (statusText.includes("failed") || statusText.includes("cancelled")) {
-    return TaskStatus.FAILED;
-  }
-  return null;
-}
-
-/** Extract failure reason from node content */
-function extractFailureReason(content: string): string | undefined {
-  const reasonMatch = content.match(/failed[:\s]+(.+)$/i);
-  return reasonMatch ? reasonMatch[1].trim() : undefined;
-}
-
-/** Parse a single thinking node into TaskInfo */
-function parseThinkingNode(node: TaskNode): TaskInfo | null {
-  if (node.type !== "thinking" || !node.content) {
-    return null;
-  }
-
-  // Cast id to string - the BaseNode.id type is z.infer<typeof z.string> which is string
-  const nodeId = String(node.id);
-  const taskMatch = nodeId.match(/^task-([^-]+)/);
-  if (!taskMatch) {
-    return null;
-  }
-
-  const taskId = taskMatch[1];
-  const contentMatch = node.content.match(/^(.+?)\s*·\s*(.+)$/);
-  if (!contentMatch) {
-    return null;
-  }
-
-  const title = contentMatch[1];
-  const statusText = contentMatch[2].toLowerCase().replace(/\s+/g, "_");
-  const status = parseStatusText(statusText);
-
-  if (!status) {
-    return null;
-  }
-
-  const failureReason =
-    status === TaskStatus.FAILED ? extractFailureReason(node.content) : undefined;
-
-  return { taskId, title, status, failureReason };
-}
-
-function extractTaskInfoFromNodes(nodes: TaskNode[]): Map<string, TaskInfo> {
-  const tasks = new Map<string, TaskInfo>();
-
-  for (const node of nodes) {
-    const info = parseThinkingNode(node);
-    if (info) {
-      tasks.set(info.taskId, info);
-    }
-  }
-
-  return tasks;
-}
+import {
+  MODEL_CATALOG,
+  getDefaultModelId,
+  getModelCapability,
+  normalizeModelId,
+} from "@ku0/ai-core";
+import { AIPanel as ShellAIPanel } from "@ku0/shell";
+import React, { useCallback, useMemo } from "react";
+import { updateSettings } from "../../api/coworkApi";
+import { useChatSession } from "./hooks/useChatSession";
+// ChatMessage is no longer used, we use Message from @ku0/shell via useChatSession
 
 export function ChatThread({ sessionId }: { sessionId: string }) {
-  const { getSession, getWorkspace } = useWorkspace();
-  const session = getSession(sessionId);
-  const workspace = session ? getWorkspace(session.workspaceId) : null;
+  const { messages, sendMessage, isSending, isLoading } = useChatSession(sessionId);
+  const [input, setInput] = React.useState("");
+  const [model, setModel] = React.useState(getDefaultModelId());
 
-  const [messages, setMessages] = React.useState<ChatMessage[]>(() =>
-    buildInitialMessages(workspace?.name ?? null)
-  );
-  const [isSending, setIsSending] = React.useState(false);
+  // Reuse the translations from CoworkAIPanel (ideally shared)
+  const translations = {
+    title: "Session Chat",
+    statusStreaming: "Streaming...",
+    statusDone: "Done",
+    statusError: "Error",
+    statusCanceled: "Canceled",
+    emptyTitle: "What can I do for you?",
+    emptyDescription: "Assign a task or ask anything.",
+    you: "You",
+    assistant: "Assistant",
+    actionEdit: "Edit",
+    actionBranch: "Branch",
+    actionQuote: "Quote",
+    actionCopy: "Copy",
+    actionRetry: "Retry",
+    requestIdLabel: "Request ID",
+    copyLast: "Copy Last",
+    newChat: "New Chat",
+    closePanel: "Close",
+    exportChat: "Export",
+    attachmentsLabel: "Attachments",
+    addImage: "Add Image",
+    runBackground: "Run in Background",
+    removeAttachment: "Remove",
+    inputPlaceholder: "Message current session...",
+    attachmentsMeta: "",
+    referenceLabel: "Ref",
+    referenceResolved: "Resolved",
+    referenceRemapped: "Remapped",
+    referenceUnresolved: "Unresolved",
+    referenceFind: "Find",
+    referenceUnavailable: "Unavailable",
+    alertTitleError: "Error",
+    alertTitleCanceled: "Canceled",
+    alertBodyError: "Something went wrong.",
+    alertBodyCanceled: "Request was canceled.",
+    alertRetry: "Retry",
+    statusLabels: {
+      streaming: "Streaming",
+      done: "Done",
+      error: "Error",
+      canceled: "Canceled",
+      pending: "Pending",
+    },
+    alertLabels: {
+      titleError: "Error",
+      titleCanceled: "Canceled",
+      bodyError: "Error",
+      bodyCanceled: "Canceled",
+      retry: "Retry",
+    },
+  };
 
-  // De-duplication: Key = "taskId:status" for status, "artifact:id" for artifacts
-  const shownItemsRef = React.useRef(new Set<string>());
-
-  // Track task titles from createTask response for immediate use
-  const taskTitlesRef = React.useRef(new Map<string, string>());
-
-  // Subscribe to task stream
-  const { graph } = useTaskStream(sessionId);
-
-  // Track previous nodes/artifacts count to detect changes
-  const prevNodesLengthRef = React.useRef(0);
-  const prevArtifactKeysRef = React.useRef<string[]>([]);
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: sessionId is required to reset chat even if workspace name is the same
-  React.useEffect(() => {
-    setMessages(buildInitialMessages(workspace?.name ?? null));
-    setIsSending(false);
-    shownItemsRef.current.clear();
-    taskTitlesRef.current.clear();
-    prevNodesLengthRef.current = 0;
-    prevArtifactKeysRef.current = [];
-  }, [sessionId, workspace?.name]);
-
-  // React to task stream changes - status updates per task
-  React.useEffect(() => {
-    // Skip if no new nodes
-    if (graph.nodes.length === prevNodesLengthRef.current) {
-      return;
-    }
-    prevNodesLengthRef.current = graph.nodes.length;
-
-    const taskInfoMap = extractTaskInfoFromNodes(graph.nodes);
-    const newMessages: ChatMessage[] = [];
-
-    for (const [taskId, info] of taskInfoMap) {
-      const dedupeKey = `task:${taskId}:${info.status}`;
-
-      if (shownItemsRef.current.has(dedupeKey)) {
-        continue;
-      }
-
-      // Use stored title from createTask if available, otherwise use extracted
-      const title = taskTitlesRef.current.get(taskId) ?? info.title;
-      const statusMessage = getStatusMessage(info.status, title, info.failureReason);
-
-      if (statusMessage) {
-        shownItemsRef.current.add(dedupeKey);
-        newMessages.push(createSystemMessage(statusMessage, `status-${dedupeKey}`));
-      }
-    }
-
-    if (newMessages.length > 0) {
-      setMessages((prev) => [...prev, ...newMessages]);
-    }
-  }, [graph.nodes]);
-
-  // React to artifact changes
-  React.useEffect(() => {
-    const currentKeys = Object.keys(graph.artifacts);
-    const prevKeys = prevArtifactKeysRef.current;
-
-    // Find new artifact keys
-    const newKeys = currentKeys.filter((key) => !prevKeys.includes(key));
-    prevArtifactKeysRef.current = currentKeys;
-
-    if (newKeys.length === 0) {
-      return;
-    }
-
-    const newMessages: ChatMessage[] = [];
-
-    for (const artifactId of newKeys) {
-      const dedupeKey = `artifact:${artifactId}`;
-
-      if (shownItemsRef.current.has(dedupeKey)) {
-        continue;
-      }
-
-      const artifact = graph.artifacts[artifactId];
-      if (!artifact) {
-        continue;
-      }
-
-      shownItemsRef.current.add(dedupeKey);
-      const message = getArtifactMessage(artifactId, artifact);
-      newMessages.push(createSystemMessage(message, dedupeKey));
-    }
-
-    if (newMessages.length > 0) {
-      setMessages((prev) => [...prev, ...newMessages]);
-    }
-  }, [graph.artifacts]);
-
-  const handleSend = React.useCallback(
-    async (content: string) => {
-      // Validate sessionId
-      if (!sessionId) {
-        setMessages((prev) => [
-          ...prev,
-          createSystemMessage("Error: No active session. Please select or create a session first."),
-        ]);
+  const filteredModels = useMemo(() => MODEL_CATALOG, []);
+  const handleSetModel = useCallback(
+    (nextModel: string) => {
+      const normalized = normalizeModelId(nextModel) ?? nextModel;
+      const resolved = getModelCapability(normalized);
+      const modelId = resolved?.id ?? getDefaultModelId();
+      if (!modelId || modelId === model) {
         return;
       }
-
-      // Add user message with "sending" status
-      const userMessage: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: "user",
-        content,
-        createdAt: Date.now(),
-        status: "sending",
-      };
-      setMessages((prev) => [...prev, userMessage]);
-      setIsSending(true);
-
-      try {
-        // Create task via API
-        const task = await createTask(sessionId, { prompt: content });
-
-        // Store task title for status messages
-        if (task.taskId && task.title) {
-          taskTitlesRef.current.set(task.taskId, task.title);
-        }
-
-        // Mark user message as sent and add success response
-        setMessages((prev) => {
-          const updated = prev.map((msg) =>
-            msg.id === userMessage.id ? { ...msg, status: "sent" as const } : msg
-          );
-          const taskTitle = task.title || "Untitled task";
-          return [...updated, createSystemMessage(`Task queued: ${taskTitle}`)];
-        });
-      } catch (err) {
-        // Mark user message as sent and add error response
-        const errorMessage = err instanceof Error ? err.message : "Unknown error occurred";
-        setMessages((prev) => {
-          const updated = prev.map((msg) =>
-            msg.id === userMessage.id ? { ...msg, status: "sent" as const } : msg
-          );
-          return [...updated, createSystemMessage(`Failed to create task: ${errorMessage}`)];
-        });
-      } finally {
-        setIsSending(false);
-      }
+      setModel(modelId);
+      updateSettings({ defaultModel: modelId }).catch((err) => {
+        console.error("Failed to update model:", err);
+        setModel(model);
+      });
     },
-    [sessionId]
+    [model]
   );
 
   return (
-    <section className="chat-panel">
-      <div className="context-strip">
-        <span className="pill">Threaded Context</span>
-        <span className="pill pill--outline">Workspace: {workspace?.name ?? "None"}</span>
-        <span className="pill pill--outline">Session: {session?.title ?? "Unknown"}</span>
-      </div>
-      <ChatMessageList messages={messages} />
-      <ChatComposer onSend={handleSend} isBusy={isSending} />
-    </section>
+    <div className="h-full w-full bg-surface-1">
+      <ShellAIPanel
+        title={translations.title}
+        model={model}
+        setModel={handleSetModel}
+        models={filteredModels}
+        onSelectModel={handleSetModel}
+        filteredModels={filteredModels}
+        isStreaming={isSending}
+        isLoading={isLoading}
+        onClose={() => {
+          /* no-op */
+        }}
+        showClose={false}
+        onClear={() => {
+          /* no-op */
+        }}
+        onCopyLast={() => {
+          /* no-op */
+        }}
+        onExport={() => {
+          /* no-op */
+        }}
+        headerTranslations={translations}
+        panelPosition="main"
+        // Messages
+        messages={messages}
+        suggestions={[]}
+        listRef={{ current: null }}
+        onEdit={() => {
+          /* no-op */
+        }}
+        onBranch={() => {
+          /* no-op */
+        }}
+        onQuote={() => {
+          /* no-op */
+        }}
+        onCopy={(content) => {
+          navigator.clipboard.writeText(content);
+        }}
+        onRetry={() => {
+          /* no-op */
+        }}
+        onSuggestionClick={() => {
+          /* no-op */
+        }}
+        messageListTranslations={translations}
+        // Input
+        input={input}
+        setInput={setInput}
+        onSend={async () => {
+          if (!input.trim()) {
+            return;
+          }
+          const content = input;
+          setInput("");
+          await sendMessage(content, "chat", { modelId: model }); // Default to chat execution in thread? Or strict task?
+          // Ideally we share the intent detection from controller, but for now
+          // let's assume direct chat works. The unified hook handles optimistic updates.
+        }}
+        onRunBackground={() => {
+          /* no-op */
+        }}
+        onAbort={() => {
+          /* no-op */
+        }}
+        attachments={[]}
+        onAddAttachment={() => {
+          /* no-op */
+        }}
+        onRemoveAttachment={() => {
+          /* no-op */
+        }}
+        fileInputRef={{ current: null }}
+        inputRef={{ current: null }}
+        onFileChange={() => {
+          /* no-op */
+        }}
+        inputTranslations={translations}
+        // Features
+        tasks={[]} // Tasks are embedded in messages now, but widget might need them if separated.
+        // We'll trust the message stream to show tasks.
+      />
+    </div>
   );
 }

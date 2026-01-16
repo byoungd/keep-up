@@ -49,8 +49,8 @@ export function CoworkAIPanel({ onClose, onPreviewArtifact }: CoworkAIPanelProps
     statusDone: "Done",
     statusError: "Error",
     statusCanceled: "Canceled",
-    emptyTitle: "How can I help you today?",
-    emptyDescription: "I can help you plan and execute tasks in your workspace.",
+    emptyTitle: "What can I do for you?",
+    emptyDescription: "Assign a task or ask anything.",
     you: "You",
     assistant: "Assistant",
     actionEdit: "Edit",
@@ -85,6 +85,7 @@ export function CoworkAIPanel({ onClose, onPreviewArtifact }: CoworkAIPanelProps
       done: "Done",
       error: "Error",
       canceled: "Canceled",
+      pending: "Pending",
     },
     alertLabels: {
       titleError: "Error",
@@ -97,6 +98,7 @@ export function CoworkAIPanel({ onClose, onPreviewArtifact }: CoworkAIPanelProps
 
   return (
     <ShellAIPanel
+      showHeader={false}
       title={translations.title}
       model={model}
       setModel={setModel}
@@ -111,6 +113,7 @@ export function CoworkAIPanel({ onClose, onPreviewArtifact }: CoworkAIPanelProps
           /* No-op */
         })
       }
+      showClose={false}
       onClear={() => {
         /* TODO */
       }}

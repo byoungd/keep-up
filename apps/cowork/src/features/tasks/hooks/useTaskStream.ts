@@ -1,4 +1,4 @@
-import type { CoworkRiskTag, CoworkTask } from "@ku0/agent-runtime";
+import type { CoworkRiskTag, CoworkTask, CoworkTaskStatus } from "@ku0/agent-runtime";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   type CoworkApproval,
@@ -14,6 +14,7 @@ import {
   type TaskGraph,
   type TaskNode,
   TaskStatus,
+  type TaskStatusNode,
 } from "../types";
 
 const RISK_TAGS = new Set<CoworkRiskTag>(["delete", "overwrite", "network", "connector", "batch"]);
@@ -72,13 +73,33 @@ function appendNode(nodes: TaskNode[], next: TaskNode): TaskNode[] {
   return [...nodes, next];
 }
 
-function buildTaskNodes(tasks: CoworkTask[]): TaskNode[] {
+function upsertNode(nodes: TaskNode[], next: TaskNode): TaskNode[] {
+  const index = nodes.findIndex((node) => node.id === next.id);
+  if (index === -1) {
+    return [...nodes, next];
+  }
+  if (nodes[index] === next) {
+    return nodes;
+  }
+  const updated = [...nodes];
+  updated[index] = next;
+  return updated;
+}
+
+function buildTaskNodes(tasks: CoworkTask[]): TaskStatusNode[] {
   return [...tasks]
     .sort((a, b) => a.createdAt - b.createdAt)
     .map((task) => ({
-      id: `task-${task.taskId}-${task.updatedAt}`,
-      type: "thinking" as const,
-      content: `${task.title} · ${formatStatus(task.status)}`,
+      id: `task-${task.taskId}`,
+      type: "task_status" as const,
+      taskId: task.taskId,
+      title: task.title,
+      prompt: task.prompt,
+      status: task.status,
+      mappedStatus: mapTaskStatus(task.status),
+      modelId: task.modelId,
+      providerId: task.providerId,
+      fallbackNotice: task.fallbackNotice,
       timestamp: new Date(task.updatedAt).toISOString(),
     }));
 }
@@ -92,11 +113,13 @@ export function useTaskStream(sessionId: string) {
   });
 
   const [isConnected, setIsConnected] = useState(false);
+  const [isPollingFallback, setIsPollingFallback] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const graphRef = useRef(graph);
   const lastEventIdRef = useRef<string | null>(null);
   const seenEventIdsRef = useRef(new Set<string>());
   const taskTitleRef = useRef(new Map<string, string>());
+  const taskPromptRef = useRef(new Map<string, string>());
 
   useEffect(() => {
     graphRef.current = graph;
@@ -112,12 +135,11 @@ export function useTaskStream(sessionId: string) {
     lastEventIdRef.current = null;
     seenEventIdsRef.current = new Set();
     taskTitleRef.current.clear();
+    taskPromptRef.current.clear();
   }, [sessionId]);
 
-  useEffect(() => {
-    let isActive = true;
-
-    async function loadInitialState() {
+  const refreshSessionState = useCallback(
+    async (isActiveRef?: { current: boolean }) => {
       if (!sessionId || sessionId === "undefined") {
         return;
       }
@@ -126,24 +148,47 @@ export function useTaskStream(sessionId: string) {
           listTasks(sessionId),
           listApprovals(sessionId),
         ]);
-        if (!isActive) {
+        if (isActiveRef && !isActiveRef.current) {
           return;
         }
 
-        setGraph((prev) => deriveInitialState(prev, tasks, approvals, taskTitleRef.current));
+        setGraph((prev) =>
+          deriveInitialState(prev, tasks, approvals, taskTitleRef.current, taskPromptRef.current)
+        );
       } catch (error) {
-        if (isActive) {
-          console.error("Failed to load initial session state", error);
+        if (!isActiveRef || isActiveRef.current) {
+          console.error("Failed to load session state", error);
         }
       }
+    },
+    [sessionId]
+  );
+
+  useEffect(() => {
+    const isActiveRef = { current: true };
+    void refreshSessionState(isActiveRef);
+    return () => {
+      isActiveRef.current = false;
+    };
+  }, [refreshSessionState]);
+
+  useEffect(() => {
+    if (!isPollingFallback || !sessionId || sessionId === "undefined") {
+      return;
     }
 
-    loadInitialState();
+    const isActiveRef = { current: true };
+    void refreshSessionState(isActiveRef);
+    const interval = setInterval(
+      () => void refreshSessionState(isActiveRef),
+      config.taskPollInterval
+    );
 
     return () => {
-      isActive = false;
+      isActiveRef.current = false;
+      clearInterval(interval);
     };
-  }, [sessionId]);
+  }, [isPollingFallback, sessionId, refreshSessionState]);
 
   const handleEvent = useCallback((id: string, type: string, data: unknown) => {
     if (seenEventIdsRef.current.has(id)) {
@@ -153,7 +198,15 @@ export function useTaskStream(sessionId: string) {
     lastEventIdRef.current = id;
 
     setGraph((prev) =>
-      reduceGraph(prev, id, type, data, new Date().toISOString(), taskTitleRef.current)
+      reduceGraph(
+        prev,
+        id,
+        type,
+        data,
+        new Date().toISOString(),
+        taskTitleRef.current,
+        taskPromptRef.current
+      )
     );
   }, []);
 
@@ -162,7 +215,8 @@ export function useTaskStream(sessionId: string) {
     id: string,
     data: unknown,
     now: string,
-    taskTitles: Map<string, string>
+    taskTitles: Map<string, string>,
+    taskPrompts: Map<string, string>
   ) => TaskGraph;
 
   const EVENT_HANDLERS: Record<string, EventHandler> = {
@@ -181,7 +235,9 @@ export function useTaskStream(sessionId: string) {
     prev: TaskGraph,
     _id: string,
     data: unknown,
-    now: string
+    now: string,
+    _taskTitles: Map<string, string>,
+    _taskPrompts: Map<string, string>
   ): TaskGraph {
     if (!isRecord(data)) {
       return prev;
@@ -192,6 +248,7 @@ export function useTaskStream(sessionId: string) {
     }
     const action = typeof data.action === "string" ? data.action : "tool";
     const riskTags = extractRiskTags(data.riskTags);
+    const taskId = typeof data.taskId === "string" ? data.taskId : undefined;
 
     return {
       ...prev,
@@ -205,6 +262,7 @@ export function useTaskStream(sessionId: string) {
         requiresApproval: true,
         approvalId,
         riskLevel: mapRiskLevel(riskTags),
+        taskId,
         timestamp: now,
       }),
     };
@@ -214,13 +272,16 @@ export function useTaskStream(sessionId: string) {
     prev: TaskGraph,
     id: string,
     data: unknown,
-    now: string
+    now: string,
+    _taskTitles: Map<string, string>,
+    _taskPrompts: Map<string, string>
   ): TaskGraph {
     if (!isRecord(data)) {
       return prev;
     }
     const approvalId = typeof data.approvalId === "string" ? data.approvalId : undefined;
     const status = typeof data.status === "string" ? data.status : "resolved";
+    const taskId = typeof data.taskId === "string" ? data.taskId : undefined;
 
     return {
       ...prev,
@@ -230,30 +291,48 @@ export function useTaskStream(sessionId: string) {
         id: `event-${id}`,
         type: "thinking",
         content: `Approval ${approvalId ? approvalId.slice(0, 8) : ""} ${formatStatus(status)}.`,
+        taskId,
         timestamp: now,
       }),
     };
   }
 
-  function handleAgentThink(prev: TaskGraph, id: string, data: unknown, now: string): TaskGraph {
+  function handleAgentThink(
+    prev: TaskGraph,
+    id: string,
+    data: unknown,
+    now: string,
+    _taskTitles: Map<string, string>,
+    _taskPrompts: Map<string, string>
+  ): TaskGraph {
     if (!isRecord(data) || typeof data.content !== "string") {
       return prev;
     }
+    const taskId = typeof data.taskId === "string" ? data.taskId : undefined;
     return {
       ...prev,
       nodes: appendNode(prev.nodes, {
         id: `think-${id}`,
         type: "thinking",
         content: data.content,
+        taskId,
         timestamp: now,
       }),
     };
   }
 
-  function handleToolCall(prev: TaskGraph, id: string, data: unknown, now: string): TaskGraph {
+  function handleToolCall(
+    prev: TaskGraph,
+    id: string,
+    data: unknown,
+    now: string,
+    _taskTitles: Map<string, string>,
+    _taskPrompts: Map<string, string>
+  ): TaskGraph {
     if (!isRecord(data) || typeof data.tool !== "string") {
       return prev;
     }
+    const taskId = typeof data.taskId === "string" ? data.taskId : undefined;
     const riskLevel =
       typeof data.riskLevel === "string" &&
       Object.values(RiskLevel).includes(data.riskLevel as RiskLevel)
@@ -272,14 +351,23 @@ export function useTaskStream(sessionId: string) {
           typeof data.requiresApproval === "boolean" ? data.requiresApproval : undefined,
         approvalId: typeof data.approvalId === "string" ? data.approvalId : undefined,
         riskLevel,
+        taskId,
       }),
     };
   }
 
-  function handleToolResult(prev: TaskGraph, id: string, data: unknown, now: string): TaskGraph {
+  function handleToolResult(
+    prev: TaskGraph,
+    id: string,
+    data: unknown,
+    now: string,
+    _taskTitles: Map<string, string>,
+    _taskPrompts: Map<string, string>
+  ): TaskGraph {
     if (!isRecord(data)) {
       return prev;
     }
+    const taskId = typeof data.taskId === "string" ? data.taskId : undefined;
     return {
       ...prev,
       nodes: appendNode(prev.nodes, {
@@ -288,12 +376,20 @@ export function useTaskStream(sessionId: string) {
         callId: typeof data.callId === "string" ? data.callId : "unknown",
         output: data.result,
         isError: typeof data.isError === "boolean" ? data.isError : undefined,
+        taskId,
         timestamp: now,
       }),
     };
   }
 
-  function handlePlanUpdate(prev: TaskGraph, id: string, data: unknown, now: string): TaskGraph {
+  function handlePlanUpdate(
+    prev: TaskGraph,
+    id: string,
+    data: unknown,
+    now: string,
+    _taskTitles: Map<string, string>,
+    _taskPrompts: Map<string, string>
+  ): TaskGraph {
     if (!isRecord(data)) {
       return prev;
     }
@@ -302,6 +398,7 @@ export function useTaskStream(sessionId: string) {
       return prev;
     }
     const artifactId = typeof data.artifactId === "string" ? data.artifactId : "plan";
+    const taskId = typeof data.taskId === "string" ? data.taskId : undefined;
 
     return {
       ...prev,
@@ -313,12 +410,20 @@ export function useTaskStream(sessionId: string) {
         id: `plan-${id}`,
         type: "plan_update",
         plan: { type: "plan", steps: parsedPlan.data },
+        taskId,
         timestamp: now,
       }),
     };
   }
 
-  function handleArtifactUpdate(prev: TaskGraph, _id: string, data: unknown): TaskGraph {
+  function handleArtifactUpdate(
+    prev: TaskGraph,
+    _id: string,
+    data: unknown,
+    _now: string,
+    _taskTitles: Map<string, string>,
+    _taskPrompts: Map<string, string>
+  ): TaskGraph {
     if (!isRecord(data)) {
       return prev;
     }
@@ -335,31 +440,98 @@ export function useTaskStream(sessionId: string) {
     };
   }
 
+  function resolveTaskMetadata(data: Record<string, unknown>) {
+    return {
+      modelId: typeof data.modelId === "string" ? data.modelId : undefined,
+      providerId: typeof data.providerId === "string" ? data.providerId : undefined,
+      fallbackNotice: typeof data.fallbackNotice === "string" ? data.fallbackNotice : undefined,
+    };
+  }
+
+  function resolveTaskNodeProps(data: Record<string, unknown>, taskId: string | undefined) {
+    const statusValue = typeof data.status === "string" ? data.status : undefined;
+    const title = resolveTaskTitle(taskId, data.title, taskTitleRef.current);
+    let prompt = typeof data.prompt === "string" ? data.prompt : undefined;
+    if (!prompt && taskId) {
+      prompt = taskPromptRef.current.get(taskId);
+    }
+    if (taskId && prompt) {
+      taskPromptRef.current.set(taskId, prompt);
+    }
+
+    const { modelId, providerId, fallbackNotice } = resolveTaskMetadata(data);
+
+    return {
+      statusValue,
+      title,
+      prompt,
+      mappedStatus: statusValue ? mapTaskStatus(statusValue) : null,
+      modelId,
+      providerId,
+      fallbackNotice,
+    };
+  }
+
+  function createTaskStatusNode(
+    taskId: string,
+    title: string,
+    prompt: string | undefined,
+    statusValue: string,
+    mappedStatus: TaskStatus | null,
+    modelId: string | undefined,
+    providerId: string | undefined,
+    fallbackNotice: string | undefined,
+    now: string
+  ): TaskStatusNode {
+    return {
+      id: `task-${taskId}`,
+      type: "task_status",
+      taskId,
+      title,
+      prompt,
+      status: statusValue as CoworkTaskStatus,
+      mappedStatus,
+      modelId,
+      providerId,
+      fallbackNotice,
+      timestamp: now,
+    };
+  }
+
   function handleTaskUpdate(
     prev: TaskGraph,
-    id: string,
+    _id: string,
     data: unknown,
     now: string,
-    taskTitles: Map<string, string>
+    _taskTitles: Map<string, string>,
+    _taskPrompts: Map<string, string>
   ): TaskGraph {
     if (!isRecord(data)) {
       return prev;
     }
     const taskId = typeof data.taskId === "string" ? data.taskId : undefined;
-    const statusValue = typeof data.status === "string" ? data.status : undefined;
-
-    const title = resolveTaskTitle(taskId, data.title, taskTitles);
-    const nodeId = taskId ? `task-${taskId}-${id}` : `event-${id}`;
+    const props = resolveTaskNodeProps(data, taskId);
 
     return {
       ...prev,
-      status: (statusValue ? mapTaskStatus(statusValue) : null) ?? prev.status,
-      nodes: appendNode(prev.nodes, {
-        id: nodeId,
-        type: "thinking",
-        content: `${title} · ${statusValue ? formatStatus(statusValue) : "updated"}`,
-        timestamp: now,
-      }),
+      status: props.mappedStatus ?? prev.status,
+      nodes:
+        taskId && props.statusValue
+          ? upsertNode(
+              prev.nodes,
+              createTaskStatusNode(
+                taskId,
+                props.title,
+                props.prompt,
+                props.statusValue,
+                props.mappedStatus,
+                props.modelId,
+                props.providerId,
+                props.fallbackNotice,
+                now
+              )
+            )
+          : prev.nodes,
     };
   }
 
@@ -380,11 +552,13 @@ export function useTaskStream(sessionId: string) {
     prev: TaskGraph,
     tasks: CoworkTask[],
     approvals: CoworkApproval[],
-    taskTitles: Map<string, string>
+    taskTitles: Map<string, string>,
+    taskPrompts: Map<string, string>
   ): TaskGraph {
-    const nodes = buildTaskNodes(tasks);
+    const statusNodes = buildTaskNodes(tasks);
     for (const task of tasks) {
       taskTitles.set(task.taskId, task.title);
+      taskPrompts.set(task.taskId, task.prompt);
     }
 
     const pendingApprovals = approvals.filter((a) => a.status === "pending");
@@ -403,12 +577,18 @@ export function useTaskStream(sessionId: string) {
     const mappedStatus = latestTask ? mapTaskStatus(latestTask.status) : null;
     const latestApproval = pendingApprovals.sort((a, b) => b.createdAt - a.createdAt)[0];
 
+    const nonStatusNodes = prev.nodes.filter((node) => node.type !== "task_status");
+    const mergedStatusNodes = statusNodes.reduce<TaskNode[]>(
+      (acc, node) => upsertNode(acc, node),
+      nonStatusNodes
+    );
+
     return {
       ...prev,
       status: mappedStatus ?? prev.status,
-      nodes: approvalNodes.reduce(
+      nodes: approvalNodes.reduce<TaskNode[]>(
         (acc, node) => appendNode(acc, node),
-        nodes.reduce((acc, node) => appendNode(acc, node), prev.nodes)
+        mergedStatusNodes
       ),
       pendingApprovalId: latestApproval?.approvalId,
     };
@@ -420,11 +600,12 @@ export function useTaskStream(sessionId: string) {
     type: string,
     data: unknown,
     now: string,
-    taskTitles: Map<string, string>
+    taskTitles: Map<string, string>,
+    taskPrompts: Map<string, string>
   ): TaskGraph {
     const handler = EVENT_HANDLERS[type];
     if (handler) {
-      return handler(prev, id, data, now, taskTitles);
+      return handler(prev, id, data, now, taskTitles, taskPrompts);
     }
     return prev;
   }
@@ -432,32 +613,71 @@ export function useTaskStream(sessionId: string) {
   useEffect(() => {
     let retryTimeout: ReturnType<typeof setTimeout> | undefined;
 
-    async function connect(lastEventId?: string | null) {
-      const abortController = setupAbortController(abortControllerRef);
-      const signal = abortController.signal;
+    const requestReader = async (
+      lastEventId: string | null | undefined,
+      signal: AbortSignal
+    ): Promise<ReadableStreamDefaultReader<Uint8Array> | null> => {
+      const response = await fetchStream(sessionId, lastEventId, signal);
+      if (!response.ok) {
+        setIsConnected(false);
+        setIsPollingFallback(true);
+        return null;
+      }
+      const contentType = response.headers.get("content-type") ?? "";
+      if (!contentType.includes("text/event-stream") || !response.body) {
+        setIsConnected(false);
+        setIsPollingFallback(true);
+        return null;
+      }
+      setIsPollingFallback(false);
+      setIsConnected(true);
+      return response.body.getReader();
+    };
 
+    const markDisconnected = (pollingFallback: boolean) => {
+      setIsConnected(false);
+      setIsPollingFallback(pollingFallback);
+    };
+
+    const scheduleReconnect = () => {
+      retryTimeout = setTimeout(() => connect(lastEventIdRef.current), config.sseReconnectDelay);
+    };
+
+    const runStream = async (
+      lastEventId: string | null | undefined,
+      signal: AbortSignal
+    ): Promise<void> => {
       try {
-        const response = await fetchStream(sessionId, lastEventId, signal);
-        if (response.ok) {
-          setIsConnected(true);
-          const reader = response.body?.getReader();
-          if (reader) {
-            await readStream(reader, handleEvent);
-          }
+        const reader = await requestReader(lastEventId, signal);
+        if (!reader) {
+          return;
+        }
+        await readStream(reader, handleEvent);
+        if (!signal.aborted) {
+          setIsConnected(false);
+          scheduleReconnect();
         }
       } catch (error) {
-        if (!signal.aborted) {
-          console.error("Stream disconnected", error);
-          setIsConnected(false);
-          retryTimeout = setTimeout(
-            () => connect(lastEventIdRef.current),
-            config.sseReconnectDelay
-          );
+        if (signal.aborted) {
+          return;
         }
+        console.error("Stream disconnected", error);
+        markDisconnected(true);
+        scheduleReconnect();
       }
-    }
+    };
 
-    connect(lastEventIdRef.current);
+    const connect = async (lastEventId?: string | null) => {
+      if (!sessionId || sessionId === "undefined") {
+        markDisconnected(false);
+        return;
+      }
+
+      const abortController = setupAbortController(abortControllerRef);
+      await runStream(lastEventId, abortController.signal);
+    };
+
+    void connect(lastEventIdRef.current);
 
     return () => {
       abortControllerRef.current?.abort();

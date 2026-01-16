@@ -1,3 +1,4 @@
+import type { CoworkTaskStatus } from "@ku0/agent-runtime";
 import { z } from "zod";
 
 export enum TaskStatus {
@@ -43,12 +44,19 @@ export type ArtifactPayload = z.infer<typeof ArtifactPayloadSchema>;
 
 // --- Node Types ---
 
-export type TaskNodeType = "thinking" | "tool_call" | "tool_output" | "error" | "plan_update";
+export type TaskNodeType =
+  | "thinking"
+  | "tool_call"
+  | "tool_output"
+  | "error"
+  | "plan_update"
+  | "task_status";
 
 export interface BaseNode {
   id: string;
   type: TaskNodeType;
   timestamp: string;
+  taskId?: string;
 }
 
 export interface ThinkingNode extends BaseNode {
@@ -84,7 +92,25 @@ export interface PlanUpdateNode extends BaseNode {
   plan: z.infer<typeof ArtifactPayloadSchema>;
 }
 
-export type TaskNode = ThinkingNode | ToolCallNode | ToolOutputNode | ErrorNode | PlanUpdateNode;
+export interface TaskStatusNode extends BaseNode {
+  type: "task_status";
+  taskId: string;
+  title: string;
+  status: CoworkTaskStatus;
+  mappedStatus: TaskStatus | null;
+  prompt?: string;
+  modelId?: string;
+  providerId?: string;
+  fallbackNotice?: string;
+}
+
+export type TaskNode =
+  | ThinkingNode
+  | ToolCallNode
+  | ToolOutputNode
+  | ErrorNode
+  | PlanUpdateNode
+  | TaskStatusNode;
 
 export interface TaskGraph {
   sessionId: string;
