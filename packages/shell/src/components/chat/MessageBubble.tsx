@@ -11,6 +11,8 @@ export interface MessageBubbleProps {
   content: string;
   isUser: boolean;
   isStreaming: boolean;
+  className?: string;
+  density?: "default" | "compact";
 }
 
 /**
@@ -21,6 +23,8 @@ export const MessageBubble = React.memo(function MessageBubble({
   content,
   isUser,
   isStreaming,
+  className,
+  density = "default",
 }: MessageBubbleProps) {
   // If streaming but no content yet, show thinking indicator
   if (isStreaming && !content) {
@@ -36,24 +40,100 @@ export const MessageBubble = React.memo(function MessageBubble({
     isUser ? "text-foreground/90" : "text-foreground"
   );
 
-  return (
-    <div className={cn(containerClass, "max-w-[70ch] text-[14.5px] leading-[1.65]")}>
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={{
-          p: ({ children }) => <p className="my-2">{children}</p>,
-          h1: ({ children }) => (
+  const components =
+    density === "compact"
+      ? {
+          p: ({ children }: { children: React.ReactNode }) => <p className="my-1">{children}</p>,
+          h1: ({ children }: { children: React.ReactNode }) => (
+            <h1 className="mt-3 mb-1 text-sm font-semibold tracking-tight">{children}</h1>
+          ),
+          h2: ({ children }: { children: React.ReactNode }) => (
+            <h2 className="mt-2 mb-1 text-xs font-semibold tracking-tight">{children}</h2>
+          ),
+          h3: ({ children }: { children: React.ReactNode }) => (
+            <h3 className="mt-2 mb-1 text-[11px] font-semibold uppercase text-muted-foreground">
+              {children}
+            </h3>
+          ),
+          pre: ({ children }: { children: React.ReactNode }) => (
+            <pre className="rounded-lg bg-surface-2/70 p-3 text-[11px] text-foreground/90 overflow-x-auto border border-border/40">
+              {children}
+            </pre>
+          ),
+          // biome-ignore lint/suspicious/noExplicitAny: ReactMarkdown types are complex
+          code: ({ inline, className, children, ...props }: any) =>
+            inline ? (
+              <code
+                className={cn(
+                  "rounded bg-surface-2/80 px-1.5 py-0.5 text-[11px] text-foreground/90",
+                  className
+                )}
+                {...props}
+              >
+                {children}
+              </code>
+            ) : (
+              <code className={className} {...props}>
+                {children}
+              </code>
+            ),
+          blockquote: ({ children }: { children: React.ReactNode }) => (
+            <blockquote className="border-l-2 border-border/60 pl-3 text-muted-foreground">
+              {children}
+            </blockquote>
+          ),
+          ul: ({ children }: { children: React.ReactNode }) => (
+            <ul className="my-1 ml-4 list-disc space-y-1">{children}</ul>
+          ),
+          ol: ({ children }: { children: React.ReactNode }) => (
+            <ol className="my-1 ml-4 list-decimal space-y-1">{children}</ol>
+          ),
+          li: ({ children }: { children: React.ReactNode }) => (
+            <li className="leading-relaxed">{children}</li>
+          ),
+          hr: () => <hr className="my-3 border-border/60" />,
+          a: ({ children, href }: { children: React.ReactNode; href?: string }) => (
+            <a
+              href={href}
+              className="font-medium text-primary underline underline-offset-4 hover:text-primary/80"
+            >
+              {children}
+            </a>
+          ),
+          strong: ({ children }: { children: React.ReactNode }) => (
+            <strong className="font-semibold text-foreground">{children}</strong>
+          ),
+          em: ({ children }: { children: React.ReactNode }) => (
+            <em className="text-foreground/80">{children}</em>
+          ),
+          table: ({ children }: { children: React.ReactNode }) => (
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">{children}</table>
+            </div>
+          ),
+          th: ({ children }: { children: React.ReactNode }) => (
+            <th className="border-b border-border/50 px-2 py-1 text-left text-[11px] font-semibold">
+              {children}
+            </th>
+          ),
+          td: ({ children }: { children: React.ReactNode }) => (
+            <td className="border-b border-border/30 px-2 py-1 text-[11px]">{children}</td>
+          ),
+        }
+      : {
+          p: ({ children }: { children: React.ReactNode }) => <p className="my-2">{children}</p>,
+          h1: ({ children }: { children: React.ReactNode }) => (
             <h1 className="mt-5 mb-2 text-lg font-semibold tracking-tight">{children}</h1>
           ),
-          h2: ({ children }) => (
+          h2: ({ children }: { children: React.ReactNode }) => (
             <h2 className="mt-4 mb-2 text-base font-semibold tracking-tight">{children}</h2>
           ),
-          h3: ({ children }) => (
+          h3: ({ children }: { children: React.ReactNode }) => (
             <h3 className="mt-3 mb-1 text-sm font-semibold tracking-tight uppercase text-muted-foreground">
               {children}
             </h3>
           ),
-          pre: ({ children }) => (
+          pre: ({ children }: { children: React.ReactNode }) => (
             <pre className="rounded-lg bg-surface-2/70 p-3 text-xs text-foreground/90 overflow-x-auto border border-border/40">
               {children}
             </pre>
@@ -75,16 +155,22 @@ export const MessageBubble = React.memo(function MessageBubble({
                 {children}
               </code>
             ),
-          blockquote: ({ children }) => (
+          blockquote: ({ children }: { children: React.ReactNode }) => (
             <blockquote className="border-l-2 border-border/60 pl-3 text-muted-foreground">
               {children}
             </blockquote>
           ),
-          ul: ({ children }) => <ul className="my-2 ml-5 list-disc space-y-1">{children}</ul>,
-          ol: ({ children }) => <ol className="my-2 ml-5 list-decimal space-y-1">{children}</ol>,
-          li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+          ul: ({ children }: { children: React.ReactNode }) => (
+            <ul className="my-2 ml-5 list-disc space-y-1">{children}</ul>
+          ),
+          ol: ({ children }: { children: React.ReactNode }) => (
+            <ol className="my-2 ml-5 list-decimal space-y-1">{children}</ol>
+          ),
+          li: ({ children }: { children: React.ReactNode }) => (
+            <li className="leading-relaxed">{children}</li>
+          ),
           hr: () => <hr className="my-4 border-border/60" />,
-          a: ({ children, href }) => (
+          a: ({ children, href }: { children: React.ReactNode; href?: string }) => (
             <a
               href={href}
               className="font-medium text-primary underline underline-offset-4 hover:text-primary/80"
@@ -92,25 +178,30 @@ export const MessageBubble = React.memo(function MessageBubble({
               {children}
             </a>
           ),
-          strong: ({ children }) => (
+          strong: ({ children }: { children: React.ReactNode }) => (
             <strong className="font-semibold text-foreground">{children}</strong>
           ),
-          em: ({ children }) => <em className="text-foreground/80">{children}</em>,
-          table: ({ children }) => (
+          em: ({ children }: { children: React.ReactNode }) => (
+            <em className="text-foreground/80">{children}</em>
+          ),
+          table: ({ children }: { children: React.ReactNode }) => (
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">{children}</table>
             </div>
           ),
-          th: ({ children }) => (
+          th: ({ children }: { children: React.ReactNode }) => (
             <th className="border-b border-border/50 px-2 py-1 text-left text-xs font-semibold">
               {children}
             </th>
           ),
-          td: ({ children }) => (
+          td: ({ children }: { children: React.ReactNode }) => (
             <td className="border-b border-border/30 px-2 py-1 text-xs">{children}</td>
           ),
-        }}
-      >
+        };
+
+  return (
+    <div className={cn(containerClass, "max-w-[70ch] text-[14.5px] leading-[1.65]", className)}>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
         {content}
       </ReactMarkdown>
       {isStreaming && <TypingCursor />}

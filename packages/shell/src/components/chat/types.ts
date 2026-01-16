@@ -47,6 +47,9 @@ export interface AgentTask {
   progress: number; // 0-100
   steps: TaskStep[];
   artifacts: ArtifactItem[];
+  modelId?: string;
+  providerId?: string;
+  fallbackNotice?: string;
   // Stats for display
   filesChanged?: number;
   linesAdded?: number;
@@ -98,6 +101,10 @@ export interface Message {
 
   /** Semantic type of the message for UI rendering */
   type?: "text" | "info" | "ask" | "result" | "task_stream";
+
+  /** Model metadata for transparency */
+  providerId?: string;
+  fallbackNotice?: string;
 
   /** For 'ask' messages, what kind of action is requested (Spec 2.2.1) */
   suggested_action?:

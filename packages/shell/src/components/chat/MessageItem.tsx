@@ -13,6 +13,7 @@ import { MessageAlert } from "./MessageAlert";
 import { MessageBubble } from "./MessageBubble";
 import { MessageReferences } from "./MessageReferences";
 import { MessageStatusBadge } from "./MessageStatusBadge";
+import { ModelBadge } from "./ModelBadge";
 import { ThinkingProcess } from "./ThinkingProcess";
 import { TokenUsageDisplay } from "./TokenUsageDisplay";
 
@@ -178,7 +179,7 @@ export const MessageItem = React.memo(function MessageItem({
         className={cn(
           "relative min-w-0 max-w-[92%] py-0.5 text-sm leading-normal",
           isUser ? "text-foreground/90" : "text-foreground",
-          message.type === "task_stream" && "w-full"
+          message.type === "task_stream" && "w-full max-w-none"
         )}
       >
         <MessageContent
@@ -190,6 +191,9 @@ export const MessageItem = React.memo(function MessageItem({
           isStreaming={isStreaming}
           onPreviewArtifact={onPreviewArtifact}
         />
+        {!isUser && message.fallbackNotice && message.type !== "task_stream" && (
+          <div className="mt-2 text-[11px] text-amber-600/90">{message.fallbackNotice}</div>
+        )}
 
         {/* Artifacts (from inline artifact blocks only) */}
         <ArtifactList artifacts={artifacts} />
@@ -289,6 +293,11 @@ function AssistantStatusRow({
     <div className="mt-2 flex items-center justify-between">
       <div className="flex items-center gap-2">
         <MessageStatusBadge status={message.status} labels={translations.statusLabels} />
+        <ModelBadge
+          modelId={message.modelId}
+          providerId={message.providerId}
+          fallbackNotice={message.fallbackNotice}
+        />
         {message.confidence !== undefined && (
           <ConfidenceBadge score={message.confidence} provenance={message.provenance} size="sm" />
         )}

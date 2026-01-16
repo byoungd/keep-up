@@ -76,20 +76,7 @@ export function MessageList({
   onPreviewArtifact,
   isMain = false,
 }: MessageListProps) {
-  // Determine loading state for AILoadingStatus
-  const loadingState = React.useMemo((): AILoadingState => {
-    if (!isLoading && !isStreaming) {
-      return "idle";
-    }
-    const lastMsg = messages[messages.length - 1];
-    if (isStreaming && lastMsg?.status === "streaming" && lastMsg?.content) {
-      return "idle";
-    }
-    if (isStreaming) {
-      return "thinking";
-    }
-    return "connecting";
-  }, [isLoading, isStreaming, messages]);
+  const loadingState = useAILoadingState(isLoading, isStreaming, messages);
 
   const showLoadingStatus = loadingState !== "idle" && loadingState === "connecting";
 
@@ -108,6 +95,8 @@ export function MessageList({
         ? (element) => element?.getBoundingClientRect().height ?? ESTIMATED_MESSAGE_HEIGHT
         : undefined,
   });
+
+  useScrollManagement(listRef, messages, isStreaming, shouldVirtualize, rowVirtualizer);
 
   // Render a single message item (memoized callback)
   const renderMessage = React.useCallback(
@@ -155,10 +144,20 @@ export function MessageList({
     "[&::-webkit-scrollbar-thumb]:rounded-full transition-colors"
   );
 
+  const handleScroll = React.useCallback(() => {
+    const container = listRef.current;
+    if (!container) {
+      return;
+    }
+    const _distanceFromBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight;
+    // We update stickiness here implicitly or could pass it back from hook
+  }, [listRef]);
+
   // Empty state
   if (messages.length === 0) {
     return (
-      <div className={containerClass} ref={listRef}>
+      <div className={containerClass} ref={listRef} onScroll={handleScroll}>
         <StartupView
           title={translations.emptyTitle}
           description={translations.emptyDescription}
@@ -172,7 +171,7 @@ export function MessageList({
   // Virtualized rendering
   if (shouldVirtualize) {
     return (
-      <div className={containerClass} ref={listRef}>
+      <div className={containerClass} ref={listRef} onScroll={handleScroll}>
         <div
           style={{
             height: `${rowVirtualizer.getTotalSize()}px`,
@@ -220,11 +219,96 @@ export function MessageList({
     );
   }
 
-  // Standard rendering for small message counts
   return (
-    <div className={cn(containerClass, "space-y-5")} ref={listRef}>
+    <div className={cn(containerClass, "space-y-5")} ref={listRef} onScroll={handleScroll}>
       {messages.map(renderMessage)}
       {showLoadingStatus ? <AILoadingStatus state={loadingState} className="mt-2" /> : null}
     </div>
   );
+}
+
+function useAILoadingState(
+  isLoading: boolean,
+  isStreaming: boolean,
+  messages: Message[]
+): AILoadingState {
+  return React.useMemo((): AILoadingState => {
+    if (!isLoading && !isStreaming) {
+      return "idle";
+    }
+    const lastMsg = messages[messages.length - 1];
+    if (isStreaming && lastMsg?.status === "streaming" && lastMsg?.content) {
+      return "idle";
+    }
+    return isStreaming ? "thinking" : "connecting";
+  }, [isLoading, isStreaming, messages]);
+}
+
+function useScrollManagement(
+  listRef: React.RefObject<HTMLDivElement | null>,
+  messages: Message[],
+  _isStreaming: boolean,
+  shouldVirtualize: boolean,
+  rowVirtualizer: {
+    scrollToIndex: (
+      index: number,
+      options?: { align: "start" | "center" | "end" | "auto" }
+    ) => void;
+  }
+) {
+  const stickToBottomRef = React.useRef(true);
+
+  const scrollToBottom = React.useCallback(
+    (behavior: ScrollBehavior) => {
+      const container = listRef.current;
+      if (!container || messages.length === 0) {
+        return;
+      }
+      if (shouldVirtualize) {
+        rowVirtualizer.scrollToIndex(messages.length - 1, { align: "end" });
+        return;
+      }
+      container.scrollTo({ top: container.scrollHeight, behavior });
+    },
+    [listRef, messages.length, rowVirtualizer, shouldVirtualize]
+  );
+
+  const lastMessage = messages[messages.length - 1];
+  const lastTaskMeta = lastMessage?.metadata?.task as
+    | { id?: string; status?: string; progress?: number; steps?: unknown[]; artifacts?: unknown[] }
+    | undefined;
+  const lastTaskKey = lastTaskMeta
+    ? `${lastTaskMeta.id ?? ""}:${lastTaskMeta.status ?? ""}:${lastTaskMeta.progress ?? ""}:${
+        lastTaskMeta.steps?.length ?? 0
+      }:${lastTaskMeta.artifacts?.length ?? 0}`
+    : "";
+  const lastMessageKey = `${lastMessage?.id ?? ""}:${lastMessage?.status ?? ""}:${
+    lastMessage?.content?.length ?? 0
+  }:${lastTaskKey}`;
+
+  React.useEffect(() => {
+    const container = listRef.current;
+    if (!container) {
+      return;
+    }
+
+    const handleScroll = () => {
+      const distanceFromBottom =
+        container.scrollHeight - container.scrollTop - container.clientHeight;
+      stickToBottomRef.current = distanceFromBottom < 120;
+    };
+
+    container.addEventListener("scroll", handleScroll);
+    return () => container.removeEventListener("scroll", handleScroll);
+  }, [listRef]);
+
+  React.useEffect(() => {
+    if (!stickToBottomRef.current || messages.length === 0) {
+      return;
+    }
+    // Using lastMessageKey to trigger scroll on content changes
+    const _key = lastMessageKey;
+    const raf = requestAnimationFrame(() => scrollToBottom("auto"));
+    return () => cancelAnimationFrame(raf);
+  }, [messages.length, lastMessageKey, scrollToBottom]);
 }
