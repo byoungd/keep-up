@@ -7,7 +7,7 @@ import {
   type CoworkSession,
   DEFAULT_COWORK_POLICY,
 } from "@ku0/agent-runtime";
-import type { ApprovalStoreLike } from "../storage";
+import type { ApprovalStoreLike } from "../storage/contracts";
 import type { CoworkApproval } from "../storage/types";
 
 export type ToolCheckRequest =

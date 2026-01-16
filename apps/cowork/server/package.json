@@ -3,6 +3,18 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "COWORK_SERVER_START=true bun --watch index.ts"
+    "dev": "COWORK_SERVER_START=true tsx watch index.ts",
+    "dev:bun": "COWORK_SERVER_START=true bun --watch index.ts",
+    "start": "COWORK_SERVER_START=true tsx serve.ts"
+  },
+  "dependencies": {
+    "@ku0/agent-runtime": "workspace:*",
+    "@ku0/ai-core": "workspace:*",
+    "@hono/node-server": "^1.19.9",
+    "better-sqlite3": "^9.6.0",
+    "hono": "^4.11.4"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12"
   }
 }

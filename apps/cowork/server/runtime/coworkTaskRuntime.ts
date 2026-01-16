@@ -1,0 +1,1020 @@
+import { readFile, stat } from "node:fs/promises";
+import { basename, extname } from "node:path";
+import {
+  type ConfirmationRequest,
+  type CoworkRiskTag,
+  type CoworkSession,
+  type CoworkTask,
+  type CoworkTaskStatus,
+  type CoworkTaskSummary,
+  createAICoreAdapter,
+  createBashToolServer,
+  createCodeToolServer,
+  createCoworkRuntime,
+  createFileToolServer,
+  createToolRegistry,
+  createWebSearchToolServer,
+  isPathWithinRoots,
+} from "@ku0/agent-runtime";
+import {
+  AnthropicProvider,
+  type CompletionRequest,
+  type CompletionResponse,
+  GeminiProvider,
+  type LLMProvider,
+  OpenAIProvider,
+  ProviderRouter,
+  type StreamChunk,
+  type Tool,
+  getModelCapability,
+  normalizeModelId,
+  resolveProviderFromEnv,
+} from "@ku0/ai-core";
+import type { StorageLayer } from "../storage/contracts";
+import type { CoworkApproval, CoworkSettings } from "../storage/types";
+import { COWORK_EVENTS, type SessionEventHub } from "../streaming/eventHub";
+import { createWebSearchProvider } from "./webSearchProvider";
+
+type Logger = Pick<Console, "info" | "warn" | "error">;
+
+type ProviderLike = Pick<LLMProvider, "complete" | "stream">;
+
+type SessionRuntime = {
+  sessionId: string;
+  runtime: ReturnType<typeof createCoworkRuntime>;
+  activeTaskId: string | null;
+  modelId: string | null;
+  providerId: string | null;
+  fallbackNotice: string | null;
+  unsubscribeQueue: () => void;
+  unsubscribeOrchestrator: () => void;
+};
+
+type RuntimeFactory = (
+  session: CoworkSession,
+  settings: CoworkSettings
+) => Promise<ReturnType<typeof createCoworkRuntime>>;
+
+const RISK_TAGS = new Set<CoworkRiskTag>(["delete", "overwrite", "network", "connector", "batch"]);
+const noop = () => undefined;
+
+export class CoworkTaskRuntime {
+  private readonly storage: StorageLayer;
+  private readonly events: SessionEventHub;
+  private readonly logger: Logger;
+  private readonly runtimes = new Map<string, SessionRuntime>();
+  private readonly runtimeFactory?: RuntimeFactory;
+  private taskWriteQueue: Promise<void> = Promise.resolve();
+
+  constructor(deps: {
+    storage: StorageLayer;
+    events: SessionEventHub;
+    logger?: Logger;
+    runtimeFactory?: RuntimeFactory;
+  }) {
+    this.storage = deps.storage;
+    this.events = deps.events;
+    this.logger = deps.logger ?? console;
+    this.runtimeFactory = deps.runtimeFactory;
+  }
+
+  async enqueueTask(
+    session: CoworkSession,
+    payload: { prompt: string; title?: string; modelId?: string }
+  ) {
+    const runtime = await this.getOrCreateRuntime(session);
+    const taskId = await runtime.runtime.enqueueTask(payload.prompt, payload.title);
+    const now = Date.now();
+    const task: CoworkTask = {
+      taskId,
+      sessionId: session.sessionId,
+      title: payload.title ?? "Cowork Task",
+      prompt: payload.prompt,
+      status: "queued",
+      modelId: payload.modelId ?? runtime.modelId ?? undefined,
+      providerId: runtime.providerId ?? undefined,
+      fallbackNotice: runtime.fallbackNotice ?? undefined,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await this.enqueueTaskWrite(() => this.storage.taskStore.create(task));
+    this.events.publish(session.sessionId, COWORK_EVENTS.TASK_CREATED, {
+      taskId,
+      status: task.status,
+      title: task.title,
+      prompt: task.prompt,
+      modelId: task.modelId,
+      providerId: task.providerId,
+      fallbackNotice: task.fallbackNotice,
+    });
+    return task;
+  }
+
+  async resolveApproval(
+    approvalId: string,
+    status: "approved" | "rejected"
+  ): Promise<CoworkApproval | null> {
+    const updated = await this.storage.approvalStore.update(approvalId, (approval) => ({
+      ...approval,
+      status,
+      resolvedAt: Date.now(),
+    }));
+
+    if (!updated) {
+      return null;
+    }
+
+    this.events.publish(updated.sessionId, COWORK_EVENTS.APPROVAL_RESOLVED, {
+      approvalId: updated.approvalId,
+      status: updated.status,
+    });
+
+    return updated;
+  }
+
+  private async getOrCreateRuntime(session: CoworkSession): Promise<SessionRuntime> {
+    const existing = this.runtimes.get(session.sessionId);
+    const settings = await this.storage.configStore.get();
+    const requestedModel = normalizeModelId(settings.defaultModel ?? undefined) ?? null;
+
+    if (existing) {
+      if (!existing.activeTaskId && requestedModel && requestedModel !== existing.modelId) {
+        this.detachRuntime(existing);
+        this.runtimes.delete(session.sessionId);
+      } else {
+        return existing;
+      }
+    }
+
+    const runtimeCore = this.runtimeFactory
+      ? { runtime: await this.runtimeFactory(session, settings), providerInfo: null }
+      : await this.createRuntimeCore(session, settings);
+    const created = this.attachRuntime(session, runtimeCore.runtime);
+    created.modelId = runtimeCore.providerInfo?.modelId ?? requestedModel;
+    created.providerId = runtimeCore.providerInfo?.providerId ?? null;
+    created.fallbackNotice = runtimeCore.providerInfo?.fallbackNotice ?? null;
+    this.runtimes.set(session.sessionId, created);
+    return created;
+  }
+
+  private async createRuntimeCore(
+    session: CoworkSession,
+    settings: CoworkSettings
+  ): Promise<{
+    runtime: ReturnType<typeof createCoworkRuntime>;
+    providerInfo: {
+      modelId: string | null;
+      providerId: string;
+      fallbackNotice?: string;
+    };
+  }> {
+    const { provider, model, providerId, fallbackNotice } = createCoworkProvider(
+      settings,
+      this.logger
+    );
+    const llm = createAICoreAdapter(provider, { model });
+
+    const registry = createToolRegistry();
+    await registry.register(createBashToolServer());
+    await registry.register(createFileToolServer());
+    await registry.register(createCodeToolServer());
+    await registry.register(createWebSearchToolServer(createWebSearchProvider(this.logger)));
+
+    const outputRoots = collectOutputRoots(session);
+    return {
+      runtime: createCoworkRuntime({
+        llm,
+        registry,
+        cowork: { session },
+        taskQueueConfig: { maxConcurrent: 1 },
+        outputRoots,
+      }),
+      providerInfo: {
+        modelId: model ?? null,
+        providerId,
+        fallbackNotice,
+      },
+    };
+  }
+
+  private attachRuntime(session: CoworkSession, runtime: ReturnType<typeof createCoworkRuntime>) {
+    const runtimeState: SessionRuntime = {
+      sessionId: session.sessionId,
+      runtime,
+      activeTaskId: null,
+      modelId: null,
+      providerId: null,
+      fallbackNotice: null,
+      unsubscribeQueue: noop,
+      unsubscribeOrchestrator: noop,
+    };
+
+    runtime.orchestrator.setConfirmationHandler((request) =>
+      this.handleConfirmation(runtimeState, request)
+    );
+
+    runtimeState.unsubscribeQueue = runtime.onCoworkEvents((event) => {
+      void this.handleTaskEvent(runtimeState, event).catch((error) => {
+        this.logger.error("Failed to handle task event", error);
+      });
+    });
+
+    runtimeState.unsubscribeOrchestrator = runtime.orchestrator.on((event) => {
+      void this.handleOrchestratorEvent(runtimeState, event).catch((error) => {
+        this.logger.error("Failed to handle orchestrator event", error);
+      });
+    });
+
+    return runtimeState;
+  }
+
+  private detachRuntime(runtimeState: SessionRuntime) {
+    runtimeState.unsubscribeQueue();
+    runtimeState.unsubscribeOrchestrator();
+  }
+
+  private async handleConfirmation(runtime: SessionRuntime, request: ConfirmationRequest) {
+    const approvalId = crypto.randomUUID();
+    const approval = {
+      approvalId,
+      sessionId: runtime.sessionId,
+      action: request.description,
+      riskTags: normalizeRiskTags(request.riskTags),
+      reason: request.reason,
+      status: "pending" as const,
+      createdAt: Date.now(),
+    };
+    await this.storage.approvalStore.create(approval);
+    this.events.publish(runtime.sessionId, COWORK_EVENTS.APPROVAL_REQUIRED, {
+      approvalId,
+      action: approval.action,
+      riskTags: approval.riskTags,
+      reason: approval.reason,
+      taskId: runtime.activeTaskId ?? undefined,
+    });
+
+    if (runtime.activeTaskId) {
+      void this.updateTaskStatus(runtime.activeTaskId, "awaiting_confirmation");
+    }
+
+    const decision = await this.waitForApprovalDecision(runtime.sessionId, approvalId);
+    if (runtime.activeTaskId) {
+      void this.updateTaskStatus(runtime.activeTaskId, "running");
+    }
+    return decision === "approved";
+  }
+
+  private async handleTaskEvent(
+    runtime: SessionRuntime,
+    event: { type: string; taskId: string; data?: Record<string, unknown> }
+  ) {
+    await this.ensureTaskRecord(runtime, event.taskId, event.data);
+    switch (event.type) {
+      case "task.queued":
+        await this.updateTaskStatus(event.taskId, "queued");
+        break;
+      case "task.running":
+        runtime.activeTaskId = event.taskId;
+        await this.updateTaskStatus(event.taskId, "running");
+        break;
+      case "task.completed":
+        await this.handleTaskCompleted(runtime, event.taskId, event.data);
+        break;
+      case "task.failed":
+        await this.updateTaskStatus(event.taskId, "failed");
+        runtime.activeTaskId = runtime.activeTaskId === event.taskId ? null : runtime.activeTaskId;
+        break;
+      case "task.cancelled":
+        await this.updateTaskStatus(event.taskId, "cancelled");
+        runtime.activeTaskId = runtime.activeTaskId === event.taskId ? null : runtime.activeTaskId;
+        break;
+      default:
+        break;
+    }
+  }
+
+  private async handleTaskCompleted(
+    runtime: SessionRuntime,
+    taskId: string,
+    data?: Record<string, unknown>
+  ) {
+    await this.updateTaskStatus(taskId, "completed");
+    runtime.activeTaskId = runtime.activeTaskId === taskId ? null : runtime.activeTaskId;
+    const summary = extractTaskSummary(data);
+    const reportContent = summary && !isSummaryEmpty(summary) ? formatSummary(summary) : null;
+    const fallbackContent = extractResultContent(data);
+    const session = await this.storage.sessionStore.getById(runtime.sessionId);
+    const artifactRoots = session ? collectArtifactRoots(session) : [];
+    const outputArtifacts = summary
+      ? await buildOutputArtifacts(summary, artifactRoots, taskId)
+      : [];
+    const content = normalizeArtifactContent(
+      outputArtifacts.length > 0 ? null : (fallbackContent ?? reportContent)
+    );
+    if (content) {
+      this.events.publish(runtime.sessionId, COWORK_EVENTS.AGENT_ARTIFACT, {
+        id: `summary-${taskId}`,
+        artifact: { type: "markdown", content },
+        taskId: taskId,
+      });
+    }
+    for (const artifact of outputArtifacts) {
+      this.events.publish(runtime.sessionId, COWORK_EVENTS.AGENT_ARTIFACT, {
+        ...artifact,
+        taskId: taskId,
+      });
+    }
+  }
+
+  private async handleOrchestratorEvent(
+    runtime: SessionRuntime,
+    event: { type: string; data: unknown }
+  ) {
+    const taskId = runtime.activeTaskId;
+    switch (event.type) {
+      case "thinking":
+        this.handleThinkingEvent(runtime, event.data);
+        return;
+      case "tool:calling":
+        this.handleToolCallingEvent(runtime, event.data);
+        return;
+      case "tool:result":
+        this.handleToolResultEvent(runtime, event.data);
+        return;
+      case "plan:created":
+        await this.handlePlanCreatedEvent(runtime, event.data, taskId);
+        return;
+      case "confirmation:received":
+        await this.handleConfirmationReceivedEvent(taskId);
+        return;
+      case "error":
+        await this.handleErrorEvent(taskId);
+        return;
+      default:
+        return;
+    }
+  }
+
+  private handleThinkingEvent(runtime: SessionRuntime, data: unknown): void {
+    if (!isRecord(data) || typeof data.content !== "string") {
+      return;
+    }
+    this.events.publish(runtime.sessionId, COWORK_EVENTS.AGENT_THINK, {
+      content: data.content,
+      taskId: runtime.activeTaskId ?? undefined,
+    });
+  }
+
+  private handleToolCallingEvent(runtime: SessionRuntime, data: unknown): void {
+    if (!isRecord(data) || typeof data.toolName !== "string") {
+      return;
+    }
+    this.events.publish(runtime.sessionId, COWORK_EVENTS.AGENT_TOOL_CALL, {
+      tool: data.toolName,
+      args: isRecord(data.arguments) ? data.arguments : {},
+      taskId: runtime.activeTaskId ?? undefined,
+    });
+  }
+
+  private handleToolResultEvent(runtime: SessionRuntime, data: unknown): void {
+    if (!isRecord(data) || typeof data.toolName !== "string") {
+      return;
+    }
+    this.events.publish(runtime.sessionId, COWORK_EVENTS.AGENT_TOOL_RESULT, {
+      callId: `${data.toolName}-${Date.now().toString(36)}`,
+      result: data.result,
+      isError: isToolError(data.result),
+      taskId: runtime.activeTaskId ?? undefined,
+    });
+  }
+
+  private async handlePlanCreatedEvent(
+    runtime: SessionRuntime,
+    data: unknown,
+    taskId: string | null
+  ): Promise<void> {
+    if (!isRecord(data)) {
+      return;
+    }
+    const steps = buildPlanSteps(data.steps);
+    this.events.publish(runtime.sessionId, COWORK_EVENTS.AGENT_PLAN, {
+      artifactId: taskId ? `plan-${taskId}` : "plan",
+      plan: steps,
+      taskId: taskId ?? undefined,
+    });
+    if (taskId) {
+      await this.updateTaskStatus(taskId, "planning", ["queued", "planning", "ready"]);
+    }
+  }
+
+  private async handleConfirmationReceivedEvent(taskId: string | null): Promise<void> {
+    if (!taskId) {
+      return;
+    }
+    await this.updateTaskStatus(taskId, "running");
+  }
+
+  private async handleErrorEvent(taskId: string | null): Promise<void> {
+    if (!taskId) {
+      return;
+    }
+    await this.updateTaskStatus(taskId, "failed");
+  }
+
+  private async updateTaskStatus(
+    taskId: string,
+    status: CoworkTaskStatus,
+    allowedStatuses?: CoworkTaskStatus[]
+  ) {
+    const now = Date.now();
+    let didChange = false;
+    const updated = await this.enqueueTaskWrite(() =>
+      this.storage.taskStore.update(taskId, (task) => {
+        if (allowedStatuses && !allowedStatuses.includes(task.status)) {
+          return task;
+        }
+        if (task.status === status) {
+          return task;
+        }
+        didChange = true;
+        return { ...task, status, updatedAt: now };
+      })
+    );
+
+    if (!updated || !didChange) {
+      return;
+    }
+
+    this.events.publish(updated.sessionId, COWORK_EVENTS.TASK_UPDATED, {
+      taskId: updated.taskId,
+      status: updated.status,
+      title: updated.title,
+      prompt: updated.prompt,
+      modelId: updated.modelId,
+      providerId: updated.providerId,
+      fallbackNotice: updated.fallbackNotice,
+    });
+  }
+
+  private async ensureTaskRecord(
+    runtime: SessionRuntime,
+    taskId: string,
+    data: Record<string, unknown> | undefined
+  ) {
+    const existing = await this.storage.taskStore.getById(taskId);
+    if (existing) {
+      return existing;
+    }
+
+    const prompt = extractPrompt(data);
+    const title = extractTitle(data);
+    const now = Date.now();
+    const task: CoworkTask = {
+      taskId,
+      sessionId: runtime.sessionId,
+      title: title ?? "Cowork Task",
+      prompt: prompt ?? "",
+      status: "queued",
+      modelId: runtime.modelId ?? undefined,
+      providerId: runtime.providerId ?? undefined,
+      fallbackNotice: runtime.fallbackNotice ?? undefined,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await this.enqueueTaskWrite(() => this.storage.taskStore.create(task));
+    return task;
+  }
+
+  private enqueueTaskWrite<T>(work: () => Promise<T>): Promise<T> {
+    const next = this.taskWriteQueue.then(work, work);
+    this.taskWriteQueue = next.then(
+      () => undefined,
+      () => undefined
+    );
+    return next;
+  }
+
+  private async waitForApprovalDecision(
+    sessionId: string,
+    approvalId: string
+  ): Promise<"approved" | "rejected"> {
+    const intervalMs = 200;
+    while (true) {
+      const approval = await this.storage.approvalStore.getById(approvalId);
+      if (!approval) {
+        this.logger.warn("Approval missing, defaulting to rejected", { approvalId, sessionId });
+        return "rejected";
+      }
+      if (approval.status !== "pending") {
+        return approval.status;
+      }
+      await delay(intervalMs);
+    }
+  }
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function resolveProviders(settings: CoworkSettings): LLMProvider[] {
+  const openaiEnv = resolveProviderFromEnv("openai");
+  const claudeEnv = resolveProviderFromEnv("claude");
+  const geminiEnv = resolveProviderFromEnv("gemini");
+  const openAiKey = settings.openAiKey?.trim() || openaiEnv?.apiKeys[0];
+  const anthropicKey = settings.anthropicKey?.trim() || claudeEnv?.apiKeys[0];
+  const geminiKey = settings.geminiKey?.trim() || geminiEnv?.apiKeys[0];
+  const geminiBaseUrl =
+    geminiEnv?.baseUrl || "https://generativelanguage.googleapis.com/v1beta/openai";
+
+  const providers: LLMProvider[] = [];
+  if (openAiKey) {
+    providers.push(new OpenAIProvider({ apiKey: openAiKey, baseUrl: openaiEnv?.baseUrl }));
+  }
+  if (anthropicKey) {
+    providers.push(new AnthropicProvider({ apiKey: anthropicKey, baseUrl: claudeEnv?.baseUrl }));
+  }
+  if (geminiKey) {
+    providers.push(new GeminiProvider({ apiKey: geminiKey, baseUrl: geminiBaseUrl }));
+  }
+  return providers;
+}
+
+function createCoworkProvider(settings: CoworkSettings, logger: Logger) {
+  const providers = resolveProviders(settings);
+
+  if (providers.length === 0) {
+    throw new Error("No AI provider configured. Add an API key in settings or env.");
+  }
+
+  const requestedModel = normalizeModelId(settings.defaultModel ?? undefined);
+  const preferred = resolvePreferredProvider(requestedModel);
+  const primary =
+    preferred && providers.some((provider) => provider.name === preferred)
+      ? preferred
+      : providers[0].name;
+  const fallbackOrder = providers
+    .map((provider) => provider.name)
+    .filter((name) => name !== primary);
+  const fallbackNotice =
+    requestedModel && preferred && preferred !== primary
+      ? `Requested provider ${preferred} unavailable. Using ${primary} instead.`
+      : undefined;
+
+  if (requestedModel && preferred && preferred !== primary) {
+    logger.warn("Requested model provider not available, falling back.", {
+      requestedModel,
+      preferred,
+      primary,
+    });
+  }
+
+  const router = new ProviderRouter({
+    primaryProvider: primary,
+    fallbackOrder,
+    enableFallback: true,
+  });
+
+  for (const provider of providers) {
+    router.registerProvider(provider);
+  }
+
+  router.startHealthChecks();
+
+  return {
+    provider: createProviderAdapter(router, "cowork"),
+    model: requestedModel ?? providers.find((provider) => provider.name === primary)?.defaultModel,
+    providerId: primary,
+    fallbackNotice,
+  };
+}
+
+function createProviderAdapter(provider: ProviderLike, name: string) {
+  return {
+    name,
+    async complete(request: {
+      model?: string;
+      messages: Array<{ role: string; content: string }>;
+      temperature?: number;
+      maxTokens?: number;
+      tools?: Array<{ name: string; description: string; inputSchema: Record<string, unknown> }>;
+    }) {
+      const response = await provider.complete(convertRequest(request));
+      return convertResponse(response);
+    },
+    async *stream(request: {
+      model?: string;
+      messages: Array<{ role: string; content: string }>;
+      temperature?: number;
+      maxTokens?: number;
+      tools?: Array<{ name: string; description: string; inputSchema: Record<string, unknown> }>;
+    }) {
+      const stream = provider.stream(convertRequest(request));
+      for await (const chunk of stream) {
+        const mapped = convertChunk(chunk);
+        if (mapped) {
+          yield mapped;
+        }
+      }
+    },
+  };
+}
+
+function convertRequest(request: {
+  model?: string;
+  messages: Array<{ role: string; content: string }>;
+  temperature?: number;
+  maxTokens?: number;
+  tools?: Array<{ name: string; description: string; inputSchema: Record<string, unknown> }>;
+}): CompletionRequest {
+  return {
+    model: request.model ?? "",
+    messages: request.messages,
+    temperature: request.temperature,
+    maxTokens: request.maxTokens,
+    tools: request.tools?.map((tool) => ({
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.inputSchema,
+    })) as Tool[] | undefined,
+  };
+}
+
+function convertResponse(response: CompletionResponse) {
+  return {
+    content: response.content ?? "",
+    toolCalls: response.toolCalls?.map((call) => ({
+      id: call.id,
+      name: call.name,
+      arguments: parseArguments(call.arguments),
+    })),
+    usage: response.usage
+      ? { inputTokens: response.usage.inputTokens, outputTokens: response.usage.outputTokens }
+      : undefined,
+    finishReason: response.finishReason,
+  };
+}
+
+function convertChunk(chunk: StreamChunk) {
+  switch (chunk.type) {
+    case "content":
+      return { type: "content", content: chunk.content };
+    case "tool_call":
+      return chunk.toolCall?.name
+        ? {
+            type: "tool_call",
+            toolCall: {
+              id: chunk.toolCall.id ?? crypto.randomUUID(),
+              name: chunk.toolCall.name,
+              arguments: parseArguments(chunk.toolCall.arguments),
+            },
+          }
+        : null;
+    case "error":
+      return { type: "error", error: chunk.error ?? "Unknown error" };
+    case "done":
+      return { type: "done" };
+    default:
+      return null;
+  }
+}
+
+function parseArguments(value: unknown): Record<string, unknown> {
+  if (isRecord(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      return isRecord(parsed) ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
+
+function resolvePreferredProvider(
+  model: string | undefined
+): "openai" | "anthropic" | "gemini" | undefined {
+  if (!model) {
+    return undefined;
+  }
+  const capability = getModelCapability(model);
+  if (capability?.provider === "openai") {
+    return "openai";
+  }
+  if (capability?.provider === "gemini") {
+    return "gemini";
+  }
+  if (capability?.provider === "claude") {
+    return "anthropic";
+  }
+  const lower = model.toLowerCase();
+  if (lower.includes("claude")) {
+    return "anthropic";
+  }
+  if (lower.includes("gemini")) {
+    return "gemini";
+  }
+  if (
+    lower.includes("gpt") ||
+    lower.includes("o1") ||
+    lower.includes("o3") ||
+    lower.includes("o4")
+  ) {
+    return "openai";
+  }
+  return undefined;
+}
+
+function collectOutputRoots(session: CoworkSession): string[] {
+  const roots: string[] = [];
+  for (const grant of session.grants) {
+    if (Array.isArray(grant.outputRoots)) {
+      roots.push(...grant.outputRoots);
+    }
+  }
+  return roots;
+}
+
+const MAX_ARTIFACT_BYTES = 512 * 1024;
+const PREVIEWABLE_EXTENSIONS = new Set([".md", ".markdown", ".mdx", ".txt"]);
+
+function collectArtifactRoots(session: CoworkSession): string[] {
+  const roots = new Set<string>();
+  for (const grant of session.grants) {
+    if (typeof grant.rootPath === "string") {
+      roots.add(grant.rootPath);
+    }
+    if (Array.isArray(grant.outputRoots)) {
+      for (const root of grant.outputRoots) {
+        roots.add(root);
+      }
+    }
+  }
+  return Array.from(roots);
+}
+
+function normalizeArtifactContent(content: string | null): string | null {
+  if (!content) {
+    return null;
+  }
+  const trimmed = content.trim();
+  return trimmed.length > 0 ? content : null;
+}
+
+function collectCandidateArtifactPaths(summary: CoworkTaskSummary): string[] {
+  const paths = new Set<string>();
+  for (const output of summary.outputs) {
+    paths.add(output.path);
+  }
+  for (const change of summary.fileChanges) {
+    if (change.change === "delete") {
+      continue;
+    }
+    paths.add(change.path);
+  }
+  return Array.from(paths);
+}
+
+function isPreviewablePath(filePath: string): boolean {
+  const ext = extname(filePath).toLowerCase();
+  return PREVIEWABLE_EXTENSIONS.has(ext);
+}
+
+function buildArtifactId(taskId: string, filePath: string): string {
+  const raw = basename(filePath);
+  const safe = raw.replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/^-+|-+$/g, "");
+  return `output-${taskId}-${safe || "file"}`;
+}
+
+async function readArtifactContent(filePath: string): Promise<string | null> {
+  try {
+    const stats = await stat(filePath);
+    if (!stats.isFile() || stats.size > MAX_ARTIFACT_BYTES) {
+      return null;
+    }
+    return await readFile(filePath, "utf-8");
+  } catch {
+    return null;
+  }
+}
+
+async function buildOutputArtifacts(
+  summary: CoworkTaskSummary,
+  roots: string[],
+  taskId: string
+): Promise<Array<{ id: string; artifact: { type: "markdown"; content: string } }>> {
+  const artifacts: Array<{ id: string; artifact: { type: "markdown"; content: string } }> = [];
+  const candidates = collectCandidateArtifactPaths(summary);
+
+  for (const filePath of candidates) {
+    if (!isPreviewablePath(filePath)) {
+      continue;
+    }
+    if (roots.length > 0 && !isPathWithinRoots(filePath, roots, false)) {
+      continue;
+    }
+    const content = await readArtifactContent(filePath);
+    if (!content) {
+      continue;
+    }
+    artifacts.push({
+      id: buildArtifactId(taskId, filePath),
+      artifact: { type: "markdown", content },
+    });
+  }
+
+  return artifacts;
+}
+
+function normalizeRiskTags(tags?: string[]): CoworkRiskTag[] {
+  if (!tags) {
+    return [];
+  }
+  return tags.filter((tag): tag is CoworkRiskTag => RISK_TAGS.has(tag as CoworkRiskTag));
+}
+
+function extractPrompt(data: Record<string, unknown> | undefined): string | undefined {
+  if (!isRecord(data) || !isRecord(data.task)) {
+    return undefined;
+  }
+  const payload = data.task.payload;
+  return isRecord(payload) && typeof payload.prompt === "string" ? payload.prompt : undefined;
+}
+
+function extractTitle(data: Record<string, unknown> | undefined): string | undefined {
+  if (!isRecord(data) || !isRecord(data.task)) {
+    return undefined;
+  }
+  return typeof data.task.name === "string" ? data.task.name : undefined;
+}
+
+function buildPlanSteps(rawSteps: unknown): Array<{ id: string; label: string; status: string }> {
+  if (!Array.isArray(rawSteps)) {
+    return [];
+  }
+  return rawSteps
+    .map((step) => {
+      if (!isRecord(step) || typeof step.id !== "string" || typeof step.description !== "string") {
+        return null;
+      }
+      return {
+        id: step.id,
+        label: step.description,
+        status: mapPlanStatus(step.status),
+      };
+    })
+    .filter((step): step is { id: string; label: string; status: string } => step !== null);
+}
+
+function mapPlanStatus(status: unknown): "pending" | "in_progress" | "completed" | "failed" {
+  switch (status) {
+    case "executing":
+      return "in_progress";
+    case "complete":
+      return "completed";
+    case "failed":
+      return "failed";
+    default:
+      return "pending";
+  }
+}
+
+function extractTaskSummary(data: Record<string, unknown> | undefined): CoworkTaskSummary | null {
+  if (!isRecord(data) || !isRecord(data.result)) {
+    return null;
+  }
+  const summary = data.result.summary;
+  return isRecord(summary) ? (summary as CoworkTaskSummary) : null;
+}
+
+function formatSummary(summary: CoworkTaskSummary): string {
+  const lines: string[] = ["## Summary"];
+
+  if (summary.outputs.length > 0) {
+    lines.push("", "### Outputs");
+    for (const output of summary.outputs) {
+      lines.push(`- ${output.path} (${output.kind})`);
+    }
+  }
+
+  if (summary.fileChanges.length > 0) {
+    lines.push("", "### File Changes");
+    for (const change of summary.fileChanges) {
+      lines.push(`- ${change.change}: ${change.path}`);
+    }
+  }
+
+  if (summary.actionLog.length > 0) {
+    lines.push("", "### Actions");
+    for (const entry of summary.actionLog) {
+      lines.push(`- ${new Date(entry.timestamp).toLocaleString()}: ${entry.action}`);
+    }
+  }
+
+  if (summary.followups.length > 0) {
+    lines.push("", "### Follow-ups");
+    for (const followup of summary.followups) {
+      lines.push(`- ${followup}`);
+    }
+  }
+
+  return lines.join("\n");
+}
+
+function isSummaryEmpty(summary: CoworkTaskSummary): boolean {
+  return (
+    summary.outputs.length === 0 &&
+    summary.fileChanges.length === 0 &&
+    summary.actionLog.length === 0 &&
+    summary.followups.length === 0
+  );
+}
+
+function extractResultContent(data: Record<string, unknown> | undefined): string | null {
+  if (!isRecord(data) || !isRecord(data.result)) {
+    return null;
+  }
+  const result = data.result;
+  if (typeof result === "string") {
+    return result;
+  }
+  if (!isRecord(result)) {
+    return null;
+  }
+  if (typeof result.content === "string") {
+    return result.content;
+  }
+  if (typeof result.output === "string") {
+    return result.output;
+  }
+  if (Array.isArray(result.messages)) {
+    const content = extractAssistantMessage(result.messages);
+    if (content) {
+      return content;
+    }
+  }
+  const state = result.state;
+  if (!isRecord(state) || !Array.isArray(state.messages)) {
+    return null;
+  }
+  const content = extractAssistantMessage(state.messages);
+  if (content) {
+    return content;
+  }
+  return null;
+}
+
+function extractAssistantMessage(messages: unknown[]): string | null {
+  const reversed = messages.slice().reverse();
+  for (const message of reversed) {
+    if (!isRecord(message)) {
+      continue;
+    }
+    if (message.role !== "assistant") {
+      continue;
+    }
+    const content = extractMessageContent(message.content);
+    if (content) {
+      return content;
+    }
+  }
+  return null;
+}
+
+function extractMessageContent(content: unknown): string | null {
+  if (typeof content === "string") {
+    return content;
+  }
+  if (Array.isArray(content)) {
+    const parts = content
+      .map((part) => extractMessageContent(part))
+      .filter((value): value is string => typeof value === "string" && value.length > 0);
+    return parts.length > 0 ? parts.join("") : null;
+  }
+  if (isRecord(content)) {
+    if (typeof content.text === "string") {
+      return content.text;
+    }
+    if (typeof content.content === "string") {
+      return content.content;
+    }
+  }
+  return null;
+}
+
+function isToolError(result: unknown): boolean | undefined {
+  if (!isRecord(result)) {
+    return undefined;
+  }
+  if (typeof result.success === "boolean") {
+    return !result.success;
+  }
+  return undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
