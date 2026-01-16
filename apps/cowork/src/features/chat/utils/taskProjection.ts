@@ -33,7 +33,14 @@ export function projectGraphToMessages(
     }
   }
 
-  return messages.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+  return messages.sort((a, b) => {
+    const timeDiff = (a.createdAt || 0) - (b.createdAt || 0);
+    if (timeDiff !== 0) {
+      return timeDiff;
+    }
+    // Stable secondary sort by ID when timestamps are equal
+    return a.id.localeCompare(b.id);
+  });
 }
 
 function buildProjectionContext(messages: Message[]): ProjectionContext {
@@ -92,6 +99,11 @@ function processTaskStatusNode(
 
 function handleUserPrompt(node: TaskStatusNode, messages: Message[], context: ProjectionContext) {
   const prompt = (node.prompt ?? "").trim();
+  // Skip empty prompts to prevent ghost user messages
+  if (!prompt) {
+    return;
+  }
+
   const normalizedPrompt = prompt.toLowerCase();
   let timestamp = new Date(node.timestamp).getTime();
   if (Number.isNaN(timestamp)) {
