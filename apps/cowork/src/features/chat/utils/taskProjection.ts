@@ -347,11 +347,26 @@ function filterNodesForTask(
   if (taskCount <= 1) {
     return nodes;
   }
+
   return nodes.filter((node) => {
+    // Task status nodes: exact match
     if (node.type === "task_status") {
       return node.taskId === taskId;
     }
-    return node.taskId === taskId;
+    // Other nodes: match taskId, or include if taskId is undefined and this is the only/latest task
+    if (node.taskId === taskId) {
+      return true;
+    }
+    // Include orphaned nodes (no taskId) only for the latest task
+    if (!node.taskId) {
+      // Get all task_status nodes sorted by timestamp
+      const taskNodes = nodes
+        .filter((n): n is TaskStatusNode => n.type === "task_status")
+        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      const latestTaskId = taskNodes[taskNodes.length - 1]?.taskId;
+      return taskId === latestTaskId;
+    }
+    return false;
   });
 }
 
