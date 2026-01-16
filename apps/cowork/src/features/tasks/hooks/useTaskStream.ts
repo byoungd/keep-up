@@ -22,6 +22,54 @@ import {
 
 const RISK_TAGS = new Set<CoworkRiskTag>(["delete", "overwrite", "network", "connector", "batch"]);
 
+// --- LocalStorage Persistence ---
+const GRAPH_STORAGE_PREFIX = "cowork-task-graph-";
+
+function getStorageKey(sessionId: string): string {
+  return `${GRAPH_STORAGE_PREFIX}${sessionId}`;
+}
+
+function saveGraphToStorage(sessionId: string, graph: TaskGraph): void {
+  if (!sessionId || sessionId === "undefined") {
+    return;
+  }
+  try {
+    const serializable = {
+      ...graph,
+      savedAt: Date.now(),
+    };
+    window.localStorage.setItem(getStorageKey(sessionId), JSON.stringify(serializable));
+  } catch {
+    // Ignore storage errors (quota exceeded, etc.)
+  }
+}
+
+function loadGraphFromStorage(sessionId: string): TaskGraph | null {
+  if (!sessionId || sessionId === "undefined") {
+    return null;
+  }
+  try {
+    const stored = window.localStorage.getItem(getStorageKey(sessionId));
+    if (!stored) {
+      return null;
+    }
+    const parsed = JSON.parse(stored) as TaskGraph & { savedAt?: number };
+    // Validate basic structure
+    if (!parsed.sessionId || !Array.isArray(parsed.nodes)) {
+      return null;
+    }
+    return {
+      sessionId: parsed.sessionId,
+      status: parsed.status ?? TaskStatus.PLANNING,
+      nodes: parsed.nodes,
+      artifacts: parsed.artifacts ?? {},
+      pendingApprovalId: parsed.pendingApprovalId,
+    };
+  } catch {
+    return null;
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -129,17 +177,30 @@ export function useTaskStream(sessionId: string) {
   }, [graph]);
 
   useEffect(() => {
-    setGraph({
-      sessionId,
-      status: TaskStatus.PLANNING,
-      nodes: [],
-      artifacts: {},
-    });
+    // Try to restore from localStorage first
+    const cached = loadGraphFromStorage(sessionId);
+    if (cached && cached.nodes.length > 0) {
+      setGraph(cached);
+    } else {
+      setGraph({
+        sessionId,
+        status: TaskStatus.PLANNING,
+        nodes: [],
+        artifacts: {},
+      });
+    }
     lastEventIdRef.current = null;
     seenEventIdsRef.current = new Set();
     taskTitleRef.current.clear();
     taskPromptRef.current.clear();
   }, [sessionId]);
+
+  // Persist graph to localStorage on every change
+  useEffect(() => {
+    if (graph.nodes.length > 0) {
+      saveGraphToStorage(sessionId, graph);
+    }
+  }, [sessionId, graph]);
 
   const refreshSessionState = useCallback(
     async (isActiveRef?: { current: boolean }) => {
