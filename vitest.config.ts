@@ -1,6 +1,15 @@
 import path from "node:path";
 
-import { defineConfig } from "vitest/config";
+import { defineConfig, defineProject } from "vitest/config";
+
+const defaultExclude = [
+  "**/node_modules/**",
+  "**/dist/**",
+  "**/coverage/**",
+  "**/.turbo/**",
+  "**/.next/**",
+  "**/.out/**",
+];
 
 // Define aliases as an array to ensure subpaths are matched before their parent packages
 const aliases = [
@@ -110,8 +119,98 @@ export default defineConfig({
     },
     coverage: {
       provider: "v8",
-      reporter: ["text", "html"],
+      reporter: ["text", "html", "json"],
       reportsDirectory: "coverage",
     },
+    projects: [
+      defineProject({
+        resolve: {
+          alias: aliases,
+        },
+        test: {
+          name: "core-conformance",
+          include: [
+            "packages/core/src/**/__tests__/**/*.test.ts",
+            "packages/conformance-kit/src/**/__tests__/**/*.test.ts",
+          ],
+          exclude: defaultExclude,
+          environment: "node",
+          server: {
+            deps: {
+              inline: [/@ku0\/.*/],
+            },
+          },
+        },
+      }),
+      defineProject({
+        resolve: {
+          alias: aliases,
+        },
+        test: {
+          name: "collab-server",
+          include: ["packages/collab-server/src/**/*.test.ts"],
+          exclude: defaultExclude,
+          globals: true,
+          server: {
+            deps: {
+              inline: [/@ku0\/.*/],
+            },
+          },
+        },
+      }),
+      defineProject({
+        resolve: {
+          alias: aliases,
+        },
+        test: {
+          name: "app-jsdom",
+          include: ["packages/app/src/**/*.test.ts"],
+          exclude: defaultExclude,
+          environment: "jsdom",
+          server: {
+            deps: {
+              inline: [/@ku0\/.*/],
+            },
+          },
+        },
+      }),
+      defineProject({
+        resolve: {
+          alias: aliases,
+        },
+        test: {
+          name: "packages-default",
+          include: [
+            "packages/lfcc-bridge/src/**/*.test.ts",
+            "packages/overlay/src/**/*.test.ts",
+            "packages/compat/src/**/*.test.ts",
+            "packages/ingest-youtube/src/**/*.test.ts",
+            "packages/agent-runtime/src/**/*.test.ts",
+          ],
+          exclude: defaultExclude,
+          server: {
+            deps: {
+              inline: [/@ku0\/.*/],
+            },
+          },
+        },
+      }),
+      defineProject({
+        resolve: {
+          alias: aliases,
+        },
+        test: {
+          name: "cowork-server",
+          include: ["apps/cowork/server/**/*.test.ts"],
+          exclude: defaultExclude,
+          environment: "node",
+          server: {
+            deps: {
+              inline: [/@ku0\/.*/],
+            },
+          },
+        },
+      }),
+    ],
   },
 });
