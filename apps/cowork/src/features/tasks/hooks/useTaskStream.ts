@@ -44,6 +44,9 @@ function saveGraphToStorage(sessionId: string, graph: TaskGraph): void {
   }
 }
 
+// Cache TTL: 7 days
+const GRAPH_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
 function loadGraphFromStorage(sessionId: string): TaskGraph | null {
   if (!sessionId || sessionId === "undefined") {
     return null;
@@ -54,6 +57,13 @@ function loadGraphFromStorage(sessionId: string): TaskGraph | null {
       return null;
     }
     const parsed = JSON.parse(stored) as TaskGraph & { savedAt?: number };
+
+    // Check cache expiration
+    if (parsed.savedAt && Date.now() - parsed.savedAt > GRAPH_CACHE_TTL_MS) {
+      window.localStorage.removeItem(getStorageKey(sessionId));
+      return null;
+    }
+
     // Validate basic structure
     if (!parsed.sessionId || !Array.isArray(parsed.nodes)) {
       return null;

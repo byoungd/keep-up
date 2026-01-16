@@ -270,14 +270,24 @@ export function useChatSession(sessionId: string | undefined) {
 
 function mergeHistory(existing: Message[], history: Message[]): Message[] {
   const merged = new Map<string, Message>();
+  // First add all history messages
   for (const msg of history) {
     merged.set(msg.id, msg);
   }
+  // Then overlay existing messages that are actively streaming or newer
   for (const msg of existing) {
     const previous = merged.get(msg.id);
-    if (!previous || msg.status === "streaming" || msg.status === "pending") {
+    if (!previous) {
+      // New message not in history
+      merged.set(msg.id, msg);
+    } else if (msg.status === "streaming" || msg.status === "pending") {
+      // Keep actively streaming/pending messages (optimistic updates)
+      merged.set(msg.id, msg);
+    } else if ((msg.createdAt ?? 0) > (previous.createdAt ?? 0)) {
+      // Keep newer version by timestamp
       merged.set(msg.id, msg);
     }
+    // Otherwise keep the history version (more authoritative)
   }
   return Array.from(merged.values()).sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
 }
