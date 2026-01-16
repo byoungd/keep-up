@@ -23,6 +23,7 @@ function extractIdFromHref(href: string): string | null {
 }
 
 export const SidebarItem = React.memo(function SidebarItem({
+  id,
   label,
   icon: Icon,
   href,
@@ -33,13 +34,14 @@ export const SidebarItem = React.memo(function SidebarItem({
 }: SidebarItemProps) {
   const { components } = useReaderShell();
   const { Link } = components;
+  const shortcut = id === "search" ? "⌘ K" : null;
 
   return (
     <Link
       href={href}
       aria-current={isActive ? "page" : undefined}
       className={cn(
-        "sidebar-item group relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
+        "sidebar-item group relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         isActive
           ? "bg-accent text-accent-foreground font-medium"
@@ -71,6 +73,12 @@ export const SidebarItem = React.memo(function SidebarItem({
           {extractIdFromHref(href)}
         </span>
       </span>
+
+      {shortcut ? (
+        <kbd className="ml-auto h-5 px-2.5 rounded-md bg-surface-2/70 border border-border/40 text-[12px] font-semibold text-muted-foreground/80 flex items-center leading-none opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+          {shortcut}
+        </kbd>
+      ) : null}
 
       {badgeCount > 0 && (
         <Badge

@@ -7,6 +7,8 @@ export interface AppShellProps {
   sidebar?: React.ReactNode;
   /** Collapsed sidebar content (rail) */
   sidebarCollapsed?: React.ReactNode;
+  /** Left panel content (beside sidebar, for AI or preview) */
+  leftPanel?: React.ReactNode;
   /** Right panel content */
   rightPanel?: React.ReactNode;
   /** Header content */
@@ -19,6 +21,8 @@ export interface AppShellProps {
   isSidebarCollapsed?: boolean;
   /** Callback when sidebar collapse state changes */
   onSidebarCollapsedChange?: (collapsed: boolean) => void;
+  /** Whether left panel is visible */
+  isLeftPanelVisible?: boolean;
   /** Whether right panel is visible */
   isRightPanelVisible?: boolean;
   /** Callback when right panel visibility changes */

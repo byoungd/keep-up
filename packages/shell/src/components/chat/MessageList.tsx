@@ -5,8 +5,9 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import * as React from "react";
 import type { ReferenceAnchor, ReferenceRange } from "../../lib/ai/referenceAnchors";
 import { type AILoadingState, AILoadingStatus } from "./AILoadingStatus";
-import { type Message, MessageItem, type MessageStatus } from "./MessageItem";
+import { MessageItem } from "./MessageItem";
 import { StartupView } from "./StartupView";
+import type { ArtifactItem, Message, MessageStatus } from "./types";
 
 // Estimated height per message for virtualization calculations
 const ESTIMATED_MESSAGE_HEIGHT = 120;
@@ -53,6 +54,8 @@ export interface MessageListProps {
   };
   resolveReference?: (anchor: ReferenceAnchor) => ReferenceRange;
   onReferenceSelect?: (anchor: ReferenceAnchor) => void;
+  onPreviewArtifact?: (item: ArtifactItem) => void;
+  isMain?: boolean;
 }
 
 export function MessageList({
@@ -70,6 +73,8 @@ export function MessageList({
   translations,
   resolveReference,
   onReferenceSelect,
+  onPreviewArtifact,
+  isMain = false,
 }: MessageListProps) {
   // Determine loading state for AILoadingStatus
   const loadingState = React.useMemo((): AILoadingState => {
@@ -107,24 +112,44 @@ export function MessageList({
   // Render a single message item (memoized callback)
   const renderMessage = React.useCallback(
     (m: Message) => (
-      <MessageItem
-        key={m.id}
-        message={m}
-        onEdit={onEdit}
-        onBranch={onBranch}
-        onQuote={onQuote}
-        onCopy={onCopy}
-        onRetry={onRetry}
-        translations={translations}
-        resolveReference={resolveReference}
-        onReferenceSelect={onReferenceSelect}
-      />
+      <div className={cn(isMain && "max-w-3xl mx-auto w-full")}>
+        <MessageItem
+          key={m.id}
+          message={m}
+          onEdit={onEdit}
+          onBranch={onBranch}
+          onQuote={onQuote}
+          onCopy={onCopy}
+          onRetry={onRetry}
+          translations={translations}
+          resolveReference={resolveReference}
+          onReferenceSelect={onReferenceSelect}
+          onPreviewArtifact={onPreviewArtifact}
+        />
+      </div>
     ),
-    [onEdit, onBranch, onQuote, onCopy, onRetry, translations, resolveReference, onReferenceSelect]
+    [
+      onEdit,
+      onBranch,
+      onQuote,
+      onCopy,
+      onRetry,
+      translations,
+      resolveReference,
+      onReferenceSelect,
+      onPreviewArtifact,
+      isMain,
+    ]
   );
 
   const containerClass = cn(
     "flex-1 overflow-y-auto overflow-x-hidden px-6 py-6 space-y-6",
+    isMain && "px-0", // Remove global padding in main mode to allow full-width scrollbar area (though padding usually inside scrollbar?)
+    // Actually, distinct padding logic for items?
+    // If I keep px-6, the scrollbar is at the edge of the container (which has padding).
+    // So keeping px-6 is fine for scrollbar position.
+    // BUT I want content to be max-w-3xl.
+    // So I need a wrapper around items.
     "[&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent",
     "[&::-webkit-scrollbar-thumb]:bg-transparent hover:[&::-webkit-scrollbar-thumb]:bg-border/40",
     "[&::-webkit-scrollbar-thumb]:rounded-full transition-colors"
@@ -171,17 +196,20 @@ export function MessageList({
                 }}
               >
                 <div className="pb-5">
-                  <MessageItem
-                    message={message}
-                    onEdit={onEdit}
-                    onBranch={onBranch}
-                    onQuote={onQuote}
-                    onCopy={onCopy}
-                    onRetry={onRetry}
-                    translations={translations}
-                    resolveReference={resolveReference}
-                    onReferenceSelect={onReferenceSelect}
-                  />
+                  <div className={cn(isMain && "max-w-3xl mx-auto w-full")}>
+                    <MessageItem
+                      message={message}
+                      onEdit={onEdit}
+                      onBranch={onBranch}
+                      onQuote={onQuote}
+                      onCopy={onCopy}
+                      onRetry={onRetry}
+                      translations={translations}
+                      resolveReference={resolveReference}
+                      onReferenceSelect={onReferenceSelect}
+                      onPreviewArtifact={onPreviewArtifact}
+                    />
+                  </div>
                 </div>
               </div>
             );

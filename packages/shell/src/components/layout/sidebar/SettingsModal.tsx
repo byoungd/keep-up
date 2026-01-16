@@ -23,8 +23,24 @@ export function SettingsModal({ open, onClose, userConfig, onSave, groups }: Set
   const dialogRef = React.useRef<HTMLDialogElement>(null);
   const lastFocusedRef = React.useRef<HTMLElement | null>(null);
   const [liveMessage, setLiveMessage] = React.useState("");
-  const { i18n, aiPanel } = useReaderShell();
+  const { i18n, aiPanel, auxPanel } = useReaderShell();
   const t = (key: string, defaultValue?: string) => i18n.t(`Settings.${key}`, defaultValue || key);
+  const panelPosition = auxPanel ? auxPanel.position : aiPanel.position;
+  const availablePositions = auxPanel
+    ? (["left", "right"] as Array<"main" | "left" | "right">)
+    : undefined;
+  const handlePanelPosition = React.useCallback(
+    (position: "main" | "left" | "right") => {
+      if (auxPanel) {
+        if (position === "left" || position === "right") {
+          auxPanel.setPosition(position);
+        }
+        return;
+      }
+      aiPanel.setPosition(position);
+    },
+    [auxPanel, aiPanel]
+  );
 
   // Sync staged config and dialog state when modal opens/closes
   React.useEffect(() => {
@@ -116,7 +132,12 @@ export function SettingsModal({ open, onClose, userConfig, onSave, groups }: Set
           <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3 scrollbar-thin scrollbar-thumb-transparent hover:scrollbar-thumb-border/40 scrollbar-track-transparent focus-visible:outline-none">
             <AppearanceSection t={t} />
 
-            <AIPanelSection t={t} position={aiPanel.position} setPosition={aiPanel.setPosition} />
+            <AIPanelSection
+              t={t}
+              position={panelPosition}
+              setPosition={handlePanelPosition}
+              availablePositions={availablePositions}
+            />
 
             <SidebarConfigSection
               userConfig={userConfig}

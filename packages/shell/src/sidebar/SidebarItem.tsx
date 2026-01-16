@@ -44,17 +44,12 @@ export const SidebarItem = React.memo(function SidebarItem({
         "sidebar-item group relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         isActive
-          ? "bg-surface-2 text-foreground shadow-sm"
+          ? "bg-surface-2 text-foreground font-semibold"
           : isContextSelected
             ? "text-foreground/80"
             : "text-muted-foreground hover:bg-surface-2/50 hover:text-foreground"
       )}
     >
-      {/* Active indicator - only for active leaf */}
-      {isActive && (
-        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 bg-primary rounded-r-full shadow-[0_0_8px_var(--color-accent-indigo-glow)]" />
-      )}
-
       <Icon
         className={cn(
           "h-4 w-4 shrink-0 transition-colors",

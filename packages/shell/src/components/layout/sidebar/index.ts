@@ -5,4 +5,10 @@ export { SidebarItem } from "./SidebarItem";
 export { SidebarRail } from "./SidebarRail";
 export { SettingsModal } from "./SettingsModal";
 export { ResizableSidebar } from "./ResizableSidebar";
-export type { SidebarItemRenderProps, SidebarItemRenderer } from "./types";
+export type {
+  SidebarGroupRenderProps,
+  SidebarGroupRenderer,
+  SidebarItemRenderProps,
+  SidebarItemRenderer,
+  SidebarNewAction,
+} from "./types";

@@ -24,6 +24,26 @@ export interface ReaderShellContextValue {
     isHydrated?: boolean;
   };
 
+  auxPanel?: {
+    isVisible: boolean;
+    toggle: () => void;
+    setVisible: (visible: boolean) => void;
+    width: number;
+    setWidth: (width: number) => void;
+    position: "left" | "right";
+    setPosition: (position: "left" | "right") => void;
+    isHydrated?: boolean;
+  };
+
+  // Preview Panel State
+  preview?: {
+    artifact: import("../components/chat/types").ArtifactItem | null;
+    setArtifact: (item: import("../components/chat/types").ArtifactItem | null) => void;
+    close: () => void;
+    preferredPosition: "auto" | "main" | "left" | "right";
+    setPreferredPosition: (position: "auto" | "main" | "left" | "right") => void;
+  };
+
   sidebar: {
     isCollapsed: boolean;
     toggle: () => void;

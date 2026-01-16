@@ -15,8 +15,8 @@ import {
   LayoutGrid,
   Search,
   Settings,
-  Sigma,
   Star,
+  Video,
   Wrench,
   Zap,
 } from "lucide-react";
@@ -48,7 +48,7 @@ import { ProviderDetailView, ProviderListView } from "./ProviderSettingsModal";
 
 import { useShellTranslations } from "../../hooks/useShellTranslations";
 
-export type PanelPosition = "left" | "right";
+export type PanelPosition = "left" | "right" | "main";
 
 export interface ModelSelectorProps {
   model: string;
@@ -79,11 +79,11 @@ type ProviderFilter =
 type FeatureId =
   | "fast"
   | "vision"
-  | "reasoning"
   | "effort"
   | "toolCalling"
   | "imageGeneration"
-  | "nativePDFs";
+  | "nativePDFs"
+  | "video";
 
 type ProviderIcon = React.ComponentType<React.SVGProps<SVGSVGElement>>;
 
@@ -182,10 +182,12 @@ const getModelFeatureSet = (model: ModelCapability) => {
   if (model.supports.vision) {
     features.add("vision");
   }
-  if (model.supports.thinking) {
-    features.add("reasoning");
-  }
-  if (model.tags.includes("thinking")) {
+  // Map both 'thinking' and 'reasoning' to the 'effort' (Thinking) feature
+  if (
+    model.supports.thinking ||
+    model.tags.includes("thinking") ||
+    model.tags.includes("reasoning")
+  ) {
     features.add("effort");
   }
   if (model.supports.tools) {
@@ -197,6 +199,9 @@ const getModelFeatureSet = (model: ModelCapability) => {
   if (model.tags.includes("pdf")) {
     features.add("nativePDFs");
   }
+  if (model.tags.includes("video") || model.id.includes("video")) {
+    features.add("video");
+  }
 
   return features;
 };
@@ -207,7 +212,7 @@ export function ModelSelector({
   models,
   onSelect,
   className,
-  panelPosition = "right",
+  panelPosition = "main",
 }: ModelSelectorProps) {
   // const t = useTranslations("AIPanel");
   const t = useShellTranslations("AIPanel");
@@ -311,12 +316,6 @@ export function ModelSelector({
         tone: "bg-surface-2/80 text-muted-foreground",
       },
       {
-        id: "reasoning",
-        label: t("modelFeatureReasoning"),
-        icon: Sigma,
-        tone: "bg-surface-2/80 text-muted-foreground",
-      },
-      {
         id: "effort",
         label: t("modelFeatureEffort"),
         icon: Brain,
@@ -340,15 +339,20 @@ export function ModelSelector({
         icon: FileText,
         tone: "bg-surface-2/80 text-muted-foreground",
       },
+      {
+        id: "video",
+        label: t("modelFeatureVideo"),
+        icon: Video,
+        tone: "bg-surface-2/80 text-muted-foreground",
+      },
     ],
     [t]
   );
 
   const availableFilters = React.useMemo(() => {
-    return featureDefinitions.filter((definition) =>
-      models.some((entry) => getModelFeatureSet(entry).has(definition.id))
-    );
-  }, [featureDefinitions, models]);
+    // Show all filters regardless of model availability to aid discovery
+    return featureDefinitions;
+  }, [featureDefinitions]);
 
   const providerAvailability = React.useMemo(() => {
     // All providers are enabled (unified proxy handles routing)
@@ -604,9 +608,14 @@ export function ModelSelector({
             variant="ghost"
             size="compact"
             className={cn(
-              "group flex items-center gap-2 px-2 py-1 h-10 text-left rounded-xl transition-all duration-300",
-              "hover:bg-surface-2/60 hover:shadow-sm",
-              "data-[state=open]:bg-surface-2 data-[state=open]:shadow-md",
+              "group flex items-center gap-1.5 px-2 py-0.5 h-auto text-left rounded-md transition-all duration-300",
+              // Default side view: standard pill
+              panelPosition !== "main" &&
+                "h-10 px-2 rounded-xl bg-surface-2/10 hover:bg-surface-2/60 hover:shadow-sm",
+              // Main/Toolbar view: minimal ghost
+              panelPosition === "main" &&
+                "text-muted-foreground hover:text-foreground hover:bg-surface-2",
+              "data-[state=open]:bg-surface-2 data-[state=open]:text-foreground",
               "focus-visible:ring-2 focus-visible:ring-primary/20",
               className
             )}
@@ -615,20 +624,31 @@ export function ModelSelector({
               {selectedModel && (
                 <div
                   className={cn(
-                    "h-7 w-7 rounded-lg flex items-center justify-center shrink-0",
-                    "transition-all duration-200 group-hover:scale-105 group-data-[state=open]:scale-105",
-                    PROVIDER_ACCENTS[selectedModel.provider].chip
+                    "flex items-center justify-center shrink-0",
+                    // Main: simplified icon
+                    panelPosition === "main"
+                      ? "h-4 w-4"
+                      : "h-7 w-7 rounded-lg transition-all duration-200 group-hover:scale-105 group-data-[state=open]:scale-105",
+                    panelPosition !== "main" && PROVIDER_ACCENTS[selectedModel.provider].chip
                   )}
                 >
                   {React.createElement(PROVIDER_ICONS[selectedModel.provider], {
-                    className: cn("h-3.5 w-3.5", PROVIDER_ACCENTS[selectedModel.provider].icon),
+                    className: cn(
+                      panelPosition === "main" ? "h-3.5 w-3.5" : "h-3.5 w-3.5",
+                      panelPosition !== "main" && PROVIDER_ACCENTS[selectedModel.provider].icon
+                    ),
                     "aria-hidden": true,
                   })}
                 </div>
               )}
               <div className="flex flex-col items-start leading-none gap-0.5">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="text-sm font-medium truncate max-w-[140px] text-foreground">
+                <div className="flex items-center gap-1 min-w-0">
+                  <span
+                    className={cn(
+                      "font-medium truncate max-w-[140px]",
+                      panelPosition === "main" ? "text-xs" : "text-sm text-foreground"
+                    )}
+                  >
                     {(() => {
                       if (selectedModel) {
                         return selectedModel.shortLabel || selectedModel.label;
@@ -651,7 +671,8 @@ export function ModelSelector({
                   </span>
                   <ChevronDown
                     className={cn(
-                      "h-3.5 w-3.5 text-muted-foreground/50 transition-transform duration-300",
+                      "text-muted-foreground/50 transition-transform duration-300",
+                      panelPosition === "main" ? "h-3 w-3" : "h-3.5 w-3.5",
                       "group-data-[state=open]:rotate-180"
                     )}
                   />
@@ -665,7 +686,7 @@ export function ModelSelector({
           align={panelPosition === "right" ? "end" : "start"}
           sideOffset={12}
           className={cn(
-            "w-[500px] max-w-[calc(100vw-24px)] p-0 rounded-2xl overflow-hidden",
+            "w-[540px] max-w-[calc(100vw-24px)] p-0 rounded-2xl overflow-hidden",
             "glass-surface premium-shadow border-border/20",
             "max-h-[85vh] flex flex-col"
           )}
@@ -773,7 +794,7 @@ export function ModelSelector({
               </div>
 
               {/* Content area */}
-              <div className="flex min-w-0 flex-1 flex-col h-full overflow-hidden">
+              <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
                 {settingsMode ? (
                   <div className="flex-1 overflow-hidden flex flex-col">
                     <div className="px-4 py-3 border-b border-border/30 shrink-0">
@@ -794,12 +815,11 @@ export function ModelSelector({
                 ) : (
                   <>
                     {/* Search header */}
-                    <div className="relative px-4 pt-4 pb-2 shrink-0">
+                    <div className="relative shrink-0">
                       <div
                         className={cn(
-                          "flex items-center gap-3 px-4 py-2.5 rounded-xl",
-                          "bg-surface-1/50 border border-border/20",
-                          "focus-within:bg-surface-2 focus-within:border-primary/20 focus-within:ring-2 focus-within:ring-primary/10",
+                          "flex items-center gap-3 px-3 py-2",
+                          "border-b border-border/40",
                           "transition-all duration-200 group/search"
                         )}
                       >
@@ -811,8 +831,8 @@ export function ModelSelector({
                           type="text"
                           value={search}
                           onChange={(e) => setSearch(e.target.value)}
-                          placeholder="Search models... (e.g. 'claude', 'vision', 'fast')"
-                          className="flex-1 bg-transparent border-none p-0 text-sm placeholder:text-muted-foreground/40 focus:outline-none focus:ring-0"
+                          placeholder="Search models..."
+                          className="flex-1 bg-transparent border-none p-0 text-xs placeholder:text-muted-foreground/40 focus:outline-none focus:ring-0"
                         />
                         {search && (
                           <button
@@ -826,8 +846,8 @@ export function ModelSelector({
                         )}
                       </div>
 
-                      {/* Feature filters */}
-                      <div className="flex flex-wrap gap-1.5 mt-3">
+                      {/* Feature filters - Compact Single Line */}
+                      <div className="flex items-center gap-1 overflow-x-auto py-2.5 px-3 scrollbar-none snap-x [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] border-b border-border/20 bg-surface-1/30">
                         {availableFilters.length > 0 &&
                           featureDefinitions.map((feature) => {
                             if (!availableFilters.some((f) => f.id === feature.id)) {
@@ -842,10 +862,10 @@ export function ModelSelector({
                                 type="button"
                                 onClick={() => handleFilterToggle(feature.id)}
                                 className={cn(
-                                  "flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] font-medium border transition-all duration-200",
+                                  "shrink-0 snap-start flex items-center gap-1 px-1.5 py-1 rounded-full text-[10px] tracking-tight font-medium border transition-all duration-200",
                                   isActive
-                                    ? "bg-primary/10 border-primary/20 text-primary"
-                                    : "bg-surface-1 border-border/20 text-muted-foreground/60 hover:border-border/40 hover:text-muted-foreground"
+                                    ? "bg-primary/10 border-primary/20 text-primary shadow-sm"
+                                    : "bg-surface-1/50 border-border/10 text-muted-foreground/70 hover:bg-surface-2 hover:text-foreground hover:border-border/30"
                                 )}
                               >
                                 <Icon className="h-3 w-3" />
@@ -1019,10 +1039,10 @@ function ModelItem({
     <button
       type="button"
       className={cn(
-        "group relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 cursor-pointer w-full text-left",
+        "group relative flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors duration-200 cursor-pointer w-full text-left",
         isSelected
-          ? "bg-surface-2 shadow-sm ring-1 ring-border/50"
-          : "hover:bg-surface-2/50 hover:shadow-sm hover:ring-1 hover:ring-border/20",
+          ? "bg-surface-2 text-foreground"
+          : "text-muted-foreground hover:bg-surface-2/50 hover:text-foreground",
         isLegacy && "opacity-70 hover:opacity-100"
       )}
       onClick={onSelect}
@@ -1030,16 +1050,14 @@ function ModelItem({
       {/* Icon */}
       <div
         className={cn(
-          "h-9 w-9 rounded-lg flex items-center justify-center shrink-0 border transition-colors",
-          isSelected
-            ? PROVIDER_ACCENTS[model.provider].chip
-            : "bg-surface-1 border-border/20 group-hover:border-border/40"
+          "h-6 w-6 rounded flex items-center justify-center shrink-0 transition-colors",
+          isSelected ? "bg-background shadow-none" : "bg-surface-2/50 group-hover:bg-background"
         )}
       >
         {React.createElement(PROVIDER_ICONS[model.provider], {
           className: cn(
-            "h-4.5 w-4.5",
-            isSelected ? PROVIDER_ACCENTS[model.provider].icon : "text-muted-foreground"
+            "h-3.5 w-3.5",
+            isSelected ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
           ),
           "aria-hidden": true,
         })}
@@ -1069,9 +1087,6 @@ function ModelItem({
               </span>
             )}
           </div>
-          {isSelected && (
-            <div className="h-1.5 w-1.5 rounded-full bg-primary shadow-sm shadow-primary/20 shrink-0" />
-          )}
         </div>
         <div className="flex items-center gap-2 text-[11px] text-muted-foreground/60">
           <span className="truncate">{providerName}</span>

@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, PanelLeft, Plus, Search } from "lucide-react";
+import { PanelLeft, Search } from "lucide-react";
 import * as React from "react";
 import { cn } from "../utils/cn";
 import type { SidebarHeaderProps } from "./types";
@@ -32,7 +32,6 @@ export const SidebarHeader = React.memo(function SidebarHeader({
   workspaceAvatarUrl,
   className,
   onSearch,
-  onCreate,
   onToggleCollapse,
   renderAvatar,
 }: SidebarHeaderProps) {
@@ -42,52 +41,28 @@ export const SidebarHeader = React.memo(function SidebarHeader({
     <div className={cn("sidebar-header px-4 py-2 space-y-2", className)}>
       {/* Row 1: Workspace & Actions */}
       <div className="flex items-center gap-2">
-        {/* Toggle / Avatar Zone */}
-        <div className="relative group/toggle shrink-0 h-6 w-6">
-          <div className="transition-opacity duration-200 group-hover/toggle:opacity-0">
-            <AvatarComponent name={workspaceName} url={workspaceAvatarUrl} />
-          </div>
-          {onToggleCollapse && (
-            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/toggle:opacity-100 transition-opacity duration-200 z-10">
-              <button
-                type="button"
-                className="h-6 w-6 flex items-center justify-center text-muted-foreground hover:text-foreground rounded-md hover:bg-surface-2"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleCollapse();
-                }}
-                aria-label="Collapse sidebar"
-              >
-                <PanelLeft className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          )}
+        {/* Avatar */}
+        <div className="shrink-0 h-6 w-6">
+          <AvatarComponent name={workspaceName} url={workspaceAvatarUrl} />
         </div>
 
         {/* Workspace Switcher */}
-        <button
-          type="button"
-          className={cn(
-            "flex items-center gap-2 flex-1 py-1.5 rounded-lg -ml-1 px-1",
-            "hover:bg-surface-2 transition-colors group",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-          )}
-        >
+        {/* Workspace Name */}
+        <div className="flex items-center gap-2 flex-1 py-1.5 -ml-1 px-1">
           <span className="text-sm font-semibold text-foreground truncate flex-1 text-left">
             {workspaceName}
           </span>
-          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground transition-colors" />
-        </button>
+        </div>
 
-        {/* Create (+) */}
-        {onCreate && (
+        {/* Toggle Sidebar */}
+        {onToggleCollapse && (
           <button
             type="button"
-            className="h-8 w-8 flex items-center justify-center text-muted-foreground hover:text-foreground shrink-0 rounded-md hover:bg-surface-2"
-            aria-label="Create new"
-            onClick={onCreate}
+            className="h-6 w-6 flex items-center justify-center text-muted-foreground hover:text-foreground shrink-0 rounded-md hover:bg-surface-2"
+            onClick={onToggleCollapse}
+            aria-label="Collapse sidebar"
           >
-            <Plus className="h-4 w-4" />
+            <PanelLeft className="h-4 w-4" />
           </button>
         )}
       </div>
@@ -103,7 +78,7 @@ export const SidebarHeader = React.memo(function SidebarHeader({
           )}
           onClick={onSearch}
         >
-          <Search className="h-3.5 w-3.5" />
+          <Search className="h-4 w-4" />
           <span className="text-xs font-medium flex-1 text-left">Search...</span>
           <kbd className="text-[10px] text-foreground/80 bg-surface-2 px-1.5 py-0.5 rounded border border-border/50">
             ⌘K

@@ -23,13 +23,14 @@ import {
 import { Tooltip } from "../../ui/Tooltip";
 import { SidebarGroup } from "./SidebarGroup";
 import { SidebarHeader } from "./SidebarHeader";
-import type { SidebarItemRenderer } from "./types";
+import type { SidebarGroupRenderer, SidebarItemRenderer, SidebarNewAction } from "./types";
 
 interface SidebarProps {
   className?: string;
   onOpenCustomize?: () => void;
   onOpenSearch?: () => void;
   onOpenImport?: () => void;
+  newAction?: SidebarNewAction;
   state: EffectiveSidebarState;
   actions: SidebarConfigActions;
   isLoading: boolean;
@@ -40,6 +41,8 @@ interface SidebarProps {
   importModals?: React.ReactNode;
   importStatus?: React.ReactNode;
   renderItemChildren?: SidebarItemRenderer;
+  renderGroup?: SidebarGroupRenderer;
+  showSearch?: boolean;
 }
 
 export const Sidebar = React.memo(function Sidebar({
@@ -47,6 +50,7 @@ export const Sidebar = React.memo(function Sidebar({
   onOpenCustomize,
   onOpenSearch,
   onOpenImport,
+  newAction,
   state,
   actions,
   isLoading,
@@ -56,6 +60,8 @@ export const Sidebar = React.memo(function Sidebar({
   importModals,
   importStatus,
   renderItemChildren,
+  renderGroup,
+  showSearch,
 }: SidebarProps) {
   const { router, components, i18n } = useReaderShell();
   const { pathname } = router;
@@ -116,31 +122,81 @@ export const Sidebar = React.memo(function Sidebar({
         workspaceAvatarUrl={workspaceAvatarUrl}
         onOpenSearch={onOpenSearch}
         onOpenImport={onOpenImport ?? onOpenFeedModal}
+        newAction={newAction}
+        showSearch={showSearch}
       />
 
       {importModals}
       {importStatus}
 
       {/* Scrollable Groups */}
+
+      {/* Pinned Groups (Non-scrollable) */}
+      <div className="px-2 pt-2 space-y-4">
+        {state.groups
+          .filter((g) => g.id === "pinned")
+          .map((group) => {
+            const defaultGroup = (
+              <SidebarGroup
+                id={group.id}
+                label={group.label}
+                collapsible={group.collapsible}
+                collapsed={group.collapsed}
+                mainItems={group.mainItems}
+                badgeStyle={state.badgeStyle}
+                activePath={pathname}
+                onToggleCollapse={() => actions.toggleGroupCollapse(group.id)}
+                renderItemChildren={renderItemChildren}
+              />
+            );
+            const rendered =
+              renderGroup?.({
+                group,
+                defaultGroup,
+                badgeStyle: state.badgeStyle,
+                activePath: pathname,
+              }) ?? defaultGroup;
+
+            return <React.Fragment key={group.id}>{rendered}</React.Fragment>;
+          })}
+      </div>
+
       {/* Scrollable Groups */}
       <nav
         aria-label="Sidebar navigation"
-        className="flex-1 overflow-y-auto px-2 py-2 space-y-4 scrollbar-thin scrollbar-thumb-transparent hover:scrollbar-thumb-border/50 scrollbar-track-transparent outline-none"
+        className={cn(
+          "flex-1 overflow-y-auto px-2 py-2 space-y-4 outline-none",
+          "[&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent",
+          "[&::-webkit-scrollbar-thumb]:bg-transparent hover:[&::-webkit-scrollbar-thumb]:bg-border/40",
+          "[&::-webkit-scrollbar-thumb]:rounded-full transition-colors"
+        )}
       >
-        {state.groups.map((group) => (
-          <SidebarGroup
-            key={group.id}
-            id={group.id}
-            label={group.label}
-            collapsible={group.collapsible}
-            collapsed={group.collapsed}
-            mainItems={group.mainItems}
-            badgeStyle={state.badgeStyle}
-            activePath={pathname}
-            onToggleCollapse={() => actions.toggleGroupCollapse(group.id)}
-            renderItemChildren={renderItemChildren}
-          />
-        ))}
+        {state.groups
+          .filter((g) => g.id !== "pinned")
+          .map((group) => {
+            const defaultGroup = (
+              <SidebarGroup
+                id={group.id}
+                label={group.label}
+                collapsible={group.collapsible}
+                collapsed={group.collapsed}
+                mainItems={group.mainItems}
+                badgeStyle={state.badgeStyle}
+                activePath={pathname}
+                onToggleCollapse={() => actions.toggleGroupCollapse(group.id)}
+                renderItemChildren={renderItemChildren}
+              />
+            );
+            const rendered =
+              renderGroup?.({
+                group,
+                defaultGroup,
+                badgeStyle: state.badgeStyle,
+                activePath: pathname,
+              }) ?? defaultGroup;
+
+            return <React.Fragment key={group.id}>{rendered}</React.Fragment>;
+          })}
       </nav>
 
       {/* Footer */}

@@ -1,26 +1,11 @@
 "use client";
 
 import { cn } from "@ku0/shared/utils";
-import {
-  BookOpen,
-  Github,
-  Globe,
-  MessageSquareText,
-  PanelLeft,
-  PanelRight,
-  Rss,
-} from "lucide-react";
+import { PanelLeft, PanelRight, Square } from "lucide-react";
 
 import { useReaderShell } from "../../context/ReaderShellContext";
 import { Button } from "../ui/Button";
 import { Tooltip } from "../ui/Tooltip";
-
-const SOURCE_ICONS = {
-  local: BookOpen,
-  github: Github,
-  rss: Rss,
-  url: Globe,
-} as const;
 
 export interface HeaderProps {
   docId?: string; // Kept for API consistency if needed
@@ -29,6 +14,8 @@ export interface HeaderProps {
   onToggleLeft: () => void;
   onToggleRight: () => void;
   isRightPanelOpen?: boolean;
+  rightPanelPosition?: "left" | "right";
+  rightPanelLabel?: string;
   syncIndicator?: React.ReactNode;
   presenceAvatars?: React.ReactNode;
   globalActions?: React.ReactNode;
@@ -36,15 +23,14 @@ export interface HeaderProps {
 }
 
 export function Header({
-  title = "Untitled",
-  sourceType = "local",
   onToggleLeft,
   onToggleRight,
   isRightPanelOpen,
+  rightPanelPosition,
+  rightPanelLabel,
   syncIndicator,
   presenceAvatars,
   globalActions,
-  appName = "Reader",
 }: HeaderProps) {
   const { sidebar, aiPanel, i18n } = useReaderShell();
   const t = (key: string, values?: Record<string, string | number>, defaultValue?: string) =>
@@ -52,23 +38,28 @@ export function Header({
   const { isCollapsed, toggle: toggleCollapsed } = sidebar;
   const { position: aiPanelPosition } = aiPanel;
 
-  // Determine icon based on AI panel position
+  const resolvedPanelPosition =
+    rightPanelPosition ?? (aiPanelPosition === "left" ? "left" : "right");
   const GlobalAiIcon =
-    aiPanelPosition === "left"
-      ? PanelLeft
-      : aiPanelPosition === "main"
-        ? MessageSquareText
+    aiPanelPosition === "main" && !rightPanelPosition
+      ? Square
+      : resolvedPanelPosition === "left"
+        ? PanelLeft
         : PanelRight;
 
-  const SourceIcon = SOURCE_ICONS[sourceType || "local"];
   const expandLabel = t("expand", undefined, "Expand sidebar");
   const collapseLabel = t("collapse", undefined, "Collapse sidebar");
 
-  const toggleLabel = t("toggleAi", { shortcut: "⌘+2" }, "Toggle AI Companion (⌘+2)");
+  const toggleLabel =
+    rightPanelLabel ?? t("toggleAi", { shortcut: "⌘+2" }, "Toggle AI Companion (⌘+2)");
 
   return (
-    <header className="relative flex h-12 items-center justify-between px-3 bg-background/80 backdrop-blur-md border-b border-border/20 z-10 select-none">
-      <div className="flex items-center gap-2">
+    <header
+      className={cn(
+        "absolute top-0 left-0 right-0 z-50 flex items-start justify-between p-3 pointer-events-none"
+      )}
+    >
+      <div className="flex items-center gap-2 pointer-events-auto">
         {/* Sidebar expand button - shows when sidebar is collapsed */}
         <Tooltip content={isCollapsed ? expandLabel : collapseLabel} side="right" sideOffset={8}>
           <Button
@@ -81,7 +72,7 @@ export function Header({
             )}
             aria-label={isCollapsed ? expandLabel : collapseLabel}
           >
-            <PanelLeft className="h-3.5 w-3.5" />
+            <PanelLeft className="h-4 w-4" />
           </Button>
         </Tooltip>
 
@@ -96,17 +87,6 @@ export function Header({
           <PanelLeft className="h-4 w-4" />
         </Button>
 
-        <div className="flex items-center gap-2 group cursor-default">
-          <span className="text-sm font-semibold tracking-tight text-foreground/90">{appName}</span>
-          <span className="text-muted-foreground/40 text-xs">/</span>
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-md hover:bg-surface-2 px-1.5 py-0.5">
-            <SourceIcon className="h-3.5 w-3.5" />
-            <span className="font-medium max-w-[200px] truncate">{title}</span>
-          </div>
-        </div>
-
-        <div className="hidden md:flex h-3 w-px bg-border/40 mx-2" />
-
         {syncIndicator}
 
         <div className="hidden md:flex h-3 w-px bg-border/40 mx-2" />
@@ -114,7 +94,7 @@ export function Header({
         {presenceAvatars}
       </div>
 
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5 pointer-events-auto">
         {globalActions}
         {/* Panel Toggles */}
         <div className="flex items-center gap-0.5">

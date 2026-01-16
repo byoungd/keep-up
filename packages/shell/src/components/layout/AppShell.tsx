@@ -19,7 +19,9 @@ import {
   ResizableSidebar,
   SettingsModal,
   Sidebar,
+  type SidebarGroupRenderer,
   type SidebarItemRenderer,
+  type SidebarNewAction,
   SidebarRail,
 } from "./sidebar";
 
@@ -31,6 +33,12 @@ export interface RightPanelProps {
 export interface AppShellProps {
   children: React.ReactNode;
   rightPanel?: React.ReactNode;
+  /** Optional auxiliary/context panel for main AI layouts */
+  auxPanel?: React.ReactNode;
+  /** Preview panel to show in right position when AI is in main mode */
+  previewPanel?: React.ReactNode;
+  /** Whether preview panel is visible */
+  isPreviewVisible?: boolean;
   sidebar?: React.ReactNode;
   isDesktop?: boolean;
   createDocumentDialog?: React.ReactNode;
@@ -44,12 +52,16 @@ export interface AppShellProps {
     importModals?: React.ReactNode;
     importStatus?: React.ReactNode;
     renderItemChildren?: SidebarItemRenderer;
+    renderGroup?: SidebarGroupRenderer;
+    newAction?: SidebarNewAction;
+    showSearch?: boolean;
   };
   headerActions?: React.ReactNode;
   appName?: string;
 }
 
 const PANEL_MIN_SIZES_PX: [number, number, number] = [240, 400, 380];
+const noop = () => undefined;
 
 type PanelPosition = "left" | "right" | "main";
 type PanelState = {
@@ -67,6 +79,28 @@ type LayoutChangeDeps = {
   isAIPanelVisible: boolean;
   setAIPanelWidth: (width: number) => void;
   setAIPanelVisible: (visible: boolean) => void;
+  hasAuxPanel: boolean;
+  isAuxPanelLeft: boolean;
+  isAuxPanelVisible: boolean;
+  setAuxPanelWidth: (width: number) => void;
+  setAuxPanelVisible: (visible: boolean) => void;
+};
+
+type AuxPanelState = {
+  content: React.ReactNode | null;
+  hasPanel: boolean;
+  isVisible: boolean;
+  position: "left" | "right";
+  width: number;
+  setWidth: (width: number) => void;
+  setVisible: (visible: boolean) => void;
+  toggle?: () => void;
+};
+
+type AuxLayoutState = {
+  isActive: boolean;
+  isVisible: boolean;
+  width?: number;
 };
 
 type SidebarContentProps = {
@@ -115,33 +149,240 @@ function getTargetWidth(width: number): number {
   return width > 0 ? Math.max(width, 380) : 450;
 }
 
-function getPanelMinSizes(
-  isAIPanelLeft: boolean,
-  isAIPanelRight: boolean
-): [number, number, number] {
+function getPanelMinSizes({
+  isAIPanelLeft,
+  isAIPanelRight,
+  isAuxPanelLeft,
+  isAuxPanelRight,
+}: {
+  isAIPanelLeft: boolean;
+  isAIPanelRight: boolean;
+  isAuxPanelLeft: boolean;
+  isAuxPanelRight: boolean;
+}): [number, number, number] {
   return [
-    isAIPanelLeft ? PANEL_MIN_SIZES_PX[2] : PANEL_MIN_SIZES_PX[0],
+    isAIPanelLeft || isAuxPanelLeft ? PANEL_MIN_SIZES_PX[2] : PANEL_MIN_SIZES_PX[0],
     PANEL_MIN_SIZES_PX[1],
-    isAIPanelRight ? PANEL_MIN_SIZES_PX[2] : 0,
+    isAIPanelRight || isAuxPanelRight ? PANEL_MIN_SIZES_PX[2] : 0,
   ];
+}
+
+function resolveAuxPanelState({
+  auxPanel,
+  panelProp,
+  previewPanel,
+  isPreviewVisible,
+  fallbackWidth,
+}: {
+  auxPanel: ReturnType<typeof useReaderShell>["auxPanel"];
+  panelProp?: React.ReactNode;
+  previewPanel?: React.ReactNode;
+  isPreviewVisible: boolean;
+  fallbackWidth: number;
+}): AuxPanelState {
+  const content = panelProp ?? previewPanel ?? null;
+  return {
+    content,
+    hasPanel: Boolean(content),
+    isVisible: auxPanel?.isVisible ?? isPreviewVisible,
+    position: auxPanel?.position ?? "right",
+    width: auxPanel?.width ?? fallbackWidth,
+    setWidth: auxPanel?.setWidth ?? noop,
+    setVisible: auxPanel?.setVisible ?? noop,
+    toggle: auxPanel?.toggle,
+  };
+}
+
+function resolveAuxLayoutState({
+  panelState,
+  auxState,
+  targetWidth,
+}: {
+  panelState: PanelState;
+  auxState: AuxPanelState;
+  targetWidth: number;
+}): AuxLayoutState {
+  if (!panelState.isMain || !auxState.hasPanel) {
+    return { isActive: false, isVisible: false };
+  }
+  return {
+    isActive: true,
+    isVisible: auxState.isVisible,
+    width: targetWidth,
+  };
+}
+
+function resolveHeaderConfig({
+  panelState,
+  hasAuxPanel,
+  isAuxPanelVisible,
+  auxPanelPosition,
+  isAIPanelVisible,
+  i18n,
+}: {
+  panelState: PanelState;
+  hasAuxPanel: boolean;
+  isAuxPanelVisible: boolean;
+  auxPanelPosition: "left" | "right";
+  isAIPanelVisible: boolean;
+  i18n: ReturnType<typeof useReaderShell>["i18n"];
+}): Pick<HeaderProps, "isRightPanelOpen" | "rightPanelPosition" | "rightPanelLabel"> {
+  if (panelState.isMain && hasAuxPanel) {
+    return {
+      isRightPanelOpen: isAuxPanelVisible,
+      rightPanelPosition: auxPanelPosition,
+      rightPanelLabel: i18n.t("Header.toggleContext", "Toggle Context Panel (⌘+2)"),
+    };
+  }
+  return {
+    isRightPanelOpen: isAIPanelVisible,
+  };
+}
+
+function resolveDesktopToggle({
+  panelState,
+  hasAuxPanel,
+  toggleAuxPanel,
+  toggleAIPanel,
+}: {
+  panelState: PanelState;
+  hasAuxPanel: boolean;
+  toggleAuxPanel?: () => void;
+  toggleAIPanel: () => void;
+}): () => void {
+  if (panelState.isMain && hasAuxPanel && toggleAuxPanel) {
+    return toggleAuxPanel;
+  }
+  return toggleAIPanel;
+}
+
+function resolveMobileRightPanel({
+  panelState,
+  auxPanel,
+  rightPanel,
+  onClose,
+}: {
+  panelState: PanelState;
+  auxPanel: React.ReactNode | null;
+  rightPanel?: React.ReactNode;
+  onClose: () => void;
+}): React.ReactNode | null {
+  const panel = panelState.isMain ? auxPanel : rightPanel;
+  return clonePanel(panel ?? undefined, onClose);
+}
+
+function renderMainContent({
+  isDesktop,
+  layoutRef,
+  defaultLayout,
+  panelMinSizes,
+  desktopLeftPanel,
+  desktopCenterPanel,
+  desktopRightPanel,
+  handleLayoutChange,
+
+  mobilePanel,
+  mobileRightPanel,
+  state,
+  actions,
+  isLoading,
+  handleCustomizeOpen,
+  sidebarProps,
+  workspaceName,
+  workspaceAvatarUrl,
+}: {
+  isDesktop: boolean;
+  layoutRef: React.RefObject<ResizableThreePaneLayoutHandle | null>;
+  defaultLayout: [number, number, number];
+  panelMinSizes: [number, number, number];
+  desktopLeftPanel: React.ReactNode | null;
+  desktopCenterPanel: React.ReactNode;
+  desktopRightPanel: React.ReactNode | null;
+  handleLayoutChange: (layout: [number, number, number]) => void;
+
+  mobilePanel: MobilePanel;
+  mobileRightPanel: React.ReactNode | null;
+  state: EffectiveSidebarState;
+  actions: SidebarConfigActions;
+  isLoading: boolean;
+  handleCustomizeOpen: () => void;
+  sidebarProps?: AppShellProps["sidebarProps"];
+  workspaceName: string;
+  workspaceAvatarUrl?: string;
+}): React.ReactNode {
+  if (isDesktop) {
+    return (
+      <ResizableThreePaneLayout
+        ref={layoutRef}
+        layoutUnit="pixel"
+        defaultLayout={defaultLayout}
+        minSizes={panelMinSizes}
+        minWidthsPx={panelMinSizes}
+        leftPanel={desktopLeftPanel}
+        centerPanel={desktopCenterPanel}
+        rightPanel={desktopRightPanel}
+        onLayoutChange={handleLayoutChange}
+      />
+    );
+  }
+  return (
+    <MobileLayout
+      mobilePanel={mobilePanel}
+      mobileRightPanel={mobileRightPanel}
+      state={state}
+      actions={actions}
+      isLoading={isLoading}
+      onOpenCustomize={handleCustomizeOpen}
+      sidebarProps={sidebarProps}
+      workspaceName={workspaceName}
+      workspaceAvatarUrl={workspaceAvatarUrl}
+    >
+      {desktopCenterPanel}
+    </MobileLayout>
+  );
+}
+
+function useResetMobilePanel({
+  isDesktop,
+  setMobilePanel,
+}: {
+  isDesktop: boolean;
+  setMobilePanel: React.Dispatch<React.SetStateAction<MobilePanel>>;
+}) {
+  React.useEffect(() => {
+    if (isDesktop) {
+      setMobilePanel("center");
+    }
+  }, [isDesktop, setMobilePanel]);
 }
 
 function getDefaultLayout({
   isAIPanelLeft,
   isAIPanelRight,
+  isAIPanelMain,
   isAIPanelVisible,
+  isAuxPanelVisible,
+  auxPanelPosition,
   targetWidth,
+  auxTargetWidth,
 }: {
   isAIPanelLeft: boolean;
   isAIPanelRight: boolean;
+  isAIPanelMain: boolean;
   isAIPanelVisible: boolean;
+  isAuxPanelVisible: boolean;
+  auxPanelPosition: "left" | "right";
   targetWidth: number;
+  auxTargetWidth: number;
 }): [number, number, number] {
   if (isAIPanelLeft) {
     return [isAIPanelVisible ? targetWidth : 0, 0, 0];
   }
   if (isAIPanelRight) {
     return [0, 0, isAIPanelVisible ? targetWidth : 0];
+  }
+  if (isAIPanelMain && isAuxPanelVisible) {
+    return auxPanelPosition === "left" ? [auxTargetWidth, 0, 0] : [0, 0, auxTargetWidth];
   }
   return [0, 0, 0];
 }
@@ -152,6 +393,9 @@ function getDesktopPanels({
   isAIPanelMain,
   isAIPanelVisible,
   desktopPanel,
+  auxPanel,
+  isAuxPanelVisible,
+  auxPanelPosition,
   children,
 }: {
   isAIPanelLeft: boolean;
@@ -159,15 +403,27 @@ function getDesktopPanels({
   isAIPanelMain: boolean;
   isAIPanelVisible: boolean;
   desktopPanel: React.ReactNode | null;
+  auxPanel?: React.ReactNode | null;
+  isAuxPanelVisible: boolean;
+  auxPanelPosition: "left" | "right";
   children: React.ReactNode;
 }): DesktopPanels {
-  const leftPanel = isAIPanelLeft ? desktopPanel : null;
-  const rightPanel = isAIPanelRight ? desktopPanel : null;
+  const leftPanel = isAIPanelLeft
+    ? desktopPanel
+    : isAIPanelMain && isAuxPanelVisible && auxPanelPosition === "left"
+      ? auxPanel
+      : null;
+  let rightPanel: React.ReactNode | null = null;
+  if (isAIPanelRight) {
+    rightPanel = desktopPanel;
+  } else if (isAIPanelMain && isAuxPanelVisible && auxPanelPosition === "right") {
+    rightPanel = auxPanel ?? null;
+  }
   const centerPanel = isAIPanelMain && isAIPanelVisible && desktopPanel ? desktopPanel : children;
   return { leftPanel, rightPanel, centerPanel };
 }
 
-function cloneRightPanel(
+function clonePanel(
   panel: React.ReactNode | undefined,
   onClose: () => void
 ): React.ReactNode | null {
@@ -188,11 +444,24 @@ function applySidebarConfig(actions: SidebarConfigActions, config: SidebarUserCo
   }
 }
 
-function applyLayoutChange(layout: [number, number, number], deps: LayoutChangeDeps): void {
-  if (deps.isAIPanelMain) {
+function applyAuxLayoutChange(layout: [number, number, number], deps: LayoutChangeDeps): void {
+  if (!deps.hasAuxPanel) {
     return;
   }
+  const panelWidth = deps.isAuxPanelLeft ? layout[0] : layout[2];
+  if (panelWidth > 1) {
+    deps.setAuxPanelWidth(panelWidth);
+    if (!deps.isAuxPanelVisible) {
+      deps.setAuxPanelVisible(true);
+    }
+    return;
+  }
+  if (deps.isAuxPanelVisible) {
+    deps.setAuxPanelVisible(false);
+  }
+}
 
+function applyAIPanelLayoutChange(layout: [number, number, number], deps: LayoutChangeDeps): void {
   const panelWidth = deps.isAIPanelLeft ? layout[0] : layout[2];
   if (panelWidth > 1) {
     deps.setAIPanelWidth(panelWidth);
@@ -205,6 +474,14 @@ function applyLayoutChange(layout: [number, number, number], deps: LayoutChangeD
   if (deps.isAIPanelVisible) {
     deps.setAIPanelVisible(false);
   }
+}
+
+function applyLayoutChange(layout: [number, number, number], deps: LayoutChangeDeps): void {
+  if (deps.isAIPanelMain) {
+    applyAuxLayoutChange(layout, deps);
+    return;
+  }
+  applyAIPanelLayoutChange(layout, deps);
 }
 
 function togglePanel({
@@ -244,12 +521,15 @@ function SidebarContent({
       onOpenCustomize={onOpenCustomize}
       onOpenSearch={sidebarProps?.onOpenSearch}
       onOpenImport={sidebarProps?.onOpenImport}
+      newAction={sidebarProps?.newAction}
+      showSearch={sidebarProps?.showSearch}
       workspaceName={workspaceName}
       workspaceAvatarUrl={workspaceAvatarUrl}
       onOpenFeedModal={sidebarProps?.onOpenFeedModal}
       importModals={sidebarProps?.importModals}
       importStatus={sidebarProps?.importStatus}
       renderItemChildren={sidebarProps?.renderItemChildren}
+      renderGroup={sidebarProps?.renderGroup}
     />
   );
 }
@@ -357,6 +637,8 @@ export function AppShell(props: AppShellProps) {
   const {
     children,
     rightPanel,
+    previewPanel,
+    isPreviewVisible = false,
     isDesktop = true,
     createDocumentDialog,
     commandPalette,
@@ -374,6 +656,8 @@ export function AppShell(props: AppShellProps) {
   const {
     user,
     aiPanel,
+    auxPanel,
+    i18n,
     sidebar: {
       state: sidebarState,
       actions: sidebarActions,
@@ -401,6 +685,19 @@ export function AppShell(props: AppShellProps) {
   } = aiPanel;
 
   const panelState = resolvePanelPosition(aiPanelPosition);
+  const auxState = resolveAuxPanelState({
+    auxPanel,
+    panelProp: props.auxPanel,
+    previewPanel,
+    isPreviewVisible,
+    fallbackWidth: aiPanelWidth,
+  });
+  const hasAuxPanel = auxState.hasPanel;
+  const auxPanelPosition = auxState.position;
+  const setAuxPanelWidth = auxState.setWidth;
+  const setAuxPanelVisible = auxState.setVisible;
+  const toggleAuxPanel = auxState.toggle;
+  const auxPanelWidth = auxState.width;
 
   // Map context values to local names for compatibility with existing code
   const state = sidebarState;
@@ -415,6 +712,13 @@ export function AppShell(props: AppShellProps) {
   // If stored width is 0 (first run), default to 450px
   // Also ensure it meets the minimum of 380px
   const targetWidth = getTargetWidth(aiPanelWidth);
+  const auxTargetWidth = getTargetWidth(auxPanelWidth);
+  const auxLayout = resolveAuxLayoutState({
+    panelState,
+    auxState,
+    targetWidth: auxTargetWidth,
+  });
+  const isAuxPanelActive = auxLayout.isActive;
 
   // Sync AI Panel state with ResizableThreePaneLayout
   useAIPanelSync({
@@ -424,14 +728,13 @@ export function AppShell(props: AppShellProps) {
     isAIPanelVisible,
     aiPanelPosition: panelState.position,
     targetWidth,
+    auxPanelVisible: auxLayout.isVisible,
+    auxPanelPosition: auxPanelPosition,
+    auxPanelWidth: auxLayout.width,
   });
 
   // Reset mobile panel when switching to desktop
-  React.useEffect(() => {
-    if (isDesktop) {
-      setMobilePanel("center");
-    }
-  }, [isDesktop]);
+  useResetMobilePanel({ isDesktop, setMobilePanel });
 
   const handleToggleLeft = React.useCallback(() => {
     togglePanel({
@@ -443,16 +746,30 @@ export function AppShell(props: AppShellProps) {
   }, [isDesktop]);
 
   const handleToggleRight = React.useCallback(() => {
+    const onDesktopToggle = resolveDesktopToggle({
+      panelState,
+      hasAuxPanel,
+      toggleAuxPanel,
+      toggleAIPanel,
+    });
     togglePanel({
       isDesktop,
       setMobilePanel,
       target: "right",
-      onDesktopToggle: toggleAIPanel,
+      onDesktopToggle,
     });
-  }, [isDesktop, toggleAIPanel]);
+  }, [isDesktop, panelState, hasAuxPanel, toggleAuxPanel, toggleAIPanel]);
 
-  const mobileRightPanel = cloneRightPanel(rightPanel, () => setMobilePanel("center"));
-  const desktopPanel = cloneRightPanel(rightPanel, () => setAIPanelVisible(false));
+  const mobileRightPanel = resolveMobileRightPanel({
+    panelState,
+    auxPanel: auxState.content,
+    rightPanel,
+    onClose: () => setMobilePanel("center"),
+  });
+  const desktopPanel = clonePanel(rightPanel, () => setAIPanelVisible(false));
+  const auxPanelElement = clonePanel(auxState.content ?? undefined, () =>
+    setAuxPanelVisible(false)
+  );
 
   const handleSaveConfig = React.useCallback(
     (config: SidebarUserConfig) => {
@@ -469,12 +786,33 @@ export function AppShell(props: AppShellProps) {
         isAIPanelVisible,
         setAIPanelWidth,
         setAIPanelVisible,
+        hasAuxPanel,
+        isAuxPanelLeft: auxPanelPosition === "left",
+        isAuxPanelVisible: auxLayout.isVisible,
+        setAuxPanelWidth,
+        setAuxPanelVisible,
       });
     },
-    [panelState.isLeft, panelState.isMain, isAIPanelVisible, setAIPanelWidth, setAIPanelVisible]
+    [
+      panelState.isLeft,
+      panelState.isMain,
+      isAIPanelVisible,
+      setAIPanelWidth,
+      setAIPanelVisible,
+      hasAuxPanel,
+      auxPanelPosition,
+      auxLayout.isVisible,
+      setAuxPanelWidth,
+      setAuxPanelVisible,
+    ]
   );
 
-  const panelMinSizes = getPanelMinSizes(panelState.isLeft, panelState.isRight);
+  const panelMinSizes = getPanelMinSizes({
+    isAIPanelLeft: panelState.isLeft,
+    isAIPanelRight: panelState.isRight,
+    isAuxPanelLeft: isAuxPanelActive && auxPanelPosition === "left",
+    isAuxPanelRight: isAuxPanelActive && auxPanelPosition === "right",
+  });
   const {
     leftPanel: desktopLeftPanel,
     rightPanel: desktopRightPanel,
@@ -485,13 +823,20 @@ export function AppShell(props: AppShellProps) {
     isAIPanelMain: panelState.isMain,
     isAIPanelVisible,
     desktopPanel,
+    auxPanel: auxPanelElement,
+    isAuxPanelVisible: auxLayout.isVisible,
+    auxPanelPosition,
     children,
   });
   const defaultLayout = getDefaultLayout({
     isAIPanelLeft: panelState.isLeft,
     isAIPanelRight: panelState.isRight,
+    isAIPanelMain: panelState.isMain,
     isAIPanelVisible,
+    isAuxPanelVisible: auxLayout.isVisible,
+    auxPanelPosition,
     targetWidth,
+    auxTargetWidth,
   });
 
   const handleCustomizeOpen = React.useCallback(() => setCustomizeOpen(true), []);
@@ -514,7 +859,15 @@ export function AppShell(props: AppShellProps) {
     />
   );
 
-  const sidebarElement = sidebar ? sidebar : defaultSidebar;
+  const sidebarElement = sidebar ?? defaultSidebar;
+  const headerConfig = resolveHeaderConfig({
+    panelState,
+    hasAuxPanel,
+    isAuxPanelVisible: auxLayout.isVisible,
+    auxPanelPosition,
+    isAIPanelVisible,
+    i18n,
+  });
 
   return (
     <>
@@ -525,44 +878,39 @@ export function AppShell(props: AppShellProps) {
         {sidebarElement}
 
         {/* Main Content Area */}
-        <div className="flex-1 flex flex-col min-w-0 bg-background">
+        <div className="flex-1 flex flex-col min-w-0 bg-background relative">
           <Header
             onToggleLeft={handleToggleLeft}
             onToggleRight={handleToggleRight}
-            isRightPanelOpen={isAIPanelVisible}
+            isRightPanelOpen={headerConfig.isRightPanelOpen}
+            rightPanelPosition={headerConfig.rightPanelPosition}
+            rightPanelLabel={headerConfig.rightPanelLabel}
             globalActions={headerActions}
             appName={appName}
             {...headerProps}
           />
 
           <div className="flex-1 overflow-hidden relative">
-            {isDesktop ? (
-              <ResizableThreePaneLayout
-                ref={layoutRef}
-                layoutUnit="pixel"
-                defaultLayout={defaultLayout}
-                minSizes={panelMinSizes}
-                minWidthsPx={panelMinSizes}
-                leftPanel={desktopLeftPanel}
-                centerPanel={desktopCenterPanel}
-                rightPanel={desktopRightPanel}
-                onLayoutChange={handleLayoutChange}
-              />
-            ) : (
-              <MobileLayout
-                mobilePanel={mobilePanel}
-                mobileRightPanel={mobileRightPanel}
-                state={state}
-                actions={actions}
-                isLoading={isLoading}
-                onOpenCustomize={handleCustomizeOpen}
-                sidebarProps={sidebarProps}
-                workspaceName={workspaceName}
-                workspaceAvatarUrl={workspaceAvatarUrl}
-              >
-                {children}
-              </MobileLayout>
-            )}
+            {renderMainContent({
+              isDesktop,
+              layoutRef,
+              defaultLayout,
+              panelMinSizes,
+              desktopLeftPanel,
+              desktopCenterPanel,
+              desktopRightPanel,
+              handleLayoutChange,
+
+              mobilePanel,
+              mobileRightPanel,
+              state,
+              actions,
+              isLoading,
+              handleCustomizeOpen,
+              sidebarProps,
+              workspaceName,
+              workspaceAvatarUrl,
+            })}
           </div>
         </div>
       </div>

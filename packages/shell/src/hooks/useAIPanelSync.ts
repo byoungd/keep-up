@@ -8,6 +8,59 @@ interface UseAIPanelSyncProps {
   isAIPanelVisible: boolean;
   aiPanelPosition: "left" | "right" | "main";
   targetWidth: number;
+  auxPanelVisible?: boolean;
+  auxPanelPosition?: "left" | "right";
+  auxPanelWidth?: number;
+}
+
+type LayoutHandle = ResizableThreePaneLayoutHandle;
+
+type AuxLayoutState = {
+  isVisible: boolean;
+  position?: "left" | "right";
+  width?: number;
+};
+
+function applyAuxLayout(layout: LayoutHandle, auxState: AuxLayoutState): boolean {
+  if (!auxState.isVisible || !auxState.position || !auxState.width) {
+    return false;
+  }
+  if (auxState.position === "left") {
+    layout.collapseRight();
+    layout.expandLeft?.(auxState.width);
+    return true;
+  }
+  layout.collapseLeft?.();
+  layout.expandRight(auxState.width);
+  return true;
+}
+
+function applySideLayout({
+  layout,
+  isLeft,
+  isVisible,
+  targetWidth,
+}: {
+  layout: LayoutHandle;
+  isLeft: boolean;
+  isVisible: boolean;
+  targetWidth: number;
+}) {
+  if (isLeft) {
+    layout.collapseRight();
+    if (isVisible) {
+      layout.expandLeft?.(targetWidth);
+    } else {
+      layout.collapseLeft?.();
+    }
+    return;
+  }
+  layout.collapseLeft?.();
+  if (isVisible) {
+    layout.expandRight(targetWidth);
+  } else {
+    layout.collapseRight();
+  }
 }
 
 export function useAIPanelSync({
@@ -17,6 +70,9 @@ export function useAIPanelSync({
   isAIPanelVisible,
   aiPanelPosition,
   targetWidth,
+  auxPanelVisible,
+  auxPanelPosition,
+  auxPanelWidth,
 }: UseAIPanelSyncProps) {
   const resolvedPanelPosition = aiPanelPosition ?? "right";
   const isAIPanelLeft = resolvedPanelPosition === "left";
@@ -24,36 +80,34 @@ export function useAIPanelSync({
   const isAIPanelMain = resolvedPanelPosition === "main";
 
   React.useEffect(() => {
-    // Check if layoutRef.current is available and we are on desktop
-    if (!isDesktop || !layoutRef.current || !(isAIPanelHydrated ?? true)) {
+    if (!isDesktop || !(isAIPanelHydrated ?? true)) {
       return;
     }
-
-    const validLayout = layoutRef.current;
+    const layout = layoutRef.current;
+    if (!layout) {
+      return;
+    }
 
     if (isAIPanelMain) {
-      validLayout.collapseRight();
-      validLayout.collapseLeft?.();
-      return;
-    }
-
-    if (isAIPanelLeft) {
-      validLayout.collapseRight();
-      if (isAIPanelVisible) {
-        validLayout.expandLeft?.(targetWidth);
-      } else {
-        validLayout.collapseLeft?.();
+      const didApplyAux = applyAuxLayout(layout, {
+        isVisible: auxPanelVisible ?? false,
+        position: auxPanelPosition,
+        width: auxPanelWidth,
+      });
+      if (didApplyAux) {
+        return;
       }
+      layout.collapseRight();
+      layout.collapseLeft?.();
       return;
     }
 
-    // Default: Right panel
-    validLayout.collapseLeft?.();
-    if (isAIPanelVisible) {
-      validLayout.expandRight(targetWidth);
-    } else {
-      validLayout.collapseRight();
-    }
+    applySideLayout({
+      layout,
+      isLeft: isAIPanelLeft,
+      isVisible: isAIPanelVisible,
+      targetWidth,
+    });
   }, [
     isAIPanelVisible,
     isDesktop,
@@ -62,6 +116,9 @@ export function useAIPanelSync({
     isAIPanelMain,
     targetWidth,
     layoutRef,
+    auxPanelVisible,
+    auxPanelPosition,
+    auxPanelWidth,
   ]);
 
   return { isAIPanelLeft, isAIPanelRight, isAIPanelMain };

@@ -3,14 +3,15 @@ import { cn } from "../utils/cn";
 import type { AppShellProps } from "./types";
 
 /**
- * AppShell - A flexible application shell layout with sidebar and optional right panel.
+ * AppShell - A flexible application shell layout with sidebar and optional panels.
  *
  * This is an abstracted version of Reader's AppShell that provides the layout structure
  * without Reader-specific dependencies.
  *
  * Features:
  * - Responsive sidebar with collapse support
- * - Optional right panel
+ * - Optional left panel (for AI or preview when docked left)
+ * - Optional right panel (for AI or preview when docked right)
  * - Customizable header
  * - Mobile-first approach
  */
@@ -18,10 +19,12 @@ export function AppShell({
   children,
   sidebar,
   sidebarCollapsed,
+  leftPanel,
   rightPanel,
   header,
   showSidebar = true,
   isSidebarCollapsed = false,
+  isLeftPanelVisible = false,
   isRightPanelVisible = false,
   className,
 }: AppShellProps) {
@@ -37,6 +40,11 @@ export function AppShell({
         <div className="hidden lg:flex">{isSidebarCollapsed ? sidebarCollapsed : sidebar}</div>
       )}
 
+      {/* Left Panel (beside sidebar) */}
+      {leftPanel && isLeftPanelVisible && (
+        <div className="hidden lg:flex shrink-0 border-r border-border h-full">{leftPanel}</div>
+      )}
+
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 bg-background">
         {/* Header */}
@@ -50,7 +58,9 @@ export function AppShell({
 
             {/* Right panel */}
             {rightPanel && isRightPanelVisible && (
-              <div className="hidden lg:block shrink-0 border-l border-border">{rightPanel}</div>
+              <div className="hidden lg:flex shrink-0 border-l border-border h-full">
+                {rightPanel}
+              </div>
             )}
           </div>
         </div>

@@ -3,7 +3,7 @@
 import { cn } from "@ku0/shared/utils";
 import { AlertTriangle, CheckCircle2, Square } from "lucide-react";
 import type * as React from "react";
-import type { MessageStatus } from "./MessageItem";
+import type { MessageStatus } from "./types";
 
 const STATUS_META: Record<MessageStatus, { className: string; icon: React.ReactNode }> = {
   streaming: {
@@ -22,6 +22,10 @@ const STATUS_META: Record<MessageStatus, { className: string; icon: React.ReactN
     className: "text-muted-foreground",
     icon: <Square className="h-3 w-3" />,
   },
+  pending: {
+    className: "text-muted-foreground/50",
+    icon: <div className="h-1.5 w-1.5 rounded-full bg-current opacity-50" />,
+  },
 };
 
 export function MessageStatusBadge({
@@ -31,9 +35,9 @@ export function MessageStatusBadge({
   status?: MessageStatus;
   labels: Record<MessageStatus, string>;
 }) {
-  // For Linear-quality UI, we hide status badges for normal states (streaming, done)
+  // For Linear-quality UI, we hide status badges for normal states (streaming, done, pending)
   // as they are redundant or noisy. Only show for exceptions (error, canceled).
-  if (!status || status === "streaming" || status === "done") {
+  if (!status || status === "streaming" || status === "done" || status === "pending") {
     return null;
   }
   const meta = STATUS_META[status];

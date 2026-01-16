@@ -11,9 +11,11 @@ import {
   Image as ImageIcon,
   Link as LinkIcon,
   Loader2,
+  Target,
 } from "lucide-react";
+import * as React from "react";
 import { TextShimmer } from "../ui/TextShimmer";
-import type { AgentTask, ArtifactItem } from "./types";
+import type { AgentTask, ArtifactItem, TaskPhase } from "./types";
 import { groupArtifactsByType } from "./types";
 
 export interface TaskProgressWidgetProps {
@@ -31,6 +33,47 @@ export interface TaskProgressWidgetProps {
   className?: string;
 }
 
+function PhaseItem({
+  phase,
+  isActive,
+  isCompleted,
+}: { phase: TaskPhase; isActive: boolean; isCompleted: boolean }) {
+  return (
+    <div className="flex items-center shrink-0">
+      <motion.div
+        initial={false}
+        animate={{
+          backgroundColor: isActive
+            ? "var(--primary-10)"
+            : isCompleted
+              ? "var(--green-10)"
+              : "transparent",
+          borderColor: isActive
+            ? "var(--primary-20)"
+            : isCompleted
+              ? "var(--green-20)"
+              : "var(--border-10)",
+        }}
+        className={cn(
+          "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors relative overflow-hidden",
+          isActive
+            ? "text-primary shadow-[0_0_10px_-3px_var(--primary)]"
+            : isCompleted
+              ? "text-green-600 dark:text-green-400"
+              : "bg-surface-2/50 border-border/10 text-muted-foreground"
+        )}
+      >
+        {/* Pulsing Dot for Active Phase */}
+        {isActive && <span className="absolute inset-0 bg-primary/5 animate-pulse" />}
+
+        {isCompleted && <CheckCircle2 className="w-3.5 h-3.5" />}
+        {isActive && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+        <span className="relative z-10">{phase.label}</span>
+      </motion.div>
+    </div>
+  );
+}
+
 function TaskDetails({
   task,
   onReviewClick,
@@ -38,11 +81,53 @@ function TaskDetails({
   task: AgentTask;
   onReviewClick?: (task: AgentTask) => void;
 }) {
-  const { steps, filesChanged = 0, linesAdded = 0, linesRemoved = 0 } = task;
+  const {
+    steps,
+    filesChanged = 0,
+    linesAdded = 0,
+    linesRemoved = 0,
+    goal,
+    phases,
+    currentPhaseId,
+  } = task;
 
   return (
-    <div className="bg-surface-2/10 border-t border-border/5">
-      {/* Task List */}
+    <div className="bg-surface-2/5 border-t border-border/5">
+      {/* Task Goal Header (Spec 2.1.1 Refined) */}
+      {goal && (
+        <div className="relative px-5 py-4 border-b border-border/5 bg-gradient-to-r from-surface-2/20 to-transparent">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 p-1.5 rounded-md bg-primary/10 text-primary shrink-0">
+              <Target className="w-3.5 h-3.5" />
+            </div>
+            <div className="space-y-1">
+              <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                Current Objective
+              </div>
+              <div className="text-sm text-foreground font-medium leading-relaxed">{goal}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Phase List (Spec 2.1.1 Refined) */}
+      {phases && phases.length > 0 && (
+        <div className="px-4 py-3 border-b border-border/5 flex items-center gap-2 overflow-x-auto no-scrollbar mask-linear-fade">
+          {phases.map((phase, idx) => {
+            const isActive = phase.id === currentPhaseId;
+            const isCompleted = phase.status === "completed";
+
+            return (
+              <React.Fragment key={phase.id}>
+                <PhaseItem phase={phase} isActive={isActive} isCompleted={isCompleted} />
+                {idx < phases.length - 1 && <div className="w-6 h-px bg-border/20 mx-1 shrink-0" />}
+              </React.Fragment>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Task Steps List */}
       <div className="px-4 py-3 space-y-3">
         {steps.map((step) => {
           const isCompleted = step.status === "completed";
@@ -146,7 +231,7 @@ function TaskAccordionItem({
       <button
         type="button"
         onClick={onToggle}
-        className="relative flex items-center gap-4 px-4 py-3 w-full text-left outline-none overflow-hidden"
+        className="relative flex items-center gap-4 px-4 py-3 w-full text-left outline-none overflow-hidden cursor-pointer"
       >
         {/* Background Progress Fill (Extremely Light) */}
         {isLoading && (
@@ -204,7 +289,9 @@ function TaskAccordionItem({
                   onClick={(e) => {
                     e.stopPropagation();
                     const doc = grouped.docs[0];
-                    if (doc) onArtifactClick?.(doc, task);
+                    if (doc) {
+                      onArtifactClick?.(doc, task);
+                    }
                   }}
                   className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/10 hover:bg-blue-500/20 transition-colors"
                   title={`${grouped.docs.length} Documents`}
@@ -219,7 +306,9 @@ function TaskAccordionItem({
                   onClick={(e) => {
                     e.stopPropagation();
                     const image = grouped.images[0];
-                    if (image) onArtifactClick?.(image, task);
+                    if (image) {
+                      onArtifactClick?.(image, task);
+                    }
                   }}
                   className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/10 hover:bg-purple-500/20 transition-colors"
                   title={`${grouped.images.length} Images`}
@@ -234,7 +323,9 @@ function TaskAccordionItem({
                   onClick={(e) => {
                     e.stopPropagation();
                     const link = grouped.links[0];
-                    if (link) onArtifactClick?.(link, task);
+                    if (link) {
+                      onArtifactClick?.(link, task);
+                    }
                   }}
                   className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/10 hover:bg-orange-500/20 transition-colors"
                   title={`${grouped.links.length} Links`}

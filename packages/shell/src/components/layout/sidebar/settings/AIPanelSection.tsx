@@ -1,49 +1,76 @@
 import { PanelLeft, PanelRight, Square } from "lucide-react";
 import { OptionCard } from "./OptionCard";
+import { SettingsSection } from "./SettingsSection";
 
 interface AIPanelSectionProps {
   t: (key: string, defaultValue?: string) => string;
   position: "main" | "left" | "right";
   setPosition: (position: "main" | "left" | "right") => void;
+  availablePositions?: Array<"main" | "left" | "right">;
 }
 
-export function AIPanelSection({ t, position, setPosition }: AIPanelSectionProps) {
+const POSITION_OPTIONS: Record<
+  "main" | "left" | "right",
+  {
+    titleKey: string;
+    defaultTitle: string;
+    descriptionKey: string;
+    defaultDescription: string;
+    icon: typeof PanelLeft;
+  }
+> = {
+  left: {
+    titleKey: "aiPanelLeftRail",
+    defaultTitle: "Left Rail",
+    descriptionKey: "aiPanelLeftRailDesc",
+    defaultDescription: "Dock beside the sidebar",
+    icon: PanelLeft,
+  },
+  main: {
+    titleKey: "aiPanelMain",
+    defaultTitle: "Main",
+    descriptionKey: "aiPanelMainDesc",
+    defaultDescription: "Show in the primary workspace",
+    icon: Square,
+  },
+  right: {
+    titleKey: "aiPanelRightRail",
+    defaultTitle: "Right Rail",
+    descriptionKey: "aiPanelRightRailDesc",
+    defaultDescription: "Dock on the right side",
+    icon: PanelRight,
+  },
+};
+
+export function AIPanelSection({
+  t,
+  position,
+  setPosition,
+  availablePositions,
+}: AIPanelSectionProps) {
+  const options = availablePositions ?? ["left", "main", "right"];
+  const label = t("aiPanelPosition", "AI Panel");
   return (
-    <fieldset
-      className="grid items-center gap-2 rounded-xl border border-border/40 bg-surface-1/30 p-3"
-      style={{ gridTemplateColumns: "auto 1fr" }}
-      aria-labelledby="ai-panel-position-label"
-    >
-      <legend className="sr-only">{t("aiPanelPosition", "AI Panel")}</legend>
-      <span
-        id="ai-panel-position-label"
-        className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-1 whitespace-nowrap self-center"
+    <SettingsSection id="ai-panel-position-label" label={label}>
+      <div
+        className="grid gap-2 w-full min-w-0"
+        style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}
       >
-        {t("aiPanelPosition", "AI Panel")}
-      </span>
-      <div className="grid grid-cols-3 gap-2 w-full min-w-0">
-        <OptionCard
-          title={t("aiPanelLeftRail", "Left Rail")}
-          description={t("aiPanelLeftRailDesc", "Dock beside the sidebar")}
-          selected={position === "left"}
-          onSelect={() => setPosition("left")}
-          preview={<PanelLeft className="h-5 w-5" />}
-        />
-        <OptionCard
-          title={t("aiPanelMain", "Main")}
-          description={t("aiPanelMainDesc", "Show in the primary workspace")}
-          selected={position === "main"}
-          onSelect={() => setPosition("main")}
-          preview={<Square className="h-5 w-5" />}
-        />
-        <OptionCard
-          title={t("aiPanelRightRail", "Right Rail")}
-          description={t("aiPanelRightRailDesc", "Dock on the right side")}
-          selected={position === "right"}
-          onSelect={() => setPosition("right")}
-          preview={<PanelRight className="h-5 w-5" />}
-        />
+        {options.map((option) => {
+          const config = POSITION_OPTIONS[option];
+          const Icon = config.icon;
+          return (
+            <OptionCard
+              key={option}
+              title={t(config.titleKey, config.defaultTitle)}
+              description={t(config.descriptionKey, config.defaultDescription)}
+              selected={position === option}
+              onSelect={() => setPosition(option)}
+              preview={<Icon className="h-5 w-5" />}
+            />
+          );
+        })}
       </div>
-    </fieldset>
+    </SettingsSection>
   );
 }

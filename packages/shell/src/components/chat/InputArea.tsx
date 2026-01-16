@@ -1,10 +1,11 @@
 "use client";
+import type { ModelCapability } from "@ku0/ai-core";
 import { cn } from "@ku0/shared/utils";
 import { AlertTriangle, Loader2, X } from "lucide-react";
 import * as React from "react";
 import { useSlashCommand } from "../../hooks/useSlashCommand";
 import type { AIPrompt } from "../../lib/ai/types";
-import { InputBottomBar } from "./InputBottomBar";
+import { InputToolbar } from "./InputToolbar";
 import { SlashCommandMenu } from "./SlashCommandMenu";
 
 export interface Attachment {
@@ -44,6 +45,10 @@ export interface InputAreaProps {
   attachmentError?: string;
   isAttachmentBusy?: boolean;
   prompts?: AIPrompt[];
+  className?: string;
+  model: string;
+  models: ModelCapability[];
+  onSelectModel: (modelId: string) => void;
 }
 
 const MAX_CHARS = 4000;
@@ -69,6 +74,10 @@ export function InputArea({
   attachmentError,
   isAttachmentBusy = false,
   prompts = [],
+  className,
+  model,
+  models,
+  onSelectModel,
 }: InputAreaProps) {
   const [isFocused, setIsFocused] = React.useState(false);
   // Memoize derived values to simplify render logic
@@ -139,7 +148,7 @@ export function InputArea({
     const styles = window.getComputedStyle(textarea);
     const minHeight = Number.parseFloat(styles.minHeight);
     const maxHeight = Number.parseFloat(styles.maxHeight);
-    const resolvedMinHeight = Number.isNaN(minHeight) ? 0 : minHeight;
+    const resolvedMinHeight = Number.isNaN(minHeight) ? 44 : minHeight;
     const resolvedMaxHeight = Number.isNaN(maxHeight) ? Number.POSITIVE_INFINITY : maxHeight;
 
     textarea.style.height = "auto";
@@ -180,11 +189,8 @@ export function InputArea({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       className={cn(
-        "px-4 py-4 border-t transition-all duration-500 ease-out",
-        isFocused
-          ? "border-primary/20 bg-surface-0/90 backdrop-blur-xl shadow-[0_-4px_20px_rgba(0,0,0,0.03)]"
-          : "border-border/30 bg-surface-0/60 backdrop-blur-md",
-        isDragOver && "border-primary bg-primary/5 ring-4 ring-primary/10"
+        "w-full max-w-3xl mx-auto px-4 pb-4 transition-all duration-300 ease-out",
+        className
       )}
     >
       <SlashCommandMenu
@@ -198,41 +204,48 @@ export function InputArea({
       />
       {/* Context Status */}
       {contextStatus && (
-        <div className="mb-3 animate-in fade-in slide-in-from-bottom-2 duration-300 ease-out-expo">
+        <div className="mb-2 animate-in fade-in slide-in-from-bottom-2 duration-300 ease-out-expo">
           {contextStatus}
         </div>
       )}
 
       {visionGuard && (
-        <div className="mb-3 animate-in fade-in slide-in-from-bottom-2 duration-300 ease-out-expo">
+        <div className="mb-2 animate-in fade-in slide-in-from-bottom-2 duration-300 ease-out-expo">
           {visionGuard}
         </div>
       )}
 
       {attachmentError && (
-        <div className="mb-3 text-[11px] font-medium text-destructive flex items-center gap-2 px-2 py-1.5 rounded-lg bg-destructive/5 border border-destructive/10">
+        <div className="mb-2 text-[11px] font-medium text-destructive flex items-center gap-2 px-2 py-1.5 rounded-lg bg-destructive/5 border border-destructive/10">
           <AlertTriangle className="h-3.5 w-3.5" />
           <span>{attachmentError}</span>
         </div>
       )}
 
-      {/* Attachments Preview */}
-      <AttachmentList
-        attachments={attachments}
-        onRemove={onRemoveAttachment}
-        isBusy={isAttachmentBusy || isLoading || isStreaming}
-        translations={translations}
-      />
-
-      {/* Input Container */}
+      {/* Main Omnibox Container */}
       <div
         className={cn(
-          "relative rounded-xl border transition-all duration-300 ease-out",
-          isFocused
-            ? "border-primary/40 bg-surface-1 shadow-sm ring-1 ring-primary/10"
-            : "border-border/40 bg-surface-1/50 hover:border-border/60 hover:bg-surface-1/80"
+          "relative flex flex-col rounded-xl border transition-all duration-200 ease-out",
+          // Idle state
+          "bg-surface-1 border-border/40",
+          // Focus state
+          isFocused || hasContent
+            ? "bg-surface-0 border-border shadow-sm ring-1 ring-border/20"
+            : "hover:border-border/60",
+          // Drag state
+          isDragOver && "border-primary bg-primary/5 ring-2 ring-primary/10"
         )}
       >
+        {/* Attachments Area (Top) */}
+        <div className={cn("px-3", attachments.length > 0 && "pt-3")}>
+          <AttachmentList
+            attachments={attachments}
+            onRemove={onRemoveAttachment}
+            isBusy={isAttachmentBusy || isLoading || isStreaming}
+            translations={translations}
+          />
+        </div>
+
         {/* Textarea */}
         <textarea
           ref={inputRef}
@@ -244,16 +257,18 @@ export function InputArea({
           placeholder={translations.inputPlaceholder}
           aria-label={translations.inputPlaceholder}
           className={cn(
-            "w-full bg-transparent px-4 py-3.5 pr-24 text-[14px] resize-none font-medium",
-            "focus-visible:outline-none placeholder:text-foreground/70",
-            "leading-relaxed text-foreground"
+            "w-full bg-transparent px-3 py-3 text-[15px] resize-none font-medium",
+            "focus-visible:outline-none placeholder:text-muted-foreground/40",
+            "leading-relaxed text-foreground min-h-[44px]",
+            // Hide scrollbar but allow scrolling
+            "[&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']"
           )}
           rows={1}
-          style={{ minHeight: "48px", maxHeight: `${20 * MAX_ROWS + 24}px` }}
+          style={{ maxHeight: `${20 * MAX_ROWS + 24}px` }}
         />
 
-        {/* Bottom Bar */}
-        <InputBottomBar
+        {/* Toolbar (Bottom) */}
+        <InputToolbar
           isLoading={isLoading}
           isStreaming={isStreaming}
           hasContent={hasContent}
@@ -266,6 +281,9 @@ export function InputArea({
           onSend={handleSendClick}
           onVoiceInput={handleVoiceInput}
           onRunBackground={onRunBackground}
+          model={model}
+          models={models}
+          onSelectModel={onSelectModel}
         />
       </div>
 

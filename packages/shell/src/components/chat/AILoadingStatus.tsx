@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@ku0/shared/utils";
-import { Loader2, Sparkles, Zap } from "lucide-react";
+import { Loader2, Sparkles } from "lucide-react";
 
 export type AILoadingState = "idle" | "connecting" | "thinking" | "streaming";
 
@@ -22,7 +22,7 @@ export function AILoadingStatus({ state, className }: AILoadingStatusProps) {
   const getStatusConfig = () => {
     switch (state) {
       case "connecting":
-        return { icon: Zap, label: "Connecting..." };
+        return { icon: Loader2, label: "Thinking..." };
       case "thinking":
         return { icon: Sparkles, label: "Thinking..." };
       case "streaming":
@@ -49,7 +49,8 @@ export function AILoadingStatus({ state, className }: AILoadingStatusProps) {
       <Icon
         className={cn(
           "h-3 w-3",
-          state === "streaming" || state === "thinking" ? "animate-pulse" : ""
+          state === "streaming" || state === "thinking" ? "animate-pulse" : "",
+          state === "connecting" ? "animate-spin" : ""
         )}
       />
       <span className="text-[10px] font-medium tracking-normal opacity-80">{label}</span>

@@ -4,7 +4,7 @@ import { cn } from "@ku0/shared/utils";
 import { AlertTriangle, Square } from "lucide-react";
 import * as React from "react";
 import { Button } from "../ui/Button";
-import type { MessageStatus } from "./MessageItem";
+import type { MessageStatus } from "./types";
 
 export interface MessageAlertLabels {
   titleError: string;

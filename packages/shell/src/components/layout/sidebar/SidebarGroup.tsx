@@ -48,7 +48,7 @@ export const SidebarGroup = React.memo(function SidebarGroup({
           className={cn(
             "flex items-center gap-2 w-full px-2 py-1.5 text-[11px] font-bold",
             "text-foreground/80 hover:text-foreground transition-colors",
-            "group uppercase tracking-wider rounded-md",
+            "group uppercase tracking-wider rounded-md cursor-pointer",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           )}
         >

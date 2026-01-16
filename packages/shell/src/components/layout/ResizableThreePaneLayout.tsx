@@ -14,6 +14,7 @@ interface ResizableThreePaneLayoutProps {
   nav?: React.ReactNode;
   onLayoutChange?: (layout: [number, number, number]) => void;
   layoutUnit?: "percent" | "pixel";
+  centerPanelClassName?: string;
 }
 
 export interface ResizableThreePaneLayoutHandle {
@@ -40,6 +41,7 @@ export const ResizableThreePaneLayout = React.forwardRef<
       nav,
       onLayoutChange,
       layoutUnit = "percent",
+      centerPanelClassName,
     },
     ref
   ) => {
@@ -123,7 +125,12 @@ export const ResizableThreePaneLayout = React.forwardRef<
 
           {/* CENTER PANEL */}
           <div className="h-full flex-1 min-w-0 bg-background z-10 relative overflow-hidden">
-            <div className="h-full w-full overflow-auto bg-background scroll-smooth">
+            <div
+              className={cn(
+                "h-full w-full overflow-auto bg-background scroll-smooth",
+                centerPanelClassName
+              )}
+            >
               {centerPanel}
             </div>
           </div>

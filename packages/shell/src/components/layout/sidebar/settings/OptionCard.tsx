@@ -7,9 +7,23 @@ interface OptionCardProps {
   selected: boolean;
   onSelect: () => void;
   preview?: React.ReactNode;
+  size?: "sm" | "md" | "lg";
 }
 
-export function OptionCard({ title, description, selected, onSelect, preview }: OptionCardProps) {
+const SIZE_CLASSES: Record<NonNullable<OptionCardProps["size"]>, string> = {
+  sm: "p-1.5 min-h-[44px]",
+  md: "p-2",
+  lg: "p-3 min-h-[64px]",
+};
+
+export function OptionCard({
+  title,
+  description,
+  selected,
+  onSelect,
+  preview,
+  size = "md",
+}: OptionCardProps) {
   const tooltipContent = description?.trim();
   const button = (
     <button
@@ -18,7 +32,8 @@ export function OptionCard({ title, description, selected, onSelect, preview }: 
       aria-pressed={selected}
       aria-label={tooltipContent ? `${title} ${tooltipContent}` : title}
       className={cn(
-        "flex items-center justify-between gap-2 rounded-xl border p-2 text-left transition-all h-full",
+        "flex items-center justify-between gap-2 rounded-xl border text-left transition-all h-full",
+        SIZE_CLASSES[size],
         selected
           ? "border-primary/50 bg-primary/5 shadow-sm"
           : "border-border/60 bg-surface-1 hover:bg-surface-2"

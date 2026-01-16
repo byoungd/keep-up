@@ -13,6 +13,8 @@ export { SettingsModal } from "./components/layout/sidebar/SettingsModal";
 export type {
   SidebarItemRenderProps,
   SidebarItemRenderer,
+  SidebarGroupRenderProps,
+  SidebarGroupRenderer,
   SidebarNewAction,
 } from "./components/layout/sidebar/types";
 
@@ -123,5 +125,11 @@ export { Tooltip, TooltipProvider } from "./components/ui/Tooltip";
 export type { TooltipProps } from "./components/ui/Tooltip";
 
 export type { PanelPosition } from "./components/chat/ModelSelector";
-export type { Message, MessageStatus } from "./components/chat/MessageItem";
-export type { AgentTask, ArtifactItem, ActiveTask, TaskStep } from "./components/chat/types";
+export type {
+  Message,
+  MessageStatus,
+  AgentTask,
+  ArtifactItem,
+  ActiveTask,
+  TaskStep,
+} from "./components/chat/types";

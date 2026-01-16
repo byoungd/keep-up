@@ -44,7 +44,10 @@ export interface AIPanelProps
 
   // Agent Runtime task data
   /** Real-time agent tasks to display in TaskProgressWidget */
+  /** Real-time agent tasks to display in TaskProgressWidget */
   tasks?: AgentTask[];
+  /** Whether to show the top header bar. Defaults to true. */
+  showHeader?: boolean;
 }
 
 export function AIPanel({
@@ -104,6 +107,7 @@ export function AIPanel({
   prompts,
   onPreviewArtifact,
   tasks,
+  showHeader = true,
 }: AIPanelProps) {
   const [focusedTaskId, setFocusedTaskId] = React.useState<string | null>("task-1");
 
@@ -141,24 +145,26 @@ export function AIPanel({
           "flex flex-col h-full min-w-0 overflow-hidden",
           // Main view inner container - constrained width and centered
           panelPosition === "main"
-            ? "max-w-3xl w-full mx-auto" // Constrain width and center with mx-auto
+            ? "w-full" // Change: Full width to push scrollbar to edge
             : "w-full" // Full width in side panel mode
         )}
       >
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col min-w-0 min-h-0 bg-transparent w-full">
-          <AIPanelHeader
-            title={title}
-            isStreaming={isStreaming}
-            isLoading={isLoading}
-            onClose={onClose}
-            onClear={onClear}
-            onCopyLast={onCopyLast}
-            onExport={onExport}
-            translations={headerTranslations}
-            panelPosition={panelPosition}
-            showClose={showClose}
-          />
+          {showHeader && (
+            <AIPanelHeader
+              title={title}
+              isStreaming={isStreaming}
+              isLoading={isLoading}
+              onClose={onClose}
+              onClear={onClear}
+              onCopyLast={onCopyLast}
+              onExport={onExport}
+              translations={headerTranslations}
+              panelPosition={panelPosition}
+              showClose={showClose}
+            />
+          )}
 
           {topContent}
 
@@ -177,12 +183,14 @@ export function AIPanel({
             translations={messageListTranslations}
             resolveReference={resolveReference}
             onReferenceSelect={onReferenceSelect}
+            onPreviewArtifact={onPreviewArtifact}
+            isMain={panelPosition === "main"}
           />
 
           {overlayContent}
 
-          {/* Task Progress Widget - Only render when tasks are provided */}
-          {panelPosition === "main" && tasks && tasks.length > 0 && (
+          {/* Task Progress Widget - Show only for parallel tasks (length > 1) to keep UI clean */}
+          {panelPosition === "main" && tasks && tasks.length > 1 && (
             <div className="w-full max-w-3xl mx-auto px-4 z-10 relative">
               <TaskProgressWidget
                 tasks={tasks}
@@ -220,7 +228,7 @@ export function AIPanel({
             // In "Main" mode, if widget is present, we need to flatten the top of the input box
             className={cn(
               panelPosition === "main" && [
-                "border-t-0 shadow-none bg-transparent",
+                "border-t-0 shadow-none bg-transparent max-w-3xl mx-auto",
                 // Target the inner omnibox container (which has rounded-xl) to flatten top
                 // We use a specific selector assuming the structure in InputArea.tsx
                 "[&>div:last-child]:rounded-t-none [&>div:last-child]:border-t-0",

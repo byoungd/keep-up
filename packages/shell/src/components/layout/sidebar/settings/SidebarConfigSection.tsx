@@ -25,6 +25,7 @@ import type {
   SidebarVisibilityPolicy,
 } from "../../../../lib/sidebar";
 import { OptionCard } from "./OptionCard";
+import { SettingsSection } from "./SettingsSection";
 
 // --- Types ---
 
@@ -168,6 +169,7 @@ export function SidebarConfigSection({
   setLiveMessage,
 }: SidebarConfigSectionProps) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  const twoOptionGridClass = "grid grid-cols-2 gap-2 w-full min-w-0";
 
   // --- Handlers ---
 
@@ -338,60 +340,16 @@ export function SidebarConfigSection({
 
   return (
     <div className="space-y-3">
-      {/* Badge Style */}
-      <fieldset
-        className="grid items-center gap-2 rounded-xl border border-border/40 bg-surface-1/30 p-3"
-        style={{ gridTemplateColumns: "auto 1fr" }}
-        aria-labelledby="badge-style-label"
-      >
-        <legend className="sr-only">{t("badgeStyle", "Badge")}</legend>
-        <span
-          id="badge-style-label"
-          className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-1 whitespace-nowrap self-center"
-        >
-          {t("badgeStyle", "Badge")}
-        </span>
-        <div className="grid grid-cols-3 gap-2 w-full min-w-0">
-          <div />
-
-          <OptionCard
-            title={t("badgeStyleCount")}
-            description={t("badgeStyleCountDesc")}
-            selected={userConfig.badgeStyle === "COUNT"}
-            preview={badgeCountPreview}
-            onSelect={() => handleBadgeStyleChange("COUNT")}
-          />
-          <OptionCard
-            title={t("badgeStyleDot")}
-            description={t("badgeStyleDotDesc")}
-            selected={userConfig.badgeStyle === "DOT"}
-            preview={badgeDotPreview}
-            onSelect={() => handleBadgeStyleChange("DOT")}
-          />
-        </div>
-      </fieldset>
-
       {/* Collapse behavior */}
-      <fieldset
-        className="grid items-center gap-2 rounded-xl border border-border/40 bg-surface-1/30 p-3"
-        style={{ gridTemplateColumns: "auto 1fr" }}
-        aria-labelledby="collapse-behavior-label"
-      >
-        <legend className="sr-only">{t("collapseBehavior", "Collapse")}</legend>
-        <span
-          id="collapse-behavior-label"
-          className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-1 whitespace-nowrap self-center"
-        >
-          {t("collapseBehavior", "Collapse")}
-        </span>
-        <div className="grid grid-cols-3 gap-2 w-full min-w-0">
-          <div />
+      <SettingsSection id="collapse-behavior-label" label={t("collapseBehavior", "Collapse")}>
+        <div className={twoOptionGridClass}>
           <OptionCard
             title={t("collapsePeek")}
             description={t("collapsePeekDesc")}
             selected={userConfig.collapseMode === "peek"}
             preview={collapsePeekPreview}
             onSelect={() => handleCollapseModeChange("peek")}
+            size="sm"
           />
           <OptionCard
             title={t("collapseRail")}
@@ -399,9 +357,32 @@ export function SidebarConfigSection({
             selected={userConfig.collapseMode === "rail"}
             preview={collapseRailPreview}
             onSelect={() => handleCollapseModeChange("rail")}
+            size="sm"
           />
         </div>
-      </fieldset>
+      </SettingsSection>
+
+      {/* Badge Style */}
+      <SettingsSection id="badge-style-label" label={t("badgeStyle", "Badge")}>
+        <div className={twoOptionGridClass}>
+          <OptionCard
+            title={t("badgeStyleCount")}
+            description={t("badgeStyleCountDesc")}
+            selected={userConfig.badgeStyle === "COUNT"}
+            preview={badgeCountPreview}
+            onSelect={() => handleBadgeStyleChange("COUNT")}
+            size="sm"
+          />
+          <OptionCard
+            title={t("badgeStyleDot")}
+            description={t("badgeStyleDotDesc")}
+            selected={userConfig.badgeStyle === "DOT"}
+            preview={badgeDotPreview}
+            onSelect={() => handleBadgeStyleChange("DOT")}
+            size="sm"
+          />
+        </div>
+      </SettingsSection>
 
       {/* Groups */}
       {groups.map((group) => {

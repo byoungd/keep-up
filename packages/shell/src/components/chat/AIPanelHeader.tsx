@@ -1,4 +1,3 @@
-import type { ModelCapability } from "@ku0/ai-core";
 import { cn } from "@ku0/shared/utils";
 import { Download, History, MoreHorizontal, PanelRightClose, Plus } from "lucide-react";
 import { Button } from "../ui/Button";
@@ -8,13 +7,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../ui/DropdownMenu";
-import { ModelSelector, type PanelPosition } from "./ModelSelector";
+import type { PanelPosition } from "./ModelSelector";
 
 export interface AIPanelHeaderProps {
   title: string;
-  model: string;
-  setModel: (model: string) => void;
-  filteredModels: ModelCapability[];
   isStreaming: boolean;
   isLoading: boolean;
   onClose: () => void;
@@ -30,12 +26,11 @@ export interface AIPanelHeaderProps {
   onHistory?: () => void;
   /** Which side of the screen this panel is on. Affects tooltip/dropdown directions. */
   panelPosition?: PanelPosition;
+  showClose?: boolean;
 }
 
 export function AIPanelHeader({
-  model,
-  setModel,
-  filteredModels,
+  title,
   isStreaming,
   isLoading,
   onClose,
@@ -43,19 +38,22 @@ export function AIPanelHeader({
   onExport,
   onHistory,
   translations,
-  panelPosition = "right",
+  panelPosition = "main",
+  showClose = true,
 }: AIPanelHeaderProps) {
   return (
-    <div className="flex items-center justify-between gap-2 px-3 py-2.5 border-b border-border/20 shrink-0 bg-surface-0/50 backdrop-blur-md z-10">
+    <div
+      className={cn(
+        "flex items-center justify-between gap-2 px-3 py-2.5 shrink-0 z-10 backdrop-blur-md",
+        // Standard Side Mode: Surface bg + border
+        panelPosition !== "main" && "border-b border-border/20 bg-surface-0/50",
+        // Main Mode: Transparent/Background match + no border + sticky feel
+        panelPosition === "main" && "bg-background/80 supports-[backdrop-filter]:bg-background/60"
+      )}
+    >
       {/* Left: Model + Status */}
       <div className="flex items-center gap-3 min-w-0">
-        <ModelSelector
-          model={model}
-          models={filteredModels}
-          onSelect={setModel}
-          className="-ml-1"
-          panelPosition={panelPosition}
-        />
+        <h3 className="text-sm font-medium pl-1">{title}</h3>
         <StatusDot isStreaming={isStreaming} isLoading={isLoading} />
       </div>
 
@@ -107,15 +105,17 @@ export function AIPanelHeader({
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 rounded-lg text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors duration-100"
-          onClick={onClose}
-          aria-label={translations.closePanel}
-        >
-          <PanelRightClose className="h-4 w-4" />
-        </Button>
+        {showClose && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 rounded-lg text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors duration-100"
+            onClick={onClose}
+            aria-label={translations.closePanel}
+          >
+            <PanelRightClose className="h-4 w-4" />
+          </Button>
+        )}
       </div>
     </div>
   );

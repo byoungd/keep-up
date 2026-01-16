@@ -11,6 +11,15 @@ export interface TaskStep {
 }
 
 /**
+ * Represents a high-level phase in the task execution (Manus Spec 2.1.1).
+ */
+export interface TaskPhase {
+  id: string;
+  label: string;
+  status: "pending" | "active" | "completed";
+}
+
+/**
  * Represents an artifact produced by an agent task.
  * Uses a flat structure with a type discriminator for flexibility.
  */
@@ -47,6 +56,93 @@ export interface AgentTask {
   completedAt?: string;
   // Error info
   error?: string;
+
+  // Manus UI Spec (2.1.1)
+  goal?: string; // Task Goal Header
+  phases?: TaskPhase[]; // Progress Bar / Phase List
+  currentPhaseId?: string;
+  thoughts?: string[]; // Agent reasoning/updates
+}
+
+/**
+ * Represents a rich message in the chat stream.
+ */
+export interface Message {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  createdAt: number;
+  status: "pending" | "done" | "error" | "streaming" | "canceled";
+
+  // -- Legacy / UI Fields --
+  requestId?: string;
+  modelId?: string;
+  // biome-ignore lint/suspicious/noExplicitAny: legacy
+  references?: any[]; // Keep flexible or import ReferenceAnchor
+  confidence?: number;
+  // biome-ignore lint/suspicious/noExplicitAny: legacy
+  provenance?: any; // Import AIProvenance
+  tokenUsage?: {
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+    contextWindow?: number;
+    utilization?: number;
+  };
+  thinking?: Array<{
+    content: string;
+    type: "reasoning" | "planning" | "reflection";
+    timestamp: number;
+    complete: boolean;
+  }>;
+
+  /** Semantic type of the message for UI rendering */
+  type?: "text" | "info" | "ask" | "result" | "task_stream";
+
+  /** For 'ask' messages, what kind of action is requested (Spec 2.2.1) */
+  suggested_action?:
+    | "none"
+    | "confirm_browser_operation"
+    | "take_over_browser"
+    | "upgrade_to_unlock_feature";
+
+  /** Optional metadata for structured info (e.g. task phases) */
+  // biome-ignore lint/suspicious/noExplicitAny: legacy
+  metadata?: Record<string, any>;
+
+  /** @deprecated - usage migrating to inline rendering based on type */
+  // biome-ignore lint/suspicious/noExplicitAny: legacy
+  executionSteps?: any[];
+  /** @deprecated - usage migrating to inline rendering based on type */
+  // biome-ignore lint/suspicious/noExplicitAny: legacy
+  artifacts?: any[];
+}
+
+export type MessageStatus = "done" | "streaming" | "error" | "canceled" | "pending";
+
+export interface MessageItemTranslations {
+  you: string;
+  assistant: string;
+  actionEdit: string;
+  actionBranch: string;
+  actionQuote: string;
+  actionCopy: string;
+  actionRetry: string;
+  requestIdLabel: string;
+  statusLabels: Record<MessageStatus, string>;
+  alertLabels: {
+    titleError: string;
+    titleCanceled: string;
+    bodyError: string;
+    bodyCanceled: string;
+    retry: string;
+  };
+  referenceLabel: string;
+  referenceResolved: string;
+  referenceRemapped: string;
+  referenceUnresolved: string;
+  referenceFind: string;
+  referenceUnavailable: string;
 }
 
 /**

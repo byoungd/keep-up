@@ -5,7 +5,7 @@ import { Bot, User } from "lucide-react";
 import * as React from "react";
 import { parseArtifactsFromContent } from "../../lib/ai/artifacts";
 import type { ReferenceAnchor, ReferenceRange } from "../../lib/ai/referenceAnchors";
-import { type AIProvenance, ConfidenceBadge } from "../ai/ConfidenceBadge";
+import { ConfidenceBadge } from "../ai/ConfidenceBadge";
 import { ArtifactList } from "./ArtifactCard";
 import { ExecutionSteps } from "./ExecutionSteps";
 import { MessageActions } from "./MessageActions";
@@ -16,77 +16,11 @@ import { MessageStatusBadge } from "./MessageStatusBadge";
 import { ThinkingProcess } from "./ThinkingProcess";
 import { TokenUsageDisplay } from "./TokenUsageDisplay";
 
-export type MessageStatus = "done" | "streaming" | "error" | "canceled";
-
-export interface Message {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  status?: MessageStatus;
-  requestId?: string;
-  modelId?: string;
-  references?: ReferenceAnchor[];
-
-  // AI confidence metadata
-  confidence?: number;
-  provenance?: AIProvenance;
-
-  // Execution metadata (for agent visualization)
-  tokenUsage?: {
-    inputTokens: number;
-    outputTokens: number;
-    totalTokens: number;
-    contextWindow?: number;
-    utilization?: number;
-  };
-  executionSteps?: Array<{
-    id: string;
-    toolName: string;
-    arguments: Record<string, unknown>;
-    status: "pending" | "executing" | "success" | "error";
-    result?: {
-      success: boolean;
-      content: Array<{ type: string; text?: string }>;
-      error?: { code: string; message: string };
-    };
-    startTime: number;
-    endTime?: number;
-    durationMs?: number;
-    parallel?: boolean;
-  }>;
-  thinking?: Array<{
-    content: string;
-    type: "reasoning" | "planning" | "reflection";
-    timestamp: number;
-    complete: boolean;
-  }>;
-  createdAt: number;
-}
-
-export interface MessageItemTranslations {
-  you: string;
-  assistant: string;
-  actionEdit: string;
-  actionBranch: string;
-  actionQuote: string;
-  actionCopy: string;
-  actionRetry: string;
-  requestIdLabel: string;
-  statusLabels: Record<MessageStatus, string>;
-  alertLabels: {
-    titleError: string;
-    titleCanceled: string;
-    bodyError: string;
-    bodyCanceled: string;
-    retry: string;
-  };
-  referenceLabel: string;
-  referenceResolved: string;
-  referenceRemapped: string;
-  referenceUnresolved: string;
-  referenceFind: string;
-  referenceUnavailable: string;
-}
+import { AskMessage } from "./AskMessage";
+import { InfoMessage } from "./InfoMessage";
+import { ResultMessage } from "./ResultMessage";
+import { TaskStreamMessage } from "./TaskStreamMessage";
+import type { AgentTask, ArtifactItem, Message, MessageItemTranslations } from "./types";
 
 export interface MessageItemProps {
   message: Message;
@@ -98,12 +32,111 @@ export interface MessageItemProps {
   translations: MessageItemTranslations;
   resolveReference?: (anchor: ReferenceAnchor) => ReferenceRange;
   onReferenceSelect?: (anchor: ReferenceAnchor) => void;
+  onPreviewArtifact?: (artifact: ArtifactItem) => void;
 }
 
 /**
  * Container component for a single chat message.
  * Composes MessageBubble, MessageActions, MessageReferences, and MessageAlert.
  */
+const useMessageArtifacts = (message: Message) => {
+  const isUser = message.role === "user";
+
+  const { content: displayContent, artifacts } = React.useMemo(
+    () => parseArtifactsFromContent(message.content),
+    [message.content]
+  );
+
+  const metadataArtifacts = React.useMemo<ArtifactItem[]>(() => {
+    if (isUser) {
+      return [];
+    }
+    const raw = message.metadata?.artifacts;
+    if (!Array.isArray(raw)) {
+      return [];
+    }
+    return raw.filter(isArtifactItem).map((artifact, index) => ({
+      ...artifact,
+      id: artifact.id || `meta-${artifact.type}-${artifact.title}-${index}`,
+    }));
+  }, [isUser, message.metadata?.artifacts]);
+
+  const parsedArtifacts = React.useMemo<ArtifactItem[]>(() => {
+    if (isUser) {
+      return [];
+    }
+    return artifacts.map((artifact, index) => ({
+      id: artifact.id || `parsed-${artifact.type}-${artifact.title}-${index}`,
+      title: artifact.title,
+      type: mapParsedArtifactType(artifact.type),
+      content: artifact.summary,
+    }));
+  }, [isUser, artifacts]);
+
+  const assistantArtifacts = React.useMemo(() => {
+    const merged = [...metadataArtifacts, ...parsedArtifacts];
+    const seen = new Set<string>();
+    return merged.filter((artifact) => {
+      if (seen.has(artifact.id)) {
+        return false;
+      }
+      seen.add(artifact.id);
+      return true;
+    });
+  }, [metadataArtifacts, parsedArtifacts]);
+
+  return { displayContent, artifacts, assistantArtifacts };
+};
+
+const MessageContent = ({
+  message,
+  displayContent,
+  assistantArtifacts,
+  showBubble,
+  isUser,
+  isStreaming,
+  onPreviewArtifact,
+}: {
+  message: Message;
+  displayContent: string;
+  assistantArtifacts: ArtifactItem[];
+  showBubble: boolean;
+  isUser: boolean;
+  isStreaming: boolean;
+  onPreviewArtifact?: (artifact: ArtifactItem) => void;
+}) => {
+  if (message.type === "info") {
+    return <InfoMessage content={message.content} />;
+  }
+  if (message.type === "ask") {
+    return (
+      <AskMessage
+        content={message.content}
+        suggestedAction={message.suggested_action}
+        metadata={message.metadata}
+      />
+    );
+  }
+  if (message.type === "result") {
+    return (
+      <ResultMessage
+        content={message.content}
+        artifacts={assistantArtifacts}
+        onPreview={onPreviewArtifact}
+      />
+    );
+  }
+  if (message.type === "task_stream" && message.metadata?.task) {
+    return (
+      <TaskStreamMessage task={message.metadata.task as AgentTask} onPreview={onPreviewArtifact} />
+    );
+  }
+  if (showBubble) {
+    return <MessageBubble content={displayContent} isUser={isUser} isStreaming={isStreaming} />;
+  }
+  return null;
+};
+
 export const MessageItem = React.memo(function MessageItem({
   message,
   onEdit,
@@ -114,16 +147,13 @@ export const MessageItem = React.memo(function MessageItem({
   translations,
   resolveReference,
   onReferenceSelect,
+  onPreviewArtifact,
 }: MessageItemProps) {
-  const m = message;
-  const isUser = m.role === "user";
-  const isStreaming = m.status === "streaming";
-  const { content: displayContent, artifacts } = React.useMemo(
-    () => parseArtifactsFromContent(m.content),
-    [m.content]
-  );
+  const isUser = message.role === "user";
+  const isStreaming = message.status === "streaming";
+
+  const { displayContent, artifacts, assistantArtifacts } = useMessageArtifacts(message);
   const showBubble = isUser || isStreaming || displayContent.length > 0;
-  const assistantArtifacts = isUser ? [] : artifacts;
 
   return (
     <div
@@ -135,38 +165,38 @@ export const MessageItem = React.memo(function MessageItem({
       {/* Avatar */}
       <div
         className={cn(
-          "shrink-0 h-6 w-6 rounded-md flex items-center justify-center border",
-          isUser
-            ? "bg-primary/10 border-primary/20 text-primary"
-            : "bg-surface-2/60 border-border/30 text-muted-foreground/70"
+          "shrink-0 h-6 w-6 rounded-md flex items-center justify-center",
+          isUser ? "text-primary" : "text-muted-foreground/70",
+          message.type === "task_stream" && "text-muted-foreground/60"
         )}
       >
-        {isUser ? (
-          <User className="h-3 w-3" aria-hidden="true" />
-        ) : (
-          <Bot className="h-3 w-3" aria-hidden="true" />
-        )}
+        {isUser ? <User className="h-3 w-3" /> : <Bot className="h-3 w-3" />}
       </div>
 
       {/* Message Content */}
       <div
         className={cn(
           "relative min-w-0 max-w-[92%] py-0.5 text-sm leading-normal",
-          isUser ? "text-foreground/90" : "text-foreground"
+          isUser ? "text-foreground/90" : "text-foreground",
+          message.type === "task_stream" && "w-full"
         )}
       >
-        {/* Bubble Content */}
-        {showBubble && (
-          <MessageBubble content={displayContent} isUser={isUser} isStreaming={isStreaming} />
-        )}
+        <MessageContent
+          message={message}
+          displayContent={displayContent}
+          assistantArtifacts={assistantArtifacts}
+          showBubble={showBubble}
+          isUser={isUser}
+          isStreaming={isStreaming}
+          onPreviewArtifact={onPreviewArtifact}
+        />
 
-        {/* Artifacts */}
-        <ArtifactList artifacts={assistantArtifacts} />
+        {/* Artifacts (from inline artifact blocks only) */}
+        <ArtifactList artifacts={artifacts} />
 
-        {/* Status Badge + Confidence + Actions - Assistant */}
         <AssistantStatusRow
           isUser={isUser}
-          message={m}
+          message={message}
           translations={translations}
           onEdit={onEdit}
           onBranch={onBranch}
@@ -175,28 +205,21 @@ export const MessageItem = React.memo(function MessageItem({
           onRetry={onRetry}
         />
 
-        {/* References */}
         <AssistantReferences
           isUser={isUser}
-          message={m}
+          message={message}
           translations={translations}
           resolveReference={resolveReference}
           onReferenceSelect={onReferenceSelect}
         />
 
-        {/* Execution Steps (Tool Calls) */}
-        <AssistantExecutionSteps isUser={isUser} message={m} />
+        <AssistantExecutionSteps isUser={isUser} message={message} />
+        <AssistantThinking isUser={isUser} message={message} />
+        <AssistantTokenUsage isUser={isUser} message={message} />
 
-        {/* Thinking Process */}
-        <AssistantThinking isUser={isUser} message={m} />
-
-        {/* Token Usage */}
-        <AssistantTokenUsage isUser={isUser} message={m} />
-
-        {/* User Actions on Hover */}
         <UserActionsRow
           isUser={isUser}
-          message={m}
+          message={message}
           onEdit={onEdit}
           onBranch={onBranch}
           onQuote={onQuote}
@@ -205,20 +228,39 @@ export const MessageItem = React.memo(function MessageItem({
           translations={translations}
         />
 
-        {/* Error/Canceled Alert */}
-        {!isUser && (m.status === "error" || m.status === "canceled") && (
+        {!isUser && (message.status === "error" || message.status === "canceled") && (
           <MessageAlert
-            status={m.status}
-            requestId={m.requestId}
+            status={message.status}
+            requestId={message.requestId}
             requestIdLabel={translations.requestIdLabel}
             labels={translations.alertLabels}
-            onRetry={() => onRetry(m.id)}
+            onRetry={() => onRetry(message.id)}
           />
         )}
       </div>
     </div>
   );
 });
+
+function isArtifactItem(value: unknown): value is ArtifactItem {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  return "type" in value && "title" in value;
+}
+
+function mapParsedArtifactType(type: string): ArtifactItem["type"] {
+  switch (type) {
+    case "plan":
+      return "plan";
+    case "diff":
+      return "diff";
+    case "report":
+      return "report";
+    default:
+      return "doc";
+  }
+}
 
 function AssistantStatusRow({
   isUser,
@@ -369,7 +411,3 @@ function UserActionsRow({
     </div>
   );
 }
-
-// ============================================================================
-// MessageItem
-// ============================================================================
