@@ -73,6 +73,24 @@ describe("TaskGraphStore", () => {
       }).toThrow(InvalidStatusTransitionError);
     });
 
+    it("records custom node events", () => {
+      const graph = createTaskGraphStore({
+        graphId: "graph-1",
+        idFactory: createIdFactory("n"),
+        now: fixedNow,
+      });
+
+      const node = graph.createNode({
+        type: "tool_call",
+        title: "Execute tool",
+      });
+
+      graph.recordNodeEvent(node.id, "policy_decision", { decisionId: "d-1" });
+
+      const events = graph.listEvents();
+      expect(events.map((event) => event.type)).toContain("policy_decision");
+    });
+
     it("throws NodeNotFoundError for missing nodes", () => {
       const graph = createTaskGraphStore();
       expect(() => graph.updateNodeStatus("nonexistent", "running")).toThrow(NodeNotFoundError);

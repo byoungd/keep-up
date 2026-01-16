@@ -26,10 +26,12 @@ import type { IToolRegistry } from "../tools/mcp/registry";
 import type {
   AuditLogEntry,
   AuditLogger,
+  ExecutionDecision,
   MCPTool,
   MCPToolCall,
   MCPToolResult,
   ToolContext,
+  ToolExecutionRecord,
 } from "../types";
 import type { ToolResultCache } from "../utils/cache";
 import type { RateLimitResult, ToolRateLimiter } from "../utils/rateLimit";
@@ -244,8 +246,9 @@ function createMockTool(name: string, options?: { readOnly?: boolean }): MCPTool
   };
 }
 
-function createMockCall(name: string, args?: Record<string, unknown>): MCPToolCall {
+function createMockCall(name: string, args?: Record<string, unknown>, id?: string): MCPToolCall {
   return {
+    id,
     name,
     arguments: args ?? {},
   };
@@ -732,6 +735,67 @@ describe("ToolExecutionPipeline", () => {
 
       const deniedMetrics = metrics.increments.filter((m) => m.labels?.permission === "policy");
       expect(deniedMetrics).toHaveLength(1);
+    });
+  });
+
+  describe("execution observer", () => {
+    it("should emit decisions and records for successful execution", async () => {
+      const decisions: ExecutionDecision[] = [];
+      const records: ToolExecutionRecord[] = [];
+
+      pipeline = new ToolExecutionPipeline({
+        registry,
+        policy,
+        executionObserver: {
+          onDecision: (decision) => decisions.push(decision),
+          onRecord: (record) => records.push(record),
+        },
+      });
+
+      const call = createMockCall("test_tool", { input: "ok" }, "call-1");
+      await pipeline.execute(call, context);
+
+      expect(decisions).toHaveLength(1);
+      expect(decisions[0]).toEqual(
+        expect.objectContaining({
+          toolName: "test_tool",
+          toolCallId: "call-1",
+          allowed: true,
+        })
+      );
+
+      expect(records.map((record) => record.status)).toEqual(["started", "completed"]);
+      expect(records[1]?.policyDecisionId).toBe(decisions[0]?.decisionId);
+    });
+
+    it("should emit failed record when policy denies", async () => {
+      policy.allowAll = false;
+      policy.denyReason = "Denied by policy";
+
+      const decisions: ExecutionDecision[] = [];
+      const records: ToolExecutionRecord[] = [];
+
+      pipeline = new ToolExecutionPipeline({
+        registry,
+        policy,
+        executionObserver: {
+          onDecision: (decision) => decisions.push(decision),
+          onRecord: (record) => records.push(record),
+        },
+      });
+
+      const call = createMockCall("test_tool", undefined, "call-2");
+      await pipeline.execute(call, context);
+
+      expect(decisions).toHaveLength(1);
+      expect(decisions[0]?.allowed).toBe(false);
+      expect(records).toHaveLength(1);
+      expect(records[0]).toEqual(
+        expect.objectContaining({
+          status: "failed",
+          error: "Denied by policy",
+        })
+      );
     });
   });
 

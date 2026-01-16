@@ -83,6 +83,7 @@ export function createCoworkToolExecutor(
     policy,
     sandboxAdapter: config.sandboxAdapter,
     telemetryHandler: config.telemetryHandler,
+    executionObserver: config.executionObserver,
     audit: config.audit,
     telemetry: config.telemetry,
     rateLimiter: config.rateLimiter,

@@ -467,6 +467,17 @@ export class TaskGraphStore {
     this.eventContext = { ...this.eventContext, ...context };
   }
 
+  /** Record a custom event against an existing node */
+  recordNodeEvent(
+    nodeId: string,
+    type: TaskGraphEventType,
+    payload: Record<string, unknown>,
+    meta: TaskGraphEventMeta = {}
+  ): TaskGraphEvent {
+    this.touchNode(nodeId);
+    return this.recordEvent(nodeId, type, payload, meta);
+  }
+
   /** Manually trigger compaction */
   compact(): number {
     return this.performCompaction();

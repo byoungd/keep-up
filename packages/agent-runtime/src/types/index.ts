@@ -49,6 +49,7 @@ export interface JSONSchemaProperty {
 
 /** MCP Tool call request */
 export interface MCPToolCall {
+  id?: string;
   name: string;
   arguments: Record<string, unknown>;
 }
@@ -444,6 +445,33 @@ export type ConfirmationHandler = (request: ConfirmationRequest) => Promise<bool
 // ============================================================================
 // Execution Metadata Types (for visualization)
 // ============================================================================
+
+/** Execution decision emitted by the execution plane */
+export interface ExecutionDecision {
+  decisionId: string;
+  toolName: string;
+  toolCallId?: string;
+  taskNodeId?: string;
+  allowed: boolean;
+  requiresConfirmation: boolean;
+  reason?: string;
+  riskTags?: string[];
+  sandboxed: boolean;
+  affectedPaths?: string[];
+}
+
+/** Execution record emitted by the execution plane */
+export interface ToolExecutionRecord {
+  toolCallId?: string;
+  toolName: string;
+  taskNodeId?: string;
+  status: "started" | "completed" | "failed";
+  durationMs: number;
+  affectedPaths?: string[];
+  policyDecisionId?: string;
+  sandboxed: boolean;
+  error?: string;
+}
 
 /** Detailed token usage statistics */
 export interface TokenUsageStats {

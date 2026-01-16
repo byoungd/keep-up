@@ -162,6 +162,7 @@ export class AICoreProviderAdapter implements IAgentLLM {
 
   private convertResponse(response: AICoreCompletionResponse): AgentLLMResponse {
     const toolCalls: MCPToolCall[] | undefined = response.toolCalls?.map((tc) => ({
+      id: tc.id,
       name: this.mapToolNameToOriginal(tc.name),
       arguments: tc.arguments,
     }));
@@ -188,6 +189,7 @@ export class AICoreProviderAdapter implements IAgentLLM {
       return {
         type: "tool_call",
         toolCall: {
+          id: chunk.toolCall.id,
           name: this.mapToolNameToOriginal(chunk.toolCall.name),
           arguments: chunk.toolCall.arguments,
         },

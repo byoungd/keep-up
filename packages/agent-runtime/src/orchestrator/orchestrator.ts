@@ -18,6 +18,7 @@ import type { RuntimeEventBus } from "../events/eventBus";
 import {
   type ToolConfirmationDetailsProvider,
   type ToolConfirmationResolver,
+  type ToolExecutionObserver,
   type ToolExecutionOptions,
   type ToolExecutor,
   createToolExecutor,
@@ -1186,16 +1187,21 @@ export function createOrchestrator(
     options,
     auditLogger
   );
+  const taskGraph = options.components?.taskGraph ?? createTaskGraphStore();
+  const executionObserver = mergeExecutionObservers(
+    options.toolExecution?.executionObserver,
+    taskGraph ? createTaskGraphExecutionObserver(taskGraph) : undefined
+  );
+  const toolExecution = { ...(options.toolExecution ?? {}), executionObserver };
   const policyEngine = resolvePolicyEngine(options, permissionChecker, skillRegistry);
   const toolExecutor = resolveToolExecutor(
     options,
     registry,
     permissionChecker,
     policyEngine,
-    auditLogger
+    auditLogger,
+    toolExecution
   );
-
-  const taskGraph = options.components?.taskGraph ?? createTaskGraphStore();
   const components: OrchestratorComponents = {
     ...options.components,
     toolExecutor,
@@ -1288,7 +1294,8 @@ function resolveToolExecutor(
   registry: IToolRegistry,
   permissionChecker: ReturnType<typeof createPermissionChecker>,
   policyEngine: ReturnType<typeof resolvePolicyEngine>,
-  auditLogger: ReturnType<typeof createAuditLogger>
+  auditLogger: ReturnType<typeof createAuditLogger>,
+  toolExecution: ToolExecutionOptions | undefined
 ): ToolExecutor {
   if (options.components?.toolExecutor) {
     return options.components.toolExecutor;
@@ -1297,15 +1304,16 @@ function resolveToolExecutor(
     registry,
     policy: permissionChecker,
     policyEngine,
-    sandboxAdapter: options.toolExecution?.sandboxAdapter,
-    telemetryHandler: options.toolExecution?.telemetryHandler,
+    sandboxAdapter: toolExecution?.sandboxAdapter,
+    telemetryHandler: toolExecution?.telemetryHandler,
+    executionObserver: toolExecution?.executionObserver,
     audit: auditLogger,
-    telemetry: options.toolExecution?.telemetry ?? options.telemetry,
-    rateLimiter: options.toolExecution?.rateLimiter,
-    cache: options.toolExecution?.cache,
-    retryOptions: options.toolExecution?.retryOptions,
-    cachePredicate: options.toolExecution?.cachePredicate,
-    contextOverrides: options.toolExecution?.contextOverrides,
+    telemetry: toolExecution?.telemetry ?? options.telemetry,
+    rateLimiter: toolExecution?.rateLimiter,
+    cache: toolExecution?.cache,
+    retryOptions: toolExecution?.retryOptions,
+    cachePredicate: toolExecution?.cachePredicate,
+    contextOverrides: toolExecution?.contextOverrides,
   });
 }
 
@@ -1321,6 +1329,60 @@ function resolveParallelConfig(
   return {
     enabled: input.enabled ?? true,
     maxConcurrent: input.maxConcurrent ?? 5,
+  };
+}
+
+function mergeExecutionObservers(
+  primary?: ToolExecutionObserver,
+  secondary?: ToolExecutionObserver
+): ToolExecutionObserver | undefined {
+  if (!primary) {
+    return secondary;
+  }
+  if (!secondary) {
+    return primary;
+  }
+  return {
+    onDecision: (decision) => {
+      primary.onDecision?.(decision);
+      secondary.onDecision?.(decision);
+    },
+    onRecord: (record) => {
+      primary.onRecord?.(record);
+      secondary.onRecord?.(record);
+    },
+  };
+}
+
+function createTaskGraphExecutionObserver(taskGraph: TaskGraphStore): ToolExecutionObserver {
+  return {
+    onDecision: (decision) => {
+      if (!decision.taskNodeId) {
+        return;
+      }
+      taskGraph.recordNodeEvent(
+        decision.taskNodeId,
+        "policy_decision",
+        { decision },
+        {
+          idempotencyKey: decision.toolCallId,
+        }
+      );
+    },
+    onRecord: (record) => {
+      if (!record.taskNodeId) {
+        return;
+      }
+      const eventType = record.status === "started" ? "tool_call_started" : "tool_call_finished";
+      taskGraph.recordNodeEvent(
+        record.taskNodeId,
+        eventType,
+        { record },
+        {
+          idempotencyKey: record.toolCallId,
+        }
+      );
+    },
   };
 }
 
