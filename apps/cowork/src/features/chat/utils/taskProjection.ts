@@ -321,7 +321,7 @@ function buildActivitySteps(nodes: TaskGraph["nodes"], status: string): TaskStep
     const isActive = isLast && status === "running";
     return {
       id: node.id,
-      label: formatActivityLabel(node),
+      label: formatActivityLabel(node, nodes),
       status: isActive ? "running" : "completed",
     };
   });
@@ -366,12 +366,21 @@ function mapTaskStatusToStepStatus(status: string): TaskStep["status"] | null {
   }
 }
 
-function formatActivityLabel(node: TaskGraph["nodes"][number]): string {
+function formatActivityLabel(
+  node: TaskGraph["nodes"][number],
+  allNodes: TaskGraph["nodes"]
+): string {
   switch (node.type) {
     case "tool_call":
       return `Calling ${formatToolName(node.toolName)}`;
-    case "tool_output":
-      return node.isError ? "Tool error" : "Tool result";
+    case "tool_output": {
+      // Find the corresponding tool_call node to get the tool name
+      const callNode = allNodes.find((n) => n.type === "tool_call" && n.id === node.callId) as
+        | { toolName?: string }
+        | undefined;
+      const toolName = callNode?.toolName ? formatToolName(callNode.toolName) : "tool";
+      return node.isError ? `${toolName} failed` : `${toolName} completed`;
+    }
     default:
       return "";
   }
