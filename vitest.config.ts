@@ -185,6 +185,7 @@ export default defineConfig({
             "packages/overlay/src/**/*.test.ts",
             "packages/compat/src/**/*.test.ts",
             "packages/ingest-youtube/src/**/*.test.ts",
+            "packages/ai-core/src/**/*.test.ts",
             "packages/agent-runtime/src/**/*.test.ts",
           ],
           exclude: defaultExclude,
