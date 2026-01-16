@@ -365,9 +365,10 @@ export function CoworkSidebarSections() {
                   <Link
                     href={`/sessions/${session.id}`}
                     className="flex items-center gap-2 flex-1 min-w-0 pr-2 text-sm cursor-pointer"
+                    title={session.title}
                   >
-                    <Brain className="h-4 w-4" aria-hidden="true" />
-                    <span className="truncate">{session.title}</span>
+                    <Brain className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    <span className="overflow-hidden whitespace-nowrap block">{session.title}</span>
                   </Link>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -375,7 +376,12 @@ export function CoworkSidebarSections() {
                         variant="ghost"
                         size="icon"
                         className={cn(
-                          "absolute right-2 top-1/2 h-6 w-6 -translate-y-1/2 rounded-md text-muted-foreground hover:text-foreground hover:bg-surface-2/70 transition-opacity opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus-visible:opacity-100 focus-visible:pointer-events-auto data-[state=open]:opacity-100 data-[state=open]:pointer-events-auto"
+                          "absolute right-2 top-1/2 h-6 w-6 -translate-y-1/2 rounded-md",
+                          "text-muted-foreground hover:text-foreground",
+                          "bg-surface-2 shadow-sm border border-border/20", // Added solid background and subtle border
+                          "transition-opacity opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto",
+                          "focus-visible:opacity-100 focus-visible:pointer-events-auto",
+                          "data-[state=open]:opacity-100 data-[state=open]:pointer-events-auto data-[state=open]:bg-surface-3"
                         )}
                         aria-label="More options"
                       >
