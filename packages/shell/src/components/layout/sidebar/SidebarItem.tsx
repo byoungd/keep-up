@@ -67,11 +67,13 @@ export const SidebarItem = React.memo(function SidebarItem({
         />
       )}
 
-      <span className="truncate flex-1" title={`ID: ${extractIdFromHref(href)}`}>
+      <span
+        className="truncate flex-1"
+        title={
+          process.env.NODE_ENV === "development" ? `ID: ${extractIdFromHref(href)}` : undefined
+        }
+      >
         {label}
-        <span className="ml-2 text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity font-mono">
-          {extractIdFromHref(href)}
-        </span>
       </span>
 
       {shortcut ? (
