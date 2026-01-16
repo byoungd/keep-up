@@ -10,6 +10,14 @@
  * - HALF_OPEN: Testing if service recovered
  */
 
+import {
+  type CircuitBreakerPolicy,
+  CircuitState as CockatielState,
+  SamplingBreaker,
+  circuitBreaker,
+  handleAll,
+} from "cockatiel";
+
 /** Circuit breaker state */
 export type CircuitState = "CLOSED" | "OPEN" | "HALF_OPEN";
 
@@ -40,34 +48,20 @@ export interface CircuitBreakerMetrics {
   totalSuccesses: number;
 }
 
-/** Failure record for sliding window */
-interface FailureRecord {
-  timestamp: number;
-  error: string;
-}
-
 /**
- * Circuit Breaker implementation.
- *
- * Usage:
- * ```ts
- * const breaker = new CircuitBreaker({ failureThreshold: 5 });
- *
- * const result = await breaker.execute(async () => {
- *   return await externalService.call();
- * });
- * ```
+ * Circuit Breaker implementation using Cockatiel.
  */
 export class CircuitBreaker {
-  private state: CircuitState = "CLOSED";
-  private failures: FailureRecord[] = [];
-  private successCount = 0;
-  private lastStateChangeAt = Date.now();
+  private readonly policy: CircuitBreakerPolicy;
+  private readonly config: CircuitBreakerConfig;
+  private isolationHandle: { dispose: () => void } | null = null;
+
+  private lastFailureAt: number | null = null;
+  private lastSuccessAt: number | null = null;
+  private lastStateChangeAt: number = Date.now();
   private totalRequests = 0;
   private totalFailures = 0;
   private totalSuccesses = 0;
-
-  private readonly config: CircuitBreakerConfig;
 
   constructor(config: Partial<CircuitBreakerConfig> = {}) {
     this.config = {
@@ -77,6 +71,54 @@ export class CircuitBreaker {
       failureWindowMs: config.failureWindowMs ?? 60000,
       onStateChange: config.onStateChange,
     };
+
+    // Use SamplingBreaker to respect the time window.
+    this.policy = circuitBreaker(handleAll, {
+      halfOpenAfter: this.config.resetTimeoutMs,
+      breaker: new SamplingBreaker({
+        threshold: 0.1,
+        duration: this.config.failureWindowMs,
+        minimumRps: 1,
+      }),
+    });
+
+    this.policy.onStateChange((state) => {
+      const to = this.mapState(state);
+      const from = this.getState();
+      this.lastStateChangeAt = Date.now();
+
+      if (this.config.onStateChange) {
+        this.config.onStateChange(from, to, "Cockatiel state transition");
+      }
+    });
+
+    this.policy.onSuccess(() => {
+      this.totalSuccesses++;
+      this.lastSuccessAt = Date.now();
+    });
+
+    this.policy.onFailure(() => {
+      this.totalFailures++;
+      this.lastFailureAt = Date.now();
+    });
+  }
+
+  private mapState(state: CockatielState): CircuitState {
+    switch (state) {
+      case CockatielState.Closed: {
+        return "CLOSED";
+      }
+      case CockatielState.Open:
+      case CockatielState.Isolated: {
+        return "OPEN";
+      }
+      case CockatielState.HalfOpen: {
+        return "HALF_OPEN";
+      }
+      default: {
+        return "CLOSED";
+      }
+    }
   }
 
   /**
@@ -85,20 +127,15 @@ export class CircuitBreaker {
   async execute<T>(fn: () => Promise<T>): Promise<T> {
     this.totalRequests++;
 
-    // Check if we should allow the request
-    if (!this.canExecute()) {
-      throw new CircuitBreakerOpenError(
-        `Circuit breaker is ${this.state}`,
-        this.getTimeUntilRetry()
-      );
-    }
-
     try {
-      const result = await fn();
-      this.recordSuccess();
-      return result;
+      return await this.policy.execute(fn);
     } catch (error) {
-      this.recordFailure(error instanceof Error ? error.message : "Unknown error");
+      if (error instanceof Error && error.name === "BrokenCircuitError") {
+        throw new CircuitBreakerOpenError(
+          `Circuit breaker is ${this.getState()}`,
+          this.getTimeUntilRetry()
+        );
+      }
       throw error;
     }
   }
@@ -107,103 +144,16 @@ export class CircuitBreaker {
    * Check if request can proceed.
    */
   canExecute(): boolean {
-    this.cleanupOldFailures();
-
-    switch (this.state) {
-      case "CLOSED":
-        return true;
-
-      case "OPEN":
-        // Check if reset timeout has passed
-        if (Date.now() - this.lastStateChangeAt >= this.config.resetTimeoutMs) {
-          this.transitionTo("HALF_OPEN", "Reset timeout elapsed");
-          return true;
-        }
-        return false;
-
-      case "HALF_OPEN":
-        // Allow limited requests to test recovery
-        return true;
-
-      default:
-        return false;
-    }
-  }
-
-  /**
-   * Record a successful execution.
-   */
-  private recordSuccess(): void {
-    this.totalSuccesses++;
-
-    switch (this.state) {
-      case "HALF_OPEN":
-        this.successCount++;
-        if (this.successCount >= this.config.successThreshold) {
-          this.transitionTo("CLOSED", "Success threshold reached");
-        }
-        break;
-
-      case "CLOSED":
-        // Reset failure count on success in closed state
-        this.failures = [];
-        break;
-    }
-  }
-
-  /**
-   * Record a failed execution.
-   */
-  private recordFailure(error: string): void {
-    this.totalFailures++;
-    this.failures.push({ timestamp: Date.now(), error });
-
-    switch (this.state) {
-      case "CLOSED":
-        if (this.failures.length >= this.config.failureThreshold) {
-          this.transitionTo("OPEN", `Failure threshold reached (${this.failures.length} failures)`);
-        }
-        break;
-
-      case "HALF_OPEN":
-        // Single failure in half-open returns to open
-        this.transitionTo("OPEN", "Failure during recovery test");
-        break;
-    }
-  }
-
-  /**
-   * Transition to a new state.
-   */
-  private transitionTo(newState: CircuitState, reason: string): void {
-    const oldState = this.state;
-    this.state = newState;
-    this.lastStateChangeAt = Date.now();
-
-    // Reset counters based on new state
-    if (newState === "HALF_OPEN") {
-      this.successCount = 0;
-    } else if (newState === "CLOSED") {
-      this.failures = [];
-      this.successCount = 0;
-    }
-
-    this.config.onStateChange?.(oldState, newState, reason);
-  }
-
-  /**
-   * Remove failures outside the window.
-   */
-  private cleanupOldFailures(): void {
-    const cutoff = Date.now() - this.config.failureWindowMs;
-    this.failures = this.failures.filter((f) => f.timestamp > cutoff);
+    return (
+      this.policy.state === CockatielState.Closed || this.policy.state === CockatielState.HalfOpen
+    );
   }
 
   /**
    * Get time until retry is allowed (for OPEN state).
    */
   getTimeUntilRetry(): number {
-    if (this.state !== "OPEN") {
+    if (this.policy.state !== CockatielState.Open) {
       return 0;
     }
     const elapsed = Date.now() - this.lastStateChangeAt;
@@ -214,21 +164,19 @@ export class CircuitBreaker {
    * Get current state.
    */
   getState(): CircuitState {
-    return this.state;
+    return this.mapState(this.policy.state);
   }
 
   /**
    * Get metrics.
    */
   getMetrics(): CircuitBreakerMetrics {
-    this.cleanupOldFailures();
     return {
-      state: this.state,
-      failureCount: this.failures.length,
-      successCount: this.successCount,
-      lastFailureAt:
-        this.failures.length > 0 ? this.failures[this.failures.length - 1].timestamp : null,
-      lastSuccessAt: this.totalSuccesses > 0 ? Date.now() : null, // Simplified
+      state: this.getState(),
+      failureCount: this.totalFailures,
+      successCount: this.totalSuccesses,
+      lastFailureAt: this.lastFailureAt,
+      lastSuccessAt: this.lastSuccessAt,
       lastStateChangeAt: this.lastStateChangeAt,
       totalRequests: this.totalRequests,
       totalFailures: this.totalFailures,
@@ -237,19 +185,34 @@ export class CircuitBreaker {
   }
 
   /**
-   * Force state (for testing or manual intervention).
+   * Force state.
    */
   forceState(state: CircuitState): void {
-    this.transitionTo(state, "Forced state change");
+    if (state === "OPEN") {
+      if (!this.isolationHandle) {
+        this.isolationHandle = this.policy.isolate();
+      }
+    } else {
+      if (this.isolationHandle) {
+        this.isolationHandle.dispose();
+        this.isolationHandle = null;
+      }
+    }
   }
 
   /**
    * Reset circuit breaker to initial state.
    */
   reset(): void {
-    this.state = "CLOSED";
-    this.failures = [];
-    this.successCount = 0;
+    if (this.isolationHandle) {
+      this.isolationHandle.dispose();
+      this.isolationHandle = null;
+    }
+    this.totalRequests = 0;
+    this.totalFailures = 0;
+    this.totalSuccesses = 0;
+    this.lastFailureAt = null;
+    this.lastSuccessAt = null;
     this.lastStateChangeAt = Date.now();
   }
 }

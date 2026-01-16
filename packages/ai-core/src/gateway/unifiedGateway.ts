@@ -14,6 +14,7 @@
  * - Standardized error handling
  */
 
+import { getLangfuseClient } from "../observability/langfuseClient";
 import { ProviderRouter, type ProviderRouterConfig } from "../providers/providerRouter";
 import { TokenTracker } from "../providers/tokenTracker";
 import type { Message, TokenUsage } from "../providers/types";
@@ -316,6 +317,20 @@ export class UnifiedAIGateway {
    */
   async complete(messages: Message[], options: GatewayRequestOptions): Promise<GatewayResponse> {
     const context = this.createContext(options);
+    const langfuse = getLangfuseClient();
+
+    // Create generation trace
+    const generation = langfuse?.generation({
+      name: "gateway.complete",
+      model: context.model,
+      input: messages,
+      metadata: {
+        ...options.metadata,
+        provider: context.model.split("/")[0], // heuristic
+        requestId: context.requestId,
+        userId: options.userId,
+      },
+    });
 
     this.totalRequests++;
     this.observability.metrics.increment("gateway.requests", {
@@ -347,6 +362,22 @@ export class UnifiedAIGateway {
       const latencyMs = Date.now() - context.startTime;
       this.totalLatencyMs += latencyMs;
 
+      // Update Langfuse generation
+      generation?.end({
+        output: response.content,
+        usage: {
+          input: response.usage.inputTokens,
+          output: response.usage.outputTokens,
+          total: response.usage.totalTokens,
+        },
+        model: response.model,
+        metadata: {
+          latencyMs,
+          provider: this.router.getProviderNames()[0], // Use fallback or derive from model
+          finishReason: response.finishReason,
+        },
+      });
+
       // Emit telemetry
       this.emitTelemetry({
         kind: "request",
@@ -371,6 +402,11 @@ export class UnifiedAIGateway {
         finishReason: response.finishReason ?? "stop",
       };
     } catch (error) {
+      // Log error to Langfuse
+      generation?.end({
+        statusMessage: error instanceof Error ? error.message : String(error),
+        level: "ERROR",
+      });
       return this.handleError(error, context, options);
     }
   }
@@ -383,6 +419,19 @@ export class UnifiedAIGateway {
     options: GatewayStreamOptions
   ): AsyncIterable<GatewayStreamChunk> {
     const context = this.createContext(options);
+    const langfuse = getLangfuseClient();
+
+    // Create generation trace for stream
+    const generation = langfuse?.generation({
+      name: "gateway.stream",
+      model: context.model,
+      input: messages,
+      metadata: {
+        ...options.metadata,
+        requestId: context.requestId,
+        userId: options.userId,
+      },
+    });
 
     this.totalRequests++;
     this.observability.metrics.increment("gateway.requests", {
@@ -445,6 +494,20 @@ export class UnifiedAIGateway {
       const latencyMs = Date.now() - context.startTime;
       this.totalLatencyMs += latencyMs;
 
+      // Update Langfuse generation
+      generation?.end({
+        output: accumulated,
+        usage: {
+          input: totalUsage.inputTokens,
+          output: totalUsage.outputTokens,
+          total: totalUsage.totalTokens,
+        },
+        metadata: {
+          latencyMs,
+          finishReason: "stop", // Streaming usually ends with stop or explicit done. We assume stop here if successful.
+        },
+      });
+
       // Emit telemetry
       this.emitTelemetry({
         kind: "stream",
@@ -459,6 +522,10 @@ export class UnifiedAIGateway {
 
       yield { type: "done" };
     } catch (error) {
+      generation?.end({
+        statusMessage: error instanceof Error ? error.message : String(error),
+        level: "ERROR",
+      });
       this.handleStreamError(error, context, options);
       yield {
         type: "error",

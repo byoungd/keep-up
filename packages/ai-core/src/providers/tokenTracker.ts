@@ -5,6 +5,7 @@
  * Supports rate limiting and budget enforcement.
  */
 
+import { type Tiktoken, type TiktokenEncoding, getEncoding } from "js-tiktoken";
 import type { TokenUsage } from "./types";
 
 /** Pricing per 1M tokens in USD */
@@ -66,12 +67,22 @@ export interface UsageSummary {
   /** Breakdown by model */
   byModel: Record<
     string,
-    { requests: number; inputTokens: number; outputTokens: number; costUsd: number }
+    {
+      requests: number;
+      inputTokens: number;
+      outputTokens: number;
+      costUsd: number;
+    }
   >;
   /** Breakdown by provider */
   byProvider: Record<
     string,
-    { requests: number; inputTokens: number; outputTokens: number; costUsd: number }
+    {
+      requests: number;
+      inputTokens: number;
+      outputTokens: number;
+      costUsd: number;
+    }
   >;
   /** Period start */
   periodStart: number;
@@ -116,10 +127,46 @@ export class TokenTracker {
   private readonly rateLimits = new Map<string, RateLimitConfig>();
   private readonly rateLimitState = new Map<string, RateLimitState>();
   private readonly customPricing: Record<string, ModelPricing>;
+  private readonly encodings = new Map<TiktokenEncoding, Tiktoken>();
 
-  constructor(options: { maxRecords?: number; customPricing?: Record<string, ModelPricing> } = {}) {
+  constructor(
+    options: {
+      maxRecords?: number;
+      customPricing?: Record<string, ModelPricing>;
+    } = {}
+  ) {
     this.maxRecords = options.maxRecords ?? 10000;
     this.customPricing = options.customPricing ?? {};
+  }
+
+  /**
+   * Count tokens in a string for a specific model using Tiktoken.
+   */
+  countTokens(text: string, model = "gpt-4o"): number {
+    const encodingName = this.getEncodingNameForModel(model);
+    let encoding = this.encodings.get(encodingName);
+
+    if (!encoding) {
+      encoding = getEncoding(encodingName);
+      this.encodings.set(encodingName, encoding);
+    }
+
+    return encoding.encode(text).length;
+  }
+
+  private getEncodingNameForModel(model: string): TiktokenEncoding {
+    // cl100k_base is used by GPT-3.5-Turbo, GPT-4, and GPT-4o
+    if (
+      model.includes("gpt-4") ||
+      model.includes("gpt-3.5") ||
+      model.includes("o1") ||
+      model.includes("text-embedding-3")
+    ) {
+      return "cl100k_base";
+    }
+    // o200k_base is used by GPT-4o (some variants) but js-tiktoken might not have it yet
+    // depending on version. cl100k_base is a safe fallback for modern OpenAI.
+    return "cl100k_base";
   }
 
   /**
@@ -165,7 +212,7 @@ export class TokenTracker {
     const inputCost = (usage.inputTokens / 1_000_000) * pricing.inputTokensPer1M;
     const outputCost = (usage.outputTokens / 1_000_000) * pricing.outputTokensPer1M;
 
-    return Math.round((inputCost + outputCost) * 1_000_000) / 1_000_000; // Round to 6 decimals
+    return Math.round((inputCost + outputCost) * 1_000_000) / 1_000_000;
   }
 
   /**
@@ -175,7 +222,7 @@ export class TokenTracker {
     options: { userId?: string; startTime?: number; endTime?: number } = {}
   ): UsageSummary {
     const now = Date.now();
-    const startTime = options.startTime ?? now - 24 * 60 * 60 * 1000; // Default: last 24 hours
+    const startTime = options.startTime ?? now - 24 * 60 * 60 * 1000;
     const endTime = options.endTime ?? now;
 
     const filtered = this.records.filter((r) => {
@@ -205,7 +252,6 @@ export class TokenTracker {
       summary.totalOutputTokens += record.usage.outputTokens;
       summary.totalCostUsd += record.costUsd;
 
-      // By model
       if (!summary.byModel[record.model]) {
         summary.byModel[record.model] = {
           requests: 0,
@@ -214,12 +260,12 @@ export class TokenTracker {
           costUsd: 0,
         };
       }
-      summary.byModel[record.model].requests++;
-      summary.byModel[record.model].inputTokens += record.usage.inputTokens;
-      summary.byModel[record.model].outputTokens += record.usage.outputTokens;
-      summary.byModel[record.model].costUsd += record.costUsd;
+      const modelStat = summary.byModel[record.model];
+      modelStat.requests++;
+      modelStat.inputTokens += record.usage.inputTokens;
+      modelStat.outputTokens += record.usage.outputTokens;
+      modelStat.costUsd += record.costUsd;
 
-      // By provider
       if (!summary.byProvider[record.provider]) {
         summary.byProvider[record.provider] = {
           requests: 0,
@@ -228,13 +274,13 @@ export class TokenTracker {
           costUsd: 0,
         };
       }
-      summary.byProvider[record.provider].requests++;
-      summary.byProvider[record.provider].inputTokens += record.usage.inputTokens;
-      summary.byProvider[record.provider].outputTokens += record.usage.outputTokens;
-      summary.byProvider[record.provider].costUsd += record.costUsd;
+      const providerStat = summary.byProvider[record.provider];
+      providerStat.requests++;
+      providerStat.inputTokens += record.usage.inputTokens;
+      providerStat.outputTokens += record.usage.outputTokens;
+      providerStat.costUsd += record.costUsd;
     }
 
-    // Round total cost
     summary.totalCostUsd = Math.round(summary.totalCostUsd * 1_000_000) / 1_000_000;
 
     return summary;
@@ -266,23 +312,18 @@ export class TokenTracker {
     const state = this.getOrCreateRateLimitState(userId);
     const now = Date.now();
 
-    // Check minute window
     if (now - state.minuteWindowStart > 60_000) {
-      // Reset minute window
       state.requestsInMinute = 0;
       state.tokensInMinute = 0;
       state.minuteWindowStart = now;
     }
 
-    // Check day window
     if (now - state.dayWindowStart > 24 * 60 * 60 * 1000) {
-      // Reset day window
       state.tokensInDay = 0;
       state.costInDay = 0;
       state.dayWindowStart = now;
     }
 
-    // Check requests per minute
     if (limits.requestsPerMinute && state.requestsInMinute >= limits.requestsPerMinute) {
       return {
         allowed: false,
@@ -291,7 +332,6 @@ export class TokenTracker {
       };
     }
 
-    // Check tokens per minute
     if (limits.tokensPerMinute && state.tokensInMinute + estimatedTokens > limits.tokensPerMinute) {
       return {
         allowed: false,
@@ -300,7 +340,6 @@ export class TokenTracker {
       };
     }
 
-    // Check tokens per day
     if (limits.tokensPerDay && state.tokensInDay + estimatedTokens > limits.tokensPerDay) {
       return {
         allowed: false,
@@ -309,7 +348,6 @@ export class TokenTracker {
       };
     }
 
-    // Check cost per day
     if (limits.costPerDayUsd && state.costInDay >= limits.costPerDayUsd) {
       return {
         allowed: false,
@@ -340,7 +378,7 @@ export class TokenTracker {
   }
 
   /**
-   * Get all records (for export/analysis).
+   * Get all records.
    */
   getRecords(options: { userId?: string; limit?: number } = {}): UsageRecord[] {
     let filtered = this.records;
@@ -385,7 +423,6 @@ export class TokenTracker {
     const state = this.getOrCreateRateLimitState(userId);
     const now = Date.now();
 
-    // Reset windows if needed
     if (now - state.minuteWindowStart > 60_000) {
       state.requestsInMinute = 0;
       state.tokensInMinute = 0;
@@ -398,7 +435,6 @@ export class TokenTracker {
       state.dayWindowStart = now;
     }
 
-    // Update counters
     state.requestsInMinute++;
     state.tokensInMinute += usage.totalTokens;
     state.tokensInDay += usage.totalTokens;

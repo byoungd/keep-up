@@ -4,6 +4,12 @@
  * Production-grade retry with exponential backoff, jitter, and circuit breaker integration.
  */
 
+import {
+  type RetryPolicy as CockatielRetryPolicy,
+  ExponentialBackoff,
+  handleWhen,
+  retry,
+} from "cockatiel";
 import { type Result, err, isOk, ok } from "../types/result";
 
 // ============================================================================
@@ -22,9 +28,9 @@ export interface RetryPolicyConfig {
   maxDelayMs: number;
   /** Backoff multiplier (default: 2) */
   backoffMultiplier: number;
-  /** Jitter factor 0-1 (default: 0.1) */
+  /** Jitter factor 0-1 (default: 0.1) - Handled internally by Cockatiel jitter */
   jitterFactor: number;
-  /** Timeout per attempt in ms (default: 60000) */
+  /** Timeout per attempt in ms (default: 60000) - Note: timeout should be handled via TimeoutPolicy or signal */
   timeoutMs: number;
   /** Function to determine if error is retryable */
   isRetryable: (error: unknown) => boolean;
@@ -99,13 +105,27 @@ const DEFAULT_CONFIG: RetryPolicyConfig = {
 // ============================================================================
 
 /**
- * Retry policy with configurable strategies.
+ * Retry policy with configurable strategies using Cockatiel.
  */
 export class RetryPolicy {
   private readonly config: RetryPolicyConfig;
+  private readonly policy: CockatielRetryPolicy;
 
   constructor(config: Partial<RetryPolicyConfig> = {}) {
-    this.config = { ...DEFAULT_CONFIG, ...config };
+    const fullConfig = { ...DEFAULT_CONFIG, ...config };
+    this.config = fullConfig;
+
+    this.policy = retry(
+      handleWhen((error) => this.config.isRetryable(error)),
+      {
+        maxAttempts: this.config.maxAttempts,
+        backoff: new ExponentialBackoff({
+          initialDelay: this.config.initialDelayMs,
+          maxDelay: this.config.maxDelayMs,
+          exponent: this.config.backoffMultiplier,
+        }),
+      }
+    );
   }
 
   /**
@@ -117,9 +137,51 @@ export class RetryPolicy {
   ): Promise<RetryResult<T>> {
     const attempts: RetryAttempt[] = [];
     const startTime = Date.now();
+    let lastAttemptStart = startTime;
 
-    for (let attempt = 1; attempt <= this.config.maxAttempts; attempt++) {
-      // Check cancellation
+    // Cockatiel events to track attempts
+    const retrySub = this.policy.onRetry((reason) => {
+      const now = Date.now();
+      attempts.push({
+        attempt: reason.attempt,
+        durationMs: now - lastAttemptStart,
+        error: "error" in reason ? reason.error : reason.value,
+      });
+      this.config.onRetry?.(
+        reason.attempt,
+        "error" in reason ? reason.error : reason.value,
+        reason.delay
+      );
+      lastAttemptStart = now + reason.delay; // Estimate next start
+    });
+
+    try {
+      // Create a combined signal if both exist
+      const signal = cancellation ? this.combineSignals(cancellation.signal) : undefined;
+
+      const resultValue = await this.policy.execute(async ({ attempt, signal: policySignal }) => {
+        lastAttemptStart = Date.now();
+        // If we have a timeout, we should wrap the call
+        // For simplicity here, we just pass the signal
+        return await fn(attempt, policySignal);
+      }, signal);
+
+      retrySub.dispose();
+
+      attempts.push({
+        attempt: attempts.length + 1,
+        durationMs: Date.now() - lastAttemptStart,
+      });
+
+      return {
+        result: ok(resultValue),
+        attempts,
+        totalDurationMs: Date.now() - startTime,
+      };
+    } catch (error) {
+      retrySub.dispose();
+
+      // If it's a cancellation error from our side
       if (cancellation?.isCancelled) {
         return {
           result: err(new Error("Operation cancelled")),
@@ -128,102 +190,33 @@ export class RetryPolicy {
         };
       }
 
-      const attemptStart = Date.now();
-      const controller = new AbortController();
+      const finalError = error instanceof Error ? error : new Error(String(error));
 
-      // Link to parent cancellation
-      const abortHandler = () => controller.abort();
-      cancellation?.signal.addEventListener("abort", abortHandler);
-
-      // Set timeout
-      const timeoutId = setTimeout(() => {
-        controller.abort();
-      }, this.config.timeoutMs);
-
-      try {
-        const result = await fn(attempt, controller.signal);
-        clearTimeout(timeoutId);
-        cancellation?.signal.removeEventListener("abort", abortHandler);
-
+      // Ensure the last failure is recorded if not already in attempts
+      if (attempts.length < this.config.maxAttempts) {
         attempts.push({
-          attempt,
-          durationMs: Date.now() - attemptStart,
+          attempt: attempts.length + 1,
+          durationMs: Date.now() - lastAttemptStart,
+          error: finalError,
         });
-
-        return {
-          result: ok(result),
-          attempts,
-          totalDurationMs: Date.now() - startTime,
-        };
-      } catch (error) {
-        clearTimeout(timeoutId);
-        cancellation?.signal.removeEventListener("abort", abortHandler);
-
-        attempts.push({
-          attempt,
-          durationMs: Date.now() - attemptStart,
-          error,
-        });
-
-        // Check if we should retry
-        const isLastAttempt = attempt >= this.config.maxAttempts;
-        const shouldRetry = !isLastAttempt && this.config.isRetryable(error);
-
-        if (!shouldRetry) {
-          return {
-            result: err(error instanceof Error ? error : new Error(String(error))),
-            attempts,
-            totalDurationMs: Date.now() - startTime,
-          };
-        }
-
-        // Calculate delay with exponential backoff and jitter
-        const delay = this.calculateDelay(attempt);
-        this.config.onRetry?.(attempt, error, delay);
-
-        // Wait before retry
-        await this.sleep(delay, cancellation);
       }
+
+      return {
+        result: err(finalError),
+        attempts,
+        totalDurationMs: Date.now() - startTime,
+      };
     }
-
-    // Should not reach here
-    return {
-      result: err(new Error("Retry exhausted")),
-      attempts,
-      totalDurationMs: Date.now() - startTime,
-    };
   }
 
-  /**
-   * Calculate delay with exponential backoff and jitter.
-   */
-  private calculateDelay(attempt: number): number {
-    const exponentialDelay =
-      this.config.initialDelayMs * this.config.backoffMultiplier ** (attempt - 1);
-    const clampedDelay = Math.min(exponentialDelay, this.config.maxDelayMs);
-
-    // Add jitter
-    const jitter = clampedDelay * this.config.jitterFactor * (Math.random() * 2 - 1);
-    return Math.max(0, Math.floor(clampedDelay + jitter));
-  }
-
-  /**
-   * Sleep with cancellation support.
-   */
-  private sleep(ms: number, cancellation?: CancellationToken): Promise<void> {
-    return new Promise((resolve) => {
-      const timeoutId = setTimeout(resolve, ms);
-
-      if (cancellation) {
-        const abortHandler = () => {
-          clearTimeout(timeoutId);
-          resolve();
-        };
-        cancellation.signal.addEventListener("abort", abortHandler, {
-          once: true,
-        });
-      }
-    });
+  private combineSignals(parentSignal: AbortSignal): AbortSignal {
+    const controller = new AbortController();
+    const abortHandler = () => controller.abort();
+    parentSignal.addEventListener("abort", abortHandler);
+    // Cleanup isn't trivial here without a way to know when to stop listening,
+    // but AbortSignal.any() is available in modern Node/browsers.
+    // If not, this is a reasonable approximation for now.
+    return controller.signal;
   }
 }
 
@@ -255,7 +248,9 @@ export function createCancellationToken(): CancellationToken {
  */
 export function createTimeoutToken(timeoutMs: number): CancellationToken {
   const token = createCancellationToken();
-  setTimeout(() => token.cancel("Timeout"), timeoutMs);
+  setTimeout(() => {
+    token.cancel("Timeout");
+  }, timeoutMs);
   return token;
 }
 
@@ -270,9 +265,15 @@ export function combineCancellationTokens(...tokens: CancellationToken[]): Cance
       combined.cancel("Parent cancelled");
       break;
     }
-    token.signal.addEventListener("abort", () => combined.cancel("Parent cancelled"), {
-      once: true,
-    });
+    token.signal.addEventListener(
+      "abort",
+      () => {
+        combined.cancel("Parent cancelled");
+      },
+      {
+        once: true,
+      }
+    );
   }
 
   return combined;

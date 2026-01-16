@@ -226,17 +226,17 @@ export class ResiliencePipeline {
     logContext: Record<string, unknown>
   ): RetryPolicy {
     const userOnRetry = this.baseRetryConfig?.onRetry;
-    const onRetry = this.observability
-      ? (attempt: number, error: unknown, delayMs: number) => {
-          userOnRetry?.(attempt, error, delayMs);
-          this.observability?.logger.warn("Retrying operation", {
-            ...logContext,
-            attempt,
-            delayMs,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
-      : userOnRetry;
+    const onRetry = (attempt: number, error: unknown, delayMs: number) => {
+      userOnRetry?.(attempt, error, delayMs);
+      if (this.observability) {
+        this.observability.logger.warn("Retrying operation", {
+          ...logContext,
+          attempt,
+          delayMs,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    };
 
     return new RetryPolicy({
       ...this.baseRetryConfig,
