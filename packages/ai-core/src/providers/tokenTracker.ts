@@ -6,7 +6,7 @@
  */
 
 import { getEncoding, type Tiktoken, type TiktokenEncoding } from "js-tiktoken";
-import { getModelCapability, type ModelPricing } from "../catalog/models";
+import { getDefaultModelId, getModelCapability, type ModelPricing } from "../catalog/models";
 import type { TokenUsage } from "./types";
 
 /** Usage record for a single request */
@@ -93,6 +93,8 @@ interface RateLimitState {
   dayWindowStart: number;
 }
 
+const DEFAULT_MODEL_ID = getDefaultModelId();
+
 /**
  * Token Counter & Cost Tracker.
  */
@@ -117,7 +119,7 @@ export class TokenTracker {
   /**
    * Count tokens in a string for a specific model using Tiktoken.
    */
-  countTokens(text: string, model = "gpt-4o"): number {
+  countTokens(text: string, model = DEFAULT_MODEL_ID): number {
     const encodingName = this.getEncodingNameForModel(model);
     let encoding = this.encodings.get(encodingName);
 

@@ -6,14 +6,14 @@ describe("TokenTracker", () => {
 
   test("counts tokens for OpenAI models using cl100k_base", () => {
     const text = "Hello, world!";
-    const count = tracker.countTokens(text, "gpt-4o");
+    const count = tracker.countTokens(text, "gpt-5.2-auto");
     // "Hello", ",", " world", "!" -> 4 tokens
     expect(count).toBeGreaterThan(0);
   });
 
   test("counts tokens for non-OpenAI models using fallback encoding", () => {
     const text = "Hello, world!";
-    const count = tracker.countTokens(text, "claude-3-opus");
+    const count = tracker.countTokens(text, "claude-sonnet-4-5");
     // Should default to cl100k_base and return same/similar count
     expect(count).toBeGreaterThan(0);
   });

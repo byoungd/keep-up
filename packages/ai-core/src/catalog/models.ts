@@ -64,7 +64,6 @@ export const MODEL_CATALOG: ModelCapability[] = [
     supports: { vision: false, tools: true, thinking: false },
     tags: ["fast"],
     pricing: { inputTokensPer1M: 0.1, outputTokensPer1M: 0.4 },
-    default: true,
   },
   {
     id: "gemini-3-pro-high",
@@ -421,7 +420,7 @@ const MODEL_ALIASES: Record<string, string> = {
   "gemini-3.0-pro": "gemini-3-pro-high",
   "gemini-3-pro": "gemini-3-pro-high",
   "gpt-5": "gpt-5.2-auto",
-  "gpt-5.1": "gpt-5.1-pro",
+  "gpt-5.1": "gpt-5.2-auto",
 };
 
 export function normalizeModelId(value?: string | null): string | undefined {

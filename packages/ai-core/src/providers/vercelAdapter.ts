@@ -59,9 +59,15 @@ const PROVIDER_MODELS: Record<VercelProviderType, string[]> = {
 };
 
 const DEFAULT_MODELS: Record<VercelProviderType, string> = {
-  openai: "gpt-4o-mini",
-  anthropic: "claude-sonnet-4-20250514",
-  google: "gemini-2.0-flash",
+  openai:
+    MODEL_CATALOG.find((m) => m.provider === "openai" && m.default)?.id ??
+    PROVIDER_MODELS.openai[0],
+  anthropic:
+    MODEL_CATALOG.find((m) => m.provider === "claude" && m.default)?.id ??
+    PROVIDER_MODELS.anthropic[0],
+  google:
+    MODEL_CATALOG.find((m) => m.provider === "gemini" && m.default)?.id ??
+    PROVIDER_MODELS.google[0],
 };
 
 const DEFAULT_EMBEDDING_MODELS: Record<VercelProviderType, string> = {
@@ -70,7 +76,10 @@ const DEFAULT_EMBEDDING_MODELS: Record<VercelProviderType, string> = {
   google: "text-embedding-004",
 };
 
-type ProviderInstance = ReturnType<typeof createOpenAI>;
+type ProviderInstance =
+  | ReturnType<typeof createOpenAI>
+  | ReturnType<typeof createAnthropic>
+  | ReturnType<typeof createGoogleGenerativeAI>;
 
 /**
  * Vercel AI SDK Adapter
