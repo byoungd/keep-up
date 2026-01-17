@@ -1,12 +1,12 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
-  AnthropicProvider,
-  GeminiProvider,
+  createAnthropicAdapter,
+  createGoogleAdapter,
+  createOpenAIAdapter,
   getModelCapability,
   type LLMProvider,
   normalizeModelId,
-  OpenAIProvider,
   ProviderRouter,
   resolveProviderFromEnv,
 } from "@ku0/ai-core";
@@ -453,13 +453,13 @@ async function buildChatProviders(providerKeys: ProviderKeyService): Promise<Cha
   const providers: ChatProviderEntry[] = [];
 
   addChatProvider(providers, "openai", openAiKey, (key) => {
-    return new OpenAIProvider({ apiKey: key, baseUrl: openaiEnv?.baseUrl });
+    return createOpenAIAdapter({ apiKey: key, baseUrl: openaiEnv?.baseUrl });
   });
   addChatProvider(providers, "anthropic", anthropicKey, (key) => {
-    return new AnthropicProvider({ apiKey: key, baseUrl: claudeEnv?.baseUrl });
+    return createAnthropicAdapter({ apiKey: key, baseUrl: claudeEnv?.baseUrl });
   });
   addChatProvider(providers, "gemini", geminiKey, (key) => {
-    return new GeminiProvider({ apiKey: key, baseUrl: geminiBaseUrl });
+    return createGoogleAdapter({ apiKey: key, baseUrl: geminiBaseUrl });
   });
 
   return providers;

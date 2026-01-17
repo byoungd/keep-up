@@ -4,14 +4,14 @@
  */
 
 import {
-  AnthropicProvider,
   type CompletionRequest,
   type CompletionResponse,
-  GeminiProvider,
+  createAnthropicAdapter,
+  createGoogleAdapter,
+  createOpenAIAdapter,
   getModelCapability,
   type LLMProvider,
   normalizeModelId,
-  OpenAIProvider,
   ProviderRouter,
   resolveProviderFromEnv,
   type StreamChunk,
@@ -109,13 +109,13 @@ export class ProviderManager {
 
     const providers: LLMProvider[] = [];
     if (openAiKey) {
-      providers.push(new OpenAIProvider({ apiKey: openAiKey, baseUrl: openaiEnv?.baseUrl }));
+      providers.push(createOpenAIAdapter({ apiKey: openAiKey, baseUrl: openaiEnv?.baseUrl }));
     }
     if (anthropicKey) {
-      providers.push(new AnthropicProvider({ apiKey: anthropicKey, baseUrl: claudeEnv?.baseUrl }));
+      providers.push(createAnthropicAdapter({ apiKey: anthropicKey, baseUrl: claudeEnv?.baseUrl }));
     }
     if (geminiKey) {
-      providers.push(new GeminiProvider({ apiKey: geminiKey, baseUrl: geminiBaseUrl }));
+      providers.push(createGoogleAdapter({ apiKey: geminiKey, baseUrl: geminiBaseUrl }));
     }
     return providers;
   }

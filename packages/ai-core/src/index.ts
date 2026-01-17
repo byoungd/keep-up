@@ -284,6 +284,10 @@ export {
   // Types
   type CompletionRequest,
   type CompletionResponse,
+  // Vercel AI SDK Adapters (Recommended)
+  createAnthropicAdapter,
+  createGoogleAdapter,
+  createOpenAIAdapter,
   createProviderRouter,
   createResilientProvider,
   type EmbeddingRequest,
@@ -321,6 +325,10 @@ export {
   type ToolCall,
   type UsageRecord,
   type UsageSummary,
+  // Vercel adapter types
+  VercelAIAdapter,
+  type VercelAIAdapterConfig,
+  type VercelProviderType,
 } from "./providers";
 // ============================================================================
 // Resilience - Circuit Breaker, Queue, Errors, Observability
