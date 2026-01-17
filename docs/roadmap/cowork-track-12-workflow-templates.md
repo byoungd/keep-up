@@ -1,5 +1,10 @@
 # Track 12: Workflow Templates + Skills
 
+> [!TIP]
+> **Parallel Execution**
+> This track is independent of the Phase F architecture changes and can be developed in parallel.
+
+
 ## Mission
 Make repeatable agent workflows first-class so teams can standardize quality
 and reduce prompt overhead.

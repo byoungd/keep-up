@@ -1,5 +1,11 @@
 # Track 14: Multi-Agent Orchestration
 
+> [!CAUTION]
+> **SUPERSEDED BY TRACK 15 (PHASE F)**
+> This track has been replaced by the "Swarm Runtime" architecture in Track 15. 
+> Do not implement this isolation; proceed to Track 15 for the new specification.
+
+
 ## Mission
 Enable role-based delegation so complex tasks can be handled in parallel with
 clear responsibilities and summaries.

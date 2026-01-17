@@ -1,5 +1,11 @@
 # Track 13: Autonomous QA + Preflight Gates
 
+> [!NOTE]
+> **Dependency on Phase F (Track 15)**
+> While the core logic of this track (lint/test parsers) can be built now, the *autonomous* aspect relies heavily on the "Background Jobs" capability from the **Phase F Swarm Runtime**. 
+> Recommendation: Build parsers now; integrate execution loop after Track 15 (F2) lands.
+
+
 ## Mission
 Increase trust in agent output by running preflight checks that catch regressions
 before changes are finalized.

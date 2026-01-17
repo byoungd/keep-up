@@ -1,5 +1,10 @@
 # Track 11: Semantic Context Indexing (Context Packs)
 
+> [!TIP]
+> **Parallel Execution**
+> This track is independent of the Phase F architecture changes and can be developed in parallel.
+
+
 ## Mission
 Provide fast semantic retrieval of project context so agents can pull relevant
 code and documentation without manual file selection.
