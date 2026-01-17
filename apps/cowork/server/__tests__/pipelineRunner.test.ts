@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import type { ToolExecutor } from "@ku0/agent-runtime";
+import { describe, expect, it, vi } from "vitest";
 import { createPipelineRunner } from "../pipelines/pipelineRunner";
 import type { PipelineDefinition, PipelineRunRecord } from "../pipelines/pipelineSchema";
 import type { PipelineStore } from "../pipelines/pipelineStore";
@@ -77,6 +78,13 @@ async function waitForRun(
 }
 
 describe("PipelineRunner", () => {
+  it("throws when starting a run for a missing pipeline", async () => {
+    const store = new MemoryPipelineStore();
+    const runner = createPipelineRunner({ store });
+
+    await expect(runner.startRun("missing")).rejects.toThrow("Pipeline not found");
+  });
+
   it("executes command stages and marks run complete", async () => {
     const store = new MemoryPipelineStore();
     const runner = createPipelineRunner({ store });
@@ -104,5 +112,113 @@ describe("PipelineRunner", () => {
 
     expect(completed?.status).toBe("completed");
     expect(completed?.stageResults[0]?.status).toBe("completed");
+  });
+
+  it("fails a tool stage when the executor is missing", async () => {
+    const store = new MemoryPipelineStore();
+    const runner = createPipelineRunner({ store });
+    const now = Date.now();
+    const pipeline: PipelineDefinition = {
+      pipelineId: "pipeline-tool-missing",
+      name: "Tool Stage Pipeline",
+      description: "Runs a tool without an executor",
+      version: "1.0.0",
+      stages: [
+        {
+          stageId: "stage-1",
+          name: "Tool",
+          type: "tool",
+          toolName: "tool:noop",
+        },
+      ],
+      createdAt: now,
+      updatedAt: now,
+    };
+    await store.createPipeline(pipeline);
+
+    const run = await runner.startRun(pipeline.pipelineId);
+    const failed = await waitForRun(store, run.runId, "failed");
+
+    expect(failed?.status).toBe("failed");
+    expect(failed?.stageResults[0]?.status).toBe("failed");
+    expect(failed?.stageResults[0]?.error).toBe("Tool executor not configured");
+  });
+
+  it("retries tool stages and succeeds after a retry", async () => {
+    const store = new MemoryPipelineStore();
+    let attempts = 0;
+    const execute = vi.fn(async () => {
+      attempts += 1;
+      if (attempts === 1) {
+        return {
+          success: false,
+          content: [],
+          error: { code: "EXECUTION_FAILED", message: "boom" },
+        };
+      }
+      return {
+        success: true,
+        content: [{ type: "text", text: "ok" }],
+      };
+    });
+    const toolExecutor: ToolExecutor = { execute };
+    const runner = createPipelineRunner({ store, toolExecutor });
+    const now = Date.now();
+    const pipeline: PipelineDefinition = {
+      pipelineId: "pipeline-tool-retry",
+      name: "Retry Pipeline",
+      description: "Retries tool execution",
+      version: "1.0.0",
+      stages: [
+        {
+          stageId: "stage-1",
+          name: "Tool",
+          type: "tool",
+          toolName: "tool:retry",
+          retry: { maxAttempts: 2, backoffMs: 0 },
+        },
+      ],
+      createdAt: now,
+      updatedAt: now,
+    };
+    await store.createPipeline(pipeline);
+
+    const run = await runner.startRun(pipeline.pipelineId);
+    const completed = await waitForRun(store, run.runId, "completed");
+
+    expect(completed?.status).toBe("completed");
+    expect(completed?.stageResults[0]?.attempts).toBe(2);
+    expect(completed?.stageResults[0]?.status).toBe("completed");
+    expect(completed?.stageResults[0]?.output).toContain("ok");
+  });
+
+  it("truncates oversized command output", async () => {
+    const store = new MemoryPipelineStore();
+    const runner = createPipelineRunner({ store, maxOutputBytes: 128 });
+    const now = Date.now();
+    const pipeline: PipelineDefinition = {
+      pipelineId: "pipeline-output-truncation",
+      name: "Output Pipeline",
+      description: "Truncates command output",
+      version: "1.0.0",
+      stages: [
+        {
+          stageId: "stage-1",
+          name: "Spam",
+          type: "command",
+          command: `node -e "process.stdout.write('a'.repeat(2048))"`,
+        },
+      ],
+      createdAt: now,
+      updatedAt: now,
+    };
+    await store.createPipeline(pipeline);
+
+    const run = await runner.startRun(pipeline.pipelineId);
+    const completed = await waitForRun(store, run.runId, "completed");
+
+    expect(completed?.status).toBe("completed");
+    expect(completed?.stageResults[0]?.status).toBe("completed");
+    expect(completed?.stageResults[0]?.output).toContain("[output truncated]");
   });
 });
