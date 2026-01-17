@@ -49,6 +49,7 @@ function initSchema(database: DatabaseInstance): void {
       grants TEXT NOT NULL DEFAULT '[]',
       connectors TEXT NOT NULL DEFAULT '[]',
       created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
       ended_at INTEGER
     )
   `);

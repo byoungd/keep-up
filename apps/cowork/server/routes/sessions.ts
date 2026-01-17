@@ -44,6 +44,7 @@ export function createSessionRoutes(deps: SessionRouteDeps) {
         id: connector.id ?? crypto.randomUUID(),
       })),
       createdAt: Date.now(),
+      updatedAt: Date.now(),
       title: title ?? deriveSessionTitle(grants),
     };
 

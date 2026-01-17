@@ -1,4 +1,10 @@
-import type { CoworkProject, CoworkSession, CoworkTask } from "@ku0/agent-runtime";
+import type {
+  CoworkConnectorGrant,
+  CoworkFolderGrant,
+  CoworkProject,
+  CoworkSession,
+  CoworkTask,
+} from "@ku0/agent-runtime";
 import type {
   AgentStateCheckpointStoreLike,
   ApprovalStoreLike,
@@ -46,6 +52,7 @@ async function ensureSchema(db: D1Database): Promise<void> {
         grants TEXT NOT NULL DEFAULT '[]',
         connectors TEXT NOT NULL DEFAULT '[]',
         created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
         ended_at INTEGER
       )
     `,
@@ -213,9 +220,10 @@ function rowToSession(row: Record<string, unknown>): CoworkSession {
     deviceId: String(row.device_id),
     platform: row.platform as CoworkSession["platform"],
     mode: row.mode as CoworkSession["mode"],
-    grants: parseJsonArray<CoworkSession["grants"][number]>(row.grants),
-    connectors: parseJsonArray<CoworkSession["connectors"][number]>(row.connectors),
+    grants: parseJsonArray<CoworkFolderGrant>(row.grants),
+    connectors: parseJsonArray<CoworkConnectorGrant>(row.connectors),
     createdAt: Number(row.created_at),
+    updatedAt: Number(row.updated_at),
   };
 }
 
@@ -298,8 +306,8 @@ async function createD1SessionStore(db: D1Database): Promise<SessionStoreLike> {
       await prepare(
         db,
         `INSERT INTO sessions
-          (session_id, user_id, device_id, platform, mode, grants, connectors, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          (session_id, user_id, device_id, platform, mode, grants, connectors, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           session.sessionId,
           session.userId,
@@ -309,6 +317,7 @@ async function createD1SessionStore(db: D1Database): Promise<SessionStoreLike> {
           JSON.stringify(session.grants ?? []),
           JSON.stringify(session.connectors ?? []),
           session.createdAt,
+          session.updatedAt || session.createdAt,
         ]
       ).run();
       return session;
@@ -328,7 +337,7 @@ async function createD1SessionStore(db: D1Database): Promise<SessionStoreLike> {
       await prepare(
         db,
         `UPDATE sessions
-          SET user_id = ?, device_id = ?, platform = ?, mode = ?, grants = ?, connectors = ?, ended_at = ?
+          SET user_id = ?, device_id = ?, platform = ?, mode = ?, grants = ?, connectors = ?, updated_at = ?, ended_at = ?
           WHERE session_id = ?`,
         [
           updated.userId,
@@ -337,6 +346,7 @@ async function createD1SessionStore(db: D1Database): Promise<SessionStoreLike> {
           updated.mode,
           JSON.stringify(updated.grants ?? []),
           JSON.stringify(updated.connectors ?? []),
+          Date.now(),
           updated.endedAt || null,
           updated.sessionId,
         ]

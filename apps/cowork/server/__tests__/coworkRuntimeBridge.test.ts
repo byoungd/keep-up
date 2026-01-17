@@ -30,6 +30,7 @@ function createSession(): CoworkSession {
     ],
     connectors: [],
     createdAt: Date.now(),
+    updatedAt: Date.now(),
   };
 }
 

@@ -105,7 +105,10 @@ export class CoworkTaskRuntime {
       createdAt: now,
       updatedAt: now,
     };
-    await this.enqueueTaskWrite(() => this.storage.taskStore.create(task));
+    await this.enqueueTaskWrite(async () => {
+      await this.storage.taskStore.create(task);
+      await this.touchSession(session.sessionId);
+    });
     this.events.publish(session.sessionId, COWORK_EVENTS.TASK_CREATED, {
       taskId,
       status: task.status,
@@ -328,7 +331,7 @@ export class CoworkTaskRuntime {
       outputArtifacts.length > 0 ? null : (fallbackContent ?? reportContent)
     );
     if (content) {
-      await this.persistArtifact(runtime.sessionId, {
+      const { updatedAt } = await this.persistArtifact(runtime.sessionId, {
         artifactId: `summary-${taskId}`,
         artifact: { type: "markdown", content },
         taskId,
@@ -338,10 +341,11 @@ export class CoworkTaskRuntime {
         id: `summary-${taskId}`,
         artifact: { type: "markdown", content },
         taskId: taskId,
+        updatedAt,
       });
     }
     for (const artifact of outputArtifacts) {
-      await this.persistArtifact(runtime.sessionId, {
+      const { updatedAt } = await this.persistArtifact(runtime.sessionId, {
         artifactId: artifact.id,
         artifact: artifact.artifact,
         taskId,
@@ -351,6 +355,7 @@ export class CoworkTaskRuntime {
       this.events.publish(runtime.sessionId, COWORK_EVENTS.AGENT_ARTIFACT, {
         ...artifact,
         taskId: taskId,
+        updatedAt,
       });
     }
   }
@@ -532,8 +537,8 @@ export class CoworkTaskRuntime {
       title?: string;
       sourcePath?: string;
     }
-  ): Promise<void> {
-    await this.enqueueTaskWrite(async () => {
+  ): Promise<{ updatedAt: number }> {
+    return await this.enqueueTaskWrite(async () => {
       const existing = await this.storage.artifactStore.getById(data.artifactId);
       const now = Date.now();
       const record = {
@@ -548,7 +553,13 @@ export class CoworkTaskRuntime {
         updatedAt: now,
       };
       await this.storage.artifactStore.upsert(record);
+      await this.touchSession(sessionId);
+      return { updatedAt: now };
     });
+  }
+
+  private async touchSession(sessionId: string): Promise<void> {
+    await this.storage.sessionStore.update(sessionId, (s) => s);
   }
 
   private async waitForApprovalDecision(

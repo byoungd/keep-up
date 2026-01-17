@@ -64,6 +64,7 @@ export class CoworkSessionManager {
       grants: seed.grants,
       connectors: seed.connectors,
       createdAt: Date.now(),
+      updatedAt: Date.now(),
       expiresAt: seed.expiresAt,
     };
 

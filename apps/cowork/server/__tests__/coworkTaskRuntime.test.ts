@@ -52,6 +52,7 @@ function createSession(rootPath: string): CoworkSession {
     ],
     connectors: [],
     createdAt: Date.now(),
+    updatedAt: Date.now(),
   };
 }
 

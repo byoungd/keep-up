@@ -118,4 +118,5 @@ export interface TaskGraph {
   nodes: TaskNode[];
   artifacts: Record<string, ArtifactPayload & { updatedAt?: number; taskId?: string }>; // map of artifactId -> payload with versioning and task association
   pendingApprovalId?: string;
+  savedAt?: number;
 }

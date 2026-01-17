@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   type CoworkApproval,
   type CoworkArtifact,
+  getSession,
   listApprovals,
   listSessionArtifacts,
   listTasks,
@@ -230,7 +231,8 @@ export function useTaskStream(sessionId: string) {
         return;
       }
       try {
-        const [tasks, approvals, artifacts] = await Promise.all([
+        const [session, tasks, approvals, artifacts] = await Promise.all([
+          getSession(sessionId),
           listTasks(sessionId),
           listApprovals(sessionId),
           listSessionArtifacts(sessionId),
@@ -239,16 +241,22 @@ export function useTaskStream(sessionId: string) {
           return;
         }
 
-        setGraph((prev) =>
-          deriveInitialState(
-            prev,
+        const cached = loadGraphFromStorage(sessionId);
+        const isCacheStale = cached && session.updatedAt > (cached.savedAt ?? 0);
+
+        setGraph((prev) => {
+          const base = isCacheStale
+            ? { sessionId, status: TaskStatus.PLANNING, nodes: [], artifacts: {} }
+            : prev;
+          return deriveInitialState(
+            base,
             tasks,
             approvals,
             artifacts,
             taskTitleRef.current,
             taskPromptRef.current
-          )
-        );
+          );
+        });
       } catch (error) {
         if (!isActiveRef || isActiveRef.current) {
           console.error("Failed to load session state", error);
@@ -536,7 +544,7 @@ export function useTaskStream(sessionId: string) {
       return prev;
     }
 
-    const eventTime = new Date(now).getTime();
+    const eventTime = typeof data.updatedAt === "number" ? data.updatedAt : new Date(now).getTime();
     const existing = prev.artifacts[data.id];
 
     // Version check: only update if newer than current artifact

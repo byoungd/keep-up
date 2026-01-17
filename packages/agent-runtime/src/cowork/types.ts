@@ -16,6 +16,7 @@ export interface CoworkSession {
   grants: CoworkFolderGrant[];
   connectors: CoworkConnectorGrant[];
   createdAt: number;
+  updatedAt: number;
   expiresAt?: number;
   endedAt?: number;
   title?: string;

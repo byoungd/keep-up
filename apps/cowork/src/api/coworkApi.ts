@@ -138,6 +138,14 @@ export async function createSession(payload: CreateSessionPayload): Promise<Cowo
   return data.session;
 }
 
+export async function getSession(sessionId: string): Promise<CoworkSession> {
+  const data = await fetchJson<ApiResult<unknown>>(`/api/sessions/${sessionId}`);
+  if (!data.session) {
+    throw new Error("Session not found");
+  }
+  return data.session;
+}
+
 export async function listTasks(sessionId: string): Promise<CoworkTask[]> {
   const data = await fetchJson<ApiResult<unknown>>(`/api/sessions/${sessionId}/tasks`);
   return data.tasks ?? [];
