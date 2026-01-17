@@ -5,9 +5,10 @@
  * Supports spawning, parallel execution, and status tracking.
  */
 
-import type { AgentEvents, RuntimeEventBus } from "../events/eventBus";
+import { type AgentEvents, createScopedEventBus, type RuntimeEventBus } from "../events";
 import { type AgentOrchestrator, createOrchestrator } from "../orchestrator/orchestrator";
 import { createSecurityPolicy } from "../security";
+import { createSessionState, type SessionState } from "../session";
 import type { TelemetryContext } from "../telemetry";
 import type { IToolRegistry } from "../tools/mcp/registry";
 import type { SecurityPolicy } from "../types";
@@ -60,6 +61,7 @@ interface RunningAgent {
   status: AgentStatus;
   startTime: number;
   promise?: Promise<AgentResult>;
+  viewContextId?: string;
 }
 
 // ============================================================================
@@ -75,6 +77,7 @@ export class AgentManager implements IAgentManager {
   private agentCounter = 0;
   private totalSpawnedCount = 0;
   private telemetry?: TelemetryContext;
+  private readonly contextManager?: AgentManagerConfig["contextManager"];
 
   constructor(config: AgentManagerConfig, telemetry?: TelemetryContext) {
     this.config = config;
@@ -82,38 +85,25 @@ export class AgentManager implements IAgentManager {
     this.maxDepth = config.maxDepth ?? DEFAULT_MAX_DEPTH;
     this.maxTotalAgents = config.maxTotalAgents ?? DEFAULT_MAX_TOTAL_AGENTS;
     this.eventBus = config.eventBus;
+    this.contextManager = config.contextManager;
   }
 
   /**
    * Spawn a specialized agent.
    */
   async spawn(options: SpawnAgentOptions): Promise<AgentResult> {
-    // Check abort signal
-    if (options.signal?.aborted) {
-      throw new AgentLimitError("ABORTED", "Agent spawn aborted");
-    }
-
-    // Check recursion depth
-    const currentDepth = options._depth ?? 0;
-    if (currentDepth >= this.maxDepth) {
-      throw new AgentLimitError(
-        "MAX_DEPTH_EXCEEDED",
-        `Maximum agent recursion depth (${this.maxDepth}) exceeded. This prevents infinite agent spawning loops.`
-      );
-    }
-
-    // Check total agents limit
-    if (this.totalSpawnedCount >= this.maxTotalAgents) {
-      throw new AgentLimitError(
-        "MAX_AGENTS_EXCEEDED",
-        `Maximum total agents (${this.maxTotalAgents}) exceeded. This prevents runaway agent creation.`
-      );
-    }
-
-    this.totalSpawnedCount++;
+    this.assertSpawnAllowed(options);
     const agentId = this.generateAgentId(options.type);
     const profile = getAgentProfile(options.type);
     const allowedTools = this.resolveAllowedTools(profile.allowedTools, options.allowedTools);
+    const scopedEventBus = this.eventBus
+      ? createScopedEventBus(this.eventBus, {
+          agentId,
+          parentId: options.parentTraceId,
+          source: "agent-manager",
+        })
+      : undefined;
+    const { sessionState, viewContextId } = this.buildSessionState(options);
 
     this.emitAgentEvent(
       "agent:spawned",
@@ -126,7 +116,13 @@ export class AgentManager implements IAgentManager {
     );
 
     // Create orchestrator with profile settings
-    const orchestrator = this.createAgentOrchestrator(profile, options, allowedTools);
+    const orchestrator = this.createAgentOrchestrator(
+      profile,
+      options,
+      allowedTools,
+      scopedEventBus,
+      sessionState
+    );
 
     // Track the running agent
     const runningAgent: RunningAgent = {
@@ -135,6 +131,7 @@ export class AgentManager implements IAgentManager {
       orchestrator,
       status: "running",
       startTime: Date.now(),
+      viewContextId,
     };
 
     this.runningAgents.set(agentId, runningAgent);
@@ -182,6 +179,10 @@ export class AgentManager implements IAgentManager {
         durationMs: Date.now() - runningAgent.startTime,
       };
     } finally {
+      scopedEventBus?.dispose();
+      if (viewContextId && this.contextManager) {
+        this.contextManager.disposeView(viewContextId, true);
+      }
       // Cleanup after completion (keep for a short time for status queries)
       setTimeout(() => {
         this.runningAgents.delete(agentId);
@@ -296,10 +297,35 @@ export class AgentManager implements IAgentManager {
     return `${type}-${this.agentCounter}-${Date.now().toString(36)}`;
   }
 
+  private assertSpawnAllowed(options: SpawnAgentOptions): void {
+    if (options.signal?.aborted) {
+      throw new AgentLimitError("ABORTED", "Agent spawn aborted");
+    }
+
+    const currentDepth = options._depth ?? 0;
+    if (currentDepth >= this.maxDepth) {
+      throw new AgentLimitError(
+        "MAX_DEPTH_EXCEEDED",
+        `Maximum agent recursion depth (${this.maxDepth}) exceeded. This prevents infinite agent spawning loops.`
+      );
+    }
+
+    if (this.totalSpawnedCount >= this.maxTotalAgents) {
+      throw new AgentLimitError(
+        "MAX_AGENTS_EXCEEDED",
+        `Maximum total agents (${this.maxTotalAgents}) exceeded. This prevents runaway agent creation.`
+      );
+    }
+
+    this.totalSpawnedCount++;
+  }
+
   private createAgentOrchestrator(
     profile: AgentProfile,
     options: SpawnAgentOptions,
-    allowedTools: string[]
+    allowedTools: string[],
+    eventBus?: RuntimeEventBus,
+    sessionState?: SessionState
   ): AgentOrchestrator {
     // Determine security policy
     const security: SecurityPolicy =
@@ -317,7 +343,46 @@ export class AgentManager implements IAgentManager {
       maxTurns: options.maxTurns ?? profile.maxTurns,
       requireConfirmation: profile.requireConfirmation,
       telemetry: this.telemetry,
+      eventBus,
+      components: sessionState ? { sessionState } : undefined,
     });
+  }
+
+  private buildSessionState(options: SpawnAgentOptions): {
+    sessionState?: SessionState;
+    viewContextId?: string;
+  } {
+    if (!this.contextManager) {
+      return {};
+    }
+
+    if (options.contextId) {
+      return {
+        sessionState: createSessionState({
+          contextManager: this.contextManager,
+          contextId: options.contextId,
+        }),
+      };
+    }
+
+    if (options.parentContextId) {
+      const view = this.contextManager.createView(options.parentContextId);
+      return {
+        sessionState: createSessionState({
+          contextManager: this.contextManager,
+          contextId: view.id,
+        }),
+        viewContextId: view.id,
+      };
+    }
+
+    const context = this.contextManager.create({ parentId: undefined });
+    return {
+      sessionState: createSessionState({
+        contextManager: this.contextManager,
+        contextId: context.id,
+      }),
+    };
   }
 
   private createFilteredRegistry(allowedTools: string[]): IToolRegistry {

@@ -93,7 +93,7 @@ describeIf("BrowserToolServer (e2e)", () => {
     if (server) {
       await new Promise<void>((resolve) => server?.close(() => resolve()));
     }
-  });
+  }, 30_000);
 
   it("navigates, snapshots, and interacts using accessibility refs", async () => {
     const context = createContext();

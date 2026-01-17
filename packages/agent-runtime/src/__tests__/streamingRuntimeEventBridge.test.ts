@@ -119,4 +119,46 @@ describe("RuntimeEventStreamBridge", () => {
     );
     expect(progressChunk?.data).toEqual(expect.objectContaining({ message: "Searching..." }));
   });
+
+  it("streams subagent execution events with nested metadata", async () => {
+    const eventBus = createEventBus();
+    const childBus = createEventBus();
+    const writer = createStreamWriter("stream-bridge");
+    attachRuntimeEventStreamBridge({ eventBus, stream: writer, correlationId: "parent-1" });
+
+    const innerEvent = childBus.emit(
+      "execution:record",
+      {
+        toolCallId: "call-1",
+        toolName: "bash",
+        status: "started",
+        durationMs: 0,
+        sandboxed: true,
+      },
+      { correlationId: "child-1", source: "child-agent" }
+    );
+
+    eventBus.emit(
+      "subagent:event",
+      {
+        agentId: "agent-1",
+        parentId: "parent-1",
+        event: innerEvent,
+      },
+      { correlationId: "parent-1", source: "parent-agent" }
+    );
+
+    writer.close();
+
+    const chunks = await collectStream(writer);
+    const subagentMetadata = chunks.find(
+      (chunk) => chunk.type === "metadata" && chunk.data.key === "subagent:event"
+    );
+    const progressChunk = chunks.find((chunk) => chunk.type === "progress");
+
+    expect(subagentMetadata).toBeDefined();
+    expect(progressChunk?.data.message).toContain("Subagent agent-1:");
+
+    childBus.dispose();
+  });
 });

@@ -198,6 +198,17 @@ export interface ExecutionEvents {
   "execution:record": ToolExecutionRecord;
 }
 
+/** Subagent event forwarding */
+export interface SubagentEventPayload {
+  agentId: string;
+  parentId?: string;
+  event: RuntimeEvent;
+}
+
+export interface SubagentEvents {
+  "subagent:event": SubagentEventPayload;
+}
+
 /** Artifact lifecycle events */
 export interface ArtifactEvents {
   "artifact:emitted": {
@@ -221,6 +232,7 @@ export interface RuntimeEventMap
     PluginEvents,
     SystemEvents,
     ExecutionEvents,
+    SubagentEvents,
     ArtifactEvents {
   // Allow custom events with string index
   [key: string]: unknown;

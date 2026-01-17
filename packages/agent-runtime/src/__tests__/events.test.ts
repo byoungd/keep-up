@@ -3,7 +3,13 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createEventBus, type EventBus, getGlobalEventBus, resetGlobalEventBus } from "../events";
+import {
+  createEventBus,
+  createScopedEventBus,
+  type EventBus,
+  getGlobalEventBus,
+  resetGlobalEventBus,
+} from "../events";
 
 describe("EventBus", () => {
   let eventBus: EventBus;
@@ -374,6 +380,41 @@ describe("EventBus", () => {
           payload: { foo: "bar" },
         })
       );
+    });
+  });
+
+  describe("scoped event bus", () => {
+    it("should forward child events as subagent:event", () => {
+      const parentBus = createEventBus();
+      const scoped = createScopedEventBus(parentBus, {
+        agentId: "agent-1",
+        parentId: "parent-1",
+      });
+      const handler = vi.fn();
+      parentBus.subscribe("subagent:event", handler);
+
+      scoped.emit("execution:record", {
+        toolCallId: "call-1",
+        toolName: "bash",
+        status: "started",
+        durationMs: 0,
+        sandboxed: true,
+      });
+
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(handler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          meta: expect.objectContaining({ correlationId: "parent-1" }),
+          payload: expect.objectContaining({
+            agentId: "agent-1",
+            parentId: "parent-1",
+            event: expect.objectContaining({ type: "execution:record" }),
+          }),
+        })
+      );
+
+      scoped.dispose();
+      parentBus.dispose();
     });
   });
 });
