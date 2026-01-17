@@ -413,7 +413,15 @@ export class CoworkTaskRuntime {
     runtimeState.unsubscribeOrchestrator = runtime.orchestrator.on((event) => {
       runtimeState.eventQueue = runtimeState.eventQueue
         .then(() =>
-          this.taskOrchestrator.handleOrchestratorEvent(sessionId, runtimeState.activeTaskId, event)
+          this.taskOrchestrator.handleOrchestratorEvent(
+            sessionId,
+            runtimeState.activeTaskId,
+            event,
+            {
+              modelId: runtimeState.modelId ?? undefined,
+              providerId: runtimeState.providerId ?? undefined,
+            }
+          )
         )
         .catch((err) => this.logger.error("Orchestrator event error", err));
     });
