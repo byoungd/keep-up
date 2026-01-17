@@ -22,7 +22,7 @@ export function useChatSession(sessionId: string | undefined) {
   const [error, setError] = useState<string | null>(null);
 
   // Subscribe to the real-time task stream
-  const { graph, isConnected } = useTaskStream(sessionId ?? "");
+  const { graph, isConnected, isLive } = useTaskStream(sessionId ?? "");
 
   // Load initial chat history
   useEffect(() => {
@@ -288,6 +288,7 @@ export function useChatSession(sessionId: string | undefined) {
     isSending,
     isLoading: isLoadingHistory || isSending,
     isConnected,
+    isLive,
     error,
     workspace,
     session,

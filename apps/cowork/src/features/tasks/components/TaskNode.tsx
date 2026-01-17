@@ -169,7 +169,7 @@ function ToolCallNodeDisplay({ node }: { node: TaskNode & { type: "tool_call" } 
             </svg>
           </div>
           <span className="font-black font-mono tracking-tight uppercase">
-            call:{node.toolName}
+            {node.activityLabel ? `${node.activityLabel}...` : `call:${node.toolName}`}
           </span>
         </div>
         {node.riskLevel && (
@@ -217,7 +217,12 @@ function ToolOutputDisplay({ node }: { node: TaskNode & { type: "tool_output" } 
           </svg>
         </div>
         <span className="font-black text-[10px] uppercase tracking-widest">
-          {node.isError ? "Failure Response" : "Success Execution"}
+          {node.activityLabel
+            ? node.activityLabel
+            : node.isError
+              ? "Failure Response"
+              : "Success Execution"}
+          {node.activityLabel && (node.isError ? " Failed" : " Complete")}
         </span>
       </div>
       <div className="opacity-90 font-mono text-[10px] bg-black/5 dark:bg-white/5 p-2 rounded-lg border border-black/5 overflow-hidden">

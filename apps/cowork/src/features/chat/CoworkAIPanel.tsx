@@ -1,4 +1,5 @@
 "use client";
+import { useMemo } from "react";
 
 import { AIPanel as ShellAIPanel, useReaderShell } from "@ku0/shell";
 import type { ArtifactItem } from "@ku0/shell";
@@ -34,18 +35,39 @@ export function CoworkAIPanel({ onClose, onPreviewArtifact }: CoworkAIPanelProps
     onFileChange,
     statusMessage,
     isConnected,
+    isLive,
     tasks,
   } = ctrl;
   const panelPosition = aiPanel.position;
 
   // Connection status indicator
-  const connectionStatus =
-    !isConnected && messages.length > 0 ? (
-      <div className="text-[11px] font-medium text-amber-600 flex items-center gap-2 px-2 py-1.5 rounded-lg bg-amber-500/5 border border-amber-500/10">
-        <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-        Reconnecting...
-      </div>
-    ) : null;
+  const connectionStatus = useMemo(() => {
+    if (!isConnected && messages.length > 0) {
+      return (
+        <div className="text-[11px] font-medium text-amber-600 flex items-center gap-2 px-2 py-1.5 rounded-lg bg-amber-500/5 border border-amber-500/10">
+          <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+          Reconnecting...
+        </div>
+      );
+    }
+    if (isConnected && !isLive && messages.length > 0) {
+      return (
+        <div className="text-[11px] font-medium text-amber-600 flex items-center gap-2 px-2 py-1.5 rounded-lg bg-amber-500/5 border border-amber-500/10">
+          <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+          Connection Stalled
+        </div>
+      );
+    }
+    if (isConnected && isLive && messages.length > 0) {
+      return (
+        <div className="text-[11px] font-medium text-emerald-600 flex items-center gap-2 px-2 py-1.5 rounded-lg bg-emerald-500/5 border border-emerald-500/10">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          Live
+        </div>
+      );
+    }
+    return null;
+  }, [isConnected, isLive, messages.length]);
 
   const contextStatus = statusMessage ? (
     <div className="text-[11px] font-medium text-destructive flex items-center gap-2 px-2 py-1.5 rounded-lg bg-destructive/5 border border-destructive/10">

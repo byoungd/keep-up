@@ -77,6 +77,6 @@ export function formatToolActivityMessage(
 function tokenizeToolName(toolName: string): string[] {
   return toolName
     .toLowerCase()
-    .split(/[:._/-]+/)
+    .split(/[:._/\\-]+/)
     .filter(Boolean);
 }

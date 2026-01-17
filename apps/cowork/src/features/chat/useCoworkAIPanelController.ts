@@ -28,7 +28,7 @@ export function useCoworkAIPanelController() {
   const pendingMessageRef = useRef<{ content: string; mode: "chat" | "task" } | null>(null);
 
   // Use unified session hook
-  const { messages, sendMessage, sendAction, isSending, isLoading, isConnected } =
+  const { messages, sendMessage, sendAction, isSending, isLoading, isConnected, isLive } =
     useChatSession(sessionId);
 
   // Helper to ensure we have a valid session before sending
@@ -201,6 +201,7 @@ export function useCoworkAIPanelController() {
     },
     statusMessage,
     isConnected,
+    isLive,
     // Tasks are now embedded in messages, but we can extract them if the UI needs a separate list
     tasks: [], // Deprecated in favor of inline task cards
   };
