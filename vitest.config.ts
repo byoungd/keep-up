@@ -60,10 +60,6 @@ const aliases = [
   { find: "@ku0/ai-core", replacement: path.resolve(__dirname, "packages/ai-core/src/index.ts") },
   { find: "@ku0/app", replacement: path.resolve(__dirname, "packages/app/src/index.ts") },
   { find: "@ku0/bench", replacement: path.resolve(__dirname, "packages/bench/src/index.ts") },
-  {
-    find: "@ku0/collab-server-lib",
-    replacement: path.resolve(__dirname, "packages/collab-server/src/index.ts"),
-  },
   { find: "@ku0/compat", replacement: path.resolve(__dirname, "packages/compat/src/index.ts") },
   {
     find: "@ku0/conformance-kit",
@@ -135,22 +131,6 @@ export default defineConfig({
           ],
           exclude: defaultExclude,
           environment: "node",
-          server: {
-            deps: {
-              inline: [/@ku0\/.*/],
-            },
-          },
-        },
-      }),
-      defineProject({
-        resolve: {
-          alias: aliases,
-        },
-        test: {
-          name: "collab-server",
-          include: ["packages/collab-server/src/**/*.test.ts"],
-          exclude: defaultExclude,
-          globals: true,
           server: {
             deps: {
               inline: [/@ku0\/.*/],

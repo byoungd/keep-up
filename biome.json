@@ -99,8 +99,7 @@
       "!*.min.js",
       "!pnpm-lock.yaml",
       "!pnpm-lock.yaml",
-      "!packages/mdvp-wasm/pkg",
-      "!packages/collab-server"
+      "!packages/mdvp-wasm/pkg"
     ]
   },
   "overrides": [
