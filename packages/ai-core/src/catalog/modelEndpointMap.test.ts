@@ -15,6 +15,7 @@ const PROVIDER_PATHS: Record<ProviderKind, { chatPath: string; isOpenAIStyle: bo
   xai: { chatPath: "/v1/chat/completions", isOpenAIStyle: true },
   zai: { chatPath: "/v1/chat/completions", isOpenAIStyle: true },
   stealth: { chatPath: "/v1/chat/completions", isOpenAIStyle: true },
+  ollama: { chatPath: "/v1/chat/completions", isOpenAIStyle: true },
 };
 
 describe("model endpoint mapping", () => {

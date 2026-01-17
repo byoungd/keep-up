@@ -1,7 +1,7 @@
 import type { TaskType } from "@ku0/agent-runtime";
 import { getModelCapability } from "@ku0/ai-core";
 
-export type ProviderId = "openai" | "anthropic" | "gemini";
+export type ProviderId = "openai" | "anthropic" | "gemini" | "deepseek" | "ollama";
 
 export interface SmartRouterConfig {
   costOptimizationLevel: 0 | 1 | 2;
@@ -134,6 +134,12 @@ function resolveProviderFromModel(modelId: string): ProviderId | null {
   if (capability?.provider === "claude") {
     return "anthropic";
   }
+  if (capability?.provider === "deepseek") {
+    return "deepseek";
+  }
+  if (capability?.provider === "ollama") {
+    return "ollama";
+  }
 
   const lower = modelId.toLowerCase();
   if (lower.includes("claude")) {
@@ -141,6 +147,12 @@ function resolveProviderFromModel(modelId: string): ProviderId | null {
   }
   if (lower.includes("gemini")) {
     return "gemini";
+  }
+  if (lower.includes("deepseek")) {
+    return "deepseek";
+  }
+  if (lower.includes("llama") || lower.includes("mistral") || lower.includes("phi")) {
+    return "ollama";
   }
   if (
     lower.includes("gpt") ||

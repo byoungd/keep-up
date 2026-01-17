@@ -129,6 +129,10 @@ const PROVIDER_ACCENTS: Record<ModelCapability["provider"], { chip: string; icon
     chip: "bg-surface-2/80 border border-border/60 shadow-sm",
     icon: "text-foreground/80",
   },
+  ollama: {
+    chip: "bg-surface-2/80 border border-border/60 shadow-sm",
+    icon: "text-foreground/80",
+  },
 };
 
 const PROVIDER_ICONS: Record<ModelCapability["provider"], ProviderIcon> = {
@@ -143,6 +147,7 @@ const PROVIDER_ICONS: Record<ModelCapability["provider"], ProviderIcon> = {
   xai: XAIIcon,
   zai: ZAIIcon,
   stealth: StealthIcon,
+  ollama: OpenAIIcon, // Use OpenAI icon as fallback for Ollama
 };
 
 const PROVIDER_TO_MODEL_PROVIDER: Record<ProviderFilter, ModelCapability["provider"] | null> = {
@@ -296,6 +301,7 @@ export function ModelSelector({
       xai: t("modelProviderXAI"),
       zai: t("modelProviderZAI"),
       stealth: t("modelProviderStealth"),
+      ollama: "Ollama",
     }),
     [t]
   );

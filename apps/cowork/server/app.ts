@@ -13,6 +13,7 @@ import { createCostRoutes } from "./routes/cost";
 import { createPipelineRoutes } from "./routes/pipelines";
 import { createPreflightRoutes } from "./routes/preflight";
 import { createProjectRoutes } from "./routes/projects";
+import { createProviderRoutes } from "./routes/providers";
 import { createSessionRoutes } from "./routes/sessions";
 import { createSettingsRoutes } from "./routes/settings";
 import { createStreamRoutes } from "./routes/stream";
@@ -100,6 +101,13 @@ export function createCoworkApp(deps: CoworkAppDeps) {
     "/api",
     createStreamRoutes({
       events: eventHub,
+    })
+  );
+
+  app.route(
+    "/api",
+    createProviderRoutes({
+      providerKeys,
     })
   );
 

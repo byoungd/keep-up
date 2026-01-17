@@ -9,7 +9,8 @@ export type ProviderKind =
   | "moonshot"
   | "xai"
   | "zai"
-  | "stealth";
+  | "stealth"
+  | "ollama";
 
 export type ModelPricing = {
   /** Price per 1 million input tokens in USD */

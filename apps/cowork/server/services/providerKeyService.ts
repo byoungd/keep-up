@@ -22,11 +22,16 @@ const TAG_BYTES = 16;
 const ENVELOPE_PREFIX = "v1:";
 const CIPHER_ALGORITHM = "aes-256-gcm";
 
-const PROVIDER_IDS: CoworkProviderId[] = ["openai", "anthropic", "gemini"];
-const PROVIDER_ENV_MAP: Record<CoworkProviderId, "openai" | "claude" | "gemini"> = {
+const PROVIDER_IDS: CoworkProviderId[] = ["openai", "anthropic", "gemini", "ollama", "deepseek"];
+const PROVIDER_ENV_MAP: Record<
+  CoworkProviderId,
+  "openai" | "claude" | "gemini" | "ollama" | "deepseek"
+> = {
   openai: "openai",
   anthropic: "claude",
   gemini: "gemini",
+  ollama: "ollama",
+  deepseek: "deepseek",
 };
 
 export type ProviderKeyStatus = {

@@ -231,6 +231,22 @@ export const PROVIDER_CATALOG: ProviderMetadata[] = [
       icon: "stealth",
     },
   },
+  {
+    id: "ollama",
+    env: {
+      protocol: "openai-compatible",
+      apiKeyEnvVars: [], // Ollama requires no API key
+      baseUrlEnvVars: ["OLLAMA_BASE_URL", "OLLAMA_HOST"],
+      defaultBaseUrl: "http://localhost:11434/v1",
+    },
+    display: {
+      name: "Ollama",
+      shortName: "Ollama",
+      description: "Local inference with open models",
+      accentColor: "#FFFFFF",
+      icon: "ollama",
+    },
+  },
 ];
 
 // ============================================================================
