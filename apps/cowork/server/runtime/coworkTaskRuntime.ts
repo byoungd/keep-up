@@ -1,5 +1,5 @@
-import { readFile, stat } from "node:fs/promises";
-import { basename, extname } from "node:path";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { basename, extname, join } from "node:path";
 import {
   AgentModeManager,
   type ConfirmationRequest,
@@ -252,7 +252,8 @@ export class CoworkTaskRuntime {
 
     try {
       // Try to read existing AGENTS.md from .cowork directory
-      const agentsMdPath = `${rootPath}/.cowork/AGENTS.md`;
+      const agentsDir = join(rootPath, ".cowork");
+      const agentsMdPath = join(agentsDir, "AGENTS.md");
       try {
         const content = await readFile(agentsMdPath, "utf-8");
         return truncateToTokenBudget(content, DEFAULT_PROJECT_CONTEXT_TOKEN_BUDGET);
@@ -264,6 +265,8 @@ export class CoworkTaskRuntime {
       const analysis = await analyzeProject(rootPath, { maxDepth: 2 });
       const context = createProjectContext(analysis);
       const content = generateAgentsMd(context, { includePatterns: false });
+      await mkdir(agentsDir, { recursive: true });
+      await writeFile(agentsMdPath, content, "utf-8");
       return truncateToTokenBudget(content, DEFAULT_PROJECT_CONTEXT_TOKEN_BUDGET);
     } catch (error) {
       this.logger.warn("Failed to load project context", error);
