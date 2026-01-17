@@ -71,7 +71,7 @@ by executing ten parallel tracks with clear dependencies and acceptance gates.
     - Doc: `docs/roadmap/cowork-track-14-multi-agent-orchestration.md`
     - Output: role-based subagents, delegation, aggregated summaries
     - Inspiration: Claude Code planner/implementer/reviewer split
-    - Status: Not Started
+    - Status: 🛑 SUPERSEDED by Track 15 (Phase F)
 
 ## Phase E Trend Drivers (Why These Tracks)
 - Context indexing and retrieval are now baseline in top IDE agents (Cursor, OpenCode).
