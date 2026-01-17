@@ -1,6 +1,7 @@
 import type { Message } from "@ku0/shell";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  type ChatAttachmentRef,
   createTask,
   editChatMessage,
   getChatHistory,
@@ -49,7 +50,10 @@ export function useChatSession(sessionId: string | undefined) {
           modelId: msg.modelId,
           providerId: msg.providerId,
           fallbackNotice: msg.fallbackNotice,
-          metadata: msg.metadata ?? {},
+          metadata: {
+            ...(msg.metadata ?? {}),
+            ...(msg.attachments ? { attachments: msg.attachments } : {}),
+          },
           requestId:
             typeof msg.metadata?.requestId === "string" ? msg.metadata.requestId : undefined,
         }));
@@ -80,8 +84,11 @@ export function useChatSession(sessionId: string | undefined) {
   }, [graph, historyMessages]);
 
   const addOptimisticMessage = useCallback(
-    (content: string, tempId: string, requestId?: string) => {
-      const metadata = requestId ? { requestId } : undefined;
+    (content: string, tempId: string, requestId?: string, attachments?: ChatAttachmentRef[]) => {
+      const metadata = {
+        ...(requestId ? { requestId } : {}),
+        ...(attachments && attachments.length > 0 ? { attachments } : {}),
+      };
       const optimisticMsg: Message = {
         id: tempId,
         role: "user",
@@ -90,7 +97,7 @@ export function useChatSession(sessionId: string | undefined) {
         status: "pending",
         type: "text",
         requestId,
-        metadata,
+        metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
       };
       setHistoryMessages((prev) => [...prev, optimisticMsg]);
     },
@@ -156,7 +163,8 @@ export function useChatSession(sessionId: string | undefined) {
       userMessageId: string,
       clientRequestId: string,
       modelId?: string,
-      parentId?: string
+      parentId?: string,
+      attachments?: ChatAttachmentRef[]
     ) => {
       const now = Date.now();
       const assistantId = `assistant-${clientRequestId}`;
@@ -197,7 +205,7 @@ export function useChatSession(sessionId: string | undefined) {
 
       const response = await sendChatMessage(
         sessionId,
-        { content, parentId, clientRequestId, messageId: userMessageId },
+        { content, parentId, clientRequestId, messageId: userMessageId, attachments },
         (chunk) => {
           if (stallTimeout) {
             clearTimeout(stallTimeout);
@@ -291,7 +299,7 @@ export function useChatSession(sessionId: string | undefined) {
     async (
       content: string,
       type: "chat" | "task" = "chat",
-      options?: { modelId?: string; parentId?: string }
+      options?: { modelId?: string; parentId?: string; attachments?: ChatAttachmentRef[] }
     ) => {
       if (!sessionId || !content.trim()) {
         return;
@@ -302,7 +310,7 @@ export function useChatSession(sessionId: string | undefined) {
 
       const clientRequestId = crypto.randomUUID();
       const userMessageId = `user-${clientRequestId}`;
-      addOptimisticMessage(content, userMessageId, clientRequestId);
+      addOptimisticMessage(content, userMessageId, clientRequestId, options?.attachments);
 
       try {
         if (type === "task") {
@@ -315,7 +323,8 @@ export function useChatSession(sessionId: string | undefined) {
             userMessageId,
             clientRequestId,
             options?.modelId,
-            options?.parentId
+            options?.parentId,
+            options?.attachments
           );
         }
       } catch (err) {

@@ -32,6 +32,7 @@ export function CoworkAIPanel({ onClose, onPreviewArtifact }: CoworkAIPanelProps
     onRemoveAttachment,
     fileInputRef,
     onFileChange,
+    isAttachmentBusy,
     statusMessage,
     isConnected,
     isLive,
@@ -213,6 +214,7 @@ export function CoworkAIPanel({ onClose, onPreviewArtifact }: CoworkAIPanelProps
       inputRef={inputRef}
       onFileChange={onFileChange}
       inputTranslations={translations}
+      isAttachmentBusy={isAttachmentBusy}
       contextStatus={contextStatus}
       onPreviewArtifact={onPreviewArtifact}
       tasks={tasks}

@@ -7,13 +7,24 @@ import {
 } from "@ku0/ai-core";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { updateSettings } from "../../api/coworkApi";
+import { type ChatAttachmentRef, updateSettings, uploadChatAttachment } from "../../api/coworkApi";
 import { useWorkspace } from "../../app/providers/WorkspaceProvider";
 import { detectIntent } from "../../lib/intentDetector";
 import { parseSlashCommand } from "../../lib/slashCommands";
 import { useChatSession } from "./hooks/useChatSession";
 import { downloadFile, exportToJson, exportToMarkdown } from "./utils/chatExport";
 import { generateTaskTitle } from "./utils/textUtils";
+
+interface PanelAttachment {
+  id: string;
+  name: string;
+  url: string;
+  type: string;
+  size: number;
+  status: "processing" | "ready" | "sending" | "error";
+  error?: string;
+  previewUrl?: string;
+}
 
 export function useCoworkAIPanelController() {
   const { sessionId } = useParams({ strict: false }) as { sessionId: string };
@@ -25,9 +36,17 @@ export function useCoworkAIPanelController() {
   const [input, setInput] = useState("");
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<PanelAttachment[]>([]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  const pendingMessageRef = useRef<{ content: string; mode: "chat" | "task" } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const pendingMessageRef = useRef<{
+    content: string;
+    mode: "chat" | "task";
+    attachments?: ChatAttachmentRef[];
+  } | null>(null);
+  const pendingAttachmentRef = useRef<FileList | null>(null);
+  const attachmentRefs = useRef(new Map<string, ChatAttachmentRef>());
 
   // Use unified session hook
   const {
@@ -55,18 +74,6 @@ export function useCoworkAIPanelController() {
     },
     [sessionId, activeWorkspaceId, createSessionForPath, createSessionWithoutGrant]
   );
-
-  useEffect(() => {
-    if (!sessionId || sessionId === "undefined") {
-      return;
-    }
-    const pending = pendingMessageRef.current;
-    if (!pending) {
-      return;
-    }
-    pendingMessageRef.current = null;
-    void sendMessage(pending.content, pending.mode, { modelId: model });
-  }, [model, sessionId, sendMessage]);
 
   const resolveMessageMode = useCallback(
     (content: string): { resolvedContent: string; mode: "chat" | "task"; error?: string } => {
@@ -107,8 +114,42 @@ export function useCoworkAIPanelController() {
     [ensureActiveSession]
   );
 
+  const clearAttachments = useCallback(() => {
+    setAttachments((prev) => {
+      for (const att of prev) {
+        if (att.previewUrl) {
+          URL.revokeObjectURL(att.previewUrl);
+        }
+      }
+      return [];
+    });
+    attachmentRefs.current.clear();
+  }, []);
+
+  useEffect(() => {
+    if (!sessionId || sessionId === "undefined") {
+      return;
+    }
+    const pending = pendingMessageRef.current;
+    if (!pending) {
+      return;
+    }
+    pendingMessageRef.current = null;
+    void sendMessage(pending.content, pending.mode, {
+      modelId: model,
+      attachments: pending.attachments,
+    });
+    if (pending.attachments && pending.attachments.length > 0) {
+      clearAttachments();
+    }
+  }, [model, sessionId, sendMessage, clearAttachments]);
+
   const executeMessageSend = useCallback(
-    async (resolvedContent: string, mode: "chat" | "task") => {
+    async (
+      resolvedContent: string,
+      mode: "chat" | "task",
+      nextAttachments: ChatAttachmentRef[]
+    ) => {
       if (mode === "task") {
         setStatusMessage("Initiating task...");
       }
@@ -117,11 +158,45 @@ export function useCoworkAIPanelController() {
         await editMessage(editingMessageId, resolvedContent);
         setEditingMessageId(null);
       } else {
-        await sendMessage(resolvedContent, mode, { modelId: model });
+        await sendMessage(resolvedContent, mode, {
+          modelId: model,
+          attachments: mode === "chat" ? nextAttachments : undefined,
+        });
       }
       setStatusMessage(null);
     },
     [editingMessageId, editMessage, sendMessage, model]
+  );
+
+  const getSendBlocker = useCallback(() => {
+    if (editingMessageId && attachments.length > 0) {
+      return "Attachments are not supported while editing a message.";
+    }
+    if (attachments.some((attachment) => attachment.status === "processing")) {
+      return "Wait for attachments to finish uploading.";
+    }
+    return null;
+  }, [editingMessageId, attachments]);
+
+  const queueSendAfterNavigation = useCallback(
+    async (targetSessionId: string, content: string, mode: "chat" | "task") => {
+      const readyRefs = getReadyAttachmentRefs(attachments, attachmentRefs.current);
+      pendingMessageRef.current = { content, mode, attachments: readyRefs };
+      await navigate({
+        to: "/sessions/$sessionId",
+        params: { sessionId: targetSessionId },
+      });
+    },
+    [attachments, navigate]
+  );
+
+  const sendInSession = useCallback(
+    async (resolvedContent: string, mode: "chat" | "task") => {
+      const readyRefs = getReadyAttachmentRefs(attachments, attachmentRefs.current);
+      await executeMessageSend(resolvedContent, mode, readyRefs);
+      clearAttachments();
+    },
+    [attachments, executeMessageSend, clearAttachments]
   );
 
   const handleSend = useCallback(async () => {
@@ -143,18 +218,20 @@ export function useCoworkAIPanelController() {
         return;
       }
 
-      const targetSessionId = await prepareSession(resolvedContent);
-
-      if (targetSessionId !== sessionId) {
-        pendingMessageRef.current = { content: resolvedContent, mode };
-        await navigate({
-          to: "/sessions/$sessionId",
-          params: { sessionId: targetSessionId },
-        });
+      const blocker = getSendBlocker();
+      if (blocker) {
+        setStatusMessage(blocker);
+        setInput(content);
         return;
       }
 
-      await executeMessageSend(resolvedContent, mode);
+      const targetSessionId = await prepareSession(resolvedContent);
+      if (targetSessionId !== sessionId) {
+        await queueSendAfterNavigation(targetSessionId, resolvedContent, mode);
+        return;
+      }
+
+      await sendInSession(resolvedContent, mode);
     } catch (_err) {
       setInput(content);
       setStatusMessage(
@@ -166,9 +243,10 @@ export function useCoworkAIPanelController() {
     isSending,
     sessionId,
     prepareSession,
-    navigate,
-    executeMessageSend,
     resolveMessageMode,
+    getSendBlocker,
+    queueSendAfterNavigation,
+    sendInSession,
   ]);
 
   const startEditing = useCallback(
@@ -229,6 +307,92 @@ export function useCoworkAIPanelController() {
     inputRef.current?.focus();
   }, []);
 
+  const uploadFiles = useCallback(async (targetSessionId: string, files: FileList) => {
+    const fileArray = Array.from(files);
+    for (const file of fileArray) {
+      const localId = crypto.randomUUID();
+      const previewUrl = URL.createObjectURL(file);
+      setAttachments((prev) => [
+        ...prev,
+        {
+          id: localId,
+          name: file.name,
+          url: previewUrl,
+          type: file.type,
+          size: file.size,
+          status: "processing",
+          previewUrl,
+        },
+      ]);
+
+      try {
+        const ref = await uploadChatAttachment(targetSessionId, file);
+        attachmentRefs.current.set(localId, ref);
+        setAttachments((prev) =>
+          prev.map((att) => (att.id === localId ? { ...att, status: "ready" } : att))
+        );
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Attachment upload failed";
+        setAttachments((prev) =>
+          prev.map((att) =>
+            att.id === localId ? { ...att, status: "error", error: message } : att
+          )
+        );
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!sessionId || sessionId === "undefined") {
+      return;
+    }
+    const pending = pendingAttachmentRef.current;
+    if (!pending) {
+      return;
+    }
+    pendingAttachmentRef.current = null;
+    void uploadFiles(sessionId, pending);
+  }, [sessionId, uploadFiles]);
+
+  const removeAttachment = useCallback((id: string) => {
+    setAttachments((prev) => {
+      const target = prev.find((att) => att.id === id);
+      if (target?.previewUrl) {
+        URL.revokeObjectURL(target.previewUrl);
+      }
+      return prev.filter((att) => att.id !== id);
+    });
+    attachmentRefs.current.delete(id);
+  }, []);
+
+  const handleFileChange = useCallback(
+    async (files: FileList | null) => {
+      if (!files || files.length === 0) {
+        return;
+      }
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+
+      const targetSessionId = await ensureActiveSession("Untitled Session");
+      if (targetSessionId !== sessionId) {
+        pendingAttachmentRef.current = files;
+        await navigate({
+          to: "/sessions/$sessionId",
+          params: { sessionId: targetSessionId },
+        });
+        return;
+      }
+
+      await uploadFiles(targetSessionId, files);
+    },
+    [ensureActiveSession, sessionId, navigate, uploadFiles]
+  );
+
+  const handleAddAttachment = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
   return {
     messages,
     input,
@@ -247,18 +411,14 @@ export function useCoworkAIPanelController() {
     handleTaskAction: sendAction,
     approvalBusy: false,
     approvalError: null,
-    attachments: [],
-    // Attachments not supported yet
-    onAddAttachment: () => {
-      /* Not implemented yet */
-    },
-    onRemoveAttachment: () => {
-      /* Not implemented yet */
-    },
-    fileInputRef: { current: null },
-    onFileChange: () => {
-      /* Not implemented yet */
-    },
+    attachments,
+    onAddAttachment: handleAddAttachment,
+    onRemoveAttachment: removeAttachment,
+    fileInputRef,
+    onFileChange: handleFileChange,
+    isAttachmentBusy: attachments.some(
+      (attachment) => attachment.status === "processing" || attachment.status === "sending"
+    ),
     statusMessage,
     isConnected,
     isLive,
@@ -271,4 +431,21 @@ export function useCoworkAIPanelController() {
     onRetry: retryMessage,
     editingMessageId,
   };
+}
+
+function getReadyAttachmentRefs(
+  attachments: PanelAttachment[],
+  refs: Map<string, ChatAttachmentRef>
+): ChatAttachmentRef[] {
+  const ready: ChatAttachmentRef[] = [];
+  for (const attachment of attachments) {
+    if (attachment.status !== "ready") {
+      continue;
+    }
+    const ref = refs.get(attachment.id);
+    if (ref) {
+      ready.push(ref);
+    }
+  }
+  return ready;
 }
