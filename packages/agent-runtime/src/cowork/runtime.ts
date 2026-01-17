@@ -37,6 +37,11 @@ export interface CoworkRuntimeOptions {
   caseInsensitivePaths?: boolean;
   /** Optional VM provider for sandboxed execution */
   vmProvider?: IVmProvider;
+  /**
+   * Additional system prompt content to inject (e.g., AGENTS.md project context).
+   * Will be appended to the base system prompt.
+   */
+  systemPromptAddition?: string;
 }
 
 export class CoworkRuntime {
@@ -58,6 +63,10 @@ export class CoworkRuntime {
 
       this.orchestrator = createCoworkOrchestrator(options.llm, options.registry, {
         ...options.orchestratorOptions,
+        systemPrompt: buildSystemPrompt(
+          options.orchestratorOptions?.systemPrompt,
+          options.systemPromptAddition
+        ),
         cowork: {
           ...options.cowork,
           audit: options.cowork.audit ?? this.auditLogger,
@@ -98,4 +107,20 @@ export class CoworkRuntime {
 
 export function createCoworkRuntime(options: CoworkRuntimeOptions): CoworkRuntime {
   return new CoworkRuntime(options);
+}
+
+/**
+ * Build the combined system prompt from base and additional context
+ */
+function buildSystemPrompt(base?: string, addition?: string): string | undefined {
+  if (!base && !addition) {
+    return undefined;
+  }
+  if (!addition) {
+    return base;
+  }
+  if (!base) {
+    return addition;
+  }
+  return `${base}\n\n---\n\n${addition}`;
 }

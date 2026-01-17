@@ -1,6 +1,7 @@
 import { readFile, stat } from "node:fs/promises";
 import { basename, extname } from "node:path";
 import {
+  AgentModeManager,
   type ConfirmationRequest,
   type CoworkRiskTag,
   type CoworkSession,
@@ -34,6 +35,7 @@ import {
   TokenTracker,
   type Tool,
 } from "@ku0/ai-core";
+import { analyzeProject, createProjectContext, generateAgentsMd } from "@ku0/project-context";
 import { ApprovalService } from "../services/approvalService";
 import type { StorageLayer } from "../storage/contracts";
 import type {
@@ -205,6 +207,16 @@ export class CoworkTaskRuntime {
     await registry.register(createCodeToolServer());
     await registry.register(createWebSearchToolServer(createWebSearchProvider(this.logger)));
 
+    // Load project context for system prompt injection
+    const projectContext = await this.loadProjectContext(session);
+
+    // Get mode-specific system prompt addition
+    const modeManager = new AgentModeManager(session.agentMode ?? "build");
+    const modePrompt = modeManager.getSystemPromptAddition();
+
+    // Combine project context and mode prompt
+    const systemPromptAddition = combinePromptAdditions(projectContext, modePrompt);
+
     const outputRoots = collectOutputRoots(session);
     return {
       runtime: createCoworkRuntime({
@@ -213,6 +225,7 @@ export class CoworkTaskRuntime {
         cowork: { session },
         taskQueueConfig: { maxConcurrent: 1 },
         outputRoots,
+        systemPromptAddition,
       }),
       providerInfo: {
         modelId: model ?? null,
@@ -220,6 +233,36 @@ export class CoworkTaskRuntime {
         fallbackNotice,
       },
     };
+  }
+
+  /**
+   * Load project context from AGENTS.md or generate from project analysis
+   */
+  private async loadProjectContext(session: CoworkSession): Promise<string | undefined> {
+    const rootPath = session.grants[0]?.rootPath;
+    if (!rootPath) {
+      return undefined;
+    }
+
+    try {
+      // Try to read existing AGENTS.md from .cowork directory
+      const agentsMdPath = `${rootPath}/.cowork/AGENTS.md`;
+      try {
+        const content = await readFile(agentsMdPath, "utf-8");
+        return truncateToTokenBudget(content, 4000);
+      } catch {
+        // AGENTS.md doesn't exist, generate from analysis
+      }
+
+      // Analyze project and generate context
+      const analysis = await analyzeProject(rootPath, { maxDepth: 2 });
+      const context = createProjectContext(analysis);
+      const content = generateAgentsMd(context, { includePatterns: false });
+      return truncateToTokenBudget(content, 4000);
+    } catch (error) {
+      this.logger.warn("Failed to load project context", error);
+      return undefined;
+    }
   }
 
   private attachRuntime(session: CoworkSession, runtime: ReturnType<typeof createCoworkRuntime>) {
@@ -1359,4 +1402,28 @@ function extractTelemetry(data: unknown): { durationMs?: number; attempts?: numb
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+/**
+ * Combine multiple prompt additions into one
+ */
+function combinePromptAdditions(...additions: (string | undefined)[]): string | undefined {
+  const nonEmpty = additions.filter((a): a is string => typeof a === "string" && a.length > 0);
+  if (nonEmpty.length === 0) {
+    return undefined;
+  }
+  return nonEmpty.join("\n\n---\n\n");
+}
+
+/**
+ * Truncate content to approximate token budget
+ * Uses rough estimate of 4 characters per token
+ */
+function truncateToTokenBudget(content: string, maxTokens: number): string {
+  const maxChars = maxTokens * 4;
+  if (content.length <= maxChars) {
+    return content;
+  }
+  // Truncate and add indicator
+  return `${content.substring(0, maxChars - 50)}\n\n... (truncated for token budget)`;
 }
