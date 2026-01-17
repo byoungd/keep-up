@@ -6,17 +6,19 @@ import { join } from "node:path";
 import { AgentStateCheckpointStore } from "./agentStateStore";
 import { ApprovalStore } from "./approvalStore";
 import { ArtifactStore } from "./artifactStore";
+import { ChatMessageStore } from "./chatMessageStore";
 import { ConfigStore } from "./configStore";
 import { getDatabase } from "./database";
 import { SessionStore } from "./sessionStore";
 import { ensureStateDir } from "./statePaths";
 import { TaskStore } from "./taskStore";
-import type { CoworkSettings } from "./types";
+import type { CoworkChatMessage, CoworkSettings } from "./types";
 
 export interface MigrationResult {
   sessions: number;
   tasks: number;
   artifacts: number;
+  chatMessages: number;
   approvals: number;
   agentStateCheckpoints: number;
   settings: number;
@@ -43,25 +45,29 @@ export async function migrateJsonToSqlite(
   const sessionStore = new SessionStore(join(stateDir, "sessions.json"));
   const taskStore = new TaskStore(join(stateDir, "tasks.json"));
   const artifactStore = new ArtifactStore(join(stateDir, "artifacts.json"));
+  const chatMessageStore = new ChatMessageStore(join(stateDir, "chat_messages.json"));
   const approvalStore = new ApprovalStore(join(stateDir, "approvals.json"));
   const agentStateStore = new AgentStateCheckpointStore(
     join(stateDir, "agent_state_checkpoints.json")
   );
   const configStore = new ConfigStore(join(stateDir, "settings.json"));
 
-  const [sessions, tasks, artifacts, approvals, checkpoints, settings] = await Promise.all([
-    sessionStore.getAll(),
-    taskStore.getAll(),
-    artifactStore.getAll(),
-    approvalStore.getAll(),
-    agentStateStore.getAll(),
-    configStore.get(),
-  ]);
+  const [sessions, tasks, artifacts, chatMessages, approvals, checkpoints, settings] =
+    await Promise.all([
+      sessionStore.getAll(),
+      taskStore.getAll(),
+      artifactStore.getAll(),
+      chatMessageStore.getAll(),
+      approvalStore.getAll(),
+      agentStateStore.getAll(),
+      configStore.get(),
+    ]);
 
   const result: MigrationResult = {
     sessions: sessions.length,
     tasks: tasks.length,
     artifacts: artifacts.length,
+    chatMessages: chatMessages.length,
     approvals: approvals.length,
     agentStateCheckpoints: checkpoints.length,
     settings: Object.keys(settings).length,
@@ -90,6 +96,12 @@ export async function migrateJsonToSqlite(
     VALUES ($approvalId, $sessionId, $taskId, $action, $riskTags, $reason, $status, $createdAt, $resolvedAt)
   `);
 
+  const insertChatMessage = db.prepare(`
+    INSERT OR REPLACE INTO chat_messages
+    (message_id, session_id, role, content, status, created_at, updated_at, model_id, provider_id, fallback_notice, parent_id, client_request_id, attachments, metadata, task_id)
+    VALUES ($messageId, $sessionId, $role, $content, $status, $createdAt, $updatedAt, $modelId, $providerId, $fallbackNotice, $parentId, $clientRequestId, $attachments, $metadata, $taskId)
+  `);
+
   const insertCheckpoint = db.prepare(`
     INSERT OR REPLACE INTO agent_state_checkpoints
     (checkpoint_id, session_id, state, created_at, updated_at)
@@ -109,73 +121,13 @@ export async function migrateJsonToSqlite(
 
   db.exec("BEGIN");
   try {
-    for (const session of sessions) {
-      insertSession.run({
-        $sessionId: session.sessionId,
-        $userId: session.userId,
-        $deviceId: session.deviceId,
-        $platform: session.platform,
-        $mode: session.mode,
-        $grants: JSON.stringify(session.grants),
-        $connectors: JSON.stringify(session.connectors),
-        $createdAt: session.createdAt,
-        $endedAt: null,
-      });
-    }
-
-    for (const task of tasks) {
-      insertTask.run({
-        $taskId: task.taskId,
-        $sessionId: task.sessionId,
-        $title: task.title,
-        $prompt: task.prompt,
-        $status: task.status,
-        $createdAt: task.createdAt,
-        $updatedAt: task.updatedAt,
-      });
-    }
-
-    for (const artifact of artifacts) {
-      insertArtifact.run({
-        $artifactId: artifact.artifactId,
-        $sessionId: artifact.sessionId,
-        $taskId: artifact.taskId ?? null,
-        $title: artifact.title,
-        $type: artifact.type,
-        $artifact: JSON.stringify(artifact.artifact),
-        $sourcePath: artifact.sourcePath ?? null,
-        $createdAt: artifact.createdAt,
-        $updatedAt: artifact.updatedAt,
-      });
-    }
-
-    for (const checkpoint of checkpoints) {
-      insertCheckpoint.run({
-        $checkpointId: checkpoint.checkpointId,
-        $sessionId: checkpoint.sessionId,
-        $state: JSON.stringify(checkpoint.state),
-        $createdAt: checkpoint.createdAt,
-        $updatedAt: checkpoint.updatedAt,
-      });
-    }
-
-    for (const approval of approvals) {
-      insertApproval.run({
-        $approvalId: approval.approvalId,
-        $sessionId: approval.sessionId,
-        $taskId: approval.taskId ?? null,
-        $action: approval.action,
-        $riskTags: JSON.stringify(approval.riskTags ?? []),
-        $reason: approval.reason ?? null,
-        $status: approval.status,
-        $createdAt: approval.createdAt,
-        $resolvedAt: approval.resolvedAt ?? null,
-      });
-    }
-
-    for (const [key, value] of toSettingsEntries(settings)) {
-      insertSetting.run({ $key: key, $value: value });
-    }
+    insertSessions(insertSession, sessions);
+    insertTasks(insertTask, tasks);
+    insertArtifacts(insertArtifact, artifacts);
+    insertChatMessages(insertChatMessage, chatMessages);
+    insertCheckpoints(insertCheckpoint, checkpoints);
+    insertApprovals(insertApproval, approvals);
+    insertSettings(insertSetting, settings);
 
     db.exec("COMMIT");
   } catch (error) {
@@ -184,4 +136,174 @@ export async function migrateJsonToSqlite(
   }
 
   return result;
+}
+
+function toChatMessageParams(message: CoworkChatMessage) {
+  return {
+    $messageId: message.messageId,
+    $sessionId: message.sessionId,
+    $role: message.role,
+    $content: message.content,
+    $status: message.status,
+    $createdAt: message.createdAt,
+    $updatedAt: message.updatedAt ?? message.createdAt,
+    $modelId: message.modelId ?? null,
+    $providerId: message.providerId ?? null,
+    $fallbackNotice: message.fallbackNotice ?? null,
+    $parentId: message.parentId ?? null,
+    $clientRequestId: message.clientRequestId ?? null,
+    $attachments: JSON.stringify(message.attachments ?? []),
+    $metadata: JSON.stringify(message.metadata ?? {}),
+    $taskId: message.taskId ?? null,
+  };
+}
+
+function insertSessions(
+  stmt: { run: (params: Record<string, unknown>) => void },
+  sessions: Array<{
+    sessionId: string;
+    userId: string;
+    deviceId: string;
+    platform: string;
+    mode: string;
+    grants: unknown[];
+    connectors: unknown[];
+    createdAt: number;
+  }>
+): void {
+  for (const session of sessions) {
+    stmt.run({
+      $sessionId: session.sessionId,
+      $userId: session.userId,
+      $deviceId: session.deviceId,
+      $platform: session.platform,
+      $mode: session.mode,
+      $grants: JSON.stringify(session.grants),
+      $connectors: JSON.stringify(session.connectors),
+      $createdAt: session.createdAt,
+      $endedAt: null,
+    });
+  }
+}
+
+function insertTasks(
+  stmt: { run: (params: Record<string, unknown>) => void },
+  tasks: Array<{
+    taskId: string;
+    sessionId: string;
+    title: string;
+    prompt: string;
+    status: string;
+    createdAt: number;
+    updatedAt: number;
+  }>
+): void {
+  for (const task of tasks) {
+    stmt.run({
+      $taskId: task.taskId,
+      $sessionId: task.sessionId,
+      $title: task.title,
+      $prompt: task.prompt,
+      $status: task.status,
+      $createdAt: task.createdAt,
+      $updatedAt: task.updatedAt,
+    });
+  }
+}
+
+function insertArtifacts(
+  stmt: { run: (params: Record<string, unknown>) => void },
+  artifacts: Array<{
+    artifactId: string;
+    sessionId: string;
+    taskId?: string;
+    title: string;
+    type: string;
+    artifact: unknown;
+    sourcePath?: string;
+    createdAt: number;
+    updatedAt: number;
+  }>
+): void {
+  for (const artifact of artifacts) {
+    stmt.run({
+      $artifactId: artifact.artifactId,
+      $sessionId: artifact.sessionId,
+      $taskId: artifact.taskId ?? null,
+      $title: artifact.title,
+      $type: artifact.type,
+      $artifact: JSON.stringify(artifact.artifact),
+      $sourcePath: artifact.sourcePath ?? null,
+      $createdAt: artifact.createdAt,
+      $updatedAt: artifact.updatedAt,
+    });
+  }
+}
+
+function insertChatMessages(
+  stmt: { run: (params: Record<string, unknown>) => void },
+  messages: CoworkChatMessage[]
+): void {
+  for (const message of messages) {
+    stmt.run(toChatMessageParams(message));
+  }
+}
+
+function insertCheckpoints(
+  stmt: { run: (params: Record<string, unknown>) => void },
+  checkpoints: Array<{
+    checkpointId: string;
+    sessionId: string;
+    state: unknown;
+    createdAt: number;
+    updatedAt: number;
+  }>
+): void {
+  for (const checkpoint of checkpoints) {
+    stmt.run({
+      $checkpointId: checkpoint.checkpointId,
+      $sessionId: checkpoint.sessionId,
+      $state: JSON.stringify(checkpoint.state),
+      $createdAt: checkpoint.createdAt,
+      $updatedAt: checkpoint.updatedAt,
+    });
+  }
+}
+
+function insertApprovals(
+  stmt: { run: (params: Record<string, unknown>) => void },
+  approvals: Array<{
+    approvalId: string;
+    sessionId: string;
+    taskId?: string;
+    action: string;
+    riskTags?: string[];
+    reason?: string;
+    status: string;
+    createdAt: number;
+    resolvedAt?: number;
+  }>
+): void {
+  for (const approval of approvals) {
+    stmt.run({
+      $approvalId: approval.approvalId,
+      $sessionId: approval.sessionId,
+      $taskId: approval.taskId ?? null,
+      $action: approval.action,
+      $riskTags: JSON.stringify(approval.riskTags ?? []),
+      $reason: approval.reason ?? null,
+      $status: approval.status,
+      $createdAt: approval.createdAt,
+      $resolvedAt: approval.resolvedAt ?? null,
+    });
+  }
+}
+
+function insertSettings(
+  stmt: { run: (params: Record<string, unknown>) => void },
+  settings: CoworkSettings
+): void {
+  for (const [key, value] of toSettingsEntries(settings)) {
+    stmt.run({ $key: key, $value: value });
+  }
 }

@@ -10,6 +10,8 @@ export interface MessageBubbleProps {
   content: string;
   isUser: boolean;
   isStreaming: boolean;
+  showWaitingLabel?: boolean;
+  waitingLabel?: string;
   className?: string;
   density?: "default" | "compact";
 }
@@ -22,14 +24,17 @@ export const MessageBubble = React.memo(function MessageBubble({
   content,
   isUser,
   isStreaming,
+  showWaitingLabel = false,
+  waitingLabel = "Working...",
   className,
   density = "default",
 }: MessageBubbleProps) {
   // If streaming but no content yet, show thinking indicator
   if (isStreaming && !content) {
     return (
-      <div className="py-2">
+      <div className="py-2 flex items-center gap-2 text-xs text-muted-foreground">
         <ThinkingIndicator />
+        {showWaitingLabel ? <span>{waitingLabel}</span> : null}
       </div>
     );
   }

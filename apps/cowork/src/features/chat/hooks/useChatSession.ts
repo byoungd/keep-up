@@ -158,6 +158,7 @@ export function useChatSession(sessionId: string | undefined) {
       modelId?: string,
       parentId?: string
     ) => {
+      const now = Date.now();
       const assistantId = `assistant-${clientRequestId}`;
       setHistoryMessages((prev) => [
         ...prev,
@@ -165,7 +166,7 @@ export function useChatSession(sessionId: string | undefined) {
           id: assistantId,
           role: "assistant",
           content: "",
-          createdAt: Date.now(),
+          createdAt: now + 1,
           status: "streaming",
           type: "text",
           modelId,

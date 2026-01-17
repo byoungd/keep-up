@@ -22,6 +22,35 @@ export interface CoworkSettings {
   theme?: "light" | "dark";
 }
 
+export type CoworkChatMessageStatus = "pending" | "streaming" | "done" | "error" | "canceled";
+
+export interface CoworkChatAttachmentRef {
+  id: string;
+  kind: "image" | "file";
+  name: string;
+  sizeBytes: number;
+  mimeType: string;
+  storageUri: string;
+}
+
+export interface CoworkChatMessage {
+  messageId: string;
+  sessionId: string;
+  role: "user" | "assistant";
+  content: string;
+  createdAt: number;
+  updatedAt?: number;
+  status: CoworkChatMessageStatus;
+  modelId?: string;
+  providerId?: string;
+  fallbackNotice?: string;
+  parentId?: string;
+  clientRequestId?: string;
+  taskId?: string;
+  attachments?: CoworkChatAttachmentRef[];
+  metadata?: Record<string, unknown>;
+}
+
 export interface AgentStateCheckpointRecord {
   checkpointId: string;
   sessionId: string;

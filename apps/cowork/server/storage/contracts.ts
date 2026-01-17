@@ -3,6 +3,7 @@ import type {
   AgentStateCheckpointRecord,
   CoworkApproval,
   CoworkArtifactRecord,
+  CoworkChatMessage,
   CoworkSettings,
 } from "./types";
 
@@ -69,10 +70,23 @@ export interface ArtifactStoreLike {
   delete(artifactId: string): Promise<boolean>;
 }
 
+export interface ChatMessageStoreLike {
+  getAll(): Promise<CoworkChatMessage[]>;
+  getById(messageId: string): Promise<CoworkChatMessage | null>;
+  getBySession(sessionId: string): Promise<CoworkChatMessage[]>;
+  getByClientRequestId(clientRequestId: string): Promise<CoworkChatMessage | null>;
+  create(message: CoworkChatMessage): Promise<CoworkChatMessage>;
+  update(
+    messageId: string,
+    updater: (message: CoworkChatMessage) => CoworkChatMessage
+  ): Promise<CoworkChatMessage | null>;
+}
+
 export interface StorageLayer {
   sessionStore: SessionStoreLike;
   taskStore: TaskStoreLike;
   artifactStore: ArtifactStoreLike;
+  chatMessageStore: ChatMessageStoreLike;
   approvalStore: ApprovalStoreLike;
   agentStateStore: AgentStateCheckpointStoreLike;
   configStore: ConfigStoreLike;

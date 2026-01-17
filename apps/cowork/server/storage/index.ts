@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { createAgentStateCheckpointStore } from "./agentStateStore";
 import { createApprovalStore } from "./approvalStore";
 import { createArtifactStore } from "./artifactStore";
+import { createChatMessageStore } from "./chatMessageStore";
 import { createConfigStore } from "./configStore";
 import type { StorageLayer } from "./contracts";
 import { createProjectStore } from "./projectStore";
@@ -14,6 +15,7 @@ import { createSessionStore } from "./sessionStore";
 import { createSqliteAgentStateStore } from "./sqliteAgentStateStore";
 import { createSqliteApprovalStore } from "./sqliteApprovalStore";
 import { createSqliteArtifactStore } from "./sqliteArtifactStore";
+import { createSqliteChatMessageStore } from "./sqliteChatMessageStore";
 import { createSqliteConfigStore } from "./sqliteConfigStore";
 import { createSqliteProjectStore } from "./sqliteProjectStore";
 import { createSqliteSessionStore } from "./sqliteSessionStore";
@@ -27,11 +29,13 @@ export {
 } from "./agentStateStore";
 export { type ApprovalStore, createApprovalStore } from "./approvalStore";
 export { type ArtifactStore, createArtifactStore } from "./artifactStore";
+export { type ChatMessageStore, createChatMessageStore } from "./chatMessageStore";
 export { type ConfigStore, createConfigStore } from "./configStore";
 export type {
   AgentStateCheckpointStoreLike,
   ApprovalStoreLike,
   ArtifactStoreLike,
+  ChatMessageStoreLike,
   ConfigStoreLike,
   ProjectStoreLike,
   SessionStoreLike,
@@ -48,6 +52,10 @@ export { createSessionStore, type SessionStore } from "./sessionStore";
 export { createSqliteAgentStateStore, type SqliteAgentStateStore } from "./sqliteAgentStateStore";
 export { createSqliteApprovalStore, type SqliteApprovalStore } from "./sqliteApprovalStore";
 export { createSqliteArtifactStore, type SqliteArtifactStore } from "./sqliteArtifactStore";
+export {
+  createSqliteChatMessageStore,
+  type SqliteChatMessageStore,
+} from "./sqliteChatMessageStore";
 export { createSqliteConfigStore, type SqliteConfigStore } from "./sqliteConfigStore";
 export { createSqliteProjectStore, type SqliteProjectStore } from "./sqliteProjectStore";
 export { createSqliteSessionStore, type SqliteSessionStore } from "./sqliteSessionStore";
@@ -67,6 +75,7 @@ export async function createStorageLayer(mode: StorageMode = "json"): Promise<St
       sessionStore,
       taskStore,
       artifactStore,
+      chatMessageStore,
       approvalStore,
       agentStateStore,
       configStore,
@@ -75,6 +84,7 @@ export async function createStorageLayer(mode: StorageMode = "json"): Promise<St
       createSqliteSessionStore(),
       createSqliteTaskStore(),
       createSqliteArtifactStore(),
+      createSqliteChatMessageStore(),
       createSqliteApprovalStore(),
       createSqliteAgentStateStore(),
       createSqliteConfigStore(),
@@ -85,6 +95,7 @@ export async function createStorageLayer(mode: StorageMode = "json"): Promise<St
       sessionStore,
       taskStore,
       artifactStore,
+      chatMessageStore,
       approvalStore,
       agentStateStore,
       configStore,
@@ -97,6 +108,7 @@ export async function createStorageLayer(mode: StorageMode = "json"): Promise<St
     sessionStore: createSessionStore(join(stateDir, "sessions.json")),
     taskStore: createTaskStore(join(stateDir, "tasks.json")),
     artifactStore: createArtifactStore(join(stateDir, "artifacts.json")),
+    chatMessageStore: createChatMessageStore(join(stateDir, "chat_messages.json")),
     approvalStore: createApprovalStore(join(stateDir, "approvals.json")),
     agentStateStore: createAgentStateCheckpointStore(
       join(stateDir, "agent_state_checkpoints.json")

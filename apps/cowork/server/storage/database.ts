@@ -118,6 +118,35 @@ function initSchema(database: DatabaseInstance): void {
   `);
 
   database.exec(`
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      message_id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      status TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      model_id TEXT,
+      provider_id TEXT,
+      fallback_notice TEXT,
+      parent_id TEXT,
+      client_request_id TEXT,
+      attachments TEXT NOT NULL DEFAULT '[]',
+      metadata TEXT DEFAULT '{}',
+      task_id TEXT,
+      FOREIGN KEY (session_id) REFERENCES sessions(session_id)
+    )
+  `);
+
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id)
+  `);
+
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_chat_messages_request ON chat_messages(client_request_id)
+  `);
+
+  database.exec(`
     CREATE TABLE IF NOT EXISTS agent_state_checkpoints (
       checkpoint_id TEXT PRIMARY KEY,
       session_id TEXT NOT NULL,

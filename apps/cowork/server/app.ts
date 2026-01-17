@@ -97,6 +97,7 @@ export function createCoworkApp(deps: CoworkAppDeps) {
     "/api",
     createChatRoutes({
       sessionStore: deps.storage.sessionStore,
+      chatMessageStore: deps.storage.chatMessageStore,
       getSettings: () => deps.storage.configStore.get(),
     })
   );

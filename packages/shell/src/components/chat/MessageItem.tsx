@@ -145,7 +145,15 @@ const MessageContent = ({
     );
   }
   if (showBubble) {
-    return <MessageBubble content={displayContent} isUser={isUser} isStreaming={isStreaming} />;
+    const showWaitingLabel = Boolean(message.metadata?.stalled);
+    return (
+      <MessageBubble
+        content={displayContent}
+        isUser={isUser}
+        isStreaming={isStreaming}
+        showWaitingLabel={showWaitingLabel}
+      />
+    );
   }
   return null;
 };

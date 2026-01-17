@@ -9,6 +9,7 @@ import type {
   AgentStateCheckpointStoreLike,
   ApprovalStoreLike,
   ArtifactStoreLike,
+  ChatMessageStoreLike,
   ConfigStoreLike,
   ProjectStoreLike,
   SessionStoreLike,
@@ -19,6 +20,7 @@ import type {
   AgentStateCheckpointRecord,
   CoworkApproval,
   CoworkArtifactRecord,
+  CoworkChatMessage,
   CoworkSettings,
 } from "./types";
 
@@ -109,6 +111,31 @@ async function ensureSchema(db: D1Database): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_approvals_task ON approvals(task_id)
     `,
     `
+      CREATE TABLE IF NOT EXISTS chat_messages (
+        message_id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
+        status TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        model_id TEXT,
+        provider_id TEXT,
+        fallback_notice TEXT,
+        parent_id TEXT,
+        client_request_id TEXT,
+        attachments TEXT NOT NULL DEFAULT '[]',
+        metadata TEXT DEFAULT '{}',
+        task_id TEXT
+      )
+    `,
+    `
+      CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id)
+    `,
+    `
+      CREATE INDEX IF NOT EXISTS idx_chat_messages_request ON chat_messages(client_request_id)
+    `,
+    `
       CREATE TABLE IF NOT EXISTS agent_state_checkpoints (
         checkpoint_id TEXT PRIMARY KEY,
         session_id TEXT NOT NULL,
@@ -176,6 +203,18 @@ function parseJsonArray<T>(raw: unknown): T[] {
     return Array.isArray(parsed) ? (parsed as T[]) : [];
   } catch {
     return [];
+  }
+}
+
+function parseJsonObject(raw: unknown): Record<string, unknown> {
+  if (typeof raw !== "string") {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return {};
   }
 }
 
@@ -275,6 +314,26 @@ function rowToArtifact(row: Record<string, unknown>): CoworkArtifactRecord {
     sourcePath: row.source_path ? String(row.source_path) : undefined,
     createdAt: Number(row.created_at),
     updatedAt: Number(row.updated_at),
+  };
+}
+
+function rowToChatMessage(row: Record<string, unknown>): CoworkChatMessage {
+  return {
+    messageId: String(row.message_id),
+    sessionId: String(row.session_id),
+    role: row.role as CoworkChatMessage["role"],
+    content: String(row.content),
+    status: row.status as CoworkChatMessage["status"],
+    createdAt: Number(row.created_at),
+    updatedAt: Number(row.updated_at),
+    modelId: row.model_id ? String(row.model_id) : undefined,
+    providerId: row.provider_id ? String(row.provider_id) : undefined,
+    fallbackNotice: row.fallback_notice ? String(row.fallback_notice) : undefined,
+    parentId: row.parent_id ? String(row.parent_id) : undefined,
+    clientRequestId: row.client_request_id ? String(row.client_request_id) : undefined,
+    attachments: parseJsonArray<CoworkChatMessage["attachments"][number]>(row.attachments),
+    metadata: parseJsonObject(row.metadata),
+    taskId: row.task_id ? String(row.task_id) : undefined,
   };
 }
 
@@ -541,6 +600,103 @@ async function createD1ArtifactStore(db: D1Database): Promise<ArtifactStoreLike>
   };
 }
 
+async function createD1ChatMessageStore(db: D1Database): Promise<ChatMessageStoreLike> {
+  return {
+    async getAll(): Promise<CoworkChatMessage[]> {
+      const result = await prepare(db, "SELECT * FROM chat_messages ORDER BY created_at ASC").all();
+      return result.results.map(rowToChatMessage);
+    },
+
+    async getById(messageId: string): Promise<CoworkChatMessage | null> {
+      const row = await prepare(db, "SELECT * FROM chat_messages WHERE message_id = ?", [
+        messageId,
+      ]).first();
+      return row ? rowToChatMessage(row) : null;
+    },
+
+    async getBySession(sessionId: string): Promise<CoworkChatMessage[]> {
+      const result = await prepare(
+        db,
+        "SELECT * FROM chat_messages WHERE session_id = ? ORDER BY created_at ASC",
+        [sessionId]
+      ).all();
+      return result.results.map(rowToChatMessage);
+    },
+
+    async getByClientRequestId(clientRequestId: string): Promise<CoworkChatMessage | null> {
+      const row = await prepare(
+        db,
+        "SELECT * FROM chat_messages WHERE client_request_id = ? LIMIT 1",
+        [clientRequestId]
+      ).first();
+      return row ? rowToChatMessage(row) : null;
+    },
+
+    async create(message: CoworkChatMessage): Promise<CoworkChatMessage> {
+      await prepare(
+        db,
+        `INSERT OR REPLACE INTO chat_messages
+          (message_id, session_id, role, content, status, created_at, updated_at, model_id, provider_id, fallback_notice, parent_id, client_request_id, attachments, metadata, task_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          message.messageId,
+          message.sessionId,
+          message.role,
+          message.content,
+          message.status,
+          message.createdAt,
+          message.updatedAt ?? message.createdAt,
+          message.modelId ?? null,
+          message.providerId ?? null,
+          message.fallbackNotice ?? null,
+          message.parentId ?? null,
+          message.clientRequestId ?? null,
+          JSON.stringify(message.attachments ?? []),
+          JSON.stringify(message.metadata ?? {}),
+          message.taskId ?? null,
+        ]
+      ).run();
+      return message;
+    },
+
+    async update(
+      messageId: string,
+      updater: (message: CoworkChatMessage) => CoworkChatMessage
+    ): Promise<CoworkChatMessage | null> {
+      const existing = await prepare(db, "SELECT * FROM chat_messages WHERE message_id = ?", [
+        messageId,
+      ]).first();
+      if (!existing) {
+        return null;
+      }
+      const updated = updater(rowToChatMessage(existing));
+      await prepare(
+        db,
+        `UPDATE chat_messages
+          SET session_id = ?, role = ?, content = ?, status = ?, updated_at = ?, model_id = ?, provider_id = ?, fallback_notice = ?, parent_id = ?, client_request_id = ?, attachments = ?, metadata = ?, task_id = ?
+          WHERE message_id = ?`,
+        [
+          updated.sessionId,
+          updated.role,
+          updated.content,
+          updated.status,
+          updated.updatedAt ?? Date.now(),
+          updated.modelId ?? null,
+          updated.providerId ?? null,
+          updated.fallbackNotice ?? null,
+          updated.parentId ?? null,
+          updated.clientRequestId ?? null,
+          JSON.stringify(updated.attachments ?? []),
+          JSON.stringify(updated.metadata ?? {}),
+          updated.taskId ?? null,
+          updated.messageId,
+        ]
+      ).run();
+      return updated;
+    },
+  };
+}
+
 async function createD1ApprovalStore(db: D1Database): Promise<ApprovalStoreLike> {
   return {
     async getAll(): Promise<CoworkApproval[]> {
@@ -756,6 +912,7 @@ export async function createD1StorageLayer(db: D1Database): Promise<StorageLayer
     sessionStore,
     taskStore,
     artifactStore,
+    chatMessageStore,
     approvalStore,
     agentStateStore,
     configStore,
@@ -764,6 +921,7 @@ export async function createD1StorageLayer(db: D1Database): Promise<StorageLayer
     createD1SessionStore(db),
     createD1TaskStore(db),
     createD1ArtifactStore(db),
+    createD1ChatMessageStore(db),
     createD1ApprovalStore(db),
     createD1AgentStateStore(db),
     createD1ConfigStore(db),
@@ -774,6 +932,7 @@ export async function createD1StorageLayer(db: D1Database): Promise<StorageLayer
     sessionStore,
     taskStore,
     artifactStore,
+    chatMessageStore,
     approvalStore,
     agentStateStore,
     configStore,
