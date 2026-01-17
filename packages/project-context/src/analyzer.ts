@@ -476,7 +476,9 @@ async function detectFeatureBasedArchitecture(appsDir: string): Promise<ProjectP
   try {
     const apps = await readdir(appsDir);
     for (const app of apps) {
-      if (typeof app !== "string") continue;
+      if (typeof app !== "string") {
+        continue;
+      }
       const featuresDir = join(appsDir, app, "src", "features");
       if (await pathExists(featuresDir)) {
         return {
