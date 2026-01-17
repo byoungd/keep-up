@@ -1,0 +1,278 @@
+{
+  "@tanstack/react-query": {
+    "current": "5.90.16",
+    "latest": "5.90.18",
+    "wanted": "5.90.16",
+    "isDeprecated": false,
+    "dependencyType": "dependencies",
+    "dependentPackages": [
+      {
+        "name": "@ku0/cowork",
+        "location": "/Users/han/Documents/Code/Parallel/keep-up/apps/cowork"
+      }
+    ]
+  },
+  "@tanstack/react-virtual": {
+    "current": "3.13.17",
+    "latest": "3.13.18",
+    "wanted": "3.13.17",
+    "isDeprecated": false,
+    "dependencyType": "dependencies",
+    "dependentPackages": [
+      {
+        "name": "@ku0/cowork",
+        "location": "/Users/han/Documents/Code/Parallel/keep-up/apps/cowork"
+      },
+      {
+        "name": "@ku0/shell",
+        "location": "/Users/han/Documents/Code/Parallel/keep-up/packages/shell"
+      }
+    ]
+  },
+  "@types/react": {
+    "current": "19.2.7",
+    "latest": "19.2.8",
+    "wanted": "19.2.7",
+    "isDeprecated": false,
+    "dependencyType": "devDependencies",
+    "dependentPackages": [
+      {
+        "name": "keep-up",
+        "location": "/Users/han/Documents/Code/Parallel/keep-up"
+      },
+      {
+        "name": "@ku0/cowork",
+        "location": "/Users/han/Documents/Code/Parallel/keep-up/apps/cowork"
+      }
+    ]
+  },
+  "@vitest/coverage-v8": {
+    "current": "4.0.16",
+    "latest": "4.0.17",
+    "wanted": "4.0.16",
+    "isDeprecated": false,
+    "dependencyType": "devDependencies",
+    "dependentPackages": [
+      {
+        "name": "keep-up",
+        "location": "/Users/han/Documents/Code/Parallel/keep-up"
+      }
+    ]
+  },
+  "better-sqlite3": {
+    "current": "12.6.0",
+    "latest": "12.6.2",
+    "wanted": "12.6.0",
+    "isDeprecated": false,
+    "dependencyType": "dependencies",
+    "dependentPackages": [
+      {
+        "name": "@ku0/cowork",
+        "location": "/Users/han/Documents/Code/Parallel/keep-up/apps/cowork"
+      }
+    ]
+  },
+  "loro-crdt": {
+    "current": "1.10.3",
+    "latest": "1.10.4",
+    "wanted": "1.10.3",
+    "isDeprecated": false,
+    "dependencyType": "dependencies",
+    "dependentPackages": [
+      {
+        "name": "@ku0/bench",
+        "location": "/Users/han/Documents/Code/Parallel/keep-up/packages/bench"
+      },
+      {
+        "name": "@ku0/lfcc-bridge",
+        "location": "/Users/han/Documents/Code/Parallel/keep-up/packages/lfcc-bridge"
+      }
+    ]
+  },
+  "prosemirror-view": {
+    "current": "1.41.4",
+    "latest": "1.41.5",
+    "wanted": "1.41.4",
+    "isDeprecated": false,
+    "dependencyType": "dependencies",
+    "dependentPackages": [
+      {
+        "name": "@ku0/lfcc-bridge",
+        "location": "/Users/han/Documents/Code/Parallel/keep-up/packages/lfcc-bridge"
+      }
+    ]
+  },
+  "turbo": {
+    "current": "2.7.3",
+    "latest": "2.7.5",
+    "wanted": "2.7.3",
+    "isDeprecated": false,
+    "dependencyType": "devDependencies",
+    "dependentPackages": [
+      {
+        "name": "keep-up",
+        "location": "/Users/han/Documents/Code/Parallel/keep-up"
+      }
+    ]
+  },
+  "vitest": {
+    "current": "3.2.4",
+    "latest": "4.0.17",
+    "wanted": "3.2.4",
+    "isDeprecated": false,
+    "dependencyType": "devDependencies",
+    "dependentPackages": [
+      {
+        "name": "@ku0/ingest-youtube",
+        "location": "/Users/han/Documents/Code/Parallel/keep-up/packages/ingest-youtube"
+      }
+    ]
+  },
+  "@dnd-kit/sortable": {
+    "current": "8.0.0",
+    "latest": "10.0.0",
+    "wanted": "8.0.0",
+    "isDeprecated": false,
+    "dependencyType": "dependencies",
+    "dependentPackages": [
+      {
+        "name": "@ku0/shell",
+        "location": "/Users/han/Documents/Code/Parallel/keep-up/packages/shell"
+      }
+    ]
+  },
+  "@types/jsdom": {
+    "current": "21.1.7",
+    "latest": "27.0.0",
+    "wanted": "21.1.7",
+    "isDeprecated": false,
+    "dependencyType": "devDependencies",
+    "dependentPackages": [
+      {
+        "name": "@ku0/ingest-rss",
+        "location": "/Users/han/Documents/Code/Parallel/keep-up/packages/ingest/rss"
+      }
+    ]
+  },
+  "@types/node": {
+    "current": "22.19.3",
+    "latest": "25.0.9",
+    "wanted": "22.19.3",
+    "isDeprecated": false,
+    "dependencyType": "devDependencies",
+    "dependentPackages": [
+      {
+        "name": "@ku0/agent-runtime",
+        "location": "/Users/han/Documents/Code/Parallel/keep-up/packages/agent-runtime"
+      }
+    ]
+  },
+  "@vitejs/plugin-react": {
+    "current": "4.7.0",
+    "latest": "5.1.2",
+    "wanted": "4.7.0",
+    "isDeprecated": false,
+    "dependencyType": "devDependencies",
+    "dependentPackages": [
+      {
+        "name": "@ku0/cowork",
+        "location": "/Users/han/Documents/Code/Parallel/keep-up/apps/cowork"
+      }
+    ]
+  },
+  "electron": {
+    "current": "39.2.7",
+    "latest": "40.0.0",
+    "wanted": "39.2.7",
+    "isDeprecated": false,
+    "dependencyType": "devDependencies",
+    "dependentPackages": [
+      {
+        "name": "@ku0/desktop",
+        "location": "/Users/han/Documents/Code/Parallel/keep-up/apps/desktop"
+      }
+    ]
+  },
+  "fast-check": {
+    "current": "3.23.2",
+    "latest": "4.5.3",
+    "wanted": "3.23.2",
+    "isDeprecated": false,
+    "dependencyType": "devDependencies",
+    "dependentPackages": [
+      {
+        "name": "@ku0/ingest-file",
+        "location": "/Users/han/Documents/Code/Parallel/keep-up/packages/ingest/file"
+      }
+    ]
+  },
+  "framer-motion": {
+    "current": "11.18.2",
+    "latest": "12.26.2",
+    "wanted": "11.18.2",
+    "isDeprecated": false,
+    "dependencyType": "dependencies",
+    "dependentPackages": [
+      {
+        "name": "@ku0/shell",
+        "location": "/Users/han/Documents/Code/Parallel/keep-up/packages/shell"
+      }
+    ]
+  },
+  "jsdom": {
+    "current": "26.1.0",
+    "latest": "27.4.0",
+    "wanted": "26.1.0",
+    "isDeprecated": false,
+    "dependencyType": "dependencies",
+    "dependentPackages": [
+      {
+        "name": "@ku0/ingest-rss",
+        "location": "/Users/han/Documents/Code/Parallel/keep-up/packages/ingest/rss"
+      }
+    ]
+  },
+  "pdf-parse": {
+    "current": "1.1.4",
+    "latest": "2.4.5",
+    "wanted": "1.1.4",
+    "isDeprecated": false,
+    "dependencyType": "dependencies",
+    "dependentPackages": [
+      {
+        "name": "@ku0/ingest-file",
+        "location": "/Users/han/Documents/Code/Parallel/keep-up/packages/ingest/file"
+      }
+    ]
+  },
+  "tailwind-merge": {
+    "current": "2.6.0",
+    "latest": "3.4.0",
+    "wanted": "2.6.0",
+    "isDeprecated": false,
+    "dependencyType": "dependencies",
+    "dependentPackages": [
+      {
+        "name": "@ku0/shared",
+        "location": "/Users/han/Documents/Code/Parallel/keep-up/packages/shared"
+      },
+      {
+        "name": "@ku0/shell",
+        "location": "/Users/han/Documents/Code/Parallel/keep-up/packages/shell"
+      }
+    ]
+  },
+  "zod": {
+    "current": "3.25.76",
+    "latest": "4.3.5",
+    "wanted": "3.25.76",
+    "isDeprecated": false,
+    "dependencyType": "dependencies",
+    "dependentPackages": [
+      {
+        "name": "@ku0/ingest-file",
+        "location": "/Users/han/Documents/Code/Parallel/keep-up/packages/ingest/file"
+      }
+    ]
+  }
+}

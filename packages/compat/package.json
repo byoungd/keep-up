@@ -12,6 +12,6 @@
     "@ku0/lfcc-bridge": "workspace:*"
   },
   "devDependencies": {
-    "vitest": "^1.2.0"
+    "vitest": "^4.0.0"
   }
 }
