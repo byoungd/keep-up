@@ -115,7 +115,7 @@ describe("CoworkTaskRuntime", () => {
         },
       });
 
-      const task = await runtime.enqueueTask(session, { prompt: "Say hello" });
+      const task = await runtime.enqueueTask(session.sessionId, { prompt: "Say hello" });
       expect(task.status).toBe("queued");
 
       if (!runtimeRef) {
@@ -157,7 +157,7 @@ describe("CoworkTaskRuntime", () => {
         },
       });
 
-      const task = await runtime.enqueueTask(session, { prompt: "Say hello" });
+      const task = await runtime.enqueueTask(session.sessionId, { prompt: "Say hello" });
 
       if (!runtimeRef) {
         throw new Error("Runtime not created");
@@ -224,7 +224,7 @@ describe("CoworkTaskRuntime", () => {
         },
       });
 
-      const task = await runtime.enqueueTask(session, { prompt: "write file" });
+      const task = await runtime.enqueueTask(session.sessionId, { prompt: "write file" });
       expect(task.status).toBe("queued");
 
       await withTimeout(waitForApprovalRecord(storage, session.sessionId), 2000, "approval record");
@@ -293,8 +293,8 @@ describe("CoworkTaskRuntime", () => {
       });
 
       runtime.orchestrator.setConfirmationHandler(async () => true);
+      const taskId = await runtime.enqueueTask("Write note");
 
-      const taskId = await runtime.enqueueTask("write file", "Write note");
       const result = await withTimeout(runtime.waitForTask(taskId), 5000, "task completion");
       expect(result?.state.status).toBe("complete");
 

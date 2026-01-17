@@ -114,6 +114,13 @@ export class ArtifactProcessor {
   }
 
   /**
+   * Get artifact by ID
+   */
+  async getArtifact(_sessionId: string, artifactId: string): Promise<CoworkArtifactRecord | null> {
+    return this.artifactStore.getById(artifactId);
+  }
+
+  /**
    * Build artifacts from task outputs and file changes
    */
   private async buildOutputArtifacts(

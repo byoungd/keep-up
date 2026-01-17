@@ -140,6 +140,7 @@ export interface CoworkEventPayloads {
     id: string;
     artifact: unknown;
     taskId?: string;
+    updatedAt: number;
   };
   [COWORK_EVENTS.SYSTEM_HEARTBEAT]: {
     timestamp: number;

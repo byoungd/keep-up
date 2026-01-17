@@ -100,7 +100,7 @@ export function createSessionRoutes(deps: SessionRouteDeps) {
     }
 
     try {
-      const task = await deps.taskRuntime.enqueueTask(session, parsed.data);
+      const task = await deps.taskRuntime.enqueueTask(session.sessionId, parsed.data);
       // biome-ignore lint/suspicious/noConsole: Server logging
       console.info("[cowork] task created", {
         sessionId,
@@ -229,6 +229,12 @@ export function createSessionRoutes(deps: SessionRouteDeps) {
       return jsonError(c, 400, "Invalid mode. Must be 'plan' or 'build'");
     }
 
+    const session = await deps.sessionStore.getById(sessionId);
+    if (!session) {
+      return jsonError(c, 404, "Session not found");
+    }
+
+    const previousMode = session.agentMode ?? "build";
     const updated = await deps.sessionStore.update(sessionId, (prev) => ({
       ...prev,
       agentMode: mode,
@@ -243,6 +249,12 @@ export function createSessionRoutes(deps: SessionRouteDeps) {
       sessionId,
       agentMode: mode,
     });
+    deps.events.publish(sessionId, COWORK_EVENTS.SESSION_MODE_CHANGED, {
+      sessionId,
+      mode,
+      previousMode,
+    });
+    deps.taskRuntime?.updateSessionMode(sessionId, mode);
 
     return c.json({
       ok: true,
@@ -279,6 +291,12 @@ export function createSessionRoutes(deps: SessionRouteDeps) {
       sessionId,
       agentMode: newMode,
     });
+    deps.events.publish(sessionId, COWORK_EVENTS.SESSION_MODE_CHANGED, {
+      sessionId,
+      mode: newMode,
+      previousMode: currentMode,
+    });
+    deps.taskRuntime?.updateSessionMode(sessionId, newMode);
 
     return c.json({
       ok: true,

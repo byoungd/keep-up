@@ -119,7 +119,7 @@ export class EventStreamPublisher {
     sessionId: string;
     id: string;
     artifact: { type: string; content?: string; [key: string]: unknown };
-    taskId: string;
+    taskId?: string;
     updatedAt: number;
   }) {
     this.events.publish(data.sessionId, COWORK_EVENTS.AGENT_ARTIFACT, {
