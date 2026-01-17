@@ -7,7 +7,6 @@ import {
   type CoworkTask,
   type CoworkTaskStatus,
   type CoworkTaskSummary,
-  type TaskType,
   createAICoreAdapter,
   createBashToolServer,
   createCodeToolServer,
@@ -15,22 +14,25 @@ import {
   createFileToolServer,
   createToolRegistry,
   createWebSearchToolServer,
+  formatToolActivityLabel,
   isPathWithinRoots,
+  resolveToolActivity,
+  type TaskType,
 } from "@ku0/agent-runtime";
 import {
   AnthropicProvider,
   type CompletionRequest,
   type CompletionResponse,
   GeminiProvider,
+  getModelCapability,
   type LLMProvider,
+  normalizeModelId,
   OpenAIProvider,
   ProviderRouter,
+  resolveProviderFromEnv,
   type StreamChunk,
   TokenTracker,
   type Tool,
-  getModelCapability,
-  normalizeModelId,
-  resolveProviderFromEnv,
 } from "@ku0/ai-core";
 import { ApprovalService } from "../services/approvalService";
 import type { StorageLayer } from "../storage/contracts";
@@ -403,9 +405,13 @@ export class CoworkTaskRuntime {
     if (!isRecord(data) || typeof data.toolName !== "string") {
       return;
     }
+    const activity = resolveToolActivity(data.toolName);
+    const activityLabel = formatToolActivityLabel(activity);
     this.events.publish(runtime.sessionId, COWORK_EVENTS.AGENT_TOOL_CALL, {
       tool: data.toolName,
       args: isRecord(data.arguments) ? data.arguments : {},
+      activity,
+      activityLabel,
       taskId: runtime.activeTaskId ?? undefined,
     });
   }
@@ -414,10 +420,23 @@ export class CoworkTaskRuntime {
     if (!isRecord(data) || typeof data.toolName !== "string") {
       return;
     }
+    const result = data.result;
+    const isError = isToolError(result);
+    const errorCode = extractErrorCode(result);
+    const telemetry = extractTelemetry(data);
+    const activity = resolveToolActivity(data.toolName);
+    const activityLabel = formatToolActivityLabel(activity);
+
     this.events.publish(runtime.sessionId, COWORK_EVENTS.AGENT_TOOL_RESULT, {
       callId: `${data.toolName}-${Date.now().toString(36)}`,
-      result: data.result,
-      isError: isToolError(data.result),
+      toolName: data.toolName,
+      result,
+      isError,
+      errorCode,
+      durationMs: telemetry?.durationMs,
+      attempts: telemetry?.attempts,
+      activity,
+      activityLabel,
       taskId: runtime.activeTaskId ?? undefined,
     });
   }
@@ -1221,6 +1240,38 @@ function isToolError(result: unknown): boolean | undefined {
     return !result.success;
   }
   return undefined;
+}
+
+function extractErrorCode(result: unknown): string | undefined {
+  if (!isRecord(result)) {
+    return undefined;
+  }
+  if (isRecord(result.error) && typeof result.error.code === "string") {
+    return result.error.code;
+  }
+  return undefined;
+}
+
+function extractTelemetry(data: unknown): { durationMs?: number; attempts?: number } | undefined {
+  if (!isRecord(data)) {
+    return undefined;
+  }
+  const result: { durationMs?: number; attempts?: number } = {};
+  if (isRecord(data.meta)) {
+    if (typeof data.meta.durationMs === "number") {
+      result.durationMs = data.meta.durationMs;
+    }
+    if (typeof data.meta.attempts === "number") {
+      result.attempts = data.meta.attempts;
+    }
+  }
+  // Also check nested result meta if orchestrator passed it through
+  if (isRecord(data.result) && isRecord(data.result.meta)) {
+    if (typeof data.result.meta.durationMs === "number") {
+      result.durationMs = data.result.meta.durationMs;
+    }
+  }
+  return Object.keys(result).length > 0 ? result : undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -4,93 +4,95 @@
  * Common utilities for the agent runtime.
  */
 
-// Retry utilities
+// Batch processing
 export {
-  retry,
-  withRetry,
-  isRetryableError,
-  neverRetry,
-  alwaysRetry,
-  CircuitBreaker,
-  CircuitOpenError,
-  createCircuitBreaker,
-  type RetryOptions,
-  type RetryResult,
-  type CircuitBreakerOptions,
-  type CircuitState,
-} from "./retry";
+  type BatchConfig,
+  BatchProcessor,
+  type BatchResult,
+  batchToolCalls,
+  createBatchProcessor,
+  createDebouncedExecutor,
+  type DebounceConfig,
+  debounce,
+  parallelBatch,
+  throttle,
+} from "./batch";
 
 // Caching utilities
 export {
-  LRUCache,
-  ToolResultCache,
-  createCache,
-  createToolResultCache,
   type CacheEntry,
   type CacheOptions,
   type CacheStats,
+  createCache,
+  createToolResultCache,
+  LRUCache,
+  ToolResultCache,
 } from "./cache";
-
+// Lazy initialization
+export {
+  type AsyncLazy,
+  asyncLazy,
+  type Lazy,
+  type LazyOptions,
+  lazy,
+  lazyWithDisposal,
+  memoize,
+} from "./lazy";
+// LLM response parsing
+export { parseJsonFromText } from "./llmJson";
 // Parallel execution utilities
 export {
+  createSemaphore,
+  executeBatch,
   executeParallel,
   executeWithDependencies,
-  executeBatch,
-  createSemaphore,
-  withTimeout,
   type ParallelExecutionOptions,
   type ParallelExecutionResult,
   type ToolCallWithDeps,
+  withTimeout,
 } from "./parallel";
-
 // Rate limiting utilities
 export {
-  SlidingWindowRateLimiter,
-  TokenBucketRateLimiter,
-  ToolRateLimiter,
   createRateLimiter,
   createToolRateLimiter,
   type RateLimitConfig,
   type RateLimitResult,
   type RateLimitStats,
+  SlidingWindowRateLimiter,
+  TokenBucketRateLimiter,
   type ToolRateLimitConfig,
+  ToolRateLimiter,
 } from "./rateLimit";
-
 // Resource pooling
 export {
-  ResourcePool,
   createResourcePool,
+  type HealthCheck,
   type PoolConfig,
   type PoolStats,
-  type ResourceFactory,
-  type HealthCheck,
   type ResourceCleanup,
+  type ResourceFactory,
+  ResourcePool,
 } from "./resourcePool";
-
-// Lazy initialization
+// Retry utilities
 export {
-  lazy,
-  asyncLazy,
-  lazyWithDisposal,
-  memoize,
-  type Lazy,
-  type AsyncLazy,
-  type LazyOptions,
-} from "./lazy";
+  alwaysRetry,
+  CircuitBreaker,
+  type CircuitBreakerOptions,
+  CircuitOpenError,
+  type CircuitState,
+  createCircuitBreaker,
+  isRetryableError,
+  neverRetry,
+  type RetryOptions,
+  type RetryResult,
+  retry,
+  withRetry,
+} from "./retry";
 
-// Batch processing
+// Tool activity helpers
 export {
-  BatchProcessor,
-  createBatchProcessor,
-  createDebouncedExecutor,
-  debounce,
-  throttle,
-  parallelBatch,
-  batchToolCalls,
-  type BatchConfig,
-  type BatchResult,
-  type DebounceConfig,
-} from "./batch";
-
-// LLM response parsing
-export { parseJsonFromText } from "./llmJson";
+  formatToolActivityLabel,
+  formatToolActivityMessage,
+  resolveToolActivity,
+  type ToolActivity,
+} from "./toolActivity";

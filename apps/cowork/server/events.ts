@@ -3,6 +3,8 @@
  * Eliminates magic strings and provides compile-time safety.
  */
 
+import type { ToolActivity } from "@ku0/agent-runtime";
+
 export const COWORK_EVENTS = {
   // Session lifecycle
   SESSION_CREATED: "session.created",
@@ -25,6 +27,9 @@ export const COWORK_EVENTS = {
   AGENT_TOOL_RESULT: "agent.tool.result",
   AGENT_PLAN: "agent.plan",
   AGENT_ARTIFACT: "agent.artifact",
+
+  // System events
+  SYSTEM_HEARTBEAT: "system.heartbeat",
 } as const;
 
 export type CoworkEventType = (typeof COWORK_EVENTS)[keyof typeof COWORK_EVENTS];
@@ -92,12 +97,20 @@ export interface CoworkEventPayloads {
     requiresApproval?: boolean;
     approvalId?: string;
     riskLevel?: string;
+    activity?: ToolActivity;
+    activityLabel?: string;
     taskId?: string;
   };
   [COWORK_EVENTS.AGENT_TOOL_RESULT]: {
     callId: string;
+    toolName?: string;
     result: unknown;
     isError?: boolean;
+    errorCode?: string;
+    durationMs?: number;
+    attempts?: number;
+    activity?: ToolActivity;
+    activityLabel?: string;
     taskId?: string;
   };
   [COWORK_EVENTS.AGENT_PLAN]: {
@@ -109,6 +122,10 @@ export interface CoworkEventPayloads {
     id: string;
     artifact: unknown;
     taskId?: string;
+  };
+  [COWORK_EVENTS.SYSTEM_HEARTBEAT]: {
+    timestamp: number;
+    sessionId: string;
   };
 }
 

@@ -1,4 +1,4 @@
-import type { CoworkRiskTag, CoworkTask, CoworkTaskStatus } from "@ku0/agent-runtime";
+import type { CoworkRiskTag, CoworkTask, CoworkTaskStatus, ToolActivity } from "@ku0/agent-runtime";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   type CoworkApproval,
@@ -175,7 +175,9 @@ export function useTaskStream(sessionId: string) {
   });
 
   const [isConnected, setIsConnected] = useState(false);
+  const [isLive, setIsLive] = useState(false);
   const [isPollingFallback, setIsPollingFallback] = useState(false);
+  const lastHeartbeatRef = useRef<number>(Date.now());
   const abortControllerRef = useRef<AbortController | null>(null);
   const graphRef = useRef(graph);
   const lastEventIdRef = useRef<string | null>(null);
@@ -302,6 +304,28 @@ export function useTaskStream(sessionId: string) {
     };
   }, [isPollingFallback, sessionId, refreshSessionState]);
 
+  // Connection liveness monitor
+  useEffect(() => {
+    if (!isConnected) {
+      setIsLive(false);
+      return;
+    }
+
+    setIsLive(true);
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const elapsed = now - lastHeartbeatRef.current;
+      // If no heartbeat for > 45 seconds (server sends every 30s), mark as not live
+      if (elapsed > 45000) {
+        setIsLive(false);
+      } else {
+        setIsLive(true);
+      }
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [isConnected]);
+
   const handleEvent = useCallback((id: string, type: string, data: unknown) => {
     if (seenEventIdsRef.current.has(id)) {
       return;
@@ -341,6 +365,11 @@ export function useTaskStream(sessionId: string) {
     "agent.tool.result": handleToolResult,
     "agent.plan": handlePlanUpdate,
     "agent.artifact": handleArtifactUpdate,
+    "system.heartbeat": (prev) => {
+      lastHeartbeatRef.current = Date.now();
+      setIsLive(true);
+      return prev;
+    },
   };
 
   function handleApprovalRequired(
@@ -444,12 +473,8 @@ export function useTaskStream(sessionId: string) {
     if (!isRecord(data) || typeof data.tool !== "string") {
       return prev;
     }
-    const taskId = typeof data.taskId === "string" ? data.taskId : undefined;
-    const riskLevel =
-      typeof data.riskLevel === "string" &&
-      Object.values(RiskLevel).includes(data.riskLevel as RiskLevel)
-        ? (data.riskLevel as RiskLevel)
-        : undefined;
+
+    const { riskLevel, activity, activityLabel, taskId } = extractToolInvocationMetadata(data);
 
     return {
       ...prev,
@@ -463,6 +488,8 @@ export function useTaskStream(sessionId: string) {
           typeof data.requiresApproval === "boolean" ? data.requiresApproval : undefined,
         approvalId: typeof data.approvalId === "string" ? data.approvalId : undefined,
         riskLevel,
+        activity,
+        activityLabel,
         taskId,
       }),
     };
@@ -479,18 +506,60 @@ export function useTaskStream(sessionId: string) {
     if (!isRecord(data)) {
       return prev;
     }
-    const taskId = typeof data.taskId === "string" ? data.taskId : undefined;
+
+    const { toolName, activity, activityLabel, taskId } = extractToolResultMetadata(data);
+
     return {
       ...prev,
       nodes: appendNode(prev.nodes, {
         id: `out-${id}`,
         type: "tool_output",
         callId: typeof data.callId === "string" ? data.callId : "unknown",
+        toolName,
         output: data.result,
         isError: typeof data.isError === "boolean" ? data.isError : undefined,
+        errorCode: typeof data.errorCode === "string" ? data.errorCode : undefined,
+        durationMs: typeof data.durationMs === "number" ? data.durationMs : undefined,
+        attempts: typeof data.attempts === "number" ? data.attempts : undefined,
+        activity,
+        activityLabel,
         taskId,
         timestamp: now,
       }),
+    };
+  }
+
+  function extractToolResultMetadata(data: Record<string, unknown>): {
+    toolName?: string;
+    activity?: ToolActivity;
+    activityLabel?: string;
+    taskId?: string;
+  } {
+    return {
+      toolName: typeof data.toolName === "string" ? data.toolName : undefined,
+      activity: typeof data.activity === "string" ? (data.activity as ToolActivity) : undefined,
+      activityLabel: typeof data.activityLabel === "string" ? data.activityLabel : undefined,
+      taskId: typeof data.taskId === "string" ? data.taskId : undefined,
+    };
+  }
+
+  function extractToolInvocationMetadata(data: Record<string, unknown>): {
+    riskLevel?: RiskLevel;
+    activity?: ToolActivity;
+    activityLabel?: string;
+    taskId?: string;
+  } {
+    const riskLevel =
+      typeof data.riskLevel === "string" &&
+      Object.values(RiskLevel).includes(data.riskLevel as RiskLevel)
+        ? (data.riskLevel as RiskLevel)
+        : undefined;
+
+    return {
+      riskLevel,
+      activity: typeof data.activity === "string" ? (data.activity as ToolActivity) : undefined,
+      activityLabel: typeof data.activityLabel === "string" ? data.activityLabel : undefined,
+      taskId: typeof data.taskId === "string" ? data.taskId : undefined,
     };
   }
 
@@ -890,7 +959,7 @@ export function useTaskStream(sessionId: string) {
     [refreshSessionState]
   );
 
-  return { graph, isConnected, approveTool, rejectTool };
+  return { graph, isConnected, isLive, approveTool, rejectTool };
 }
 
 function setupAbortController(

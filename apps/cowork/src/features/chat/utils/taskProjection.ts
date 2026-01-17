@@ -5,6 +5,7 @@ import type {
   TaskGraph,
   TaskStatusNode,
   ToolCallNode,
+  ToolOutputNode,
 } from "../../tasks/types";
 
 /**
@@ -269,7 +270,7 @@ function extractActionsForStep(nodes: TaskGraph["nodes"], stepId: string): Actio
       if (n.type === "tool_call") {
         return {
           id: n.id,
-          label: `Calling ${n.toolName}`,
+          label: formatToolCallLabel(n),
           toolName: n.toolName,
           args: n.args as Record<string, unknown>,
           status: "running" as const,
@@ -403,18 +404,40 @@ function formatActivityLabel(
 ): string {
   switch (node.type) {
     case "tool_call":
-      return `Calling ${formatToolName(node.toolName)}`;
+      return formatToolCallLabel(node);
     case "tool_output": {
-      // Find the corresponding tool_call node to get the tool name
-      const callNode = allNodes.find((n) => n.type === "tool_call" && n.id === node.callId) as
-        | { toolName?: string }
-        | undefined;
-      const toolName = callNode?.toolName ? formatToolName(callNode.toolName) : "tool";
-      return node.isError ? `${toolName} failed` : `${toolName} completed`;
+      const activityLabel = resolveToolOutputLabel(node, allNodes);
+      return node.isError ? `${activityLabel} failed` : `${activityLabel} completed`;
     }
     default:
       return "";
   }
+}
+
+function formatToolCallLabel(node: ToolCallNode): string {
+  if (node.activityLabel) {
+    return `${node.activityLabel}...`;
+  }
+  return `Calling ${formatToolName(node.toolName)}`;
+}
+
+function resolveToolOutputLabel(node: ToolOutputNode, allNodes: TaskGraph["nodes"]): string {
+  if (node.activityLabel) {
+    return node.activityLabel;
+  }
+  if (node.toolName) {
+    return formatToolName(node.toolName);
+  }
+  const callNode = allNodes.find(
+    (n): n is ToolCallNode => n.type === "tool_call" && n.id === node.callId
+  );
+  if (callNode?.activityLabel) {
+    return callNode.activityLabel;
+  }
+  if (callNode?.toolName) {
+    return formatToolName(callNode.toolName);
+  }
+  return "Tool";
 }
 
 function formatToolName(toolName: string): string {

@@ -1,4 +1,4 @@
-import type { CoworkTaskStatus } from "@ku0/agent-runtime";
+import type { CoworkTaskStatus, ToolActivity } from "@ku0/agent-runtime";
 import { z } from "zod";
 
 export enum TaskStatus {
@@ -72,13 +72,21 @@ export interface ToolCallNode extends BaseNode {
   requiresApproval?: boolean;
   approvalId?: string;
   riskLevel?: RiskLevel;
+  activity?: ToolActivity;
+  activityLabel?: string;
 }
 
 export interface ToolOutputNode extends BaseNode {
   type: "tool_output";
   callId: string; // References ToolCallNode.id
+  toolName?: string;
   output: unknown;
   isError?: boolean;
+  errorCode?: string;
+  durationMs?: number;
+  attempts?: number;
+  activity?: ToolActivity;
+  activityLabel?: string;
 }
 
 export interface ErrorNode extends BaseNode {

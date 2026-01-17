@@ -4,12 +4,20 @@
  * Maps runtime event bus signals to streaming chunks for progress and artifact previews.
  */
 
-import type { RuntimeEvent, RuntimeEventBus, Subscription } from "../events/eventBus";
-import type { ArtifactEvents } from "../events/eventBus";
+import type {
+  ArtifactEvents,
+  RuntimeEvent,
+  RuntimeEventBus,
+  Subscription,
+} from "../events/eventBus";
 import type { ExecutionDecision, ToolExecutionRecord } from "../types";
+import {
+  formatToolActivityLabel,
+  formatToolActivityMessage,
+  resolveToolActivity,
+  type ToolActivity,
+} from "../utils/toolActivity";
 import type { StreamWriter } from "./streamWriter";
-
-type ToolActivity = "search" | "browse" | "read" | "write" | "run";
 
 interface ToolActivityMetadata {
   toolName: string;
@@ -20,83 +28,6 @@ interface ToolActivityMetadata {
   status: ToolExecutionRecord["status"];
   durationMs: number;
   error?: string;
-}
-
-const TOOL_ACTIVITY_RULES: Array<{ activity: ToolActivity; tokens: string[] }> = [
-  {
-    activity: "search",
-    tokens: ["search", "query", "find", "lookup", "serp", "tavily", "bing", "google"],
-  },
-  {
-    activity: "browse",
-    tokens: ["browse", "browser", "navigate", "crawl", "scrape", "page", "url", "http", "fetch"],
-  },
-  {
-    activity: "read",
-    tokens: ["read", "open", "load", "download", "extract", "parse", "ingest"],
-  },
-  {
-    activity: "write",
-    tokens: [
-      "write",
-      "save",
-      "create",
-      "update",
-      "insert",
-      "delete",
-      "remove",
-      "append",
-      "edit",
-      "patch",
-      "replace",
-      "apply",
-      "upload",
-      "persist",
-      "store",
-    ],
-  },
-];
-
-const TOOL_ACTIVITY_LABELS: Record<ToolActivity, string> = {
-  search: "Searching",
-  browse: "Browsing",
-  read: "Reading",
-  write: "Writing",
-  run: "Running",
-};
-
-function tokenizeToolName(toolName: string): string[] {
-  return toolName
-    .toLowerCase()
-    .split(/[:._/\\-]+/)
-    .filter(Boolean);
-}
-
-function resolveToolActivity(toolName: string): ToolActivity {
-  const tokens = tokenizeToolName(toolName);
-  for (const rule of TOOL_ACTIVITY_RULES) {
-    if (rule.tokens.some((token) => tokens.includes(token))) {
-      return rule.activity;
-    }
-  }
-  return "run";
-}
-
-function formatToolActivityMessage(
-  activity: ToolActivity,
-  status: ToolExecutionRecord["status"]
-): string {
-  const label = TOOL_ACTIVITY_LABELS[activity] ?? TOOL_ACTIVITY_LABELS.run;
-  switch (status) {
-    case "started":
-      return `${label}...`;
-    case "completed":
-      return `${label} complete`;
-    case "failed":
-      return `${label} failed`;
-    default:
-      return `${label}...`;
-  }
 }
 
 export interface RuntimeEventStreamBridgeConfig {
@@ -144,7 +75,7 @@ export function attachRuntimeEventStreamBridge(config: RuntimeEventStreamBridgeC
         toolCallId: record.toolCallId,
         taskNodeId: record.taskNodeId,
         activity,
-        label: TOOL_ACTIVITY_LABELS[activity] ?? TOOL_ACTIVITY_LABELS.run,
+        label: formatToolActivityLabel(activity),
         status: record.status,
         durationMs: record.durationMs,
         error: record.error,
