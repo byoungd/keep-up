@@ -80,20 +80,16 @@ function log(
     };
   }
 
-  const formatted = formatEntry(entry);
+  const _formatted = formatEntry(entry);
 
   switch (level) {
     case "debug":
-      console.debug(formatted);
       break;
     case "info":
-      console.info(formatted);
       break;
     case "warn":
-      console.warn(formatted);
       break;
     case "error":
-      console.error(formatted);
       break;
   }
 }

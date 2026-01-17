@@ -4,7 +4,7 @@
  * MCP-compatible browser automation using Playwright.
  */
 
-import type { AriaRole, Locator, Page } from "playwright";
+import type { Locator, Page } from "playwright";
 import type {
   AccessibilityNodeRef,
   AccessibilitySnapshot,
@@ -394,7 +394,8 @@ function resolveLocatorFromRef(page: Page, ref: AccessibilityNodeRef): Locator {
   if (role) {
     try {
       const options = name ? { name } : undefined;
-      return page.getByRole(role as AriaRole, options).nth(ref.occurrence ?? 0);
+      // biome-ignore lint/suspicious/noExplicitAny: AriaRole is not exported in current playwright
+      return page.getByRole(role as any, options).nth(ref.occurrence ?? 0);
     } catch {
       // Fallback to text selector
     }
@@ -484,9 +485,11 @@ async function performInteraction(
     await locator.press(interaction.key);
     return;
   }
-  await locator.fill("");
-  await locator.type(
-    interaction.text,
-    interaction.delayMs ? { delay: interaction.delayMs } : undefined
-  );
+  if (interaction.action === "type") {
+    await locator.fill("");
+    await locator.type(
+      interaction.text,
+      interaction.delayMs ? { delay: interaction.delayMs } : undefined
+    );
+  }
 }

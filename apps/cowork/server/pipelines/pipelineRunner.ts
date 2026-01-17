@@ -298,22 +298,24 @@ export class PipelineRunner {
     for (let index = current.stageIndex; index < pipeline.stages.length; index += 1) {
       const stage = pipeline.stages[index];
       const result = await this.executeStageWithRetry(stage);
-      current = await this.store.updateRun(runId, (existing) =>
+      const updatedRun = await this.store.updateRun(runId, (existing: PipelineRunRecord) =>
         updateStageResult(existing, index, result)
       );
-      if (!current) {
+      if (!updatedRun) {
         return null;
       }
+      current = updatedRun;
       if (result.status === "failed") {
         return await this.failRun(current, result.error ?? "Stage failed");
       }
-      current = await this.store.updateRun(runId, (existing) => ({
+      const finalRun = await this.store.updateRun(runId, (existing: PipelineRunRecord) => ({
         ...existing,
         stageIndex: index + 1,
       }));
-      if (!current) {
+      if (!finalRun) {
         return null;
       }
+      current = finalRun;
     }
 
     return await this.store.updateRun(runId, (existing) => ({

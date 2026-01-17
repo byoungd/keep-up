@@ -130,16 +130,23 @@ export async function createPipelineStore(): Promise<PipelineStore> {
     return pipelineRunSchema.parse(parsed);
   }
 
+  async function getPipelineById(pipelineId: string): Promise<PipelineDefinition | null> {
+    const row = selectPipelineStmt.get({ pipelineId }) as Record<string, unknown> | undefined;
+    return row ? rowToPipeline(row) : null;
+  }
+
+  async function getRunById(runId: string): Promise<PipelineRunRecord | null> {
+    const row = selectRunStmt.get({ runId }) as Record<string, unknown> | undefined;
+    return row ? rowToRun(row) : null;
+  }
+
   return {
     async getAllPipelines(): Promise<PipelineDefinition[]> {
       const rows = selectAllPipelinesStmt.all() as Record<string, unknown>[];
       return rows.map(rowToPipeline);
     },
 
-    async getPipelineById(pipelineId: string): Promise<PipelineDefinition | null> {
-      const row = selectPipelineStmt.get({ pipelineId }) as Record<string, unknown> | undefined;
-      return row ? rowToPipeline(row) : null;
-    },
+    getPipelineById,
 
     async createPipeline(input: PipelineDefinition): Promise<PipelineDefinition> {
       const pipeline = pipelineSchema.parse(input);
@@ -158,7 +165,7 @@ export async function createPipelineStore(): Promise<PipelineStore> {
       pipelineId: string,
       updater: (pipeline: PipelineDefinition) => PipelineDefinition
     ): Promise<PipelineDefinition | null> {
-      const existing = await this.getPipelineById(pipelineId);
+      const existing = await getPipelineById(pipelineId);
       if (!existing) {
         return null;
       }
@@ -198,7 +205,7 @@ export async function createPipelineStore(): Promise<PipelineStore> {
       runId: string,
       updater: (run: PipelineRunRecord) => PipelineRunRecord
     ): Promise<PipelineRunRecord | null> {
-      const existing = await this.getRunById(runId);
+      const existing = await getRunById(runId);
       if (!existing) {
         return null;
       }
@@ -220,10 +227,7 @@ export async function createPipelineStore(): Promise<PipelineStore> {
       return next;
     },
 
-    async getRunById(runId: string): Promise<PipelineRunRecord | null> {
-      const row = selectRunStmt.get({ runId }) as Record<string, unknown> | undefined;
-      return row ? rowToRun(row) : null;
-    },
+    getRunById,
 
     async listRunsByStatus(statuses: PipelineRunStatus[]): Promise<PipelineRunRecord[]> {
       if (statuses.length === 0) {

@@ -9,6 +9,7 @@ import { createArtifactRoutes } from "./routes/artifacts";
 import { createAuditLogRoutes } from "./routes/auditLogs";
 import { createChatRoutes } from "./routes/chat";
 import { createContextRoutes } from "./routes/context";
+import { createCostRoutes } from "./routes/cost";
 import { createPipelineRoutes } from "./routes/pipelines";
 import { createPreflightRoutes } from "./routes/preflight";
 import { createProjectRoutes } from "./routes/projects";
@@ -99,6 +100,13 @@ export function createCoworkApp(deps: CoworkAppDeps) {
     "/api",
     createStreamRoutes({
       events: eventHub,
+    })
+  );
+
+  app.route(
+    "/api",
+    createCostRoutes({
+      sessionStore: deps.storage.sessionStore,
     })
   );
 

@@ -74,25 +74,25 @@ const DEFAULT_ALLOWLIST: PreflightCheckDefinition[] = [
 const DEFAULT_RULES: PreflightSelectionRule[] = [
   {
     id: "cowork-server",
-    match: (path) => path.startsWith("apps/cowork/server/"),
+    match: (path: string) => path.startsWith("apps/cowork/server/"),
     checkIds: ["test:cowork-server"],
     note: "Cowork server changes detected.",
   },
   {
     id: "cowork-app",
-    match: (path) => path.startsWith("apps/cowork/src/"),
+    match: (path: string) => path.startsWith("apps/cowork/src/"),
     checkIds: ["test:cowork-app"],
     note: "Cowork UI changes detected.",
   },
   {
     id: "context-index",
-    match: (path) => path.startsWith("packages/context-index/"),
+    match: (path: string) => path.startsWith("packages/context-index/"),
     checkIds: ["test:context-index"],
     note: "Context index changes detected.",
   },
   {
     id: "agent-runtime",
-    match: (path) => path.startsWith("packages/agent-runtime/"),
+    match: (path: string) => path.startsWith("packages/agent-runtime/"),
     checkIds: ["test:packages-default"],
     note: "Agent runtime changes detected.",
   },
@@ -147,7 +147,8 @@ export function createPreflightRunner(config: PreflightRunnerConfig = {}): Prefl
       const report = await runPreflightPlan({
         sessionId: input.sessionId,
         plan,
-        runCheck: (check) => runCheckCommand(check, input.rootPath, maxOutputBytes),
+        runCheck: (check: PreflightCheckDefinition) =>
+          runCheckCommand(check, input.rootPath, maxOutputBytes),
       });
       return { plan, report };
     },
@@ -187,7 +188,7 @@ function appendBaselineChecks(
   allowlistMap: Map<string, PreflightCheckDefinition>,
   baselineIds: string[]
 ): PreflightPlan {
-  const selected = new Set(plan.checks.map((check) => check.id));
+  const selected = new Set(plan.checks.map((check: PreflightCheckDefinition) => check.id));
   const nextChecks = [...plan.checks];
   let added = 0;
   for (const id of baselineIds) {

@@ -17,7 +17,7 @@ import { useWorkspace } from "../../app/providers/WorkspaceProvider";
 import { detectIntent } from "../../lib/intentDetector";
 import { parseSlashCommand } from "../../lib/slashCommands";
 import { useChatSession } from "./hooks/useChatSession";
-import { downloadFile, exportToJson, exportToMarkdown } from "./utils/chatExport";
+import { downloadFile, exportToJson, exportToMarkdown } from "./utils/exportUtils";
 import { generateTaskTitle } from "./utils/textUtils";
 
 interface PanelAttachment {
@@ -68,6 +68,7 @@ export function useCoworkAIPanelController() {
     agentMode,
     toggleMode,
     usage,
+    session,
   } = useChatSession(sessionId);
 
   // Helper to ensure we have a valid session before sending
@@ -318,18 +319,20 @@ export function useCoworkAIPanelController() {
 
   const handleExport = useCallback(
     (format: "markdown" | "json") => {
-      if (!messages.length) {
+      if (!messages.length || !session) {
         return;
       }
       if (format === "markdown") {
-        const md = exportToMarkdown(messages);
+        // biome-ignore lint/suspicious/noExplicitAny: Loosened type for export
+        const md = exportToMarkdown(session as any, messages);
         downloadFile(`chat-export-${sessionId || "session"}.md`, md, "text/markdown");
       } else {
-        const json = exportToJson(messages);
+        // biome-ignore lint/suspicious/noExplicitAny: Loosened type for export
+        const json = exportToJson(session as any, messages);
         downloadFile(`chat-export-${sessionId || "session"}.json`, json, "application/json");
       }
     },
-    [messages, sessionId]
+    [messages, sessionId, session]
   );
 
   const handleQuote = useCallback((content: string) => {
