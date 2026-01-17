@@ -153,12 +153,13 @@ describe("PipelineRunner", () => {
         return {
           success: false,
           content: [],
-          error: { code: "EXECUTION_FAILED", message: "boom" },
+          // biome-ignore lint/suspicious/noExplicitAny: Required for test mock matching
+          error: { code: "EXECUTION_FAILED" as any, message: "boom" },
         };
       }
       return {
         success: true,
-        content: [{ type: "text", text: "ok" }],
+        content: [{ type: "text" as const, text: "ok" }],
       };
     });
     const toolExecutor: ToolExecutor = { execute };

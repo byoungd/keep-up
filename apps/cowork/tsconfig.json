@@ -5,7 +5,12 @@
     "types": ["vite/client", "node", "wicg-file-system-access"],
     "declaration": false,
     "declarationMap": false,
-    "noEmit": true
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@ku0/agent-runtime": ["../../packages/agent-runtime/src"],
+      "@ku0/ai-core": ["../../packages/ai-core/src"]
+    }
   },
   "include": ["src", "server"]
 }

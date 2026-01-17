@@ -1,5 +1,5 @@
 import type { TokenUsageStats } from "@ku0/agent-runtime";
-import { MODEL_CATALOG } from "@ku0/ai-core";
+import { MODEL_CATALOG, type ModelCapability } from "@ku0/ai-core";
 import { useMemo } from "react";
 
 interface CostMeterProps {
@@ -12,7 +12,7 @@ export function CostMeter({ usage, modelId }: CostMeterProps) {
     if (!usage) {
       return null;
     }
-    const model = MODEL_CATALOG.find((m) => m.id === modelId);
+    const model = MODEL_CATALOG.find((m) => m.id === modelId) as ModelCapability | undefined;
     const pricing = model?.pricing;
 
     return {
