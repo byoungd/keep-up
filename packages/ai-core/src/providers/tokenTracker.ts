@@ -6,33 +6,8 @@
  */
 
 import { getEncoding, type Tiktoken, type TiktokenEncoding } from "js-tiktoken";
+import { getModelCapability, type ModelPricing } from "../catalog/models";
 import type { TokenUsage } from "./types";
-
-/** Pricing per 1M tokens in USD */
-export interface ModelPricing {
-  inputTokensPer1M: number;
-  outputTokensPer1M: number;
-}
-
-/** Known model pricing (as of 2026-01) */
-const MODEL_PRICING: Record<string, ModelPricing> = {
-  // OpenAI
-  "gpt-4o": { inputTokensPer1M: 2.5, outputTokensPer1M: 10 },
-  "gpt-4o-mini": { inputTokensPer1M: 0.15, outputTokensPer1M: 0.6 },
-  "gpt-4-turbo": { inputTokensPer1M: 10, outputTokensPer1M: 30 },
-  "gpt-4": { inputTokensPer1M: 30, outputTokensPer1M: 60 },
-  "gpt-3.5-turbo": { inputTokensPer1M: 0.5, outputTokensPer1M: 1.5 },
-  "text-embedding-3-small": { inputTokensPer1M: 0.02, outputTokensPer1M: 0 },
-  "text-embedding-3-large": { inputTokensPer1M: 0.13, outputTokensPer1M: 0 },
-  // Anthropic
-  "claude-opus-4-20250514": { inputTokensPer1M: 15, outputTokensPer1M: 75 },
-  "claude-sonnet-4-20250514": { inputTokensPer1M: 3, outputTokensPer1M: 15 },
-  "claude-3-5-sonnet-20241022": { inputTokensPer1M: 3, outputTokensPer1M: 15 },
-  "claude-3-5-haiku-20241022": { inputTokensPer1M: 1, outputTokensPer1M: 5 },
-  "claude-3-opus-20240229": { inputTokensPer1M: 15, outputTokensPer1M: 75 },
-  "claude-3-sonnet-20240229": { inputTokensPer1M: 3, outputTokensPer1M: 15 },
-  "claude-3-haiku-20240307": { inputTokensPer1M: 0.25, outputTokensPer1M: 1.25 },
-};
 
 /** Usage record for a single request */
 export interface UsageRecord {
@@ -204,7 +179,7 @@ export class TokenTracker {
    * Calculate cost for token usage.
    */
   calculateCost(model: string, usage: TokenUsage): number {
-    const pricing = this.customPricing[model] ?? MODEL_PRICING[model];
+    const pricing = this.customPricing[model] ?? getModelCapability(model)?.pricing;
     if (!pricing) {
       return 0;
     }
@@ -363,7 +338,7 @@ export class TokenTracker {
    * Get pricing for a model.
    */
   getPricing(model: string): ModelPricing | undefined {
-    return this.customPricing[model] ?? MODEL_PRICING[model];
+    return this.customPricing[model] ?? getModelCapability(model)?.pricing;
   }
 
   /**

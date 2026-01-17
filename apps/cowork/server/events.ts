@@ -12,6 +12,7 @@ export const COWORK_EVENTS = {
   SESSION_ENDED: "session.ended",
   SESSION_DELETED: "session.deleted",
   SESSION_MODE_CHANGED: "session.mode.changed",
+  SESSION_USAGE_UPDATED: "session.usage.updated",
 
   // Task lifecycle
   TASK_CREATED: "task.created",
@@ -60,6 +61,11 @@ export interface CoworkEventPayloads {
     sessionId: string;
     mode: "plan" | "build";
     previousMode: "plan" | "build";
+  };
+  [COWORK_EVENTS.SESSION_USAGE_UPDATED]: {
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
   };
   [COWORK_EVENTS.TASK_CREATED]: {
     taskId: string;

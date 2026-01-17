@@ -5,6 +5,7 @@
  */
 
 import type { AgentMode } from "../modes";
+import type { TokenUsageStats } from "../types";
 
 export type CoworkPlatform = "macos";
 export type CoworkMode = "cowork";
@@ -25,6 +26,8 @@ export interface CoworkSession {
   projectId?: string;
   /** Agent mode: 'plan' for read-only analysis, 'build' for full development access */
   agentMode?: AgentMode;
+  /** Cumulative token usage for this session */
+  usage?: TokenUsageStats;
 }
 
 export interface CoworkFolderGrant {

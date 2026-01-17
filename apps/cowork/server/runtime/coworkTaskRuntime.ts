@@ -19,6 +19,7 @@ import {
   isPathWithinRoots,
   resolveToolActivity,
   type TaskType,
+  type TokenUsageStats,
 } from "@ku0/agent-runtime";
 import {
   AnthropicProvider,
@@ -448,6 +449,13 @@ export class CoworkTaskRuntime {
       case "tool:result":
         this.handleToolResultEvent(runtime, event.data);
         return;
+      case "usage:update":
+        void this.handleUsageUpdate(runtime, event.data as { totalUsage: TokenUsageStats }).catch(
+          (error: unknown) => {
+            this.logger.error("Failed to handle usage update", error);
+          }
+        );
+        return;
       case "plan:created":
         await this.handlePlanCreatedEvent(runtime, event.data, taskId);
         return;
@@ -460,6 +468,18 @@ export class CoworkTaskRuntime {
       default:
         return;
     }
+  }
+  private async handleUsageUpdate(runtime: SessionRuntime, data: { totalUsage: TokenUsageStats }) {
+    await this.storage.sessionStore.update(runtime.sessionId, (s) => ({
+      ...s,
+      usage: data.totalUsage,
+    }));
+
+    this.events.publish(runtime.sessionId, COWORK_EVENTS.SESSION_USAGE_UPDATED, {
+      inputTokens: data.totalUsage.inputTokens,
+      outputTokens: data.totalUsage.outputTokens,
+      totalTokens: data.totalUsage.totalTokens,
+    });
   }
 
   private handleThinkingEvent(runtime: SessionRuntime, data: unknown): void {

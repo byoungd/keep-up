@@ -62,6 +62,7 @@ export function useCoworkAIPanelController() {
     retryMessage,
     agentMode,
     toggleMode,
+    usage,
   } = useChatSession(sessionId);
 
   // Helper to ensure we have a valid session before sending
@@ -449,6 +450,7 @@ export function useCoworkAIPanelController() {
     editingMessageId,
     agentMode,
     toggleMode,
+    usage,
   };
 }
 

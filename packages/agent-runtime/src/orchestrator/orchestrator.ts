@@ -12,6 +12,7 @@
  * - Streaming support for real-time feedback
  */
 
+import { MODEL_CATALOG, type ModelCapability } from "@ku0/ai-core";
 import type { IntentRegistry } from "@ku0/core";
 import { createIntentRegistry } from "@ku0/core";
 import type {
@@ -61,6 +62,7 @@ import type {
   MCPToolServer,
   ParallelExecutionConfig,
   SecurityPolicy,
+  TokenUsageStats,
   ToolContext,
   ToolError,
 } from "../types";
@@ -114,12 +116,14 @@ export interface AgentLLMResponse {
   content: string;
   toolCalls?: MCPToolCall[];
   finishReason: "stop" | "tool_use" | "max_tokens" | "error";
+  usage?: TokenUsageStats;
 }
 
 export interface AgentLLMChunk {
-  type: "content" | "tool_call" | "done";
+  type: "content" | "tool_call" | "done" | "usage";
   content?: string;
   toolCall?: MCPToolCall;
+  usage?: TokenUsageStats;
 }
 
 // ============================================================================
@@ -140,7 +144,8 @@ export type OrchestratorEventType =
   | "plan:rejected"
   | "plan:executing"
   | "error"
-  | "complete";
+  | "complete"
+  | "usage:update";
 
 export interface OrchestratorEvent {
   type: OrchestratorEventType;
@@ -227,8 +232,39 @@ export class AgentOrchestrator {
   private currentRunId?: string;
   private currentPlanNodeId?: string;
   private readonly taskGraphToolCalls = new WeakMap<MCPToolCall, string>();
+  private totalUsage: TokenUsageStats = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
 
   private state: AgentState;
+
+  /**
+   * Smart Model Routing
+   * Selects the best model ID based on the requested strategy.
+   * Leverages centralized MODEL_CATALOG data.
+   */
+  public static selectModel(
+    strategy: "fast" | "quality" | "balanced" | "thinking" = "balanced"
+  ): string {
+    const candidates = MODEL_CATALOG.filter((m) => !m.legacy);
+    let match: ModelCapability | undefined;
+
+    switch (strategy) {
+      case "fast":
+        match = candidates.find((m) => m.tags.includes("fast"));
+        break;
+      case "quality":
+        match = candidates.find((m) => m.tags.includes("quality"));
+        break;
+      case "thinking":
+        match = candidates.find((m) => m.supports.thinking);
+        break;
+      default:
+        // Default to balanced
+        match = candidates.find((m) => m.tags.includes("balanced"));
+        break;
+    }
+    return match?.id ?? candidates[0]?.id ?? "gemini-3-flash";
+  }
+
   private confirmationHandler?: ConfirmationHandler;
   private abortController?: AbortController;
 
@@ -537,6 +573,11 @@ export class AgentOrchestrator {
         this.recordMessage(outcome.assistantMessage);
       }
 
+      // Track usage
+      if (outcome.usage) {
+        this.accumulateUsage(outcome.usage);
+      }
+
       // Handle outcome
       if (outcome.type === "complete") {
         this.state.status = "complete";
@@ -772,6 +813,17 @@ export class AgentOrchestrator {
     } finally {
       toolSpan?.end();
     }
+  }
+
+  private accumulateUsage(usage: TokenUsageStats): void {
+    this.totalUsage.inputTokens += usage.inputTokens;
+    this.totalUsage.outputTokens += usage.outputTokens;
+    this.totalUsage.totalTokens += usage.totalTokens;
+
+    this.emit("usage:update", {
+      usage: { ...usage },
+      totalUsage: { ...this.totalUsage },
+    });
   }
 
   private handleDeniedToolCall(call: MCPToolCall, toolSpan?: SpanContext): void {

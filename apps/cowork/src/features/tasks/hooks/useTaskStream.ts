@@ -653,7 +653,34 @@ const EVENT_HANDLERS: Record<string, EventHandler> = {
   "agent.tool.result": handleToolResult,
   "agent.plan": handlePlanUpdate,
   "agent.artifact": handleArtifactUpdate,
+  "session.usage.updated": handleUsageUpdated,
 };
+
+function handleUsageUpdated(
+  prev: TaskGraph,
+  _id: string,
+  data: unknown,
+  _now: string,
+  _taskTitles: Map<string, string>,
+  _taskPrompts: Map<string, string>
+): TaskGraph {
+  if (
+    !isRecord(data) ||
+    typeof data.inputTokens !== "number" ||
+    typeof data.outputTokens !== "number" ||
+    typeof data.totalTokens !== "number"
+  ) {
+    return prev;
+  }
+  return {
+    ...prev,
+    usage: {
+      inputTokens: data.inputTokens,
+      outputTokens: data.outputTokens,
+      totalTokens: data.totalTokens,
+    },
+  };
+}
 
 function handleSessionModeChanged(
   prev: TaskGraph,

@@ -29,7 +29,7 @@ import { SkillPromptAdapter, type SkillPromptOptions } from "../skills/skillProm
 import type { SkillRegistry } from "../skills/skillRegistry";
 import type { IMetricsCollector, SpanContext } from "../telemetry";
 import { AGENT_METRICS } from "../telemetry";
-import type { AgentMessage, AgentState, MCPToolCall } from "../types";
+import type { AgentMessage, AgentState, MCPToolCall, TokenUsageStats } from "../types";
 import type { MessageCompressor } from "./messageCompression";
 import type {
   AgentLLMRequest,
@@ -65,6 +65,8 @@ export interface TurnOutcome {
   readonly metrics: TurnMetrics;
   /** Compressed message history used for the request */
   readonly compressedMessages?: AgentMessage[];
+  /** Token usage for the turn */
+  readonly usage?: TokenUsageStats;
 }
 
 /**
@@ -225,6 +227,7 @@ export class TurnExecutor implements ITurnExecutor {
         assistantMessage,
         metrics,
         compressedMessages: compressionResult.messages,
+        usage: response.usage,
       };
 
       if (this.isComplete(response)) {

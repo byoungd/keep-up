@@ -11,6 +11,13 @@ export type ProviderKind =
   | "zai"
   | "stealth";
 
+export type ModelPricing = {
+  /** Price per 1 million input tokens in USD */
+  inputTokensPer1M: number;
+  /** Price per 1 million output tokens in USD */
+  outputTokensPer1M: number;
+};
+
 export type ModelCapability = {
   id: string;
   label: string;
@@ -39,6 +46,7 @@ export type ModelCapability = {
     thinking: boolean;
   };
   tags: string[];
+  pricing?: ModelPricing;
   default?: boolean;
   legacy?: boolean;
 };
@@ -55,6 +63,7 @@ export const MODEL_CATALOG: ModelCapability[] = [
     contextWindow: 128_000,
     supports: { vision: false, tools: true, thinking: false },
     tags: ["fast"],
+    pricing: { inputTokensPer1M: 0.1, outputTokensPer1M: 0.4 },
     default: true,
   },
   {
@@ -67,6 +76,7 @@ export const MODEL_CATALOG: ModelCapability[] = [
     contextWindow: 1_000_000,
     supports: { vision: true, tools: true, thinking: true },
     tags: ["quality", "thinking"],
+    pricing: { inputTokensPer1M: 1.25, outputTokensPer1M: 5 },
   },
   {
     id: "gemini-3-pro-low",
@@ -146,6 +156,7 @@ export const MODEL_CATALOG: ModelCapability[] = [
     contextWindow: 200_000,
     supports: { vision: true, tools: true, thinking: false },
     tags: ["balanced"],
+    pricing: { inputTokensPer1M: 3, outputTokensPer1M: 15 },
   },
   {
     id: "claude-opus-4-5",
@@ -170,6 +181,7 @@ export const MODEL_CATALOG: ModelCapability[] = [
     contextWindow: 128_000,
     supports: { vision: true, tools: true, thinking: true },
     tags: ["quality"],
+    pricing: { inputTokensPer1M: 2.5, outputTokensPer1M: 10 },
     default: true,
   },
   {
@@ -250,6 +262,7 @@ export const MODEL_CATALOG: ModelCapability[] = [
     contextWindow: 128_000,
     supports: { vision: false, tools: true, thinking: false },
     tags: ["balanced", "coding"],
+    pricing: { inputTokensPer1M: 0.14, outputTokensPer1M: 0.28 },
   },
   {
     id: "deepseek-r1",

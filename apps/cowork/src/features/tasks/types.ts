@@ -1,4 +1,4 @@
-import type { CoworkTaskStatus, ToolActivity } from "@ku0/agent-runtime";
+import type { CoworkTaskStatus, TokenUsageStats, ToolActivity } from "@ku0/agent-runtime";
 import { z } from "zod";
 
 export enum TaskStatus {
@@ -137,4 +137,5 @@ export interface TaskGraph {
   pendingApprovalId?: string;
   savedAt?: number;
   agentMode?: "plan" | "build";
+  usage?: TokenUsageStats;
 }

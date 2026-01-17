@@ -481,6 +481,7 @@ export function useChatSession(sessionId: string | undefined) {
       }
       await toggleSessionMode(sessionId);
     }, [sessionId]),
+    usage: graph.usage,
   };
 }
 

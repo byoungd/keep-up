@@ -52,6 +52,7 @@ export interface AICoreCompletionResponse {
   usage?: {
     inputTokens: number;
     outputTokens: number;
+    totalTokens?: number;
   };
   finishReason?: string;
 }
@@ -178,6 +179,15 @@ export class AICoreProviderAdapter implements IAgentLLM {
       content: response.content,
       toolCalls,
       finishReason,
+      usage: response.usage
+        ? {
+            inputTokens: response.usage.inputTokens,
+            outputTokens: response.usage.outputTokens,
+            totalTokens:
+              response.usage.totalTokens ??
+              response.usage.inputTokens + response.usage.outputTokens,
+          }
+        : undefined,
     };
   }
 
@@ -262,6 +272,7 @@ export class MockAgentLLM implements IAgentLLM {
   private defaultResponse: AgentLLMResponse = {
     content: "I understand. How can I help you?",
     finishReason: "stop",
+    usage: { inputTokens: 5, outputTokens: 5, totalTokens: 10 },
   };
 
   /** Add a mock response for a message pattern */
@@ -310,6 +321,12 @@ export class MockAgentLLM implements IAgentLLM {
         yield { type: "tool_call", toolCall };
       }
     }
+
+    // Yield usage
+    yield {
+      type: "usage",
+      usage: response.usage ?? { inputTokens: 5, outputTokens: 5, totalTokens: 10 },
+    };
 
     yield { type: "done" };
   }

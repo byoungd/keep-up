@@ -3,6 +3,7 @@
 import { type ArtifactItem, AIPanel as ShellAIPanel, useReaderShell } from "@ku0/shell";
 import { useEffect, useMemo, useState } from "react";
 import { ProjectContextPanel } from "../context/ProjectContextPanel";
+import { CostMeter } from "./components/CostMeter";
 import { ModeToggle } from "./components/ModeToggle";
 import { useCoworkAIPanelController } from "./useCoworkAIPanelController";
 
@@ -47,6 +48,7 @@ export function CoworkAIPanel({ onClose, onPreviewArtifact }: CoworkAIPanelProps
     onRetry,
     agentMode,
     toggleMode,
+    usage,
   } = ctrl;
 
   useEffect(() => {
@@ -89,12 +91,17 @@ export function CoworkAIPanel({ onClose, onPreviewArtifact }: CoworkAIPanelProps
     return null;
   }, [isConnected, isLive, messages.length]);
 
-  const contextStatus = statusMessage ? (
-    <div className="text-[11px] font-medium text-destructive flex items-center gap-2 px-2 py-1.5 rounded-lg bg-destructive/5 border border-destructive/10">
-      {statusMessage}
+  const contextStatus = (
+    <div className="flex items-center gap-2">
+      <CostMeter usage={usage} modelId={model} />
+      {statusMessage ? (
+        <div className="text-[11px] font-medium text-destructive flex items-center gap-2 px-2 py-1.5 rounded-lg bg-destructive/5 border border-destructive/10">
+          {statusMessage}
+        </div>
+      ) : (
+        connectionStatus
+      )}
     </div>
-  ) : (
-    connectionStatus
   );
 
   // Simplified translations for Cowork for now
