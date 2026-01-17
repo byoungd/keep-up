@@ -185,7 +185,7 @@ export function CoworkAIPanel({ onClose, onPreviewArtifact }: CoworkAIPanelProps
       onEdit={onEdit}
       onBranch={(id) => {
         // TODO: Implement proper branch UI (set replyingTo state then send)
-        onBranch(id, "");
+        onBranch(id);
       }}
       onQuote={onQuote}
       onCopy={(content) => {

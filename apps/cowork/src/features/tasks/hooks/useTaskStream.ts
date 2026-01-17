@@ -1,6 +1,7 @@
 import type { CoworkRiskTag, CoworkTask, CoworkTaskStatus, ToolActivity } from "@ku0/agent-runtime";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  applyArtifact as applyArtifactRequest,
   type CoworkApproval,
   type CoworkArtifact,
   getSession,
@@ -8,6 +9,7 @@ import {
   listSessionArtifacts,
   listTasks,
   resolveApproval,
+  revertArtifact as revertArtifactRequest,
 } from "../../../api/coworkApi";
 import { apiUrl, config } from "../../../lib/config";
 import {
@@ -481,7 +483,56 @@ export function useTaskStream(sessionId: string) {
     [refreshSessionState]
   );
 
-  return { graph, isConnected, isLive, approveTool, rejectTool };
+  const updateArtifactRecord = useCallback((record: CoworkArtifact) => {
+    const parsed = ArtifactPayloadSchema.safeParse(record.artifact);
+    if (!parsed.success) {
+      return;
+    }
+    setGraph((prev) => ({
+      ...prev,
+      artifacts: {
+        ...prev.artifacts,
+        [record.artifactId]: {
+          ...parsed.data,
+          updatedAt: record.updatedAt,
+          taskId: record.taskId,
+          version: record.version,
+          status: record.status,
+          appliedAt: record.appliedAt,
+        },
+      },
+    }));
+  }, []);
+
+  const applyArtifact = useCallback(
+    async (artifactId: string) => {
+      try {
+        const updated = await applyArtifactRequest(artifactId);
+        updateArtifactRecord(updated);
+      } catch (error) {
+        // biome-ignore lint/suspicious/noConsole: Expected error logging
+        console.error("Failed to apply artifact", error);
+        void refreshSessionState();
+      }
+    },
+    [refreshSessionState, updateArtifactRecord]
+  );
+
+  const revertArtifact = useCallback(
+    async (artifactId: string) => {
+      try {
+        const updated = await revertArtifactRequest(artifactId);
+        updateArtifactRecord(updated);
+      } catch (error) {
+        // biome-ignore lint/suspicious/noConsole: Expected error logging
+        console.error("Failed to revert artifact", error);
+        void refreshSessionState();
+      }
+    },
+    [refreshSessionState, updateArtifactRecord]
+  );
+
+  return { graph, isConnected, isLive, approveTool, rejectTool, applyArtifact, revertArtifact };
 }
 
 function setupAbortController(
@@ -978,9 +1029,27 @@ function resolveTaskTitle(
 }
 
 function buildArtifactMap(
-  existing: Record<string, ArtifactPayload & { updatedAt?: number; taskId?: string }>,
+  existing: Record<
+    string,
+    ArtifactPayload & {
+      updatedAt?: number;
+      taskId?: string;
+      version?: number;
+      status?: "pending" | "applied" | "reverted";
+      appliedAt?: number;
+    }
+  >,
   records: CoworkArtifact[]
-): Record<string, ArtifactPayload & { updatedAt?: number; taskId?: string }> {
+): Record<
+  string,
+  ArtifactPayload & {
+    updatedAt?: number;
+    taskId?: string;
+    version?: number;
+    status?: "pending" | "applied" | "reverted";
+    appliedAt?: number;
+  }
+> {
   const next = { ...existing };
   for (const record of records) {
     const parsed = ArtifactPayloadSchema.safeParse(record.artifact);
@@ -994,6 +1063,9 @@ function buildArtifactMap(
         ...parsed.data,
         updatedAt: record.updatedAt,
         taskId: record.taskId,
+        version: record.version,
+        status: record.status,
+        appliedAt: record.appliedAt,
       };
     }
   }
