@@ -2,47 +2,41 @@
 
 Agent Runtime with MCP tools, orchestration, and security for building AI agents.
 
+> **Architecture Note**: Please read [ARCHITECTURE.md](./ARCHITECTURE.md) for mandatory integration standards.
+
 ## Overview
 
 This package provides the core infrastructure for building AI agents with:
 
-- **MCP Tool Registry** - Plugin-based tool management with event-driven architecture
-- **Core Tools** - Bash, File, and Code execution with sandboxing
-- **LFCC Integration** - Document operations through Local-First Collaboration Contract
-- **Agent Orchestrator** - LLM coordination with planning and confirmation flows
+- **Multi-Agent Orchestration** - Powered by `@openai/agents` (Standard)
+- **Persistent Memory** - Powered by `mem0ai` (Standard)
+- **Monitoring** - Proactive file watching via `chokidar` (Ghost Agent)
+- **MCP Tool Registry** - Plugin-based tool management
 - **Security Model** - Policies, permissions, and audit logging
-- **External Adapters** - Extension points for LangChain, Dify, and other frameworks
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                     Agent Runtime Architecture                   │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │                    Agent Orchestrator                      │  │
-│  │  • Intent understanding  • Planning  • Execution           │  │
-│  └───────────────────────────────────────────────────────────┘  │
-│                              │                                   │
-│                              ▼                                   │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │                   MCP Tool Registry                        │  │
-│  │                  (Plugin Architecture)                     │  │
-│  └───────────────────────────────────────────────────────────┘  │
-│         │              │              │              │           │
-│         ▼              ▼              ▼              ▼           │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │
-│  │  Bash    │  │  File    │  │   Code   │  │   LFCC   │        │
-│  │  Server  │  │  Server  │  │  Server  │  │  Server  │        │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────┘        │
-│                                                                  │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │                    Security Layer                          │  │
-│  │  • Permissions  • Sandbox  • Audit  • Rate Limiting        │  │
-│  └───────────────────────────────────────────────────────────┘  │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                  Agent Runtime Architecture                 │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌──────────────────────┐      ┌─────────────────────────┐  │
+│  │ OpenAI Agents SDK    │◄────►│      Mem0 Memory        │  │
+│  │ (Orchestration)      │      │     (Long-term)         │  │
+│  └──────────────────────┘      └─────────────────────────┘  │
+│             │                               ▲               │
+│             ▼                               │               │
+│  ┌──────────────────────┐      ┌─────────────────────────┐  │
+│  │   MCP Tool Registry  │      │      Ghost Agent        │  │
+│  │ (Plugin Architecture)│◄────►│  (Chokidar Monitor)     │  │
+│  └──────────────────────┘      └─────────────────────────┘  │
+│             │                                               │
+│             ▼                                               │
+│      [ Tool Servers ]                                       │
+│    Bash • File • Code                                       │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ## Installation
@@ -55,50 +49,40 @@ pnpm add @ku0/agent-runtime
 
 ```typescript
 import {
+  createOpenAIAgentsOrchestrator,
+  createMem0MemoryAdapter,
   createToolRegistry,
   createBashToolServer,
   createFileToolServer,
-  createLFCCToolServer,
-  createOrchestrator,
-  createAICoreAdapter,
-  securityPolicy,
+  createRuntimeLogger
 } from '@ku0/agent-runtime';
 
-// 1. Create tool registry
-const registry = createToolRegistry();
+// 1. Setup logging
+const logger = createRuntimeLogger({ module: "MyAgent" });
 
-// 2. Register tools
+// 2. Setup Memory (Mem0)
+const memory = createMem0MemoryAdapter({
+  apiKey: process.env.MEM0_API_KEY
+});
+
+// 3. Create tool registry
+const registry = createToolRegistry();
 await registry.register(createBashToolServer());
 await registry.register(createFileToolServer());
-await registry.register(createLFCCToolServer(myLFCCBridge));
 
-// 3. Create LLM adapter
-const llm = createAICoreAdapter(myAICoreProvider, {
-  model: 'claude-sonnet-4-20250514',
+// 4. Create Orchestrator (OpenAI Agents SDK)
+const agent = createOpenAIAgentsOrchestrator({
+  model: 'gpt-4o',
 });
 
-// 4. Configure security
-const security = securityPolicy()
-  .fromPreset('balanced')
-  .withWorkingDirectory('/path/to/workspace')
-  .build();
-
-// 5. Create orchestrator
-const agent = createOrchestrator(llm, registry, {
-  systemPrompt: 'You are a helpful assistant with access to tools.',
-  security,
-  requireConfirmation: true,
+// 5. Run the agent
+// The orchestrator handles the loop, planning, and tool execution
+const result = await agent.run({
+  prompt: 'Help me organize my notes relating to the Q1 roadmap',
+  context: { memory, registry }
 });
 
-// 6. Handle confirmations
-agent.setConfirmationHandler(async (request) => {
-  console.log(`Confirm: ${request.description}?`);
-  return await askUser();
-});
-
-// 7. Run the agent
-const result = await agent.run('Help me organize my notes');
-console.log(result.messages);
+logger.info("Agent complete", { result });
 ```
 
 ## Security Presets
