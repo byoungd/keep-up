@@ -28,6 +28,18 @@ export {
   LRUCache,
   ToolResultCache,
 } from "./cache";
+// YAML frontmatter parsing
+export {
+  extractFrontmatter,
+  type FrontmatterResult,
+  type GenericSkillMeta,
+  grayMatter,
+  type PromptTemplateMeta,
+  parseFrontmatter,
+  parseGenericSkillMeta,
+  parsePromptTemplate,
+  stringifyWithFrontmatter,
+} from "./frontmatter";
 // Lazy initialization
 export {
   type AsyncLazy,
@@ -40,6 +52,16 @@ export {
 } from "./lazy";
 // LLM response parsing
 export { parseJsonFromText } from "./llmJson";
+// Pino-based structured logging
+export {
+  createChildLogger,
+  createLogger,
+  createRuntimeLogger,
+  getLogger,
+  type Logger,
+  type LoggerConfig,
+  type RuntimeLogger,
+} from "./logger";
 // Parallel execution utilities
 export {
   createSemaphore,
@@ -88,7 +110,6 @@ export {
   retry,
   withRetry,
 } from "./retry";
-
 // Tool activity helpers
 export {
   formatToolActivityLabel,
