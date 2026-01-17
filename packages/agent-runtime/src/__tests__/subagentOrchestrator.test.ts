@@ -12,8 +12,10 @@ import type {
 } from "../agents/types";
 import { SubagentOrchestrator, type SubagentTask } from "../orchestrator/subagentOrchestrator";
 
+type SpawnRecord = SubagentTask & { parentContextId?: string };
+
 class FakeAgentManager implements IAgentManager {
-  public spawned: SubagentTask[] = [];
+  public spawned: SpawnRecord[] = [];
   public activeCount = 0;
   public maxActive = 0;
 
@@ -31,6 +33,7 @@ class FakeAgentManager implements IAgentManager {
         network: options.security?.permissions.network === "none" ? "none" : "full",
         fileAccess: options.security?.permissions.file === "read" ? "read" : "write",
       },
+      parentContextId: options.parentContextId,
     });
 
     return {
@@ -108,5 +111,37 @@ describe("SubagentOrchestrator", () => {
     expect(spawned?.scope?.allowedTools).toEqual(["file:write"]);
     expect(spawned?.scope?.network).toBe("none");
     expect(spawned?.scope?.fileAccess).toBe("read");
+  });
+
+  it("threads workflow context between subagents", async () => {
+    const manager = new FakeAgentManager();
+    const orchestrator = new SubagentOrchestrator(manager);
+
+    await orchestrator.executeWorkflow("parent", {
+      research: "Find relevant details",
+      plan: "Draft a plan",
+      implement: "Implement the changes",
+      verify: "Verify the result",
+      context: { docId: "doc-1" },
+    });
+
+    expect(manager.spawned[0]?.task).toContain("Context from parent");
+    expect(manager.spawned[0]?.task).toContain('docId: "doc-1"');
+    expect(manager.spawned[1]?.task).toContain('research: "ok"');
+    expect(manager.spawned[2]?.task).toContain('plan: "ok"');
+    expect(manager.spawned[3]?.task).toContain('implementation: "ok"');
+  });
+
+  it("propagates context IDs to spawned agents", async () => {
+    const manager = new FakeAgentManager();
+    const orchestrator = new SubagentOrchestrator(manager);
+
+    await orchestrator.spawnSubagent(
+      "parent",
+      { type: "plan", task: "do work" },
+      { contextId: "ctx-parent" }
+    );
+
+    expect(manager.spawned[0]?.parentContextId).toBe("ctx-parent");
   });
 });

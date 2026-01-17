@@ -61,6 +61,7 @@ import type {
   MCPToolResult,
   MCPToolServer,
   ParallelExecutionConfig,
+  PermissionEscalation,
   SecurityPolicy,
   TokenUsageStats,
   ToolContext,
@@ -151,6 +152,11 @@ export type OrchestratorEventType =
   | "plan:approved"
   | "plan:rejected"
   | "plan:executing"
+  | "control:signal"
+  | "control:paused"
+  | "control:resumed"
+  | "control:step"
+  | "control:injected"
   | "error"
   | "complete"
   | "usage:update";
@@ -163,6 +169,17 @@ export interface OrchestratorEvent {
 }
 
 export type OrchestratorEventHandler = (event: OrchestratorEvent) => void;
+
+export type AgentControlSignal =
+  | { type: "PAUSE"; reason?: string }
+  | { type: "RESUME"; reason?: string }
+  | { type: "STEP"; reason?: string }
+  | { type: "INJECT_THOUGHT"; thought: string; reason?: string };
+
+export interface ControlStateSnapshot {
+  paused: boolean;
+  stepMode: boolean;
+}
 
 export interface OrchestratorComponents {
   messageCompressor?: MessageCompressor;
@@ -245,6 +262,8 @@ export class AgentOrchestrator {
   private currentPlanNodeId?: string;
   private readonly taskGraphToolCalls = new WeakMap<MCPToolCall, string>();
   private totalUsage: TokenUsageStats = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+  private readonly controlState: ControlStateSnapshot = { paused: false, stepMode: false };
+  private controlGate?: { promise: Promise<void>; resolve: () => void };
 
   private state: AgentState;
 
@@ -414,7 +433,12 @@ export class AgentOrchestrator {
     try {
       // Run the agentic loop
       while (this.shouldContinue()) {
+        await this.awaitControlGate();
+        if (!this.shouldContinue()) {
+          break;
+        }
         await this.executeTurn();
+        this.applyStepPause();
       }
     } finally {
       detachStreamBridge?.();
@@ -477,7 +501,12 @@ export class AgentOrchestrator {
     this.state.status = "executing";
     this.loopStateMachine.resume();
     while (this.shouldContinue()) {
+      await this.awaitControlGate();
+      if (!this.shouldContinue()) {
+        break;
+      }
       await this.executeTurn();
+      this.applyStepPause();
     }
 
     return this.state;
@@ -490,6 +519,37 @@ export class AgentOrchestrator {
     this.abortController?.abort();
     this.state.status = "complete";
     this.loopStateMachine.stop();
+    this.releaseControlGate();
+  }
+
+  /**
+   * Send a control signal to the running agent.
+   */
+  sendControlSignal(signal: AgentControlSignal): void {
+    this.emit("control:signal", signal);
+    this.loopStateMachine.applyControlSignal(signal.type);
+
+    switch (signal.type) {
+      case "PAUSE":
+        this.pauseExecution(signal.reason);
+        break;
+      case "RESUME":
+        this.resumeExecution(signal.reason);
+        break;
+      case "STEP":
+        this.stepExecution(signal.reason);
+        break;
+      case "INJECT_THOUGHT":
+        this.injectThought(signal.thought, signal.reason);
+        break;
+    }
+  }
+
+  /**
+   * Get the current control plane state.
+   */
+  getControlState(): ControlStateSnapshot {
+    return { ...this.controlState };
   }
 
   /**
@@ -552,6 +612,91 @@ export class AgentOrchestrator {
   private recordMessage(message: AgentMessage): void {
     this.sessionState?.recordMessage(message);
     this.sessionState?.setState(this.state);
+  }
+
+  private async awaitControlGate(): Promise<void> {
+    if (!this.controlState.paused) {
+      return;
+    }
+
+    if (!this.controlGate) {
+      this.controlGate = this.createControlGate();
+    }
+
+    await this.controlGate.promise;
+  }
+
+  private releaseControlGate(): void {
+    if (this.controlGate) {
+      this.controlGate.resolve();
+      this.controlGate = undefined;
+    }
+  }
+
+  private pauseExecution(reason?: string): void {
+    if (this.controlState.paused) {
+      return;
+    }
+
+    this.controlState.paused = true;
+    this.loopStateMachine.pause();
+    this.emit("control:paused", { reason });
+  }
+
+  private resumeExecution(reason?: string): void {
+    if (!this.controlState.paused && !this.controlState.stepMode) {
+      return;
+    }
+
+    this.controlState.paused = false;
+    this.controlState.stepMode = false;
+    this.loopStateMachine.resume();
+    this.releaseControlGate();
+    this.emit("control:resumed", { reason });
+  }
+
+  private stepExecution(reason?: string): void {
+    this.controlState.stepMode = true;
+    if (this.controlState.paused) {
+      this.controlState.paused = false;
+      this.loopStateMachine.resume();
+      this.releaseControlGate();
+    }
+    this.emit("control:step", { reason });
+  }
+
+  private injectThought(thought: string, reason?: string): void {
+    const message: AgentMessage = {
+      role: "system",
+      content: `[Control] ${thought}`,
+    };
+    this.state.messages.push(message);
+    this.recordMessage(message);
+    this.emit("control:injected", { thought, reason });
+  }
+
+  private applyStepPause(): void {
+    if (!this.controlState.stepMode) {
+      return;
+    }
+
+    if (!this.shouldContinue()) {
+      this.controlState.stepMode = false;
+      return;
+    }
+
+    this.controlState.stepMode = false;
+    this.controlState.paused = true;
+    this.loopStateMachine.pause();
+    this.emit("control:paused", { reason: "step" });
+  }
+
+  private createControlGate(): { promise: Promise<void>; resolve: () => void } {
+    let resolve!: () => void;
+    const promise = new Promise<void>((res) => {
+      resolve = res;
+    });
+    return { promise, resolve };
   }
 
   private shouldContinue(): boolean {
@@ -1098,6 +1243,14 @@ export class AgentOrchestrator {
 
     result = await this.executeToolCall(call, context);
 
+    if (
+      !result.success &&
+      result.error?.code === "PERMISSION_ESCALATION_REQUIRED" &&
+      result.error
+    ) {
+      result = await this.attemptEscalation(call, result.error, context);
+    }
+
     if (!result.success && result.error && this.errorRecoveryEngine) {
       result = await this.attemptRecovery(call, result.error, context);
     }
@@ -1177,11 +1330,6 @@ export class AgentOrchestrator {
   }
 
   private async requestConfirmation(call: MCPToolCall): Promise<boolean> {
-    if (!this.confirmationHandler) {
-      // No handler, default to deny
-      return false;
-    }
-
     const taskNodeId = this.ensureTaskGraphToolNode(call, "blocked");
     const confirmationDetails = this.getConfirmationDetails(call);
     const request: ConfirmationRequest = {
@@ -1194,6 +1342,15 @@ export class AgentOrchestrator {
       taskNodeId,
     };
 
+    return this.requestUserConfirmation(request);
+  }
+
+  private async requestUserConfirmation(request: ConfirmationRequest): Promise<boolean> {
+    if (!this.confirmationHandler) {
+      // No handler, default to deny
+      return false;
+    }
+
     this.state.status = "waiting_confirmation";
     this.emit("confirmation:required", request);
     this.loopStateMachine.pause();
@@ -1205,6 +1362,75 @@ export class AgentOrchestrator {
     this.loopStateMachine.resume();
 
     return confirmed;
+  }
+
+  private async attemptEscalation(
+    call: MCPToolCall,
+    error: ToolError,
+    context: ToolContext
+  ): Promise<MCPToolResult> {
+    const escalation = this.extractEscalation(error);
+    if (!escalation) {
+      return { success: false, content: [], error };
+    }
+
+    const approved = await this.requestEscalation(call, escalation);
+    if (!approved) {
+      this.metrics?.increment(AGENT_METRICS.permissionDenied.name, {
+        tool_name: call.name,
+        permission: "escalation",
+      });
+      return { success: false, content: [], error };
+    }
+
+    this.applyPermissionEscalation(escalation);
+    return this.executeToolCall(call, { ...context, security: this.config.security });
+  }
+
+  private async requestEscalation(
+    call: MCPToolCall,
+    escalation: PermissionEscalation
+  ): Promise<boolean> {
+    const taskNodeId = this.ensureTaskGraphToolNode(call, "blocked");
+    const request: ConfirmationRequest = {
+      toolName: call.name,
+      description: `Escalate ${escalation.permission} permission to "${escalation.level}" for ${call.name}`,
+      arguments: call.arguments,
+      risk: "medium",
+      reason: escalation.reason ?? "Permission escalation requested",
+      riskTags: ["permission:escalation"],
+      taskNodeId,
+      escalation,
+    };
+
+    return this.requestUserConfirmation(request);
+  }
+
+  private extractEscalation(error: ToolError): PermissionEscalation | undefined {
+    const details = error.details;
+    if (!details || typeof details !== "object") {
+      return undefined;
+    }
+    const record = details as { escalation?: unknown };
+    if (!record.escalation || typeof record.escalation !== "object") {
+      return undefined;
+    }
+    const escalation = record.escalation as PermissionEscalation;
+    return this.isPermissionEscalation(escalation) ? escalation : undefined;
+  }
+
+  private isPermissionEscalation(value: PermissionEscalation): boolean {
+    return Boolean(value.permission && value.level);
+  }
+
+  private applyPermissionEscalation(escalation: PermissionEscalation): void {
+    this.config.security = {
+      ...this.config.security,
+      permissions: {
+        ...this.config.security.permissions,
+        [escalation.permission]: escalation.level,
+      },
+    };
   }
 
   private assessRisk(call: MCPToolCall): "low" | "medium" | "high" {
@@ -1240,6 +1466,7 @@ export class AgentOrchestrator {
     return {
       userId: undefined, // Set from session
       sessionId: this.sessionState?.id,
+      contextId: this.sessionState?.getContextId(),
       docId: undefined, // Set from context
       correlationId: this.currentRunId,
       taskNodeId: call ? this.taskGraphToolCalls.get(call) : undefined,

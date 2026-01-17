@@ -30,6 +30,7 @@ import type {
   MCPTool,
   MCPToolCall,
   MCPToolResult,
+  PermissionEscalation,
   ToolContext,
   ToolExecutionRecord,
 } from "../types";
@@ -78,18 +79,20 @@ class MockToolRegistry implements IToolRegistry {
 class MockPermissionChecker implements IPermissionChecker {
   public allowAll = true;
   public denyReason = "Permission denied by policy";
+  public escalation?: PermissionEscalation;
   public checkedOperations: Array<{ tool: string; operation: string; resource?: string }> = [];
 
   check(operation: { tool: string; operation: string; resource?: string }): {
     allowed: boolean;
     reason?: string;
+    escalation?: PermissionEscalation;
   } {
     this.checkedOperations.push(operation);
 
     if (this.allowAll) {
       return { allowed: true };
     }
-    return { allowed: false, reason: this.denyReason };
+    return { allowed: false, reason: this.denyReason, escalation: this.escalation };
   }
 }
 
@@ -344,6 +347,23 @@ describe("ToolExecutionPipeline", () => {
       expect(result.success).toBe(false);
       expect(result.error?.code).toBe("PERMISSION_DENIED");
       expect(result.error?.message).toBe("Forbidden by security policy");
+    });
+
+    it("should surface escalation metadata when policy suggests escalation", async () => {
+      policy.allowAll = false;
+      policy.denyReason = "File access is disabled";
+      policy.escalation = {
+        permission: "file",
+        level: "read",
+        resource: "/tmp/test.txt",
+      };
+
+      const call = createMockCall("file:read", { path: "/tmp/test.txt" });
+      const result = await pipeline.execute(call, context);
+
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe("PERMISSION_ESCALATION_REQUIRED");
+      expect(result.error?.details).toEqual({ escalation: policy.escalation });
     });
 
     it("should parse qualified tool names for policy check", async () => {

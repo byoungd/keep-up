@@ -322,6 +322,7 @@ export class ToolExecutionPipeline
     const policyDecision = this.evaluatePolicy(call, tool, context);
 
     if (!policyDecision.allowed) {
+      const escalation = policyDecision.escalation;
       const decision = this.createExecutionDecision({
         decisionId,
         toolName: call.name,
@@ -331,13 +332,15 @@ export class ToolExecutionPipeline
         requiresConfirmation: policyDecision.requiresConfirmation,
         reason: policyDecision.reason ?? "Permission denied",
         riskTags: policyDecision.riskTags,
+        escalation,
         sandboxed: context.security.sandbox.type !== "none",
       });
       this.emitDecision(decision, context);
 
       const denied = this.createErrorResult(
-        "PERMISSION_DENIED",
-        policyDecision.reason ?? "Permission denied"
+        escalation ? "PERMISSION_ESCALATION_REQUIRED" : "PERMISSION_DENIED",
+        policyDecision.reason ?? "Permission denied",
+        escalation ? { escalation } : undefined
       );
       this.emitRecord(
         this.createExecutionRecord({
@@ -592,11 +595,15 @@ export class ToolExecutionPipeline
     return undefined;
   }
 
-  private createErrorResult(code: ToolError["code"], message: string): MCPToolResult {
+  private createErrorResult(
+    code: ToolError["code"],
+    message: string,
+    details?: ToolError["details"]
+  ): MCPToolResult {
     return {
       success: false,
       content: [{ type: "text", text: message }],
-      error: { code, message },
+      error: { code, message, details },
     };
   }
 

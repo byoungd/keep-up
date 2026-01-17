@@ -11,6 +11,7 @@ import type {
   AuditLogger,
   MCPTool,
   MCPToolCall,
+  PermissionEscalation,
   ResourceLimits,
   SandboxConfig,
   SecurityPolicy,
@@ -41,6 +42,7 @@ export interface PermissionResult {
   reason?: string;
   requiresConfirmation?: boolean;
   riskTags?: string[];
+  escalation?: PermissionEscalation;
 }
 
 /**
@@ -85,7 +87,11 @@ export class PermissionChecker implements IPermissionChecker {
 
     switch (permission) {
       case "disabled":
-        return { allowed: false, reason: "Bash execution is disabled" };
+        return {
+          allowed: false,
+          reason: "Bash execution is disabled",
+          escalation: this.buildEscalation("bash", "sandbox"),
+        };
       case "confirm":
         return { allowed: true, requiresConfirmation: true };
       case "sandbox":
@@ -97,16 +103,24 @@ export class PermissionChecker implements IPermissionChecker {
     }
   }
 
-  private checkFilePermission(operation: string, _resource?: string): PermissionResult {
+  private checkFilePermission(operation: string, resource?: string): PermissionResult {
     const permission = this.policy.permissions.file;
     const isWrite = ["write", "delete", "create"].includes(operation);
 
     switch (permission) {
       case "none":
-        return { allowed: false, reason: "File access is disabled" };
+        return {
+          allowed: false,
+          reason: "File access is disabled",
+          escalation: this.buildEscalation("file", isWrite ? "workspace" : "read", resource),
+        };
       case "read":
         if (isWrite) {
-          return { allowed: false, reason: "File write access is disabled" };
+          return {
+            allowed: false,
+            reason: "File write access is disabled",
+            escalation: this.buildEscalation("file", "workspace", resource),
+          };
         }
         return { allowed: true };
       case "workspace":
@@ -123,7 +137,11 @@ export class PermissionChecker implements IPermissionChecker {
 
     switch (permission) {
       case "disabled":
-        return { allowed: false, reason: "Code execution is disabled" };
+        return {
+          allowed: false,
+          reason: "Code execution is disabled",
+          escalation: this.buildEscalation("code", "sandbox"),
+        };
       case "sandbox":
         return { allowed: true, requiresConfirmation: true };
       case "full":
@@ -139,10 +157,18 @@ export class PermissionChecker implements IPermissionChecker {
 
     switch (permission) {
       case "none":
-        return { allowed: false, reason: "Document access is disabled" };
+        return {
+          allowed: false,
+          reason: "Document access is disabled",
+          escalation: this.buildEscalation("lfcc", isWrite ? "write" : "read"),
+        };
       case "read":
         if (isWrite) {
-          return { allowed: false, reason: "Document write access is disabled" };
+          return {
+            allowed: false,
+            reason: "Document write access is disabled",
+            escalation: this.buildEscalation("lfcc", "write"),
+          };
         }
         return { allowed: true };
       case "write":
@@ -158,7 +184,11 @@ export class PermissionChecker implements IPermissionChecker {
 
     switch (permission) {
       case "none":
-        return { allowed: false, reason: "Network access is disabled" };
+        return {
+          allowed: false,
+          reason: "Network access is disabled",
+          escalation: this.buildEscalation("network", "allowlist"),
+        };
       case "allowlist":
         return { allowed: true, requiresConfirmation: true };
       case "full":
@@ -166,6 +196,18 @@ export class PermissionChecker implements IPermissionChecker {
       default:
         return { allowed: false, reason: "Unknown permission level" };
     }
+  }
+
+  private buildEscalation(
+    permission: PermissionEscalation["permission"],
+    level: PermissionEscalation["level"],
+    resource?: string
+  ): PermissionEscalation {
+    return {
+      permission,
+      level,
+      resource,
+    };
   }
 }
 
@@ -188,6 +230,7 @@ export interface ToolPolicyDecision {
   requiresConfirmation: boolean;
   reason?: string;
   riskTags?: string[];
+  escalation?: PermissionEscalation;
 }
 
 export interface ToolPolicyEngine {
@@ -213,6 +256,7 @@ export class PermissionPolicyEngine implements ToolPolicyEngine {
       requiresConfirmation: result.requiresConfirmation ?? false,
       reason: result.reason,
       riskTags: result.riskTags,
+      escalation: result.escalation,
     };
   }
 }

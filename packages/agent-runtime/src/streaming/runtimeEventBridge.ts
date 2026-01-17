@@ -8,6 +8,7 @@ import type {
   ArtifactEvents,
   RuntimeEvent,
   RuntimeEventBus,
+  SubagentEventPayload,
   Subscription,
 } from "../events/eventBus";
 import type { ExecutionDecision, ToolExecutionRecord } from "../types";
@@ -23,6 +24,8 @@ interface ToolActivityMetadata {
   toolName: string;
   toolCallId?: string;
   taskNodeId?: string;
+  agentId?: string;
+  parentId?: string;
   activity: ToolActivity;
   label: string;
   status: ToolExecutionRecord["status"];
@@ -52,13 +55,110 @@ export function attachRuntimeEventStreamBridge(config: RuntimeEventStreamBridgeC
     return true;
   };
 
+  const handleExecutionDecision = (
+    decision: ExecutionDecision,
+    context?: { agentId?: string; parentId?: string }
+  ) => {
+    if (context?.agentId) {
+      stream.writeMetadata("execution:decision", {
+        ...decision,
+        agentId: context.agentId,
+        parentId: context.parentId,
+      });
+      return;
+    }
+    stream.writeMetadata("execution:decision", decision);
+  };
+
+  const handleExecutionRecord = (
+    record: ToolExecutionRecord,
+    context?: { agentId?: string; parentId?: string }
+  ) => {
+    const activity = resolveToolActivity(record.toolName);
+    const activityMeta: ToolActivityMetadata = {
+      toolName: record.toolName,
+      toolCallId: record.toolCallId,
+      taskNodeId: record.taskNodeId,
+      agentId: context?.agentId,
+      parentId: context?.parentId,
+      activity,
+      label: formatToolActivityLabel(activity),
+      status: record.status,
+      durationMs: record.durationMs,
+      error: record.error,
+    };
+    const messagePrefix = context?.agentId ? `Subagent ${context.agentId}: ` : "";
+    stream.writeMetadata("tool:activity", activityMeta);
+    if (record.status === "started") {
+      stream.writeProgress(
+        "tool",
+        `${messagePrefix}${formatToolActivityMessage(activity, "started")}`,
+        {
+          percent: 0,
+        }
+      );
+    } else if (record.status === "completed") {
+      stream.writeProgress(
+        "tool",
+        `${messagePrefix}${formatToolActivityMessage(activity, "completed")}`,
+        {
+          percent: 100,
+        }
+      );
+    } else {
+      stream.writeError(record.error ?? `${record.toolName} failed`, "TOOL_FAILED", false);
+    }
+    stream.writeMetadata("execution:record", record);
+  };
+
+  const handleArtifactEmitted = (
+    payload: ArtifactEvents["artifact:emitted"],
+    context?: { agentId?: string; parentId?: string }
+  ) => {
+    if (context?.agentId) {
+      stream.writeMetadata("artifact", {
+        ...payload,
+        agentId: context.agentId,
+        parentId: context.parentId,
+      });
+    } else {
+      stream.writeMetadata("artifact", payload);
+    }
+    if (payload.stored) {
+      const prefix = context?.agentId ? `Subagent ${context.agentId}: ` : "";
+      stream.writeProgress("artifact", `${prefix}${payload.artifact.title} ready`, {
+        percent: 100,
+      });
+    }
+  };
+
+  const handleArtifactQuarantined = (
+    payload: ArtifactEvents["artifact:quarantined"],
+    context?: { agentId?: string; parentId?: string }
+  ) => {
+    if (context?.agentId) {
+      stream.writeMetadata("artifact:quarantined", {
+        ...payload,
+        agentId: context.agentId,
+        parentId: context.parentId,
+      });
+    } else {
+      stream.writeMetadata("artifact:quarantined", payload);
+    }
+    const message =
+      payload.errors.length > 0
+        ? `Artifact ${payload.artifact.title} quarantined: ${payload.errors[0]}`
+        : `Artifact ${payload.artifact.title} quarantined`;
+    stream.writeError(message, "ARTIFACT_QUARANTINED", false);
+  };
+
   if (includeDecisions) {
     subscriptions.push(
       eventBus.subscribe("execution:decision", (event) => {
         if (!shouldHandle(event)) {
           return;
         }
-        stream.writeMetadata("execution:decision", event.payload as ExecutionDecision);
+        handleExecutionDecision(event.payload as ExecutionDecision);
       })
     );
   }
@@ -68,31 +168,7 @@ export function attachRuntimeEventStreamBridge(config: RuntimeEventStreamBridgeC
       if (!shouldHandle(event)) {
         return;
       }
-      const record = event.payload as ToolExecutionRecord;
-      const activity = resolveToolActivity(record.toolName);
-      const activityMeta: ToolActivityMetadata = {
-        toolName: record.toolName,
-        toolCallId: record.toolCallId,
-        taskNodeId: record.taskNodeId,
-        activity,
-        label: formatToolActivityLabel(activity),
-        status: record.status,
-        durationMs: record.durationMs,
-        error: record.error,
-      };
-      stream.writeMetadata("tool:activity", activityMeta);
-      if (record.status === "started") {
-        stream.writeProgress("tool", formatToolActivityMessage(activity, record.status), {
-          percent: 0,
-        });
-      } else if (record.status === "completed") {
-        stream.writeProgress("tool", formatToolActivityMessage(activity, record.status), {
-          percent: 100,
-        });
-      } else {
-        stream.writeError(record.error ?? `${record.toolName} failed`, "TOOL_FAILED", false);
-      }
-      stream.writeMetadata("execution:record", record);
+      handleExecutionRecord(event.payload as ToolExecutionRecord);
     })
   );
 
@@ -101,11 +177,7 @@ export function attachRuntimeEventStreamBridge(config: RuntimeEventStreamBridgeC
       if (!shouldHandle(event)) {
         return;
       }
-      const payload = event.payload as ArtifactEvents["artifact:emitted"];
-      stream.writeMetadata("artifact", payload);
-      if (payload.stored) {
-        stream.writeProgress("artifact", `${payload.artifact.title} ready`, { percent: 100 });
-      }
+      handleArtifactEmitted(event.payload as ArtifactEvents["artifact:emitted"]);
     })
   );
 
@@ -114,13 +186,39 @@ export function attachRuntimeEventStreamBridge(config: RuntimeEventStreamBridgeC
       if (!shouldHandle(event)) {
         return;
       }
-      const payload = event.payload as ArtifactEvents["artifact:quarantined"];
-      stream.writeMetadata("artifact:quarantined", payload);
-      const message =
-        payload.errors.length > 0
-          ? `Artifact ${payload.artifact.title} quarantined: ${payload.errors[0]}`
-          : `Artifact ${payload.artifact.title} quarantined`;
-      stream.writeError(message, "ARTIFACT_QUARANTINED", false);
+      handleArtifactQuarantined(event.payload as ArtifactEvents["artifact:quarantined"]);
+    })
+  );
+
+  subscriptions.push(
+    eventBus.subscribe("subagent:event", (event) => {
+      if (!shouldHandle(event)) {
+        return;
+      }
+      const payload = event.payload as SubagentEventPayload;
+      const innerEvent = payload.event;
+      const context = { agentId: payload.agentId, parentId: payload.parentId };
+
+      stream.writeMetadata("subagent:event", payload);
+
+      if (innerEvent.type === "execution:decision" && includeDecisions) {
+        handleExecutionDecision(innerEvent.payload as ExecutionDecision, context);
+      }
+
+      if (innerEvent.type === "execution:record") {
+        handleExecutionRecord(innerEvent.payload as ToolExecutionRecord, context);
+      }
+
+      if (innerEvent.type === "artifact:emitted") {
+        handleArtifactEmitted(innerEvent.payload as ArtifactEvents["artifact:emitted"], context);
+      }
+
+      if (innerEvent.type === "artifact:quarantined") {
+        handleArtifactQuarantined(
+          innerEvent.payload as ArtifactEvents["artifact:quarantined"],
+          context
+        );
+      }
     })
   );
 

@@ -84,6 +84,7 @@ export type ToolErrorCode =
   | "EXECUTION_FAILED"
   | "TIMEOUT"
   | "PERMISSION_DENIED"
+  | "PERMISSION_ESCALATION_REQUIRED"
   | "INVALID_ARGUMENTS"
   | "SANDBOX_VIOLATION"
   | "RESOURCE_NOT_FOUND"
@@ -120,6 +121,8 @@ export interface ToolContext {
   userId?: string;
   /** Current session ID */
   sessionId?: string;
+  /** Context ID for shared context views */
+  contextId?: string;
   /** Current document ID (for LFCC tools) */
   docId?: string;
   /** Correlation ID for tracing */
@@ -225,6 +228,13 @@ export interface ToolPermissions {
   network: "none" | "allowlist" | "full";
   /** LFCC document permission */
   lfcc: "none" | "read" | "write" | "admin";
+}
+
+export interface PermissionEscalation {
+  permission: keyof ToolPermissions;
+  level: ToolPermissions[keyof ToolPermissions];
+  resource?: string;
+  reason?: string;
 }
 
 export interface ResourceLimits {
@@ -437,6 +447,7 @@ export interface ConfirmationRequest {
   reason?: string;
   riskTags?: string[];
   taskNodeId?: string;
+  escalation?: PermissionEscalation;
 }
 
 /** Confirmation handler callback */
@@ -456,6 +467,7 @@ export interface ExecutionDecision {
   requiresConfirmation: boolean;
   reason?: string;
   riskTags?: string[];
+  escalation?: PermissionEscalation;
   sandboxed: boolean;
   affectedPaths?: string[];
 }

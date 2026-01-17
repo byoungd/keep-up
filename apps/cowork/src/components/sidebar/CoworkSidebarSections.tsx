@@ -138,7 +138,9 @@ export function CoworkSidebarSections() {
       setProjectName("");
       setProjectInstructions("");
       setIsDialogOpen(false);
-    } catch (_err) {}
+    } catch (_err) {
+      // Ignore failures to keep the dialog responsive.
+    }
   }, [projectInstructions, projectName, createProject]);
 
   const handleSelectProject = React.useCallback(
@@ -177,7 +179,9 @@ export function CoworkSidebarSections() {
     async (sessionId: string, projectId: string | null) => {
       try {
         await moveSessionToProject(sessionId, projectId);
-      } catch (_err) {}
+      } catch (_err) {
+        // Ignore failures to keep the UI responsive.
+      }
     },
     [moveSessionToProject]
   );
@@ -187,7 +191,9 @@ export function CoworkSidebarSections() {
       if (window.confirm("Are you sure you want to delete this session?")) {
         try {
           await deleteSession(sessionId);
-        } catch (_e) {}
+        } catch (_e) {
+          // Ignore failures to keep the list usable.
+        }
       }
     },
     [deleteSession]

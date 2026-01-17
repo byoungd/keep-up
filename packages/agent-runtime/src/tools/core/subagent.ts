@@ -4,15 +4,14 @@
  * Provides MCP tools for spawning focused subagents.
  */
 
-import type { AgentResult, AgentType, IAgentManager, SpawnAgentOptions } from "../../agents/types";
+import type { AgentResult, AgentType, IAgentManager } from "../../agents/types";
+import {
+  SubagentOrchestrator,
+  type SubagentScope,
+  type SubagentTask,
+} from "../../orchestrator/subagentOrchestrator";
 import type { MCPToolResult, SecurityPolicy, ToolContext } from "../../types";
 import { BaseToolServer, errorResult, textResult } from "../mcp/baseServer";
-
-type SpawnRequest = {
-  type: AgentType;
-  task: string;
-  maxTurns?: number;
-};
 
 type WorkflowResult = {
   research?: AgentResult;
@@ -25,13 +24,13 @@ export class SubagentToolServer extends BaseToolServer {
   readonly name = "subagent";
   readonly description = "Spawn and orchestrate subagents for focused tasks";
 
-  private readonly manager: IAgentManager;
+  private readonly orchestrator: SubagentOrchestrator;
   private readonly availableTypes: AgentType[];
   private readonly availableTypeSet: Set<AgentType>;
 
   constructor(manager: IAgentManager) {
     super();
-    this.manager = manager;
+    this.orchestrator = new SubagentOrchestrator(manager);
     this.availableTypes = manager.getAvailableTypes();
     this.availableTypeSet = new Set(this.availableTypes);
     this.registerTools();
@@ -52,6 +51,16 @@ export class SubagentToolServer extends BaseToolServer {
             },
             task: { type: "string", description: "Task for the subagent" },
             maxTurns: { type: "number", description: "Override max turns for the subagent" },
+            context: { type: "object", description: "Optional context to pass to the subagent" },
+            scope: {
+              type: "object",
+              description: "Optional scope constraints for the subagent",
+              properties: {
+                allowedTools: { type: "array", items: { type: "string" } },
+                fileAccess: { type: "string", enum: ["none", "read", "write"] },
+                network: { type: "string", enum: ["none", "restricted", "full"] },
+              },
+            },
           },
           required: ["type", "task"],
         },
@@ -85,9 +94,26 @@ export class SubagentToolServer extends BaseToolServer {
                   },
                   task: { type: "string", description: "Task for the subagent" },
                   maxTurns: { type: "number", description: "Override max turns for the subagent" },
+                  context: {
+                    type: "object",
+                    description: "Optional context to pass to the subagent",
+                  },
+                  scope: {
+                    type: "object",
+                    description: "Optional scope constraints for the subagent",
+                    properties: {
+                      allowedTools: { type: "array", items: { type: "string" } },
+                      fileAccess: { type: "string", enum: ["none", "read", "write"] },
+                      network: { type: "string", enum: ["none", "restricted", "full"] },
+                    },
+                  },
                 },
                 required: ["type", "task"],
               },
+            },
+            maxConcurrent: {
+              type: "number",
+              description: "Maximum number of subagents to run concurrently",
             },
           },
           required: ["tasks"],
@@ -114,6 +140,16 @@ export class SubagentToolServer extends BaseToolServer {
             implement: { type: "string", description: "Implementation task" },
             verify: { type: "string", description: "Verification task" },
             maxTurns: { type: "number", description: "Override max turns for each agent" },
+            context: { type: "object", description: "Optional context to pass to each step" },
+            scope: {
+              type: "object",
+              description: "Optional scope constraints for workflow subagents",
+              properties: {
+                allowedTools: { type: "array", items: { type: "string" } },
+                fileAccess: { type: "string", enum: ["none", "read", "write"] },
+                network: { type: "string", enum: ["none", "restricted", "full"] },
+              },
+            },
           },
         },
         annotations: {
@@ -147,7 +183,7 @@ export class SubagentToolServer extends BaseToolServer {
 
   private async handleSpawn(
     args: Record<string, unknown>,
-    context: ToolContext
+    toolContext: ToolContext
   ): Promise<MCPToolResult> {
     const type = this.parseAgentType(args.type);
     const task = this.parseTask(args.task);
@@ -156,10 +192,19 @@ export class SubagentToolServer extends BaseToolServer {
     }
 
     const maxTurns = this.parseMaxTurns(args.maxTurns);
+    const context = this.parseContext(args.context);
+    const scope = this.parseScope(args.scope);
+    const parentId = toolContext.correlationId ?? "subagent";
 
     try {
-      const result = await this.manager.spawn(
-        this.buildSpawnOptions({ type, task, maxTurns }, context)
+      const result = await this.orchestrator.spawnSubagent(
+        parentId,
+        { type, task, maxTurns, context, scope },
+        {
+          signal: toolContext.signal,
+          baseSecurity: this.cloneSecurity(toolContext.security),
+          contextId: toolContext.contextId,
+        }
       );
       return textResult(JSON.stringify(result, null, 2));
     } catch (error) {
@@ -172,14 +217,14 @@ export class SubagentToolServer extends BaseToolServer {
 
   private async handleSpawnParallel(
     args: Record<string, unknown>,
-    context: ToolContext
+    toolContext: ToolContext
   ): Promise<MCPToolResult> {
     const tasks = Array.isArray(args.tasks) ? args.tasks : null;
     if (!tasks || tasks.length === 0) {
       return errorResult("INVALID_ARGUMENTS", "Provide a non-empty 'tasks' array.");
     }
 
-    const spawnOptions: SpawnAgentOptions[] = [];
+    const subagentTasks: SubagentTask[] = [];
 
     for (const entry of tasks) {
       if (!entry || typeof entry !== "object") {
@@ -198,12 +243,33 @@ export class SubagentToolServer extends BaseToolServer {
       }
 
       const maxTurns = this.parseMaxTurns(entryRecord.maxTurns);
-      spawnOptions.push(this.buildSpawnOptions({ type, task, maxTurns }, context));
+      const context = this.parseContext(entryRecord.context);
+      const scope = this.parseScope(entryRecord.scope);
+      subagentTasks.push({ type, task, maxTurns, context, scope });
     }
 
     try {
-      const results = await this.manager.spawnParallel(spawnOptions);
-      return textResult(JSON.stringify({ results }, null, 2));
+      const maxConcurrent = this.parseMaxConcurrent(args.maxConcurrent);
+      const parentId = toolContext.correlationId ?? "subagent";
+      const results = await this.orchestrator.orchestrateSubagents(parentId, subagentTasks, {
+        signal: toolContext.signal,
+        maxConcurrent,
+        baseSecurity: this.cloneSecurity(toolContext.security),
+        contextId: toolContext.contextId,
+      });
+      return textResult(
+        JSON.stringify(
+          {
+            results: results.results,
+            summary: results.summary,
+            successful: results.successful,
+            failed: results.failed,
+            totalDurationMs: results.totalDurationMs,
+          },
+          null,
+          2
+        )
+      );
     } catch (error) {
       return errorResult(
         "EXECUTION_FAILED",
@@ -214,9 +280,11 @@ export class SubagentToolServer extends BaseToolServer {
 
   private async handleWorkflow(
     args: Record<string, unknown>,
-    context: ToolContext
+    toolContext: ToolContext
   ): Promise<MCPToolResult> {
     const maxTurns = this.parseMaxTurns(args.maxTurns);
+    const context = this.parseContext(args.context);
+    const scope = this.parseScope(args.scope);
 
     const researchTask = this.parseTask(args.research);
     const planTask = this.parseTask(args.plan);
@@ -228,42 +296,26 @@ export class SubagentToolServer extends BaseToolServer {
     }
 
     try {
-      const results: WorkflowResult = {};
-
-      if (researchTask) {
-        results.research = await this.manager.spawn(
-          this.buildSpawnOptions({ type: "research", task: researchTask, maxTurns }, context)
-        );
-        if (!results.research.success) {
-          return textResult(JSON.stringify(results, null, 2));
+      const parentId = toolContext.correlationId ?? "subagent";
+      const results = await this.orchestrator.executeWorkflow(
+        parentId,
+        {
+          research: researchTask ?? undefined,
+          plan: planTask ?? undefined,
+          implement: implementTask ?? undefined,
+          verify: verifyTask ?? undefined,
+          maxTurns,
+          context,
+          scope,
+        },
+        {
+          signal: toolContext.signal,
+          baseSecurity: this.cloneSecurity(toolContext.security),
+          contextId: toolContext.contextId,
         }
-      }
+      );
 
-      if (planTask) {
-        results.plan = await this.manager.spawn(
-          this.buildSpawnOptions({ type: "plan", task: planTask, maxTurns }, context)
-        );
-        if (!results.plan.success) {
-          return textResult(JSON.stringify(results, null, 2));
-        }
-      }
-
-      if (implementTask) {
-        results.implementation = await this.manager.spawn(
-          this.buildSpawnOptions({ type: "code", task: implementTask, maxTurns }, context)
-        );
-        if (!results.implementation.success) {
-          return textResult(JSON.stringify(results, null, 2));
-        }
-      }
-
-      if (verifyTask) {
-        results.verification = await this.manager.spawn(
-          this.buildSpawnOptions({ type: "bash", task: verifyTask, maxTurns }, context)
-        );
-      }
-
-      return textResult(JSON.stringify(results, null, 2));
+      return textResult(JSON.stringify(results as WorkflowResult, null, 2));
     } catch (error) {
       return errorResult(
         "EXECUTION_FAILED",
@@ -302,15 +354,46 @@ export class SubagentToolServer extends BaseToolServer {
     return rounded > 0 ? rounded : undefined;
   }
 
-  private buildSpawnOptions(request: SpawnRequest, context: ToolContext): SpawnAgentOptions {
-    return {
-      type: request.type,
-      task: request.task,
-      maxTurns: request.maxTurns,
-      parentTraceId: context.correlationId,
-      security: this.cloneSecurity(context.security),
-      signal: context.signal,
-    };
+  private parseMaxConcurrent(value: unknown): number | undefined {
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      return undefined;
+    }
+    const rounded = Math.floor(value);
+    return rounded > 0 ? rounded : undefined;
+  }
+
+  private parseContext(value: unknown): Record<string, unknown> | undefined {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return undefined;
+    }
+    return value as Record<string, unknown>;
+  }
+
+  private parseScope(value: unknown): SubagentScope | undefined {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return undefined;
+    }
+
+    const record = value as Record<string, unknown>;
+    const scope: SubagentScope = {};
+    const allowedTools = record.allowedTools;
+    if (Array.isArray(allowedTools) && allowedTools.every((tool) => typeof tool === "string")) {
+      scope.allowedTools = allowedTools;
+    }
+
+    if (
+      record.fileAccess === "none" ||
+      record.fileAccess === "read" ||
+      record.fileAccess === "write"
+    ) {
+      scope.fileAccess = record.fileAccess;
+    }
+
+    if (record.network === "none" || record.network === "restricted" || record.network === "full") {
+      scope.network = record.network;
+    }
+
+    return Object.keys(scope).length > 0 ? scope : undefined;
   }
 
   private cloneSecurity(policy: SecurityPolicy): SecurityPolicy {

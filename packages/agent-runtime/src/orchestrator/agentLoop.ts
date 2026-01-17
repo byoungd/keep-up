@@ -156,6 +156,8 @@ export interface AgentLoopConfig {
   onCycleComplete?: (cycle: AgentLoopCycle) => void;
 }
 
+export type AgentLoopControlSignal = "PAUSE" | "RESUME" | "STEP" | "INJECT_THOUGHT";
+
 // ============================================================================
 // Agent Loop State Machine
 // ============================================================================
@@ -295,6 +297,19 @@ export class AgentLoopStateMachine {
   stop(): void {
     this.state.isRunning = false;
     this.state.isPaused = false;
+  }
+
+  /**
+   * Apply a control signal to the loop state.
+   */
+  applyControlSignal(signal: AgentLoopControlSignal): void {
+    if (signal === "PAUSE") {
+      this.pause();
+      return;
+    }
+    if (signal === "RESUME" || signal === "STEP") {
+      this.resume();
+    }
   }
 
   // ============================================================================

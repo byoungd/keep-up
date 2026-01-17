@@ -151,4 +151,4 @@ export interface CoworkWorkflowTemplate {
   lastUsedSessionId?: string;
 }
 
-export { type WorkflowTemplate, type WorkflowContext, type WorkflowPhase };
+export type { WorkflowTemplate, WorkflowContext, WorkflowPhase };

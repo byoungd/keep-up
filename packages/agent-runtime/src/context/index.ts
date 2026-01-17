@@ -35,6 +35,8 @@ export {
   type ContextFact,
   ContextManager,
   type ContextManagerOptions,
+  type ContextView,
   type CreateContextOptions,
+  type CreateContextViewOptions,
   createContextManager,
 } from "./contextManager";

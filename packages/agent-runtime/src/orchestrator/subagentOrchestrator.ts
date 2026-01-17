@@ -22,6 +22,8 @@ export interface SubagentTask {
   type: AgentType;
   /** Task description for this subagent */
   task: string;
+  /** Override default max turns */
+  maxTurns?: number;
   /** Context to pass to subagent */
   context?: Record<string, unknown>;
   /** Priority (higher = earlier execution) */
@@ -84,7 +86,12 @@ export class SubagentOrchestrator {
   async orchestrateSubagents(
     parentId: string,
     tasks: SubagentTask[],
-    options: { signal?: AbortSignal; maxConcurrent?: number } = {}
+    options: {
+      signal?: AbortSignal;
+      maxConcurrent?: number;
+      baseSecurity?: SecurityPolicy;
+      contextId?: string;
+    } = {}
   ): Promise<AggregatedResults> {
     const startTime = Date.now();
 
@@ -93,7 +100,13 @@ export class SubagentOrchestrator {
 
     // Convert to spawn options
     const spawnOptions: SpawnAgentOptions[] = sortedTasks.map((task) =>
-      this.buildSpawnOptions(task, options.signal)
+      this.buildSpawnOptions(
+        task,
+        options.signal,
+        options.baseSecurity,
+        parentId,
+        options.contextId
+      )
     );
 
     const results =
@@ -118,9 +131,17 @@ export class SubagentOrchestrator {
   async spawnSubagent(
     parentId: string,
     task: SubagentTask,
-    options: { signal?: AbortSignal } = {}
+    options: { signal?: AbortSignal; baseSecurity?: SecurityPolicy; contextId?: string } = {}
   ): Promise<AgentResult> {
-    const result = await this.manager.spawn(this.buildSpawnOptions(task, options.signal));
+    const result = await this.manager.spawn(
+      this.buildSpawnOptions(
+        task,
+        options.signal,
+        options.baseSecurity,
+        parentId,
+        options.contextId
+      )
+    );
 
     // Track relationship
     const existing = this.relationships.get(parentId);
@@ -147,8 +168,11 @@ export class SubagentOrchestrator {
       plan?: string;
       implement?: string;
       verify?: string;
+      maxTurns?: number;
+      context?: Record<string, unknown>;
+      scope?: SubagentScope;
     },
-    options: { signal?: AbortSignal } = {}
+    options: { signal?: AbortSignal; baseSecurity?: SecurityPolicy; contextId?: string } = {}
   ): Promise<{
     research?: AgentResult;
     plan?: AgentResult;
@@ -156,12 +180,15 @@ export class SubagentOrchestrator {
     verification?: AgentResult;
   }> {
     const results: Record<string, AgentResult> = {};
+    const baseContext = workflowConfig.context;
+    const scope = workflowConfig.scope;
+    const maxTurns = workflowConfig.maxTurns;
 
     // Sequential execution with context passing
     if (workflowConfig.research) {
       results.research = await this.spawnSubagent(
         parentId,
-        { type: "research", task: workflowConfig.research },
+        { type: "research", task: workflowConfig.research, context: baseContext, scope, maxTurns },
         options
       );
 
@@ -172,10 +199,12 @@ export class SubagentOrchestrator {
     }
 
     if (workflowConfig.plan) {
-      const researchContext = results.research ? { research: results.research.output } : undefined;
+      const planContext = this.buildWorkflowContext(baseContext, {
+        research: results.research?.output,
+      });
       results.plan = await this.spawnSubagent(
         parentId,
-        { type: "plan", task: workflowConfig.plan, context: researchContext },
+        { type: "plan", task: workflowConfig.plan, context: planContext, scope, maxTurns },
         options
       );
 
@@ -185,10 +214,19 @@ export class SubagentOrchestrator {
     }
 
     if (workflowConfig.implement) {
-      const planContext = results.plan ? { plan: results.plan.output } : undefined;
+      const implementContext = this.buildWorkflowContext(baseContext, {
+        research: results.research?.output,
+        plan: results.plan?.output,
+      });
       results.implementation = await this.spawnSubagent(
         parentId,
-        { type: "code", task: workflowConfig.implement, context: planContext },
+        {
+          type: "code",
+          task: workflowConfig.implement,
+          context: implementContext,
+          scope,
+          maxTurns,
+        },
         options
       );
 
@@ -202,9 +240,14 @@ export class SubagentOrchestrator {
     }
 
     if (workflowConfig.verify) {
+      const verifyContext = this.buildWorkflowContext(baseContext, {
+        research: results.research?.output,
+        plan: results.plan?.output,
+        implementation: results.implementation?.output,
+      });
       results.verification = await this.spawnSubagent(
         parentId,
-        { type: "bash", task: workflowConfig.verify },
+        { type: "bash", task: workflowConfig.verify, context: verifyContext, scope, maxTurns },
         options
       );
     }
@@ -256,22 +299,40 @@ export class SubagentOrchestrator {
     return `${task}\n\n---\n\n**Context from parent:**\n${contextStr}`;
   }
 
-  private buildSpawnOptions(task: SubagentTask, signal?: AbortSignal): SpawnAgentOptions {
+  private buildSpawnOptions(
+    task: SubagentTask,
+    signal?: AbortSignal,
+    baseSecurity?: SecurityPolicy,
+    parentId?: string,
+    contextId?: string
+  ): SpawnAgentOptions {
     const scopedContext = task.scope
       ? { ...(task.context ?? {}), scope: task.scope }
       : task.context;
+    const security =
+      task.scope || baseSecurity ? this.buildScopeSecurity(task, baseSecurity) : undefined;
     return {
       type: task.type,
       task: this.buildTaskWithContext(task.task, scopedContext),
+      maxTurns: task.maxTurns,
+      parentTraceId: parentId,
+      parentContextId: contextId,
       signal,
-      security: task.scope ? this.buildScopeSecurity(task) : undefined,
+      security,
       allowedTools: task.scope?.allowedTools,
     };
   }
 
-  private buildScopeSecurity(task: SubagentTask): SecurityPolicy {
+  private buildScopeSecurity(task: SubagentTask, baseSecurity?: SecurityPolicy): SecurityPolicy {
     const profile = this.manager.getProfile(task.type);
-    const basePolicy = createSecurityPolicy(profile.securityPreset);
+    const basePolicy = baseSecurity
+      ? {
+          ...baseSecurity,
+          sandbox: { ...baseSecurity.sandbox },
+          permissions: { ...baseSecurity.permissions },
+          limits: { ...baseSecurity.limits },
+        }
+      : createSecurityPolicy(profile.securityPreset);
     const scope = task.scope;
 
     if (!scope) {
@@ -294,6 +355,41 @@ export class SubagentOrchestrator {
       ...basePolicy,
       permissions,
     };
+  }
+
+  private mergeContext(
+    base?: Record<string, unknown>,
+    extra?: Record<string, unknown>
+  ): Record<string, unknown> | undefined {
+    if (!base && !extra) {
+      return undefined;
+    }
+    return {
+      ...(base ?? {}),
+      ...(extra ?? {}),
+    };
+  }
+
+  private buildWorkflowContext(
+    base: Record<string, unknown> | undefined,
+    updates: {
+      research?: AgentResult["output"];
+      plan?: AgentResult["output"];
+      implementation?: AgentResult["output"];
+    }
+  ): Record<string, unknown> | undefined {
+    const additions: Record<string, unknown> = {};
+    if (updates.research) {
+      additions.research = updates.research;
+    }
+    if (updates.plan) {
+      additions.plan = updates.plan;
+    }
+    if (updates.implementation) {
+      additions.implementation = updates.implementation;
+    }
+
+    return this.mergeContext(base, Object.keys(additions).length > 0 ? additions : undefined);
   }
 
   private async spawnWithConcurrency(
