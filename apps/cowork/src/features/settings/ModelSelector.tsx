@@ -6,6 +6,7 @@
  */
 
 import { useCallback, useMemo, useState } from "react";
+import "./ModelSelector.css";
 
 interface ModelCapability {
   id: string;
