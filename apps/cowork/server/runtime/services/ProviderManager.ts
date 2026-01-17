@@ -3,6 +3,7 @@
  * Handles LLM provider selection, routing, and configuration
  */
 
+import type { AICoreProvider } from "@ku0/agent-runtime";
 import {
   type CompletionRequest,
   type CompletionResponse,
@@ -36,7 +37,7 @@ export class ProviderManager {
     settings: CoworkSettings,
     selectionHint?: { prompt?: string }
   ): Promise<{
-    provider: unknown;
+    provider: AICoreProvider;
     model: string;
     providerId: CoworkProviderId;
     fallbackNotice?: string;
@@ -243,7 +244,10 @@ export class ProviderManager {
   /**
    * Create provider adapter for compatibility
    */
-  private createProviderAdapter(provider: Pick<LLMProvider, "complete" | "stream">, name: string) {
+  private createProviderAdapter(
+    provider: Pick<LLMProvider, "complete" | "stream">,
+    name: string
+  ): AICoreProvider {
     return {
       name,
       async complete(request: {

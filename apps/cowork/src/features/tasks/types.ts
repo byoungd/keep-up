@@ -23,6 +23,26 @@ export const PlanStepSchema = z.object({
   status: z.enum(["pending", "in_progress", "completed", "failed"]),
 });
 
+const PreflightCheckResultSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  kind: z.enum(["lint", "typecheck", "test"]),
+  command: z.string(),
+  args: z.array(z.string()),
+  status: z.enum(["pass", "fail", "skipped"]),
+  durationMs: z.number(),
+  exitCode: z.number().optional(),
+  output: z.string(),
+});
+
+const PreflightReportSchema = z.object({
+  reportId: z.string(),
+  sessionId: z.string(),
+  checks: z.array(PreflightCheckResultSchema),
+  riskSummary: z.string(),
+  createdAt: z.number(),
+});
+
 export const ArtifactPayloadSchema = z.union([
   z.object({
     type: z.literal("diff"),
@@ -37,6 +57,12 @@ export const ArtifactPayloadSchema = z.union([
   z.object({
     type: z.literal("markdown"),
     content: z.string(),
+  }),
+  z.object({
+    type: z.literal("preflight"),
+    report: PreflightReportSchema,
+    selectionNotes: z.array(z.string()),
+    changedFiles: z.array(z.string()),
   }),
 ]);
 

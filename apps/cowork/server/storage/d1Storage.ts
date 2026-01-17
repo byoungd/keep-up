@@ -4,6 +4,7 @@ import type {
   CoworkProject,
   CoworkSession,
   CoworkTask,
+  CoworkWorkflowTemplate,
 } from "@ku0/agent-runtime";
 import type {
   AgentStateCheckpointStoreLike,
@@ -16,6 +17,7 @@ import type {
   SessionStoreLike,
   StorageLayer,
   TaskStoreLike,
+  WorkflowTemplateStoreLike,
 } from "./contracts";
 import type {
   AgentStateCheckpointRecord,
@@ -197,6 +199,24 @@ async function ensureSchema(db: D1Database): Promise<void> {
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL,
         metadata TEXT DEFAULT '{}'
+      )
+    `,
+    `
+      CREATE TABLE IF NOT EXISTS workflow_templates (
+        template_id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT NOT NULL,
+        mode TEXT NOT NULL,
+        inputs TEXT NOT NULL DEFAULT '[]',
+        prompt TEXT NOT NULL,
+        expected_artifacts TEXT NOT NULL DEFAULT '[]',
+        version TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        usage_count INTEGER NOT NULL DEFAULT 0,
+        last_used_at INTEGER,
+        last_used_inputs TEXT,
+        last_used_session_id TEXT
       )
     `,
   ];
@@ -993,6 +1013,122 @@ async function createD1ProjectStore(db: D1Database): Promise<ProjectStoreLike> {
   };
 }
 
+function rowToWorkflowTemplate(row: Record<string, unknown>): CoworkWorkflowTemplate {
+  return {
+    templateId: String(row.template_id),
+    name: String(row.name),
+    description: String(row.description),
+    mode: row.mode as CoworkWorkflowTemplate["mode"],
+    inputs: row.inputs ? (JSON.parse(String(row.inputs)) as CoworkWorkflowTemplate["inputs"]) : [],
+    prompt: String(row.prompt),
+    expectedArtifacts: row.expected_artifacts
+      ? (JSON.parse(String(row.expected_artifacts)) as string[])
+      : [],
+    version: String(row.version),
+    createdAt: Number(row.created_at),
+    updatedAt: Number(row.updated_at),
+    usageCount:
+      row.usage_count !== null && row.usage_count !== undefined
+        ? Number(row.usage_count)
+        : undefined,
+    lastUsedAt:
+      row.last_used_at !== null && row.last_used_at !== undefined
+        ? Number(row.last_used_at)
+        : undefined,
+    lastUsedInputs: row.last_used_inputs
+      ? (JSON.parse(String(row.last_used_inputs)) as Record<string, string>)
+      : undefined,
+    lastUsedSessionId: row.last_used_session_id ? String(row.last_used_session_id) : undefined,
+  };
+}
+
+async function createD1WorkflowTemplateStore(db: D1Database): Promise<WorkflowTemplateStoreLike> {
+  return {
+    async getAll(): Promise<CoworkWorkflowTemplate[]> {
+      const result = await prepare(
+        db,
+        "SELECT * FROM workflow_templates ORDER BY updated_at DESC"
+      ).all();
+      return result.results.map(rowToWorkflowTemplate);
+    },
+
+    async getById(templateId: string): Promise<CoworkWorkflowTemplate | null> {
+      const row = await prepare(db, "SELECT * FROM workflow_templates WHERE template_id = ?", [
+        templateId,
+      ]).first();
+      return row ? rowToWorkflowTemplate(row) : null;
+    },
+
+    async create(template: CoworkWorkflowTemplate): Promise<CoworkWorkflowTemplate> {
+      await prepare(
+        db,
+        `INSERT INTO workflow_templates
+          (template_id, name, description, mode, inputs, prompt, expected_artifacts, version, created_at, updated_at, usage_count, last_used_at, last_used_inputs, last_used_session_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          template.templateId,
+          template.name,
+          template.description,
+          template.mode,
+          JSON.stringify(template.inputs ?? []),
+          template.prompt,
+          JSON.stringify(template.expectedArtifacts ?? []),
+          template.version,
+          template.createdAt,
+          template.updatedAt,
+          template.usageCount ?? 0,
+          template.lastUsedAt ?? null,
+          template.lastUsedInputs ? JSON.stringify(template.lastUsedInputs) : null,
+          template.lastUsedSessionId ?? null,
+        ]
+      ).run();
+      return template;
+    },
+
+    async update(
+      templateId: string,
+      updater: (template: CoworkWorkflowTemplate) => CoworkWorkflowTemplate
+    ): Promise<CoworkWorkflowTemplate | null> {
+      const existing = await prepare(db, "SELECT * FROM workflow_templates WHERE template_id = ?", [
+        templateId,
+      ]).first();
+      if (!existing) {
+        return null;
+      }
+      const updated = updater(rowToWorkflowTemplate(existing));
+      await prepare(
+        db,
+        `UPDATE workflow_templates
+          SET name = ?, description = ?, mode = ?, inputs = ?, prompt = ?, expected_artifacts = ?, version = ?, updated_at = ?, usage_count = ?, last_used_at = ?, last_used_inputs = ?, last_used_session_id = ?
+          WHERE template_id = ?`,
+        [
+          updated.name,
+          updated.description,
+          updated.mode,
+          JSON.stringify(updated.inputs ?? []),
+          updated.prompt,
+          JSON.stringify(updated.expectedArtifacts ?? []),
+          updated.version,
+          updated.updatedAt,
+          updated.usageCount ?? 0,
+          updated.lastUsedAt ?? null,
+          updated.lastUsedInputs ? JSON.stringify(updated.lastUsedInputs) : null,
+          updated.lastUsedSessionId ?? null,
+          updated.templateId,
+        ]
+      ).run();
+      return updated;
+    },
+
+    async delete(templateId: string): Promise<boolean> {
+      const result = await prepare(db, "DELETE FROM workflow_templates WHERE template_id = ?", [
+        templateId,
+      ]).run();
+      return (result.changes ?? 0) > 0;
+    },
+  };
+}
+
 function rowToAuditEntry(row: Record<string, unknown>): CoworkAuditEntry {
   return {
     entryId: String(row.entry_id),
@@ -1167,6 +1303,7 @@ export async function createD1StorageLayer(db: D1Database): Promise<StorageLayer
     configStore,
     projectStore,
     auditLogStore,
+    workflowTemplateStore,
   ] = await Promise.all([
     createD1SessionStore(db),
     createD1TaskStore(db),
@@ -1177,6 +1314,7 @@ export async function createD1StorageLayer(db: D1Database): Promise<StorageLayer
     createD1ConfigStore(db),
     createD1ProjectStore(db),
     createD1AuditLogStore(db),
+    createD1WorkflowTemplateStore(db),
   ]);
 
   return {
@@ -1189,5 +1327,6 @@ export async function createD1StorageLayer(db: D1Database): Promise<StorageLayer
     configStore,
     projectStore,
     auditLogStore,
+    workflowTemplateStore,
   };
 }

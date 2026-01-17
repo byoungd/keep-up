@@ -226,6 +226,13 @@ function toArtifactItem(record: CoworkArtifact, payload: ArtifactPayload): Artif
         title: record.title,
         content: payload.content,
       };
+    case "preflight":
+      return {
+        id: record.artifactId,
+        type: "report",
+        title: record.title,
+        content: formatPreflightMarkdown(payload),
+      };
     default:
       return { id: record.artifactId, type: "doc", title: record.title, content: "" };
   }
@@ -239,9 +246,34 @@ function buildSnippet(payload: ArtifactPayload): string {
       return truncate(payload.steps.map((step) => step.label).join(" · "));
     case "markdown":
       return truncate(payload.content);
+    case "preflight":
+      return truncate(payload.report.riskSummary);
     default:
       return "No preview available.";
   }
+}
+
+function formatPreflightMarkdown(payload: Extract<ArtifactPayload, { type: "preflight" }>): string {
+  const lines = ["# Preflight Report", "", `Summary: ${payload.report.riskSummary}`];
+  if (payload.selectionNotes.length > 0) {
+    lines.push("", "## Selection Notes");
+    for (const note of payload.selectionNotes) {
+      lines.push(`- ${note}`);
+    }
+  }
+  if (payload.changedFiles.length > 0) {
+    lines.push("", "## Changed Files");
+    for (const file of payload.changedFiles) {
+      lines.push(`- ${file}`);
+    }
+  }
+  if (payload.report.checks.length > 0) {
+    lines.push("", "## Checks");
+    for (const check of payload.report.checks) {
+      lines.push(`- ${check.name}: ${check.status}`);
+    }
+  }
+  return lines.join("\n");
 }
 
 function truncate(input: string, max = 160): string {

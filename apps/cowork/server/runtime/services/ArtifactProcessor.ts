@@ -229,6 +229,9 @@ function deriveArtifactTitle(artifactId: string, artifact: CoworkArtifactPayload
   if (artifact.type === "plan") {
     return "Plan";
   }
+  if (artifact.type === "preflight") {
+    return "Preflight Report";
+  }
   if (artifactId.startsWith("summary-")) {
     return "Summary";
   }

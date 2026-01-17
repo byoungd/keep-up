@@ -14,6 +14,7 @@ import {
 // import { createMem0MemoryAdapter, type Mem0MemoryAdapter } from "@ku0/agent-runtime";
 import { normalizeModelId } from "@ku0/ai-core";
 import { ApprovalService } from "../services/approvalService";
+import type { ContextIndexManager } from "../services/contextIndexManager";
 import { ProviderKeyService } from "../services/providerKeyService";
 import type { StorageLayer } from "../storage/contracts";
 import type { CoworkSettings } from "../storage/types";
@@ -39,6 +40,7 @@ type SessionRuntime = {
   modelId: string | null;
   providerId: string | null;
   fallbackNotice: string | null;
+  contextPackKey: string | null;
   eventQueue: Promise<void>;
   unsubscribeQueue: () => void;
   unsubscribeOrchestrator: () => void;
@@ -48,6 +50,14 @@ type RuntimeFactory = (
   session: CoworkSession,
   settings: CoworkSettings
 ) => Promise<ReturnType<typeof createCoworkRuntime>>;
+
+type RuntimeBuildResult = {
+  runtime: ReturnType<typeof createCoworkRuntime>;
+  modelId: string | null;
+  providerId: string | null;
+  fallbackNotice: string | null;
+  contextPackKey: string | null;
+};
 
 const noop = () => undefined;
 export class CoworkTaskRuntime {
@@ -65,7 +75,6 @@ export class CoworkTaskRuntime {
   private readonly projectContextManager: ProjectContextManager;
   private readonly providerKeys: ProviderKeyService;
   private readonly configStore: StorageLayer["configStore"];
-
   // Optional Advanced Services (available when enabled)
   // private memoryAdapter?: Mem0MemoryAdapter;
   // private ghostAgent?: GhostAgent;
@@ -77,6 +86,7 @@ export class CoworkTaskRuntime {
     runtimeFactory?: RuntimeFactory;
     approvalService?: ApprovalService;
     providerKeys?: ProviderKeyService;
+    contextIndexManager?: ContextIndexManager;
   }) {
     this.logger = deps.logger ?? console; // Assign to property
     const logger = this.logger;
@@ -106,7 +116,7 @@ export class CoworkTaskRuntime {
       this.sessionManager,
       this.approvalCoordinator
     );
-    this.projectContextManager = new ProjectContextManager(logger);
+    this.projectContextManager = new ProjectContextManager(logger, deps.contextIndexManager);
   }
 
   /**
@@ -118,153 +128,18 @@ export class CoworkTaskRuntime {
       return existing;
     }
 
-    const initialSession = await this.sessionManager.getSession(sessionId);
-    if (!initialSession) {
-      throw new Error(`Session ${sessionId} not found`);
-    }
+    const initialSession = await this.getSessionOrThrow(sessionId);
     const modeManager = new AgentModeManager(initialSession.agentMode ?? "build");
     const requestedModel = normalizeModelId(settings.defaultModel ?? undefined) ?? null;
 
-    let modelId: string | null = requestedModel;
-    let providerId: string | null = null;
-    let fallbackNotice: string | null = null;
-    let provider: unknown = null;
-
-    // 2. Create Runtime
-    let runtime: ReturnType<typeof createCoworkRuntime>;
-
-    if (this.runtimeFactory) {
-      runtime = await this.runtimeFactory(initialSession, settings);
-    } else {
-      // Resolve Provider
-      const resolved = await this.providerManager.createProvider(settings, {
-        prompt: initialSession.title ?? "Cowork Session",
-      });
-      provider = resolved.provider;
-      modelId = resolved.model ?? requestedModel;
-      providerId = resolved.providerId;
-      fallbackNotice = resolved.fallbackNotice ?? null;
-
-      const toolRegistry = createToolRegistry();
-
-      // Register standard tools
-      await toolRegistry.register(createFileToolServer());
-      await toolRegistry.register(createBashToolServer()); // No args expected
-      await toolRegistry.register(createCodeToolServer());
-      await toolRegistry.register(
-        createWebSearchToolServer(createWebSearchProvider(this.logger)) // Pass logger instead of settings
-      );
-
-      // Create Adapter
-      const adapter = createAICoreAdapter(provider as Parameters<typeof createAICoreAdapter>[0], {
-        model: modelId || undefined,
-      });
-
-      // System Prompt & Context
-      const projectContext = await this.projectContextManager.getContext(initialSession);
-      const systemPromptAddition = combinePromptAdditions(
-        projectContext ? projectContext : undefined,
-        modeManager.getSystemPromptAddition()
-      );
-
-      runtime = createCoworkRuntime({
-        llm: adapter,
-        registry: toolRegistry,
-        cowork: {
-          session: initialSession,
-          audit: undefined,
-          modeManager,
-        },
-        taskQueueConfig: { maxConcurrent: 1 },
-        outputRoots: collectOutputRoots(initialSession),
-        orchestratorOptions: {
-          planning: {
-            enabled: modeManager.isPlanMode(),
-            autoExecuteLowRisk: false,
-          },
-        },
-        systemPromptAddition: systemPromptAddition || undefined,
-      });
-    }
-
-    // 3. Setup Event Handling
-    const runtimeState: SessionRuntime = {
-      sessionId,
-      runtime,
+    const runtimeResult = await this.buildRuntime(
+      initialSession,
+      settings,
       modeManager,
-      activeTaskId: null,
-      modelId,
-      providerId,
-      fallbackNotice,
-      eventQueue: Promise.resolve(),
-      unsubscribeQueue: noop,
-      unsubscribeOrchestrator: noop,
-    };
-
-    const originalWaitForTask = runtime.waitForTask.bind(runtime);
-    runtime.waitForTask = async (taskId: string) => {
-      const result = await originalWaitForTask(taskId);
-      await runtimeState.eventQueue.catch(() => undefined);
-      return result;
-    };
-
-    runtime.orchestrator.setConfirmationHandler(async (request) => {
-      const taskId = runtimeState.activeTaskId;
-      if (taskId) {
-        await this.taskOrchestrator.updateTaskStatus(taskId, "awaiting_confirmation", [
-          "queued",
-          "planning",
-          "ready",
-          "running",
-          "awaiting_confirmation",
-        ]);
-      }
-
-      const approved = await this.approvalCoordinator.requestApproval({
-        sessionId,
-        taskId: taskId ?? undefined,
-        description: request.description,
-        riskTags: request.riskTags,
-        reason: request.reason,
-        toolName: request.toolName,
-      });
-
-      if (approved && taskId) {
-        await this.taskOrchestrator.updateTaskStatus(taskId, "running", [
-          "awaiting_confirmation",
-          "running",
-        ]);
-      }
-
-      return approved;
-    });
-
-    // Task Events
-    runtimeState.unsubscribeQueue = runtime.onCoworkEvents((event) => {
-      if (
-        event.type === "task.completed" ||
-        event.type === "task.failed" ||
-        event.type === "task.cancelled"
-      ) {
-        if (runtimeState.activeTaskId === event.taskId) {
-          runtimeState.activeTaskId = null;
-        }
-      } else {
-        runtimeState.activeTaskId = event.taskId;
-      }
-      runtimeState.eventQueue = runtimeState.eventQueue
-        .then(() => this.taskOrchestrator.handleTaskEvent({ ...event, taskId: event.taskId }))
-        .catch((err) => this.logger.error("Task event error", err));
-    });
-
-    // Orchestrator Events
-    runtimeState.unsubscribeOrchestrator = runtime.orchestrator.on((event) => {
-      runtimeState.eventQueue = runtimeState.eventQueue
-        .then(() =>
-          this.taskOrchestrator.handleOrchestratorEvent(sessionId, runtimeState.activeTaskId, event)
-        )
-        .catch((err) => this.logger.error("Orchestrator event error", err));
-    });
+      requestedModel
+    );
+    const runtimeState = this.createRuntimeState(sessionId, runtimeResult, modeManager);
+    this.attachRuntimeHandlers(runtimeState);
 
     this.runtimes.set(sessionId, runtimeState);
     return runtimeState;
@@ -305,23 +180,10 @@ export class CoworkTaskRuntime {
     sessionId: string,
     task: { prompt: string; title?: string; modelId?: string; files?: string[] }
   ) {
-    const session = await this.sessionManager.getSession(sessionId);
-    if (!session) {
-      throw new Error(`Session ${sessionId} not found`);
-    }
-
+    const session = await this.getSessionOrThrow(sessionId);
     const settings = await this.configStore.get();
     const requestedModel = normalizeModelId(settings.defaultModel ?? undefined) ?? null;
-    let runtime = this.runtimes.get(sessionId);
-
-    if (runtime && !runtime.activeTaskId && requestedModel && requestedModel !== runtime.modelId) {
-      await this.stopSessionRuntime(sessionId);
-      runtime = undefined;
-    }
-
-    if (!runtime) {
-      runtime = await this.startSessionRuntime(sessionId, settings);
-    }
+    const runtime = await this.ensureRuntimeForTask(sessionId, session, settings, requestedModel);
 
     // Trigger execution
     const taskId = await runtime.runtime.enqueueTask(task.prompt, task.title);
@@ -344,6 +206,217 @@ export class CoworkTaskRuntime {
     return {
       ...taskRecord,
     };
+  }
+
+  private async getSessionOrThrow(sessionId: string): Promise<CoworkSession> {
+    const session = await this.sessionManager.getSession(sessionId);
+    if (!session) {
+      throw new Error(`Session ${sessionId} not found`);
+    }
+    return session;
+  }
+
+  private async buildRuntime(
+    session: CoworkSession,
+    settings: CoworkSettings,
+    modeManager: AgentModeManager,
+    requestedModel: string | null
+  ): Promise<RuntimeBuildResult> {
+    if (this.runtimeFactory) {
+      const runtime = await this.runtimeFactory(session, settings);
+      const contextPackKey = await this.projectContextManager.getContextPackKey(session);
+      return {
+        runtime,
+        modelId: requestedModel,
+        providerId: null,
+        fallbackNotice: null,
+        contextPackKey,
+      };
+    }
+
+    const resolved = await this.providerManager.createProvider(settings, {
+      prompt: session.title ?? "Cowork Session",
+    });
+    const modelId = resolved.model ?? requestedModel;
+    const toolRegistry = await this.buildToolRegistry();
+    const adapter = createAICoreAdapter(resolved.provider, {
+      model: modelId || undefined,
+    });
+    const prompt = await this.buildSystemPromptAddition(session, modeManager);
+    const runtime = createCoworkRuntime({
+      llm: adapter,
+      registry: toolRegistry,
+      cowork: {
+        session,
+        audit: undefined,
+        modeManager,
+      },
+      taskQueueConfig: { maxConcurrent: 1 },
+      outputRoots: collectOutputRoots(session),
+      orchestratorOptions: {
+        planning: {
+          enabled: modeManager.isPlanMode(),
+          autoExecuteLowRisk: false,
+        },
+      },
+      systemPromptAddition: prompt.addition,
+    });
+
+    return {
+      runtime,
+      modelId,
+      providerId: resolved.providerId,
+      fallbackNotice: resolved.fallbackNotice ?? null,
+      contextPackKey: prompt.contextPackKey,
+    };
+  }
+
+  private async buildToolRegistry(): Promise<ReturnType<typeof createToolRegistry>> {
+    const toolRegistry = createToolRegistry();
+    await toolRegistry.register(createFileToolServer());
+    await toolRegistry.register(createBashToolServer());
+    await toolRegistry.register(createCodeToolServer());
+    await toolRegistry.register(createWebSearchToolServer(createWebSearchProvider(this.logger)));
+    return toolRegistry;
+  }
+
+  private async buildSystemPromptAddition(
+    session: CoworkSession,
+    modeManager: AgentModeManager
+  ): Promise<{ addition?: string; contextPackKey: string | null }> {
+    const projectContext = await this.projectContextManager.getContext(session);
+    const packPrompt = await this.projectContextManager.getContextPackPrompt(session);
+    const addition = combinePromptAdditions(
+      projectContext ? projectContext : undefined,
+      packPrompt.prompt,
+      modeManager.getSystemPromptAddition()
+    );
+
+    return {
+      addition: addition || undefined,
+      contextPackKey: packPrompt.packKey ?? null,
+    };
+  }
+
+  private createRuntimeState(
+    sessionId: string,
+    runtimeResult: RuntimeBuildResult,
+    modeManager: AgentModeManager
+  ): SessionRuntime {
+    return {
+      sessionId,
+      runtime: runtimeResult.runtime,
+      modeManager,
+      activeTaskId: null,
+      modelId: runtimeResult.modelId,
+      providerId: runtimeResult.providerId,
+      fallbackNotice: runtimeResult.fallbackNotice,
+      contextPackKey: runtimeResult.contextPackKey,
+      eventQueue: Promise.resolve(),
+      unsubscribeQueue: noop,
+      unsubscribeOrchestrator: noop,
+    };
+  }
+
+  private attachRuntimeHandlers(runtimeState: SessionRuntime): void {
+    const { runtime } = runtimeState;
+    const sessionId = runtimeState.sessionId;
+    const originalWaitForTask = runtime.waitForTask.bind(runtime);
+    runtime.waitForTask = async (taskId: string) => {
+      const result = await originalWaitForTask(taskId);
+      await runtimeState.eventQueue.catch(() => undefined);
+      return result;
+    };
+
+    runtime.orchestrator.setConfirmationHandler(async (request) => {
+      const taskId = runtimeState.activeTaskId;
+      if (taskId) {
+        await this.taskOrchestrator.updateTaskStatus(taskId, "awaiting_confirmation", [
+          "queued",
+          "planning",
+          "ready",
+          "running",
+          "awaiting_confirmation",
+        ]);
+      }
+
+      const approved = await this.approvalCoordinator.requestApproval({
+        sessionId,
+        taskId: taskId ?? undefined,
+        description: request.description,
+        riskTags: request.riskTags,
+        reason: request.reason,
+        toolName: request.toolName,
+      });
+
+      if (approved && taskId) {
+        await this.taskOrchestrator.updateTaskStatus(taskId, "running", [
+          "awaiting_confirmation",
+          "running",
+        ]);
+      }
+
+      return approved;
+    });
+
+    runtimeState.unsubscribeQueue = runtime.onCoworkEvents((event) => {
+      if (
+        event.type === "task.completed" ||
+        event.type === "task.failed" ||
+        event.type === "task.cancelled"
+      ) {
+        if (runtimeState.activeTaskId === event.taskId) {
+          runtimeState.activeTaskId = null;
+        }
+      } else {
+        runtimeState.activeTaskId = event.taskId;
+      }
+      runtimeState.eventQueue = runtimeState.eventQueue
+        .then(() => this.taskOrchestrator.handleTaskEvent({ ...event, taskId: event.taskId }))
+        .catch((err) => this.logger.error("Task event error", err));
+    });
+
+    runtimeState.unsubscribeOrchestrator = runtime.orchestrator.on((event) => {
+      runtimeState.eventQueue = runtimeState.eventQueue
+        .then(() =>
+          this.taskOrchestrator.handleOrchestratorEvent(sessionId, runtimeState.activeTaskId, event)
+        )
+        .catch((err) => this.logger.error("Orchestrator event error", err));
+    });
+  }
+
+  private async ensureRuntimeForTask(
+    sessionId: string,
+    session: CoworkSession,
+    settings: CoworkSettings,
+    requestedModel: string | null
+  ): Promise<SessionRuntime> {
+    let runtime = this.runtimes.get(sessionId);
+    if (runtime && !runtime.activeTaskId) {
+      const shouldRestart = await this.shouldRestartRuntime(runtime, requestedModel, session);
+      if (shouldRestart) {
+        await this.stopSessionRuntime(sessionId);
+        runtime = undefined;
+      }
+    }
+
+    if (!runtime) {
+      runtime = await this.startSessionRuntime(sessionId, settings);
+    }
+
+    return runtime;
+  }
+
+  private async shouldRestartRuntime(
+    runtime: SessionRuntime,
+    requestedModel: string | null,
+    session: CoworkSession
+  ): Promise<boolean> {
+    if (requestedModel && requestedModel !== runtime.modelId) {
+      return true;
+    }
+    const nextPackKey = await this.projectContextManager.getContextPackKey(session);
+    return nextPackKey !== runtime.contextPackKey;
   }
 
   // --- Proxy Methods to Services ---

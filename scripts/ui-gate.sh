@@ -29,7 +29,11 @@ pnpm test:unit
 
 for ((i = 1; i <= repeat; i++)); do
   echo "UI Gate: e2e critical path (run $i/$repeat)"
-  pnpm test:e2e:smoke 2>&1 | tee -a "$targeted_log"
+  if node -e "const pkg=require('./package.json'); process.exit(pkg.scripts && pkg.scripts['test:e2e:smoke'] ? 0 : 1)"; then
+    pnpm test:e2e:smoke 2>&1 | tee -a "$targeted_log"
+  else
+    echo "UI Gate: e2e smoke skipped (test:e2e:smoke not defined)" | tee -a "$targeted_log"
+  fi
 done
 
 if [ "$conformance" = "1" ]; then

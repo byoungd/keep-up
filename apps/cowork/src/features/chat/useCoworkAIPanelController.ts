@@ -7,7 +7,12 @@ import {
 } from "@ku0/ai-core";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { type ChatAttachmentRef, updateSettings, uploadChatAttachment } from "../../api/coworkApi";
+import {
+  type ChatAttachmentRef,
+  setSessionMode,
+  updateSettings,
+  uploadChatAttachment,
+} from "../../api/coworkApi";
 import { useWorkspace } from "../../app/providers/WorkspaceProvider";
 import { detectIntent } from "../../lib/intentDetector";
 import { parseSlashCommand } from "../../lib/slashCommands";
@@ -204,6 +209,21 @@ export function useCoworkAIPanelController() {
       clearAttachments();
     },
     [attachments, executeMessageSend, clearAttachments]
+  );
+
+  const runTemplate = useCallback(
+    async (prompt: string, mode: "plan" | "build") => {
+      const targetSessionId = await prepareSession(prompt);
+      if (targetSessionId) {
+        await setSessionMode(targetSessionId, mode);
+      }
+      if (targetSessionId !== sessionId) {
+        await queueSendAfterNavigation(targetSessionId, prompt, "task");
+        return;
+      }
+      await sendInSession(prompt, "task");
+    },
+    [prepareSession, queueSendAfterNavigation, sendInSession, sessionId]
   );
 
   const handleSend = useCallback(async () => {
@@ -451,6 +471,7 @@ export function useCoworkAIPanelController() {
     agentMode,
     toggleMode,
     usage,
+    runTemplate,
   };
 }
 

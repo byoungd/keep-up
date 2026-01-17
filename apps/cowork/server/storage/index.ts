@@ -22,8 +22,10 @@ import { createSqliteConfigStore } from "./sqliteConfigStore";
 import { createSqliteProjectStore } from "./sqliteProjectStore";
 import { createSqliteSessionStore } from "./sqliteSessionStore";
 import { createSqliteTaskStore } from "./sqliteTaskStore";
+import { createSqliteWorkflowTemplateStore } from "./sqliteWorkflowTemplateStore";
 import { ensureStateDir } from "./statePaths";
 import { createTaskStore } from "./taskStore";
+import { createWorkflowTemplateStore } from "./workflowTemplateStore";
 
 export {
   type AgentStateCheckpointStore,
@@ -45,6 +47,7 @@ export type {
   SessionStoreLike,
   StorageLayer,
   TaskStoreLike,
+  WorkflowTemplateStoreLike,
 } from "./contracts";
 // SQLite-based stores (production-ready)
 export { closeDatabase, getDatabase } from "./database";
@@ -68,9 +71,14 @@ export { createSqliteConfigStore, type SqliteConfigStore } from "./sqliteConfigS
 export { createSqliteProjectStore, type SqliteProjectStore } from "./sqliteProjectStore";
 export { createSqliteSessionStore, type SqliteSessionStore } from "./sqliteSessionStore";
 export { createSqliteTaskStore, type SqliteTaskStore } from "./sqliteTaskStore";
+export {
+  createSqliteWorkflowTemplateStore,
+  type SqliteWorkflowTemplateStore,
+} from "./sqliteWorkflowTemplateStore";
 // Utilities
 export { ensureStateDir, resolveStateDir } from "./statePaths";
 export { createTaskStore, type TaskStore } from "./taskStore";
+export { createWorkflowTemplateStore, type WorkflowTemplateStore } from "./workflowTemplateStore";
 
 export type StorageMode = "json" | "sqlite" | "d1";
 
@@ -89,6 +97,7 @@ export async function createStorageLayer(mode: StorageMode = "json"): Promise<St
       configStore,
       projectStore,
       auditLogStore,
+      workflowTemplateStore,
     ] = await Promise.all([
       createSqliteSessionStore(),
       createSqliteTaskStore(),
@@ -99,6 +108,7 @@ export async function createStorageLayer(mode: StorageMode = "json"): Promise<St
       createSqliteConfigStore(),
       createSqliteProjectStore(),
       createSqliteAuditLogStore(),
+      createSqliteWorkflowTemplateStore(),
     ]);
 
     return {
@@ -111,6 +121,7 @@ export async function createStorageLayer(mode: StorageMode = "json"): Promise<St
       configStore,
       projectStore,
       auditLogStore,
+      workflowTemplateStore,
     };
   }
 
@@ -127,5 +138,6 @@ export async function createStorageLayer(mode: StorageMode = "json"): Promise<St
     configStore: createConfigStore(join(stateDir, "settings.json")),
     projectStore: createProjectStore(join(stateDir, "projects.json")),
     auditLogStore: createAuditLogStore(join(stateDir, "audit_logs.json")),
+    workflowTemplateStore: createWorkflowTemplateStore(join(stateDir, "workflow_templates.json")),
   };
 }
