@@ -6,6 +6,7 @@ import { createApprovalRoutes } from "./routes/approvals";
 import { createArtifactRoutes } from "./routes/artifacts";
 import { createAuditLogRoutes } from "./routes/auditLogs";
 import { createChatRoutes } from "./routes/chat";
+import { createContextRoutes } from "./routes/context";
 import { createProjectRoutes } from "./routes/projects";
 import { createSessionRoutes } from "./routes/sessions";
 import { createSettingsRoutes } from "./routes/settings";
@@ -118,6 +119,8 @@ export function createCoworkApp(deps: CoworkAppDeps) {
     logger.error("Server error", error);
     return jsonError(c, 500, "Internal server error");
   });
+  // Project context routes (AGENTS.md analysis and generation)
+  app.route("/api", createContextRoutes());
 
   logger.info("Cowork server initialized");
   return app;

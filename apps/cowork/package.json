@@ -15,6 +15,7 @@
     "@ku0/ai-core": "workspace:*",
     "@ku0/app": "workspace:*",
     "@ku0/design-system": "workspace:*",
+    "@ku0/project-context": "workspace:*",
     "@ku0/shared": "workspace:*",
     "@ku0/shell": "workspace:*",
     "@tanstack/react-query": "^5.90.16",
