@@ -3,9 +3,13 @@
  *
  * Proactive background agent that monitors file changes and triggers
  * background checks. Provides toast suggestions for detected issues.
+ *
+ * Now uses chokidar for production-ready file watching.
  */
 
 import { EventEmitter } from "node:events";
+import chokidar, { type FSWatcher } from "chokidar";
+
 import type {
   FileChangeEvent,
   GhostAgentConfig,
@@ -27,7 +31,7 @@ const DEFAULT_CONFIG: GhostAgentConfig = {
 };
 
 /**
- * Ghost Agent implementation
+ * Ghost Agent implementation with chokidar file watching
  */
 export class GhostAgent extends EventEmitter implements IGhostAgent {
   private readonly config: GhostAgentConfig;
@@ -35,6 +39,7 @@ export class GhostAgent extends EventEmitter implements IGhostAgent {
   private readonly activeToasts = new Map<string, ToastSuggestion>();
   private pendingChanges: FileChangeEvent[] = [];
   private debounceTimer: NodeJS.Timeout | null = null;
+  private watcher: FSWatcher | null = null;
   private isRunning = false;
 
   constructor(
@@ -46,7 +51,7 @@ export class GhostAgent extends EventEmitter implements IGhostAgent {
   }
 
   /**
-   * Start watching for file changes
+   * Start watching for file changes using chokidar
    */
   async start(): Promise<void> {
     if (this.isRunning) {
@@ -55,17 +60,32 @@ export class GhostAgent extends EventEmitter implements IGhostAgent {
 
     this.isRunning = true;
 
-    // TODO: In production, use chokidar or native fs.watch
-    // For now, this is a placeholder for the watcher setup
-    // const watcher = chokidar.watch(this.config.watchPatterns, {
-    //   cwd: this.workspacePath,
-    //   ignored: this.config.ignorePatterns,
-    //   persistent: true,
-    // });
-    //
-    // watcher.on('change', (path) => this.handleFileChange(path, 'modify'));
-    // watcher.on('add', (path) => this.handleFileChange(path, 'create'));
-    // watcher.on('unlink', (path) => this.handleFileChange(path, 'delete'));
+    if (!this.config.enableWatcher) {
+      return;
+    }
+
+    // Initialize chokidar watcher
+    this.watcher = chokidar.watch(this.config.watchPatterns, {
+      cwd: this.workspacePath,
+      ignored: this.config.ignorePatterns,
+      persistent: true,
+      ignoreInitial: true,
+      awaitWriteFinish: {
+        stabilityThreshold: 100,
+        pollInterval: 100,
+      },
+    });
+
+    // Set up event handlers
+    this.watcher
+      .on("change", (path) => this.handleFileChange(path, "modify"))
+      .on("add", (path) => this.handleFileChange(path, "create"))
+      .on("unlink", (path) => this.handleFileChange(path, "delete"));
+
+    // Wait for initial scan to complete
+    await new Promise<void>((resolve) => {
+      this.watcher?.on("ready", resolve);
+    });
   }
 
   /**
@@ -73,6 +93,12 @@ export class GhostAgent extends EventEmitter implements IGhostAgent {
    */
   async stop(): Promise<void> {
     this.isRunning = false;
+
+    if (this.watcher) {
+      await this.watcher.close();
+      this.watcher = null;
+    }
+
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer);
       this.debounceTimer = null;
@@ -157,7 +183,7 @@ export class GhostAgent extends EventEmitter implements IGhostAgent {
 
     const startTime = Date.now();
 
-    // TODO: Run actual checks via shell commands
+    // TODO: Implement actual check execution via shell commands
     // For now, return a placeholder result
     const result: GhostCheckResult = {
       type,
