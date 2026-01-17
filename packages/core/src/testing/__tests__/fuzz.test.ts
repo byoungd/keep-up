@@ -50,7 +50,11 @@ describe("Fuzzing: Anchor Decode Survival (FUZZ-ANC-001)", () => {
           blockId: fc.uuid(),
           start: fc.nat({ max: 1000 }),
           end: fc.nat({ max: 1000 }),
-          contextHash: fc.hexaString({ minLength: 64, maxLength: 64 }),
+          contextHash: fc.string({
+            minLength: 64,
+            maxLength: 64,
+            unit: fc.constantFrom(..."0123456789abcdefABCDEF".split("")),
+          }),
         }),
         fc.context(),
         (payload, _ctx) => {

@@ -48,7 +48,7 @@ importers:
         specifier: ^2.3.3
         version: 2.7.3
       typescript:
-        specifier: ^5.7.2
+        specifier: ^5.7.3
         version: 5.9.3
       vitest:
         specifier: ^4.0.0
@@ -105,7 +105,7 @@ importers:
         specifier: ^3.4.0
         version: 3.4.0
       zod:
-        specifier: ^3.22.4
+        specifier: ^3.24.1
         version: 3.25.76
     devDependencies:
       '@tailwindcss/vite':
@@ -136,7 +136,7 @@ importers:
         specifier: ^4.1.18
         version: 4.1.18
       typescript:
-        specifier: ^5.7.2
+        specifier: ^5.7.3
         version: 5.9.3
       vite:
         specifier: ^7.3.0
@@ -160,7 +160,7 @@ importers:
         specifier: workspace:*
         version: link:../db
       zod:
-        specifier: ^3.25.76
+        specifier: ^3.24.1
         version: 3.25.76
     devDependencies:
       '@types/node':
@@ -254,8 +254,8 @@ importers:
         version: 4.3.5
     devDependencies:
       fast-check:
-        specifier: ^3.23.2
-        version: 3.23.2
+        specifier: ^4.5.3
+        version: 4.5.3
 
   packages/crypto: {}
 
@@ -284,8 +284,8 @@ importers:
         specifier: ^17.0.1
         version: 17.0.1
       typescript:
-        specifier: 5.6.3
-        version: 5.6.3
+        specifier: ^5.7.3
+        version: 5.9.3
 
   packages/design-system:
     devDependencies:
@@ -493,7 +493,7 @@ importers:
         specifier: ^19.0.0
         version: 19.2.3(react@19.2.3)
       typescript:
-        specifier: ^5.0.0
+        specifier: ^5.7.3
         version: 5.9.3
 
   packages/token: {}
@@ -4104,11 +4104,6 @@ packages:
 
   typedarray-dts@1.0.0:
     resolution: {integrity: sha512-Ka0DBegjuV9IPYFT1h0Qqk5U4pccebNIJCGl8C5uU7xtOs+jpJvKGAY4fHGK25hTmXZOEUl9Cnsg5cS6K/b5DA==}
-
-  typescript@5.6.3:
-    resolution: {integrity: sha512-hjcS1mhfuyi4WW8IWtjP7brDrG2cuDZukyrYrSauoXGNgx0S7zceP07adYkJycEr56BOUTNPzbInooiN3fn1qw==}
-    engines: {node: '>=14.17'}
-    hasBin: true
 
   typescript@5.9.3:
     resolution: {integrity: sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==}
@@ -8293,8 +8288,6 @@ snapshots:
     optional: true
 
   typedarray-dts@1.0.0: {}
-
-  typescript@5.6.3: {}
 
   typescript@5.9.3: {}
 

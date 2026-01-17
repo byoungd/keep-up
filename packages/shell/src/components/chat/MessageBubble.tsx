@@ -2,7 +2,6 @@
 
 import { cn } from "@ku0/shared/utils";
 import * as React from "react";
-// @ts-expect-error
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ThinkingIndicator, TypingCursor } from "./TypingCursor";
