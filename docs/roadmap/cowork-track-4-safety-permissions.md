@@ -26,6 +26,14 @@ and is visible in the UI.
 - `apps/cowork/server/runtime/coworkTaskRuntime.ts`
 - `apps/cowork/server/services/approvalService.ts`
 
+## Execution Steps (Do This First)
+1. Inspect `packages/agent-runtime/src/security` for current policy hooks.
+2. Implement grant-aware path checks in `apps/cowork/server/runtime/coworkTaskRuntime.ts`.
+3. Wire Policy DSL evaluation in the server tool execution path.
+4. Extend approval payload and persist risk tags + reason.
+5. Add audit log storage in `apps/cowork/server/storage`.
+6. Add UI visibility for grants and approvals (Cowork panels).
+
 ## Required Behavior
 - Every tool call is validated against grants and risk tags.
 - Destructive actions require explicit approval.

@@ -24,6 +24,17 @@ by executing six parallel tracks with clear dependencies and acceptance gates.
    - Doc: `docs/roadmap/cowork-track-6-artifacts-apply-review.md`
    - Output: apply/revert workflow + artifact audit trail
 
+## Contract Freeze (Read Before Coding)
+- `docs/roadmap/cowork-contract-freeze.md`
+
+## Execution Summary (Agent-Ready)
+- Track 1: Follow "Execution Steps" in `docs/roadmap/cowork-track-1-chat-persistence.md`
+- Track 2: Follow "Execution Steps" in `docs/roadmap/cowork-track-2-chat-ui-parity.md`
+- Track 3: Follow "Execution Steps" in `docs/roadmap/cowork-track-3-agent-task-narrative.md`
+- Track 4: Follow "Execution Steps" in `docs/roadmap/cowork-track-4-safety-permissions.md`
+- Track 5: Follow "Execution Steps" in `docs/roadmap/cowork-track-5-reliability-telemetry.md`
+- Track 6: Follow "Execution Steps" in `docs/roadmap/cowork-track-6-artifacts-apply-review.md`
+
 ## Best-Order Execution (Parallel + Gates)
 ### Phase A: Foundation (must land first)
 - Track 1 (storage + message contracts)

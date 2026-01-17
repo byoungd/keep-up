@@ -29,6 +29,14 @@ message lifecycle operations (create, edit, retry, branch, export) and attachmen
 - `apps/cowork/server/storage/*`
 - `apps/cowork/src/api/coworkApi.ts`
 
+## Execution Steps (Do This First)
+1. Read `apps/cowork/server/routes/chat.ts` to confirm current placeholder behavior.
+2. Define chat message storage contract in `apps/cowork/server/storage/contracts.ts`.
+3. Implement storage in `apps/cowork/server/storage/sqliteSessionStore.ts` or a new chat store.
+4. Update route handlers in `apps/cowork/server/routes/chat.ts` to read/write storage.
+5. Wire client API in `apps/cowork/src/api/coworkApi.ts` to include client_request_id.
+6. Add unit tests in `apps/cowork/server/__tests__` for storage + routes.
+
 ## Required Behavior
 - Stable ordering: user message must remain where sent; assistant updates in place.
 - Acknowledge client request ID and map to server message ID.

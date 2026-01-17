@@ -25,6 +25,14 @@ and performance telemetry that matches the spec budgets.
 - `apps/cowork/src/features/tasks/hooks/useTaskStream.ts`
 - `apps/cowork/src/features/chat/hooks/useChatSession.ts`
 
+## Execution Steps (Do This First)
+1. Add `client_request_id` support in `apps/cowork/src/api/coworkApi.ts`.
+2. Persist idempotency keys and map them to message IDs server-side.
+3. Improve SSE resume in `apps/cowork/src/features/tasks/hooks/useTaskStream.ts`.
+4. Add rAF batching for chat streaming in `useChatSession`.
+5. Emit telemetry in server routes and store per session/task summary.
+6. Surface connection status and stalled indicators in the UI.
+
 ## Required Behavior
 - Messages never reorder after send.
 - Streaming resumes without duplicate messages.

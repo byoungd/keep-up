@@ -27,6 +27,14 @@ Deliver user-facing chat parity features without changing agent runtime internal
 - `packages/shell/src/components/chat/*`
 - `apps/cowork/src/api/coworkApi.ts`
 
+## Execution Steps (Do This First)
+1. Inspect `packages/shell/src/components/chat/MessageItem.tsx` for message action hooks.
+2. Update `apps/cowork/src/features/chat/CoworkAIPanel.tsx` to wire action handlers.
+3. Use `apps/cowork/src/features/chat/hooks/useChatSession.ts` for action mutations.
+4. Add model/provider badges in `packages/shell/src/components/chat/MessageItem.tsx`.
+5. Implement export utilities under `apps/cowork/src/features/chat/utils/`.
+6. Add keyboard shortcuts in `apps/cowork/src/app/layouts/RootLayout.tsx` or panel wrapper.
+
 ## Required Behavior
 - User messages render immediately and never re-order.
 - Streaming assistant message updates in place (no flicker).

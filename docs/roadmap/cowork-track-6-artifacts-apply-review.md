@@ -23,6 +23,14 @@ Make artifacts actionable and auditable with a clear review flow.
 - `apps/cowork/server/storage/sqliteArtifactStore.ts`
 - `docs/specs/cowork/cowork-top-tier-agent-chat-spec.md`
 
+## Execution Steps (Do This First)
+1. Review current artifact storage in `apps/cowork/server/storage/*`.
+2. Add version and apply status fields to artifact records.
+3. Implement apply/revert endpoints in `apps/cowork/server/routes/artifacts.ts`.
+4. Wire apply/revert actions in `apps/cowork/src/features/artifacts/components/*`.
+5. Persist apply actions in audit logs and update artifact timestamps.
+6. Expose apply state in Library view and inline task message.
+
 ## Required Behavior
 - Each artifact has a stable id and version.
 - Apply action updates storage and emits an audit entry.

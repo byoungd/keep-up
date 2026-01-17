@@ -27,6 +27,14 @@ and deliverables within the assistant message body.
 - `apps/cowork/src/features/tasks/hooks/useTaskStream.ts`
 - `packages/shell/src/components/chat/MessageItem.tsx`
 
+## Execution Steps (Do This First)
+1. Review `apps/cowork/src/features/chat/utils/taskProjection.ts` and map task nodes to message metadata.
+2. Update `packages/shell/src/components/chat/MessageItem.tsx` to render task header + timeline inline.
+3. Ensure `apps/cowork/src/features/chat/hooks/useChatSession.ts` preserves task messages in order.
+4. Wire inline approvals to `onTaskAction` handlers in `packages/shell/src/components/chat/MessageItem.tsx`.
+5. Remove or de-emphasize separate TaskContainer use in `apps/cowork/src/app/routes/SessionRoute.tsx`.
+6. Add working indicator logic in message rendering for stalled streams.
+
 ## Required Behavior
 - One task equals one assistant message (no extra task cards).
 - Task updates mutate the existing message in place.
