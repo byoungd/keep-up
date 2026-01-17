@@ -4,6 +4,8 @@
  * Provides context management for agents.
  */
 
+// Active Context (Workflow State & Auto-Resume)
+export * from "./active";
 export {
   type CompactionOptions,
   type CompactionResult,
@@ -13,7 +15,6 @@ export {
   type ToolCall,
   type ToolResult,
 } from "./ContextCompactor";
-
 export {
   type ContextBudget,
   type ContextBuildResult,
@@ -23,7 +24,6 @@ export {
   TieredContextBuilder,
   type TieredContextConfig,
 } from "./contextBuilder";
-
 export {
   ContextFrameBuilder,
   type ContextFrameBuilderConfig,
