@@ -6,12 +6,16 @@
 
 import type { ToolExecutionOptions } from "../executor";
 import { createToolExecutor } from "../executor";
+import type { AgentModeManager } from "../modes";
+import { createModePolicyEngine } from "../modes";
 import type { IAgentLLM, OrchestratorComponents } from "../orchestrator/orchestrator";
 import { type CreateOrchestratorOptions, createOrchestrator } from "../orchestrator/orchestrator";
 import {
   createPermissionChecker,
   createSecurityPolicy,
+  createToolPolicyEngine,
   type IPermissionChecker,
+  type ToolPolicyEngine,
 } from "../security";
 import type { TelemetryContext } from "../telemetry";
 import type { IToolRegistry } from "../tools/mcp/registry";
@@ -35,6 +39,7 @@ export interface CoworkRuntimeConfig {
   caseInsensitivePaths?: boolean;
   audit?: AuditLogger;
   telemetry?: TelemetryContext;
+  modeManager?: AgentModeManager;
 }
 
 export interface CreateCoworkOrchestratorOptions
@@ -74,13 +79,15 @@ export function createCoworkToolExecutor(
   registry: IToolRegistry,
   config: CoworkToolExecutorConfig
 ): ReturnType<typeof createToolExecutor> {
-  const policyEngine = resolveCoworkPolicyEngine(config);
-  const policy = createCoworkPermissionChecker({ ...config, policyEngine });
-  const coworkContext = buildCoworkContext(config, policyEngine);
+  const coworkPolicyEngine = resolveCoworkPolicyEngine(config);
+  const policy = createCoworkPermissionChecker({ ...config, policyEngine: coworkPolicyEngine });
+  const coworkContext = buildCoworkContext(config, coworkPolicyEngine);
+  const toolPolicyEngine = resolveToolPolicyEngine(policy, config.modeManager);
 
   return createToolExecutor({
     registry,
     policy,
+    policyEngine: toolPolicyEngine,
     sandboxAdapter: config.sandboxAdapter,
     telemetryHandler: config.telemetryHandler,
     executionObserver: config.executionObserver,
@@ -100,12 +107,19 @@ export function createCoworkOrchestrator(
   options: CreateCoworkOrchestratorOptions
 ) {
   const { cowork, toolExecution, components, ...rest } = options;
-  const policyEngine = resolveCoworkPolicyEngine(cowork);
-  const policy = createCoworkPermissionChecker({ ...cowork, policyEngine });
-  const coworkContext = buildCoworkContext(cowork, policyEngine);
+  const coworkPolicyEngine = resolveCoworkPolicyEngine(cowork);
+  const policy = createCoworkPermissionChecker({ ...cowork, policyEngine: coworkPolicyEngine });
+  const coworkContext = buildCoworkContext(cowork, coworkPolicyEngine);
+  const baseToolPolicyEngine = toolExecution?.policyEngine ?? createToolPolicyEngine(policy);
+  const toolPolicyEngine = resolveToolPolicyEngine(
+    policy,
+    cowork.modeManager,
+    baseToolPolicyEngine
+  );
   const coworkToolExecution: ToolExecutionOptions = {
     ...toolExecution,
     policy,
+    policyEngine: toolPolicyEngine,
     audit: toolExecution?.audit ?? cowork.audit,
     telemetry: toolExecution?.telemetry ?? cowork.telemetry,
     contextOverrides: mergeContextOverrides(toolExecution?.contextOverrides, coworkContext),
@@ -128,6 +142,15 @@ function resolveCoworkPolicyEngine(config: CoworkRuntimeConfig): CoworkPolicyEng
   return (
     config.policyEngine ?? createCoworkPolicyEngine(config.policy, { telemetry: config.telemetry })
   );
+}
+
+function resolveToolPolicyEngine(
+  policy: IPermissionChecker,
+  modeManager?: AgentModeManager,
+  basePolicyEngine?: ToolPolicyEngine
+): ToolPolicyEngine {
+  const engine = basePolicyEngine ?? createToolPolicyEngine(policy);
+  return modeManager ? createModePolicyEngine(modeManager, engine) : engine;
 }
 
 function buildCoworkContext(

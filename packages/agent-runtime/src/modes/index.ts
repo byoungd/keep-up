@@ -12,6 +12,7 @@ export {
   type ModeConfig,
   PLAN_MODE,
 } from "./AgentModeManager";
+export { createModePolicyEngine, ModeToolPolicyEngine } from "./modePolicy";
 
 export {
   createEmptyPlan,

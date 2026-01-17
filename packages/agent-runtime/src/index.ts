@@ -228,6 +228,14 @@ export { BUILT_IN_WORKFLOWS, createWorkflowTemplateManager } from "./workflows";
 // Convenience Re-exports
 // ============================================================================
 
+// LSP Tools (Semantic Code Intelligence)
+export {
+  createLspToolServer,
+  createTypeScriptProvider,
+  LspClient,
+  type LspClientOptions,
+  type LspProvider,
+} from "@ku0/tool-lsp";
 export { createAICoreAdapter, createMockLLM } from "./orchestrator/aiCoreAdapter";
 export { createOrchestrator } from "./orchestrator/orchestrator";
 export { createBashToolServer } from "./tools/core/bash";

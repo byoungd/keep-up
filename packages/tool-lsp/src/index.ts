@@ -6,6 +6,7 @@
  */
 
 export { LspClient, type LspClientOptions } from "./client";
+export { createTypeScriptProvider } from "./providers";
 export { createLspToolServer } from "./tools";
 export type {
   LspCapabilities,
