@@ -186,6 +186,7 @@ export function useChatSession(sessionId: string | undefined) {
         markMessageStalled(assistantId, true);
       }, 2000);
 
+      // rAF batching logic: flush pending chunks on next frame
       const flushChunks = () => {
         if (!pendingChunk) {
           rafId = null;
@@ -193,6 +194,7 @@ export function useChatSession(sessionId: string | undefined) {
         }
         fullContent += pendingChunk;
         pendingChunk = "";
+
         setHistoryMessages((prev) =>
           prev.map((m) => (m.id === assistantId ? { ...m, content: fullContent } : m))
         );
@@ -211,10 +213,14 @@ export function useChatSession(sessionId: string | undefined) {
               markMessageStalled(assistantId, false);
             }
             pendingChunk += chunk;
+
+            // Only schedule update if not already scheduled
             if (rafId === null) {
+              // Check if we are in environment supporting rAF (browser)
               if (typeof requestAnimationFrame === "function") {
                 rafId = requestAnimationFrame(flushChunks);
               } else {
+                // Fallback for non-browser envs
                 flushChunks();
               }
             }
@@ -235,12 +241,14 @@ export function useChatSession(sessionId: string | undefined) {
           }
         );
       } finally {
+        // Cleanup rAF on finish
         if (rafId !== null) {
           if (typeof cancelAnimationFrame === "function") {
             cancelAnimationFrame(rafId);
           }
           rafId = null;
         }
+        // Flush any remaining content
         if (pendingChunk) {
           fullContent += pendingChunk;
           pendingChunk = "";

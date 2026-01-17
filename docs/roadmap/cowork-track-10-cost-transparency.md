@@ -1,5 +1,6 @@
 # Track 10: Cost & Token Transparency
 
+> **Status**: 🏗️ Implementation in Progress (UI Complete)
 ## Mission
 Provide real-time visibility into token usage, API costs, and context window
 utilization – a key feature that OpenCode prominently displays and users expect.
@@ -111,15 +112,15 @@ advantage. Users appreciate:
 ## Deliverables
 - Token tracking middleware.
 - `CostTracker` service.
-- Real-time cost display widget.
-- Context window usage meter.
+- [x] Real-time cost display widget.
+- [x] Context window usage meter.
 - Session cost summary API.
 
 ## Acceptance Criteria
 - [ ] Token count updates during streaming.
 - [ ] Cost is displayed after each message.
-- [ ] Context meter shows percentage used.
-- [ ] Warning appears at 80% context usage.
+- [x] Context meter shows percentage used.
+- [x] Warning appears at 80% context usage.
 - [ ] Session cost can be exported.
 
 ## Testing

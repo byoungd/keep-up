@@ -7,7 +7,11 @@ import {
 import { AIPanel as ShellAIPanel } from "@ku0/shell";
 import React, { useCallback, useMemo } from "react";
 import { type ChatAttachmentRef, updateSettings, uploadChatAttachment } from "../../api/coworkApi";
+import { CostMeter } from "./components/CostMeter";
+import { ModeToggle } from "./components/ModeToggle";
 import { useChatSession } from "./hooks/useChatSession";
+import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
+import { downloadFile, exportToJson, exportToMarkdown } from "./utils/exportUtils";
 
 // ChatMessage is no longer used, we use Message from @ku0/shell via useChatSession
 
@@ -23,8 +27,18 @@ type PanelAttachment = {
 };
 
 export function ChatThread({ sessionId }: { sessionId: string }) {
-  const { messages, sendMessage, sendAction, isSending, isLoading, retryMessage } =
-    useChatSession(sessionId);
+  const {
+    messages,
+    sendMessage,
+    sendAction,
+    isSending,
+    isLoading,
+    retryMessage,
+    agentMode,
+    toggleMode,
+    usage,
+    session,
+  } = useChatSession(sessionId);
   const [input, setInput] = React.useState("");
   const [model, setModel] = React.useState(getDefaultModelId());
   const [branchParentId, setBranchParentId] = React.useState<string | null>(null);
@@ -34,6 +48,21 @@ export function ChatThread({ sessionId }: { sessionId: string }) {
   const listRef = React.useRef<HTMLDivElement>(null);
   const attachmentRefs = React.useRef(new Map<string, ChatAttachmentRef>());
   const attachmentsRef = React.useRef<PanelAttachment[]>([]);
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    onSend: () => {
+      // Logic handled by wrapping ShellAIPanel's onSend usually,
+      // but purely keyboard trigger can try to submit if input is ready
+      // For now, ShellAIPanel handles cmd+enter internally for text area.
+    },
+    onToggleMode: () => {
+      void toggleMode();
+    },
+    onNewSession: () => {
+      // Handled globally or by router
+    },
+  });
 
   // Reuse the translations from CoworkAIPanel (ideally shared)
   const translations = {
@@ -223,9 +252,42 @@ export function ChatThread({ sessionId }: { sessionId: string }) {
     inputRef.current?.focus();
   }, []);
 
+  const handleExport = useCallback(
+    (format: "markdown" | "json") => {
+      if (!messages.length || !session) {
+        return;
+      }
+      if (format === "markdown") {
+        // biome-ignore lint/suspicious/noExplicitAny: Loosened type for export
+        const md = exportToMarkdown(session as any, messages);
+        downloadFile(`chat-export-${sessionId || "session"}.md`, md, "text/markdown");
+      } else {
+        // biome-ignore lint/suspicious/noExplicitAny: Loosened type for export
+        const json = exportToJson(session as any, messages);
+        downloadFile(`chat-export-${sessionId || "session"}.json`, json, "application/json");
+      }
+    },
+    [messages, sessionId, session]
+  );
+
+  const headerContent = (
+    <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200/50 dark:border-gray-800/50 bg-surface-0 min-h-[48px]">
+      <div className="flex items-center gap-2">
+        <span className="font-semibold text-sm">Cowork Session</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <CostMeter usage={usage} modelId={model} />
+        <div className="h-4 w-px bg-border mx-1" />
+        <ModeToggle mode={agentMode} onToggle={toggleMode} />
+      </div>
+    </div>
+  );
+
   return (
     <div className="h-full w-full bg-surface-1">
       <ShellAIPanel
+        showHeader={false}
+        topContent={headerContent}
         title={translations.title}
         model={model}
         setModel={handleSetModel}
@@ -245,7 +307,7 @@ export function ChatThread({ sessionId }: { sessionId: string }) {
           /* no-op */
         }}
         onExport={() => {
-          /* no-op */
+          handleExport("markdown");
         }}
         headerTranslations={translations}
         panelPosition="main"

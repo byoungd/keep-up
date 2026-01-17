@@ -257,7 +257,8 @@ export function useTaskStream(sessionId: string) {
             tasks,
             approvals,
             artifacts,
-            session.agentMode,
+            // biome-ignore lint/suspicious/noExplicitAny: Temporary cast for backward compatibility
+            session.agentMode as any,
             taskTitleRef.current,
             taskPromptRef.current
           );

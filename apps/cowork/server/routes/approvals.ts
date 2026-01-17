@@ -38,12 +38,6 @@ export function createApprovalRoutes(deps: ApprovalRouteDeps) {
 
     const result = await deps.runtime.checkAction(session, parsed.data);
     if (result.status === "approval_required") {
-      console.info("[cowork] approval required", {
-        sessionId,
-        approvalId: result.approval.approvalId,
-        action: result.approval.action,
-        riskTags: result.approval.riskTags,
-      });
       deps.events.publish(sessionId, COWORK_EVENTS.APPROVAL_REQUIRED, {
         approvalId: result.approval.approvalId,
         action: result.approval.action,
@@ -74,12 +68,6 @@ export function createApprovalRoutes(deps: ApprovalRouteDeps) {
     if (!updated) {
       return jsonError(c, 404, "Approval not found");
     }
-
-    console.info("[cowork] approval resolved", {
-      sessionId: updated.sessionId,
-      approvalId: updated.approvalId,
-      status: updated.status,
-    });
     if (!deps.taskRuntime) {
       deps.events.publish(updated.sessionId, COWORK_EVENTS.APPROVAL_RESOLVED, {
         approvalId: updated.approvalId,

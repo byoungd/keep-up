@@ -2,11 +2,15 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { jsonError } from "./http";
 import { serverLogger } from "./logger";
+import type { PipelineRunner } from "./pipelines/pipelineRunner";
+import type { PipelineStore } from "./pipelines/pipelineStore";
 import { createApprovalRoutes } from "./routes/approvals";
 import { createArtifactRoutes } from "./routes/artifacts";
 import { createAuditLogRoutes } from "./routes/auditLogs";
 import { createChatRoutes } from "./routes/chat";
 import { createContextRoutes } from "./routes/context";
+import { createCostRoutes } from "./routes/cost";
+import { createPipelineRoutes } from "./routes/pipelines";
 import { createPreflightRoutes } from "./routes/preflight";
 import { createProjectRoutes } from "./routes/projects";
 import { createSessionRoutes } from "./routes/sessions";
@@ -28,6 +32,8 @@ export interface CoworkAppDeps {
   taskRuntime?: CoworkTaskRuntime;
   contextIndexManager?: ContextIndexManager;
   providerKeys?: ProviderKeyService;
+  pipelineStore?: PipelineStore;
+  pipelineRunner?: PipelineRunner;
   logger?: Pick<typeof serverLogger, "info" | "warn" | "error">;
 }
 
@@ -99,6 +105,13 @@ export function createCoworkApp(deps: CoworkAppDeps) {
 
   app.route(
     "/api",
+    createCostRoutes({
+      sessionStore: deps.storage.sessionStore,
+    })
+  );
+
+  app.route(
+    "/api",
     createProjectRoutes({
       projectStore: deps.storage.projectStore,
     })
@@ -120,6 +133,16 @@ export function createCoworkApp(deps: CoworkAppDeps) {
       auditLogStore: deps.storage.auditLogStore,
     })
   );
+
+  if (deps.pipelineStore && deps.pipelineRunner) {
+    app.route(
+      "/api",
+      createPipelineRoutes({
+        store: deps.pipelineStore,
+        runner: deps.pipelineRunner,
+      })
+    );
+  }
 
   app.route(
     "/api",

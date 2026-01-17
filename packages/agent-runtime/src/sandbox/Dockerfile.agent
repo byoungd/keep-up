@@ -1,0 +1,7 @@
+FROM node:20-alpine
+
+RUN apk add --no-cache bash git
+
+WORKDIR /workspace
+
+CMD ["sh", "-c", "tail -f /dev/null"]

@@ -39,7 +39,7 @@ by executing ten parallel tracks with clear dependencies and acceptance gates.
    - Doc: `docs/roadmap/cowork-track-8-project-context.md`
    - Output: auto-generated project context, persistent agent memory
    - Inspiration: OpenCode AGENTS.md, Claude Code CLAUDE.md
-   - Status: ✅ Core implementation complete (analyzer, generator, API routes)
+   - Status: ✅ Core implementation complete (analyzer, generator, API routes) + Settings UI
 9) Track 9: Plan Mode & Build Mode ✅ CORE COMPLETE
    - Doc: `docs/roadmap/cowork-track-9-plan-build-modes.md`
    - Output: dual agent modes, plan.md generation, mode toggle UI
@@ -49,7 +49,7 @@ by executing ten parallel tracks with clear dependencies and acceptance gates.
     - Doc: `docs/roadmap/cowork-track-10-cost-transparency.md`
     - Output: real-time token/cost display, context meter, session summary
     - Inspiration: OpenCode's always-visible cost display
-    - Status: 🔲 Not Started
+    - Status: 🏗️ UI Implemented / Backend Integration In Progress
 
 ### Phase 3: Agentic Excellence Tracks (11-14)
 11) Track 11: Semantic Context Indexing
@@ -123,7 +123,7 @@ Gate C: approvals enforced + apply/revert workflow validated
 - Track 7 (provider agnostic - depends on Track 1 message schema) - 🔲 Not Started
 - Track 8 (project context - no dependencies) - ✅ Complete
 - Track 9 (plan/build modes - depends on Track 4 approvals) - ✅ Core Complete
-- Track 10 (cost transparency - depends on Track 7 provider pricing) - 🔲 Not Started
+- Track 10 (cost transparency - depends on Track 7 provider pricing) - 🏗️ UI Done / Integration In Progress
 Gate D: multi-model support + project context + mode switching + cost visibility
 
 ### Phase E: Agentic Excellence (parallel once Gate D passes)

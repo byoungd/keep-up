@@ -1,6 +1,7 @@
 import { Link, useParams } from "@tanstack/react-router";
 import { ArtifactRail } from "../../components/ArtifactRail";
 import { ChatThread } from "../../features/chat/ChatThread";
+import { useKeyboardShortcuts } from "../../features/chat/hooks/useKeyboardShortcuts";
 import { useTaskStream } from "../../features/tasks/hooks/useTaskStream";
 import { useWorkspace } from "../providers/WorkspaceProvider";
 
@@ -10,6 +11,19 @@ export function SessionRoute() {
   const session = getSession(sessionId);
 
   const { graph, applyArtifact, revertArtifact } = useTaskStream(sessionId);
+
+  useKeyboardShortcuts({
+    onSend: () => {
+      // Handled in ChatPanel via input ref usually, but we can emit a focused event
+      // For now, let's keep it simple: meta+enter inside textarea works by default
+    },
+    onNewSession: () => {
+      // TODO: Navigate to new session
+    },
+    onSearch: () => {
+      // TODO: Open Search/Command Palette
+    },
+  });
 
   if (!session) {
     return (

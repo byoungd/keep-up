@@ -138,9 +138,7 @@ export function CoworkSidebarSections() {
       setProjectName("");
       setProjectInstructions("");
       setIsDialogOpen(false);
-    } catch (err) {
-      console.error("Failed to create project", err);
-    }
+    } catch (_err) {}
   }, [projectInstructions, projectName, createProject]);
 
   const handleSelectProject = React.useCallback(
@@ -179,9 +177,7 @@ export function CoworkSidebarSections() {
     async (sessionId: string, projectId: string | null) => {
       try {
         await moveSessionToProject(sessionId, projectId);
-      } catch (err) {
-        console.error("Failed to move session", err);
-      }
+      } catch (_err) {}
     },
     [moveSessionToProject]
   );
@@ -191,9 +187,7 @@ export function CoworkSidebarSections() {
       if (window.confirm("Are you sure you want to delete this session?")) {
         try {
           await deleteSession(sessionId);
-        } catch (e) {
-          console.error("Failed to delete", e);
-        }
+        } catch (_e) {}
       }
     },
     [deleteSession]

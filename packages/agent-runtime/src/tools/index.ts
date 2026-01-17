@@ -4,6 +4,8 @@
  * Re-exports all tool-related modules.
  */
 
+// Browser Tools
+export * from "./browser";
 // Core Tools
 export * from "./core";
 // Digest Tools
@@ -20,5 +22,7 @@ export * from "./mcp";
 export * from "./middleware";
 // Tool Naming (LFCC v0.9.1 compliance)
 export * from "./naming";
+// Sandbox Tools
+export * from "./sandbox";
 // Web Tools
 export * from "./web";
