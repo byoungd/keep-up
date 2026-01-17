@@ -1,5 +1,9 @@
 # Track 8: Project Context System (AGENTS.md)
 
+> **Status**: ✅ Core Implementation Complete (2026-01-17)
+> **Package**: `@ku0/project-context`
+> **Remaining**: System prompt integration, Settings UI, Tests
+
 ## Mission
 Implement persistent project-level context that helps the AI agent understand
 project structure, coding conventions, and custom instructions – inspired by
@@ -24,6 +28,21 @@ as persistent memory for AI agents. This dramatically improves:
 - Custom instructions and coding conventions storage.
 - Project pattern detection (frameworks, linters, test tools).
 - Integration with agent system prompt.
+
+## Decisions and Contracts
+- Storage location: write generated context to `.cowork/AGENTS.md` in project root to avoid clashing
+  with the repo-level `AGENTS.md` (agent collaboration guide).
+- Regeneration rules: preserve user sections between explicit markers:
+  - `<!-- cowork:custom:start -->` and `<!-- cowork:custom:end -->`
+  - `<!-- cowork:notes:start -->` and `<!-- cowork:notes:end -->`
+- Token budget: inject a truncated view (default 4k tokens) into the system prompt; keep the full
+  document available in settings UI.
+- Ignore rules for analysis: `.git`, `node_modules`, `dist`, `build`, `.turbo`, `.next`, `.agent`.
+
+## API Surface (Server)
+- `GET /api/project/context` -> `{ ok, content, updatedAt }`
+- `PUT /api/project/context` -> `{ ok, content, updatedAt }` (persist edits)
+- `POST /api/project/context/regenerate` -> `{ ok, content, updatedAt }` (preserve custom sections)
 
 ## Non-Goals
 - Replacing existing `Agents.md` file (different purpose).
@@ -103,6 +122,11 @@ as persistent memory for AI agents. This dramatically improves:
    - Regenerate button.
    - Section-level enable/disable.
 
+## Analyzer Constraints
+- Depth limit (default 3) for directory tree output.
+- Cap file count per folder to avoid runaway output.
+- Surface config files from project root and `apps/*`/`packages/*`.
+
 ## Required Behavior
 - AGENTS.md is auto-generated on first project open.
 - User can edit and customize all sections.
@@ -113,24 +137,30 @@ as persistent memory for AI agents. This dramatically improves:
 ## Implementation Outline
 1. Create `packages/project-context/` with analyzer and generator.
 2. Add file watchers for project structure changes.
-3. Implement AGENTS.md CRUD API: `GET/PUT /api/project/context`.
-4. Inject context into `coworkTaskRuntime.ts` system prompt builder.
+3. Implement AGENTS.md CRUD API: `GET/PUT/POST /api/project/context`.
+4. Inject context into `coworkTaskRuntime.ts` system prompt builder with token budget.
 5. Build settings UI for viewing/editing context.
 6. Add CLI command: `cowork context init` / `cowork context refresh`.
 
 ## Deliverables
-- `@ku0/project-context` package.
-- AGENTS.md auto-generation on project init.
-- Context injection into agent system prompt.
-- Settings UI for context management.
-- CLI commands for context operations.
+- [x] `@ku0/project-context` package
+- [x] Project analyzer (tech stack, patterns, conventions detection)
+- [x] AGENTS.md generator with customizable sections
+- [x] Context API routes (`GET/POST /api/context/*`)
+- [ ] AGENTS.md auto-generation on project init
+- [ ] Context injection into agent system prompt
+- [ ] Settings UI for context management
+- [ ] CLI commands for context operations
 
 ## Acceptance Criteria
-- [ ] AGENTS.md is generated automatically on first session.
-- [ ] Agent references project conventions without explicit instruction.
-- [ ] Custom instructions section survives regeneration.
-- [ ] Context visible in settings UI.
-- [ ] File is valid markdown, Git-diffable.
+- [x] Project analyzer correctly detects tech stack from package.json
+- [x] Generator produces valid, structured AGENTS.md markdown
+- [x] API routes for analyze/generate/save/refresh work correctly
+- [x] Custom instructions are preserved during regeneration
+- [ ] AGENTS.md is generated automatically on first session
+- [ ] Agent references project conventions without explicit instruction
+- [ ] Context visible in settings UI
+- [ ] File is valid markdown, Git-diffable
 
 ## Testing
 - Unit tests for project analyzer.

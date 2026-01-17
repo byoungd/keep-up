@@ -1,5 +1,9 @@
 # Track 9: Plan Mode & Build Mode (Dual Agent Modes)
 
+> **Status**: ✅ Core Implementation Complete (2026-01-17)
+> **Location**: `packages/agent-runtime/src/modes/`
+> **Remaining**: Plan.md artifact generation, Mode toggle UI, Keyboard shortcut
+
 ## Mission
 Implement dual operating modes for the Cowork agent: **Plan Mode** for read-only
 analysis and planning, and **Build Mode** for executing code modifications –
@@ -25,6 +29,22 @@ files before execution. Both patterns address:
 - Build Mode: full tool access with confirmations.
 - Plan artifact generation (plan.md with proposed changes).
 - Mode-aware tool filtering.
+
+## Mode Policy (Initial)
+- Plan Mode allowed: `read_file`, `search`, `list_dir`, `view_file_outline`.
+- Plan Mode denied: `write_file`, `apply_patch`, `run_command`, `delete_file`.
+- Build Mode allowed: all tools, but destructive actions still require approval (Track 4).
+- Blocked tool attempts should respond with a clear, user-facing message and suggest
+  switching to Build Mode.
+
+## Plan Artifact Format
+- Artifact type: `plan`
+- Required sections: problem summary, proposed file changes, step-by-step plan, risks.
+- Stored in artifacts table with `status: pending` and linked to session.
+
+## Persistence
+- Mode is stored on the session record and survives page refresh.
+- UI reflects the stored mode and prompts when switching away from a pending plan.
 
 ## Non-Goals
 - Complex multi-agent orchestration (separate track).
@@ -122,20 +142,30 @@ files before execution. Both patterns address:
 4. Add mode toggle UI component.
 5. Wire keyboard shortcut.
 6. Add mode to session state (persisted).
+7. Emit mode changes in SSE events for live UI updates.
 
 ## Deliverables
-- `AgentModeManager` class with mode switching.
-- Mode-aware tool filtering.
-- Plan.md artifact generation in Plan Mode.
-- Mode toggle UI with keyboard shortcut.
-- Mode indicator badge.
+- [x] `AgentModeManager` class with mode switching
+- [x] Mode configurations (PLAN_MODE, BUILD_MODE)
+- [x] Mode-aware tool filtering (`canUseTool`, `filterTools`)
+- [x] System prompt additions for each mode
+- [x] `agentMode` field added to `CoworkSession` type
+- [x] Mode API endpoints (GET/PUT/toggle)
+- [x] `SESSION_UPDATED` and `SESSION_MODE_CHANGED` SSE events
+- [ ] Plan.md artifact generation in Plan Mode
+- [ ] Mode toggle UI with keyboard shortcut
+- [ ] Mode indicator badge
 
 ## Acceptance Criteria
-- [ ] Tab key (or shortcut) toggles between Plan and Build mode.
-- [ ] Plan Mode blocks file write attempts with clear message.
-- [ ] Plan Mode generates plan.md with proposed changes.
-- [ ] Build Mode executes changes with Track 4 approvals.
-- [ ] Mode indicator visible in UI at all times.
+- [x] AgentModeManager correctly filters tools by mode
+- [x] Mode persists in session state
+- [x] API endpoints for mode get/set/toggle work correctly
+- [x] SSE events emitted on mode change
+- [ ] Tab key (or shortcut) toggles between Plan and Build mode
+- [ ] Plan Mode blocks file write attempts with clear message
+- [ ] Plan Mode generates plan.md with proposed changes
+- [ ] Build Mode executes changes with Track 4 approvals
+- [ ] Mode indicator visible in UI at all times
 
 ## Testing
 - Unit tests for mode manager and tool filtering.
