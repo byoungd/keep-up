@@ -75,3 +75,9 @@ export {
   type StreamingCacheConfig,
   type StreamingCacheStats,
 } from "./streamingCache";
+
+// Runtime event bridge
+export {
+  attachRuntimeEventStreamBridge,
+  type RuntimeEventStreamBridgeConfig,
+} from "./runtimeEventBridge";
