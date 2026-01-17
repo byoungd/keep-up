@@ -67,6 +67,14 @@ import type {
   ToolError,
 } from "../types";
 import { countTokens } from "../utils/tokenCounter";
+import {
+  type AgentLoopStateMachine,
+  createAgentLoopStateMachine,
+  type Observation,
+  type PerceptionContext,
+  type ThinkingResult,
+  type ToolDecision,
+} from "./agentLoop";
 import { createDependencyAnalyzer, type DependencyAnalyzer } from "./dependencyAnalyzer";
 import { createErrorRecoveryEngine, type ErrorRecoveryEngine } from "./errorRecovery";
 import { BackpressureEventStream } from "./eventStream";
@@ -80,7 +88,7 @@ import {
 import { createRequestCache, type RequestCache } from "./requestCache";
 import { SmartToolScheduler } from "./smartToolScheduler";
 import { ToolResultCache } from "./toolResultCache";
-import { createTurnExecutor, type ITurnExecutor } from "./turnExecutor";
+import { createTurnExecutor, type ITurnExecutor, type TurnOutcome } from "./turnExecutor";
 
 // ============================================================================
 // LLM Interface (for dependency injection)
@@ -196,6 +204,8 @@ export interface OrchestratorStreamBridge {
   includeDecisions?: boolean;
 }
 
+type ToolMessage = Extract<AgentMessage, { role: "tool" }>;
+
 // ============================================================================
 // Agent Orchestrator
 // ============================================================================
@@ -229,6 +239,8 @@ export class AgentOrchestrator {
   private readonly taskGraph?: TaskGraphStore;
   private readonly streamBridge?: OrchestratorStreamBridge;
   private readonly artifactPipeline?: ArtifactPipeline;
+  private readonly loopStateMachine: AgentLoopStateMachine;
+  private lastObservation?: Observation;
   private currentRunId?: string;
   private currentPlanNodeId?: string;
   private readonly taskGraphToolCalls = new WeakMap<MCPToolCall, string>();
@@ -352,6 +364,8 @@ export class AgentOrchestrator {
       metrics: this.metrics,
       getToolDefinitions: () => this.getToolDefinitions(),
     });
+
+    this.loopStateMachine = createAgentLoopStateMachine({ enableCycleLogging: false });
   }
 
   /**
@@ -395,6 +409,7 @@ export class AgentOrchestrator {
     this.state.messages.push(userMsg);
     this.recordMessage(userMsg);
     this.metrics?.gauge(AGENT_METRICS.activeAgents.name, 1, {});
+    this.loopStateMachine.stop();
 
     try {
       // Run the agentic loop
@@ -460,6 +475,7 @@ export class AgentOrchestrator {
     }
 
     this.state.status = "executing";
+    this.loopStateMachine.resume();
     while (this.shouldContinue()) {
       await this.executeTurn();
     }
@@ -473,6 +489,7 @@ export class AgentOrchestrator {
   stop(): void {
     this.abortController?.abort();
     this.state.status = "complete";
+    this.loopStateMachine.stop();
   }
 
   /**
@@ -549,6 +566,176 @@ export class AgentOrchestrator {
     );
   }
 
+  private startLoopCycle(): void {
+    const perception: PerceptionContext = {
+      messages: [...this.state.messages],
+      previousObservation: this.lastObservation,
+      userInput: this.getLatestUserMessage(),
+    };
+
+    this.loopStateMachine.startCycle(perception);
+    this.loopStateMachine.transitionToThinking();
+  }
+
+  private buildThinkingResult(outcome: TurnOutcome): ThinkingResult {
+    if (outcome.type === "tool_use") {
+      return {
+        nextStep: "execute_tool_calls",
+        reasoning: "Model requested tool execution.",
+        shouldUpdatePlan: false,
+        shouldAdvancePhase: true,
+      };
+    }
+
+    if (outcome.type === "complete") {
+      return {
+        nextStep: "respond_to_user",
+        reasoning: "Model returned a final response.",
+        shouldUpdatePlan: false,
+        shouldAdvancePhase: true,
+      };
+    }
+
+    return {
+      nextStep: "handle_error",
+      reasoning: outcome.error ?? "Execution error.",
+      shouldUpdatePlan: false,
+      shouldAdvancePhase: false,
+    };
+  }
+
+  private buildDecisionForToolCalls(toolCalls: MCPToolCall[]): ToolDecision {
+    if (toolCalls.length === 1) {
+      const [call] = toolCalls;
+      return {
+        toolName: call.name,
+        parameters: call.arguments,
+        rationale: "Model requested a tool execution.",
+        expectedOutcome: `Result from ${call.name}`,
+      };
+    }
+
+    return {
+      toolName: "tool_batch",
+      parameters: {
+        toolCalls: toolCalls.map((call) => ({ name: call.name, arguments: call.arguments })),
+      },
+      rationale: "Model requested multiple tool calls.",
+      expectedOutcome: `Results from ${toolCalls.length} tool calls`,
+    };
+  }
+
+  private buildDecisionForResponse(response?: AgentLLMResponse): ToolDecision {
+    return {
+      toolName: "assistant_response",
+      parameters: { content: response?.content ?? "" },
+      rationale: "Model returned a final response.",
+      expectedOutcome: "Response delivered to user.",
+    };
+  }
+
+  private buildResponseObservation(
+    response: AgentLLMResponse | undefined,
+    turnStart: number
+  ): Observation {
+    const content = response?.content ?? "";
+    const toolCall: MCPToolCall = {
+      name: "assistant_response",
+      arguments: { content },
+    };
+    const duration = Date.now() - turnStart;
+    const result: MCPToolResult = {
+      success: true,
+      content: content ? [{ type: "text", text: content }] : [],
+      meta: {
+        durationMs: duration,
+        toolName: toolCall.name,
+        sandboxed: false,
+      },
+    };
+
+    return {
+      toolCall,
+      result,
+      success: true,
+      timestamp: Date.now(),
+      metadata: {
+        duration,
+        attemptNumber: 1,
+      },
+    };
+  }
+
+  private buildPlanRejectionObservation(toolCalls: MCPToolCall[], turnStart: number): Observation {
+    const duration = Date.now() - turnStart;
+    const toolCall: MCPToolCall = {
+      name: "plan_approval",
+      arguments: {
+        approved: false,
+        requestedTools: toolCalls.map((call) => call.name),
+      },
+    };
+    const result: MCPToolResult = {
+      success: false,
+      content: [{ type: "text", text: "Plan approval denied." }],
+      error: { code: "PERMISSION_DENIED", message: "Plan approval denied." },
+      meta: {
+        durationMs: duration,
+        toolName: toolCall.name,
+        sandboxed: false,
+      },
+    };
+
+    return {
+      toolCall,
+      result,
+      success: false,
+      error: result.error ? { code: result.error.code, message: result.error.message } : undefined,
+      timestamp: Date.now(),
+      metadata: {
+        duration,
+        attemptNumber: 1,
+      },
+    };
+  }
+
+  private buildToolObservation(toolCalls: MCPToolCall[], turnStart: number): Observation {
+    const lastToolMessage = this.getLastToolMessage();
+    const toolName = lastToolMessage?.toolName ?? toolCalls[toolCalls.length - 1]?.name ?? "tool";
+    const toolCall = toolCalls.find((call) => call.name === toolName) ?? {
+      name: toolName,
+      arguments: {},
+    };
+    const duration = Date.now() - turnStart;
+    const result: MCPToolResult = lastToolMessage?.result ?? {
+      success: false,
+      content: [],
+      error: { code: "EXECUTION_FAILED", message: "No tool result recorded." },
+    };
+
+    return {
+      toolCall,
+      result,
+      success: result.success,
+      error: result.error ? { code: result.error.code, message: result.error.message } : undefined,
+      timestamp: Date.now(),
+      metadata: {
+        duration,
+        attemptNumber: 1,
+      },
+    };
+  }
+
+  private getLastToolMessage(): ToolMessage | undefined {
+    for (let i = this.state.messages.length - 1; i >= 0; i--) {
+      const message = this.state.messages[i];
+      if (message.role === "tool") {
+        return message as ToolMessage;
+      }
+    }
+    return undefined;
+  }
+
   private async executeTurn(): Promise<void> {
     this.state.turn++;
     this.state.status = "thinking";
@@ -564,6 +751,8 @@ export class AgentOrchestrator {
     }
 
     try {
+      this.startLoopCycle();
+
       const outcome = await this.turnExecutor.execute(this.state, turnSpan);
 
       // Update state with used messages and new assistant message
@@ -578,8 +767,18 @@ export class AgentOrchestrator {
         this.accumulateUsage(outcome.usage);
       }
 
+      const thinkingResult = this.buildThinkingResult(outcome);
+      this.loopStateMachine.transitionToDecision(thinkingResult);
+
       // Handle outcome
       if (outcome.type === "complete") {
+        const decision = this.buildDecisionForResponse(outcome.response);
+        this.loopStateMachine.transitionToAction(decision);
+        const observation = this.buildResponseObservation(outcome.response, turnStart);
+        this.loopStateMachine.transitionToObservation(observation);
+        this.lastObservation = observation;
+        this.loopStateMachine.completeCycle();
+
         this.state.status = "complete";
         this.emit("complete", { content: outcome.response?.content });
         this.metrics?.increment(AGENT_METRICS.turnsTotal.name, { status: "complete" });
@@ -588,15 +787,29 @@ export class AgentOrchestrator {
       }
 
       if (outcome.type === "tool_use" && outcome.toolCalls) {
-        this.state.status = "executing";
+        const decision = this.buildDecisionForToolCalls(outcome.toolCalls);
         const shouldExecute = await this.maybeCreatePlan(outcome.toolCalls);
         if (!shouldExecute) {
+          const observation = this.buildPlanRejectionObservation(outcome.toolCalls, turnStart);
+          this.loopStateMachine.transitionToAction(decision);
+          this.loopStateMachine.transitionToObservation(observation);
+          this.lastObservation = observation;
+          this.loopStateMachine.completeCycle();
+
+          this.state.status = "complete";
           this.emit("turn:end", { turn: this.state.turn });
           this.metrics?.increment(AGENT_METRICS.turnsTotal.name, { status: "success" });
           turnSpan?.setStatus("ok");
           return;
         }
+
+        this.state.status = "executing";
+        this.loopStateMachine.transitionToAction(decision);
         await this.executeToolCalls(outcome.toolCalls, turnSpan);
+        const observation = this.buildToolObservation(outcome.toolCalls, turnStart);
+        this.loopStateMachine.transitionToObservation(observation);
+        this.lastObservation = observation;
+        this.loopStateMachine.completeCycle();
       } else if (outcome.type === "error") {
         throw new Error(outcome.error ?? "Unknown execution error");
       }
@@ -610,6 +823,7 @@ export class AgentOrchestrator {
       this.emit("error", { error: this.state.error });
       this.metrics?.increment(AGENT_METRICS.turnsTotal.name, { status: "error" });
       turnSpan?.setStatus("error", this.state.error);
+      this.loopStateMachine.stop();
     } finally {
       this.metrics?.observe(AGENT_METRICS.turnDuration.name, Date.now() - turnStart, {});
       turnSpan?.end();
@@ -664,10 +878,11 @@ export class AgentOrchestrator {
     this.emit("plan:created", plan);
 
     if (plan.requiresApproval) {
+      this.loopStateMachine.pause();
       const approval = await this.planningEngine.requestApproval(plan.id);
+      this.loopStateMachine.resume();
       if (!approval.approved) {
         this.emit("plan:rejected", approval);
-        this.state.status = "complete";
         return false;
       }
       this.emit("plan:approved", approval);
@@ -981,11 +1196,13 @@ export class AgentOrchestrator {
 
     this.state.status = "waiting_confirmation";
     this.emit("confirmation:required", request);
+    this.loopStateMachine.pause();
 
     const confirmed = await this.confirmationHandler(request);
 
     this.emit("confirmation:received", { confirmed });
     this.state.status = "executing";
+    this.loopStateMachine.resume();
 
     return confirmed;
   }
