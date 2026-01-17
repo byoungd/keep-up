@@ -44,7 +44,7 @@ const DEFAULT_CONFIG: OpenAIAgentsConfig = {
   defaultTimeout: 300000,
   enableBackground: true,
   backgroundPoolSize: 2,
-  model: "gpt-4o-mini",
+  model: "gpt-5.2-instant",
   maxTurns: 10,
 };
 

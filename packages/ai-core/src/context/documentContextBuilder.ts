@@ -23,8 +23,7 @@ export interface DocumentContextBuilderConfig {
   linesBefore?: number;
   /** Lines of context after cursor */
   linesAfter?: number;
-  /** Whether to include document structure hints */
-  includeStructure?: boolean;
+
   /** Optional token counter override */
   tokenCounter?: TokenCounter;
 }
@@ -64,7 +63,6 @@ export class DocumentContextBuilder {
       defaultMaxTokens: config.defaultMaxTokens ?? 2000,
       linesBefore: config.linesBefore ?? 50,
       linesAfter: config.linesAfter ?? 20,
-      includeStructure: config.includeStructure ?? true,
     };
     this.tokenCounter = config.tokenCounter ?? { countTokens: estimateTokens };
   }
@@ -353,26 +351,6 @@ export class DocumentContextBuilder {
       content.length > 0 ? Math.round((cursorPosition / content.length) * 100) : 0;
 
     return { line, column, percentageThrough };
-  }
-
-  /**
-   * Extract structural hints from document (headings, sections).
-   */
-  extractStructure(content: string): string[] {
-    const structure: string[] = [];
-    const lines = content.split("\n");
-
-    for (const line of lines) {
-      // Markdown headings
-      const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
-      if (headingMatch) {
-        const level = headingMatch[1].length;
-        const title = headingMatch[2];
-        structure.push(`${"  ".repeat(level - 1)}${title}`);
-      }
-    }
-
-    return structure;
   }
 }
 

@@ -30,13 +30,13 @@ export interface ProviderSelection {
 }
 
 const DEFAULT_TASK_PREFERENCES: Record<TaskType, string[]> = {
-  code_implementation: ["claude-3-5-sonnet", "gpt-4o", "gemini-1.5-pro"],
-  refactoring: ["claude-3-5-sonnet", "gpt-4o", "gemini-1.5-pro"],
-  debugging: ["claude-3-5-sonnet", "gpt-4o", "gemini-1.5-pro"],
-  testing: ["gpt-4o", "claude-3-5-sonnet", "gemini-1.5-pro"],
-  research: ["gpt-4o", "gemini-1.5-pro", "claude-3-5-sonnet"],
-  documentation: ["gpt-4o-mini", "gemini-1.5-flash", "claude-3-haiku"],
-  general: ["gpt-4o-mini", "gemini-1.5-flash", "claude-3-haiku"],
+  code_implementation: ["claude-sonnet-4-5", "gpt-5.2-auto", "gemini-3-pro-high"],
+  refactoring: ["claude-sonnet-4-5", "gpt-5.2-auto", "gemini-3-pro-high"],
+  debugging: ["claude-sonnet-4-5", "gpt-5.2-auto", "gemini-3-pro-high"],
+  testing: ["gpt-5.2-auto", "claude-sonnet-4-5", "gemini-3-pro-high"],
+  research: ["gpt-5.2-auto", "claude-opus-4-5", "gemini-3-pro-high"],
+  documentation: ["gpt-5.2-instant", "gemini-3-flash", "claude-sonnet-4-5"],
+  general: ["gpt-5.2-instant", "gemini-3-flash", "claude-sonnet-4-5"],
 };
 
 export class SmartProviderRouter {

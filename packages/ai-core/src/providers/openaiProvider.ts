@@ -4,6 +4,7 @@
  * LLM provider implementation for OpenAI API (GPT-4, GPT-3.5, etc.)
  */
 
+import { getDefaultModelId, MODEL_CATALOG } from "../catalog/models";
 import { BaseLLMProvider } from "./baseProvider";
 import type {
   CompletionRequest,
@@ -46,13 +47,19 @@ interface OpenAIEmbeddingResponse {
   usage: { prompt_tokens: number; total_tokens: number };
 }
 
-const OPENAI_MODELS = ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo"] as const;
+const OPENAI_MODELS = MODEL_CATALOG.filter(
+  (model) => model.provider === "openai" || model.group === "O3"
+).map((model) => model.id) as string[];
+const DEFAULT_OPENAI_MODEL =
+  MODEL_CATALOG.find((model) => model.provider === "openai" && model.default)?.id ??
+  OPENAI_MODELS[0] ??
+  getDefaultModelId();
 const STREAM_DONE_MARKER = "[" + "DONE" + "]";
 
 export class OpenAIProvider extends BaseLLMProvider {
   readonly name = "openai";
   readonly models = [...OPENAI_MODELS];
-  readonly defaultModel = "gpt-4o-mini";
+  readonly defaultModel = DEFAULT_OPENAI_MODEL;
   readonly defaultEmbeddingModel = "text-embedding-3-small";
 
   private readonly baseUrl: string;

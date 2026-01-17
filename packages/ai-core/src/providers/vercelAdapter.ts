@@ -12,6 +12,7 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import type { JSONSchema7 } from "ai";
 import { embed as embedText, generateText, jsonSchema, streamText, tool } from "ai";
+import { MODEL_CATALOG } from "../catalog/models";
 import type {
   CompletionRequest,
   CompletionResponse,
@@ -52,20 +53,21 @@ export interface VercelAIAdapterConfig {
  * Model mappings for each provider
  */
 const PROVIDER_MODELS: Record<VercelProviderType, string[]> = {
-  openai: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo", "o1", "o1-mini"],
-  anthropic: [
-    "claude-sonnet-4-20250514",
-    "claude-3-5-sonnet-20241022",
-    "claude-3-5-haiku-20241022",
-    "claude-3-opus-20240229",
-  ],
-  google: ["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"],
+  openai: MODEL_CATALOG.filter((m) => m.provider === "openai" || m.group === "O3").map((m) => m.id),
+  anthropic: MODEL_CATALOG.filter((m) => m.provider === "claude").map((m) => m.id),
+  google: MODEL_CATALOG.filter((m) => m.provider === "gemini").map((m) => m.id),
 };
 
 const DEFAULT_MODELS: Record<VercelProviderType, string> = {
-  openai: "gpt-4o-mini",
-  anthropic: "claude-sonnet-4-20250514",
-  google: "gemini-2.0-flash",
+  openai:
+    MODEL_CATALOG.find((m) => m.provider === "openai" && m.default)?.id ??
+    PROVIDER_MODELS.openai[0],
+  anthropic:
+    MODEL_CATALOG.find((m) => m.provider === "claude" && m.default)?.id ??
+    PROVIDER_MODELS.anthropic[0],
+  google:
+    MODEL_CATALOG.find((m) => m.provider === "gemini" && m.default)?.id ??
+    PROVIDER_MODELS.google[0],
 };
 
 const DEFAULT_EMBEDDING_MODELS: Record<VercelProviderType, string> = {
@@ -74,7 +76,10 @@ const DEFAULT_EMBEDDING_MODELS: Record<VercelProviderType, string> = {
   google: "text-embedding-004",
 };
 
-type ProviderInstance = ReturnType<typeof createOpenAI>;
+type ProviderInstance =
+  | ReturnType<typeof createOpenAI>
+  | ReturnType<typeof createAnthropic>
+  | ReturnType<typeof createGoogleGenerativeAI>;
 
 /**
  * Vercel AI SDK Adapter
@@ -257,18 +262,26 @@ export class VercelAIAdapter implements LLMProvider {
     try {
       const modelId = request.model || this.defaultEmbeddingModel;
 
-      // Only OpenAI provider has embedding support via this method
-      if (this.config.provider !== "openai") {
+      // Support OpenAI and Google for embeddings
+      // biome-ignore lint/suspicious/noExplicitAny: needed for multiple provider types
+      let embeddingModel: any;
+
+      if (this.config.provider === "openai") {
+        const openaiProvider = this.providerInstance as ReturnType<typeof createOpenAI>;
+        embeddingModel = openaiProvider.embedding(modelId);
+      } else if (this.config.provider === "google") {
+        const googleProvider = this.providerInstance as ReturnType<typeof createGoogleGenerativeAI>;
+        embeddingModel = googleProvider.textEmbeddingModel(modelId);
+      } else {
         throw new Error(`Embeddings not supported for provider: ${this.config.provider}`);
       }
 
-      const openaiProvider = this.providerInstance as ReturnType<typeof createOpenAI>;
       const results: number[][] = [];
       let totalTokens = 0;
 
       for (const text of request.texts) {
         const result = await embedText({
-          model: openaiProvider.embedding(modelId),
+          model: embeddingModel,
           value: text,
         });
 

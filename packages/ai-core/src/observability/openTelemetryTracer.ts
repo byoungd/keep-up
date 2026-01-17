@@ -12,6 +12,7 @@
  * - Automatic instrumentation hooks
  */
 
+import { randomBytes } from "node:crypto";
 import type { Span, Tracer } from "../resilience/observability";
 
 // ============================================================================
@@ -522,11 +523,7 @@ export class OpenTelemetryTracer implements Tracer {
   }
 
   private generateRandomHex(length: number): string {
-    let result = "";
-    for (let i = 0; i < length; i++) {
-      result += Math.floor(Math.random() * 16).toString(16);
-    }
-    return result;
+    return randomBytes(length / 2).toString("hex");
   }
 
   private startExportInterval(): void {

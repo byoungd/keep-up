@@ -14,6 +14,7 @@
  * - Standardized error handling
  */
 
+import { getDefaultModelId } from "../catalog/models";
 import {
   ProviderRouter,
   type ProviderRouterConfig,
@@ -30,6 +31,7 @@ import {
 } from "../resilience/health";
 import { createObservability, type ObservabilityContext } from "../resilience/observability";
 import type { ResiliencePipelineConfig } from "../resilience/pipeline";
+import { createResiliencePipeline, type ResiliencePipeline } from "../resilience/pipeline";
 import { fromProviderError, GatewayError, type GatewayErrorCode } from "./errors";
 import { createNoopGatewayTelemetryAdapter, type GatewayTelemetryAdapter } from "./telemetry";
 import { createTraceContext, type TraceContext } from "./traceContext";
@@ -118,10 +120,7 @@ export interface GatewayRequestOptions {
  * LFCC §11.1: Document frontier types
  * Represents the observed CRDT state boundary for AI precondition checks.
  */
-export type DocFrontier =
-  | { loro_frontier: string[] }
-  | { yjs_state_vector: string }
-  | { automerge_heads: string[] };
+export type DocFrontier = { loro_frontier: string[] };
 
 /** Stream options (extends request options) */
 export interface GatewayStreamOptions extends GatewayRequestOptions {
@@ -242,6 +241,7 @@ export class UnifiedAIGateway {
   private readonly healthAggregator;
   private readonly observability: ObservabilityContext;
   private readonly telemetryAdapter: GatewayTelemetryAdapter;
+  private readonly pipeline: ResiliencePipeline;
   private readonly startTime: number;
 
   private totalRequests = 0;
@@ -256,7 +256,7 @@ export class UnifiedAIGateway {
     this.startTime = Date.now();
     this.config = {
       ...config,
-      defaultModel: config.defaultModel ?? "gpt-4o",
+      defaultModel: config.defaultModel ?? getDefaultModelId(),
       enableFallback: config.enableFallback ?? true,
     };
 
@@ -320,6 +320,9 @@ export class UnifiedAIGateway {
     if (config.health?.enabled !== false) {
       this.router.startHealthChecks();
     }
+
+    // Initialize resilience pipeline
+    this.pipeline = createResiliencePipeline(config.resilience);
   }
 
   // ==========================================================================
@@ -351,22 +354,39 @@ export class UnifiedAIGateway {
     });
 
     try {
-      // Check rate limits
-      this.checkRateLimit(options.userId);
+      // Check rate limits with estimated cost
+      // Default estimation: input * 1.5 for output if not specified
+      const estimatedInput = this.tokenTracker.countTokens(JSON.stringify(messages), context.model);
+      const estimatedOutput = options.maxTokens ?? 1000;
+      this.checkRateLimit(options.userId, estimatedInput + estimatedOutput);
 
-      const routed = await this.observability.recordOperation(
-        "gateway.complete",
-        async () => {
-          const result = await this.router.completeWithProvider({
-            model: context.model,
-            messages,
-            temperature: options.temperature,
-            maxTokens: options.maxTokens,
-            timeoutMs: options.timeoutMs,
-          });
-          return result;
+      const routed = await this.pipeline.execute(
+        async (signal) => {
+          return this.observability.recordOperation(
+            "gateway.complete.attempt",
+            async () => {
+              return this.router.completeWithProvider({
+                model: context.model,
+                messages,
+                temperature: options.temperature,
+                maxTokens: options.maxTokens,
+                timeoutMs: options.timeoutMs,
+                signal,
+              });
+            },
+            { userId: options.userId, model: context.model }
+          );
         },
-        { userId: options.userId, model: context.model }
+        {
+          operation: "gateway.complete",
+          provider: context.provider,
+          timeoutMs: options.timeoutMs,
+          signal: options.signal,
+          metadata: {
+            requestId: context.requestId,
+            userId: options.userId,
+          },
+        }
       );
       const response = routed.response;
       context.provider = routed.provider;
@@ -455,16 +475,34 @@ export class UnifiedAIGateway {
 
     try {
       // Check rate limits
-      this.checkRateLimit(options.userId);
+      const estimatedInput = this.tokenTracker.countTokens(JSON.stringify(messages), context.model);
+      const estimatedOutput = options.maxTokens ?? 1000;
+      this.checkRateLimit(options.userId, estimatedInput + estimatedOutput);
 
       const streamState = this.createStreamState();
-      const providerStream = this.router.streamWithProvider({
-        model: context.model,
-        messages,
-        temperature: options.temperature,
-        maxTokens: options.maxTokens,
-        timeoutMs: options.timeoutMs,
-      });
+
+      // Execute stream with resilience
+      const providerStream = await this.pipeline.executeStream(
+        (signal) => {
+          return this.router.streamWithProvider({
+            model: context.model,
+            messages,
+            temperature: options.temperature,
+            maxTokens: options.maxTokens,
+            timeoutMs: options.timeoutMs,
+            signal,
+          });
+        },
+        {
+          operation: "gateway.stream",
+          timeoutMs: options.timeoutMs,
+          signal: options.signal,
+          metadata: {
+            requestId: context.requestId,
+            userId: options.userId,
+          },
+        }
+      );
 
       const result = yield* this.consumeProviderStream(
         providerStream,
@@ -643,12 +681,12 @@ export class UnifiedAIGateway {
     };
   }
 
-  private checkRateLimit(userId: string): void {
+  private checkRateLimit(userId: string, estimatedTokens = 0): void {
     if (!this.config.rateLimiting?.enabled) {
       return;
     }
 
-    const check = this.tokenTracker.checkRateLimit(userId);
+    const check = this.tokenTracker.checkRateLimit(userId, estimatedTokens);
     if (!check.allowed) {
       throw new GatewayError("RATE_LIMITED", check.reason ?? "Rate limit exceeded", {
         retryAfterMs: check.retryAfterMs,

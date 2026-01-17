@@ -5,6 +5,7 @@
  * Supports completions, streaming, and message-based conversations.
  */
 
+import { MODEL_CATALOG } from "../catalog/models";
 import { BaseLLMProvider } from "./baseProvider";
 import type {
   CompletionRequest,
@@ -49,22 +50,19 @@ interface AnthropicStreamEvent {
   usage?: { input_tokens?: number; output_tokens?: number };
 }
 
-const ANTHROPIC_MODELS = [
-  "claude-opus-4-20250514",
-  "claude-sonnet-4-20250514",
-  "claude-3-5-sonnet-20241022",
-  "claude-3-5-haiku-20241022",
-  "claude-3-opus-20240229",
-  "claude-3-sonnet-20240229",
-  "claude-3-haiku-20240307",
-] as const;
+const ANTHROPIC_MODELS = MODEL_CATALOG.filter((model) => model.provider === "claude").map(
+  (model) => model.id
+) as string[];
 
 const DEFAULT_API_VERSION = "2023-06-01";
 
 export class AnthropicProvider extends BaseLLMProvider {
   readonly name = "anthropic";
   readonly models = [...ANTHROPIC_MODELS];
-  readonly defaultModel = "claude-sonnet-4-20250514";
+  readonly defaultModel =
+    MODEL_CATALOG.find((model) => model.provider === "claude" && model.default)?.id ??
+    ANTHROPIC_MODELS[0] ??
+    "claude-sonnet-4-5";
 
   private readonly baseUrl: string;
   private readonly apiVersion: string;

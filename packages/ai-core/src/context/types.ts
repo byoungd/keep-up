@@ -57,70 +57,30 @@ export interface ModelContextLimits {
 }
 
 /** Known model context limits */
-export const MODEL_CONTEXT_LIMITS: Record<string, ModelContextLimits> = {
-  // OpenAI
-  "gpt-4o": {
-    model: "gpt-4o",
-    maxContextTokens: 128000,
-    maxOutputTokens: 16384,
-    recommendedOutputReserve: 4096,
-  },
-  "gpt-4o-mini": {
-    model: "gpt-4o-mini",
-    maxContextTokens: 128000,
-    maxOutputTokens: 16384,
-    recommendedOutputReserve: 4096,
-  },
-  "gpt-4-turbo": {
-    model: "gpt-4-turbo",
-    maxContextTokens: 128000,
-    maxOutputTokens: 4096,
-    recommendedOutputReserve: 2048,
-  },
-  "gpt-4": {
-    model: "gpt-4",
-    maxContextTokens: 8192,
-    maxOutputTokens: 4096,
-    recommendedOutputReserve: 2048,
-  },
-  "gpt-3.5-turbo": {
-    model: "gpt-3.5-turbo",
-    maxContextTokens: 16385,
-    maxOutputTokens: 4096,
-    recommendedOutputReserve: 2048,
-  },
-  // Anthropic
-  "claude-opus-4-20250514": {
-    model: "claude-opus-4-20250514",
-    maxContextTokens: 200000,
-    maxOutputTokens: 32000,
-    recommendedOutputReserve: 8192,
-  },
-  "claude-sonnet-4-20250514": {
-    model: "claude-sonnet-4-20250514",
-    maxContextTokens: 200000,
-    maxOutputTokens: 64000,
-    recommendedOutputReserve: 8192,
-  },
-  "claude-3-5-sonnet-20241022": {
-    model: "claude-3-5-sonnet-20241022",
-    maxContextTokens: 200000,
-    maxOutputTokens: 8192,
-    recommendedOutputReserve: 4096,
-  },
-  "claude-3-5-haiku-20241022": {
-    model: "claude-3-5-haiku-20241022",
-    maxContextTokens: 200000,
-    maxOutputTokens: 8192,
-    recommendedOutputReserve: 4096,
-  },
-  "claude-3-opus-20240229": {
-    model: "claude-3-opus-20240229",
-    maxContextTokens: 200000,
-    maxOutputTokens: 4096,
-    recommendedOutputReserve: 2048,
-  },
-};
+import { MODEL_CATALOG } from "../catalog/models";
+
+/** Known model context limits - Derived from MODEL_CATALOG */
+export const MODEL_CONTEXT_LIMITS: Record<string, ModelContextLimits> = {};
+
+// Initialize with catalog data
+for (const model of MODEL_CATALOG) {
+  // Heuristics for output limits based on provider/capabilities
+  let maxOutput = 4096;
+  if (model.id.includes("claude-3-5")) {
+    maxOutput = 8192;
+  } else if (model.id.includes("gpt-4o")) {
+    maxOutput = 16384;
+  } else if (model.supports.thinking) {
+    maxOutput = 32000; // Thinking models usually allow more output
+  }
+
+  MODEL_CONTEXT_LIMITS[model.id] = {
+    model: model.id,
+    maxContextTokens: model.contextWindow,
+    maxOutputTokens: maxOutput,
+    recommendedOutputReserve: Math.min(maxOutput, 4096),
+  };
+}
 
 /** Default context limits for unknown models */
 export const DEFAULT_CONTEXT_LIMITS: ModelContextLimits = {
