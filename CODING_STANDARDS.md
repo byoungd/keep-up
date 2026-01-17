@@ -203,3 +203,30 @@ All content equality checks (Shadow Model vs Real Editor) use **Recursive Canoni
 ### 11.3 Turbo Cache
 *   Never commit `.turbo/` directory.
 *   `turbo.json` defines task dependencies; follow existing patterns.
+
+## 12. AI Engineering Standards (Agentic Phase)
+
+### 12.1 Core Stack
+*   **LLM Interactions**: MUST use Vercel AI SDK (`ai`). Direct provider SDK usage is BANNED.
+*   **Structured Output**: MUST use `zod` v4.x schemas with `generateObject`.
+*   **Telemetry**: All AI operations must be traced via `langfuse`.
+
+### 12.2 Tool Definitions
+*   **MCP Protocol**: All tools must implement Model Context Protocol (MCP) interfaces.
+*   **Schema Safety**: Tool input schemas must be strict (`zconfig`, not `any`).
+*   **Permissions**: Destructive tools MUST check `SecurityPolicy` before execution.
+
+### 12.3 Agent Isolation
+*   **Filesystem**: Agents should default to `ShadowWorkspace` or `Git Worktree` to avoid polluting user space.
+*   **Browser**: Browser tools must use headless instances with resource caps.
+
+## 13. Feature Development Process
+
+### 13.1 Research First (Mandatory)
+Before implementing any new feature, specific agents MUST:
+1.  **Search Web**: Research the latest (2025-2026) open-source solutions and patterns.
+2.  **Evaluate**: Compare 2-3 options (e.g., specific libraries vs custom impl).
+3.  ** Reuse**: Prioritize integrating mature libraries over reinventing wheels.
+4.  **Justify**: In the `implementation_plan.md`, explicitly state *why* a particular stack was chosen.
+
+

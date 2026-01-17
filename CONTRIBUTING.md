@@ -6,8 +6,8 @@ Welcome! We are building a **reliable, local-first collaborative editor**. This 
 
 1.  **Clone the repo**:
     ```bash
-    git clone <repo-url>
-    cd English-level-up-tips
+    git clone https://github.com/byoungd/keep-up.git
+    cd keep-up
     ```
 2.  **Install dependencies**:
     ```bash
@@ -20,14 +20,12 @@ Welcome! We are building a **reliable, local-first collaborative editor**. This 
 4.  **Run Tests**:
     ```bash
     pnpm test
+    # Run Agent Runtime specific tests
+    pnpm --filter @ku0/agent-runtime test
     ```
 5.  **Run Web App**:
     ```bash
-    pnpm dev:reader
-    ```
-6.  **Run Desktop App** (requires the web dev server):
-    ```bash
-    pnpm dev:desktop
+    pnpm dev
     ```
 
 ## 2. Development Workflow

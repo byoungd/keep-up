@@ -11,6 +11,7 @@ This package provides the core infrastructure for building AI agents with:
 - **Multi-Agent Orchestration** - Powered by `@openai/agents` (Standard)
 - **Persistent Memory** - Powered by `mem0ai` (Standard)
 - **Monitoring** - Proactive file watching via `chokidar` (Ghost Agent)
+- **Agentic Capabilities** - Browser control, Git Worktree isolation, E2E Pipelines
 - **MCP Tool Registry** - Plugin-based tool management
 - **Security Model** - Policies, permissions, and audit logging
 
@@ -31,10 +32,11 @@ This package provides the core infrastructure for building AI agents with:
 │  │   MCP Tool Registry  │      │      Ghost Agent        │  │
 │  │ (Plugin Architecture)│◄────►│  (Chokidar Monitor)     │  │
 │  └──────────────────────┘      └─────────────────────────┘  │
-│             │                                               │
-│             ▼                                               │
-│      [ Tool Servers ]                                       │
-│    Bash • File • Code                                       │
+│             │          │            │                       │
+│             ▼          ▼            ▼                       │
+│      [ Tool Servers ]  [ Skills ]   [ Capabilities ]        │
+│    Bash • File • Code  Procedural   Browser • Worktree      │
+│                                     Pipelines               │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -188,6 +190,35 @@ Spawn focused subagents for parallel or staged workflows:
 const manager = createAgentManager({ llm, registry });
 const subagent = createSubagentToolServer(manager);
 // Tools: spawn, spawn_parallel, workflow, types
+```
+
+```
+
+### Browser Tool Server
+
+Headless browser control for web research and frontend validation (supports Playwright):
+
+```typescript
+const browser = createBrowserToolServer();
+// Tools: navigate, click, type, screenshot, evaluate
+```
+
+### Git Worktree Tool Server
+
+Safe, isolated execution in temporary git worktrees:
+
+```typescript
+const worktree = createGitWorktreeToolServer();
+// Tools: create_worktree, cleanup_worktree, shadow_exec
+```
+
+### E2E Pipelines
+
+Long-running background task orchestration:
+
+```typescript
+const pipeline = createPipelineManager();
+// APIs: createWorkflow, triggerRoute
 ```
 
 ### LFCC Tool Server

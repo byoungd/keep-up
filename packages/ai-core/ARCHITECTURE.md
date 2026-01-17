@@ -7,7 +7,7 @@
 | Capability | Standard Library | Status |
 |------------|------------------|--------|
 | **LLM Providers** | Vercel AI SDK (`ai`, `@ai-sdk/*`) | ✅ Mandatory |
-| **Structured Output** | Zod schemas + `generateObject` | ✅ Mandatory |
+| **Structured Output** | Zod schemas (v4.x) + `generateObject` | ✅ Mandatory |
 | **Token Counting** | `js-tiktoken` | ✅ Standard |
 | **Resilience** | `cockatiel` | ✅ Standard |
 | **Observability** | `langfuse` | ✅ Standard |
