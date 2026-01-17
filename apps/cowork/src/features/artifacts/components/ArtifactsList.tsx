@@ -4,10 +4,18 @@ import { PlanCard } from "./PlanCard";
 import { ReportCard } from "./ReportCard";
 
 interface ArtifactsListProps {
-  artifacts: Record<string, ArtifactPayload>;
+  artifacts: Record<
+    string,
+    ArtifactPayload & {
+      status?: "pending" | "applied" | "reverted";
+      appliedAt?: number;
+    }
+  >;
+  onApply?: (artifactId: string) => void;
+  onRevert?: (artifactId: string) => void;
 }
 
-export function ArtifactsList({ artifacts }: ArtifactsListProps) {
+export function ArtifactsList({ artifacts, onApply, onRevert }: ArtifactsListProps) {
   const list = Object.entries(artifacts);
 
   if (list.length === 0) {
@@ -60,7 +68,17 @@ export function ArtifactsList({ artifacts }: ArtifactsListProps) {
           {items.map(([id, artifact]) => {
             switch (artifact.type) {
               case "diff":
-                return <DiffCard key={id} file={artifact.file} diff={artifact.diff} />;
+                return (
+                  <DiffCard
+                    key={id}
+                    file={artifact.file}
+                    diff={artifact.diff}
+                    status={artifact.status}
+                    appliedAt={artifact.appliedAt}
+                    onApply={onApply ? () => onApply(id) : undefined}
+                    onRevert={onRevert ? () => onRevert(id) : undefined}
+                  />
+                );
               case "plan":
                 return <PlanCard key={id} steps={artifact.steps} />;
               case "markdown":

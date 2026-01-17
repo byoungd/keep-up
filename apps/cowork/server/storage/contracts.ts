@@ -3,6 +3,8 @@ import type {
   AgentStateCheckpointRecord,
   CoworkApproval,
   CoworkArtifactRecord,
+  CoworkAuditEntry,
+  CoworkAuditFilter,
   CoworkChatMessage,
   CoworkSettings,
 } from "./types";
@@ -70,6 +72,19 @@ export interface ArtifactStoreLike {
   delete(artifactId: string): Promise<boolean>;
 }
 
+export interface AuditLogStoreLike {
+  log(entry: CoworkAuditEntry): Promise<void>;
+  getBySession(sessionId: string, filter?: CoworkAuditFilter): Promise<CoworkAuditEntry[]>;
+  getByTask(taskId: string): Promise<CoworkAuditEntry[]>;
+  query(filter: CoworkAuditFilter): Promise<CoworkAuditEntry[]>;
+  getStats(sessionId: string): Promise<{
+    total: number;
+    byAction: Record<string, number>;
+    byTool: Record<string, number>;
+    byOutcome: Record<string, number>;
+  }>;
+}
+
 export interface ChatMessageStoreLike {
   getAll(): Promise<CoworkChatMessage[]>;
   getById(messageId: string): Promise<CoworkChatMessage | null>;
@@ -94,4 +109,5 @@ export interface StorageLayer {
   agentStateStore: AgentStateCheckpointStoreLike;
   configStore: ConfigStoreLike;
   projectStore: ProjectStoreLike;
+  auditLogStore: AuditLogStoreLike;
 }

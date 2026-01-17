@@ -3,17 +3,37 @@ import { useState } from "react";
 interface DiffCardProps {
   file: string;
   diff: string; // Unified diff content
-  onApply?: () => void;
+  status?: "pending" | "applied" | "reverted";
+  appliedAt?: number;
+  onApply?: () => Promise<void> | void;
+  onRevert?: () => Promise<void> | void;
 }
 
-export function DiffCard({ file, diff, onApply }: DiffCardProps) {
-  const [isApplied, setIsApplied] = useState(false);
+export function DiffCard({ file, diff, status, appliedAt, onApply, onRevert }: DiffCardProps) {
+  const [busy, setBusy] = useState<"apply" | "revert" | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const handleApply = () => {
-    if (onApply) {
-      onApply();
-      setIsApplied(true);
+  const handleApply = async () => {
+    if (!onApply) {
+      return;
+    }
+    setBusy("apply");
+    try {
+      await onApply();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleRevert = async () => {
+    if (!onRevert) {
+      return;
+    }
+    setBusy("revert");
+    try {
+      await onRevert();
+    } finally {
+      setBusy(null);
     }
   };
 
@@ -86,29 +106,34 @@ export function DiffCard({ file, diff, onApply }: DiffCardProps) {
               </svg>
             )}
           </button>
-          {!isApplied ? (
+          {status !== "applied" ? (
             <button
               type="button"
               onClick={handleApply}
-              className="text-xs font-black bg-foreground text-background px-3 py-1.5 rounded-lg shadow-sm hover:scale-105 active:scale-95 transition-all uppercase tracking-tighter"
+              className="text-xs font-black bg-foreground text-background px-3 py-1.5 rounded-lg shadow-sm hover:scale-105 active:scale-95 transition-all uppercase tracking-tighter disabled:opacity-50"
+              disabled={busy !== null || !onApply}
+              aria-busy={busy === "apply"}
             >
               Apply
             </button>
           ) : (
-            <span className="text-[11px] text-success font-black flex items-center gap-1.5 bg-success/10 px-2.5 py-1.5 rounded-lg border border-success/20 uppercase tracking-tighter">
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <title>Applied icon</title>
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={3}
-                  d="M5 13l4 4L19 7"
-                />
-              </svg>
-              Success
-            </span>
+            <button
+              type="button"
+              onClick={handleRevert}
+              className="text-xs font-black bg-surface-2 text-foreground px-3 py-1.5 rounded-lg shadow-sm hover:scale-105 active:scale-95 transition-all uppercase tracking-tighter disabled:opacity-50"
+              disabled={busy !== null || !onRevert}
+              aria-busy={busy === "revert"}
+            >
+              Revert
+            </button>
           )}
         </div>
+        {status === "applied" && appliedAt && (
+          <div className="text-[10px] text-muted-foreground">
+            Applied {new Date(appliedAt).toLocaleString()}
+          </div>
+        )}
+        {status === "reverted" && <div className="text-[10px] text-amber-600">Reverted</div>}
       </div>
 
       {/* Mock Diff Viewer - in production use Shiki/Prism */}

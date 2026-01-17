@@ -9,6 +9,7 @@ import type {
   AgentStateCheckpointStoreLike,
   ApprovalStoreLike,
   ArtifactStoreLike,
+  AuditLogStoreLike,
   ChatMessageStoreLike,
   ConfigStoreLike,
   ProjectStoreLike,
@@ -20,6 +21,9 @@ import type {
   AgentStateCheckpointRecord,
   CoworkApproval,
   CoworkArtifactRecord,
+  CoworkAuditAction,
+  CoworkAuditEntry,
+  CoworkAuditFilter,
   CoworkChatMessage,
   CoworkSettings,
 } from "./types";
@@ -81,6 +85,9 @@ async function ensureSchema(db: D1Database): Promise<void> {
         type TEXT NOT NULL,
         artifact TEXT NOT NULL,
         source_path TEXT,
+        version INTEGER NOT NULL DEFAULT 1,
+        status TEXT NOT NULL DEFAULT 'pending',
+        applied_at INTEGER,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
       )
@@ -109,6 +116,33 @@ async function ensureSchema(db: D1Database): Promise<void> {
     `,
     `
       CREATE INDEX IF NOT EXISTS idx_approvals_task ON approvals(task_id)
+    `,
+    `
+      CREATE TABLE IF NOT EXISTS audit_logs (
+        entry_id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        task_id TEXT,
+        timestamp INTEGER NOT NULL,
+        action TEXT NOT NULL,
+        tool_name TEXT,
+        input TEXT,
+        output TEXT,
+        decision TEXT,
+        rule_id TEXT,
+        risk_tags TEXT DEFAULT '[]',
+        reason TEXT,
+        duration_ms INTEGER,
+        outcome TEXT
+      )
+    `,
+    `
+      CREATE INDEX IF NOT EXISTS idx_audit_logs_session ON audit_logs(session_id)
+    `,
+    `
+      CREATE INDEX IF NOT EXISTS idx_audit_logs_task ON audit_logs(task_id)
+    `,
+    `
+      CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp DESC)
     `,
     `
       CREATE TABLE IF NOT EXISTS chat_messages (
@@ -174,6 +208,24 @@ async function ensureSchema(db: D1Database): Promise<void> {
   } else {
     for (const statement of statements) {
       await db.prepare(statement).run();
+    }
+  }
+
+  const optionalStatements = [
+    "ALTER TABLE artifacts ADD COLUMN version INTEGER DEFAULT 1",
+    "ALTER TABLE artifacts ADD COLUMN status TEXT DEFAULT 'pending'",
+    "ALTER TABLE artifacts ADD COLUMN applied_at INTEGER",
+  ];
+
+  for (const statement of optionalStatements) {
+    try {
+      if (db.exec) {
+        await db.exec(statement);
+      } else {
+        await db.prepare(statement).run();
+      }
+    } catch (error) {
+      void error;
     }
   }
 
@@ -312,6 +364,9 @@ function rowToArtifact(row: Record<string, unknown>): CoworkArtifactRecord {
     type: row.type as CoworkArtifactRecord["type"],
     artifact: parseArtifactPayload(row.artifact),
     sourcePath: row.source_path ? String(row.source_path) : undefined,
+    version: typeof row.version === "number" ? row.version : 1,
+    status: (row.status as CoworkArtifactRecord["status"]) ?? "pending",
+    appliedAt: row.applied_at ? Number(row.applied_at) : undefined,
     createdAt: Number(row.created_at),
     updatedAt: Number(row.updated_at),
   };
@@ -568,8 +623,8 @@ async function createD1ArtifactStore(db: D1Database): Promise<ArtifactStoreLike>
       await prepare(
         db,
         `INSERT INTO artifacts
-          (artifact_id, session_id, task_id, title, type, artifact, source_path, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (artifact_id, session_id, task_id, title, type, artifact, source_path, version, status, applied_at, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(artifact_id) DO UPDATE SET
             session_id = excluded.session_id,
             task_id = excluded.task_id,
@@ -577,6 +632,9 @@ async function createD1ArtifactStore(db: D1Database): Promise<ArtifactStoreLike>
             type = excluded.type,
             artifact = excluded.artifact,
             source_path = excluded.source_path,
+            version = excluded.version,
+            status = excluded.status,
+            applied_at = excluded.applied_at,
             updated_at = excluded.updated_at`,
         [
           artifact.artifactId,
@@ -586,6 +644,9 @@ async function createD1ArtifactStore(db: D1Database): Promise<ArtifactStoreLike>
           artifact.type,
           JSON.stringify(artifact.artifact),
           artifact.sourcePath ?? null,
+          artifact.version,
+          artifact.status,
+          artifact.appliedAt ?? null,
           artifact.createdAt,
           artifact.updatedAt,
         ]
@@ -913,6 +974,168 @@ async function createD1ProjectStore(db: D1Database): Promise<ProjectStoreLike> {
   };
 }
 
+function rowToAuditEntry(row: Record<string, unknown>): CoworkAuditEntry {
+  return {
+    entryId: String(row.entry_id),
+    sessionId: String(row.session_id),
+    taskId: row.task_id ? String(row.task_id) : undefined,
+    timestamp: Number(row.timestamp),
+    action: String(row.action) as CoworkAuditAction,
+    toolName: row.tool_name ? String(row.tool_name) : undefined,
+    input: row.input ? (JSON.parse(String(row.input)) as Record<string, unknown>) : undefined,
+    output: row.output ? JSON.parse(String(row.output)) : undefined,
+    decision: row.decision
+      ? (String(row.decision) as "allow" | "allow_with_confirm" | "deny")
+      : undefined,
+    ruleId: row.rule_id ? String(row.rule_id) : undefined,
+    riskTags: parseRiskTags(String(row.risk_tags ?? "[]")),
+    reason: row.reason ? String(row.reason) : undefined,
+    durationMs: row.duration_ms ? Number(row.duration_ms) : undefined,
+    outcome: row.outcome ? (String(row.outcome) as "success" | "error" | "denied") : undefined,
+  };
+}
+
+function buildD1AuditFilterConditions(filter: CoworkAuditFilter): {
+  conditions: string[];
+  params: unknown[];
+} {
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+
+  if (filter.sessionId) {
+    conditions.push("session_id = ?");
+    params.push(filter.sessionId);
+  }
+  if (filter.taskId) {
+    conditions.push("task_id = ?");
+    params.push(filter.taskId);
+  }
+  if (filter.toolName) {
+    conditions.push("tool_name = ?");
+    params.push(filter.toolName);
+  }
+  if (filter.action) {
+    conditions.push("action = ?");
+    params.push(filter.action);
+  }
+  if (filter.since !== undefined) {
+    conditions.push("timestamp >= ?");
+    params.push(filter.since);
+  }
+  if (filter.until !== undefined) {
+    conditions.push("timestamp <= ?");
+    params.push(filter.until);
+  }
+
+  return { conditions, params };
+}
+
+async function createD1AuditLogStore(db: D1Database): Promise<AuditLogStoreLike> {
+  return {
+    async log(entry: CoworkAuditEntry): Promise<void> {
+      await prepare(
+        db,
+        `INSERT INTO audit_logs
+          (entry_id, session_id, task_id, timestamp, action, tool_name, input, output,
+           decision, rule_id, risk_tags, reason, duration_ms, outcome)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          entry.entryId,
+          entry.sessionId,
+          entry.taskId ?? null,
+          entry.timestamp,
+          entry.action,
+          entry.toolName ?? null,
+          entry.input ? JSON.stringify(entry.input) : null,
+          entry.output ? JSON.stringify(entry.output) : null,
+          entry.decision ?? null,
+          entry.ruleId ?? null,
+          JSON.stringify(entry.riskTags ?? []),
+          entry.reason ?? null,
+          entry.durationMs ?? null,
+          entry.outcome ?? null,
+        ]
+      ).run();
+    },
+
+    async getBySession(sessionId: string, filter?: CoworkAuditFilter): Promise<CoworkAuditEntry[]> {
+      const limit = filter?.limit ?? 1000;
+      const offset = filter?.offset ?? 0;
+      const result = await prepare(
+        db,
+        `SELECT * FROM audit_logs WHERE session_id = ? ORDER BY timestamp DESC LIMIT ? OFFSET ?`,
+        [sessionId, limit, offset]
+      ).all();
+      return result.results.map(rowToAuditEntry);
+    },
+
+    async getByTask(taskId: string): Promise<CoworkAuditEntry[]> {
+      const result = await prepare(
+        db,
+        `SELECT * FROM audit_logs WHERE task_id = ? ORDER BY timestamp DESC`,
+        [taskId]
+      ).all();
+      return result.results.map(rowToAuditEntry);
+    },
+
+    async query(filter: CoworkAuditFilter): Promise<CoworkAuditEntry[]> {
+      const { conditions, params } = buildD1AuditFilterConditions(filter);
+
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+      const limit = filter.limit ?? 1000;
+      const offset = filter.offset ?? 0;
+      params.push(limit, offset);
+
+      const result = await prepare(
+        db,
+        `SELECT * FROM audit_logs ${whereClause} ORDER BY timestamp DESC LIMIT ? OFFSET ?`,
+        params
+      ).all();
+      return result.results.map(rowToAuditEntry);
+    },
+
+    async getStats(sessionId: string): Promise<{
+      total: number;
+      byAction: Record<string, number>;
+      byTool: Record<string, number>;
+      byOutcome: Record<string, number>;
+    }> {
+      const result = await prepare(
+        db,
+        `SELECT action, tool_name, outcome, COUNT(*) as count
+         FROM audit_logs WHERE session_id = ?
+         GROUP BY action, tool_name, outcome`,
+        [sessionId]
+      ).all();
+
+      const byAction: Record<string, number> = {};
+      const byTool: Record<string, number> = {};
+      const byOutcome: Record<string, number> = {};
+      let total = 0;
+
+      for (const row of result.results) {
+        const count = Number(row.count);
+        total += count;
+
+        const action = String(row.action);
+        byAction[action] = (byAction[action] ?? 0) + count;
+
+        if (row.tool_name) {
+          const toolName = String(row.tool_name);
+          byTool[toolName] = (byTool[toolName] ?? 0) + count;
+        }
+
+        if (row.outcome) {
+          const outcome = String(row.outcome);
+          byOutcome[outcome] = (byOutcome[outcome] ?? 0) + count;
+        }
+      }
+
+      return { total, byAction, byTool, byOutcome };
+    },
+  };
+}
+
 export async function createD1StorageLayer(db: D1Database): Promise<StorageLayer> {
   await ensureSchema(db);
   const [
@@ -924,6 +1147,7 @@ export async function createD1StorageLayer(db: D1Database): Promise<StorageLayer
     agentStateStore,
     configStore,
     projectStore,
+    auditLogStore,
   ] = await Promise.all([
     createD1SessionStore(db),
     createD1TaskStore(db),
@@ -933,6 +1157,7 @@ export async function createD1StorageLayer(db: D1Database): Promise<StorageLayer
     createD1AgentStateStore(db),
     createD1ConfigStore(db),
     createD1ProjectStore(db),
+    createD1AuditLogStore(db),
   ]);
 
   return {
@@ -944,5 +1169,6 @@ export async function createD1StorageLayer(db: D1Database): Promise<StorageLayer
     agentStateStore,
     configStore,
     projectStore,
+    auditLogStore,
   };
 }

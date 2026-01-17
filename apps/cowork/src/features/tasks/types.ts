@@ -124,7 +124,16 @@ export interface TaskGraph {
   sessionId: string;
   status: TaskStatus;
   nodes: TaskNode[];
-  artifacts: Record<string, ArtifactPayload & { updatedAt?: number; taskId?: string }>; // map of artifactId -> payload with versioning and task association
+  artifacts: Record<
+    string,
+    ArtifactPayload & {
+      updatedAt?: number;
+      taskId?: string;
+      version?: number;
+      status?: "pending" | "applied" | "reverted";
+      appliedAt?: number;
+    }
+  >; // map of artifactId -> payload with versioning and task association
   pendingApprovalId?: string;
   savedAt?: number;
 }

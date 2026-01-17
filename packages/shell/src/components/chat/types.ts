@@ -52,6 +52,8 @@ export interface ArtifactItem {
   previewUrl?: string;
   content?: string;
   createdAt?: string;
+  status?: "pending" | "applied" | "reverted";
+  appliedAt?: string;
   /** Optional reference to which task produced this artifact */
   taskId?: string;
   /** Optional reference to which step produced this artifact (compatibility) */
@@ -89,6 +91,7 @@ export interface AgentTask {
     toolName: string;
     args: Record<string, unknown>;
     riskLevel?: "low" | "medium" | "high";
+    reason?: string;
   };
 
   // Manus UI Spec (2.1.1)

@@ -13,6 +13,8 @@ export function DeliverableItem({
 }) {
   const Icon = getArtifactIcon(artifact.type);
   const preview = buildPreviewText(artifact.content);
+  const statusLabel = resolveArtifactStatusLabel(artifact.status);
+  const statusClass = resolveArtifactStatusClass(artifact.status);
 
   return (
     <button
@@ -35,6 +37,16 @@ export function DeliverableItem({
             {artifact.type}
           </div>
         </div>
+        {statusLabel && (
+          <span
+            className={cn(
+              "text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border",
+              statusClass
+            )}
+          >
+            {statusLabel}
+          </span>
+        )}
         {isPrimary && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
       </div>
 
@@ -46,4 +58,24 @@ export function DeliverableItem({
       )}
     </button>
   );
+}
+
+function resolveArtifactStatusLabel(status?: ArtifactItem["status"]): string | null {
+  if (status === "applied") {
+    return "Applied";
+  }
+  if (status === "reverted") {
+    return "Reverted";
+  }
+  return null;
+}
+
+function resolveArtifactStatusClass(status?: ArtifactItem["status"]): string {
+  if (status === "applied") {
+    return "border-emerald-500/30 text-emerald-600 bg-emerald-500/10";
+  }
+  if (status === "reverted") {
+    return "border-amber-500/30 text-amber-600 bg-amber-500/10";
+  }
+  return "border-border/50 text-muted-foreground bg-surface-2/40";
 }

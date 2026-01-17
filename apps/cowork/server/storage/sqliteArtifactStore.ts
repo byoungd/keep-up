@@ -47,9 +47,9 @@ export async function createSqliteArtifactStore(): Promise<SqliteArtifactStore> 
 
   const upsertStmt = db.prepare(`
     INSERT INTO artifacts
-      (artifact_id, session_id, task_id, title, type, artifact, source_path, created_at, updated_at)
+      (artifact_id, session_id, task_id, title, type, artifact, source_path, version, status, applied_at, created_at, updated_at)
     VALUES
-      ($artifactId, $sessionId, $taskId, $title, $type, $artifact, $sourcePath, $createdAt, $updatedAt)
+      ($artifactId, $sessionId, $taskId, $title, $type, $artifact, $sourcePath, $version, $status, $appliedAt, $createdAt, $updatedAt)
     ON CONFLICT(artifact_id) DO UPDATE SET
       session_id = excluded.session_id,
       task_id = excluded.task_id,
@@ -57,6 +57,9 @@ export async function createSqliteArtifactStore(): Promise<SqliteArtifactStore> 
       type = excluded.type,
       artifact = excluded.artifact,
       source_path = excluded.source_path,
+      version = excluded.version,
+      status = excluded.status,
+      applied_at = excluded.applied_at,
       updated_at = excluded.updated_at
   `);
 
@@ -73,6 +76,9 @@ export async function createSqliteArtifactStore(): Promise<SqliteArtifactStore> 
       type: row.type as CoworkArtifactRecord["type"],
       artifact: parseArtifactPayload(row.artifact),
       sourcePath: row.source_path ? (row.source_path as string) : undefined,
+      version: typeof row.version === "number" ? row.version : 1,
+      status: (row.status as CoworkArtifactRecord["status"]) ?? "pending",
+      appliedAt: row.applied_at ? (row.applied_at as number) : undefined,
       createdAt: row.created_at as number,
       updatedAt: row.updated_at as number,
     };
@@ -112,6 +118,9 @@ export async function createSqliteArtifactStore(): Promise<SqliteArtifactStore> 
         $type: artifact.type,
         $artifact: JSON.stringify(artifact.artifact),
         $sourcePath: artifact.sourcePath ?? null,
+        $version: artifact.version,
+        $status: artifact.status,
+        $appliedAt: artifact.appliedAt ?? null,
         $createdAt: artifact.createdAt,
         $updatedAt: artifact.updatedAt,
       });

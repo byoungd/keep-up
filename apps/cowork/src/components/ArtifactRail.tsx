@@ -4,9 +4,16 @@ import type { TaskGraph } from "../features/tasks/types";
 interface ArtifactRailProps {
   sessionId: string;
   graph: TaskGraph;
+  onApplyArtifact?: (artifactId: string) => void;
+  onRevertArtifact?: (artifactId: string) => void;
 }
 
-export function ArtifactRail({ sessionId, graph }: ArtifactRailProps) {
+export function ArtifactRail({
+  sessionId,
+  graph,
+  onApplyArtifact,
+  onRevertArtifact,
+}: ArtifactRailProps) {
   return (
     <aside className="artifact-rail" aria-label="Artifact rail">
       <div className="card-panel h-full flex flex-col p-0 overflow-hidden">
@@ -15,7 +22,11 @@ export function ArtifactRail({ sessionId, graph }: ArtifactRailProps) {
           <p className="text-xs text-muted-foreground">Session {sessionId.slice(0, 8)}...</p>
         </div>
         <div className="flex-1 overflow-y-auto">
-          <ArtifactsList artifacts={graph.artifacts} />
+          <ArtifactsList
+            artifacts={graph.artifacts}
+            onApply={onApplyArtifact}
+            onRevert={onRevertArtifact}
+          />
         </div>
       </div>
     </aside>

@@ -4,6 +4,7 @@ import { jsonError } from "./http";
 import { serverLogger } from "./logger";
 import { createApprovalRoutes } from "./routes/approvals";
 import { createArtifactRoutes } from "./routes/artifacts";
+import { createAuditLogRoutes } from "./routes/auditLogs";
 import { createChatRoutes } from "./routes/chat";
 import { createProjectRoutes } from "./routes/projects";
 import { createSessionRoutes } from "./routes/sessions";
@@ -25,7 +26,9 @@ export interface CoworkAppDeps {
 
 export function createCoworkApp(deps: CoworkAppDeps) {
   const eventHub = deps.events ?? new SessionEventHub();
-  const runtime = deps.runtime ?? new CoworkRuntimeBridge(deps.storage.approvalStore);
+  const runtime =
+    deps.runtime ??
+    new CoworkRuntimeBridge(deps.storage.approvalStore, undefined, deps.storage.auditLogStore);
   const taskRuntime = deps.taskRuntime;
   const logger = deps.logger ?? serverLogger;
 
@@ -56,8 +59,17 @@ export function createCoworkApp(deps: CoworkAppDeps) {
     "/api",
     createArtifactRoutes({
       artifactStore: deps.storage.artifactStore,
+      auditLogStore: deps.storage.auditLogStore,
       sessionStore: deps.storage.sessionStore,
       taskStore: deps.storage.taskStore,
+    })
+  );
+
+  app.route(
+    "/api",
+    createAuditLogRoutes({
+      auditLogStore: deps.storage.auditLogStore,
+      sessions: deps.storage.sessionStore,
     })
   );
 

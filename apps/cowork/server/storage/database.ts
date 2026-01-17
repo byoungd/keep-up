@@ -39,6 +39,14 @@ export async function getDatabase(): Promise<DatabaseInstance> {
 }
 
 function initSchema(database: DatabaseInstance): void {
+  const safeExec = (statement: string) => {
+    try {
+      database.exec(statement);
+    } catch (error) {
+      void error;
+    }
+  };
+
   database.exec(`
     CREATE TABLE IF NOT EXISTS sessions (
       session_id TEXT PRIMARY KEY,
@@ -80,11 +88,18 @@ function initSchema(database: DatabaseInstance): void {
       type TEXT NOT NULL,
       artifact TEXT NOT NULL,
       source_path TEXT,
+      version INTEGER NOT NULL DEFAULT 1,
+      status TEXT NOT NULL DEFAULT 'pending',
+      applied_at INTEGER,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
       FOREIGN KEY (session_id) REFERENCES sessions(session_id)
     )
   `);
+
+  safeExec("ALTER TABLE artifacts ADD COLUMN version INTEGER DEFAULT 1");
+  safeExec("ALTER TABLE artifacts ADD COLUMN status TEXT DEFAULT 'pending'");
+  safeExec("ALTER TABLE artifacts ADD COLUMN applied_at INTEGER");
 
   database.exec(`
     CREATE INDEX IF NOT EXISTS idx_artifacts_session ON artifacts(session_id)
@@ -115,6 +130,42 @@ function initSchema(database: DatabaseInstance): void {
 
   database.exec(`
     CREATE INDEX IF NOT EXISTS idx_approvals_task ON approvals(task_id)
+  `);
+
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      entry_id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      task_id TEXT,
+      timestamp INTEGER NOT NULL,
+      action TEXT NOT NULL,
+      tool_name TEXT,
+      input TEXT,
+      output TEXT,
+      decision TEXT,
+      rule_id TEXT,
+      risk_tags TEXT DEFAULT '[]',
+      reason TEXT,
+      duration_ms INTEGER,
+      outcome TEXT,
+      FOREIGN KEY (session_id) REFERENCES sessions(session_id)
+    )
+  `);
+
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_session ON audit_logs(session_id)
+  `);
+
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_task ON audit_logs(task_id)
+  `);
+
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp DESC)
+  `);
+
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action)
   `);
 
   database.exec(`

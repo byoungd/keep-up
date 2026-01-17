@@ -23,7 +23,8 @@ type PanelAttachment = {
 };
 
 export function ChatThread({ sessionId }: { sessionId: string }) {
-  const { messages, sendMessage, isSending, isLoading, retryMessage } = useChatSession(sessionId);
+  const { messages, sendMessage, sendAction, isSending, isLoading, retryMessage } =
+    useChatSession(sessionId);
   const [input, setInput] = React.useState("");
   const [model, setModel] = React.useState(getDefaultModelId());
   const [branchParentId, setBranchParentId] = React.useState<string | null>(null);
@@ -99,8 +100,7 @@ export function ChatThread({ sessionId }: { sessionId: string }) {
       }
       setModel(modelId);
       updateSettings({ defaultModel: modelId }).catch((err) => {
-        // biome-ignore lint/suspicious/noConsole: intended
-        console.error("Failed to update model:", err);
+        void err;
         setModel(model);
       });
     },
@@ -297,6 +297,7 @@ export function ChatThread({ sessionId }: { sessionId: string }) {
         onAbort={() => {
           /* no-op */
         }}
+        onTaskAction={(action, metadata) => sendAction(action, { approvalId: metadata.approvalId })}
         attachments={attachments}
         onAddAttachment={handleAddAttachment}
         onRemoveAttachment={removeAttachment}

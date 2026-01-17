@@ -7,8 +7,8 @@ import {
   type CoworkSession,
   DEFAULT_COWORK_POLICY,
 } from "@ku0/agent-runtime";
-import type { ApprovalStoreLike } from "../storage/contracts";
-import type { CoworkApproval } from "../storage/types";
+import type { ApprovalStoreLike, AuditLogStoreLike } from "../storage/contracts";
+import type { CoworkApproval, CoworkAuditEntry } from "../storage/types";
 
 export type ToolCheckRequest =
   | {
@@ -48,15 +48,22 @@ export class CoworkRuntimeBridge {
   private readonly policyEngine: CoworkPolicyEngine;
   private readonly approvals: ApprovalStoreLike;
   private readonly sandbox: CoworkSandboxAdapter;
+  private readonly auditLogs?: AuditLogStoreLike;
 
-  constructor(approvals: ApprovalStoreLike, policyEngine?: CoworkPolicyEngine) {
+  constructor(
+    approvals: ApprovalStoreLike,
+    policyEngine?: CoworkPolicyEngine,
+    auditLogs?: AuditLogStoreLike
+  ) {
     this.policyEngine = policyEngine ?? new CoworkPolicyEngine(DEFAULT_COWORK_POLICY);
     this.approvals = approvals;
     this.sandbox = new CoworkSandboxAdapter(this.policyEngine);
+    this.auditLogs = auditLogs;
   }
 
   async checkAction(session: CoworkSession, request: ToolCheckRequest): Promise<ToolCheckResult> {
     const decision = this.evaluate(session, request);
+    void this.logDecision(session.sessionId, request, decision);
     if (decision.decision === "deny") {
       return { status: "denied", decision };
     }
@@ -88,6 +95,30 @@ export class CoworkRuntimeBridge {
     });
   }
 
+  private async logDecision(
+    sessionId: string,
+    request: ToolCheckRequest,
+    decision: CoworkSandboxDecision
+  ): Promise<void> {
+    if (!this.auditLogs) {
+      return;
+    }
+    const entry: CoworkAuditEntry = {
+      entryId: crypto.randomUUID(),
+      sessionId,
+      timestamp: Date.now(),
+      action: "policy_decision",
+      toolName: this.describeAction(request),
+      input: buildDecisionInput(request),
+      decision: decision.decision,
+      ruleId: decision.ruleId,
+      riskTags: decision.riskTags,
+      reason: decision.reason,
+      outcome: decision.decision === "deny" ? "denied" : "success",
+    };
+    await this.auditLogs.log(entry);
+  }
+
   private async createApproval(
     sessionId: string,
     request: ToolCheckRequest,
@@ -115,4 +146,25 @@ export class CoworkRuntimeBridge {
     }
     return `connector.action:${request.connectorScopeAllowed ? "allowed" : "blocked"}`;
   }
+}
+
+function buildDecisionInput(request: ToolCheckRequest): Record<string, unknown> {
+  if (request.kind === "file") {
+    return {
+      kind: request.kind,
+      path: request.path,
+      intent: request.intent,
+      fileSizeBytes: request.fileSizeBytes,
+    };
+  }
+  if (request.kind === "network") {
+    return {
+      kind: request.kind,
+      host: request.host,
+    };
+  }
+  return {
+    kind: request.kind,
+    connectorScopeAllowed: request.connectorScopeAllowed,
+  };
 }

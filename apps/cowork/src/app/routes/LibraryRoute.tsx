@@ -27,11 +27,10 @@ export function LibraryRoute() {
         }
         setArtifacts(data);
       })
-      .catch((err) => {
+      .catch((_error) => {
         if (!isActive) {
           return;
         }
-        console.error("Failed to load library artifacts", err);
         setError("Failed to load library artifacts.");
       })
       .finally(() => {
@@ -49,14 +48,16 @@ export function LibraryRoute() {
   const selected = items.find((item) => item.record.artifactId === selectedId) ?? items[0] ?? null;
 
   useEffect(() => {
-    if (!selected) {
-      setSelectedId(null);
-      return;
-    }
-    if (selected.record.artifactId !== selectedId) {
-      setSelectedId(selected.record.artifactId);
-    }
-  }, [selected, selectedId]);
+    setSelectedId((current) => {
+      if (!selected) {
+        return null;
+      }
+      if (selected.record.artifactId === current) {
+        return current;
+      }
+      return selected.record.artifactId;
+    });
+  }, [selected]);
 
   return (
     <div className="page-grid">
@@ -69,58 +70,13 @@ export function LibraryRoute() {
             </p>
           </div>
 
-          {isLoading ? (
-            <div className="rounded-2xl border border-border/40 bg-surface-1/70 p-6 text-sm text-muted-foreground">
-              Loading artifacts...
-            </div>
-          ) : error ? (
-            <div className="rounded-2xl border border-destructive/40 bg-destructive/10 p-6 text-sm text-destructive">
-              {error}
-            </div>
-          ) : items.length === 0 ? (
-            <div className="rounded-2xl border border-border/40 bg-surface-1/70 p-6 text-sm text-muted-foreground">
-              No deliverables yet. Run a task to generate artifacts.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {items.map((item) => {
-                const isActive = item.record.artifactId === selected?.record.artifactId;
-                return (
-                  <button
-                    key={item.record.artifactId}
-                    type="button"
-                    onClick={() => setSelectedId(item.record.artifactId)}
-                    className={`w-full text-left rounded-2xl border px-4 py-3 transition ${
-                      isActive
-                        ? "border-foreground/40 bg-surface-2"
-                        : "border-border/40 bg-surface-1/60 hover:border-foreground/30 hover:bg-surface-2/60"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="space-y-1 min-w-0">
-                        <p className="text-sm font-semibold text-foreground truncate">
-                          {item.item.title}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {item.record.taskTitle ?? "Untitled task"}
-                          {item.record.sessionTitle ? ` · ${item.record.sessionTitle}` : ""}
-                        </p>
-                      </div>
-                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                        {item.payload.type}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-xs text-muted-foreground line-clamp-2">
-                      {item.snippet}
-                    </p>
-                    <p className="mt-2 text-[10px] text-muted-foreground">
-                      {new Date(item.record.createdAt).toLocaleString()}
-                    </p>
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          <LibraryListPanel
+            isLoading={isLoading}
+            error={error}
+            items={items}
+            activeId={selected?.record.artifactId ?? null}
+            onSelect={setSelectedId}
+          />
         </div>
 
         <div className="rounded-2xl border border-border/40 bg-surface-1/70 min-h-[360px] overflow-hidden">
@@ -156,6 +112,100 @@ function buildLibraryItems(records: CoworkArtifact[]): LibraryItem[] {
     });
   }
   return items;
+}
+
+type LibraryListPanelProps = {
+  isLoading: boolean;
+  error: string | null;
+  items: LibraryItem[];
+  activeId: string | null;
+  onSelect: (id: string) => void;
+};
+
+function LibraryListPanel({ isLoading, error, items, activeId, onSelect }: LibraryListPanelProps) {
+  if (isLoading) {
+    return (
+      <div className="rounded-2xl border border-border/40 bg-surface-1/70 p-6 text-sm text-muted-foreground">
+        Loading artifacts...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-2xl border border-destructive/40 bg-destructive/10 p-6 text-sm text-destructive">
+        {error}
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="rounded-2xl border border-border/40 bg-surface-1/70 p-6 text-sm text-muted-foreground">
+        No deliverables yet. Run a task to generate artifacts.
+      </div>
+    );
+  }
+
+  return <LibraryList items={items} activeId={activeId} onSelect={onSelect} />;
+}
+
+type LibraryListProps = {
+  items: LibraryItem[];
+  activeId: string | null;
+  onSelect: (id: string) => void;
+};
+
+function LibraryList({ items, activeId, onSelect }: LibraryListProps) {
+  return (
+    <div className="space-y-3">
+      {items.map((item) => {
+        const isActive = item.record.artifactId === activeId;
+        return (
+          <button
+            key={item.record.artifactId}
+            type="button"
+            onClick={() => onSelect(item.record.artifactId)}
+            className={`w-full text-left rounded-2xl border px-4 py-3 transition ${
+              isActive
+                ? "border-foreground/40 bg-surface-2"
+                : "border-border/40 bg-surface-1/60 hover:border-foreground/30 hover:bg-surface-2/60"
+            }`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1 min-w-0">
+                <p className="text-sm font-semibold text-foreground truncate">{item.item.title}</p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {item.record.taskTitle ?? "Untitled task"}
+                  {item.record.sessionTitle ? ` · ${item.record.sessionTitle}` : ""}
+                </p>
+              </div>
+              <div className="flex flex-col items-end gap-1">
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  {item.payload.type}
+                </span>
+                {item.record.status !== "pending" && (
+                  <span
+                    className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                      item.record.status === "applied"
+                        ? "border-emerald-500/30 text-emerald-600 bg-emerald-500/10"
+                        : "border-amber-500/30 text-amber-600 bg-amber-500/10"
+                    }`}
+                  >
+                    {item.record.status}
+                  </span>
+                )}
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground line-clamp-2">{item.snippet}</p>
+            <p className="mt-2 text-[10px] text-muted-foreground">
+              {new Date(item.record.createdAt).toLocaleString()}
+            </p>
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 function toArtifactItem(record: CoworkArtifact, payload: ArtifactPayload): ArtifactItem {

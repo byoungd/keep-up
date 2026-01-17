@@ -81,9 +81,6 @@ function processTaskStatusNode(
   handleUserPrompt(node, messages, context);
 
   const msg = getOrCreateTaskMessage(node.taskId, timestamp, messages, context.taskMessageMap);
-  if (msg.createdAt < timestamp) {
-    msg.createdAt = timestamp;
-  }
 
   const agentTask = buildAgentTaskFromGraph(node, graph);
   msg.status =
@@ -139,12 +136,13 @@ function injectApprovalMetadata(agentTask: AgentTask, graph: TaskGraph, taskId: 
       toolName: approvalNode.toolName,
       args: approvalNode.args,
       riskLevel: approvalNode.riskLevel,
+      reason: resolveApprovalReason(approvalNode),
     };
   }
 }
 
 function processToolCallNode(node: ToolCallNode, messages: Message[]) {
-  if (!node.requiresApproval) {
+  if (!node.requiresApproval || node.taskId) {
     return;
   }
 
@@ -250,6 +248,9 @@ function buildAgentTaskFromGraph(taskNode: TaskStatusNode, graph: TaskGraph): Ag
       ? Math.round((steps.filter((s) => s.status === "completed").length / steps.length) * 100)
       : 0;
 
+  const taskTimestamp = parseTimestamp(taskNode.timestamp) ?? Date.now();
+  const { startedAt, completedAt } = resolveTaskTimestamps(scopedNodes, taskTimestamp);
+
   return {
     id: taskId,
     label: title,
@@ -260,6 +261,9 @@ function buildAgentTaskFromGraph(taskNode: TaskStatusNode, graph: TaskGraph): Ag
     modelId,
     providerId,
     fallbackNotice,
+    startedAt,
+    completedAt: isTerminalStatus(status) ? completedAt : undefined,
+    goal: taskNode.prompt,
   };
 }
 
@@ -298,6 +302,7 @@ function mapCoworkStatus(status: string): AgentTask["status"] {
       return "completed";
     case "failed":
       return "failed";
+    case "awaiting_confirmation":
     case "awaiting_approval":
       return "paused";
     default:
@@ -444,11 +449,62 @@ function formatToolName(toolName: string): string {
   return toolName.replace(/[:_]/g, " ").trim();
 }
 
+function resolveApprovalReason(node: ToolCallNode): string {
+  if (node.activityLabel) {
+    return node.activityLabel;
+  }
+  return formatToolName(node.toolName);
+}
+
+function parseTimestamp(value: string): number | null {
+  const parsed = new Date(value).getTime();
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function resolveTaskTimestamps(
+  nodes: TaskGraph["nodes"],
+  fallback: number
+): {
+  startedAt: string;
+  completedAt: string;
+} {
+  const timestamps = nodes
+    .map((node) => parseTimestamp(node.timestamp))
+    .filter((time): time is number => typeof time === "number");
+  if (timestamps.length === 0) {
+    const fallbackDate = new Date(fallback).toISOString();
+    return { startedAt: fallbackDate, completedAt: fallbackDate };
+  }
+  const sorted = [...timestamps].sort((a, b) => a - b);
+  return {
+    startedAt: new Date(sorted[0]).toISOString(),
+    completedAt: new Date(sorted[sorted.length - 1]).toISOString(),
+  };
+}
+
+function isTerminalStatus(status: string): boolean {
+  return status === "completed" || status === "failed" || status === "cancelled";
+}
+
 function extractArtifactsFromGraph(
-  artifacts: Record<string, ArtifactPayload & { taskId?: string }>
+  artifacts: Record<
+    string,
+    ArtifactPayload & {
+      taskId?: string;
+      status?: "pending" | "applied" | "reverted";
+      appliedAt?: number;
+    }
+  >
 ): ArtifactItem[] {
   return Object.entries(artifacts).map(([id, payload]) => {
-    const base: ArtifactItem = { id, type: "doc", title: "Artifact", taskId: payload.taskId };
+    const base: ArtifactItem = {
+      id,
+      type: "doc",
+      title: "Artifact",
+      taskId: payload.taskId,
+      status: payload.status,
+      appliedAt: payload.appliedAt ? new Date(payload.appliedAt).toISOString() : undefined,
+    };
     switch (payload.type) {
       case "diff":
         return { ...base, type: "diff", title: payload.file, content: payload.diff };

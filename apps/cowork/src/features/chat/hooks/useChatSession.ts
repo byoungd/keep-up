@@ -62,11 +62,10 @@ export function useChatSession(sessionId: string | undefined) {
   }, [sessionId]);
 
   // Merge History + Real-time Graph
-  // Filter out task_stream from historyMessages - graph is the source of truth for tasks
-  const messages = useMemo(() => {
-    const chatOnlyHistory = historyMessages.filter((m) => m.type !== "task_stream");
-    return projectGraphToMessages(graph, chatOnlyHistory);
-  }, [graph, historyMessages]);
+  const messages = useMemo(
+    () => projectGraphToMessages(graph, historyMessages),
+    [graph, historyMessages]
+  );
 
   const addOptimisticMessage = useCallback(
     (

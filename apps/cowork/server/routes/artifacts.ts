@@ -1,9 +1,15 @@
 import { Hono } from "hono";
 import { jsonError } from "../http";
-import type { ArtifactStoreLike, SessionStoreLike, TaskStoreLike } from "../storage/contracts";
+import type {
+  ArtifactStoreLike,
+  AuditLogStoreLike,
+  SessionStoreLike,
+  TaskStoreLike,
+} from "../storage/contracts";
 
 interface ArtifactRouteDeps {
   artifactStore: ArtifactStoreLike;
+  auditLogStore: AuditLogStoreLike;
   sessionStore: SessionStoreLike;
   taskStore: TaskStoreLike;
 }
@@ -58,6 +64,72 @@ export function createArtifactRoutes(deps: ArtifactRouteDeps) {
         )
         .sort((a, b) => b.updatedAt - a.updatedAt),
     });
+  });
+
+  app.post("/artifacts/:artifactId/apply", async (c) => {
+    const artifactId = c.req.param("artifactId");
+    const record = await deps.artifactStore.getById(artifactId);
+    if (!record) {
+      return jsonError(c, 404, "Artifact not found");
+    }
+    if (record.type !== "diff") {
+      return jsonError(c, 400, "Only diff artifacts can be applied");
+    }
+
+    const now = Date.now();
+    const updated = await deps.artifactStore.upsert({
+      ...record,
+      status: "applied",
+      appliedAt: now,
+      version: record.version + 1,
+      updatedAt: now,
+    });
+
+    void deps.auditLogStore.log({
+      entryId: crypto.randomUUID(),
+      sessionId: record.sessionId,
+      taskId: record.taskId,
+      timestamp: now,
+      action: "artifact_apply",
+      toolName: "artifact.apply",
+      input: { artifactId },
+      outcome: "success",
+    });
+
+    return c.json({ ok: true, artifact: updated });
+  });
+
+  app.post("/artifacts/:artifactId/revert", async (c) => {
+    const artifactId = c.req.param("artifactId");
+    const record = await deps.artifactStore.getById(artifactId);
+    if (!record) {
+      return jsonError(c, 404, "Artifact not found");
+    }
+    if (record.type !== "diff") {
+      return jsonError(c, 400, "Only diff artifacts can be reverted");
+    }
+
+    const now = Date.now();
+    const updated = await deps.artifactStore.upsert({
+      ...record,
+      status: "reverted",
+      appliedAt: undefined,
+      version: record.version + 1,
+      updatedAt: now,
+    });
+
+    void deps.auditLogStore.log({
+      entryId: crypto.randomUUID(),
+      sessionId: record.sessionId,
+      taskId: record.taskId,
+      timestamp: now,
+      action: "artifact_revert",
+      toolName: "artifact.revert",
+      input: { artifactId },
+      outcome: "success",
+    });
+
+    return c.json({ ok: true, artifact: updated });
   });
 
   return app;

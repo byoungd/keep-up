@@ -14,6 +14,7 @@ export type ApiResult<T> = {
   settings?: CoworkSettings;
   result?: ToolCheckResult;
   artifacts?: CoworkArtifact[];
+  artifact?: CoworkArtifact;
 } & T;
 
 export type CoworkApprovalStatus = "pending" | "approved" | "rejected";
@@ -46,6 +47,9 @@ export type CoworkArtifact = {
   type: "diff" | "plan" | "markdown";
   artifact: unknown;
   sourcePath?: string;
+  version: number;
+  status: "pending" | "applied" | "reverted";
+  appliedAt?: number;
   createdAt: number;
   updatedAt: number;
   sessionTitle?: string;
@@ -349,6 +353,26 @@ export async function listSessionArtifacts(sessionId: string): Promise<CoworkArt
 export async function listLibraryArtifacts(): Promise<CoworkArtifact[]> {
   const data = await fetchJson<ApiResult<unknown>>("/api/library/artifacts");
   return data.artifacts ?? [];
+}
+
+export async function applyArtifact(artifactId: string): Promise<CoworkArtifact> {
+  const data = await fetchJson<ApiResult<unknown>>(`/api/artifacts/${artifactId}/apply`, {
+    method: "POST",
+  });
+  if (!data.artifact) {
+    throw new Error("Artifact not returned");
+  }
+  return data.artifact;
+}
+
+export async function revertArtifact(artifactId: string): Promise<CoworkArtifact> {
+  const data = await fetchJson<ApiResult<unknown>>(`/api/artifacts/${artifactId}/revert`, {
+    method: "POST",
+  });
+  if (!data.artifact) {
+    throw new Error("Artifact not returned");
+  }
+  return data.artifact;
 }
 
 export async function resolveApproval(approvalId: string, status: "approved" | "rejected") {

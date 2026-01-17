@@ -110,8 +110,8 @@ export async function migrateJsonToSqlite(
 
   const insertArtifact = db.prepare(`
     INSERT OR REPLACE INTO artifacts
-    (artifact_id, session_id, task_id, title, type, artifact, source_path, created_at, updated_at)
-    VALUES ($artifactId, $sessionId, $taskId, $title, $type, $artifact, $sourcePath, $createdAt, $updatedAt)
+    (artifact_id, session_id, task_id, title, type, artifact, source_path, version, status, applied_at, created_at, updated_at)
+    VALUES ($artifactId, $sessionId, $taskId, $title, $type, $artifact, $sourcePath, $version, $status, $appliedAt, $createdAt, $updatedAt)
   `);
 
   const insertSetting = db.prepare(`
@@ -221,6 +221,9 @@ function insertArtifacts(
     type: string;
     artifact: unknown;
     sourcePath?: string;
+    version?: number;
+    status?: string;
+    appliedAt?: number;
     createdAt: number;
     updatedAt: number;
   }>
@@ -234,6 +237,9 @@ function insertArtifacts(
       $type: artifact.type,
       $artifact: JSON.stringify(artifact.artifact),
       $sourcePath: artifact.sourcePath ?? null,
+      $version: artifact.version ?? 1,
+      $status: artifact.status ?? "pending",
+      $appliedAt: artifact.appliedAt ?? null,
       $createdAt: artifact.createdAt,
       $updatedAt: artifact.updatedAt,
     });

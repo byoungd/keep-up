@@ -12,22 +12,26 @@ export class ArtifactStore {
     });
   }
 
-  getAll(): Promise<CoworkArtifactRecord[]> {
-    return this.store.getAll();
+  async getAll(): Promise<CoworkArtifactRecord[]> {
+    const items = await this.store.getAll();
+    return items.map(normalizeArtifactRecord);
   }
 
-  getById(artifactId: string): Promise<CoworkArtifactRecord | null> {
-    return this.store.getById(artifactId);
+  async getById(artifactId: string): Promise<CoworkArtifactRecord | null> {
+    const record = await this.store.getById(artifactId);
+    return record ? normalizeArtifactRecord(record) : null;
   }
 
   async getBySession(sessionId: string): Promise<CoworkArtifactRecord[]> {
     const items = await this.store.getAll();
-    return items.filter((artifact) => artifact.sessionId === sessionId);
+    return items
+      .filter((artifact) => artifact.sessionId === sessionId)
+      .map(normalizeArtifactRecord);
   }
 
   async getByTask(taskId: string): Promise<CoworkArtifactRecord[]> {
     const items = await this.store.getAll();
-    return items.filter((artifact) => artifact.taskId === taskId);
+    return items.filter((artifact) => artifact.taskId === taskId).map(normalizeArtifactRecord);
   }
 
   upsert(artifact: CoworkArtifactRecord): Promise<CoworkArtifactRecord> {
@@ -41,4 +45,12 @@ export class ArtifactStore {
 
 export function createArtifactStore(filePath: string): ArtifactStore {
   return new ArtifactStore(filePath);
+}
+
+function normalizeArtifactRecord(record: CoworkArtifactRecord): CoworkArtifactRecord {
+  return {
+    ...record,
+    version: record.version ?? 1,
+    status: record.status ?? "pending",
+  };
 }
