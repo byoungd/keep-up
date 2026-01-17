@@ -849,23 +849,46 @@ export function useTaskStream(sessionId: string) {
     };
   }, [sessionId, handleEvent]);
 
-  const approveTool = useCallback(async (approvalId: string) => {
-    try {
-      await resolveApproval(approvalId, "approved");
-      setGraph((prev) => ({ ...prev, pendingApprovalId: undefined }));
-    } catch (error) {
-      console.error("Failed to approve", error);
-    }
-  }, []);
+  const approveTool = useCallback(
+    async (approvalId: string) => {
+      // Optimistic UI update
+      setGraph((prev) => ({
+        ...prev,
+        pendingApprovalId:
+          prev.pendingApprovalId === approvalId ? undefined : prev.pendingApprovalId,
+        status: prev.status === TaskStatus.AWAITING_APPROVAL ? TaskStatus.RUNNING : prev.status,
+      }));
 
-  const rejectTool = useCallback(async (approvalId: string) => {
-    try {
-      await resolveApproval(approvalId, "rejected");
-      setGraph((prev) => ({ ...prev, pendingApprovalId: undefined }));
-    } catch (error) {
-      console.error("Failed to reject", error);
-    }
-  }, []);
+      try {
+        await resolveApproval(approvalId, "approved");
+      } catch (error) {
+        console.error("Failed to approve", error);
+        // Rollback or handle error if needed - for now we'll just log
+        // In a real app we might want to refresh state
+        void refreshSessionState();
+      }
+    },
+    [refreshSessionState]
+  );
+
+  const rejectTool = useCallback(
+    async (approvalId: string) => {
+      // Optimistic UI update
+      setGraph((prev) => ({
+        ...prev,
+        pendingApprovalId:
+          prev.pendingApprovalId === approvalId ? undefined : prev.pendingApprovalId,
+      }));
+
+      try {
+        await resolveApproval(approvalId, "rejected");
+      } catch (error) {
+        console.error("Failed to reject", error);
+        void refreshSessionState();
+      }
+    },
+    [refreshSessionState]
+  );
 
   return { graph, isConnected, approveTool, rejectTool };
 }

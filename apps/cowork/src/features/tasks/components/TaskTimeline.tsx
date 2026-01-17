@@ -10,6 +10,13 @@ interface TaskTimelineProps {
   rejectTool: (approvalId: string) => void;
 }
 
+const formatDuration = (ms: number) => {
+  if (ms < 1000) {
+    return `${ms}ms`;
+  }
+  return `${(ms / 1000).toFixed(1)}s`;
+};
+
 export function TaskTimeline({ graph, isConnected, approveTool, rejectTool }: TaskTimelineProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -23,12 +30,10 @@ export function TaskTimeline({ graph, isConnected, approveTool, rejectTool }: Ta
     }
 
     const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
-    const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 150;
 
     if (isAtBottom) {
       bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-    } else {
-      setShowScrollButton(true);
     }
   }, [graph.nodes.length, graph.pendingApprovalId]);
 
@@ -43,33 +48,24 @@ export function TaskTimeline({ graph, isConnected, approveTool, rejectTool }: Ta
     : undefined;
 
   return (
-    <div className="flex flex-col h-full bg-surface-0/70 relative rounded-2xl border border-border/40 shadow-sm">
+    <div className="flex flex-col h-full bg-surface-0/70 relative rounded-2xl border border-border/40 shadow-sm overflow-hidden">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-border/40 bg-surface-0/90 backdrop-blur-md sticky top-0 z-20 flex justify-between items-center">
-        <h2 className="font-semibold text-foreground text-sm tracking-tight flex items-center gap-2">
-          <svg
-            className="w-4 h-4 text-muted-foreground"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <title>Timeline icon</title>
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-          Timeline
+      <div className="px-4 py-3 border-b border-border/40 bg-surface-0/90 backdrop-blur-md sticky top-0 z-20 flex justify-between items-center shadow-sm">
+        <h2 className="font-bold text-foreground text-sm tracking-tight flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-primary/20 flex items-center justify-center">
+            <div className="w-1 h-1 rounded-full bg-primary animate-pulse" />
+          </div>
+          Execution Flow
         </h2>
-        <div className="flex items-center gap-2 bg-surface-2 rounded-full px-2 py-1">
+        <div className="flex items-center gap-2 bg-surface-2 rounded-full px-2 py-1 border border-border/40">
           <span
             className={`w-1.5 h-1.5 rounded-full ${
-              isConnected ? "bg-accent-emerald animate-pulse" : "bg-muted-foreground"
+              isConnected
+                ? "bg-accent-emerald shadow-[0_0_8px_rgba(16,185,129,0.5)]"
+                : "bg-muted-foreground"
             }`}
           />
-          <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
+          <span className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">
             {graph.status.replace("_", " ")}
           </span>
         </div>
@@ -78,19 +74,62 @@ export function TaskTimeline({ graph, isConnected, approveTool, rejectTool }: Ta
       {/* List */}
       <div
         ref={containerRef}
-        className="flex-1 overflow-y-auto p-4 space-y-6 scroll-smooth"
+        className="flex-1 overflow-y-auto p-4 space-y-6 scroll-smooth scrollbar-hide"
         onScroll={(e) => {
           const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
-          setShowScrollButton(scrollHeight - scrollTop - clientHeight > 100);
+          setShowScrollButton(scrollHeight - scrollTop - clientHeight > 150);
         }}
       >
-        {graph.nodes.map((node) => (
-          <TaskNodeDisplay key={String(node.id)} node={node} />
-        ))}
+        {graph.nodes.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full space-y-4 opacity-50 animate-in fade-in duration-1000">
+            <div className="w-12 h-12 rounded-full border-2 border-dashed border-border flex items-center justify-center">
+              <svg
+                className="w-6 h-6 text-muted-foreground"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <title>Waiting</title>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-bold text-foreground">Waiting for Agent</p>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1">
+                Standby for execution flow
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="relative pl-4 space-y-6 before:absolute before:left-[19px] before:top-2 before:bottom-2 before:w-[1px] before:bg-gradient-to-b before:from-border/10 before:via-border/40 before:to-border/10">
+            {graph.nodes.map((node, index) => {
+              let durationStr: string | undefined;
+              if (index < graph.nodes.length - 1) {
+                const currentTs = new Date(node.timestamp).getTime();
+                const nextTs = new Date(graph.nodes[index + 1].timestamp).getTime();
+                const diff = nextTs - currentTs;
+                if (diff > 0) {
+                  durationStr = formatDuration(diff);
+                }
+              }
+
+              return (
+                <div key={String(node.id)} className="relative group">
+                  <TaskNodeDisplay node={node} duration={durationStr} />
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* Render Pending Approval Card at the bottom if active */}
         {pendingNode && pendingNode.type === "tool_call" && (
-          <div className="sticky bottom-4 z-10 animate-in slide-in-from-bottom-4 fade-in duration-300 shadow-xl rounded-xl">
+          <div className="sticky bottom-4 z-10 animate-in slide-in-from-bottom-6 fade-in duration-500 shadow-2xl rounded-2xl border border-accent-blue/20">
             <PendingApprovalCard
               toolName={pendingNode.toolName}
               args={pendingNode.args}

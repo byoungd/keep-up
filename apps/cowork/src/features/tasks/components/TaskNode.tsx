@@ -131,12 +131,194 @@ export function MinimalTaskView({ task, content }: { task: AgentTask; content?: 
   );
 }
 
-// Minimal Legacy Fallback
-export function TaskNodeDisplay({ node }: { node: TaskNode }) {
-  if (node.type === "thinking") {
-    return (
-      <div className="text-[10px] text-muted-foreground/30 font-mono italic">{node.content}</div>
-    );
+// --- Specialized Node Displays ---
+
+const BASE_NODE_CLASSES =
+  "animate-in fade-in slide-in-from-left-4 duration-500 fill-mode-both px-3 py-2 rounded-xl text-xs shadow-sm overflow-hidden border border-border/20";
+
+function ThinkingNodeDisplay({ node }: { node: TaskNode & { type: "thinking" } }) {
+  return (
+    <div className={`${BASE_NODE_CLASSES} bg-surface-1 text-muted-foreground italic font-mono`}>
+      <div className="flex items-center gap-2 opacity-60 mb-1.5">
+        <div className="flex space-x-0.5">
+          <div className="w-1 h-1 bg-muted-foreground rounded-full animate-bounce [animation-delay:-0.3s]" />
+          <div className="w-1 h-1 bg-muted-foreground rounded-full animate-bounce [animation-delay:-0.15s]" />
+          <div className="w-1 h-1 bg-muted-foreground rounded-full animate-bounce" />
+        </div>
+        <span className="text-[10px] uppercase font-bold tracking-widest">Internal Logic</span>
+      </div>
+      <div className="leading-relaxed whitespace-pre-wrap">{node.content}</div>
+    </div>
+  );
+}
+
+function ToolCallNodeDisplay({ node }: { node: TaskNode & { type: "tool_call" } }) {
+  return (
+    <div className={`${BASE_NODE_CLASSES} bg-accent-blue/5 border-accent-blue/20 text-accent-blue`}>
+      <div className="flex items-center justify-between mb-1.5">
+        <div className="flex items-center gap-2">
+          <div className="p-1 bg-accent-blue/10 rounded-lg">
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <title>Tool</title>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
+              />
+            </svg>
+          </div>
+          <span className="font-black font-mono tracking-tight uppercase">
+            call:{node.toolName}
+          </span>
+        </div>
+        {node.riskLevel && (
+          <div className="flex items-center gap-1.5">
+            <span
+              className={`text-[8px] px-2 py-0.5 rounded-full font-black uppercase tracking-tighter ${
+                node.riskLevel === "high"
+                  ? "bg-accent-red text-background"
+                  : "bg-accent-amber/20 text-accent-amber"
+              }`}
+            >
+              {node.riskLevel} Risk
+            </span>
+          </div>
+        )}
+      </div>
+      <div className="font-mono text-[10px] bg-black/5 dark:bg-white/5 rounded-lg p-2 overflow-x-auto border border-black/5">
+        <pre>{JSON.stringify(node.args, null, 2)}</pre>
+      </div>
+    </div>
+  );
+}
+
+function ToolOutputDisplay({ node }: { node: TaskNode & { type: "tool_output" } }) {
+  return (
+    <div
+      className={`${BASE_NODE_CLASSES} ${
+        node.isError
+          ? "bg-accent-red/5 border-accent-red/20 text-accent-red"
+          : "bg-accent-emerald/5 border-accent-emerald/20 text-accent-emerald"
+      }`}
+    >
+      <div className="flex items-center gap-2 mb-1.5">
+        <div
+          className={`p-1 rounded-lg ${node.isError ? "bg-accent-red/10" : "bg-accent-emerald/10"}`}
+        >
+          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <title>Output</title>
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M13 10V3L4 14h7v7l9-11h-7z"
+            />
+          </svg>
+        </div>
+        <span className="font-black text-[10px] uppercase tracking-widest">
+          {node.isError ? "Failure Response" : "Success Execution"}
+        </span>
+      </div>
+      <div className="opacity-90 font-mono text-[10px] bg-black/5 dark:bg-white/5 p-2 rounded-lg border border-black/5 overflow-hidden">
+        <div className="break-all line-clamp-6">
+          {typeof node.output === "string" ? node.output : JSON.stringify(node.output)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatusNodeDisplay({
+  node,
+  duration,
+}: {
+  node: TaskNode & { type: "task_status" };
+  duration?: string;
+}) {
+  return (
+    <div className="flex items-center gap-4 py-3 px-2 animate-in fade-in slide-in-from-left-2 duration-700">
+      <div className="relative">
+        <div
+          className={`w-3 h-3 rounded-full shrink-0 shadow-sm ${
+            node.status === "completed"
+              ? "bg-accent-emerald"
+              : node.status === "failed"
+                ? "bg-accent-red"
+                : "bg-accent-blue animate-pulse"
+          }`}
+        />
+        {node.status === "running" && (
+          <div className="absolute inset-0 bg-accent-blue rounded-full animate-ping opacity-20" />
+        )}
+      </div>
+      <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+        <div className="flex items-center justify-between gap-4">
+          <span className="font-black text-foreground text-sm tracking-tighter truncate">
+            {node.title}
+          </span>
+          {duration && (
+            <span className="text-[10px] font-mono text-muted-foreground bg-surface-2 px-1.5 py-0.5 rounded-md border border-border/40">
+              {duration}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-muted-foreground uppercase font-black tracking-widest opacity-50">
+            {node.status}
+          </span>
+          {node.modelId && (
+            <>
+              <span className="w-1 h-1 bg-border rounded-full" />
+              <span className="text-[9px] font-mono text-muted-foreground/40 italic">
+                {node.modelId}
+              </span>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ErrorNodeDisplay({ node }: { node: TaskNode & { type: "error" } }) {
+  return (
+    <div
+      className={`${BASE_NODE_CLASSES} bg-accent-red border-accent-red/30 text-background font-bold shadow-accent-red/20`}
+    >
+      <div className="flex items-center gap-2 mb-1.5 uppercase font-black tracking-tighter text-[9px]">
+        <div className="p-1 bg-white/20 rounded-lg">
+          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+            <title>Error icon</title>
+            <path
+              fillRule="evenodd"
+              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+              clipRule="evenodd"
+            />
+          </svg>
+        </div>
+        System Halt
+      </div>
+      <div className="leading-tight">{node.message}</div>
+    </div>
+  );
+}
+
+// --- Main Entry ---
+
+export function TaskNodeDisplay({ node, duration }: { node: TaskNode; duration?: string }) {
+  switch (node.type) {
+    case "thinking":
+      return <ThinkingNodeDisplay node={node} />;
+    case "tool_call":
+      return <ToolCallNodeDisplay node={node} />;
+    case "tool_output":
+      return <ToolOutputDisplay node={node} />;
+    case "task_status":
+      return <StatusNodeDisplay node={node} duration={duration} />;
+    case "error":
+      return <ErrorNodeDisplay node={node} />;
+    default:
+      return null;
   }
-  return null;
 }

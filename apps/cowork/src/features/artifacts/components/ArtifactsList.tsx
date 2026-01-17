@@ -12,31 +12,93 @@ export function ArtifactsList({ artifacts }: ArtifactsListProps) {
 
   if (list.length === 0) {
     return (
-      <div className="p-4 text-center text-muted-foreground text-sm">No artifacts created yet.</div>
+      <div className="flex flex-col items-center justify-center p-12 text-center space-y-4 animate-in fade-in duration-700">
+        <div className="w-16 h-16 rounded-2xl bg-surface-1 border border-border/40 flex items-center justify-center text-muted-foreground/20">
+          <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <title>Empty artifacts icon</title>
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1}
+              d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+            />
+          </svg>
+        </div>
+        <div>
+          <h3 className="text-sm font-bold text-foreground tracking-tight">No artifacts yet</h3>
+          <p className="text-xs text-muted-foreground mt-1 max-w-[180px]">
+            Generated files, plans and reports will appear here as the agent works.
+          </p>
+        </div>
+      </div>
     );
   }
 
+  const plans = list.filter(([_, a]) => a.type === "plan");
+  const diffs = list.filter(([_, a]) => a.type === "diff");
+  const markdowns = list.filter(([_, a]) => a.type === "markdown");
+
+  interface SectionProps {
+    title: string;
+    icon: React.ReactNode;
+    items: typeof list;
+  }
+
+  const Section = ({ title, icon, items }: SectionProps) => {
+    if (items.length === 0) {
+      return null;
+    }
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center gap-2 px-1">
+          {icon}
+          <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+            {title} ({items.length})
+          </h3>
+        </div>
+        <div className="space-y-4">
+          {items.map(([id, artifact]) => {
+            switch (artifact.type) {
+              case "diff":
+                return <DiffCard key={id} file={artifact.file} diff={artifact.diff} />;
+              case "plan":
+                return <PlanCard key={id} steps={artifact.steps} />;
+              case "markdown":
+                return (
+                  <ReportCard
+                    key={id}
+                    title={
+                      artifact.content.split("\n")[0].replace(/^#+\s*/, "") || "Markdown Artifact"
+                    }
+                    content={artifact.content}
+                  />
+                );
+              default:
+                return null;
+            }
+          })}
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div className="space-y-4 p-4">
-      {list.map(([id, artifact]) => {
-        switch (artifact.type) {
-          case "diff":
-            return <DiffCard key={id} file={artifact.file} diff={artifact.diff} />;
-          case "plan":
-            return <PlanCard key={id} steps={artifact.steps} />;
-          case "markdown":
-            return <ReportCard key={id} content={artifact.content} />;
-          default:
-            return (
-              <div
-                key={id}
-                className="p-2 border border-destructive/20 bg-destructive/10 text-destructive text-xs rounded"
-              >
-                Unknown artifact type
-              </div>
-            );
-        }
-      })}
+    <div className="space-y-8 p-4">
+      <Section
+        title="Plans"
+        icon={<div className="w-1.5 h-1.5 rounded-full bg-accent-blue" />}
+        items={plans}
+      />
+      <Section
+        title="File Changes"
+        icon={<div className="w-1.5 h-1.5 rounded-full bg-accent-amber" />}
+        items={diffs}
+      />
+      <Section
+        title="Reports"
+        icon={<div className="w-1.5 h-1.5 rounded-full bg-accent-indigo" />}
+        items={markdowns}
+      />
     </div>
   );
 }
