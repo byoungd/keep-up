@@ -51,6 +51,8 @@ const PROVIDER_KIND_MAP: Record<string, string> = {
   openai: "openai",
   anthropic: "claude",
   gemini: "gemini",
+  ollama: "ollama",
+  deepseek: "deepseek",
 };
 
 export function createProviderRoutes(deps: ProviderRouteDeps) {

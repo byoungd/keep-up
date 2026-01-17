@@ -69,7 +69,7 @@ export interface CoworkSettings {
   theme?: "light" | "dark";
 }
 
-export type CoworkProviderId = "openai" | "anthropic" | "gemini";
+export type CoworkProviderId = "openai" | "anthropic" | "gemini" | "ollama" | "deepseek";
 
 export interface ProviderKeyRecord {
   providerId: CoworkProviderId;
