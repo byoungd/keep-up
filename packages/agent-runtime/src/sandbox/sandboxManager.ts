@@ -6,6 +6,7 @@
 
 import { PassThrough } from "node:stream";
 import Dockerode, { type Container, type HostConfig } from "dockerode";
+import type { RuntimeAssetManager } from "../assets";
 import type {
   SandboxContext,
   SandboxExecOptions,
@@ -45,6 +46,7 @@ export interface DockerSandboxManagerOptions {
   workspacePath?: string;
   containerWorkspacePath?: string;
   defaultPolicy?: SandboxPolicy;
+  assetManager?: RuntimeAssetManager;
 }
 
 const DEFAULT_POLICY: SandboxPolicy = {
@@ -65,9 +67,11 @@ export class DockerSandboxManager implements SandboxManager {
   private readonly workspacePath: string;
   private readonly containerWorkspacePath: string;
   private readonly defaultPolicy: SandboxPolicy;
+  private readonly assetManager?: RuntimeAssetManager;
 
   constructor(options: DockerSandboxManagerOptions = {}) {
-    this.docker = options.docker ?? new Dockerode();
+    this.assetManager = options.assetManager;
+    this.docker = options.docker ?? options.assetManager?.getDockerClient() ?? new Dockerode();
     this.image = options.image ?? DEFAULT_IMAGE;
     this.workspacePath = options.workspacePath ?? process.cwd();
     this.containerWorkspacePath = options.containerWorkspacePath ?? DEFAULT_CONTAINER_WORKSPACE;
@@ -104,6 +108,7 @@ export class DockerSandboxManager implements SandboxManager {
     const policy = config.policy ?? this.defaultPolicy;
     const workspacePath = config.workspacePath ?? this.workspacePath;
     const image = config.image ?? this.image;
+    await this.ensureImageAvailable(image);
     const container = await this.createContainer({
       image,
       workspacePath,
@@ -167,6 +172,19 @@ export class DockerSandboxManager implements SandboxManager {
     });
     await container.start();
     return container;
+  }
+
+  private async ensureImageAvailable(image: string): Promise<void> {
+    if (!this.assetManager) {
+      return;
+    }
+    const status = await this.assetManager.ensureDockerImage(image);
+    if (!status.available) {
+      throw new Error(status.reason ?? "Docker engine unavailable");
+    }
+    if (!status.imagePresent) {
+      throw new Error(status.reason ?? `Docker image ${image} unavailable`);
+    }
   }
 }
 

@@ -7,6 +7,7 @@
 import { mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import { type Browser, type BrowserContext, chromium, type Page, type Video } from "playwright";
+import type { RuntimeAssetManager } from "../assets";
 import {
   type AccessibilitySnapshot,
   buildAccessibilitySnapshot,
@@ -18,6 +19,7 @@ export interface BrowserManagerOptions {
   headless?: boolean;
   recordingDir?: string;
   viewport?: { width: number; height: number };
+  assetManager?: RuntimeAssetManager;
 }
 
 export interface BrowserSessionConfig {
@@ -44,9 +46,11 @@ export class BrowserManager {
   private browser?: Browser;
   private readonly sessions = new Map<string, BrowserSession>();
   private readonly options: BrowserManagerOptions;
+  private readonly assetManager?: RuntimeAssetManager;
 
   constructor(options: BrowserManagerOptions = {}) {
     this.options = options;
+    this.assetManager = options.assetManager;
   }
 
   async getSession(sessionId: string, config: BrowserSessionConfig = {}): Promise<BrowserSession> {
@@ -150,6 +154,12 @@ export class BrowserManager {
 
   private async ensureBrowser(): Promise<Browser> {
     if (!this.browser) {
+      if (this.assetManager) {
+        const status = await this.assetManager.ensurePlaywrightBrowser();
+        if (!status.available) {
+          throw new Error(status.reason ?? "Playwright browsers unavailable");
+        }
+      }
       this.browser = await chromium.launch({
         headless: this.options.headless ?? true,
       });
