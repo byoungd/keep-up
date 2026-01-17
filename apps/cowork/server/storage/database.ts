@@ -163,6 +163,43 @@ function initSchema(database: DatabaseInstance): void {
       value TEXT NOT NULL
     )
   `);
+
+  // Audit log table for tracking all tool actions and policy decisions
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      entry_id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      task_id TEXT,
+      timestamp INTEGER NOT NULL,
+      action TEXT NOT NULL,
+      tool_name TEXT,
+      input TEXT,
+      output TEXT,
+      decision TEXT,
+      rule_id TEXT,
+      risk_tags TEXT DEFAULT '[]',
+      reason TEXT,
+      duration_ms INTEGER,
+      outcome TEXT,
+      FOREIGN KEY (session_id) REFERENCES sessions(session_id)
+    )
+  `);
+
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_session ON audit_logs(session_id)
+  `);
+
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_task ON audit_logs(task_id)
+  `);
+
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp DESC)
+  `);
+
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action)
+  `);
 }
 
 export function closeDatabase(): void {

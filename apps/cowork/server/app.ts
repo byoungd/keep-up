@@ -4,6 +4,7 @@ import { jsonError } from "./http";
 import { serverLogger } from "./logger";
 import { createApprovalRoutes } from "./routes/approvals";
 import { createArtifactRoutes } from "./routes/artifacts";
+import { createAuditLogRoutes } from "./routes/auditLogs";
 import { createChatRoutes } from "./routes/chat";
 import { createProjectRoutes } from "./routes/projects";
 import { createSessionRoutes } from "./routes/sessions";
@@ -98,6 +99,14 @@ export function createCoworkApp(deps: CoworkAppDeps) {
     createChatRoutes({
       sessionStore: deps.storage.sessionStore,
       getSettings: () => deps.storage.configStore.get(),
+    })
+  );
+
+  app.route(
+    "/api",
+    createAuditLogRoutes({
+      auditLogStore: deps.storage.auditLogStore,
+      sessions: deps.storage.sessionStore,
     })
   );
 

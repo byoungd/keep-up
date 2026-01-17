@@ -13,6 +13,7 @@ import { CoworkTaskRuntime } from "../runtime/coworkTaskRuntime";
 import { createAgentStateCheckpointStore } from "../storage/agentStateStore";
 import { createApprovalStore } from "../storage/approvalStore";
 import { createArtifactStore } from "../storage/artifactStore";
+import { createAuditLogStore } from "../storage/auditLogStore";
 import { createConfigStore } from "../storage/configStore";
 import type { StorageLayer } from "../storage/contracts";
 import { createProjectStore } from "../storage/projectStore";
@@ -30,6 +31,7 @@ async function createStorageLayer() {
     agentStateStore: createAgentStateCheckpointStore(join(dir, "agent_state.json")),
     configStore: createConfigStore(join(dir, "settings.json")),
     projectStore: createProjectStore(join(dir, "projects.json")),
+    auditLogStore: createAuditLogStore(join(dir, "audit_logs.json")),
   };
   return { storage, dir };
 }

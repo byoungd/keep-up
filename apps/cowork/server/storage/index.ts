@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { createAgentStateCheckpointStore } from "./agentStateStore";
 import { createApprovalStore } from "./approvalStore";
 import { createArtifactStore } from "./artifactStore";
+import { createAuditLogStore } from "./auditLogStore";
 import { createConfigStore } from "./configStore";
 import type { StorageLayer } from "./contracts";
 import { createProjectStore } from "./projectStore";
@@ -14,6 +15,7 @@ import { createSessionStore } from "./sessionStore";
 import { createSqliteAgentStateStore } from "./sqliteAgentStateStore";
 import { createSqliteApprovalStore } from "./sqliteApprovalStore";
 import { createSqliteArtifactStore } from "./sqliteArtifactStore";
+import { createSqliteAuditLogStore } from "./sqliteAuditLogStore";
 import { createSqliteConfigStore } from "./sqliteConfigStore";
 import { createSqliteProjectStore } from "./sqliteProjectStore";
 import { createSqliteSessionStore } from "./sqliteSessionStore";
@@ -27,11 +29,14 @@ export {
 } from "./agentStateStore";
 export { type ApprovalStore, createApprovalStore } from "./approvalStore";
 export { type ArtifactStore, createArtifactStore } from "./artifactStore";
+// Audit log stores
+export { type AuditLogStore, createAuditLogStore } from "./auditLogStore";
 export { type ConfigStore, createConfigStore } from "./configStore";
 export type {
   AgentStateCheckpointStoreLike,
   ApprovalStoreLike,
   ArtifactStoreLike,
+  AuditLogStoreLike,
   ConfigStoreLike,
   ProjectStoreLike,
   SessionStoreLike,
@@ -48,6 +53,10 @@ export { createSessionStore, type SessionStore } from "./sessionStore";
 export { createSqliteAgentStateStore, type SqliteAgentStateStore } from "./sqliteAgentStateStore";
 export { createSqliteApprovalStore, type SqliteApprovalStore } from "./sqliteApprovalStore";
 export { createSqliteArtifactStore, type SqliteArtifactStore } from "./sqliteArtifactStore";
+export {
+  type AuditLogStoreLike as SqliteAuditLogStore,
+  createSqliteAuditLogStore,
+} from "./sqliteAuditLogStore";
 export { createSqliteConfigStore, type SqliteConfigStore } from "./sqliteConfigStore";
 export { createSqliteProjectStore, type SqliteProjectStore } from "./sqliteProjectStore";
 export { createSqliteSessionStore, type SqliteSessionStore } from "./sqliteSessionStore";
@@ -71,6 +80,7 @@ export async function createStorageLayer(mode: StorageMode = "json"): Promise<St
       agentStateStore,
       configStore,
       projectStore,
+      auditLogStore,
     ] = await Promise.all([
       createSqliteSessionStore(),
       createSqliteTaskStore(),
@@ -79,6 +89,7 @@ export async function createStorageLayer(mode: StorageMode = "json"): Promise<St
       createSqliteAgentStateStore(),
       createSqliteConfigStore(),
       createSqliteProjectStore(),
+      createSqliteAuditLogStore(),
     ]);
 
     return {
@@ -89,6 +100,7 @@ export async function createStorageLayer(mode: StorageMode = "json"): Promise<St
       agentStateStore,
       configStore,
       projectStore,
+      auditLogStore,
     };
   }
 
@@ -103,5 +115,6 @@ export async function createStorageLayer(mode: StorageMode = "json"): Promise<St
     ),
     configStore: createConfigStore(join(stateDir, "settings.json")),
     projectStore: createProjectStore(join(stateDir, "projects.json")),
+    auditLogStore: createAuditLogStore(join(stateDir, "audit_logs.json")),
   };
 }

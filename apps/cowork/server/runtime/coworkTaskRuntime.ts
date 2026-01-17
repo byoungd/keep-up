@@ -36,7 +36,12 @@ import {
 } from "@ku0/ai-core";
 import { ApprovalService } from "../services/approvalService";
 import type { StorageLayer } from "../storage/contracts";
-import type { CoworkApproval, CoworkArtifactPayload, CoworkSettings } from "../storage/types";
+import type {
+  CoworkApproval,
+  CoworkArtifactPayload,
+  CoworkAuditEntry,
+  CoworkSettings,
+} from "../storage/types";
 import { COWORK_EVENTS, type SessionEventHub } from "../streaming/eventHub";
 import { SmartProviderRouter } from "./smartProviderRouter";
 import { createWebSearchProvider } from "./webSearchProvider";
@@ -274,11 +279,36 @@ export class CoworkTaskRuntime {
       taskId: runtime.activeTaskId ?? undefined,
     });
 
+    // Log approval request to audit log
+    void this.logAuditEntry({
+      entryId: crypto.randomUUID(),
+      sessionId: runtime.sessionId,
+      taskId: runtime.activeTaskId ?? undefined,
+      timestamp: Date.now(),
+      action: "approval_requested",
+      toolName: request.toolName,
+      riskTags: normalizeRiskTags(request.riskTags),
+      reason: request.reason,
+    });
+
     if (runtime.activeTaskId) {
       void this.updateTaskStatus(runtime.activeTaskId, "awaiting_confirmation");
     }
 
     const decision = await this.waitForApprovalDecision(runtime.sessionId, approvalId);
+
+    // Log approval resolution to audit log
+    void this.logAuditEntry({
+      entryId: crypto.randomUUID(),
+      sessionId: runtime.sessionId,
+      taskId: runtime.activeTaskId ?? undefined,
+      timestamp: Date.now(),
+      action: "approval_resolved",
+      toolName: request.toolName,
+      decision: decision === "approved" ? "allow" : "deny",
+      outcome: decision === "approved" ? "success" : "denied",
+    });
+
     if (runtime.activeTaskId) {
       void this.updateTaskStatus(runtime.activeTaskId, "running");
     }
@@ -414,6 +444,17 @@ export class CoworkTaskRuntime {
       activityLabel,
       taskId: runtime.activeTaskId ?? undefined,
     });
+
+    // Log tool call to audit log
+    void this.logAuditEntry({
+      entryId: crypto.randomUUID(),
+      sessionId: runtime.sessionId,
+      taskId: runtime.activeTaskId ?? undefined,
+      timestamp: Date.now(),
+      action: "tool_call",
+      toolName: data.toolName,
+      input: isRecord(data.arguments) ? (data.arguments as Record<string, unknown>) : undefined,
+    });
   }
 
   private handleToolResultEvent(runtime: SessionRuntime, data: unknown): void {
@@ -438,6 +479,19 @@ export class CoworkTaskRuntime {
       activity,
       activityLabel,
       taskId: runtime.activeTaskId ?? undefined,
+    });
+
+    // Log tool result to audit log
+    void this.logAuditEntry({
+      entryId: crypto.randomUUID(),
+      sessionId: runtime.sessionId,
+      taskId: runtime.activeTaskId ?? undefined,
+      timestamp: Date.now(),
+      action: isError ? "tool_error" : "tool_result",
+      toolName: data.toolName,
+      output: isRecord(result) ? result : undefined,
+      durationMs: telemetry?.durationMs,
+      outcome: isError ? "error" : "success",
     });
   }
 
@@ -579,6 +633,14 @@ export class CoworkTaskRuntime {
 
   private async touchSession(sessionId: string): Promise<void> {
     await this.storage.sessionStore.update(sessionId, (s) => s);
+  }
+
+  private async logAuditEntry(entry: CoworkAuditEntry): Promise<void> {
+    try {
+      await this.storage.auditLogStore.log(entry);
+    } catch (error) {
+      this.logger.error("Failed to log audit entry", error);
+    }
   }
 
   private async waitForApprovalDecision(
