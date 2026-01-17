@@ -51,6 +51,34 @@ by executing ten parallel tracks with clear dependencies and acceptance gates.
     - Inspiration: OpenCode's always-visible cost display
     - Status: 🔲 Not Started
 
+### Phase 3: Agentic Excellence Tracks (11-14)
+11) Track 11: Semantic Context Indexing
+    - Doc: `docs/roadmap/cowork-track-11-semantic-context-index.md`
+    - Output: local codebase index, context packs, retrieval API
+    - Inspiration: Cursor and OpenCode codebase indexing + context packs
+    - Status: Not Started
+12) Track 12: Workflow Templates + Skills
+    - Doc: `docs/roadmap/cowork-track-12-workflow-templates.md`
+    - Output: reusable workflows, skill registry, import/export
+    - Inspiration: OpenCode skill packs + Claude Code command workflows
+    - Status: Not Started
+13) Track 13: Autonomous QA + Preflight Gates
+    - Doc: `docs/roadmap/cowork-track-13-autonomous-qa.md`
+    - Output: auto-lint/test selection, preflight reports, change summaries
+    - Inspiration: Cursor/Devin preflight checks + Claude Code review loop
+    - Status: Not Started
+14) Track 14: Multi-Agent Orchestration
+    - Doc: `docs/roadmap/cowork-track-14-multi-agent-orchestration.md`
+    - Output: role-based subagents, delegation, aggregated summaries
+    - Inspiration: Claude Code planner/implementer/reviewer split
+    - Status: Not Started
+
+## Phase E Trend Drivers (Why These Tracks)
+- Context indexing and retrieval are now baseline in top IDE agents (Cursor, OpenCode).
+- Users expect repeatable workflows and skills instead of one-off prompts.
+- Preflight QA reduces regressions and builds trust in autonomous edits.
+- Multi-agent role delegation improves speed and accuracy on larger tasks.
+
 ## Contract Freeze (Read Before Coding)
 - `docs/roadmap/cowork-contract-freeze.md`
 
@@ -68,6 +96,12 @@ by executing ten parallel tracks with clear dependencies and acceptance gates.
 - Track 8: Follow "Execution Steps" in `docs/roadmap/cowork-track-8-project-context.md`
 - Track 9: Follow "Execution Steps" in `docs/roadmap/cowork-track-9-plan-build-modes.md`
 - Track 10: Follow "Execution Steps" in `docs/roadmap/cowork-track-10-cost-transparency.md`
+
+### Phase 3 Tracks (Agentic Excellence)
+- Track 11: Follow "Execution Steps" in `docs/roadmap/cowork-track-11-semantic-context-index.md`
+- Track 12: Follow "Execution Steps" in `docs/roadmap/cowork-track-12-workflow-templates.md`
+- Track 13: Follow "Execution Steps" in `docs/roadmap/cowork-track-13-autonomous-qa.md`
+- Track 14: Follow "Execution Steps" in `docs/roadmap/cowork-track-14-multi-agent-orchestration.md`
 
 ## Best-Order Execution (Parallel + Gates)
 ### Phase A: Foundation (must land first)
@@ -92,6 +126,13 @@ Gate C: approvals enforced + apply/revert workflow validated
 - Track 10 (cost transparency - depends on Track 7 provider pricing) - 🔲 Not Started
 Gate D: multi-model support + project context + mode switching + cost visibility
 
+### Phase E: Agentic Excellence (parallel once Gate D passes)
+- Track 11 (semantic context index - depends on Track 8 context baseline)
+- Track 12 (workflow templates - depends on Track 9 plan/build modes)
+- Track 13 (autonomous QA - depends on Track 4 approvals + Track 5 telemetry)
+- Track 14 (multi-agent orchestration - depends on Track 9 mode system)
+Gate E: context packs + skills + preflight QA + multi-agent delegation
+
 ## Cross-Track Contracts (Must Align)
 - Message schema: status, modelId, providerId, fallbackNotice, parentId
 - SSE events: message.created/delta/completed/error + task.* events + token.usage
@@ -99,6 +140,10 @@ Gate D: multi-model support + project context + mode switching + cost visibility
 - Artifact metadata: version, status, source path, appliedAt
 - Provider metadata: providerId, pricing, capabilities, contextLimit
 - Mode metadata: currentMode, allowedTools, deniedTools
+- Context indexing: contextPackId, chunkId, sourcePath, tokenCount
+- Workflow templates: skillId, version, inputs, expectedOutputs
+- Preflight reports: preflightId, checks, failures, riskSummary
+- Multi-agent: agentId, role, parentTaskId
 
 ## Ownership and Handoff
 - Each track owner updates `task.md` and `walkthrough.md` for their scope.
@@ -124,9 +169,16 @@ Gate D: multi-model support + project context + mode switching + cost visibility
 - Plan Mode generates plan.md; Build Mode executes with approvals.
 - Token usage and cost displayed in real-time.
 
+### Phase 3 Criteria (Agentic Excellence)
+- Context packs are generated and suggested with semantic search.
+- Reusable workflow templates can be executed and shared.
+- Preflight QA runs lint/tests and produces a report before commit.
+- Multi-agent delegation runs with role summaries and clear handoffs.
+
 ## Verification Plan
 - Unit tests per track (cowork-server + shared utilities).
 - Targeted e2e: `pnpm test:e2e:smoke` and `pnpm test:e2e:features`.
 - Provider integration tests with mocked responses.
 - Mode switching e2e tests.
-
+- Semantic search + context pack tests.
+- Preflight QA integration tests with mocked commands.

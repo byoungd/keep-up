@@ -21,6 +21,28 @@ while Claude Code's Anthropic lock-in has caused user friction during policy cha
 - Graceful fallback when primary provider fails.
 - Token/cost transparency per provider.
 
+## Contracts and Data Flow
+- Message schema must carry `providerId` + `modelId` for storage and SSE playback.
+- SSE payloads should include provider/model identifiers and fallback notice when used.
+- Settings schema should migrate from `openAiKey`/`anthropicKey`/`geminiKey` to
+  a provider-key map while keeping backward compatibility for older settings.
+
+## Storage and Security
+- Store provider keys encrypted at rest (server-side) and never log raw keys.
+- Reuse `packages/shell/src/lib/crypto/keyEncryption.ts` for client-side encryption when
+  storing keys in browser storage (Cowork UI).
+- Add a lightweight migration step to move legacy keys into the new storage structure.
+
+## API Surface (Server)
+- `GET /api/providers` -> registry metadata + capabilities.
+- `GET /api/settings/providers/:providerId/key` -> `{ ok, hasKey, lastValidatedAt }`
+- `POST /api/settings/providers/:providerId/key` -> store encrypted key + validate.
+- `DELETE /api/settings/providers/:providerId/key` -> revoke key.
+
+## Fallback Policy
+- Allow a configured fallback chain per session (primary -> secondary -> tertiary).
+- Emit a `fallbackNotice` in message metadata when fallback occurs.
+
 ## Non-Goals
 - Hosting or proxying API calls (users pay directly).
 - Fine-tuning or custom model training.
@@ -84,8 +106,9 @@ while Claude Code's Anthropic lock-in has caused user friction during policy cha
 3. Add model registry JSON/YAML (or fetch from `models.dev` API).
 4. Update `apps/cowork/server/routes/chat.ts` to use adapter interface.
 5. Add API key CRUD endpoints: `POST/GET/DELETE /api/settings/providers/{id}/key`.
-6. Build model selector component with provider grouping.
-7. Add cost tracking middleware; expose via SSE events.
+6. Build model selector component with provider grouping and capability badges.
+7. Add fallback logic and telemetry tags.
+8. Add cost tracking middleware; expose via SSE events.
 
 ## Deliverables
 - `@ku0/llm-providers` package with adapter implementations.

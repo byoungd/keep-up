@@ -24,6 +24,11 @@ advantage. Users appreciate:
 - Session cost summary.
 - Export cost reports.
 
+## Event and Storage Contracts
+- SSE event: `token.usage` with `{ messageId, inputTokens, outputTokens, totalTokens, costUsd, modelId, providerId }`.
+- Store token usage alongside messages or in a `token_usage` table for aggregation.
+- If pricing is unknown, emit `costUsd: null` and show "N/A" in UI.
+
 ## Non-Goals
 - Billing integration (users pay providers directly).
 - Budget enforcement (future track).
@@ -82,6 +87,11 @@ advantage. Users appreciate:
 5. **Session Summary API**:
    - `GET /api/sessions/{id}/cost` returns SessionCostSummary.
    - Export as JSON/CSV for expense tracking.
+
+## UI Notes
+- Footer widget shows total session cost and token counts.
+- Optional per-message cost badge (toggle in settings).
+- Context meter warns at 80% and 90% usage and shows remaining tokens.
 
 ## Required Behavior
 - Token usage updates in real-time during streaming.
