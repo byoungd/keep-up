@@ -140,8 +140,8 @@ function validateFrontmatter(
     frontmatter.metadata = metadataResult.value;
   }
 
-  if (data["allowed-tools"] !== undefined) {
-    const allowedResult = resolveAllowedTools(data["allowed-tools"]);
+  if (data.allowedTools !== undefined) {
+    const allowedResult = resolveAllowedTools(data.allowedTools);
     if (!allowedResult.success) {
       return allowedResult;
     }

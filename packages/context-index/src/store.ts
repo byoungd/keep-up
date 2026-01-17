@@ -8,7 +8,7 @@ import type {
   ContextSource,
 } from "./types";
 
-class JsonFileStore<T extends Record<string, unknown>> {
+class JsonFileStore<T extends object> {
   private readonly filePath: string;
   private readonly idKey: keyof T;
   private readonly fallback: T[];
@@ -25,12 +25,13 @@ class JsonFileStore<T extends Record<string, unknown>> {
 
   async getById(id: string): Promise<T | null> {
     const items = await this.readAll();
-    return items.find((item) => item[this.idKey] === id) ?? null;
+    return items.find((item) => this.getIdValue(item) === id) ?? null;
   }
 
   async upsert(item: T): Promise<T> {
     const items = await this.readAll();
-    const next = items.filter((entry) => entry[this.idKey] !== item[this.idKey]);
+    const itemId = this.getIdValue(item);
+    const next = items.filter((entry) => this.getIdValue(entry) !== itemId);
     next.unshift(item);
     await this.writeAll(next);
     return item;
@@ -38,7 +39,7 @@ class JsonFileStore<T extends Record<string, unknown>> {
 
   async update(id: string, updater: (item: T) => T): Promise<T | null> {
     const items = await this.readAll();
-    const index = items.findIndex((item) => item[this.idKey] === id);
+    const index = items.findIndex((item) => this.getIdValue(item) === id);
     if (index < 0) {
       return null;
     }
@@ -51,7 +52,7 @@ class JsonFileStore<T extends Record<string, unknown>> {
 
   async delete(id: string): Promise<boolean> {
     const items = await this.readAll();
-    const next = items.filter((item) => item[this.idKey] !== id);
+    const next = items.filter((item) => this.getIdValue(item) !== id);
     if (next.length === items.length) {
       return false;
     }
@@ -61,6 +62,14 @@ class JsonFileStore<T extends Record<string, unknown>> {
 
   async setAll(items: T[]): Promise<void> {
     await this.writeAll(items);
+  }
+
+  private getIdValue(item: T): string {
+    const value = item[this.idKey];
+    if (typeof value === "string") {
+      return value;
+    }
+    throw new Error(`Invalid ${String(this.idKey)} value in context index store`);
   }
 
   private async readAll(): Promise<T[]> {

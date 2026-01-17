@@ -1,40 +1,31 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-  createContextIndex,
-  createHashEmbeddingProvider,
-  InMemoryContextIndexStore,
-} from "@ku0/context-index";
+import { createHashEmbeddingProvider } from "@ku0/context-index";
 import type { Hono } from "hono";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createContextRoutes } from "../routes/context";
-import type { ContextIndexManager } from "../services/contextIndexManager";
+import { ContextIndexManager } from "../services/contextIndexManager";
 
 describe("Context routes", () => {
   let rootPath: string;
   let app: Hono;
-  let store: InMemoryContextIndexStore;
+  let indexManager: ContextIndexManager;
 
   beforeEach(async () => {
     rootPath = await mkdtemp(join(tmpdir(), "cowork-context-"));
     await writeFile(join(rootPath, "alpha.txt"), "alpha", "utf-8");
 
-    store = new InMemoryContextIndexStore();
-    const index = createContextIndex({
-      rootPath,
-      store,
+    indexManager = new ContextIndexManager({
+      stateDir: rootPath,
       embeddingProvider: createHashEmbeddingProvider(16),
     });
+    const index = indexManager.getIndex(rootPath);
     await index.indexProject();
-
-    const contextIndexManager = {
-      getIndex: () => index,
-    } as ContextIndexManager;
 
     app = createContextRoutes({
       basePath: rootPath,
-      contextIndexManager,
+      contextIndexManager: indexManager,
     });
   });
 
@@ -57,7 +48,9 @@ describe("Context routes", () => {
   });
 
   it("creates packs and manages pins", async () => {
-    const [chunk] = await store.listChunks();
+    const index = indexManager.getIndex(rootPath);
+    const [result] = await index.search("alpha", { minScore: 0.99, limit: 1 });
+    const chunk = result?.chunk;
     if (!chunk) {
       throw new Error("Expected a chunk to be indexed");
     }

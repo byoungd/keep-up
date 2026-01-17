@@ -360,9 +360,8 @@ export function ContextPacksPanel({ onClose }: { onClose: () => void }) {
     try {
       const data = await listContextPacks();
       setPacks(data);
-    } catch (error) {
+    } catch (_error) {
       setErrorMessage("Failed to load context packs.");
-      console.error("Failed to load context packs", error);
     } finally {
       setIsLoadingPacks(false);
     }
@@ -376,9 +375,8 @@ export function ContextPacksPanel({ onClose }: { onClose: () => void }) {
     try {
       const data = await getContextPins(resolvedSessionId);
       setPins(data);
-    } catch (error) {
+    } catch (_error) {
       setErrorMessage("Failed to load pinned packs.");
-      console.error("Failed to load pinned packs", error);
     }
   }, [resolvedSessionId]);
 
@@ -414,9 +412,8 @@ export function ContextPacksPanel({ onClose }: { onClose: () => void }) {
       const data = await searchContext(trimmed, { limit: SEARCH_LIMIT });
       setResults(data);
       setSelectedChunkIds([]);
-    } catch (error) {
+    } catch (_error) {
       setErrorMessage("Search failed. Ensure the context index is available.");
-      console.error("Failed to search context", error);
     } finally {
       setIsSearching(false);
     }
@@ -434,9 +431,8 @@ export function ContextPacksPanel({ onClose }: { onClose: () => void }) {
       setPackName("");
       setSelectedChunkIds([]);
       await loadPacks();
-    } catch (error) {
+    } catch (_error) {
       setErrorMessage("Failed to create context pack.");
-      console.error("Failed to create context pack", error);
     } finally {
       setIsSavingPack(false);
     }
@@ -467,9 +463,8 @@ export function ContextPacksPanel({ onClose }: { onClose: () => void }) {
       setPacks((prev) => prev.map((pack) => (pack.id === updated.id ? updated : pack)));
       setEditingPackId(null);
       setEditingPackName("");
-    } catch (error) {
+    } catch (_error) {
       setErrorMessage("Failed to rename context pack.");
-      console.error("Failed to rename context pack", error);
     } finally {
       setIsSavingPack(false);
     }
@@ -486,9 +481,8 @@ export function ContextPacksPanel({ onClose }: { onClose: () => void }) {
         const updated = await updateContextPack(packId, { chunkIds: selectedChunkIds });
         setPacks((prev) => prev.map((pack) => (pack.id === updated.id ? updated : pack)));
         setSelectedChunkIds([]);
-      } catch (error) {
+      } catch (_error) {
         setErrorMessage("Failed to update context pack.");
-        console.error("Failed to update context pack", error);
       } finally {
         setIsSavingPack(false);
       }
@@ -504,9 +498,8 @@ export function ContextPacksPanel({ onClose }: { onClose: () => void }) {
         await deleteContextPack(packId);
         setPacks((prev) => prev.filter((pack) => pack.id !== packId));
         await loadPins();
-      } catch (error) {
+      } catch (_error) {
         setErrorMessage("Failed to delete context pack.");
-        console.error("Failed to delete context pack", error);
       } finally {
         setIsSavingPack(false);
       }
@@ -529,9 +522,8 @@ export function ContextPacksPanel({ onClose }: { onClose: () => void }) {
       try {
         const updated = await setContextPins(resolvedSessionId, next);
         setPins(updated);
-      } catch (error) {
+      } catch (_error) {
         setErrorMessage("Failed to update pinned packs.");
-        console.error("Failed to update pinned packs", error);
       } finally {
         setIsUpdatingPins(false);
       }

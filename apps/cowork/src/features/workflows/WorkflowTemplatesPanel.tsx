@@ -492,9 +492,8 @@ export function WorkflowTemplatesPanel({
       if (!selectedId && data.length > 0) {
         setSelectedId(data[0]?.templateId ?? null);
       }
-    } catch (error) {
+    } catch (_error) {
       setErrorMessage("Failed to load workflow templates.");
-      console.error("Failed to load workflow templates", error);
     } finally {
       setIsLoading(false);
     }
@@ -594,9 +593,8 @@ export function WorkflowTemplatesPanel({
         setSuccessMessage("Template created.");
       }
       resetDraft();
-    } catch (error) {
+    } catch (_error) {
       setErrorMessage("Failed to save workflow template.");
-      console.error("Failed to save workflow template", error);
     } finally {
       setIsSaving(false);
     }
@@ -613,9 +611,8 @@ export function WorkflowTemplatesPanel({
         if (selectedId === templateId) {
           setSelectedId(null);
         }
-      } catch (error) {
+      } catch (_error) {
         setErrorMessage("Failed to delete workflow template.");
-        console.error("Failed to delete workflow template", error);
       } finally {
         setIsSaving(false);
       }
@@ -645,7 +642,6 @@ export function WorkflowTemplatesPanel({
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to run template.";
       setErrorMessage(message);
-      console.error("Failed to run workflow template", error);
     } finally {
       setIsRunning(false);
     }
@@ -655,9 +651,8 @@ export function WorkflowTemplatesPanel({
     try {
       await navigator.clipboard.writeText(JSON.stringify(template, null, 2));
       setSuccessMessage("Template copied to clipboard.");
-    } catch (error) {
+    } catch (_error) {
       setErrorMessage("Failed to copy template.");
-      console.error("Failed to copy workflow template", error);
     }
   }, []);
 
@@ -685,9 +680,8 @@ export function WorkflowTemplatesPanel({
       setTemplates((prev) => [...imported, ...prev]);
       setImportPayload("");
       setSuccessMessage("Templates imported.");
-    } catch (error) {
+    } catch (_error) {
       setErrorMessage("Failed to import templates.");
-      console.error("Failed to import workflow templates", error);
     } finally {
       setIsSaving(false);
     }
