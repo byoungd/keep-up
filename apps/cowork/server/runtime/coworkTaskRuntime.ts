@@ -37,6 +37,12 @@ import {
   type Tool,
 } from "@ku0/ai-core";
 import { analyzeProject, createProjectContext, generateAgentsMd } from "@ku0/project-context";
+import {
+  DEFAULT_PROJECT_CONTEXT_TOKEN_BUDGET,
+  isRecord,
+  MAX_ARTIFACT_BYTES,
+  PREVIEWABLE_EXTENSIONS,
+} from "@ku0/shared";
 import { ApprovalService } from "../services/approvalService";
 import type { StorageLayer } from "../storage/contracts";
 import type {
@@ -69,7 +75,6 @@ type RuntimeFactory = (
   settings: CoworkSettings
 ) => Promise<ReturnType<typeof createCoworkRuntime>>;
 
-const RISK_TAGS = new Set<CoworkRiskTag>(["delete", "overwrite", "network", "connector", "batch"]);
 const noop = () => undefined;
 const tokenTracker = new TokenTracker();
 
@@ -250,7 +255,7 @@ export class CoworkTaskRuntime {
       const agentsMdPath = `${rootPath}/.cowork/AGENTS.md`;
       try {
         const content = await readFile(agentsMdPath, "utf-8");
-        return truncateToTokenBudget(content, 4000);
+        return truncateToTokenBudget(content, DEFAULT_PROJECT_CONTEXT_TOKEN_BUDGET);
       } catch {
         // AGENTS.md doesn't exist, generate from analysis
       }
@@ -259,7 +264,7 @@ export class CoworkTaskRuntime {
       const analysis = await analyzeProject(rootPath, { maxDepth: 2 });
       const context = createProjectContext(analysis);
       const content = generateAgentsMd(context, { includePatterns: false });
-      return truncateToTokenBudget(content, 4000);
+      return truncateToTokenBudget(content, DEFAULT_PROJECT_CONTEXT_TOKEN_BUDGET);
     } catch (error) {
       this.logger.warn("Failed to load project context", error);
       return undefined;
@@ -1069,9 +1074,6 @@ function collectOutputRoots(session: CoworkSession): string[] {
   return roots;
 }
 
-const MAX_ARTIFACT_BYTES = 512 * 1024;
-const PREVIEWABLE_EXTENSIONS = new Set([".md", ".markdown", ".mdx", ".txt"]);
-
 function collectArtifactRoots(session: CoworkSession): string[] {
   const roots = new Set<string>();
   for (const grant of session.grants) {
@@ -1191,7 +1193,15 @@ function normalizeRiskTags(tags?: string[]): CoworkRiskTag[] {
   if (!tags) {
     return [];
   }
-  return tags.filter((tag): tag is CoworkRiskTag => RISK_TAGS.has(tag as CoworkRiskTag));
+  // Filter to only valid risk tags
+  const validTags = new Set<CoworkRiskTag>([
+    "delete",
+    "overwrite",
+    "network",
+    "connector",
+    "batch",
+  ]);
+  return tags.filter((tag): tag is CoworkRiskTag => validTags.has(tag as CoworkRiskTag));
 }
 
 function isErrno(error: unknown, code: string): boolean {
@@ -1418,10 +1428,6 @@ function extractTelemetry(data: unknown): { durationMs?: number; attempts?: numb
     }
   }
   return Object.keys(result).length > 0 ? result : undefined;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
 }
 
 /**
