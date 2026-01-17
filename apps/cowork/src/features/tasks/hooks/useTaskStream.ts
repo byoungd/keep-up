@@ -257,6 +257,7 @@ export function useTaskStream(sessionId: string) {
             tasks,
             approvals,
             artifacts,
+            session.agentMode,
             taskTitleRef.current,
             taskPromptRef.current
           );
@@ -642,6 +643,7 @@ type EventHandler = (
 ) => TaskGraph;
 
 const EVENT_HANDLERS: Record<string, EventHandler> = {
+  "session.mode.changed": handleSessionModeChanged,
   "task.created": handleTaskUpdate,
   "task.updated": handleTaskUpdate,
   "approval.required": handleApprovalRequired,
@@ -652,6 +654,23 @@ const EVENT_HANDLERS: Record<string, EventHandler> = {
   "agent.plan": handlePlanUpdate,
   "agent.artifact": handleArtifactUpdate,
 };
+
+function handleSessionModeChanged(
+  prev: TaskGraph,
+  _id: string,
+  data: unknown,
+  _now: string,
+  _taskTitles: Map<string, string>,
+  _taskPrompts: Map<string, string>
+): TaskGraph {
+  if (!isRecord(data) || typeof data.mode !== "string") {
+    return prev;
+  }
+  return {
+    ...prev,
+    agentMode: (data.mode as "plan" | "build") || "build",
+  };
+}
 
 function handleApprovalRequired(
   prev: TaskGraph,
@@ -1080,6 +1099,7 @@ function deriveInitialState(
   tasks: CoworkTask[],
   approvals: CoworkApproval[],
   artifacts: CoworkArtifact[],
+  agentMode: "plan" | "build" | undefined,
   taskTitles: Map<string, string>,
   taskPrompts: Map<string, string>
 ): TaskGraph {
@@ -1122,6 +1142,7 @@ function deriveInitialState(
       mergedStatusNodes
     ),
     pendingApprovalId: latestApproval?.approvalId,
+    agentMode: agentMode ?? "build",
   };
 }
 

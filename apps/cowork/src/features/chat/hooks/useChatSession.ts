@@ -8,6 +8,7 @@ import {
   getChatHistory,
   resolveApproval,
   sendChatMessage,
+  toggleSessionMode,
 } from "../../../api/coworkApi";
 import { useWorkspace } from "../../../app/providers/WorkspaceProvider";
 import { useTaskStream } from "../../tasks/hooks/useTaskStream";
@@ -473,6 +474,13 @@ export function useChatSession(sessionId: string | undefined) {
     editMessage,
     branchMessage,
     retryMessage,
+    agentMode: graph.agentMode ?? "build",
+    toggleMode: useCallback(async () => {
+      if (!sessionId) {
+        return;
+      }
+      await toggleSessionMode(sessionId);
+    }, [sessionId]),
   };
 }
 

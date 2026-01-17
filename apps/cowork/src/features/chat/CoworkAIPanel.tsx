@@ -1,7 +1,9 @@
 "use client";
 
 import { type ArtifactItem, AIPanel as ShellAIPanel, useReaderShell } from "@ku0/shell";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { ProjectContextPanel } from "../context/ProjectContextPanel";
+import { ModeToggle } from "./components/ModeToggle";
 import { useCoworkAIPanelController } from "./useCoworkAIPanelController";
 
 export interface CoworkAIPanelProps {
@@ -12,6 +14,7 @@ export interface CoworkAIPanelProps {
 export function CoworkAIPanel({ onClose, onPreviewArtifact }: CoworkAIPanelProps) {
   const { aiPanel } = useReaderShell();
   const ctrl = useCoworkAIPanelController();
+  const [showContextPanel, setShowContextPanel] = useState(false);
 
   const {
     messages,
@@ -42,6 +45,8 @@ export function CoworkAIPanel({ onClose, onPreviewArtifact }: CoworkAIPanelProps
     onBranch,
     onQuote,
     onRetry,
+    agentMode,
+    toggleMode,
   } = ctrl;
 
   useEffect(() => {
@@ -146,9 +151,76 @@ export function CoworkAIPanel({ onClose, onPreviewArtifact }: CoworkAIPanelProps
     },
   };
 
+  const headerContent = (
+    <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200/50 dark:border-gray-800/50 bg-surface-0 min-h-[48px]">
+      <div className="flex items-center gap-2">
+        <span className="font-semibold text-sm">Cowork Agent</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setShowContextPanel(true)}
+          className="text-xs font-medium text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-surface-100 transition-colors flex items-center gap-1"
+          title="Project Context"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <title>Context Icon</title>
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+            />
+          </svg>
+          Context
+        </button>
+        <div className="h-4 w-px bg-border mx-1" />
+        <ModeToggle mode={agentMode} onToggle={toggleMode} />
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground p-1 ml-1 hover:bg-surface-100 rounded"
+          >
+            <span className="sr-only">Close</span>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <title>Close Icon</title>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <ShellAIPanel
       showHeader={false}
+      topContent={headerContent}
+      overlayContent={
+        showContextPanel ? (
+          <div className="absolute inset-0 z-50 flex justify-end">
+            <button
+              type="button"
+              className="absolute inset-0 bg-black/20 w-full h-full border-none cursor-default"
+              onClick={() => setShowContextPanel(false)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  setShowContextPanel(false);
+                }
+              }}
+              tabIndex={-1}
+              aria-label="Close context panel"
+            />
+            <ProjectContextPanel onClose={() => setShowContextPanel(false)} />
+          </div>
+        ) : null
+      }
       title={translations.title}
       model={model}
       setModel={setModel}

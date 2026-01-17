@@ -136,4 +136,5 @@ export interface TaskGraph {
   >; // map of artifactId -> payload with versioning and task association
   pendingApprovalId?: string;
   savedAt?: number;
+  agentMode?: "plan" | "build";
 }

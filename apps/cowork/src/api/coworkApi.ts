@@ -466,3 +466,79 @@ export async function deleteSession(sessionId: string): Promise<void> {
     method: "DELETE",
   });
 }
+
+// ============================================================================
+// Agent Mode API
+// ============================================================================
+
+export type AgentMode = "plan" | "build";
+
+export async function getSessionMode(sessionId: string): Promise<AgentMode> {
+  const data = await fetchJson<ApiResult<{ mode: AgentMode }>>(`/api/sessions/${sessionId}/mode`);
+  return data.mode ?? "build";
+}
+
+export async function setSessionMode(sessionId: string, mode: AgentMode): Promise<AgentMode> {
+  const data = await fetchJson<ApiResult<{ mode: AgentMode }>>(`/api/sessions/${sessionId}/mode`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mode }),
+  });
+  return data.mode ?? "build";
+}
+
+export async function toggleSessionMode(sessionId: string): Promise<AgentMode> {
+  const data = await fetchJson<ApiResult<{ mode: AgentMode }>>(
+    `/api/sessions/${sessionId}/mode/toggle`,
+    {
+      method: "POST",
+    }
+  );
+  return data.mode ?? "build";
+}
+
+// ============================================================================
+// Project Context API (Track 8)
+// ============================================================================
+
+export type ProjectContextInfo = {
+  content?: string;
+  updatedAt?: number;
+};
+
+export type ProjectAnalysisResult = {
+  techStack: Array<{ category: string; name: string }>;
+  structure: { name: string; type: "file" | "directory"; children?: unknown[] };
+};
+
+export async function getProjectContext(): Promise<ProjectContextInfo> {
+  return fetchJson<ApiResult<ProjectContextInfo>>("/api/context");
+}
+
+export async function analyzeProject(): Promise<ProjectAnalysisResult> {
+  return fetchJson<ProjectAnalysisResult>("/api/context/analyze");
+}
+
+export async function generateContext(options?: { includePatterns?: boolean }): Promise<string> {
+  const data = await fetchJson<{ content: string }>("/api/context/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(options ?? {}),
+  });
+  return data.content;
+}
+
+export async function saveContext(content: string): Promise<void> {
+  await fetchJson("/api/context/save", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content }),
+  });
+}
+
+export async function refreshContext(): Promise<string> {
+  const data = await fetchJson<{ content: string }>("/api/context/refresh", {
+    method: "POST",
+  });
+  return data.content;
+}
