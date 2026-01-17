@@ -275,7 +275,7 @@ function createSchemaValidator<T extends z.ZodTypeAny>(
     }
     return {
       valid: false,
-      errors: result.error.errors.map((error) => error.message),
+      errors: result.error.issues.map((issue) => issue.message),
     };
   };
 }
