@@ -244,6 +244,45 @@ function initSchema(database: DatabaseInstance): void {
     )
   `);
 
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS pipelines (
+      pipeline_id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT,
+      pipeline TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )
+  `);
+
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS pipeline_runs (
+      run_id TEXT PRIMARY KEY,
+      pipeline_id TEXT NOT NULL,
+      status TEXT NOT NULL,
+      stage_index INTEGER NOT NULL,
+      input TEXT,
+      output TEXT,
+      stage_results TEXT NOT NULL DEFAULT '[]',
+      error TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      started_at INTEGER,
+      completed_at INTEGER,
+      FOREIGN KEY (pipeline_id) REFERENCES pipelines(pipeline_id)
+    )
+  `);
+
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_pipeline_runs_pipeline
+    ON pipeline_runs(pipeline_id)
+  `);
+
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_pipeline_runs_status
+    ON pipeline_runs(status)
+  `);
+
   try {
     database.exec("ALTER TABLE sessions ADD COLUMN project_id TEXT");
   } catch {

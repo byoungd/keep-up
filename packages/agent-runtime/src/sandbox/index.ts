@@ -116,6 +116,21 @@ export function createExecutionSandboxAdapter(): ExecutionSandboxAdapter {
   return new DefaultExecutionSandboxAdapter();
 }
 
+export { createDockerBashExecutor, DockerBashExecutor } from "./dockerBashExecutor";
+export type {
+  SandboxContext,
+  SandboxExecOptions,
+  SandboxExecResult,
+  SandboxInfo,
+} from "./sandboxContext";
+export type {
+  DockerSandboxManagerOptions,
+  SandboxManager,
+  SandboxPolicy,
+  SandboxSessionConfig,
+} from "./sandboxManager";
+export { DockerSandboxManager } from "./sandboxManager";
+
 function parseOperation(name: string): string {
   const parts = name.split(":");
   return parts.length > 1 ? parts.slice(1).join(":") : name;

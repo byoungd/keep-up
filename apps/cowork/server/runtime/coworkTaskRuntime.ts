@@ -1,13 +1,22 @@
+import { join, resolve } from "node:path";
 import type { ConfirmationRequest, CoworkSession, CoworkTask } from "@ku0/agent-runtime";
 import {
   AgentModeManager,
+  BrowserManager,
   createAICoreAdapter,
   createBashToolServer,
+  createBrowserToolServer,
   createCodeToolServer,
   createCoworkRuntime,
+  createDockerBashExecutor,
   createFileToolServer,
+  createSandboxToolServer,
+  createSecurityPolicy,
   createToolRegistry,
   createWebSearchToolServer,
+  DockerSandboxManager,
+  ProcessCodeExecutor,
+  RuntimeAssetManager,
 } from "@ku0/agent-runtime";
 // Future integrations available:
 // import { createGhostAgent, type GhostAgent } from "@ku0/agent-runtime";
@@ -17,6 +26,7 @@ import { ApprovalService } from "../services/approvalService";
 import type { ContextIndexManager } from "../services/contextIndexManager";
 import { ProviderKeyService } from "../services/providerKeyService";
 import type { StorageLayer } from "../storage/contracts";
+import { resolveStateDir } from "../storage/statePaths";
 import type { CoworkSettings } from "../storage/types";
 import type { SessionEventHub } from "../streaming/eventHub";
 // Service Imports
@@ -64,6 +74,7 @@ export class CoworkTaskRuntime {
   private readonly runtimes = new Map<string, SessionRuntime>();
   private readonly runtimeFactory?: RuntimeFactory;
   private readonly logger: Logger; // Store logger for use in methods
+  private runtimeAssetManager?: RuntimeAssetManager;
 
   // Services
   private readonly sessionManager: SessionLifecycleManager;
@@ -238,11 +249,15 @@ export class CoworkTaskRuntime {
       prompt: session.title ?? "Cowork Session",
     });
     const modelId = resolved.model ?? requestedModel;
-    const toolRegistry = await this.buildToolRegistry();
+    const toolRegistryResult = await this.buildToolRegistry(session);
+    const toolRegistry = toolRegistryResult.registry;
     const adapter = createAICoreAdapter(resolved.provider, {
       model: modelId || undefined,
     });
     const prompt = await this.buildSystemPromptAddition(session, modeManager);
+    const securityPolicy = toolRegistryResult.dockerAvailable
+      ? buildDockerSecurityPolicy()
+      : undefined;
     const runtime = createCoworkRuntime({
       llm: adapter,
       registry: toolRegistry,
@@ -250,6 +265,7 @@ export class CoworkTaskRuntime {
         session,
         audit: undefined,
         modeManager,
+        securityPolicy,
       },
       taskQueueConfig: { maxConcurrent: 1 },
       outputRoots: collectOutputRoots(session),
@@ -271,13 +287,23 @@ export class CoworkTaskRuntime {
     };
   }
 
-  private async buildToolRegistry(): Promise<ReturnType<typeof createToolRegistry>> {
+  private async buildToolRegistry(session: CoworkSession): Promise<{
+    registry: ReturnType<typeof createToolRegistry>;
+    dockerAvailable: boolean;
+  }> {
     const toolRegistry = createToolRegistry();
     await toolRegistry.register(createFileToolServer());
-    await toolRegistry.register(createBashToolServer());
-    await toolRegistry.register(createCodeToolServer());
+    const workspacePath = process.cwd();
+    const assetManager = this.getRuntimeAssetManager();
+    const dockerAvailable = await this.registerExecutionTools({
+      registry: toolRegistry,
+      session,
+      workspacePath,
+      assetManager,
+    });
     await toolRegistry.register(createWebSearchToolServer(createWebSearchProvider(this.logger)));
-    return toolRegistry;
+    await this.registerBrowserTools(toolRegistry, assetManager);
+    return { registry: toolRegistry, dockerAvailable };
   }
 
   private async buildSystemPromptAddition(
@@ -419,6 +445,129 @@ export class CoworkTaskRuntime {
     return nextPackKey !== runtime.contextPackKey;
   }
 
+  private async registerExecutionTools(input: {
+    registry: ReturnType<typeof createToolRegistry>;
+    session: CoworkSession;
+    workspacePath: string;
+    assetManager: RuntimeAssetManager;
+  }): Promise<boolean> {
+    const { dockerAvailable, dockerImage, dockerStatus } = await this.resolveDockerRuntimeStatus(
+      input.assetManager
+    );
+
+    if (!dockerAvailable) {
+      this.logDockerFallback(dockerStatus, dockerImage);
+      await input.registry.register(createBashToolServer());
+      await input.registry.register(createCodeToolServer());
+      return false;
+    }
+
+    if (!dockerStatus.imagePresent) {
+      const sizeHint = dockerStatus.expectedDownloadMB
+        ? ` (~${dockerStatus.expectedDownloadMB}MB)`
+        : "";
+      this.logger.info(`Docker image ${dockerImage} missing; will pull on demand${sizeHint}.`);
+    }
+
+    const sandboxManager = new DockerSandboxManager({
+      workspacePath: input.workspacePath,
+      image: dockerImage,
+      assetManager: input.assetManager,
+    });
+    const dockerBash = createDockerBashExecutor(sandboxManager, {
+      sessionId: input.session.sessionId,
+      workspacePath: input.workspacePath,
+    });
+    await input.registry.register(createBashToolServer(dockerBash));
+    const codeExecutor = new ProcessCodeExecutor({ bashExecutor: dockerBash });
+    await input.registry.register(createCodeToolServer(codeExecutor));
+    await input.registry.register(createSandboxToolServer({ manager: sandboxManager }));
+    return true;
+  }
+
+  private async registerBrowserTools(
+    registry: ReturnType<typeof createToolRegistry>,
+    assetManager: RuntimeAssetManager
+  ): Promise<void> {
+    const recordingsDir = join(resolveStateDir(), "browser-recordings");
+    const playwrightInstallOnDemand = parseBooleanEnv(process.env.COWORK_PLAYWRIGHT_INSTALL, true);
+    const playwrightStatus = await assetManager.inspectPlaywrightBrowser();
+    this.logPlaywrightStatus(playwrightStatus, playwrightInstallOnDemand);
+    const browserManager = new BrowserManager({
+      recordingDir: recordingsDir,
+      assetManager,
+    });
+    await registry.register(createBrowserToolServer({ manager: browserManager }));
+  }
+
+  private async resolveDockerRuntimeStatus(assetManager: RuntimeAssetManager): Promise<{
+    dockerAvailable: boolean;
+    dockerImage: string;
+    dockerStatus: Awaited<ReturnType<RuntimeAssetManager["inspectDockerImage"]>>;
+  }> {
+    const dockerImage = process.env.COWORK_SANDBOX_IMAGE ?? DEFAULT_DOCKER_IMAGE;
+    const dockerPullOnDemand = parseBooleanEnv(process.env.COWORK_DOCKER_PULL, true);
+    const dockerStatus = await assetManager.inspectDockerImage(dockerImage);
+    const dockerAvailable =
+      dockerStatus.available && (dockerStatus.imagePresent || dockerPullOnDemand);
+    return { dockerAvailable, dockerImage, dockerStatus };
+  }
+
+  private logDockerFallback(
+    dockerStatus: Awaited<ReturnType<RuntimeAssetManager["inspectDockerImage"]>>,
+    dockerImage: string
+  ): void {
+    if (!dockerStatus.available) {
+      this.logger.warn(
+        `Docker sandbox unavailable (${dockerStatus.reason ?? "unknown"}); using process execution.`
+      );
+      return;
+    }
+
+    this.logger.warn(
+      `Docker image ${dockerImage} missing; set COWORK_DOCKER_PULL=true to enable on-demand pulls.`
+    );
+  }
+
+  private logPlaywrightStatus(
+    playwrightStatus: Awaited<ReturnType<RuntimeAssetManager["inspectPlaywrightBrowser"]>>,
+    installOnDemand: boolean
+  ): void {
+    if (playwrightStatus.available) {
+      return;
+    }
+    const sizeHint = playwrightStatus.expectedDownloadMB
+      ? ` (~${playwrightStatus.expectedDownloadMB}MB)`
+      : "";
+    if (installOnDemand) {
+      this.logger.info(`Playwright browsers missing; will install on demand${sizeHint}.`);
+      return;
+    }
+    this.logger.warn(
+      "Playwright browsers missing; set COWORK_PLAYWRIGHT_INSTALL=true to enable on-demand installs."
+    );
+  }
+
+  private getRuntimeAssetManager(): RuntimeAssetManager {
+    if (!this.runtimeAssetManager) {
+      const cacheDir = resolveRuntimeAssetDir();
+      this.runtimeAssetManager = new RuntimeAssetManager({
+        cacheDir,
+        logger: this.logger,
+        playwright: {
+          browsersPath: process.env.COWORK_PLAYWRIGHT_BROWSERS_PATH,
+          installOnDemand: parseBooleanEnv(process.env.COWORK_PLAYWRIGHT_INSTALL, true),
+          expectedDownloadMB: parseNumberEnv(process.env.COWORK_PLAYWRIGHT_DOWNLOAD_MB),
+        },
+        docker: {
+          pullOnDemand: parseBooleanEnv(process.env.COWORK_DOCKER_PULL, true),
+          expectedDownloadMB: parseNumberEnv(process.env.COWORK_DOCKER_DOWNLOAD_MB),
+        },
+      });
+    }
+    return this.runtimeAssetManager;
+  }
+
   // --- Proxy Methods to Services ---
 
   async getArtifact(sessionId: string, artifactId: string) {
@@ -450,4 +599,46 @@ export class CoworkTaskRuntime {
   async resolveApproval(approvalId: string, decision: "approved" | "rejected") {
     return this.approvalCoordinator.resolveApproval(approvalId, decision);
   }
+}
+
+function buildDockerSecurityPolicy() {
+  const policy = createSecurityPolicy("balanced");
+  return {
+    ...policy,
+    sandbox: {
+      ...policy.sandbox,
+      type: "docker" as const,
+      workingDirectory: "/workspace",
+    },
+  };
+}
+
+const DEFAULT_DOCKER_IMAGE = "node:20-alpine";
+
+function resolveRuntimeAssetDir(): string {
+  return process.env.COWORK_RUNTIME_ASSET_DIR
+    ? resolve(process.env.COWORK_RUNTIME_ASSET_DIR)
+    : join(resolveStateDir(), "runtime-assets");
+}
+
+function parseBooleanEnv(value: string | undefined, fallback: boolean): boolean {
+  if (value === undefined) {
+    return fallback;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) {
+    return true;
+  }
+  if (["0", "false", "no", "off"].includes(normalized)) {
+    return false;
+  }
+  return fallback;
+}
+
+function parseNumberEnv(value: string | undefined): number | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
