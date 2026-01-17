@@ -8,7 +8,7 @@
  * - Export functionality for admin
  */
 
-import { appendFile, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import type { AuditEvent, AuditQueryParams, AuditStore } from "./auditTypes";
 
@@ -121,11 +121,7 @@ export class RotatingFileAuditStore implements AuditStore {
   /**
    * Export audit events for a document within a time range.
    */
-  async export(params: {
-    docId?: string;
-    since?: number;
-    until?: number;
-  }): Promise<AuditEvent[]> {
+  async export(params: { docId?: string; since?: number; until?: number }): Promise<AuditEvent[]> {
     await this.ensureInitialized();
 
     const files = await this.listAuditFiles();

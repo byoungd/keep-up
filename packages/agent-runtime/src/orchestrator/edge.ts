@@ -12,61 +12,55 @@
  * ```
  */
 
+// AI Core Adapter (Edge-safe)
+export {
+  type AICoreAdapterOptions,
+  type AICoreProvider,
+  AICoreProviderAdapter,
+  createAICoreAdapter,
+  createMockLLM,
+  MockAgentLLM,
+} from "./aiCoreAdapter";
 // Consensus Orchestration (Edge-safe - uses fetch only)
 export {
-  ConsensusOrchestrator,
-  createConsensusOrchestrator,
   type ConsensusConfig,
-  type ConsensusResult,
   type ConsensusModelConfig,
+  ConsensusOrchestrator,
+  type ConsensusResult,
+  createConsensusOrchestrator,
   type ModelResponse,
   type VotingStrategy,
 } from "./consensusOrchestrator";
-
+export {
+  createDependencyAnalyzer,
+  type DependencyAnalysis,
+  DependencyAnalyzer,
+} from "./dependencyAnalyzer";
 // Performance Optimizations (Edge-safe - memory only)
 export {
-  MessageCompressor,
-  createMessageCompressor,
   type CompressionConfig,
   type CompressionResult,
   type CompressionStrategy,
+  createMessageCompressor,
+  MessageCompressor,
 } from "./messageCompression";
-
-export {
-  RequestCache,
-  createRequestCache,
-  type CacheConfig,
-  type RequestCacheStats,
-} from "./requestCache";
-
-export {
-  DependencyAnalyzer,
-  createDependencyAnalyzer,
-  type DependencyAnalysis,
-} from "./dependencyAnalyzer";
-
-export { SmartToolScheduler } from "./smartToolScheduler";
-
-// AI Core Adapter (Edge-safe)
-export {
-  AICoreProviderAdapter,
-  MockAgentLLM,
-  createAICoreAdapter,
-  createMockLLM,
-  type AICoreProvider,
-  type AICoreAdapterOptions,
-} from "./aiCoreAdapter";
-
 // Core Orchestrator types (Edge-safe - types only use memory)
 export type {
-  IAgentLLM,
+  AgentLLMChunk,
   AgentLLMRequest,
   AgentLLMResponse,
-  AgentLLMChunk,
   AgentToolDefinition,
+  CreateOrchestratorOptions,
+  IAgentLLM,
+  OrchestratorComponents,
   OrchestratorEvent,
   OrchestratorEventHandler,
   OrchestratorEventType,
-  OrchestratorComponents,
-  CreateOrchestratorOptions,
 } from "./orchestrator";
+export {
+  type CacheConfig,
+  createRequestCache,
+  RequestCache,
+  type RequestCacheStats,
+} from "./requestCache";
+export { SmartToolScheduler } from "./smartToolScheduler";

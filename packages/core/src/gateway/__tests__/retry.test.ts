@@ -4,11 +4,11 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  INITIAL_RETRY_STATE,
   createAggressiveRetryPolicy,
   createLenientRetryPolicy,
   createRetryState,
   createStrictRetryPolicy,
+  INITIAL_RETRY_STATE,
   isRetryable,
   relocateAllSpans,
   relocateSpan,

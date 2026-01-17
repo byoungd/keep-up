@@ -13,342 +13,325 @@
 // ============================================================================
 
 // Providers
+// Context management
+// Resilience (Circuit Breaker, Queue, Errors, Observability)
+// Performance (Cache, Batching, Lazy Loading)
+// Types (Branded Types, Validation)
 export {
+  // Errors
+  AIError,
+  type AIErrorCode,
+  AIValidationError,
+  type AnthropicConfig,
+  AnthropicProvider,
+  and,
+  array,
+  arrayLength,
+  // Base
+  BaseLLMProvider,
+  type BatchConfig,
+  BrandValidationError,
+  type BrandValidationResult,
+  // Types
+  type BuiltContext,
+  batch,
+  batchify,
+  boolean,
+  type CacheStats,
+  type ChunkId,
+  // Circuit Breaker
+  CircuitBreaker,
+  type CircuitBreakerConfig,
+  type CircuitBreakerMetrics,
+  CircuitBreakerOpenError,
+  type CircuitState,
   // Types
   type CompletionRequest,
   type CompletionResponse,
-  type EmbeddingRequest,
-  type EmbeddingResponse,
-  type LLMProvider,
-  type Message,
-  type MessageRole,
-  type ProviderConfig,
-  type ProviderHealth,
-  type ProviderMetrics,
-  type StreamChunk,
-  type StreamChunkType,
-  type TokenUsage,
-  type Tool,
-  type ToolCall,
-  // Base
-  BaseLLMProvider,
-  // Implementations
-  OpenAIProvider,
-  type OpenAIConfig,
-  AnthropicProvider,
-  type AnthropicConfig,
-  ResilientProvider,
-  createResilientProvider,
-  type ResilientProviderConfig,
-  // Router
-  ProviderRouter,
-  createProviderRouter,
-  type ProviderRouterConfig,
-  type ProviderOperation,
-  type ProviderCandidate,
-  type ProviderSelector,
-  type ProviderLogger,
-  // Token tracking
-  TokenTracker,
-  type ModelPricing,
-  type RateLimitConfig,
-  type UsageRecord,
-  type UsageSummary,
-} from "@ku0/ai-core";
-
-// Context management
-export {
-  // Types
-  type BuiltContext,
+  // Observability
+  ConsoleLogger,
   type ContextSegment,
   type ContextSegmentType,
   type ContextWindowConfig,
-  type DocumentContextOptions,
-  type HistoryEntry,
-  type ModelContextLimits,
-  type TokenBudget,
-  type DocumentContext,
-  type DocumentContextBuilderConfig,
-  type TokenEstimateOptions,
-  // Constants
-  DEFAULT_CONTEXT_LIMITS,
-  MODEL_CONTEXT_LIMITS,
-  SEGMENT_PRIORITY,
   // Classes
   ContextWindowManager,
-  DocumentContextBuilder,
+  cacheKey,
+  calculateRetryDelay,
+  chunkId,
+  createCircuitBreaker,
   // Factory functions
   createContextManager,
   createDocumentContextBuilder,
+  createObservability,
+  createParser,
+  createProviderRouter,
+  createRequestQueue,
+  createResiliencePipeline,
+  createResilientProvider,
+  // Constants
+  DEFAULT_CONTEXT_LIMITS,
+  type DocId,
+  type DocumentContext,
+  DocumentContextBuilder,
+  type DocumentContextBuilderConfig,
+  type DocumentContextOptions,
+  docId,
+  type EmbeddingRequest,
+  type EmbeddingResponse,
+  email,
+  estimateMessagesTokens,
   // Utilities
   estimateTokens,
-  estimateMessagesTokens,
-  truncateToTokens,
-  splitIntoChunks,
-} from "@ku0/ai-core";
-
-// Resilience (Circuit Breaker, Queue, Errors, Observability)
-export {
-  // Circuit Breaker
-  CircuitBreaker,
-  CircuitBreakerOpenError,
-  type CircuitBreakerConfig,
-  type CircuitBreakerMetrics,
-  type CircuitState,
-  createCircuitBreaker,
-  // Request Queue
-  RequestQueue,
-  QueueFullError,
-  RequestTimeoutError,
-  type RequestQueueConfig,
-  type RequestPriority,
-  type QueueStats,
-  createRequestQueue,
-  // Errors
-  AIError,
-  RateLimitError,
-  ProviderError,
-  AIValidationError,
-  type AIErrorCode,
-  type RecoverySuggestion,
-  type RetryStrategy,
-  isRetryableError,
-  calculateRetryDelay,
-  wrapError,
-  // Observability
-  ConsoleLogger,
-  InMemoryMetrics,
-  SimpleTracer,
-  ObservabilityContext,
-  createObservability,
+  type FieldError,
+  generateChunkId,
+  generateDocId,
+  // ID Generators
+  generateId,
+  generateRequestId,
+  generateTraceId,
   getObservability,
-  setObservability,
-  type LogLevel,
-  type MetricType,
+  type HistoryEntry,
+  InMemoryMetrics,
+  integer,
+  isRetryableError,
+  isValidPositiveInt,
+  isValidUnitInterval,
+  // Type Guards
+  isValidUserId,
+  // Lazy Loading
+  Lazy,
+  LazyFactory,
+  LazySync,
+  type LLMProvider,
   type LogEntry,
-  type MetricEntry,
-  type Span,
   type Logger,
-  type MetricsCollector as ObservabilityMetricsCollector,
-  type Tracer,
-  // Resilience Pipeline
-  ResiliencePipeline,
-  createResiliencePipeline,
-  type ResilienceContext,
-  type ResiliencePipelineConfig,
-} from "@ku0/ai-core";
-
-// Performance (Cache, Batching, Lazy Loading)
-export {
+  type LogLevel,
   // Cache
   LRUCache,
   type LRUCacheConfig,
-  type CacheStats,
-  cacheKey,
+  lazy,
+  lazyFactory,
+  lazySync,
+  type Message,
+  type MessageRole,
+  type MetricEntry,
+  type MetricsCollector as ObservabilityMetricsCollector,
+  type MetricType,
+  MODEL_CONTEXT_LIMITS,
+  type ModelContextLimits,
+  type ModelPricing,
   memoize,
   memoizeAsync,
-  // Batching
-  RequestBatcher,
-  type BatchConfig,
-  batchify,
-  batch,
-  parallelBatch,
-  // Lazy Loading
-  Lazy,
-  LazySync,
-  LazyFactory,
-  ResourcePool,
-  lazy,
-  lazySync,
-  lazyFactory,
-} from "@ku0/ai-core";
-
-// Types (Branded Types, Validation)
-export {
-  // Branded ID Types
-  type UserId,
-  type DocId,
-  type ChunkId,
-  type TraceId,
-  type SpanId,
-  type ProviderId,
-  type RequestId,
   // Branded Value Types
   type NonEmptyString,
-  type PositiveInt,
-  type UnitInterval,
-  type TokenCount,
-  type SimilarityScore,
-  type UTF16Offset,
-  type Timestamp,
-  // Constructors
-  userId,
-  docId,
-  chunkId,
-  traceId,
-  spanId,
-  providerId,
-  requestId,
   nonEmptyString,
-  positiveInt,
-  unitInterval,
-  tokenCount,
-  similarityScore,
-  utf16Offset,
-  timestamp,
-  // Safe Constructors
-  safeUserId,
-  safeDocId,
-  safeChunkId,
-  safePositiveInt,
-  safeUnitInterval,
-  safeSimilarityScore,
-  // Type Guards
-  isValidUserId,
-  isValidPositiveInt,
-  isValidUnitInterval,
-  // ID Generators
-  generateId,
-  generateDocId,
-  generateChunkId,
-  generateTraceId,
-  generateRequestId,
-  unwrap,
-  BrandValidationError,
-  type BrandValidationResult,
-  // Validation
-  SchemaValidationError,
-  type FieldError,
-  type ValidateResult,
-  type Validator,
-  string,
   nonEmptyStringValidator,
   number,
-  integer,
-  positive,
-  range,
-  boolean,
-  array,
-  arrayLength,
+  ObservabilityContext,
+  type OpenAIConfig,
+  // Implementations
+  OpenAIProvider,
   object,
-  optional,
-  withDefault,
-  and,
-  or,
   oneOf,
-  stringLength,
+  optional,
+  or,
+  type PositiveInt,
+  type ProviderCandidate,
+  type ProviderConfig,
+  ProviderError,
+  type ProviderHealth,
+  type ProviderId,
+  type ProviderLogger,
+  type ProviderMetrics,
+  type ProviderOperation,
+  // Router
+  ProviderRouter,
+  type ProviderRouterConfig,
+  type ProviderSelector,
+  parallelBatch,
   pattern,
-  url,
-  email,
-  validate,
-  createParser,
+  positive,
+  positiveInt,
+  providerId,
+  QueueFullError,
+  type QueueStats,
+  type RateLimitConfig,
+  RateLimitError,
+  type RecoverySuggestion,
+  // Batching
+  RequestBatcher,
+  type RequestId,
+  type RequestPriority,
+  // Request Queue
+  RequestQueue,
+  type RequestQueueConfig,
+  RequestTimeoutError,
+  type ResilienceContext,
+  // Resilience Pipeline
+  ResiliencePipeline,
+  type ResiliencePipelineConfig,
+  ResilientProvider,
+  type ResilientProviderConfig,
+  ResourcePool,
+  type RetryStrategy,
+  range,
+  requestId,
+  // Validation
+  SchemaValidationError,
+  SEGMENT_PRIORITY,
+  type SimilarityScore,
+  SimpleTracer,
+  type Span,
+  type SpanId,
+  type StreamChunk,
+  type StreamChunkType,
+  safeChunkId,
+  safeDocId,
+  safePositiveInt,
+  safeSimilarityScore,
+  safeUnitInterval,
+  // Safe Constructors
+  safeUserId,
+  setObservability,
+  similarityScore,
+  spanId,
+  splitIntoChunks,
+  string,
+  stringLength,
+  type Timestamp,
+  type TokenBudget,
+  type TokenCount,
+  type TokenEstimateOptions,
+  // Token tracking
+  TokenTracker,
+  type TokenUsage,
+  type Tool,
+  type ToolCall,
+  type TraceId,
+  type Tracer,
+  timestamp,
+  tokenCount,
+  traceId,
+  truncateToTokens,
   tryValidate,
+  type UnitInterval,
+  type UsageRecord,
+  type UsageSummary,
+  // Branded ID Types
+  type UserId,
+  type UTF16Offset,
+  unitInterval,
+  unwrap,
+  url,
+  // Constructors
+  userId,
+  utf16Offset,
+  type ValidateResult,
+  type Validator,
+  validate,
+  withDefault,
+  wrapError,
 } from "@ku0/ai-core";
 
 // ============================================================================
 // Business-Specific Modules (collab-server only)
 // ============================================================================
 
-// AI Gateway (main entry point)
-export {
-  AIGateway,
-  createAIGateway,
-  type AIGatewayConfig,
-  type AIRequestOptions,
-  type CopilotRequest,
-  type CopilotResponse,
-} from "./gateway";
-
-// Legacy suggestion generator (stub)
-export {
-  SuggestionGenerator,
-  type Suggestion,
-  type SuggestionRequest,
-  type SuggestionResponse,
-  type SuggestionType,
-  type SuggestionStatus,
-  type Citation,
-  type SuggestionGeneratorConfig,
-} from "./suggestionGenerator";
-
 // Audit types
 export {
-  type AISuggestionEventType,
-  type AISuggestionAuditMetadata,
   type AISuggestionAuditEvent,
-  createSuggestionGeneratedEvent,
+  type AISuggestionAuditMetadata,
+  type AISuggestionEventType,
   createSuggestionAppliedEvent,
+  createSuggestionGeneratedEvent,
   createSuggestionRejectedEvent,
   createSuggestionUndoneEvent,
 } from "./aiAuditTypes";
-
-// Safety pipeline
-export {
-  SafetyPipeline,
-  createSafetyPipeline,
-  quickValidate,
-  type SafetyPipelineConfig,
-  type ValidationResult as SafetyValidationResult,
-  type ValidationError as SafetyValidationError,
-  type ValidationWarning,
-  type ValidationMetadata,
-  type ValidationErrorCode,
-  type ValidationWarningCode,
-} from "./safety";
-
 // Document extraction & chunking
 export {
+  // Extractors
+  BaseExtractor,
+  type ChunkEmbedding,
   // Types
   type ChunkingOptions,
   type ChunkingStrategy,
+  cosineSimilarity,
+  createChunker,
   type DocumentChunk,
   type DocumentExtractor,
   type DocumentMetadata,
   type DocumentType,
+  // Embedding
+  EmbeddingService,
+  type EmbeddingServiceConfig,
   type ExtractedImage,
   type ExtractedLink,
   type ExtractedTable,
   type ExtractionOptions,
   type ExtractionResult,
-  type ChunkEmbedding,
-  type EmbeddingServiceConfig,
-  // Extractors
-  BaseExtractor,
+  extractDocument,
+  findTopK,
+  getExtractor,
   HTMLExtractor,
   MarkdownExtractor,
-  TextExtractor,
-  extractDocument,
-  getExtractor,
   registerExtractor,
   // Chunker
   SemanticChunker,
-  createChunker,
-  // Embedding
-  EmbeddingService,
-  cosineSimilarity,
-  findTopK,
+  TextExtractor,
 } from "./extraction";
-
+// AI Gateway (main entry point)
+export {
+  AIGateway,
+  type AIGatewayConfig,
+  type AIRequestOptions,
+  type CopilotRequest,
+  type CopilotResponse,
+  createAIGateway,
+} from "./gateway";
 // RAG (Retrieval-Augmented Generation)
 export {
   // Types
   type Citation as RAGCitation,
-  type IndexedDocument,
-  type RAGConfig,
-  type RAGQueryOptions,
-  type RAGQueryResult,
-  type SearchResult,
-  type VectorStore,
+  createHybridSearch,
+  createInMemoryStore,
+  createRAGPipeline,
+  HybridSearch,
   type HybridSearchConfig,
+  type IndexedDocument,
   // Vector Store
   InMemoryVectorStore,
-  createInMemoryStore,
-  // Pipeline
-  RAGPipeline,
-  createRAGPipeline,
   // Hybrid Search
   KeywordIndex,
-  HybridSearch,
-  createHybridSearch,
+  type RAGConfig,
+  // Pipeline
+  RAGPipeline,
+  type RAGQueryOptions,
+  type RAGQueryResult,
   reciprocalRankFusion,
+  type SearchResult,
+  type VectorStore,
 } from "./rag";
+// Safety pipeline
+export {
+  createSafetyPipeline,
+  quickValidate,
+  SafetyPipeline,
+  type SafetyPipelineConfig,
+  type ValidationError as SafetyValidationError,
+  type ValidationErrorCode,
+  type ValidationMetadata,
+  type ValidationResult as SafetyValidationResult,
+  type ValidationWarning,
+  type ValidationWarningCode,
+} from "./safety";
+// Legacy suggestion generator (stub)
+export {
+  type Citation,
+  type Suggestion,
+  SuggestionGenerator,
+  type SuggestionGeneratorConfig,
+  type SuggestionRequest,
+  type SuggestionResponse,
+  type SuggestionStatus,
+  type SuggestionType,
+} from "./suggestionGenerator";

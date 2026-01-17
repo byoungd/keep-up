@@ -1,8 +1,8 @@
 import type { ModelCapability } from "@ku0/ai-core";
 import {
-  MODEL_CATALOG,
   getDefaultModelId as getDefaultModelIdFromCatalog,
   getModelCapability as getModelCapabilityFromCatalog,
+  MODEL_CATALOG,
 } from "@ku0/ai-core";
 
 export type { ModelCapability } from "@ku0/ai-core";

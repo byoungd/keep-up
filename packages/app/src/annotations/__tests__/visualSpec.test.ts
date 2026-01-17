@@ -7,10 +7,6 @@ import {
   ANIMATION,
   ANNOTATION_HIGHLIGHT_COLORS,
   BORDER_STYLES,
-  KIND_COLORS,
-  STATUS_COLORS,
-  STATUS_ICONS,
-  STATUS_LABELS,
   generateAllCss,
   generateBadgeCss,
   generateCssVariables,
@@ -19,6 +15,10 @@ import {
   getBadgeStyle,
   getHighlightStyle,
   getKindColor,
+  KIND_COLORS,
+  STATUS_COLORS,
+  STATUS_ICONS,
+  STATUS_LABELS,
 } from "../visualSpec.js";
 
 describe("Visual Spec", () => {

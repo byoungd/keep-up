@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { RSS_QUALITY_THRESHOLDS, type RssIngestStats, evaluateRssQuality } from "../rssStats";
+import { evaluateRssQuality, RSS_QUALITY_THRESHOLDS, type RssIngestStats } from "../rssStats";
 
 const passingStats: RssIngestStats = {
   totalItems: 5,

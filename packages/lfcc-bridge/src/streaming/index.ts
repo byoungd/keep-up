@@ -3,12 +3,12 @@
  */
 
 export {
-  StreamingMarkdownParser,
-  createStreamingParser,
-  astToHtml,
   type ASTNode,
+  astToHtml,
+  type BlockParser,
+  createStreamingParser,
+  type InlineParser,
   type ParseResult,
   type ParserOptions,
-  type BlockParser,
-  type InlineParser,
+  StreamingMarkdownParser,
 } from "./streamingMarkdownParser";

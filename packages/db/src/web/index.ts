@@ -12,7 +12,7 @@
  * - Graceful degradation when IndexedDB is unavailable
  */
 
-import { type IndexedDbDriver, createIndexedDbDriver } from "../driver/idb-dexie";
+import { createIndexedDbDriver, type IndexedDbDriver } from "../driver/idb-dexie";
 import type {
   AnnotationRow,
   CrdtUpdateRow,

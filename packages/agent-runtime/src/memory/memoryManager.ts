@@ -6,7 +6,7 @@
  */
 
 import { countTokens } from "../utils/tokenCounter";
-import { InMemoryStore, createInMemoryStore } from "./memoryStore";
+import { createInMemoryStore, InMemoryStore } from "./memoryStore";
 import type {
   ConsolidationResult,
   IEmbeddingProvider,

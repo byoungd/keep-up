@@ -63,7 +63,7 @@ export class DoubleBlindHarness {
   }> {
     const stepResults: StepResult[] = [];
     let completedSteps = 0;
-    let mismatch: StepResult["mismatch"] = undefined;
+    let mismatch: StepResult["mismatch"];
 
     for (let i = 0; i < ops.length; i++) {
       const op = ops[i];

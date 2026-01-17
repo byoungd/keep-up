@@ -5,37 +5,36 @@
  */
 
 export {
-  ContextManager,
-  createContextManager,
-  type AgentContext,
-  type ContextFact,
-  type CachedResult,
-  type ContextManagerOptions,
-  type CreateContextOptions,
-} from "./contextManager";
-
-export {
-  TieredContextBuilder,
-  type ContextItem,
-  type ContextTier,
-  type ContextSourceType,
-  type ContextBudget,
-  type ContextBuildResult,
-  type TieredContextConfig,
-} from "./contextBuilder";
-
-export {
-  ContextFrameBuilder,
-  type ContextFrameOutput,
-  type ContextFrameBuilderConfig,
-} from "./contextFrame";
-
-export {
+  type CompactionOptions,
+  type CompactionResult,
   ContextCompactor,
   createContextCompactor,
   type Message,
   type ToolCall,
   type ToolResult,
-  type CompactionOptions,
-  type CompactionResult,
 } from "./ContextCompactor";
+
+export {
+  type ContextBudget,
+  type ContextBuildResult,
+  type ContextItem,
+  type ContextSourceType,
+  type ContextTier,
+  TieredContextBuilder,
+  type TieredContextConfig,
+} from "./contextBuilder";
+
+export {
+  ContextFrameBuilder,
+  type ContextFrameBuilderConfig,
+  type ContextFrameOutput,
+} from "./contextFrame";
+export {
+  type AgentContext,
+  type CachedResult,
+  type ContextFact,
+  ContextManager,
+  type ContextManagerOptions,
+  type CreateContextOptions,
+  createContextManager,
+} from "./contextManager";

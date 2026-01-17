@@ -12,10 +12,17 @@ import {
   type CircuitBreakerConfig,
   type CompletionRequest,
   type CompletionResponse,
+  createObservability,
+  createResiliencePipeline,
+  createResilientProvider,
   type EmbeddingRequest,
   type EmbeddingResponse,
+  // Catalog imports for centralized configuration
+  getDefaultModelId,
+  isRetryableError,
   type LLMProvider,
   type Message,
+  normalizeMessages,
   type ObservabilityContext,
   type OpenAIConfig,
   OpenAIProvider,
@@ -25,17 +32,10 @@ import {
   type ProviderSelector,
   type RequestQueueConfig,
   type RetryPolicyConfig,
+  resolveProviderFromEnv,
   type StreamChunk,
   TokenTracker,
   type UsageSummary,
-  createObservability,
-  createResiliencePipeline,
-  createResilientProvider,
-  // Catalog imports for centralized configuration
-  getDefaultModelId,
-  isRetryableError,
-  normalizeMessages,
-  resolveProviderFromEnv,
 } from "@ku0/ai-core";
 import { type GatewayTelemetryEvent, generateRequestId } from "@ku0/core";
 import type { AuditLogger } from "../audit/auditLogger";

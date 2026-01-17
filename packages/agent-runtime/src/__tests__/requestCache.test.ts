@@ -6,7 +6,7 @@
 
 import { beforeEach, describe, expect, it } from "vitest";
 import type { AgentLLMRequest, AgentLLMResponse } from "../orchestrator/orchestrator";
-import { type RequestCache, createRequestCache } from "../orchestrator/requestCache";
+import { createRequestCache, type RequestCache } from "../orchestrator/requestCache";
 import type { AgentMessage } from "../types";
 
 // ============================================================================

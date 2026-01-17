@@ -3,8 +3,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { createOrchestrator } from "../orchestrator/orchestrator";
 import type { AgentLLMRequest, AgentLLMResponse, IAgentLLM } from "../orchestrator/orchestrator";
+import { createOrchestrator } from "../orchestrator/orchestrator";
 import { createSecurityPolicy } from "../security";
 import { createTaskGraphStore } from "../tasks/taskGraph";
 import { createToolRegistry } from "../tools/mcp/registry";

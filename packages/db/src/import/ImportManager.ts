@@ -12,8 +12,8 @@ import type {
   CreateImportJobInput,
   ImportManagerConfig,
   ImportManagerEvents,
-  IngestResult,
   IngestorFn,
+  IngestResult,
 } from "./types";
 
 const logger = observability.getLogger();

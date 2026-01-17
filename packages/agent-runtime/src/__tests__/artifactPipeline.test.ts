@@ -3,11 +3,10 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { createArtifactPipeline, createArtifactRegistry } from "../artifacts";
 import type { ArtifactEnvelope } from "../artifacts";
-import type { RuntimeEvent } from "../events";
+import { createArtifactPipeline, createArtifactRegistry } from "../artifacts";
+import type { ArtifactEvents, RuntimeEvent } from "../events";
 import { createEventBus } from "../events";
-import type { ArtifactEvents } from "../events";
 import { createTaskGraphStore } from "../tasks/taskGraph";
 
 function createPlanArtifact(overrides: Partial<ArtifactEnvelope> = {}): ArtifactEnvelope {

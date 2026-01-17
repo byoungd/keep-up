@@ -13,9 +13,9 @@
 import {
   type CircuitBreakerPolicy,
   CircuitState as CockatielState,
-  SamplingBreaker,
   circuitBreaker,
   handleAll,
+  SamplingBreaker,
 } from "cockatiel";
 
 /** Circuit breaker state */

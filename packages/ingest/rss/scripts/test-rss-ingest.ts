@@ -22,9 +22,9 @@ import { type IngestionMeta, RSSAtomicAdapter } from "../src/atomicAdapter";
 import { RSSIngestor } from "../src/index";
 import { RSSParser } from "../src/parser";
 import {
+  computeRssStatsFromMeta,
   RSS_QUALITY_THRESHOLDS,
   type RssIngestStats,
-  computeRssStatsFromMeta,
 } from "../src/rssStats";
 
 // ============================================================================

@@ -23,40 +23,35 @@
  * ```
  */
 
-// Types
-export type {
-  YouTubeSource,
-  YouTubeVideoMetadata,
-  TranscriptSegment,
-  TranscriptParagraph,
-  YouTubeTranscriptResult,
-  YouTubeIngestOptions,
-} from "./types";
-
-// URL utilities
-export {
-  extractVideoId,
-  isValidVideoId,
-  buildWatchUrl,
-  buildTimestampedUrl,
-} from "./urlParser";
-
+// Atomic ingestion
+export { type IngestionMeta, YouTubeAtomicAdapter } from "./atomicAdapter";
 // Fetchers
 export { fetchVideoMetadata } from "./metadataFetcher";
-export { fetchTranscript } from "./transcriptFetcher";
-
 // Processing
 export {
-  groupIntoParagraphs,
-  formatTimestamp,
   countWords,
+  formatTimestamp,
+  groupIntoParagraphs,
 } from "./paragraphGrouper";
-
-// Atomic ingestion
-export { YouTubeAtomicAdapter, type IngestionMeta } from "./atomicAdapter";
-
 // Plugin
-export { createYouTubePlugin, type ContentSourcePlugin } from "./plugin";
+export { type ContentSourcePlugin, createYouTubePlugin } from "./plugin";
+export { fetchTranscript } from "./transcriptFetcher";
+// Types
+export type {
+  TranscriptParagraph,
+  TranscriptSegment,
+  YouTubeIngestOptions,
+  YouTubeSource,
+  YouTubeTranscriptResult,
+  YouTubeVideoMetadata,
+} from "./types";
+// URL utilities
+export {
+  buildTimestampedUrl,
+  buildWatchUrl,
+  extractVideoId,
+  isValidVideoId,
+} from "./urlParser";
 
 // High-level API
 export { YouTubeIngestor } from "./YouTubeIngestor";

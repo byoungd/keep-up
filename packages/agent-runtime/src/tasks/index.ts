@@ -4,6 +4,37 @@
  * Async task execution with progress tracking and cancellation.
  */
 
+// Priority Heap (Optimized)
+export {
+  createPriorityHeap,
+  PriorityHeap,
+} from "./priorityHeap";
+// Task Graph
+export type {
+  EvictionHandler,
+  TaskGraphConfig,
+  TaskGraphEdge,
+  TaskGraphEvent,
+  TaskGraphEventContext,
+  TaskGraphEventMeta,
+  TaskGraphEventType,
+  TaskGraphNode,
+  TaskGraphNodeInput,
+  TaskGraphNodeUpdate,
+  TaskGraphSnapshot,
+  TaskGraphStats,
+  TaskNodeStatus,
+  TaskNodeType,
+} from "./taskGraph";
+export {
+  createTaskGraphStore,
+  createTaskGraphStoreFromSnapshot,
+  InvalidStatusTransitionError,
+  NodeNotFoundError,
+  TaskGraphStore,
+} from "./taskGraph";
+// Task Queue
+export { createTaskQueue, TaskQueue } from "./taskQueue";
 // Types
 export type {
   CancelReason,
@@ -25,39 +56,4 @@ export type {
   TaskStatus,
   TaskType,
 } from "./types";
-
 export { DEFAULT_TASK_QUEUE_CONFIG } from "./types";
-
-// Task Graph
-export type {
-  TaskGraphConfig,
-  TaskGraphEdge,
-  TaskGraphEvent,
-  TaskGraphEventContext,
-  TaskGraphEventMeta,
-  TaskGraphEventType,
-  TaskGraphNode,
-  TaskGraphNodeInput,
-  TaskGraphNodeUpdate,
-  TaskGraphSnapshot,
-  TaskGraphStats,
-  TaskNodeStatus,
-  TaskNodeType,
-  EvictionHandler,
-} from "./taskGraph";
-export {
-  TaskGraphStore,
-  NodeNotFoundError,
-  InvalidStatusTransitionError,
-  createTaskGraphStore,
-  createTaskGraphStoreFromSnapshot,
-} from "./taskGraph";
-
-// Task Queue
-export { TaskQueue, createTaskQueue } from "./taskQueue";
-
-// Priority Heap (Optimized)
-export {
-  PriorityHeap,
-  createPriorityHeap,
-} from "./priorityHeap";

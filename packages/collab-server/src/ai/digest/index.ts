@@ -5,25 +5,23 @@
  * Part of Track 2: Intelligence & Logic (AI)
  */
 
-// Types
-export * from "./types";
-
-// Services
-export { DigestService } from "./digestService";
 export type {
-  DigestServiceConfig,
   ContentStore,
+  DigestServiceConfig,
   DigestStore,
 } from "./digestService";
 
-// LLM Synthesizer
-export { LLMSynthesizer, createLLMSynthesizer } from "./llmSynthesizer";
+// Services
+export { DigestService } from "./digestService";
 export type { LLMSynthesizerConfig } from "./llmSynthesizer";
 
-// Agents
-export { VerificationAgent } from "./verificationAgent";
-export type { VerificationAgentConfig } from "./verificationAgent";
-
+// LLM Synthesizer
+export { createLLMSynthesizer, LLMSynthesizer } from "./llmSynthesizer";
+export type { DigestDbDriver } from "./storageAdapters";
 // Storage Adapters
 export { ContentStoreAdapter, DigestStoreAdapter } from "./storageAdapters";
-export type { DigestDbDriver } from "./storageAdapters";
+// Types
+export * from "./types";
+export type { VerificationAgentConfig } from "./verificationAgent";
+// Agents
+export { VerificationAgent } from "./verificationAgent";

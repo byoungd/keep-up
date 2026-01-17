@@ -1,6 +1,5 @@
-import { motion } from "framer-motion";
-
 import { cn } from "@ku0/shared/utils";
+import { motion } from "framer-motion";
 import { AlertCircle, Check, Globe, Lock, MonitorPlay, X } from "lucide-react";
 
 interface AskMessageProps {
@@ -48,7 +47,10 @@ function MetadataView({ metadata }: { metadata: Record<string, unknown> }) {
 function ActionButtons({
   suggestedAction,
   onAction,
-}: { suggestedAction: string; onAction?: (action: string, data?: unknown) => void }) {
+}: {
+  suggestedAction: string;
+  onAction?: (action: string, data?: unknown) => void;
+}) {
   if (suggestedAction === "confirm_browser_operation") {
     return (
       <div className="flex gap-3 pt-1">

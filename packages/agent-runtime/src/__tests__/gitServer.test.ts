@@ -11,10 +11,10 @@
 
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  createGitToolServer,
   GitToolServer,
   type IGitExecutor,
   MockGitExecutor,
-  createGitToolServer,
 } from "../tools/git/gitServer";
 import type {
   CommitOptions,

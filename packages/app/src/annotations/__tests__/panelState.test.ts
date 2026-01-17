@@ -4,13 +4,13 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  INITIAL_PANEL_STATE,
   calculateStats,
   clearError,
   closePanel,
   filterAnnotations,
   filterAnnotationsByStatuses,
   groupByThread,
+  INITIAL_PANEL_STATE,
   openPanel,
   processAnnotations,
   selectAnnotation,

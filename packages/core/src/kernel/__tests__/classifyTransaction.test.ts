@@ -5,9 +5,9 @@
 
 import { beforeEach, describe, expect, it } from "vitest";
 import {
-  type TransactionInput,
   classifyTransaction,
   resetTxnCounter,
+  type TransactionInput,
 } from "../shadow/classifyTransaction.js";
 
 describe("Transaction Classification (D4)", () => {

@@ -3,7 +3,7 @@
  */
 
 import { beforeEach, describe, expect, it } from "vitest";
-import { type IntentBridge, createIntentBridge } from "../../bridge/intentBridge";
+import { createIntentBridge, type IntentBridge } from "../../bridge/intentBridge";
 
 describe("intentBridge", () => {
   let bridge: IntentBridge;

@@ -27,24 +27,23 @@
  * ```
  */
 
-// Types
-export type {
-  TTSProviderId,
-  TTSVoice,
-  WordTimingData,
-  TTSSynthesizeOptions,
-  TTSSynthesizeResult,
-  TTSEngineConfig,
-  TTSPlaybackState,
-  TTSCallbacks,
-} from "./types";
+// Engine
+export { TTSEngine } from "./engine";
 
 // Provider Interface and Implementations
 export type { ITTSProvider, TTSProviderOptions } from "./providers";
-export { EdgeTTSProvider, BrowserTTSProvider } from "./providers";
-
-// Engine
-export { TTSEngine } from "./engine";
+export { BrowserTTSProvider, EdgeTTSProvider } from "./providers";
+// Types
+export type {
+  TTSCallbacks,
+  TTSEngineConfig,
+  TTSPlaybackState,
+  TTSProviderId,
+  TTSSynthesizeOptions,
+  TTSSynthesizeResult,
+  TTSVoice,
+  WordTimingData,
+} from "./types";
 
 // Factory function for convenience
 import { TTSEngine } from "./engine";

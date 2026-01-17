@@ -17,6 +17,7 @@ import type { HistoryEntry, HistoryState } from "../shadow/history.js";
 import type { ShadowBlock, ShadowDocument } from "../shadow/types.js";
 import {
   type BlockId,
+  blockId,
   Err,
   LIMITS,
   None,
@@ -25,10 +26,9 @@ import {
   type Result,
   type SnapshotId,
   Some,
+  snapshotId,
   TIMING,
   type TraceId,
-  blockId,
-  snapshotId,
   traceId,
   withTiming,
 } from "./primitives.js";

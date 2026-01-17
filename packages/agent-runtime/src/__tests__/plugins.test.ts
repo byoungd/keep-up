@@ -3,8 +3,8 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { BasePlugin, createPluginLoader, createPluginRegistry, satisfiesVersion } from "../plugins";
 import type { BeforeToolCallHookData, PluginManifest } from "../plugins";
+import { BasePlugin, createPluginLoader, createPluginRegistry, satisfiesVersion } from "../plugins";
 
 // ============================================================================
 // Test Plugin Implementations

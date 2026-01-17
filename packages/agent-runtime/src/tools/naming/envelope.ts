@@ -5,14 +5,6 @@
  * Ensures causal consistency, precondition checking, and fail-closed behavior.
  */
 
-import {
-  DEFAULT_AI_ENVELOPE_RETRY_POLICY,
-  createAIRequestEnvelope,
-  is409Conflict,
-  isSuccessResponse,
-  isUnprocessableResponse,
-  normalizeAIRequestEnvelope,
-} from "@ku0/core";
 import type {
   AIEnvelopeConflict,
   AIEnvelopeDiagnostic,
@@ -25,6 +17,14 @@ import type {
   AIRequestEnvelope,
   EditIntent,
   SpanPrecondition,
+} from "@ku0/core";
+import {
+  createAIRequestEnvelope,
+  DEFAULT_AI_ENVELOPE_RETRY_POLICY,
+  is409Conflict,
+  isSuccessResponse,
+  isUnprocessableResponse,
+  normalizeAIRequestEnvelope,
 } from "@ku0/core";
 
 export type AIEnvelopeMeta = AIOperationMeta;

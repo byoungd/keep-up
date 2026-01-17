@@ -1,6 +1,6 @@
 import type { Node as PMNode, Schema } from "prosemirror-model";
-import { EditorState, type Plugin } from "prosemirror-state";
 import type { Transaction } from "prosemirror-state"; // Added import for Transaction
+import { EditorState, type Plugin } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 
 import { pmSchema } from "../pm/pmSchema";

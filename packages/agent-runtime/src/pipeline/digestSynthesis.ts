@@ -3,8 +3,8 @@ import type { IAgentManager } from "../agents/types";
 import { VerifierAgent } from "../agents/verifier";
 import type { MCPToolResult } from "../types";
 import { parseJsonFromText } from "../utils/llmJson";
-import { PipelineExecutor, createPipeline } from "./pipelineBuilder";
 import type { Pipeline, PipelineContext } from "./pipelineBuilder";
+import { createPipeline, PipelineExecutor } from "./pipelineBuilder";
 
 export interface DigestSourceItem {
   id: string;

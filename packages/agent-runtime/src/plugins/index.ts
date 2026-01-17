@@ -43,79 +43,75 @@
  * ```
  */
 
-// Types
-export type {
-  // Manifest types
-  PluginManifest,
-  PluginType,
-  PluginCapability,
-  PluginDependency,
-  PluginContributes,
-  ToolContribution,
-  AgentContribution,
-  CommandContribution,
-  ConfigurationContribution,
-  ActivationEvent,
-  // Plugin interface
-  IPlugin,
-  PluginContext,
-  PluginLogger,
-  Disposable,
-  Progress,
-  // Handlers (prefixed with Plugin to avoid conflicts with tools module)
-  ToolHandler as PluginToolHandler,
-  ToolExecutionContext as PluginToolExecutionContext,
-  ToolResult as PluginToolResult,
-  AgentFactory as PluginAgentFactory,
-  AgentFactoryConfig,
-  IPluginAgent,
-  AgentRunResult as PluginAgentRunResult,
-  CommandHandler,
-  // Hooks
-  HookType,
-  HookHandler,
-  BeforeToolCallHookData,
-  AfterToolCallHookData,
-  BeforeAgentRunHookData,
-  AfterAgentRunHookData,
-  BeforeLLMCallHookData,
-  AfterLLMCallHookData,
-  // State
-  PluginState,
-  PluginInfo,
-} from "./types";
-
 // Base plugin
-export { BasePlugin, Tool, Command, Hook } from "./basePlugin";
-
-// Loader
-export { PluginLoader, createPluginLoader } from "./loader";
-export type { PluginLoaderConfig } from "./loader";
-
-// Registry
-export {
-  InMemoryPluginRegistry,
-  FileSystemPluginResolver,
-  NPMPluginResolver,
-  createPluginRegistry,
-  satisfiesVersion,
-} from "./registry";
-export type {
-  PluginSearchQuery,
-  PluginSearchResult,
-  PluginRegistryEntry,
-  IPluginRegistry,
-  IPluginResolver,
-} from "./registry";
-
-// Dependency Resolver
-export {
-  PluginDependencyResolver,
-  createDependencyResolver,
-} from "./dependencyResolver";
+export { BasePlugin, Command, Hook, Tool } from "./basePlugin";
 export type {
   DependencyGraph,
-  ResolutionResult,
   MissingDependency,
+  ResolutionResult,
   VersionConflict,
 } from "./dependencyResolver";
+// Dependency Resolver
+export {
+  createDependencyResolver,
+  PluginDependencyResolver,
+} from "./dependencyResolver";
+export type { PluginLoaderConfig } from "./loader";
+// Loader
+export { createPluginLoader, PluginLoader } from "./loader";
+export type {
+  IPluginRegistry,
+  IPluginResolver,
+  PluginRegistryEntry,
+  PluginSearchQuery,
+  PluginSearchResult,
+} from "./registry";
+// Registry
+export {
+  createPluginRegistry,
+  FileSystemPluginResolver,
+  InMemoryPluginRegistry,
+  NPMPluginResolver,
+  satisfiesVersion,
+} from "./registry";
+// Types
+export type {
+  ActivationEvent,
+  AfterAgentRunHookData,
+  AfterLLMCallHookData,
+  AfterToolCallHookData,
+  AgentContribution,
+  AgentFactory as PluginAgentFactory,
+  AgentFactoryConfig,
+  AgentRunResult as PluginAgentRunResult,
+  BeforeAgentRunHookData,
+  BeforeLLMCallHookData,
+  BeforeToolCallHookData,
+  CommandContribution,
+  CommandHandler,
+  ConfigurationContribution,
+  Disposable,
+  HookHandler,
+  // Hooks
+  HookType,
+  // Plugin interface
+  IPlugin,
+  IPluginAgent,
+  PluginCapability,
+  PluginContext,
+  PluginContributes,
+  PluginDependency,
+  PluginInfo,
+  PluginLogger,
+  // Manifest types
+  PluginManifest,
+  // State
+  PluginState,
+  PluginType,
+  Progress,
+  ToolContribution,
+  ToolExecutionContext as PluginToolExecutionContext,
+  // Handlers (prefixed with Plugin to avoid conflicts with tools module)
+  ToolHandler as PluginToolHandler,
+  ToolResult as PluginToolResult,
+} from "./types";

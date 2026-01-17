@@ -25,7 +25,11 @@
       "default": "./dist/security/index.js"
     }
   },
-  "files": ["dist", "README.md", "!dist/**/__tests__/**"],
+  "files": [
+    "dist",
+    "README.md",
+    "!dist/**/__tests__/**"
+  ],
   "sideEffects": false,
   "scripts": {
     "build": "tsc",

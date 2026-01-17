@@ -4,7 +4,7 @@
  * Priority-based task queue with concurrency control.
  */
 
-import { type PriorityHeap, createPriorityHeap } from "./priorityHeap";
+import { createPriorityHeap, type PriorityHeap } from "./priorityHeap";
 import type {
   CancelReason,
   CompleteHandler,

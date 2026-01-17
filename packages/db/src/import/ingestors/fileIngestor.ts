@@ -13,7 +13,7 @@ import {
   getPendingFileCount as idbGetCount,
   storePendingFile,
 } from "../PendingFileStore";
-import type { IngestResult, IngestorFn } from "../types";
+import type { IngestorFn, IngestResult } from "../types";
 
 /** Generate a simple hash from content for deduplication */
 function hashContent(content: string): string {

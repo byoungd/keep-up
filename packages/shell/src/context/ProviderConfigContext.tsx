@@ -1,12 +1,12 @@
 "use client";
 
-import { type ProviderKind, getProviderDisplayInfo, getProviderEnvConfig } from "@ku0/ai-core";
+import { getProviderDisplayInfo, getProviderEnvConfig, type ProviderKind } from "@ku0/ai-core";
 import * as React from "react";
 import type { ModelCapability } from "../lib/ai/models";
 import {
-  MODEL_CAPABILITIES,
   getDefaultModel,
   getModelCapability,
+  MODEL_CAPABILITIES,
   normalizeModelId,
 } from "../lib/ai/models";
 import { decryptApiKey, encryptApiKey, isEncrypted } from "../lib/crypto/keyEncryption";

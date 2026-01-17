@@ -9,8 +9,18 @@
  * - Client retry playbook
  */
 
-// Types
-export * from "./types.js";
+// Conflict Safety
+export {
+  type ConflictCheckResult,
+  type ConflictMiddleware,
+  checkAllPreconditions,
+  checkConflicts,
+  checkFrontier,
+  checkSpanPrecondition,
+  createConflictMiddleware,
+  createMockDocumentProvider,
+  type MockProviderConfig,
+} from "./conflict.js";
 
 // Envelope
 export {
@@ -23,57 +33,9 @@ export {
   isGatewayError,
   isGatewaySuccess,
   parseGatewayRequest,
-  validateGatewayRequest,
   type ValidationError,
+  validateGatewayRequest,
 } from "./envelope.js";
-
-// Conflict Safety
-export {
-  checkAllPreconditions,
-  checkConflicts,
-  checkFrontier,
-  checkSpanPrecondition,
-  createConflictMiddleware,
-  createMockDocumentProvider,
-  type ConflictCheckResult,
-  type ConflictMiddleware,
-  type MockProviderConfig,
-} from "./conflict.js";
-
-// Dry-Run Pipeline
-export {
-  DEFAULT_PIPELINE_CONFIG,
-  PipelineBuilder,
-  SIZE_LIMITS,
-  createPipelineBuilder,
-  detectMaliciousPayload,
-  executePipeline,
-  validatePayloadSize,
-  type PipelineConfig,
-  type PipelineResult,
-  type PipelineStage,
-} from "./pipeline.js";
-
-// Retry Playbook
-export {
-  INITIAL_RETRY_STATE,
-  createAggressiveRetryPolicy,
-  createLenientRetryPolicy,
-  createRetryState,
-  createStrictRetryPolicy,
-  executeRetryLoop,
-  isRetryable,
-  performRebase,
-  relocateAllSpans,
-  relocateSpan,
-  updateRequestAfterRebase,
-  updateRetryState,
-  type RebaseProvider,
-  type RebaseResult,
-  type RelocationProvider,
-  type RetryLoopResult,
-} from "./retry.js";
-
 // Gateway Controller
 export {
   AIGateway,
@@ -82,3 +44,39 @@ export {
   createDefaultGatewayConfig,
   type GatewayConfig,
 } from "./gateway.js";
+
+// Dry-Run Pipeline
+export {
+  createPipelineBuilder,
+  DEFAULT_PIPELINE_CONFIG,
+  detectMaliciousPayload,
+  executePipeline,
+  PipelineBuilder,
+  type PipelineConfig,
+  type PipelineResult,
+  type PipelineStage,
+  SIZE_LIMITS,
+  validatePayloadSize,
+} from "./pipeline.js";
+
+// Retry Playbook
+export {
+  createAggressiveRetryPolicy,
+  createLenientRetryPolicy,
+  createRetryState,
+  createStrictRetryPolicy,
+  executeRetryLoop,
+  INITIAL_RETRY_STATE,
+  isRetryable,
+  performRebase,
+  type RebaseProvider,
+  type RebaseResult,
+  type RelocationProvider,
+  type RetryLoopResult,
+  relocateAllSpans,
+  relocateSpan,
+  updateRequestAfterRebase,
+  updateRetryState,
+} from "./retry.js";
+// Types
+export * from "./types.js";

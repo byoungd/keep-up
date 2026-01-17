@@ -5,10 +5,10 @@
 import type { AIProvenance, EditIntent } from "@ku0/core";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
-  type StreamBridge,
   createAITokenEvent,
   createStreamBridge,
   isDocumentEditEvent,
+  type StreamBridge,
 } from "../../bridge/streamBridge";
 
 describe("streamBridge", () => {

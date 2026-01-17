@@ -2,13 +2,13 @@ import type { Node as PMNode } from "prosemirror-model";
 import type { Transaction } from "prosemirror-state";
 
 import {
-  type MarkType,
-  type RichText,
-  type TextSpan,
   assertValidBlockTree,
   computeTextDelta,
+  type MarkType,
+  type RichText,
   syncBlockChildrenOrder,
   syncRootBlockOrder,
+  type TextSpan,
   updateBlockText,
   writeBlockTree,
   writeBlockTreePartial,

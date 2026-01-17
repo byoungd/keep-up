@@ -13,8 +13,8 @@ import {
   type ConsensusConfig,
   type ConsensusModelConfig,
   ConsensusOrchestrator,
-  type ModelResponse,
   createConsensusOrchestrator,
+  type ModelResponse,
 } from "../orchestrator/consensusOrchestrator";
 
 // ============================================================================

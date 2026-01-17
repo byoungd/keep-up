@@ -5,8 +5,8 @@
  */
 
 export {
-  RolloutPolicyEngine,
   type RolloutPolicyConfig,
+  RolloutPolicyEngine,
   type RolloutPolicyInput,
   type RolloutPolicyResult,
 } from "./rolloutPolicy";

@@ -6,8 +6,8 @@
  */
 
 import {
-  type PolicyManifestV09,
   computePolicyManifestHash,
+  type PolicyManifestV09,
   validateManifest,
 } from "../kernel/policy/index.js";
 import { getLogger } from "../observability/logger.js";
@@ -28,7 +28,9 @@ import { buildErrorPayload } from "./errors.js";
 import { createDefaultSyncManifest, negotiateManifests } from "./negotiate.js";
 import {
   type CatchUpRequestMessage,
+  createMessage,
   type DocUpdateMessage,
+  deserializeMessage,
   type ErrorCode,
   type HandshakeMessage,
   type HandshakePayload,
@@ -36,10 +38,8 @@ import {
   type PresencePayload,
   type ServerCapabilities,
   type SyncMessage,
-  type UserMeta,
-  createMessage,
-  deserializeMessage,
   serializeMessage,
+  type UserMeta,
 } from "./protocol.js";
 import { type ServerInboundMessage, validateServerInboundMessage } from "./validation.js";
 

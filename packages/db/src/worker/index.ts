@@ -2279,6 +2279,7 @@ const driver: DbDriver = {
   },
 };
 
+export { handleWorkerRequest } from "./rpcHandler";
 export type {
   WorkerEvent,
   WorkerIncomingMessage,
@@ -2286,7 +2287,6 @@ export type {
   WorkerRequest,
   WorkerResponse,
 } from "./rpcTypes";
-export { handleWorkerRequest } from "./rpcHandler";
 
 const workerScope: typeof self | undefined = typeof self !== "undefined" ? self : undefined;
 

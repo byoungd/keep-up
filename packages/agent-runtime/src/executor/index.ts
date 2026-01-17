@@ -5,19 +5,19 @@
  */
 
 import {
+  createExecutionSandboxAdapter,
   type ExecutionSandboxAdapter,
   type ExecutionSandboxDecision,
   type ToolExecutionTelemetry,
-  createExecutionSandboxAdapter,
 } from "../sandbox";
 import {
+  createToolPolicyEngine,
   type IPermissionChecker,
   type ToolPolicyDecision,
   type ToolPolicyEngine,
-  createToolPolicyEngine,
 } from "../security";
-import { AGENT_METRICS } from "../telemetry";
 import type { TelemetryContext } from "../telemetry";
+import { AGENT_METRICS } from "../telemetry";
 import type { IToolRegistry } from "../tools/mcp/registry";
 import type {
   AuditLogger,

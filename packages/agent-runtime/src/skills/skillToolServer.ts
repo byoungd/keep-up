@@ -1,9 +1,9 @@
 import type { ToolExecutor } from "../executor";
 import { BaseToolServer, errorResult, textResult } from "../tools/mcp/baseServer";
 import type { MCPToolResult, SkillActivation, ToolContext } from "../types";
-import { type SkillExecutionBridge, createSkillExecutionBridge } from "./skillExecutionBridge";
+import { createSkillExecutionBridge, type SkillExecutionBridge } from "./skillExecutionBridge";
 import type { SkillRegistry } from "./skillRegistry";
-import { type SkillResolver, createSkillResolver } from "./skillResolver";
+import { createSkillResolver, type SkillResolver } from "./skillResolver";
 import type { SkillSession } from "./skillSession";
 
 export type SkillToolServerOptions = {

@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { type PolicyManifestV09, areManifestsCompatible } from "../../kernel/policy/index.js";
+import { areManifestsCompatible, type PolicyManifestV09 } from "../../kernel/policy/index.js";
 import {
   createDefaultSyncManifest,
   getSyncDegradedFeatures,

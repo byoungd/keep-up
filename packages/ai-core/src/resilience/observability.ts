@@ -415,10 +415,7 @@ export class ObservabilityContext {
  * Create a default observability context.
  */
 export function createObservability(
-  options: {
-    logLevel?: LogLevel;
-    prefix?: string;
-  } = {}
+  options: { logLevel?: LogLevel; prefix?: string } = {}
 ): ObservabilityContext {
   return new ObservabilityContext({
     logger: new ConsoleLogger({

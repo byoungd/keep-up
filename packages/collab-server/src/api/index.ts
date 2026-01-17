@@ -4,5 +4,5 @@
  * Exports all API route handlers.
  */
 
-export { AuditRoutes, type AuditQueryRequest, type AuditQueryResponse } from "./auditRoutes";
+export { type AuditQueryRequest, type AuditQueryResponse, AuditRoutes } from "./auditRoutes";
 export { MetricsRoutes } from "./metricsRoutes";

@@ -113,6 +113,7 @@ export const ResizableThreePaneLayout = React.forwardRef<
 
           {/* Left Resize Handle - only show if leftPanel exists */}
           {leftPanel && (
+            // biome-ignore lint/a11y/noStaticElementInteractions: Resize handle requires mouse
             <div
               className={cn(
                 "w-1 -mx-0.5 z-50 cursor-col-resize touch-none relative shrink-0 transition-colors duration-200",
@@ -138,6 +139,7 @@ export const ResizableThreePaneLayout = React.forwardRef<
           {rightPanel && (
             <>
               {/* Right Resize Handle */}
+              {/* biome-ignore lint/a11y/noStaticElementInteractions: Resize handle requires mouse */}
               <div
                 className={cn(
                   "w-1 -mx-0.5 z-50 cursor-col-resize touch-none relative shrink-0 transition-colors duration-200",

@@ -10,11 +10,11 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { CollabAdapter, CollabAdapterStatus, CollabSession } from "../collabAdapter";
 import { CollabManager } from "../collabManager";
 import {
-  type SyncMessage,
   createCrdtUpdateMessage,
   createJoinMessage,
   createLeaveMessage,
   createPresenceMessage,
+  type SyncMessage,
 } from "../collabMessages";
 
 // ============================================================================

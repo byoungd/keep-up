@@ -7,7 +7,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CollabAdapterStatus } from "../collabAdapter";
-import { type SyncMessage, createCrdtUpdateMessage, serializeSyncMessage } from "../collabMessages";
+import { createCrdtUpdateMessage, type SyncMessage, serializeSyncMessage } from "../collabMessages";
 import { WebSocketCollabAdapter } from "../webSocketCollabAdapter";
 
 // ============================================================================

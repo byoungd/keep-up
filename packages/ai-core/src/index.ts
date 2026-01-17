@@ -11,56 +11,51 @@
  * - Type-safe branded types and validation
  */
 
+export { normalizeMessages, withSystemPrompt } from "./catalog/messages";
 // ============================================================================
-// Providers - LLM Provider Abstraction Layer
+// Catalog - Shared model capabilities & provider configuration
 // ============================================================================
 export {
+  type CapabilityError,
+  getDefaultModelId,
+  getModelCapability,
+  getModelsWithCapabilities,
+  getSuggestedModel,
+  MODEL_CATALOG,
+  type ModelCapability,
+  modelSupportsThinking,
+  modelSupportsTools,
+  modelSupportsVision,
+  normalizeModelId,
+  type ProviderKind,
+  // Capability validation
+  type RequiredCapabilities,
+  validateModelCapabilities,
+} from "./catalog/models";
+export {
+  getAllProviderIds,
+  getConfiguredProviders,
+  // Environment utilities
+  getFirstEnvValue,
+  getProviderDisplayInfo,
+  getProviderEnvConfig,
+  // Lookup functions
+  getProviderMetadata,
+  getProvidersByProtocol,
+  isGoogleBaseUrl,
+  isProviderConfigured,
+  normalizeAnthropicBaseUrl,
+  normalizeBaseUrl,
+  // Catalog
+  PROVIDER_CATALOG,
+  type ProviderDisplayInfo,
+  type ProviderEnvConfig,
+  type ProviderMetadata,
   // Types
-  type CompletionRequest,
-  type CompletionResponse,
-  type EmbeddingRequest,
-  type EmbeddingResponse,
-  type LLMProvider,
-  type Message,
-  type MessageRole,
-  type ProviderConfig,
-  type ProviderHealth,
-  type ProviderMetrics,
-  type StreamChunk,
-  type StreamChunkType,
-  type TokenUsage,
-  type Tool,
-  type ToolCall,
-  // Base
-  BaseLLMProvider,
-  // Implementations
-  OpenAIProvider,
-  type OpenAIConfig,
-  AnthropicProvider,
-  type AnthropicConfig,
-  GeminiProvider,
-  type GeminiConfig,
-  ResilientProvider,
-  createResilientProvider,
-  type ResilientProviderConfig,
-  // Router
-  ProviderRouter,
-  createProviderRouter,
-  type ProviderRouterConfig,
-  type ProviderOperation,
-  type ProviderCandidate,
-  type ProviderSelector,
-  type ProviderLogger,
-  type ProviderRoutedResponse,
-  type ProviderStreamChunk,
-  // Token tracking
-  TokenTracker,
-  type ModelPricing,
-  type RateLimitConfig,
-  type UsageRecord,
-  type UsageSummary,
-} from "./providers";
-
+  type ProviderProtocol,
+  parseApiKeys,
+  resolveProviderFromEnv,
+} from "./catalog/providers";
 // ============================================================================
 // Context - Token & Context Window Management
 // ============================================================================
@@ -70,136 +65,203 @@ export {
   type ContextSegment,
   type ContextSegmentType,
   type ContextWindowConfig,
-  type DocumentContextOptions,
-  type HistoryEntry,
-  type ModelContextLimits,
-  type TokenBudget,
-  type DocumentContext,
-  type DocumentContextBuilderConfig,
-  type TokenEstimateOptions,
-  // Constants
-  DEFAULT_CONTEXT_LIMITS,
-  MODEL_CONTEXT_LIMITS,
-  SEGMENT_PRIORITY,
   // Classes
   ContextWindowManager,
-  DocumentContextBuilder,
   // Factory functions
   createContextManager,
   createDocumentContextBuilder,
+  // Constants
+  DEFAULT_CONTEXT_LIMITS,
+  type DocumentContext,
+  DocumentContextBuilder,
+  type DocumentContextBuilderConfig,
+  type DocumentContextOptions,
+  estimateMessagesTokens,
   // Utilities
   estimateTokens,
-  estimateMessagesTokens,
-  truncateToTokens,
+  type HistoryEntry,
+  MODEL_CONTEXT_LIMITS,
+  type ModelContextLimits,
+  SEGMENT_PRIORITY,
   splitIntoChunks,
+  type TokenBudget,
+  type TokenEstimateOptions,
+  truncateToTokens,
 } from "./context";
-
 // ============================================================================
-// Resilience - Circuit Breaker, Queue, Errors, Observability
+// Gateway - Unified AI Gateway & Tracing
 // ============================================================================
 export {
-  // Circuit Breaker
-  CircuitBreaker,
-  CircuitBreakerOpenError,
-  type CircuitBreakerConfig,
-  type CircuitBreakerMetrics,
-  type CircuitState,
-  createCircuitBreaker,
-  // Request Queue
-  RequestQueue,
-  QueueFullError,
-  RequestTimeoutError,
-  type RequestQueueConfig,
-  type RequestPriority,
-  type QueueStats,
-  createRequestQueue,
+  createGatewayError,
+  createLangfuseGatewayTelemetryAdapter,
+  createNoopGatewayTelemetryAdapter,
+  createTraceContext,
+  createUnifiedAIGateway,
+  extractTraceFromHeaders,
+  formatErrorResponse,
   // Errors
-  AIError,
-  RateLimitError,
-  ProviderError,
-  ValidationError as AIValidationError,
-  type AIErrorCode,
-  type RecoverySuggestion,
-  type RetryStrategy,
-  isRetryableError,
-  calculateRetryDelay,
-  wrapError,
-  // Observability
-  ConsoleLogger,
-  InMemoryMetrics,
-  SimpleTracer,
-  ObservabilityContext,
-  createObservability,
-  getObservability,
-  setObservability,
-  type LogLevel,
-  type MetricType,
-  type LogEntry,
-  type MetricEntry,
-  type Span,
-  type Logger,
-  type MetricsCollector,
-  type Tracer,
-  // Retry Policy
-  RetryPolicy,
-  createRetryPolicy,
-  createAggressiveRetryPolicy,
-  createGentleRetryPolicy,
-  withRetry,
-  tryWithRetry,
-  createCancellationToken,
-  createTimeoutToken,
-  combineCancellationTokens,
-  type RetryPolicyConfig,
-  type RetryAttempt,
-  type RetryResult,
-  type CancellationToken,
-  // Resilience Pipeline
-  ResiliencePipeline,
-  createResiliencePipeline,
-  type ResilienceContext,
-  type ResiliencePipelineConfig,
-  // Health Aggregation
-  HealthAggregator,
-  createHealthAggregator,
-  createPingCheck,
-  createLatencyCheck,
-  createProviderHealthCheck,
-  formatHealthResponse,
-  type HealthStatus,
-  type ComponentHealth,
-  type SystemHealth,
-  type HealthCheck,
-  type HealthAggregatorConfig,
-} from "./resilience";
-
+  GatewayError,
+  type GatewayErrorCode,
+  type GatewayErrorResponse,
+  type GatewayGenerationResult,
+  type GatewayGenerationStart,
+  type GatewayGenerationUsage,
+  type GatewayHealthStatus,
+  type GatewayRequestOptions,
+  type GatewayResponse,
+  type GatewayStreamChunk,
+  type GatewayStreamOptions,
+  // Telemetry adapters
+  type GatewayTelemetryAdapter,
+  type GatewayTelemetryGeneration,
+  type GatewayTelemetryLevel,
+  generateSpanId as generateGatewaySpanId,
+  generateTraceId as generateGatewayTraceId,
+  injectTraceToHeaders,
+  isGatewayError,
+  // Trace Context
+  TraceContext,
+  type TraceContextData,
+  type TracePropagator,
+  toHttpStatus,
+  // Unified Gateway
+  UnifiedAIGateway,
+  type UnifiedGatewayConfig,
+} from "./gateway";
+// ============================================================================
+// Lanes - Multi-Lane Model Routing (Fast/Deep/Consensus)
+// ============================================================================
+export {
+  type ComplexityHints,
+  type ComplexitySelectorOptions,
+  type ConsensusConfig,
+  type ConsensusDiff,
+  type ConsensusMergeStrategy,
+  type ConsensusModelResult,
+  type ConsensusResult,
+  type ConsensusSelectorOptions,
+  combineSelectors,
+  // Selectors
+  createComplexityBasedSelector,
+  createConsensusSelector,
+  createLaneRouter,
+  createPreferenceBasedSelector,
+  type LaneCompletionRequest,
+  type LaneCompletionResponse,
+  type LaneConfig,
+  type LaneLogger,
+  type LaneModelConfig,
+  // Lane Router
+  LaneRouter,
+  type LaneRouterConfig,
+  type LaneSelectionContext,
+  type LaneSelector,
+  type LaneTelemetryEvent,
+  // Types
+  type ModelLane,
+  type MultiLaneConfig,
+  type PreferenceSelectorOptions,
+  type ProviderFactory,
+} from "./lanes";
+// ============================================================================
+// Middleware - Response Processing & Citation Grounding
+// ============================================================================
+export {
+  // Citation Middleware
+  CitationMiddleware,
+  type CitationMiddlewareConfig,
+  type CitationRef,
+  createCitationMiddleware,
+  createMiddlewareChain,
+  createSimpleMiddleware,
+  type FlagSeverity,
+  type GroundingSummary,
+  // Middleware Chain
+  MiddlewareChain,
+  type MiddlewareChainConfig,
+  type MiddlewareContext,
+  type MiddlewareLogger,
+  type MiddlewareRequestOptions,
+  type MiddlewareResponse,
+  type ProcessedResponse,
+  type ResponseFlag,
+  type ResponseFlagType,
+  type ResponseMetadata,
+  // Types
+  type ResponseMiddleware,
+  type SourceContext,
+} from "./middleware";
+// ============================================================================
+// Observability - Enhanced Telemetry & Profiling
+// ============================================================================
+export {
+  createAlwaysSampler,
+  createConsoleTraceExporter,
+  createNeverSampler,
+  createOpenTelemetryTracer,
+  createPerformanceProfiler,
+  createProbabilitySampler,
+  createRateLimitingSampler,
+  createTelemetryContext,
+  type ExportResult,
+  type FunctionStats,
+  type HotPath,
+  type LogExportEntry,
+  type MemorySnapshot,
+  type MemoryStats,
+  type MetricExportEntry,
+  type OpenTelemetryConfig,
+  // OpenTelemetry Tracer
+  OpenTelemetryTracer,
+  type OTelSpan,
+  // Performance Profiler
+  PerformanceProfiler,
+  type ProfileEntry,
+  type ProfileReport,
+  type ProfilerConfig,
+  type ProfilerMetrics,
+  type ProfileSummary,
+  type ResourceAttributes,
+  type Sampler,
+  type SamplingResult,
+  type ScopedContext,
+  type SpanContext,
+  type SpanExportEntry,
+  type SpanKind,
+  type SpanLink,
+  type SpanStatus,
+  // Unified Telemetry Context
+  TelemetryContext,
+  type TelemetryContextConfig,
+  type TelemetryExporter,
+  type TraceExporter,
+} from "./observability";
 // ============================================================================
 // Performance - Cache, Batching, Lazy Loading
 // ============================================================================
 export {
+  type BatchConfig,
+  batch,
+  batchify,
+  type CacheStats,
+  cacheKey,
+  // Lazy Loading
+  Lazy,
+  LazyFactory,
+  LazySync,
   // Cache
   LRUCache,
   type LRUCacheConfig,
-  type CacheStats,
-  cacheKey,
+  lazy,
+  lazyFactory,
+  lazySync,
   memoize,
   memoizeAsync,
+  parallelBatch,
   // Batching
   RequestBatcher,
-  type BatchConfig,
-  batchify,
-  batch,
-  parallelBatch,
-  // Lazy Loading
-  Lazy,
-  LazySync,
-  LazyFactory,
   ResourcePool,
-  lazy,
-  lazySync,
-  lazyFactory,
 } from "./performance";
-
 // ============================================================================
 // Prompts - Shared Prompt Templates
 // ============================================================================
@@ -211,285 +273,213 @@ export {
   type DigestReducePromptInput,
   type VerifierPromptInput,
 } from "./prompts";
-
+// ============================================================================
+// Providers - LLM Provider Abstraction Layer
+// ============================================================================
+export {
+  type AnthropicConfig,
+  AnthropicProvider,
+  // Base
+  BaseLLMProvider,
+  // Types
+  type CompletionRequest,
+  type CompletionResponse,
+  createProviderRouter,
+  createResilientProvider,
+  type EmbeddingRequest,
+  type EmbeddingResponse,
+  type GeminiConfig,
+  GeminiProvider,
+  type LLMProvider,
+  type Message,
+  type MessageRole,
+  type ModelPricing,
+  type OpenAIConfig,
+  // Implementations
+  OpenAIProvider,
+  type ProviderCandidate,
+  type ProviderConfig,
+  type ProviderHealth,
+  type ProviderLogger,
+  type ProviderMetrics,
+  type ProviderOperation,
+  type ProviderRoutedResponse,
+  // Router
+  ProviderRouter,
+  type ProviderRouterConfig,
+  type ProviderSelector,
+  type ProviderStreamChunk,
+  type RateLimitConfig,
+  ResilientProvider,
+  type ResilientProviderConfig,
+  type StreamChunk,
+  type StreamChunkType,
+  // Token tracking
+  TokenTracker,
+  type TokenUsage,
+  type Tool,
+  type ToolCall,
+  type UsageRecord,
+  type UsageSummary,
+} from "./providers";
+// ============================================================================
+// Resilience - Circuit Breaker, Queue, Errors, Observability
+// ============================================================================
+export {
+  // Errors
+  AIError,
+  type AIErrorCode,
+  type CancellationToken,
+  // Circuit Breaker
+  CircuitBreaker,
+  type CircuitBreakerConfig,
+  type CircuitBreakerMetrics,
+  CircuitBreakerOpenError,
+  type CircuitState,
+  type ComponentHealth,
+  // Observability
+  ConsoleLogger,
+  calculateRetryDelay,
+  combineCancellationTokens,
+  createAggressiveRetryPolicy,
+  createCancellationToken,
+  createCircuitBreaker,
+  createGentleRetryPolicy,
+  createHealthAggregator,
+  createLatencyCheck,
+  createObservability,
+  createPingCheck,
+  createProviderHealthCheck,
+  createRequestQueue,
+  createResiliencePipeline,
+  createRetryPolicy,
+  createTimeoutToken,
+  formatHealthResponse,
+  getObservability,
+  // Health Aggregation
+  HealthAggregator,
+  type HealthAggregatorConfig,
+  type HealthCheck,
+  type HealthStatus,
+  InMemoryMetrics,
+  isRetryableError,
+  type LogEntry,
+  type Logger,
+  type LogLevel,
+  type MetricEntry,
+  type MetricsCollector,
+  type MetricType,
+  ObservabilityContext,
+  ProviderError,
+  QueueFullError,
+  type QueueStats,
+  RateLimitError,
+  type RecoverySuggestion,
+  type RequestPriority,
+  // Request Queue
+  RequestQueue,
+  type RequestQueueConfig,
+  RequestTimeoutError,
+  type ResilienceContext,
+  // Resilience Pipeline
+  ResiliencePipeline,
+  type ResiliencePipelineConfig,
+  type RetryAttempt,
+  // Retry Policy
+  RetryPolicy,
+  type RetryPolicyConfig,
+  type RetryResult,
+  type RetryStrategy,
+  SimpleTracer,
+  type Span,
+  type SystemHealth,
+  setObservability,
+  type Tracer,
+  tryWithRetry,
+  ValidationError as AIValidationError,
+  withRetry,
+  wrapError,
+} from "./resilience";
 // ============================================================================
 // Types - Branded Types & Validation
 // ============================================================================
 export {
-  // Branded ID Types
-  type UserId,
-  type DocId,
-  type ChunkId,
-  type TraceId,
-  type SpanId,
-  type ProviderId,
-  type RequestId,
-  // Branded Value Types
-  type NonEmptyString,
-  type PositiveInt,
-  type UnitInterval,
-  type TokenCount,
-  type SimilarityScore,
-  type UTF16Offset,
-  type Timestamp,
-  // Constructors
-  userId,
-  docId,
-  chunkId,
-  traceId,
-  spanId,
-  providerId,
-  requestId,
-  nonEmptyString,
-  positiveInt,
-  unitInterval,
-  tokenCount,
-  similarityScore,
-  utf16Offset,
-  timestamp,
-  // Safe Constructors
-  safeUserId,
-  safeDocId,
-  safeChunkId,
-  safePositiveInt,
-  safeUnitInterval,
-  safeSimilarityScore,
-  // Type Guards
-  isValidUserId,
-  isValidPositiveInt,
-  isValidUnitInterval,
-  // ID Generators
-  generateId,
-  generateDocId,
-  generateChunkId,
-  generateTraceId,
-  generateRequestId,
-  unwrap,
-  BrandValidationError,
-  type ValidationResult as BrandValidationResult,
-  // Validation
-  ValidationError as SchemaValidationError,
-  type FieldError,
-  type ValidateResult,
-  type Validator,
-  string,
-  nonEmptyStringValidator,
-  number,
-  integer,
-  positive,
-  range,
-  boolean,
+  and,
   array,
   arrayLength,
-  object,
-  optional,
-  withDefault,
-  and,
-  or,
-  oneOf,
-  stringLength,
-  pattern,
-  url,
-  email,
-  validate,
+  BrandValidationError,
+  boolean,
+  type ChunkId,
+  chunkId,
   createParser,
+  type DocId,
+  docId,
+  email,
+  type FieldError,
+  generateChunkId,
+  generateDocId,
+  // ID Generators
+  generateId,
+  generateRequestId,
+  generateTraceId,
+  integer,
+  isValidPositiveInt,
+  isValidUnitInterval,
+  // Type Guards
+  isValidUserId,
+  // Branded Value Types
+  type NonEmptyString,
+  nonEmptyString,
+  nonEmptyStringValidator,
+  number,
+  object,
+  oneOf,
+  optional,
+  or,
+  type PositiveInt,
+  type ProviderId,
+  pattern,
+  positive,
+  positiveInt,
+  providerId,
+  type RequestId,
+  range,
+  requestId,
+  type SimilarityScore,
+  type SpanId,
+  safeChunkId,
+  safeDocId,
+  safePositiveInt,
+  safeSimilarityScore,
+  safeUnitInterval,
+  // Safe Constructors
+  safeUserId,
+  similarityScore,
+  spanId,
+  string,
+  stringLength,
+  type Timestamp,
+  type TokenCount,
+  type TraceId,
+  timestamp,
+  tokenCount,
+  traceId,
   tryValidate,
+  type UnitInterval,
+  // Branded ID Types
+  type UserId,
+  type UTF16Offset,
+  unitInterval,
+  unwrap,
+  url,
+  // Constructors
+  userId,
+  utf16Offset,
+  type ValidateResult,
+  // Validation
+  ValidationError as SchemaValidationError,
+  type ValidationResult as BrandValidationResult,
+  type Validator,
+  validate,
+  withDefault,
 } from "./types";
-
-// ============================================================================
-// Catalog - Shared model capabilities & provider configuration
-// ============================================================================
-export {
-  MODEL_CATALOG,
-  type ModelCapability,
-  type ProviderKind,
-  getDefaultModelId,
-  getModelCapability,
-  normalizeModelId,
-  // Capability validation
-  type RequiredCapabilities,
-  type CapabilityError,
-  validateModelCapabilities,
-  modelSupportsVision,
-  modelSupportsTools,
-  modelSupportsThinking,
-  getModelsWithCapabilities,
-  getSuggestedModel,
-} from "./catalog/models";
-export { normalizeMessages, withSystemPrompt } from "./catalog/messages";
-export {
-  // Types
-  type ProviderProtocol,
-  type ProviderEnvConfig,
-  type ProviderDisplayInfo,
-  type ProviderMetadata,
-  // Catalog
-  PROVIDER_CATALOG,
-  // Lookup functions
-  getProviderMetadata,
-  getProviderEnvConfig,
-  getProviderDisplayInfo,
-  getAllProviderIds,
-  getProvidersByProtocol,
-  // Environment utilities
-  getFirstEnvValue,
-  parseApiKeys,
-  normalizeBaseUrl,
-  normalizeAnthropicBaseUrl,
-  isGoogleBaseUrl,
-  resolveProviderFromEnv,
-  isProviderConfigured,
-  getConfiguredProviders,
-} from "./catalog/providers";
-
-// ============================================================================
-// Observability - Enhanced Telemetry & Profiling
-// ============================================================================
-export {
-  // Unified Telemetry Context
-  TelemetryContext,
-  createTelemetryContext,
-  type TelemetryContextConfig,
-  type TelemetryExporter,
-  type LogExportEntry,
-  type MetricExportEntry,
-  type SpanExportEntry,
-  type ResourceAttributes,
-  type ScopedContext,
-  // OpenTelemetry Tracer
-  OpenTelemetryTracer,
-  createOpenTelemetryTracer,
-  createConsoleTraceExporter,
-  createAlwaysSampler,
-  createNeverSampler,
-  createProbabilitySampler,
-  createRateLimitingSampler,
-  type OpenTelemetryConfig,
-  type SpanContext,
-  type TraceExporter,
-  type ExportResult,
-  type Sampler,
-  type SamplingResult,
-  type SpanKind,
-  type SpanStatus,
-  type SpanLink,
-  type OTelSpan,
-  // Performance Profiler
-  PerformanceProfiler,
-  createPerformanceProfiler,
-  type ProfilerConfig,
-  type ProfileEntry,
-  type ProfileReport,
-  type ProfilerMetrics,
-  type FunctionStats,
-  type HotPath,
-  type MemoryStats,
-  type MemorySnapshot,
-  type ProfileSummary,
-} from "./observability";
-
-// ============================================================================
-// Gateway - Unified AI Gateway & Tracing
-// ============================================================================
-export {
-  // Unified Gateway
-  UnifiedAIGateway,
-  createUnifiedAIGateway,
-  type UnifiedGatewayConfig,
-  type GatewayRequestOptions,
-  type GatewayStreamOptions,
-  type GatewayResponse,
-  type GatewayStreamChunk,
-  type GatewayHealthStatus,
-  // Trace Context
-  TraceContext,
-  createTraceContext,
-  extractTraceFromHeaders,
-  injectTraceToHeaders,
-  generateTraceId as generateGatewayTraceId,
-  generateSpanId as generateGatewaySpanId,
-  type TraceContextData,
-  type TracePropagator,
-  // Errors
-  GatewayError,
-  type GatewayErrorCode,
-  createGatewayError,
-  isGatewayError,
-  toHttpStatus,
-  formatErrorResponse,
-  type GatewayErrorResponse,
-  // Telemetry adapters
-  type GatewayTelemetryAdapter,
-  type GatewayTelemetryGeneration,
-  type GatewayGenerationStart,
-  type GatewayGenerationResult,
-  type GatewayGenerationUsage,
-  type GatewayTelemetryLevel,
-  createNoopGatewayTelemetryAdapter,
-  createLangfuseGatewayTelemetryAdapter,
-} from "./gateway";
-
-// ============================================================================
-// Lanes - Multi-Lane Model Routing (Fast/Deep/Consensus)
-// ============================================================================
-export {
-  // Lane Router
-  LaneRouter,
-  createLaneRouter,
-  type ProviderFactory,
-  // Types
-  type ModelLane,
-  type LaneConfig,
-  type LaneModelConfig,
-  type MultiLaneConfig,
-  type LaneRouterConfig,
-  type LaneCompletionRequest,
-  type LaneCompletionResponse,
-  type LaneSelector,
-  type LaneSelectionContext,
-  type ComplexityHints,
-  type ConsensusConfig,
-  type ConsensusMergeStrategy,
-  type ConsensusResult,
-  type ConsensusModelResult,
-  type ConsensusDiff,
-  type LaneLogger,
-  type LaneTelemetryEvent,
-  // Selectors
-  createComplexityBasedSelector,
-  createPreferenceBasedSelector,
-  createConsensusSelector,
-  combineSelectors,
-  type ComplexitySelectorOptions,
-  type PreferenceSelectorOptions,
-  type ConsensusSelectorOptions,
-} from "./lanes";
-
-// ============================================================================
-// Middleware - Response Processing & Citation Grounding
-// ============================================================================
-export {
-  // Middleware Chain
-  MiddlewareChain,
-  createMiddlewareChain,
-  createSimpleMiddleware,
-  // Citation Middleware
-  CitationMiddleware,
-  createCitationMiddleware,
-  // Types
-  type ResponseMiddleware,
-  type MiddlewareResponse,
-  type MiddlewareContext,
-  type MiddlewareRequestOptions,
-  type ResponseMetadata,
-  type CitationRef,
-  type SourceContext,
-  type ResponseFlag,
-  type ResponseFlagType,
-  type FlagSeverity,
-  type ProcessedResponse,
-  type GroundingSummary,
-  type MiddlewareChainConfig,
-  type CitationMiddlewareConfig,
-  type MiddlewareLogger,
-} from "./middleware";

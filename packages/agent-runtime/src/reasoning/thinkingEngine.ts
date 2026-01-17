@@ -7,10 +7,10 @@
 
 import { countTokens } from "../utils/tokenCounter";
 import {
-  ReasoningChainBuilder as ChainBuilder,
-  type ReasoningChainBuilder,
   analyzeChain,
+  ReasoningChainBuilder as ChainBuilder,
   exportChain,
+  type ReasoningChainBuilder,
   summarizeChain,
 } from "./reasoningChain";
 import type {

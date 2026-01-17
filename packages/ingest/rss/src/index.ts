@@ -9,6 +9,7 @@ import { computeRssStatsFromItems, evaluateRssQuality } from "./rssStats";
 import type { FeedSource, IngestResult, RSSIngestOptions, RSSItem } from "./types";
 
 export * from "./atomicAdapter";
+export * from "./deduper";
 // NOTE: contentExtractor and fullTextFetcher use jsdom which requires Node.js.
 // Import directly from those files in server-side code only.
 // export * from './contentExtractor';
@@ -16,7 +17,7 @@ export * from "./defaultFeeds";
 export * from "./fetcher";
 // export * from './fullTextFetcher';
 export * from "./htmlUtils";
-export * from "./deduper";
+export * from "./ingestReport";
 export * from "./mapper";
 export * from "./normalizer";
 export * from "./parser";
@@ -24,7 +25,6 @@ export * from "./plugin";
 export * from "./retry";
 export * from "./rssStats";
 export * from "./types";
-export * from "./ingestReport";
 
 export interface EnhancedIngestOptions extends RSSIngestOptions {
   /** Fetch full article content when RSS only provides snippets */

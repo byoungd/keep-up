@@ -64,6 +64,7 @@ export function TokenUsageDisplay({
       {/* Context window visualization bar */}
       {showDetails && (
         <div className="relative h-2 w-16 rounded-full bg-surface-3 overflow-hidden">
+          {/* biome-ignore lint/a11y/useAriaPropsSupportedByRole: Visualization */}
           <div
             className={cn(
               "absolute left-0 top-0 h-full rounded-full transition-all",

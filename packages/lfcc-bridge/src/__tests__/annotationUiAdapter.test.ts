@@ -4,7 +4,6 @@ import { describe, expect, it } from "vitest";
 import {
   type AnnotationSpan,
   type AnnotationWithRanges,
-  StatefulAnnotationUIAdapter,
   buildDecorations,
   buildDeterministicDecorations,
   buildGapMarkers,
@@ -12,6 +11,7 @@ import {
   getColorClass,
   getGapClass,
   getStateClasses,
+  StatefulAnnotationUIAdapter,
 } from "../annotations/annotationUiAdapter";
 
 const schema = new Schema({

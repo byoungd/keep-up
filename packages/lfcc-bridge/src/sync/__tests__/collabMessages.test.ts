@@ -10,19 +10,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   type CrdtUpdateMessage,
-  type ErrorMessage,
-  type JoinMessage,
-  type LeaveMessage,
-  type PresenceMessage,
-  type PresencePayload,
-  type Role,
-  type SyncMessage,
   createCrdtUpdateMessage,
   createErrorMessage,
   createJoinMessage,
   createLeaveMessage,
   createPresenceMessage,
   deserializeSyncMessage,
+  type ErrorMessage,
   isCrdtUpdateMessage,
   isErrorMessage,
   isJoinMessage,
@@ -32,6 +26,12 @@ import {
   isValidErrorCode,
   isValidRole,
   isValidSyncMessage,
+  type JoinMessage,
+  type LeaveMessage,
+  type PresenceMessage,
+  type PresencePayload,
+  type Role,
+  type SyncMessage,
   serializeSyncMessage,
 } from "../collabMessages";
 

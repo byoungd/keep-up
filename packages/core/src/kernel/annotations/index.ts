@@ -5,11 +5,11 @@
 export * from "./aiStateMachine.js";
 export * from "./aiTypes.js";
 export {
-  createAnnoContext,
-  transition,
   type AnnoAction,
+  createAnnoContext,
   type StateMachineConfig,
   type TransitionResult,
+  transition,
 } from "./stateMachine.js";
 export * from "./tokenizedTimers.js";
 export * from "./types.js";

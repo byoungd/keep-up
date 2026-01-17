@@ -211,7 +211,9 @@ export class ArtifactPipeline {
 
 export function createArtifactRegistry({
   registerDefaults = true,
-}: { registerDefaults?: boolean } = {}): ArtifactRegistry {
+}: {
+  registerDefaults?: boolean;
+} = {}): ArtifactRegistry {
   const registry = new ArtifactRegistry();
   if (registerDefaults) {
     registerDefaultSchemas(registry);

@@ -7,7 +7,7 @@
 
 import { type ChildProcess, type SpawnOptions, spawn } from "node:child_process";
 import type { ToolContext } from "../../types";
-import { BaseToolServer, type ToolHandler, errorResult, textResult } from "../mcp/baseServer";
+import { BaseToolServer, errorResult, type ToolHandler, textResult } from "../mcp/baseServer";
 
 // ============================================================================
 // Bash Executor Interface (for dependency injection)
@@ -220,7 +220,7 @@ export class BashToolServer extends BaseToolServer {
 
     // Check for dangerous commands (basic blocklist)
     const dangerousPatterns = [
-      /rm\s+-rf\s+[\/~]/i,
+      /rm\s+-rf\s+[/~]/i,
       /mkfs/i,
       /dd\s+if=/i,
       />\s*\/dev\//i,

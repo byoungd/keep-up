@@ -4,9 +4,9 @@
 
 import { beforeEach, describe, expect, it } from "vitest";
 import { LfccError } from "../../errors.js";
-import { LFCCLogger, getLogger } from "../logger.js";
-import { MetricsRegistry, getMetrics, initMetricsRegistry } from "../metrics.js";
-import { LFCCTracer, getTracer, setDefaultTracer, traceAsync } from "../tracer.js";
+import { getLogger, LFCCLogger } from "../logger.js";
+import { getMetrics, initMetricsRegistry, MetricsRegistry } from "../metrics.js";
+import { getTracer, LFCCTracer, setDefaultTracer, traceAsync } from "../tracer.js";
 
 describe("LFCCLogger", () => {
   let logger: LFCCLogger;

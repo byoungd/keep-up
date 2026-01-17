@@ -7,93 +7,88 @@
 // Circuit Breaker
 export {
   CircuitBreaker,
-  CircuitBreakerOpenError,
-  createCircuitBreaker,
   type CircuitBreakerConfig,
   type CircuitBreakerMetrics,
+  CircuitBreakerOpenError,
   type CircuitState,
+  createCircuitBreaker,
 } from "./circuitBreaker";
-
-// Request Queue
-export {
-  RequestQueue,
-  QueueFullError,
-  RequestTimeoutError,
-  createRequestQueue,
-  type RequestQueueConfig,
-  type RequestPriority,
-  type QueueStats,
-} from "./requestQueue";
-
 // Typed Errors
 export {
   AIError,
+  type AIErrorCode,
+  calculateRetryDelay,
+  isRetryableError,
   ProviderError,
   RateLimitError,
-  ValidationError,
-  isRetryableError,
-  calculateRetryDelay,
-  wrapError,
-  type AIErrorCode,
-  type RetryStrategy,
   type RecoverySuggestion,
+  type RetryStrategy,
+  ValidationError,
+  wrapError,
 } from "./errors";
+// Health Aggregation
+export {
+  type ComponentHealth,
+  createHealthAggregator,
+  createLatencyCheck,
+  createPingCheck,
+  createProviderHealthCheck,
+  formatHealthResponse,
+  HealthAggregator,
+  type HealthAggregatorConfig,
+  type HealthCheck,
+  type HealthStatus,
+  type SystemHealth,
+} from "./health";
 
 // Observability
 export {
   ConsoleLogger,
-  InMemoryMetrics,
-  SimpleTracer,
-  ObservabilityContext,
   createObservability,
   getObservability,
-  setObservability,
-  type LogLevel,
+  InMemoryMetrics,
   type LogEntry,
-  type MetricType,
-  type MetricEntry,
-  type Span,
   type Logger,
+  type LogLevel,
+  type MetricEntry,
   type MetricsCollector,
+  type MetricType,
+  ObservabilityContext,
+  SimpleTracer,
+  type Span,
+  setObservability,
   type Tracer,
 } from "./observability";
-
-// Retry Policy
-export {
-  RetryPolicy,
-  createRetryPolicy,
-  createAggressiveRetryPolicy,
-  createGentleRetryPolicy,
-  withRetry,
-  tryWithRetry,
-  createCancellationToken,
-  createTimeoutToken,
-  combineCancellationTokens,
-  type RetryPolicyConfig,
-  type RetryAttempt,
-  type RetryResult,
-  type CancellationToken,
-} from "./retryPolicy";
-
 // Resilience Pipeline
 export {
-  ResiliencePipeline,
   createResiliencePipeline,
   type ResilienceContext,
+  ResiliencePipeline,
   type ResiliencePipelineConfig,
 } from "./pipeline";
-
-// Health Aggregation
+// Request Queue
 export {
-  HealthAggregator,
-  createHealthAggregator,
-  createPingCheck,
-  createLatencyCheck,
-  createProviderHealthCheck,
-  formatHealthResponse,
-  type HealthStatus,
-  type ComponentHealth,
-  type SystemHealth,
-  type HealthCheck,
-  type HealthAggregatorConfig,
-} from "./health";
+  createRequestQueue,
+  QueueFullError,
+  type QueueStats,
+  type RequestPriority,
+  RequestQueue,
+  type RequestQueueConfig,
+  RequestTimeoutError,
+} from "./requestQueue";
+// Retry Policy
+export {
+  type CancellationToken,
+  combineCancellationTokens,
+  createAggressiveRetryPolicy,
+  createCancellationToken,
+  createGentleRetryPolicy,
+  createRetryPolicy,
+  createTimeoutToken,
+  type RetryAttempt,
+  RetryPolicy,
+  type RetryPolicyConfig,
+  type RetryResult,
+  tryWithRetry,
+  withRetry,
+} from "./retryPolicy";

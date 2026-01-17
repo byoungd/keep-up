@@ -1,8 +1,7 @@
+import { absoluteFromAnchor } from "@ku0/core";
 import type { Node as PMNode } from "prosemirror-model";
 import { EditorState, TextSelection } from "prosemirror-state";
 import { describe, expect, it } from "vitest";
-
-import { absoluteFromAnchor } from "@ku0/core";
 import { type BlockNode, serializeAttrs, writeBlockTree } from "../crdt/crdtSchema";
 import { pmSchema } from "../pm/pmSchema";
 import { createLoroRuntime } from "../runtime/loroRuntime";

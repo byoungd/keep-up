@@ -7,159 +7,146 @@
  * - Optimized dependency analysis
  */
 
-export {
-  AgentOrchestrator,
-  createOrchestrator,
-  type IAgentLLM,
-  type AgentLLMRequest,
-  type AgentLLMResponse,
-  type AgentLLMChunk,
-  type AgentToolDefinition,
-  type OrchestratorEvent,
-  type OrchestratorEventHandler,
-  type OrchestratorEventType,
-  type OrchestratorComponents,
-  type CreateOrchestratorOptions,
-} from "./orchestrator";
-
-export {
-  AICoreProviderAdapter,
-  MockAgentLLM,
-  createAICoreAdapter,
-  createMockLLM,
-  type AICoreProvider,
-  type AICoreAdapterOptions,
-} from "./aiCoreAdapter";
-
-// Performance Optimizations
-export {
-  MessageCompressor,
-  createMessageCompressor,
-  type CompressionConfig,
-  type CompressionResult,
-  type CompressionStrategy,
-  type ISummarizer,
-  type CompressionMetrics,
-} from "./messageCompression";
-
-export {
-  RequestCache,
-  createRequestCache,
-  type CacheConfig,
-  type RequestCacheStats,
-} from "./requestCache";
-
-export {
-  DependencyAnalyzer,
-  createDependencyAnalyzer,
-  type DependencyAnalysis,
-} from "./dependencyAnalyzer";
-
-export { SmartToolScheduler } from "./smartToolScheduler";
-
-// Consensus Orchestration
-export {
-  ConsensusOrchestrator,
-  createConsensusOrchestrator,
-  type ConsensusConfig,
-  type ConsensusResult,
-  type ConsensusModelConfig,
-  type ModelResponse,
-  type VotingStrategy,
-} from "./consensusOrchestrator";
-
-// Planning with File Persistence
-export {
-  PlanningEngine,
-  createPlanningEngine,
-  type ExecutionPlan,
-  type PlanStep,
-  type PlanRefinement,
-  type PlanApproval,
-  type PlanningConfig,
-  type PlanApprovalHandler,
-} from "./planning";
-
-export {
-  PlanPersistence,
-  createPlanPersistence,
-  type PlanPersistenceConfig,
-  type PersistedPlanMetadata,
-} from "./planPersistence";
-
-export {
-  IntegratedPlanningService,
-  createIntegratedPlanningService,
-  type IntegratedPlanningConfig,
-  type PlanTodoLink,
-} from "./integratedPlanning";
-
-// Lifecycle Hooks
-export {
-  HookRegistry,
-  createHookRegistry,
-  createHookContext,
-  executeBeforeTurnHooks,
-  executeAfterTurnHooks,
-  executeBeforeToolHooks,
-  executeAfterToolHooks,
-  executeErrorHooks,
-  executeCompleteHooks,
-  type HookContext,
-  type OrchestratorHooks,
-  type BeforeTurnHook,
-  type AfterTurnHook,
-  type BeforeToolHook,
-  type AfterToolHook,
-  type ErrorHook,
-  type CompleteHook,
-} from "./hooks";
-
-// Turn Executor (extracted from orchestrator)
-export {
-  TurnExecutor,
-  createTurnExecutor,
-  type ITurnExecutor,
-  type TurnOutcome,
-  type TurnOutcomeType,
-  type TurnMetrics,
-  type TurnExecutorDependencies,
-  type TurnExecutorConfig,
-} from "./turnExecutor";
-
-// State Machine
-export {
-  AgentStateMachine,
-  InvalidTransitionError,
-  createAgentStateMachine,
-  type IAgentStateMachine,
-  type AgentStatus,
-  type AgentStateEvent,
-  type AgentStateTransition,
-  type AgentStateMachineConfig,
-  type TransitionHandler,
-} from "./stateMachine";
-
 // Agent Loop (Manus Spec)
 export {
+  type AgentLoopConfig,
+  type AgentLoopCycle,
+  type AgentLoopPhase,
+  type AgentLoopState,
   AgentLoopStateMachine,
   createAgentLoopStateMachine,
-  type AgentLoopPhase,
+  type Observation,
   type PerceptionContext,
   type ThinkingResult,
   type ToolDecision,
-  type Observation,
-  type AgentLoopCycle,
-  type AgentLoopState,
-  type AgentLoopConfig,
 } from "./agentLoop";
 
+export {
+  type AICoreAdapterOptions,
+  type AICoreProvider,
+  AICoreProviderAdapter,
+  createAICoreAdapter,
+  createMockLLM,
+  MockAgentLLM,
+} from "./aiCoreAdapter";
+// Consensus Orchestration
+export {
+  type ConsensusConfig,
+  type ConsensusModelConfig,
+  ConsensusOrchestrator,
+  type ConsensusResult,
+  createConsensusOrchestrator,
+  type ModelResponse,
+  type VotingStrategy,
+} from "./consensusOrchestrator";
+export {
+  createDependencyAnalyzer,
+  type DependencyAnalysis,
+  DependencyAnalyzer,
+} from "./dependencyAnalyzer";
+// Lifecycle Hooks
+export {
+  type AfterToolHook,
+  type AfterTurnHook,
+  type BeforeToolHook,
+  type BeforeTurnHook,
+  type CompleteHook,
+  createHookContext,
+  createHookRegistry,
+  type ErrorHook,
+  executeAfterToolHooks,
+  executeAfterTurnHooks,
+  executeBeforeToolHooks,
+  executeBeforeTurnHooks,
+  executeCompleteHooks,
+  executeErrorHooks,
+  type HookContext,
+  HookRegistry,
+  type OrchestratorHooks,
+} from "./hooks";
+export {
+  createIntegratedPlanningService,
+  type IntegratedPlanningConfig,
+  IntegratedPlanningService,
+  type PlanTodoLink,
+} from "./integratedPlanning";
+// Performance Optimizations
+export {
+  type CompressionConfig,
+  type CompressionMetrics,
+  type CompressionResult,
+  type CompressionStrategy,
+  createMessageCompressor,
+  type ISummarizer,
+  MessageCompressor,
+} from "./messageCompression";
+export {
+  type AgentLLMChunk,
+  type AgentLLMRequest,
+  type AgentLLMResponse,
+  AgentOrchestrator,
+  type AgentToolDefinition,
+  type CreateOrchestratorOptions,
+  createOrchestrator,
+  type IAgentLLM,
+  type OrchestratorComponents,
+  type OrchestratorEvent,
+  type OrchestratorEventHandler,
+  type OrchestratorEventType,
+} from "./orchestrator";
+// Planning with File Persistence
+export {
+  createPlanningEngine,
+  type ExecutionPlan,
+  type PlanApproval,
+  type PlanApprovalHandler,
+  type PlanningConfig,
+  PlanningEngine,
+  type PlanRefinement,
+  type PlanStep,
+} from "./planning";
+export {
+  createPlanPersistence,
+  type PersistedPlanMetadata,
+  PlanPersistence,
+  type PlanPersistenceConfig,
+} from "./planPersistence";
+export {
+  type CacheConfig,
+  createRequestCache,
+  RequestCache,
+  type RequestCacheStats,
+} from "./requestCache";
 // Single-Step Execution Enforcer (Manus Spec)
 export {
-  SingleStepEnforcer,
   createSingleStepEnforcer,
   createSingleStepMiddleware,
-  type SingleStepValidationResult,
-  type SingleStepPolicy,
+  SingleStepEnforcer,
   type SingleStepMiddleware,
+  type SingleStepPolicy,
+  type SingleStepValidationResult,
 } from "./singleStepEnforcer";
+export { SmartToolScheduler } from "./smartToolScheduler";
+// State Machine
+export {
+  type AgentStateEvent,
+  AgentStateMachine,
+  type AgentStateMachineConfig,
+  type AgentStateTransition,
+  type AgentStatus,
+  createAgentStateMachine,
+  type IAgentStateMachine,
+  InvalidTransitionError,
+  type TransitionHandler,
+} from "./stateMachine";
+// Turn Executor (extracted from orchestrator)
+export {
+  createTurnExecutor,
+  type ITurnExecutor,
+  TurnExecutor,
+  type TurnExecutorConfig,
+  type TurnExecutorDependencies,
+  type TurnMetrics,
+  type TurnOutcome,
+  type TurnOutcomeType,
+} from "./turnExecutor";

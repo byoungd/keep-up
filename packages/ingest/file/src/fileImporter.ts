@@ -20,7 +20,7 @@ import {
   type FileSource,
   type IngestionMeta,
 } from "./types";
-import { type UrlFetchOptions, fetchFromUrl } from "./urlFetcher";
+import { fetchFromUrl, type UrlFetchOptions } from "./urlFetcher";
 
 export interface UrlImportOptions extends FileImportOptions, UrlFetchOptions {}
 

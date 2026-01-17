@@ -7,9 +7,9 @@
 import { describe, expect, it } from "vitest";
 import { createAnchor } from "../kernel/mapping/anchors.js";
 import {
-  type DocumentContentAccessor,
   computeContentHash,
   computeTextSimilarity,
+  type DocumentContentAccessor,
   findSubstringMatches,
   fuzzyRelocateAnchor,
 } from "../kernel/mapping/fuzzyRelocate.js";

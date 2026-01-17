@@ -1,6 +1,6 @@
 import { DEFAULT_POLICY_MANIFEST } from "@ku0/core";
 import { beforeEach, describe, expect, it } from "vitest";
-import { type RelocationSecurity, createRelocationSecurity } from "../security/relocation";
+import { createRelocationSecurity, type RelocationSecurity } from "../security/relocation";
 
 describe("RelocationSecurity", () => {
   let relocationSecurity: RelocationSecurity;

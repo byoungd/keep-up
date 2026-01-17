@@ -1,8 +1,8 @@
 import {
-  MODEL_CATALOG,
-  type ModelCapability,
   getDefaultModelId,
   getModelCapability,
+  MODEL_CATALOG,
+  type ModelCapability,
   normalizeModelId,
 } from "@ku0/ai-core";
 import { useNavigate, useParams } from "@tanstack/react-router";
@@ -131,8 +131,7 @@ export function useCoworkAIPanelController() {
 
       await sendMessage(resolvedContent, mode, { modelId: model });
       setStatusMessage(null);
-    } catch (err) {
-      console.error("Failed to send message:", err);
+    } catch (_err) {
       setInput(content);
       setStatusMessage(
         "Unable to send message. Ensure the Cowork server is running, then try again."
@@ -159,7 +158,6 @@ export function useCoworkAIPanelController() {
       }
       setModel(modelId);
       updateSettings({ defaultModel: modelId }).catch((err) => {
-        console.error("Failed to update model:", err);
         const message = err instanceof Error ? err.message : "Failed to update model.";
         setStatusMessage(message);
       });

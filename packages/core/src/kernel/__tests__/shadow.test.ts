@@ -5,18 +5,18 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_POLICY_MANIFEST } from "../policy/index.js";
 import {
-  type EditorEvent,
-  type TypedOp,
   addBlock,
   applyOp,
   classifyEvent,
   createHistoryState,
   createShadowDocument,
+  type EditorEvent,
   getBlock,
   isStructuralOp,
   processHistoryRestore,
   pushHistory,
   redo,
+  type TypedOp,
   undo,
 } from "../shadow/index.js";
 

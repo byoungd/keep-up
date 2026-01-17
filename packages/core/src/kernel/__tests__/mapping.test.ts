@@ -4,9 +4,9 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  type BlockTransform,
   absoluteFromAnchor,
   anchorFromAbsolute,
+  type BlockTransform,
   compareAnchors,
   createBlockMapping,
   expandTouchedBlocks,

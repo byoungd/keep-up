@@ -1,3 +1,4 @@
+import type { ArtifactItem } from "@ku0/shell";
 import {
   AppShell,
   ReaderPreferencesProvider,
@@ -5,7 +6,6 @@ import {
   type SidebarGroupRenderProps,
   TooltipProvider,
 } from "@ku0/shell";
-import type { ArtifactItem } from "@ku0/shell";
 import { Link, Outlet, useLocation, useRouter } from "@tanstack/react-router";
 import { Sparkles } from "lucide-react";
 import React from "react";
@@ -166,7 +166,11 @@ export function RootLayout() {
           href,
           children,
           ...props
-        }: { href: string; children: React.ReactNode; [key: string]: unknown }) => (
+        }: {
+          href: string;
+          children: React.ReactNode;
+          [key: string]: unknown;
+        }) => (
           <Link to={href} {...props}>
             {children}
           </Link>

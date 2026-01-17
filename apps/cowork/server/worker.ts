@@ -1,5 +1,5 @@
 import { createCoworkApp } from "./app";
-import { type D1Database, createD1StorageLayer } from "./storage/d1Storage";
+import { createD1StorageLayer, type D1Database } from "./storage/d1Storage";
 
 export type CoworkWorkerEnv = {
   COWORK_DB?: D1Database;

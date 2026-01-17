@@ -7,8 +7,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { createAnnotation } from "../../annotations/annotationSchema";
 import { createEmptyDoc } from "../../crdt/crdtSchema";
-import { type LoroRuntime, createLoroRuntime } from "../../runtime/loroRuntime";
-import { LoroDocumentFacade, createDocumentFacade } from "../documentFacade";
+import { createLoroRuntime, type LoroRuntime } from "../../runtime/loroRuntime";
+import { createDocumentFacade, LoroDocumentFacade } from "../documentFacade";
 import type { FacadeChangeEvent } from "../types";
 
 describe("DocumentFacade", () => {

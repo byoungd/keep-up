@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_AI_SANITIZATION_POLICY, createSanitizer } from "../sanitizer.js";
+import { createSanitizer, DEFAULT_AI_SANITIZATION_POLICY } from "../sanitizer.js";
 import type { AISanitizationPolicyV1 } from "../types.js";
 
 describe("AI Sanitizer Limits", () => {

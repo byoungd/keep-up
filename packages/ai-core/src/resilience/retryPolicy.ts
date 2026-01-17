@@ -10,7 +10,7 @@ import {
   handleWhen,
   retry,
 } from "cockatiel";
-import { type Result, err, isOk, ok } from "../types/result";
+import { err, isOk, ok, type Result } from "../types/result";
 
 // ============================================================================
 // Types

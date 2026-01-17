@@ -390,10 +390,7 @@ export class GitToolServer implements MCPToolServer, IGitOperations {
   }
 
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: handles diff generation with multiple options and outputs
-  private async handleDiff(options: {
-    staged?: boolean;
-    file?: string;
-  }): Promise<MCPToolResult> {
+  private async handleDiff(options: { staged?: boolean; file?: string }): Promise<MCPToolResult> {
     const diffs = await this.diff(options);
 
     if (diffs.length === 0) {
@@ -456,10 +453,7 @@ export class GitToolServer implements MCPToolServer, IGitOperations {
     };
   }
 
-  private async handleLog(args: {
-    limit?: number;
-    file?: string;
-  }): Promise<MCPToolResult> {
+  private async handleLog(args: { limit?: number; file?: string }): Promise<MCPToolResult> {
     const commits = await this.log(args);
 
     const lines = commits.map(
@@ -491,10 +485,7 @@ export class GitToolServer implements MCPToolServer, IGitOperations {
     };
   }
 
-  private async handleCheckout(args: {
-    branch: string;
-    create?: boolean;
-  }): Promise<MCPToolResult> {
+  private async handleCheckout(args: { branch: string; create?: boolean }): Promise<MCPToolResult> {
     await this.checkout(args.branch, { create: args.create });
 
     return {
@@ -510,9 +501,7 @@ export class GitToolServer implements MCPToolServer, IGitOperations {
     };
   }
 
-  private async handleSemanticDiff(args: {
-    staged?: boolean;
-  }): Promise<MCPToolResult> {
+  private async handleSemanticDiff(args: { staged?: boolean }): Promise<MCPToolResult> {
     const analysis = await this.semanticDiff(args);
 
     const lines: string[] = [

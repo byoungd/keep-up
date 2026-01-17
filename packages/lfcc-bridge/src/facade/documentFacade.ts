@@ -12,20 +12,20 @@ import {
 import {
   type BlockKind,
   type BlockNode,
-  type RichText,
   ensureBlockMap,
   getRootBlocks,
   nextBlockId,
   parseAttrs,
+  type RichText,
   readBlockTree,
   serializeAttrs,
   updateBlockText,
 } from "../crdt/crdtSchema";
 import { LoroList, type LoroRuntime } from "../runtime/loroRuntime";
 import type {
+  AddCommentIntent,
   AIContext,
   AIWriteMetadata,
-  AddCommentIntent,
   AnnotationNode,
   AppendStreamChunkIntent,
   ApplyPlan,

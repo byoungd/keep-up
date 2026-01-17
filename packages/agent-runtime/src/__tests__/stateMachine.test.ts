@@ -6,8 +6,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   AgentStateMachine,
-  InvalidTransitionError,
   createAgentStateMachine,
+  InvalidTransitionError,
 } from "../orchestrator/stateMachine";
 
 describe("AgentStateMachine", () => {

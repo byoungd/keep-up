@@ -27,8 +27,8 @@ import type { KnowledgeMatchResult, KnowledgeRegistry } from "../knowledge";
 import { AGENTS_GUIDE_PROMPT } from "../prompts/agentGuidelines";
 import { SkillPromptAdapter, type SkillPromptOptions } from "../skills/skillPromptAdapter";
 import type { SkillRegistry } from "../skills/skillRegistry";
-import { AGENT_METRICS } from "../telemetry";
 import type { IMetricsCollector, SpanContext } from "../telemetry";
+import { AGENT_METRICS } from "../telemetry";
 import type { AgentMessage, AgentState, MCPToolCall } from "../types";
 import type { MessageCompressor } from "./messageCompression";
 import type {

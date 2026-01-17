@@ -143,25 +143,25 @@ export function createConsoleTelemetryAdapter(options?: {
   return {
     trackDuration(metric, durationMs, tags) {
       if (durationMs >= minDurationMs) {
-        // biome-ignore lint/suspicious/noConsoleLog: dev adapter
+        // biome-ignore lint/suspicious/noConsole: dev adapter
         console.log(`${prefix} DURATION ${metric}=${durationMs}ms`, tags ?? "");
       }
     },
     count(metric, count, tags) {
       const actualCount = count ?? 1;
-      // biome-ignore lint/suspicious/noConsoleLog: dev adapter
+      // biome-ignore lint/suspicious/noConsole: dev adapter
       console.log(`${prefix} COUNT ${metric}=${actualCount}`, tags ?? "");
     },
     gauge(metric, value, tags) {
-      // biome-ignore lint/suspicious/noConsoleLog: dev adapter
+      // biome-ignore lint/suspicious/noConsole: dev adapter
       console.log(`${prefix} GAUGE ${metric}=${value}`, tags ?? "");
     },
     histogram(metric, value, tags) {
-      // biome-ignore lint/suspicious/noConsoleLog: dev adapter
+      // biome-ignore lint/suspicious/noConsole: dev adapter
       console.log(`${prefix} HISTOGRAM ${metric}=${value}`, tags ?? "");
     },
     event(eventName, data) {
-      // biome-ignore lint/suspicious/noConsoleLog: dev adapter
+      // biome-ignore lint/suspicious/noConsole: dev adapter
       console.log(`${prefix} EVENT ${eventName}`, data);
     },
   };

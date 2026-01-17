@@ -8,7 +8,7 @@
 
 import { addBlock, createShadowDocument } from "../../kernel/shadow/shadowModel.js";
 import type { ShadowDocument, TypedOp } from "../../kernel/shadow/types.js";
-import { DEFAULT_FUZZ_CONFIG, createRng, generateOp } from "../../kernel/testing/generators.js";
+import { createRng, DEFAULT_FUZZ_CONFIG, generateOp } from "../../kernel/testing/generators.js";
 import type { FuzzConfig } from "../../kernel/testing/types.js";
 
 // ============================================================================

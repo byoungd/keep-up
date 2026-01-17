@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { MODEL_CATALOG } from "./models";
 import type { ProviderKind } from "./models";
+import { MODEL_CATALOG } from "./models";
 
 // Simple mapping of provider kind to expected base path behavior
 const PROVIDER_PATHS: Record<ProviderKind, { chatPath: string; isOpenAIStyle: boolean }> = {

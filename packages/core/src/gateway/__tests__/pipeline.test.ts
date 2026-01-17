@@ -5,11 +5,11 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_AI_SANITIZATION_POLICY } from "../../kernel/ai/types.js";
 import {
-  DEFAULT_PIPELINE_CONFIG,
-  SIZE_LIMITS,
   createPipelineBuilder,
+  DEFAULT_PIPELINE_CONFIG,
   detectMaliciousPayload,
   executePipeline,
+  SIZE_LIMITS,
   validatePayloadSize,
 } from "../pipeline.js";
 

@@ -3,7 +3,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { type EventBus, createEventBus, getGlobalEventBus, resetGlobalEventBus } from "../events";
+import { createEventBus, type EventBus, getGlobalEventBus, resetGlobalEventBus } from "../events";
 
 describe("EventBus", () => {
   let eventBus: EventBus;

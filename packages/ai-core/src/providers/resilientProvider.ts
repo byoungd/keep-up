@@ -5,7 +5,7 @@
  * retries, circuit breaking, queueing, and optional caching.
  */
 
-import { LRUCache, type LRUCacheConfig, cacheKey } from "../performance/cache";
+import { cacheKey, LRUCache, type LRUCacheConfig } from "../performance/cache";
 import type { ResilienceContext, ResiliencePipeline } from "../resilience/pipeline";
 import type {
   CompletionRequest,

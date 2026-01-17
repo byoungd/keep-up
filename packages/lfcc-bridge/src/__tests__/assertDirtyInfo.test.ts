@@ -6,8 +6,8 @@
 import type { DirtyInfo } from "@ku0/core";
 import { describe, expect, it } from "vitest";
 import {
-  type DirtyInfoDiff,
   assertDirtyInfoSuperset,
+  type DirtyInfoDiff,
   formatDirtyInfoDiff,
 } from "../dirty/assertDirtyInfo";
 

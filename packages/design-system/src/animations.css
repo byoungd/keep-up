@@ -177,7 +177,9 @@
   /* Smooth focus ring for AI inputs */
   .ai-focus-ring:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px var(--color-background), 0 0 0 4px var(--color-primary);
+    box-shadow:
+      0 0 0 2px var(--color-background),
+      0 0 0 4px var(--color-primary);
     transition: box-shadow var(--duration-fast) var(--ease-smooth);
   }
 

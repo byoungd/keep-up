@@ -8,8 +8,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
-  FEATURE_FLAGS,
   clearFeatureFlagOverrides,
+  FEATURE_FLAGS,
   getFeatureFlag,
   isCollabEnabled,
   isCollabEnabledWithOverrides,

@@ -3,18 +3,18 @@
  */
 
 export {
-  ToolRegistry,
+  BaseToolServer,
+  errorResult,
+  type ToolDefinition,
+  type ToolHandler,
+  textResult,
+} from "./baseServer";
+export {
   createToolRegistry,
   type IToolRegistry,
-  type ToolRegistryOptions,
   type RegistryEvent,
   type RegistryEventHandler,
   type RegistryEventType,
+  ToolRegistry,
+  type ToolRegistryOptions,
 } from "./registry";
-export {
-  BaseToolServer,
-  textResult,
-  errorResult,
-  type ToolHandler,
-  type ToolDefinition,
-} from "./baseServer";

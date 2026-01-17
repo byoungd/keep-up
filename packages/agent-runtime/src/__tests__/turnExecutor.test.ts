@@ -4,8 +4,8 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import { ContextFrameBuilder } from "../context";
 import type { ContextItem } from "../context";
+import { ContextFrameBuilder } from "../context";
 import type { AgentLLMResponse, IAgentLLM } from "../orchestrator/orchestrator";
 import type { TurnExecutorDependencies } from "../orchestrator/turnExecutor";
 import { createTurnExecutor } from "../orchestrator/turnExecutor";

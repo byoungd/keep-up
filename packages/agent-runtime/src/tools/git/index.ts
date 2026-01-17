@@ -4,6 +4,13 @@
  * Intelligent git operations with semantic diff analysis.
  */
 
+// Git Tool Server
+export type { IGitExecutor } from "./gitServer";
+export {
+  createGitToolServer,
+  GitToolServer,
+  MockGitExecutor,
+} from "./gitServer";
 // Types
 export type {
   CommitOptions,
@@ -25,13 +32,4 @@ export type {
   IGitOperations,
   SemanticDiffAnalysis,
 } from "./types";
-
 export { DEFAULT_GIT_CONFIG } from "./types";
-
-// Git Tool Server
-export type { IGitExecutor } from "./gitServer";
-export {
-  GitToolServer,
-  MockGitExecutor,
-  createGitToolServer,
-} from "./gitServer";

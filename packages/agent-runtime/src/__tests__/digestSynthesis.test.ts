@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
-  type DigestSourceItem,
-  VerifierAgent,
   createAgentManager,
   createMockLLM,
   createToolRegistry,
+  type DigestSourceItem,
   runDigestSynthesis,
+  VerifierAgent,
 } from "../index";
 
 describe("Digest synthesis pipeline", () => {

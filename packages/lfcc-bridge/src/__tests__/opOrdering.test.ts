@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  type StructuralOp,
   buildStructuralOpsFromDirtyInfo,
   mergeAndOrderStructuralOps,
+  type StructuralOp,
 } from "../bridge/opOrdering";
 
 describe("bridge op ordering helper", () => {

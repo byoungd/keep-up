@@ -5,6 +5,23 @@
  * Provides structured reasoning with self-correction.
  */
 
+// Reasoning Chain
+export {
+  analyzeChain,
+  exportChain,
+  ReasoningChainBuilder,
+  summarizeChain,
+  validateChain,
+} from "./reasoningChain";
+// Thinking Engine
+export {
+  createDeepThinkingEngine,
+  createQuickThinkingEngine,
+  createThinkingEngine,
+  reasoningWrapper,
+  ThinkingEngine,
+  withReasoning,
+} from "./thinkingEngine";
 // Types
 export type {
   ChainAnalysis,
@@ -13,37 +30,17 @@ export type {
   ReasoningStatus,
   ReasoningStep,
   ReasoningStepType,
+  ReasoningThinkingEvent,
+  ReasoningThinkingEventHandler,
   ReflectionPrompt,
   SummarizeOptions,
   ThinkingBudget,
   ThinkingConfig,
-  ReasoningThinkingEvent,
-  ReasoningThinkingEventHandler,
   ThinkingEventType,
   ThinkingVisibility,
 } from "./types";
-
 export {
   DEFAULT_THINKING_CONFIG,
   REFLECTION_PROMPTS,
   THINKING_BUDGETS,
 } from "./types";
-
-// Reasoning Chain
-export {
-  ReasoningChainBuilder,
-  analyzeChain,
-  exportChain,
-  summarizeChain,
-  validateChain,
-} from "./reasoningChain";
-
-// Thinking Engine
-export {
-  ThinkingEngine,
-  createDeepThinkingEngine,
-  createQuickThinkingEngine,
-  createThinkingEngine,
-  reasoningWrapper,
-  withReasoning,
-} from "./thinkingEngine";

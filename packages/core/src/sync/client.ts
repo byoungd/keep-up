@@ -6,8 +6,8 @@
 
 import { LfccError } from "../errors.js";
 import {
-  type PolicyManifestV09,
   computePolicyManifestHash,
+  type PolicyManifestV09,
   validateManifest,
 } from "../kernel/policy/index.js";
 import { getLogger } from "../observability/logger.js";
@@ -19,9 +19,11 @@ import {
   type CatchUpResponseMessage,
   type ClientCapabilities,
   type CursorPosition,
+  createMessage,
   type DocAckMessage,
   type DocUpdateMessage,
   type DocUpdatePayload,
+  deserializeMessage,
   type ErrorMessage,
   type HandshakeAckMessage,
   type HandshakePayload,
@@ -29,10 +31,8 @@ import {
   type PresencePayload,
   type SelectionRange,
   type SyncMessage,
-  type UserMeta,
-  createMessage,
-  deserializeMessage,
   serializeMessage,
+  type UserMeta,
 } from "./protocol.js";
 import { validateClientInboundMessage } from "./validation.js";
 

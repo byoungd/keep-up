@@ -37,7 +37,11 @@ function PhaseItem({
   phase,
   isActive,
   isCompleted,
-}: { phase: TaskPhase; isActive: boolean; isCompleted: boolean }) {
+}: {
+  phase: TaskPhase;
+  isActive: boolean;
+  isCompleted: boolean;
+}) {
   return (
     <div className="flex items-center shrink-0">
       <motion.div

@@ -7,7 +7,7 @@
 import type { AgentOrchestrator } from "../orchestrator/orchestrator";
 import type { ITaskExecutor, ITaskQueue, TaskExecutionContext } from "../tasks/types";
 import type { AgentState, AuditLogger } from "../types";
-import { type CoworkTaskEventHandler, attachCoworkTaskEvents } from "./events";
+import { attachCoworkTaskEvents, type CoworkTaskEventHandler } from "./events";
 import { buildCoworkTaskSummary } from "./summary";
 import type { CoworkTaskSummary } from "./types";
 

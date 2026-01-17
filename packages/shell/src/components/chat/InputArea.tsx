@@ -184,6 +184,7 @@ export function InputArea({
   };
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: Drag and drop zone
     <div
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}

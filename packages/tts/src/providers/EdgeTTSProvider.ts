@@ -90,6 +90,7 @@ export class EdgeTTSProvider implements ITTSProvider {
 
       return this.cachedVoices;
     } catch (error) {
+      // biome-ignore lint/suspicious/noConsole: Expected warning
       console.warn("[EdgeTTSProvider] Failed to fetch voices:", error);
       return [];
     }

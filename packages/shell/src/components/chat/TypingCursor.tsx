@@ -1,8 +1,7 @@
 "use client";
 
 import { cn } from "@ku0/shared/utils";
-import { useReducedMotion } from "framer-motion";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 
 export interface TypingCursorProps {
   /** Additional CSS classes */
@@ -94,6 +93,7 @@ export function ThinkingIndicator({ className }: { className?: string }) {
   }
 
   return (
+    // biome-ignore lint/a11y/useAriaPropsSupportedByRole: Status indicator
     <span className={cn("inline-flex gap-1 items-center", className)} aria-label="Thinking">
       {[0, 1, 2].map((i) => (
         <motion.span

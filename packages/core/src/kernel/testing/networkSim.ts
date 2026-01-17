@@ -3,7 +3,7 @@
  */
 
 import type { TypedOp } from "../shadow/types.js";
-import { type RngState, createRng, nextRandom, randomInt } from "./generators.js";
+import { createRng, nextRandom, type RngState, randomInt } from "./generators.js";
 import type {
   FuzzConfig,
   NetworkLogEntry,

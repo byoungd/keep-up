@@ -5,6 +5,14 @@
  * Provides short-term context and long-term knowledge storage.
  */
 
+// Memory Manager
+export {
+  createMemoryManager,
+  createMemoryManagerWithStore,
+  MemoryManager,
+} from "./memoryManager";
+// Memory Store
+export { createInMemoryStore, InMemoryStore } from "./memoryStore";
 // Types
 export type {
   ConsolidationResult,
@@ -23,26 +31,15 @@ export type {
   RecallOptions,
   RememberOptions,
 } from "./types";
-
-export { DEFAULT_MEMORY_CONFIG, cosineSimilarity } from "./types";
-
-// Memory Store
-export { InMemoryStore, createInMemoryStore } from "./memoryStore";
-
-// Memory Manager
-export {
-  MemoryManager,
-  createMemoryManager,
-  createMemoryManagerWithStore,
-} from "./memoryManager";
+export { cosineSimilarity, DEFAULT_MEMORY_CONFIG } from "./types";
 
 // Vector Index
 export type { VectorIndexConfig, VectorSearchResult } from "./vectorIndex";
 export {
-  MemoryVectorIndex,
-  MockEmbeddingProvider,
-  VectorIndex,
   createMemoryVectorIndex,
   createMockEmbeddingProvider,
   createVectorIndex,
+  MemoryVectorIndex,
+  MockEmbeddingProvider,
+  VectorIndex,
 } from "./vectorIndex";

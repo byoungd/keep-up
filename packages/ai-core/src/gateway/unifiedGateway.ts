@@ -20,20 +20,19 @@ import {
   type ProviderStreamChunk,
 } from "../providers/providerRouter";
 import { TokenTracker } from "../providers/tokenTracker";
-import type { Message, TokenUsage } from "../providers/types";
-import type { LLMProvider } from "../providers/types";
+import type { LLMProvider, Message, TokenUsage } from "../providers/types";
 import {
   type ComponentHealth,
-  type HealthStatus,
-  type SystemHealth,
   createHealthAggregator,
   formatHealthResponse,
+  type HealthStatus,
+  type SystemHealth,
 } from "../resilience/health";
-import { type ObservabilityContext, createObservability } from "../resilience/observability";
+import { createObservability, type ObservabilityContext } from "../resilience/observability";
 import type { ResiliencePipelineConfig } from "../resilience/pipeline";
-import { GatewayError, type GatewayErrorCode, fromProviderError } from "./errors";
-import { type GatewayTelemetryAdapter, createNoopGatewayTelemetryAdapter } from "./telemetry";
-import { type TraceContext, createTraceContext } from "./traceContext";
+import { fromProviderError, GatewayError, type GatewayErrorCode } from "./errors";
+import { createNoopGatewayTelemetryAdapter, type GatewayTelemetryAdapter } from "./telemetry";
+import { createTraceContext, type TraceContext } from "./traceContext";
 
 // ============================================================================
 // Types
@@ -610,11 +609,7 @@ export class UnifiedAIGateway {
   /**
    * Get usage summary.
    */
-  getUsageSummary(options?: {
-    userId?: string;
-    startTime?: number;
-    endTime?: number;
-  }) {
+  getUsageSummary(options?: { userId?: string; startTime?: number; endTime?: number }) {
     return this.tokenTracker.getSummary(options);
   }
 

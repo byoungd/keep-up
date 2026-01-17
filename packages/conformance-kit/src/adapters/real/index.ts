@@ -5,22 +5,22 @@
  */
 
 import {
+  applyOp,
   type CanonInputNode,
   type CanonNode,
-  type ShadowBlock,
-  type ShadowDocument,
-  applyOp,
   canonicalizeDocument,
   createShadowDocument,
+  type ShadowBlock,
+  type ShadowDocument,
   stableStringifyCanon,
 } from "@ku0/core";
 import {
   type BlockNode,
-  type LoroRuntime,
   createEmptyDoc,
   createLoroRuntime,
   ensureBlockMap,
   getRootBlocks,
+  type LoroRuntime,
   parseAttrs,
   readBlockTree,
   updateBlockText,

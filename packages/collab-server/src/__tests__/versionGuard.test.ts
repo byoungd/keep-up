@@ -4,11 +4,11 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  DEPRECATED_VERSIONS,
-  SUPPORTED_PROTOCOL_VERSIONS,
   createVersionMismatchError,
+  DEPRECATED_VERSIONS,
   isVersionDeprecated,
   isVersionSupported,
+  SUPPORTED_PROTOCOL_VERSIONS,
   validateProtocolVersion,
 } from "../protocol/versionGuard";
 

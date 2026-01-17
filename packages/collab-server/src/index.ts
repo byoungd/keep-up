@@ -6,40 +6,38 @@
  * and protocol version enforcement.
  */
 
-export { CollabServer, type CollabServerConfig } from "./server";
-export { SecureCollabServer, type SecureCollabServerConfig } from "./secureServer";
-export { JwtAuthAdapter, type JwtAuthConfig } from "./auth";
-export { FileSystemPersistenceAdapter } from "./persistence";
-export { SUPPORTED_PROTOCOL_VERSIONS, isVersionSupported } from "./protocol/versionGuard";
-
+// Phase 5: AI Suggestions
+export * from "./ai";
+export * from "./api";
+export * from "./audit";
+// WebSocket Security (P0.1)
+export {
+  type AuthRole,
+  type ConnectionRateLimitConfig,
+  type ConnectionState,
+  type ConnectionTimeoutConfig,
+  createNextAuthProvider,
+  JwtAuthAdapter,
+  type JwtAuthConfig,
+  type NextAuthJwtPayload,
+  NextAuthProvider,
+  type NextAuthProviderConfig,
+  type SecurityAuditEvent,
+  type SessionAuthProvider,
+  type SessionAuthResult,
+  type WsSecurityConfig,
+  WsSecurityMiddleware,
+} from "./auth";
+export * from "./auth/devTokenResolver";
+export * from "./auth/tokenResolver";
+export { type CollabMessage, CollabRelay, type CollabRelayConfig } from "./collabRelay";
+export * from "./metrics";
 // Phase 3: Permissions, Audit, and Observability
 export * from "./permissions";
-export * from "./auth/tokenResolver";
-export * from "./auth/devTokenResolver";
-export * from "./audit";
-export * from "./metrics";
-export * from "./api";
-export { CollabRelay, type CollabRelayConfig, type CollabMessage } from "./collabRelay";
+export { FileSystemPersistenceAdapter } from "./persistence";
+export { isVersionSupported, SUPPORTED_PROTOCOL_VERSIONS } from "./protocol/versionGuard";
 
 // Phase 4: Scale Hardening
 export * from "./scale";
-
-// Phase 5: AI Suggestions
-export * from "./ai";
-
-// WebSocket Security (P0.1)
-export {
-  WsSecurityMiddleware,
-  type WsSecurityConfig,
-  type ConnectionState,
-  type ConnectionRateLimitConfig,
-  type ConnectionTimeoutConfig,
-  type SecurityAuditEvent,
-  NextAuthProvider,
-  createNextAuthProvider,
-  type NextAuthProviderConfig,
-  type NextAuthJwtPayload,
-  type SessionAuthProvider,
-  type SessionAuthResult,
-  type AuthRole,
-} from "./auth";
+export { SecureCollabServer, type SecureCollabServerConfig } from "./secureServer";
+export { CollabServer, type CollabServerConfig } from "./server";

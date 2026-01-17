@@ -21,32 +21,13 @@ import { createSqliteTaskStore } from "./sqliteTaskStore";
 import { ensureStateDir } from "./statePaths";
 import { createTaskStore } from "./taskStore";
 
-// JSON-based stores (current default)
-export { JsonStore } from "./jsonStore";
-export { createSessionStore, type SessionStore } from "./sessionStore";
-export { createTaskStore, type TaskStore } from "./taskStore";
-export { createArtifactStore, type ArtifactStore } from "./artifactStore";
-export { createProjectStore, type ProjectStore } from "./projectStore";
-export { createApprovalStore, type ApprovalStore } from "./approvalStore";
 export {
-  createAgentStateCheckpointStore,
   type AgentStateCheckpointStore,
+  createAgentStateCheckpointStore,
 } from "./agentStateStore";
-export { createConfigStore, type ConfigStore } from "./configStore";
-
-// SQLite-based stores (production-ready)
-export { getDatabase, closeDatabase } from "./database";
-export { createSqliteSessionStore, type SqliteSessionStore } from "./sqliteSessionStore";
-export { createSqliteTaskStore, type SqliteTaskStore } from "./sqliteTaskStore";
-export { createSqliteArtifactStore, type SqliteArtifactStore } from "./sqliteArtifactStore";
-export { createSqliteApprovalStore, type SqliteApprovalStore } from "./sqliteApprovalStore";
-export { createSqliteConfigStore, type SqliteConfigStore } from "./sqliteConfigStore";
-export { createSqliteProjectStore, type SqliteProjectStore } from "./sqliteProjectStore";
-export { createSqliteAgentStateStore, type SqliteAgentStateStore } from "./sqliteAgentStateStore";
-
-// Utilities
-export { resolveStateDir, ensureStateDir } from "./statePaths";
-export { migrateJsonToSqlite, type MigrationOptions, type MigrationResult } from "./migrations";
+export { type ApprovalStore, createApprovalStore } from "./approvalStore";
+export { type ArtifactStore, createArtifactStore } from "./artifactStore";
+export { type ConfigStore, createConfigStore } from "./configStore";
 export type {
   AgentStateCheckpointStoreLike,
   ApprovalStoreLike,
@@ -57,6 +38,23 @@ export type {
   StorageLayer,
   TaskStoreLike,
 } from "./contracts";
+// SQLite-based stores (production-ready)
+export { closeDatabase, getDatabase } from "./database";
+// JSON-based stores (current default)
+export { JsonStore } from "./jsonStore";
+export { type MigrationOptions, type MigrationResult, migrateJsonToSqlite } from "./migrations";
+export { createProjectStore, type ProjectStore } from "./projectStore";
+export { createSessionStore, type SessionStore } from "./sessionStore";
+export { createSqliteAgentStateStore, type SqliteAgentStateStore } from "./sqliteAgentStateStore";
+export { createSqliteApprovalStore, type SqliteApprovalStore } from "./sqliteApprovalStore";
+export { createSqliteArtifactStore, type SqliteArtifactStore } from "./sqliteArtifactStore";
+export { createSqliteConfigStore, type SqliteConfigStore } from "./sqliteConfigStore";
+export { createSqliteProjectStore, type SqliteProjectStore } from "./sqliteProjectStore";
+export { createSqliteSessionStore, type SqliteSessionStore } from "./sqliteSessionStore";
+export { createSqliteTaskStore, type SqliteTaskStore } from "./sqliteTaskStore";
+// Utilities
+export { ensureStateDir, resolveStateDir } from "./statePaths";
+export { createTaskStore, type TaskStore } from "./taskStore";
 
 export type StorageMode = "json" | "sqlite" | "d1";
 

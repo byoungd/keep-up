@@ -5,10 +5,10 @@
 
 import { afterEach, describe, expect, it } from "vitest";
 import {
-  type RenderingKeysSnapshot,
   compareRenderingKeys,
   createSimpleRenderingKeysProvider,
   getRenderingKeys,
+  type RenderingKeysSnapshot,
   registerRenderingKeysProvider,
   unregisterRenderingKeysProvider,
 } from "../devtools/renderingKeys.js";

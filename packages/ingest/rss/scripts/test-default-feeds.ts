@@ -7,9 +7,9 @@
  */
 
 import {
-  RSSHUB_INSTANCES,
   getAllDefaultFeeds,
   isRSSHubFeed,
+  RSSHUB_INSTANCES,
   switchRSSHubInstance,
 } from "../src/defaultFeeds";
 import { RSSIngestor } from "../src/index";

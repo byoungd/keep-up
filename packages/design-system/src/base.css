@@ -7,11 +7,9 @@
   body {
     background-color: var(--reader-canvas, var(--color-background));
     color: var(--color-foreground);
-    background-image: radial-gradient(
-        900px circle at 12% 8%,
-        var(--color-ambient-paper),
-        transparent 55%
-      ), radial-gradient(760px circle at 88% 12%, var(--color-ambient-emerald), transparent 55%),
+    background-image:
+      radial-gradient(900px circle at 12% 8%, var(--color-ambient-paper), transparent 55%),
+      radial-gradient(760px circle at 88% 12%, var(--color-ambient-emerald), transparent 55%),
       radial-gradient(820px circle at 18% 84%, var(--color-ambient-blue), transparent 60%);
     background-repeat: no-repeat;
     @apply antialiased;
@@ -112,13 +110,17 @@
   }
 
   .premium-shadow {
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.03), 0 2px 4px rgba(0, 0, 0, 0.05), 0 12px 24px
-      rgba(0, 0, 0, 0.05);
+    box-shadow:
+      0 0 0 1px rgba(0, 0, 0, 0.03),
+      0 2px 4px rgba(0, 0, 0, 0.05),
+      0 12px 24px rgba(0, 0, 0, 0.05);
   }
 
   .dark .premium-shadow {
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05), 0 2px 4px rgba(0, 0, 0, 0.2), 0 12px 24px
-      rgba(0, 0, 0, 0.2);
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.05),
+      0 2px 4px rgba(0, 0, 0, 0.2),
+      0 12px 24px rgba(0, 0, 0, 0.2);
   }
 
   .linear-border {

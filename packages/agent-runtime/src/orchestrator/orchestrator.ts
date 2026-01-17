@@ -21,14 +21,14 @@ import type {
 } from "../artifacts";
 import { createArtifactPipeline, createArtifactRegistry } from "../artifacts";
 import type { ContextFrameBuilder, ContextItem } from "../context";
-import { type RuntimeEventBus, getGlobalEventBus } from "../events/eventBus";
+import { getGlobalEventBus, type RuntimeEventBus } from "../events/eventBus";
 import {
+  createToolExecutor,
   type ToolConfirmationDetailsProvider,
   type ToolConfirmationResolver,
   type ToolExecutionObserver,
   type ToolExecutionOptions,
   type ToolExecutor,
-  createToolExecutor,
 } from "../executor";
 import type { KnowledgeRegistry } from "../knowledge";
 import { AGENTS_GUIDE_PROMPT } from "../prompts/agentGuidelines";
@@ -40,13 +40,13 @@ import { createSkillPromptAdapter } from "../skills/skillPromptAdapter";
 import type { SkillRegistry } from "../skills/skillRegistry";
 import type { SkillSession } from "../skills/skillSession";
 import { createSkillSession } from "../skills/skillSession";
-import { type StreamWriter, attachRuntimeEventStreamBridge } from "../streaming";
-import { type TaskGraphStore, type TaskNodeStatus, createTaskGraphStore } from "../tasks/taskGraph";
+import { attachRuntimeEventStreamBridge, type StreamWriter } from "../streaming";
+import { createTaskGraphStore, type TaskGraphStore, type TaskNodeStatus } from "../tasks/taskGraph";
 import type { IMetricsCollector, ITracer, SpanContext, TelemetryContext } from "../telemetry";
 import { AGENT_METRICS } from "../telemetry";
 import {
-  type ToolDiscoveryEngine,
   createToolDiscoveryEngine,
+  type ToolDiscoveryEngine,
 } from "../tools/discovery/toolDiscovery";
 import type { IToolRegistry } from "../tools/mcp/registry";
 import type {
@@ -65,20 +65,20 @@ import type {
   ToolError,
 } from "../types";
 import { countTokens } from "../utils/tokenCounter";
-import { type DependencyAnalyzer, createDependencyAnalyzer } from "./dependencyAnalyzer";
-import { type ErrorRecoveryEngine, createErrorRecoveryEngine } from "./errorRecovery";
+import { createDependencyAnalyzer, type DependencyAnalyzer } from "./dependencyAnalyzer";
+import { createErrorRecoveryEngine, type ErrorRecoveryEngine } from "./errorRecovery";
 import { BackpressureEventStream } from "./eventStream";
 import { type MessageCompressor, SmartMessageCompressor } from "./messageCompression";
 import {
+  createPlanningEngine,
   type ExecutionPlan,
   type PlanApprovalHandler,
   type PlanningEngine,
-  createPlanningEngine,
 } from "./planning";
-import { type RequestCache, createRequestCache } from "./requestCache";
+import { createRequestCache, type RequestCache } from "./requestCache";
 import { SmartToolScheduler } from "./smartToolScheduler";
 import { ToolResultCache } from "./toolResultCache";
-import { type ITurnExecutor, createTurnExecutor } from "./turnExecutor";
+import { createTurnExecutor, type ITurnExecutor } from "./turnExecutor";
 
 // ============================================================================
 // LLM Interface (for dependency injection)
@@ -230,9 +230,7 @@ export class AgentOrchestrator {
 
   private state: AgentState;
   private confirmationHandler?: ConfirmationHandler;
-  private planApprovalHandler?: PlanApprovalHandler;
   private abortController?: AbortController;
-  private currentPlan?: ExecutionPlan;
 
   constructor(
     config: AgentConfig,
@@ -459,7 +457,6 @@ export class AgentOrchestrator {
    * Set plan approval handler for plan-then-execute flows.
    */
   setPlanApprovalHandler(handler: PlanApprovalHandler): void {
-    this.planApprovalHandler = handler;
     this.planningEngine.setApprovalHandler(handler);
   }
 
@@ -623,7 +620,6 @@ export class AgentOrchestrator {
     }
 
     const plan = this.buildPlan(toolCalls);
-    this.currentPlan = plan;
     this.emit("plan:created", plan);
 
     if (plan.requiresApproval) {

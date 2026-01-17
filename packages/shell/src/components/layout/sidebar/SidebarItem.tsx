@@ -18,7 +18,7 @@ interface SidebarItemProps {
 }
 
 function extractIdFromHref(href: string): string | null {
-  const match = href.match(/\/editor\/([^\/?]+)/);
+  const match = href.match(/\/editor\/([^/?]+)/);
   return match ? match[1] : null;
 }
 

@@ -1,17 +1,17 @@
 import { describe, expect, test } from "vitest";
 import {
-  MODEL_CATALOG,
   getDefaultModelId,
   getModelCapability,
   getModelsWithCapabilities,
   getSuggestedModel,
+  MODEL_CATALOG,
   modelSupportsThinking,
   modelSupportsTools,
   modelSupportsVision,
   normalizeModelId,
   validateModelCapabilities,
 } from "./models";
-import { PROVIDER_CATALOG, getAllProviderIds } from "./providers";
+import { getAllProviderIds, PROVIDER_CATALOG } from "./providers";
 
 describe("normalizeModelId", () => {
   test("maps legacy model ids", () => {

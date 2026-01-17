@@ -221,6 +221,7 @@ function saveUserConfig(config: SidebarUserConfig, storageKey: string): void {
   try {
     localStorage.setItem(storageKey, JSON.stringify(config));
   } catch {
+    // biome-ignore lint/suspicious/noConsole: Storage error logging
     console.error("Failed to save sidebar config");
   }
 }
@@ -395,6 +396,7 @@ export function useSidebarConfig({
     }));
   }, [user]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: syncRemoteState is stable enough
   React.useEffect(() => {
     let cancelled = false;
     // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Config loading logic is inherently complex

@@ -1,7 +1,12 @@
 {
-  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
-  "organizeImports": {
-    "enabled": true
+  "$schema": "https://biomejs.dev/schemas/2.3.11/schema.json",
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
   },
   "linter": {
     "enabled": true,
@@ -9,7 +14,6 @@
       "recommended": true,
       "a11y": {
         "noAriaHiddenOnFocusable": "error",
-        "noBlankTarget": "error",
         "useAltText": "error",
         "useButtonType": "error",
         "useKeyWithClickEvents": "error",
@@ -42,9 +46,12 @@
       "suspicious": {
         "noExplicitAny": "error",
         "noArrayIndexKey": "error",
-        "noConsoleLog": "warn",
+        "noConsole": "warn",
         "noEmptyBlockStatements": "error",
         "noConfusingVoidType": "error"
+      },
+      "security": {
+        "noBlankTarget": "error"
       }
     }
   },
@@ -67,35 +74,43 @@
       "trailingCommas": "none"
     }
   },
+  "css": {
+    "parser": {
+      "cssModules": true,
+      "tailwindDirectives": true
+    },
+    "formatter": {
+      "quoteStyle": "double"
+    }
+  },
   "files": {
-    "ignore": [
-      "node_modules",
-      ".next",
-      ".turbo",
-      "**/dist",
-      "**/*.d.ts",
-      "**/*.d.ts.map",
-      "packages/app/src/**/*.js",
-      "packages/lfcc-bridge/src/**/*.js",
-      "packages/overlay/src/**/*.js",
-      "coverage",
-      "*.min.js",
-      "pnpm-lock.yaml",
-      "packages/mdvp-wasm/pkg"
+    "includes": [
+      "**",
+      "!node_modules",
+      "!.next",
+      "!.turbo",
+      "!**/dist",
+      "!**/*.d.ts",
+      "!**/*.d.ts.map",
+      "!packages/app/src/**/*.js",
+      "!packages/lfcc-bridge/src/**/*.js",
+      "!packages/overlay/src/**/*.js",
+      "!coverage",
+      "!*.min.js",
+      "!pnpm-lock.yaml",
+      "!pnpm-lock.yaml",
+      "!packages/mdvp-wasm/pkg",
+      "!packages/collab-server"
     ]
   },
   "overrides": [
     {
-      "include": [
-        "packages/collab-server/src/ai/**",
-        "packages/collab-server/src/scale/**",
-        "packages/collab-server/src/auth/**",
-        "packages/collab-server/src/rollout/**"
-      ],
+      "includes": ["apps/reader/src/components/layout/ModelSelector.tsx"],
       "linter": {
         "rules": {
           "complexity": {
             "noExcessiveCognitiveComplexity": {
+              "level": "error",
               "options": { "maxAllowedComplexity": 22 }
             }
           }
@@ -103,23 +118,12 @@
       }
     },
     {
-      "include": ["apps/reader/src/components/layout/ModelSelector.tsx"],
+      "includes": ["e2e/**/*.ts", "e2e/**/*.spec.ts"],
       "linter": {
         "rules": {
           "complexity": {
             "noExcessiveCognitiveComplexity": {
-              "options": { "maxAllowedComplexity": 22 }
-            }
-          }
-        }
-      }
-    },
-    {
-      "include": ["e2e/**/*.ts", "e2e/**/*.spec.ts"],
-      "linter": {
-        "rules": {
-          "complexity": {
-            "noExcessiveCognitiveComplexity": {
+              "level": "error",
               "options": { "maxAllowedComplexity": 50 }
             }
           },
@@ -130,7 +134,7 @@
       }
     },
     {
-      "include": [
+      "includes": [
         "scripts/**",
         "**/*.mjs",
         "packages/bench/src/runner.ts",
@@ -142,7 +146,7 @@
       "linter": {
         "rules": {
           "suspicious": {
-            "noConsoleLog": "off"
+            "noConsole": "off"
           }
         }
       }

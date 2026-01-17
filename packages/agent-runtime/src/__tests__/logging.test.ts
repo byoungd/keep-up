@@ -4,12 +4,12 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
-  type Logger,
-  type MemoryTransport,
   configureLogger,
   createLogger,
   createMemoryTransport,
   getLogger,
+  type Logger,
+  type MemoryTransport,
   resetLogger,
 } from "../logging";
 

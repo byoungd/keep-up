@@ -9,9 +9,9 @@
 
 import {
   type AuthRole,
+  createAuthFailure,
   type SessionAuthProvider,
   type SessionAuthResult,
-  createAuthFailure,
 } from "./sessionAuthProvider";
 
 /** Supported JWT algorithms */

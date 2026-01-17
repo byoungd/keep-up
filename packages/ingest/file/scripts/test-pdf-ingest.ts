@@ -18,10 +18,10 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  computeIngestStats,
   FileImporter,
   INGEST_QUALITY_THRESHOLDS,
   type IngestNormalizationStats,
-  computeIngestStats,
 } from "../src";
 
 // ============================================================================

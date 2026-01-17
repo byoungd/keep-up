@@ -6,135 +6,133 @@
 
 // Branded Types
 export {
-  // ID Types
-  type UserId,
-  type DocId,
-  type ChunkId,
-  type TraceId,
-  type SpanId,
-  type ProviderId,
-  type RequestId,
-  // Value Types
-  type NonEmptyString,
-  type PositiveInt,
-  type UnitInterval,
-  type TokenCount,
-  type SimilarityScore,
-  type UTF16Offset,
-  type Timestamp,
-  // Constructors
-  userId,
-  docId,
-  chunkId,
-  traceId,
-  spanId,
-  providerId,
-  requestId,
-  nonEmptyString,
-  positiveInt,
-  unitInterval,
-  tokenCount,
-  similarityScore,
-  utf16Offset,
-  timestamp,
-  // Safe Constructors
-  safeUserId,
-  safeDocId,
-  safeChunkId,
-  safePositiveInt,
-  safeUnitInterval,
-  safeSimilarityScore,
-  // Type Guards
-  isValidUserId,
-  isValidPositiveInt,
-  isValidUnitInterval,
-  // Generators
-  generateId,
-  generateDocId,
-  generateChunkId,
-  generateTraceId,
-  generateRequestId,
-  // Utilities
-  unwrap,
   // Errors
   BrandValidationError,
+  type ChunkId,
+  chunkId,
+  type DocId,
+  docId,
+  generateChunkId,
+  generateDocId,
+  // Generators
+  generateId,
+  generateRequestId,
+  generateTraceId,
+  isValidPositiveInt,
+  isValidUnitInterval,
+  // Type Guards
+  isValidUserId,
+  // Value Types
+  type NonEmptyString,
+  nonEmptyString,
+  type PositiveInt,
+  type ProviderId,
+  positiveInt,
+  providerId,
+  type RequestId,
+  requestId,
+  type SimilarityScore,
+  type SpanId,
+  safeChunkId,
+  safeDocId,
+  safePositiveInt,
+  safeSimilarityScore,
+  safeUnitInterval,
+  // Safe Constructors
+  safeUserId,
+  similarityScore,
+  spanId,
+  type Timestamp,
+  type TokenCount,
+  type TraceId,
+  timestamp,
+  tokenCount,
+  traceId,
+  type UnitInterval,
+  // ID Types
+  type UserId,
+  type UTF16Offset,
+  unitInterval,
+  // Utilities
+  unwrap,
+  // Constructors
+  userId,
+  utf16Offset,
   type ValidationResult,
 } from "./branded";
-
-// Validation
-export {
-  // Types
-  type FieldError,
-  type ValidateResult,
-  type Validator,
-  // Error
-  ValidationError,
-  // Core Validators
-  string,
-  nonEmptyString as nonEmptyStringValidator,
-  number,
-  integer,
-  positive,
-  range,
-  boolean,
-  array,
-  arrayLength,
-  // Object Validators
-  object,
-  optional,
-  withDefault,
-  // Combinators
-  and,
-  or,
-  oneOf,
-  // String Validators
-  stringLength,
-  pattern,
-  url,
-  email,
-  // Utilities
-  validate,
-  createParser,
-  tryValidate,
-} from "./validation";
-
 // Result Type (Functional Error Handling)
 export {
-  // Core Types
-  type Result,
-  type Ok,
-  type Err,
   type AsyncResult,
-  // Constructors
-  ok,
-  err,
-  // Type Guards
-  isOk,
-  isErr,
-  // Transformations
-  map,
-  mapErr,
-  flatMap,
-  chain,
-  ap,
-  // Extraction
-  unwrapResult,
-  unwrapOr,
-  unwrapOrElse,
-  toOption,
-  toError,
-  // Combinators
-  match,
   all,
   any,
-  partition,
+  ap,
+  asyncResultDo,
+  chain,
+  type Err,
+  err,
+  flatMap,
+  flatMapAsync,
+  fromAsyncThrowable,
   // Async Support
   fromPromise,
   fromThrowable,
-  fromAsyncThrowable,
+  isErr,
+  // Type Guards
+  isOk,
+  // Transformations
+  map,
   mapAsync,
-  flatMapAsync,
+  mapErr,
+  // Combinators
+  match,
+  type Ok,
+  // Constructors
+  ok,
+  partition,
+  // Core Types
+  type Result,
   // Do Notation
   resultDo,
-  asyncResultDo,
+  toError,
+  toOption,
+  unwrapOr,
+  unwrapOrElse,
+  // Extraction
+  unwrapResult,
 } from "./result";
+// Validation
+export {
+  // Combinators
+  and,
+  array,
+  arrayLength,
+  boolean,
+  createParser,
+  email,
+  // Types
+  type FieldError,
+  integer,
+  nonEmptyString as nonEmptyStringValidator,
+  number,
+  // Object Validators
+  object,
+  oneOf,
+  optional,
+  or,
+  pattern,
+  positive,
+  range,
+  // Core Validators
+  string,
+  // String Validators
+  stringLength,
+  tryValidate,
+  url,
+  type ValidateResult,
+  // Error
+  ValidationError,
+  type Validator,
+  // Utilities
+  validate,
+  withDefault,
+} from "./validation";

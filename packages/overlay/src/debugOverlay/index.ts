@@ -5,26 +5,6 @@
  * Exports for the observability debug overlay
  */
 
-// Types
-export * from "./types";
-
-// State management
-export {
-  createDebugOverlayController,
-  createDebugOverlayState,
-  recordScanResult,
-  toggleDebugOverlayVisibility,
-  toggleDebugSection,
-  toggleDecorationOutlines,
-  updateAnnotationsSection,
-  updateDirtySection,
-  updateDocumentSection,
-  updateFocusSection,
-  updatePerfSection,
-  updateSelectionSection,
-  type DebugOverlayController,
-} from "./state";
-
 // Snapshot export
 export {
   copySnapshotToClipboard,
@@ -33,10 +13,8 @@ export {
   serializeSnapshot,
   validateSnapshotSchema,
 } from "./debugSnapshot";
-
 // Performance counters
 export { createPerfCounters, getPerfCounters, type PerfCounters } from "./perfCounters";
-
 // Renderer
 export {
   generateDebugOverlayCss,
@@ -49,3 +27,21 @@ export {
   renderPerfSection,
   renderSelectionSection,
 } from "./renderer";
+// State management
+export {
+  createDebugOverlayController,
+  createDebugOverlayState,
+  type DebugOverlayController,
+  recordScanResult,
+  toggleDebugOverlayVisibility,
+  toggleDebugSection,
+  toggleDecorationOutlines,
+  updateAnnotationsSection,
+  updateDirtySection,
+  updateDocumentSection,
+  updateFocusSection,
+  updatePerfSection,
+  updateSelectionSection,
+} from "./state";
+// Types
+export * from "./types";

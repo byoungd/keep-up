@@ -46,227 +46,192 @@
  */
 
 // ============================================================================
-// Types
+// Agents
 // ============================================================================
-export * from "./types";
-
+export {
+  AGENT_PROFILES,
+  AgentManager,
+  createAgentManager,
+  getAgentProfile,
+  listAgentTypes,
+  VerifierAgent,
+} from "./agents";
+// ============================================================================
+// Artifacts
+// ============================================================================
+export * from "./artifacts";
+// ============================================================================
+// Bridge (AI-Native Integration)
+// ============================================================================
+export * from "./bridge";
+// ============================================================================
+// Checkpoint
+// ============================================================================
+export * from "./checkpoint";
+// ============================================================================
+// Context
+// ============================================================================
+export * from "./context";
 // ============================================================================
 // Cowork
 // ============================================================================
 export * from "./cowork";
-
 // ============================================================================
-// Tools
+// Events
 // ============================================================================
-export * from "./tools";
-
-// Tool Discovery
-export { createToolDiscoveryEngine } from "./tools/discovery/toolDiscovery";
-export type { ToolSearchCriteria, ToolSearchResult } from "./tools/discovery/toolDiscovery";
-
-// Script Executor
-export { createScriptExecutor, SCRIPT_TEMPLATES } from "./tools/core/scriptExecutor";
-export type {
-  ScriptContext,
-  ScriptResult,
-  ScriptExecutorConfig,
-} from "./tools/core/scriptExecutor";
-
+export * from "./events";
+// ============================================================================
+// Tool Execution Pipeline
+// ============================================================================
+export * from "./executor";
+// ============================================================================
+// Kernel Interfaces
+// ============================================================================
+export * from "./kernel";
+// ============================================================================
+// Knowledge (Scoped Conditional Injection)
+// ============================================================================
+export * from "./knowledge";
+// ============================================================================
+// Logging
+// ============================================================================
+export {
+  ConsoleTransport,
+  configureLogger,
+  createLogger,
+  getLogger,
+  Logger,
+  type LoggerConfig,
+  MemoryTransport,
+} from "./logging";
+// ============================================================================
+// Memory (Cross-Session Knowledge)
+// ============================================================================
+export * from "./memory";
 // ============================================================================
 // Orchestrator (with performance optimizations)
 // ============================================================================
 export * from "./orchestrator";
 // Performance optimization components
 export {
+  createDependencyAnalyzer,
   createMessageCompressor,
   createRequestCache,
-  createDependencyAnalyzer,
 } from "./orchestrator";
-
-// ============================================================================
-// Kernel Interfaces
-// ============================================================================
-export * from "./kernel";
-
-// ============================================================================
-// Tool Execution Pipeline
-// ============================================================================
-export * from "./executor";
-
-// Planning System
-export { createPlanningEngine } from "./orchestrator/planning";
-export type { ExecutionPlan, PlanStep, PlanningConfig } from "./orchestrator/planning";
-
-// Error Recovery
-export { createErrorRecoveryEngine } from "./orchestrator/errorRecovery";
-export type { RecoveryStrategy } from "./orchestrator/errorRecovery";
-
-// Subagent Orchestration
-export { createSubagentOrchestrator } from "./orchestrator/subagentOrchestrator";
-export type { SubagentTask, AggregatedResults } from "./orchestrator/subagentOrchestrator";
-
+export type {
+  ConsensusConfig,
+  ConsensusModelConfig,
+  ConsensusResult,
+  ModelResponse,
+  VotingStrategy,
+} from "./orchestrator/consensusOrchestrator";
 // Consensus Orchestration
 export {
   ConsensusOrchestrator,
   createConsensusOrchestrator,
 } from "./orchestrator/consensusOrchestrator";
-export type {
-  ConsensusConfig,
-  ConsensusResult,
-  ConsensusModelConfig,
-  ModelResponse,
-  VotingStrategy,
-} from "./orchestrator/consensusOrchestrator";
-
-// ============================================================================
-// Security
-// ============================================================================
-export * from "./security";
-
-// ============================================================================
-// Sandbox
-// ============================================================================
-export * from "./sandbox";
-
-// ============================================================================
-// Telemetry
-// ============================================================================
-export * from "./telemetry";
-
-// ============================================================================
-// Agents
-// ============================================================================
-export {
-  createAgentManager,
-  AGENT_PROFILES,
-  getAgentProfile,
-  listAgentTypes,
-  AgentManager,
-  VerifierAgent,
-} from "./agents";
-
-// ============================================================================
-// Context
-// ============================================================================
-export * from "./context";
-
-// ============================================================================
-// Routing
-// ============================================================================
-export * from "./routing";
-
-// ============================================================================
-// Session State
-// ============================================================================
-export * from "./session";
-
-// ============================================================================
-// Utilities
-// ============================================================================
-export * from "./utils";
-
-// ============================================================================
-// Plugins
-// ============================================================================
-export * from "./plugins";
-
-// ============================================================================
-// Workflows
-// ============================================================================
-export { createWorkflowTemplateManager, BUILT_IN_WORKFLOWS } from "./workflows";
-export type { WorkflowTemplate, WorkflowPhase, WorkflowContext } from "./workflows";
-
-// ============================================================================
-// Artifacts
-// ============================================================================
-export * from "./artifacts";
-
-// ============================================================================
-// Prompts
-// ============================================================================
-export { createPromptBuilder } from "./prompts";
-export type { PromptContext, BuiltPrompt, TaskType, ExecutionPhase } from "./prompts/promptBuilder";
-
-// ============================================================================
-// Events
-// ============================================================================
-export * from "./events";
-
-// ============================================================================
-// Checkpoint
-// ============================================================================
-export * from "./checkpoint";
-
-// ============================================================================
-// Quota
-// ============================================================================
-export * from "./quota";
-
-// ============================================================================
-// Streaming
-// ============================================================================
-export * from "./streaming";
-
+export type { RecoveryStrategy } from "./orchestrator/errorRecovery";
+// Error Recovery
+export { createErrorRecoveryEngine } from "./orchestrator/errorRecovery";
+export type { ExecutionPlan, PlanningConfig, PlanStep } from "./orchestrator/planning";
+// Planning System
+export { createPlanningEngine } from "./orchestrator/planning";
+export type { AggregatedResults, SubagentTask } from "./orchestrator/subagentOrchestrator";
+// Subagent Orchestration
+export { createSubagentOrchestrator } from "./orchestrator/subagentOrchestrator";
 // ============================================================================
 // Pipeline
 // ============================================================================
 export * from "./pipeline";
-
 // ============================================================================
-// Logging
+// Plugins
 // ============================================================================
-export {
-  Logger,
-  ConsoleTransport,
-  MemoryTransport,
-  getLogger,
-  configureLogger,
-  createLogger,
-  type LoggerConfig,
-} from "./logging";
-
+export * from "./plugins";
+// ============================================================================
+// Prompts
+// ============================================================================
+export { createPromptBuilder } from "./prompts";
+export type { BuiltPrompt, ExecutionPhase, PromptContext, TaskType } from "./prompts/promptBuilder";
+// ============================================================================
+// Quota
+// ============================================================================
+export * from "./quota";
 // ============================================================================
 // Reasoning (Extended Thinking)
 // ============================================================================
 export * from "./reasoning";
-
 // ============================================================================
-// Memory (Cross-Session Knowledge)
+// Routing
 // ============================================================================
-export * from "./memory";
-
+export * from "./routing";
 // ============================================================================
-// Knowledge (Scoped Conditional Injection)
+// Sandbox
 // ============================================================================
-export * from "./knowledge";
-
+export * from "./sandbox";
+// ============================================================================
+// Security
+// ============================================================================
+export * from "./security";
+// ============================================================================
+// Session State
+// ============================================================================
+export * from "./session";
 // ============================================================================
 // Skills (Agent Skills)
 // ============================================================================
 export * from "./skills";
-
+// ============================================================================
+// Streaming
+// ============================================================================
+export * from "./streaming";
 // ============================================================================
 // Background Tasks
 // ============================================================================
 export * from "./tasks";
-
 // ============================================================================
-// Bridge (AI-Native Integration)
+// Telemetry
 // ============================================================================
-export * from "./bridge";
+export * from "./telemetry";
+// ============================================================================
+// Tools
+// ============================================================================
+export * from "./tools";
+export type {
+  ScriptContext,
+  ScriptExecutorConfig,
+  ScriptResult,
+} from "./tools/core/scriptExecutor";
+// Script Executor
+export { createScriptExecutor, SCRIPT_TEMPLATES } from "./tools/core/scriptExecutor";
+export type { ToolSearchCriteria, ToolSearchResult } from "./tools/discovery/toolDiscovery";
+// Tool Discovery
+export { createToolDiscoveryEngine } from "./tools/discovery/toolDiscovery";
+// ============================================================================
+// Types
+// ============================================================================
+export * from "./types";
+// ============================================================================
+// Utilities
+// ============================================================================
+export * from "./utils";
+export type { WorkflowContext, WorkflowPhase, WorkflowTemplate } from "./workflows";
+// ============================================================================
+// Workflows
+// ============================================================================
+export { BUILT_IN_WORKFLOWS, createWorkflowTemplateManager } from "./workflows";
 
 // ============================================================================
 // Convenience Re-exports
 // ============================================================================
 
+export { createAICoreAdapter, createMockLLM } from "./orchestrator/aiCoreAdapter";
+export { createOrchestrator } from "./orchestrator/orchestrator";
+export { createBashToolServer } from "./tools/core/bash";
+export { createCodeToolServer } from "./tools/core/code";
+export { createFileToolServer } from "./tools/core/file";
+export { createSubagentToolServer } from "./tools/core/subagent";
+export { createGitToolServer } from "./tools/git/gitServer";
+export { createLFCCToolServer } from "./tools/lfcc/lfccServer";
 // Quick access to commonly used factories
 export { createToolRegistry } from "./tools/mcp/registry";
-export { createBashToolServer } from "./tools/core/bash";
-export { createFileToolServer } from "./tools/core/file";
-export { createCodeToolServer } from "./tools/core/code";
-export { createSubagentToolServer } from "./tools/core/subagent";
-export { createLFCCToolServer } from "./tools/lfcc/lfccServer";
 export { createWebSearchToolServer } from "./tools/web/webSearchServer";
-export { createGitToolServer } from "./tools/git/gitServer";
-export { createOrchestrator } from "./orchestrator/orchestrator";
-export { createAICoreAdapter, createMockLLM } from "./orchestrator/aiCoreAdapter";

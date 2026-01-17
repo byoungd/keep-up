@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { DbDriver, DbHealthInfo, DbInitResult, ImportJobRow } from "../driver/types";
-import { type WorkerRequest, handleWorkerRequest } from "../worker";
+import { handleWorkerRequest, type WorkerRequest } from "../worker";
 
 function createStubDriver(): { driver: DbDriver; initResult: DbInitResult; jobRow: ImportJobRow } {
   const initResult: DbInitResult = { driver: "sqlite-opfs", schemaVersion: 2, initTimeMs: 5 };

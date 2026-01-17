@@ -5,8 +5,8 @@
  */
 
 export {
-  InviteTokenService,
   type InviteTokenConfig,
   type InviteTokenPayload,
   type InviteTokenResult,
+  InviteTokenService,
 } from "./inviteTokenService";

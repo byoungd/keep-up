@@ -6,7 +6,7 @@
  */
 
 import { type ContextManager, createContextManager } from "../context";
-import { type IMemoryManager, createMemoryManager } from "../memory";
+import { createMemoryManager, type IMemoryManager } from "../memory";
 import type { AgentMessage, AgentState } from "../types";
 import type { ToolResultCache } from "../utils/cache";
 

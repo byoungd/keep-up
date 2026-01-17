@@ -240,6 +240,8 @@ export const List = React.forwardRef<HTMLDivElement, ListProps>(
     React.useImperativeHandle(ref, () => listRef.current as HTMLDivElement);
 
     return (
+      // biome-ignore lint/a11y/noStaticElementInteractions: Interactive list container
+      // biome-ignore lint/a11y/useAriaPropsSupportedByRole: Role is dynamic
       <div
         ref={listRef}
         role={variant === "menu" ? "menu" : "listbox"}

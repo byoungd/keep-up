@@ -16,14 +16,14 @@ import { decodeAnchor as decodeLegacyCursorAnchor, resolveAnchor } from "../anch
 import type { SpanChainPolicy, SpanList } from "../selection/selectionMapping";
 import {
   type AnnotationSubscriber,
-  type StoredAnnoState,
-  type StoredAnnotationRecord,
-  type StoredSpanAnchor,
-  type StoredSpanRange,
   createAnnotation as createAnnotationRecord,
   removeAnnotation as hardRemoveAnnotation,
   readAllAnnotations,
   readAnnotation,
+  type StoredAnnoState,
+  type StoredAnnotationRecord,
+  type StoredSpanAnchor,
+  type StoredSpanRange,
   deleteAnnotation as softDeleteAnnotation,
   spanListToStored,
   storedToSpanList,

@@ -4,6 +4,16 @@
  * Single-authority document access layer.
  */
 
+// Implementation
+export { createDocumentFacade, LoroDocumentFacade } from "./documentFacade";
+// AI Gateway Integration
+export {
+  buildSelectionAnnotationId,
+  buildSelectionSpanId,
+  createLoroAIGateway,
+  createLoroDocumentProvider,
+  createLoroGatewayRetryProviders,
+} from "./loroDocumentProvider";
 // Types
 export type {
   AddCommentIntent,
@@ -33,17 +43,4 @@ export type {
   UpdateContentIntent,
   UpdateMessageIntent,
 } from "./types";
-
 export { FACADE_STRICT_MODE } from "./types";
-
-// Implementation
-export { LoroDocumentFacade, createDocumentFacade } from "./documentFacade";
-
-// AI Gateway Integration
-export {
-  buildSelectionAnnotationId,
-  buildSelectionSpanId,
-  createLoroAIGateway,
-  createLoroDocumentProvider,
-  createLoroGatewayRetryProviders,
-} from "./loroDocumentProvider";

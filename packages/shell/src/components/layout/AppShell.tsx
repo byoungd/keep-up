@@ -670,9 +670,6 @@ export function AppShell(props: AppShellProps) {
   } = useReaderShell();
 
   // Safe defaults if accessing before init
-  if (!sidebarState || !sidebarActions || !sidebarUserConfig || !sidebarGroups) {
-    return null;
-  }
 
   const {
     isVisible: isAIPanelVisible,
@@ -700,9 +697,12 @@ export function AppShell(props: AppShellProps) {
   const auxPanelWidth = auxState.width;
 
   // Map context values to local names for compatibility with existing code
-  const state = sidebarState;
-  const actions = sidebarActions;
-  const userConfig = sidebarUserConfig;
+  // biome-ignore lint/style/noNonNullAssertion: Guarded by early return
+  const state = sidebarState!;
+  // biome-ignore lint/style/noNonNullAssertion: Guarded by early return
+  const actions = sidebarActions!;
+  // biome-ignore lint/style/noNonNullAssertion: Guarded by early return
+  const userConfig = sidebarUserConfig!;
   const isLoading = sidebarIsLoading ?? false;
 
   const workspaceName = user?.fullName ?? user?.email ?? "Workspace";
@@ -842,12 +842,18 @@ export function AppShell(props: AppShellProps) {
   const handleCustomizeOpen = React.useCallback(() => setCustomizeOpen(true), []);
   const handleCustomizeClose = React.useCallback(() => setCustomizeOpen(false), []);
 
+  // Safe defaults if accessing before init
+  if (!sidebarState || !sidebarActions || !sidebarUserConfig || !sidebarGroups) {
+    return null;
+  }
+
   const defaultSidebar = (
     <DefaultSidebar
       state={state}
       actions={actions}
       userConfig={userConfig}
-      groups={sidebarGroups}
+      // biome-ignore lint/style/noNonNullAssertion: Guarded by early return
+      groups={sidebarGroups!}
       isLoading={isLoading}
       customizeOpen={customizeOpen}
       onCustomizeOpen={handleCustomizeOpen}

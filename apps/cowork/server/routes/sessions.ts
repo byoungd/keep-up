@@ -49,6 +49,7 @@ export function createSessionRoutes(deps: SessionRouteDeps) {
     };
 
     await deps.sessionStore.create(session);
+    // biome-ignore lint/suspicious/noConsole: Server logging
     console.info("[cowork] session created", {
       sessionId: session.sessionId,
       userId: session.userId,
@@ -100,6 +101,7 @@ export function createSessionRoutes(deps: SessionRouteDeps) {
 
     try {
       const task = await deps.taskRuntime.enqueueTask(session, parsed.data);
+      // biome-ignore lint/suspicious/noConsole: Server logging
       console.info("[cowork] task created", {
         sessionId,
         taskId: task.taskId,
@@ -139,6 +141,7 @@ export function createSessionRoutes(deps: SessionRouteDeps) {
       providerId: updated.providerId,
       fallbackNotice: updated.fallbackNotice,
     });
+    // biome-ignore lint/suspicious/noConsole: Server logging
     console.info("[cowork] task updated", {
       sessionId: updated.sessionId,
       taskId: updated.taskId,

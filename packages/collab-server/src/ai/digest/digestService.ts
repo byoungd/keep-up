@@ -12,9 +12,9 @@ import type { AIGateway } from "../gateway";
 import type { RAGPipeline } from "../rag/ragPipeline";
 import { type ClusteringConfig, ClusteringService, type ContentCluster } from "./clusteringService";
 import {
+  createLLMSynthesizer,
   type LLMSynthesizer,
   type LLMSynthesizerConfig,
-  createLLMSynthesizer,
 } from "./llmSynthesizer";
 import type {
   ContentItem,

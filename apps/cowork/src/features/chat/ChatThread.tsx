@@ -1,7 +1,7 @@
 import {
-  MODEL_CATALOG,
   getDefaultModelId,
   getModelCapability,
+  MODEL_CATALOG,
   normalizeModelId,
 } from "@ku0/ai-core";
 import { AIPanel as ShellAIPanel } from "@ku0/shell";

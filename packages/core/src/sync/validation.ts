@@ -4,7 +4,6 @@ import {
   validatePresencePayload as validatePresencePayloadSize,
   validateUpdatePayload,
 } from "../security/validation.js";
-import { PROTOCOL_VERSION } from "./protocol.js";
 import type {
   CatchUpRequestMessage,
   CatchUpResponseMessage,
@@ -23,6 +22,7 @@ import type {
   SelectionRange,
   UserMeta,
 } from "./protocol.js";
+import { PROTOCOL_VERSION } from "./protocol.js";
 
 export type ClientInboundMessage =
   | HandshakeAckMessage

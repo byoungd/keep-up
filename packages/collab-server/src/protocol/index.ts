@@ -3,11 +3,11 @@
  */
 
 export {
-  SUPPORTED_PROTOCOL_VERSIONS,
-  DEPRECATED_VERSIONS,
-  MIN_SUPPORTED_VERSION,
-  isVersionSupported,
-  isVersionDeprecated,
-  validateProtocolVersion,
   createVersionMismatchError,
+  DEPRECATED_VERSIONS,
+  isVersionDeprecated,
+  isVersionSupported,
+  MIN_SUPPORTED_VERSION,
+  SUPPORTED_PROTOCOL_VERSIONS,
+  validateProtocolVersion,
 } from "./versionGuard";

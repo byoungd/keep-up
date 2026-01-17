@@ -15,9 +15,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   type CachePredicate,
+  createToolExecutor,
   ToolExecutionPipeline,
   type ToolExecutorConfig,
-  createToolExecutor,
 } from "../executor";
 import type { ExecutionSandboxAdapter, ToolExecutionTelemetry } from "../sandbox";
 import type { IPermissionChecker } from "../security";
@@ -80,11 +80,10 @@ class MockPermissionChecker implements IPermissionChecker {
   public denyReason = "Permission denied by policy";
   public checkedOperations: Array<{ tool: string; operation: string; resource?: string }> = [];
 
-  check(operation: {
-    tool: string;
-    operation: string;
-    resource?: string;
-  }): { allowed: boolean; reason?: string } {
+  check(operation: { tool: string; operation: string; resource?: string }): {
+    allowed: boolean;
+    reason?: string;
+  } {
     this.checkedOperations.push(operation);
 
     if (this.allowAll) {

@@ -163,8 +163,10 @@ export class ConsoleTransport implements ILogTransport {
     const output = this.options.pretty ? this.formatPretty(entry) : this.formatJson(entry);
 
     if (entry.level === "error" || entry.level === "fatal") {
+      // biome-ignore lint/suspicious/noConsole: Logger transport
       console.error(output);
     } else {
+      // biome-ignore lint/suspicious/noConsole: Logger transport
       console.info(output);
     }
   }

@@ -4,6 +4,25 @@
  * Exports for document extraction, chunking, and embedding.
  */
 
+// Embedding
+export {
+  type ChunkEmbedding,
+  cosineSimilarity,
+  EmbeddingService,
+  type EmbeddingServiceConfig,
+  findTopK,
+} from "./embeddingService";
+
+// Extractors
+export {
+  BaseExtractor,
+  HTMLExtractor,
+  MarkdownExtractor,
+  TextExtractor,
+} from "./extractors";
+
+// Chunker
+export { createChunker, SemanticChunker } from "./semanticChunker";
 // Types
 export type {
   ChunkingOptions,
@@ -18,26 +37,6 @@ export type {
   ExtractionOptions,
   ExtractionResult,
 } from "./types";
-
-// Extractors
-export {
-  BaseExtractor,
-  HTMLExtractor,
-  MarkdownExtractor,
-  TextExtractor,
-} from "./extractors";
-
-// Chunker
-export { SemanticChunker, createChunker } from "./semanticChunker";
-
-// Embedding
-export {
-  EmbeddingService,
-  cosineSimilarity,
-  findTopK,
-  type ChunkEmbedding,
-  type EmbeddingServiceConfig,
-} from "./embeddingService";
 
 import { HTMLExtractor, MarkdownExtractor, TextExtractor } from "./extractors";
 // Extractor registry

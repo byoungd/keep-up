@@ -47,7 +47,8 @@ export const Slider = React.forwardRef<HTMLInputElement, SliderProps>(
     },
     ref
   ) => {
-    const inputId = id ?? React.useId();
+    const generatedId = React.useId();
+    const inputId = id ?? generatedId;
     const labelId = `${inputId}-label`;
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {

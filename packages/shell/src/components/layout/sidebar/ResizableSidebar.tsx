@@ -136,6 +136,7 @@ export function ResizableSidebar({
   // Collapsed: render a compact rail or hidden edge (Linear-style)
   if (isCollapsed) {
     return (
+      // biome-ignore lint/a11y/noStaticElementInteractions: Mouse interaction needed for auto-collapse
       <div
         className={cn("relative shrink-0 z-overlay border-r bg-surface-1", className)}
         style={{ width: collapsedWidth }}
@@ -147,6 +148,7 @@ export function ResizableSidebar({
         }}
       >
         {collapseMode === "peek" && (
+          // biome-ignore lint/a11y/noStaticElementInteractions: Hover trigger
           <div
             className="absolute inset-y-0 left-0 w-2 cursor-pointer"
             onMouseEnter={() => {
@@ -157,6 +159,7 @@ export function ResizableSidebar({
         )}
         {collapseMode === "rail" && collapsedContent}
         {collapseMode === "rail" && (
+          // biome-ignore lint/a11y/noStaticElementInteractions: Resize handle requires mouse
           <div
             className={cn(
               "absolute -right-0.5 top-0 bottom-0 w-1 cursor-col-resize z-drag",
@@ -171,6 +174,7 @@ export function ResizableSidebar({
 
   // Normal resizable sidebar
   const sidebar = (
+    // biome-ignore lint/a11y/noStaticElementInteractions: Mouse interaction needed for auto-collapse
     <div
       className={cn(
         "relative shrink-0 z-overlay border-r bg-surface-1",
@@ -189,6 +193,7 @@ export function ResizableSidebar({
       {children}
 
       {/* Resize handle */}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: Resize handle requires mouse */}
       <div
         className={cn(
           "absolute -right-0.5 top-0 bottom-0 w-1 cursor-col-resize z-drag",

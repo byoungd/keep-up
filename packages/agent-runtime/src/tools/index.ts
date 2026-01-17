@@ -4,29 +4,21 @@
  * Re-exports all tool-related modules.
  */
 
-// MCP
-export * from "./mcp";
-
 // Core Tools
 export * from "./core";
-
-// LFCC Tools
-export * from "./lfcc";
-
-// Web Tools
-export * from "./web";
-
-// Git Tools
-export * from "./git";
-
-// External Adapters
-export * from "./external";
-
-// Tool Naming (LFCC v0.9.1 compliance)
-export * from "./naming";
-
-// Middleware
-export * from "./middleware";
-
 // Digest Tools
 export * from "./digest";
+// External Adapters
+export * from "./external";
+// Git Tools
+export * from "./git";
+// LFCC Tools
+export * from "./lfcc";
+// MCP
+export * from "./mcp";
+// Middleware
+export * from "./middleware";
+// Tool Naming (LFCC v0.9.1 compliance)
+export * from "./naming";
+// Web Tools
+export * from "./web";

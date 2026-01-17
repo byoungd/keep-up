@@ -4,4 +4,4 @@
  * Exports metrics collection types and implementations.
  */
 
-export { MetricsCollector, type CollabMetrics } from "./metricsCollector";
+export { type CollabMetrics, MetricsCollector } from "./metricsCollector";

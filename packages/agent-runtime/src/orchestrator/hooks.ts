@@ -5,8 +5,7 @@
  * Enables middleware-style interception of key orchestration events.
  */
 
-import type { MCPToolCall, MCPToolResult } from "../types";
-import type { AgentMessage } from "../types";
+import type { AgentMessage, MCPToolCall, MCPToolResult } from "../types";
 
 // ============================================================================
 // Types

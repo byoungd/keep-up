@@ -27,9 +27,9 @@ import {
   validateGatewayRequest,
 } from "./envelope.js";
 import {
-  type PipelineConfig,
   detectMaliciousPayload,
   executePipeline,
+  type PipelineConfig,
   validatePayloadSize,
 } from "./pipeline.js";
 import type {

@@ -5,7 +5,7 @@
  */
 
 import { computeHash, getAssetStore } from "../AssetStore";
-import type { IngestResult, IngestorFn } from "../types";
+import type { IngestorFn, IngestResult } from "../types";
 
 /** Generate a simple hash from content for deduplication */
 function hashContent(content: string): string {

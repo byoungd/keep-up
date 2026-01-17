@@ -556,30 +556,30 @@ export function attachTelemetryToEventBus(
 
 // Profiler
 export {
-  Profiler,
-  createProfiler,
   createNoopProfiler,
+  createProfiler,
   getGlobalProfiler,
-  setGlobalProfiler,
-  profileMethod,
   type ProfileEntry,
-  type ProfileStats,
   type ProfileReport,
+  Profiler,
   type ProfilerConfig,
+  type ProfileStats,
+  profileMethod,
+  setGlobalProfiler,
 } from "./profiler";
 
 // Structured Logger
 export {
-  StructuredLogger,
-  LogBuffer,
-  createStructuredLogger,
-  createNoopLogger,
+  type AgentLogContext,
   consoleHandler,
+  createNoopLogger,
+  createStructuredLogger,
+  type IStructuredLogger,
   jsonHandler,
-  type LogLevel,
+  LogBuffer,
   type LogEntry,
   type LogHandler,
-  type AgentLogContext,
-  type IStructuredLogger,
+  type LogLevel,
+  StructuredLogger,
   type StructuredLoggerConfig,
 } from "./structuredLogger";

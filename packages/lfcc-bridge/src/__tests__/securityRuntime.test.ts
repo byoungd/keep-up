@@ -6,7 +6,7 @@
  * entrypoints and that bypassing it triggers the appropriate assertions/logs.
  */
 
-import { type MockInstance, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 import { EditorAdapterPM } from "../adapters/editorAdapterPM";
 import { BridgeController } from "../bridge/bridgeController";
 import { createLoroRuntime } from "../runtime/loroRuntime";

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from "vitest";
 
 import type { CanonNode } from "@ku0/core";
+import { describe, expect, it } from "vitest";
 import { EditorAdapterPM } from "../adapters/editorAdapterPM";
 import { BridgeController } from "../bridge/bridgeController";
 import { createLoroRuntime } from "../runtime/loroRuntime";

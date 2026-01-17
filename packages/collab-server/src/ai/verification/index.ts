@@ -5,14 +5,14 @@
  */
 
 export {
-  VerificationAgent,
+  type Claim,
+  type ClaimVerification,
+  type ConfidenceLevel,
   createVerificationAgent,
+  type Evidence,
+  VerificationAgent,
   type VerificationAgentConfig,
   type VerificationRequest,
   type VerificationResponse,
   type VerificationStatus,
-  type ConfidenceLevel,
-  type Claim,
-  type ClaimVerification,
-  type Evidence,
 } from "./verificationAgent";

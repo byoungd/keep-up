@@ -4,45 +4,42 @@
  * Exports token resolver interfaces and implementations.
  */
 
-export type {
-  TokenResolver,
-  TokenPayload,
-  TokenResult,
-  TokenResultValid,
-  TokenResultInvalid,
-} from "./tokenResolver";
 export { DevTokenResolver } from "./devTokenResolver";
 export { JwtAuthAdapter, type JwtAuthConfig } from "./jwtAuth";
-
-// Session Auth Provider (production-ready interface)
-export type {
-  SessionAuthProvider,
-  SessionAuthResult,
-  SessionAuthFailure,
-  AuthRole,
-  AuthErrorCode,
-} from "./sessionAuthProvider";
-export { createAuthFailure, isAuthFailure } from "./sessionAuthProvider";
 export {
-  JwtSessionAuthProvider,
   DevHmacAuthProvider,
   type JwtSessionAuthConfig,
+  JwtSessionAuthProvider,
 } from "./jwtSessionAuthProvider";
-
-// WebSocket Security Middleware
-export {
-  WsSecurityMiddleware,
-  type WsSecurityConfig,
-  type ConnectionState,
-  type ConnectionRateLimitConfig,
-  type ConnectionTimeoutConfig,
-  type SecurityAuditEvent,
-} from "./wsSecurityMiddleware";
-
 // NextAuth Provider
 export {
-  NextAuthProvider,
   createNextAuthProvider,
-  type NextAuthProviderConfig,
   type NextAuthJwtPayload,
+  NextAuthProvider,
+  type NextAuthProviderConfig,
 } from "./nextAuthProvider";
+// Session Auth Provider (production-ready interface)
+export type {
+  AuthErrorCode,
+  AuthRole,
+  SessionAuthFailure,
+  SessionAuthProvider,
+  SessionAuthResult,
+} from "./sessionAuthProvider";
+export { createAuthFailure, isAuthFailure } from "./sessionAuthProvider";
+export type {
+  TokenPayload,
+  TokenResolver,
+  TokenResult,
+  TokenResultInvalid,
+  TokenResultValid,
+} from "./tokenResolver";
+// WebSocket Security Middleware
+export {
+  type ConnectionRateLimitConfig,
+  type ConnectionState,
+  type ConnectionTimeoutConfig,
+  type SecurityAuditEvent,
+  type WsSecurityConfig,
+  WsSecurityMiddleware,
+} from "./wsSecurityMiddleware";

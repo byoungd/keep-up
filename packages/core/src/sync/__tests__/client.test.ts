@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as policyModule from "../../kernel/policy/index.js";
 import { SyncClient, type SyncClientConfig } from "../client.js";
 import { createDefaultSyncManifest, negotiateManifests } from "../negotiate.js";
-import { type HandshakeAckPayload, createMessage, serializeMessage } from "../protocol.js";
+import { createMessage, type HandshakeAckPayload, serializeMessage } from "../protocol.js";
 
 // Mock WebSocket
 class MockWebSocket {

@@ -25,27 +25,21 @@ export type Doc = {
   annotations: Annotation[];
 };
 
-// LFCC v0.9 RC Kernel
-export * from "./kernel/index.js";
+// Errors
+export * from "./errors.js";
 
 // LFCC v0.9 RC Gateway
 export * as gateway from "./gateway/index.js";
 export type { GatewayTelemetryEvent } from "./gateway/types.js";
-
-// Text Normalization
-export * from "./text/normalization.js";
-
-// Sync Protocol
-export * from "./sync/index.js";
-
+// LFCC v0.9 RC Kernel
+export * from "./kernel/index.js";
 // Observability (Track 12)
 export * as observability from "./observability/index.js";
-
 // Persistence (Track 10)
 export * as persistence from "./persistence/index.js";
-
 // Security (Track 11)
 export * as security from "./security/index.js";
-
-// Errors
-export * from "./errors.js";
+// Sync Protocol
+export * from "./sync/index.js";
+// Text Normalization
+export * from "./text/normalization.js";

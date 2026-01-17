@@ -49,6 +49,8 @@ export function StepItem({
       )}
 
       {/* Step Header Row */}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: Interactive step header */}
+      {/* biome-ignore lint/a11y/useAriaPropsSupportedByRole: Valid usage */}
       <div
         className={cn(
           "flex items-center gap-3 select-none px-2 py-1 rounded-md transition-all duration-200",

@@ -1,5 +1,5 @@
 import { type Block, canonicalizeText, computeCanonicalHash } from "@ku0/core";
-import { RSSNormalizer, hashSync } from "./normalizer";
+import { hashSync, RSSNormalizer } from "./normalizer";
 import type { FeedSource, IngestDoc, IngestResult, RSSItem } from "./types";
 
 export const RSSMapper = {

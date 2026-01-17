@@ -4,7 +4,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { LogBuffer, createNoopLogger, createStructuredLogger } from "../telemetry/structuredLogger";
+import { createNoopLogger, createStructuredLogger, LogBuffer } from "../telemetry/structuredLogger";
 
 describe("StructuredLogger", () => {
   describe("log levels", () => {

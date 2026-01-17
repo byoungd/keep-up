@@ -9,9 +9,9 @@ import { createToolExecutor } from "../executor";
 import type { IAgentLLM, OrchestratorComponents } from "../orchestrator/orchestrator";
 import { type CreateOrchestratorOptions, createOrchestrator } from "../orchestrator/orchestrator";
 import {
-  type IPermissionChecker,
   createPermissionChecker,
   createSecurityPolicy,
+  type IPermissionChecker,
 } from "../security";
 import type { TelemetryContext } from "../telemetry";
 import type { IToolRegistry } from "../tools/mcp/registry";

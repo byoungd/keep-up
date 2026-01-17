@@ -5,10 +5,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DragHandleController,
-  type HandleHitTarget,
-  INITIAL_DRAG_STATE,
   findHandleAtPoint,
   generateHandleCss,
+  type HandleHitTarget,
+  INITIAL_DRAG_STATE,
   isPointInHandle,
 } from "../dragHandle.js";
 

@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import { OverlayController, createOverlayController } from "../overlayController.js";
+import { createOverlayController, OverlayController } from "../overlayController.js";
 import type { BlockMeta, BlockRect } from "../types.js";
 
 describe("Overlay Controller", () => {

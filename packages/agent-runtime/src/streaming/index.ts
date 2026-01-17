@@ -5,31 +5,52 @@
  * Includes token-level streaming with backpressure and recovery.
  */
 
+// Runtime event bridge
+export {
+  attachRuntimeEventStreamBridge,
+  type RuntimeEventStreamBridgeConfig,
+} from "./runtimeEventBridge";
+// Streaming Cache
+export {
+  createStreamingCache,
+  type IStreamingCache,
+  StreamingCache,
+  type StreamingCacheConfig,
+  type StreamingCacheStats,
+} from "./streamingCache";
 // Legacy stream writer (for backward compatibility)
 export {
-  StreamWriter,
-  createStreamWriter,
   collectStream,
   collectText,
-  transformStream,
+  createStreamWriter,
+  type ErrorChunkData,
   filterStream,
+  type MetadataChunkData,
   mergeStreams,
-  withStreamTimeout,
+  type ProgressChunkData,
   processStreamWithCallbacks,
-  type StreamChunkType,
+  type StreamCallbacks,
   type StreamChunk,
+  type StreamChunkType,
+  type StreamMetrics,
+  type StreamOptions,
+  type StreamStats as LegacyStreamStats,
+  StreamWriter,
   type TextChunkData,
   type ToolCallChunkData,
   type ToolResultChunkData,
-  type ProgressChunkData,
-  type ErrorChunkData,
-  type MetadataChunkData,
-  type StreamOptions,
-  type StreamStats as LegacyStreamStats,
-  type StreamCallbacks,
-  type StreamMetrics,
+  transformStream,
+  withStreamTimeout,
 } from "./streamWriter";
 
+// Token streamer
+export {
+  createStreamPair,
+  createTokenStreamReader,
+  createTokenStreamWriter,
+  TokenStreamReader,
+  TokenStreamWriter,
+} from "./tokenStreamer";
 // New enhanced types
 export type {
   CheckpointEvent,
@@ -55,29 +76,4 @@ export type {
   ToolStartEvent,
   TypedStreamEventHandler,
 } from "./types";
-
 export { DEFAULT_STREAM_CONFIG } from "./types";
-
-// Token streamer
-export {
-  TokenStreamReader,
-  TokenStreamWriter,
-  createStreamPair,
-  createTokenStreamReader,
-  createTokenStreamWriter,
-} from "./tokenStreamer";
-
-// Streaming Cache
-export {
-  StreamingCache,
-  createStreamingCache,
-  type IStreamingCache,
-  type StreamingCacheConfig,
-  type StreamingCacheStats,
-} from "./streamingCache";
-
-// Runtime event bridge
-export {
-  attachRuntimeEventStreamBridge,
-  type RuntimeEventStreamBridgeConfig,
-} from "./runtimeEventBridge";

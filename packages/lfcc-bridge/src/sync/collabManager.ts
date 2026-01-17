@@ -10,13 +10,13 @@ import type { CollabAdapter, CollabAdapterStatus } from "./collabAdapter";
 import { base64Decode, base64Encode } from "./collabEncoding";
 import {
   type CrdtUpdateMessage,
+  createCrdtUpdateMessage,
+  createPresenceMessage,
   type JoinMessage,
   type LeaveMessage,
   type PresenceMessage,
   type PresencePayload,
   type SyncMessage,
-  createCrdtUpdateMessage,
-  createPresenceMessage,
 } from "./collabMessages";
 
 /** Configuration for CollabManager */

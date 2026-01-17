@@ -261,6 +261,7 @@ export function useTaskStream(sessionId: string) {
         });
       } catch (error) {
         if (!isActiveRef || isActiveRef.current) {
+          // biome-ignore lint/suspicious/noConsole: Expected error logging
           console.error("Failed to load session state", error);
         }
       }
@@ -327,6 +328,12 @@ export function useTaskStream(sessionId: string) {
   }, [isConnected]);
 
   const handleEvent = useCallback((id: string, type: string, data: unknown) => {
+    if (type === "system.heartbeat") {
+      lastHeartbeatRef.current = Date.now();
+      setIsLive(true);
+      return;
+    }
+
     if (seenEventIdsRef.current.has(id)) {
       return;
     }
@@ -345,494 +352,6 @@ export function useTaskStream(sessionId: string) {
       )
     );
   }, []);
-
-  type EventHandler = (
-    prev: TaskGraph,
-    id: string,
-    data: unknown,
-    now: string,
-    taskTitles: Map<string, string>,
-    taskPrompts: Map<string, string>
-  ) => TaskGraph;
-
-  const EVENT_HANDLERS: Record<string, EventHandler> = {
-    "task.created": handleTaskUpdate,
-    "task.updated": handleTaskUpdate,
-    "approval.required": handleApprovalRequired,
-    "approval.resolved": handleApprovalResolved,
-    "agent.think": handleAgentThink,
-    "agent.tool.call": handleToolCall,
-    "agent.tool.result": handleToolResult,
-    "agent.plan": handlePlanUpdate,
-    "agent.artifact": handleArtifactUpdate,
-    "system.heartbeat": (prev) => {
-      lastHeartbeatRef.current = Date.now();
-      setIsLive(true);
-      return prev;
-    },
-  };
-
-  function handleApprovalRequired(
-    prev: TaskGraph,
-    _id: string,
-    data: unknown,
-    now: string,
-    _taskTitles: Map<string, string>,
-    _taskPrompts: Map<string, string>
-  ): TaskGraph {
-    if (!isRecord(data)) {
-      return prev;
-    }
-    const approvalId = typeof data.approvalId === "string" ? data.approvalId : undefined;
-    if (!approvalId) {
-      return prev;
-    }
-    const action = typeof data.action === "string" ? data.action : "tool";
-    const riskTags = extractRiskTags(data.riskTags);
-    const taskId = typeof data.taskId === "string" ? data.taskId : undefined;
-
-    return {
-      ...prev,
-      status: TaskStatus.AWAITING_APPROVAL,
-      pendingApprovalId: approvalId,
-      nodes: appendNode(prev.nodes, {
-        id: `approval-${approvalId}`,
-        type: "tool_call",
-        toolName: action,
-        args: { action, riskTags },
-        requiresApproval: true,
-        approvalId,
-        riskLevel: mapRiskLevel(riskTags),
-        taskId,
-        timestamp: now,
-      }),
-    };
-  }
-
-  function handleApprovalResolved(
-    prev: TaskGraph,
-    id: string,
-    data: unknown,
-    now: string,
-    _taskTitles: Map<string, string>,
-    _taskPrompts: Map<string, string>
-  ): TaskGraph {
-    if (!isRecord(data)) {
-      return prev;
-    }
-    const approvalId = typeof data.approvalId === "string" ? data.approvalId : undefined;
-    const status = typeof data.status === "string" ? data.status : "resolved";
-    const taskId = typeof data.taskId === "string" ? data.taskId : undefined;
-
-    return {
-      ...prev,
-      pendingApprovalId: prev.pendingApprovalId === approvalId ? undefined : prev.pendingApprovalId,
-      status: prev.status === TaskStatus.AWAITING_APPROVAL ? TaskStatus.RUNNING : prev.status,
-      nodes: appendNode(prev.nodes, {
-        id: `event-${id}`,
-        type: "thinking",
-        content: `Approval ${approvalId ? approvalId.slice(0, 8) : ""} ${formatStatus(status)}.`,
-        taskId,
-        timestamp: now,
-      }),
-    };
-  }
-
-  function handleAgentThink(
-    prev: TaskGraph,
-    id: string,
-    data: unknown,
-    now: string,
-    _taskTitles: Map<string, string>,
-    _taskPrompts: Map<string, string>
-  ): TaskGraph {
-    if (!isRecord(data) || typeof data.content !== "string") {
-      return prev;
-    }
-    const taskId = typeof data.taskId === "string" ? data.taskId : undefined;
-    return {
-      ...prev,
-      nodes: appendNode(prev.nodes, {
-        id: `think-${id}`,
-        type: "thinking",
-        content: data.content,
-        taskId,
-        timestamp: now,
-      }),
-    };
-  }
-
-  function handleToolCall(
-    prev: TaskGraph,
-    id: string,
-    data: unknown,
-    now: string,
-    _taskTitles: Map<string, string>,
-    _taskPrompts: Map<string, string>
-  ): TaskGraph {
-    if (!isRecord(data) || typeof data.tool !== "string") {
-      return prev;
-    }
-
-    const { riskLevel, activity, activityLabel, taskId } = extractToolInvocationMetadata(data);
-
-    return {
-      ...prev,
-      nodes: appendNode(prev.nodes, {
-        id: `call-${id}`,
-        type: "tool_call",
-        toolName: data.tool,
-        args: isRecord(data.args) ? data.args : {},
-        timestamp: now,
-        requiresApproval:
-          typeof data.requiresApproval === "boolean" ? data.requiresApproval : undefined,
-        approvalId: typeof data.approvalId === "string" ? data.approvalId : undefined,
-        riskLevel,
-        activity,
-        activityLabel,
-        taskId,
-      }),
-    };
-  }
-
-  function handleToolResult(
-    prev: TaskGraph,
-    id: string,
-    data: unknown,
-    now: string,
-    _taskTitles: Map<string, string>,
-    _taskPrompts: Map<string, string>
-  ): TaskGraph {
-    if (!isRecord(data)) {
-      return prev;
-    }
-
-    const { toolName, activity, activityLabel, taskId } = extractToolResultMetadata(data);
-
-    return {
-      ...prev,
-      nodes: appendNode(prev.nodes, {
-        id: `out-${id}`,
-        type: "tool_output",
-        callId: typeof data.callId === "string" ? data.callId : "unknown",
-        toolName,
-        output: data.result,
-        isError: typeof data.isError === "boolean" ? data.isError : undefined,
-        errorCode: typeof data.errorCode === "string" ? data.errorCode : undefined,
-        durationMs: typeof data.durationMs === "number" ? data.durationMs : undefined,
-        attempts: typeof data.attempts === "number" ? data.attempts : undefined,
-        activity,
-        activityLabel,
-        taskId,
-        timestamp: now,
-      }),
-    };
-  }
-
-  function extractToolResultMetadata(data: Record<string, unknown>): {
-    toolName?: string;
-    activity?: ToolActivity;
-    activityLabel?: string;
-    taskId?: string;
-  } {
-    return {
-      toolName: typeof data.toolName === "string" ? data.toolName : undefined,
-      activity: typeof data.activity === "string" ? (data.activity as ToolActivity) : undefined,
-      activityLabel: typeof data.activityLabel === "string" ? data.activityLabel : undefined,
-      taskId: typeof data.taskId === "string" ? data.taskId : undefined,
-    };
-  }
-
-  function extractToolInvocationMetadata(data: Record<string, unknown>): {
-    riskLevel?: RiskLevel;
-    activity?: ToolActivity;
-    activityLabel?: string;
-    taskId?: string;
-  } {
-    const riskLevel =
-      typeof data.riskLevel === "string" &&
-      Object.values(RiskLevel).includes(data.riskLevel as RiskLevel)
-        ? (data.riskLevel as RiskLevel)
-        : undefined;
-
-    return {
-      riskLevel,
-      activity: typeof data.activity === "string" ? (data.activity as ToolActivity) : undefined,
-      activityLabel: typeof data.activityLabel === "string" ? data.activityLabel : undefined,
-      taskId: typeof data.taskId === "string" ? data.taskId : undefined,
-    };
-  }
-
-  function handlePlanUpdate(
-    prev: TaskGraph,
-    id: string,
-    data: unknown,
-    now: string,
-    _taskTitles: Map<string, string>,
-    _taskPrompts: Map<string, string>
-  ): TaskGraph {
-    if (!isRecord(data)) {
-      return prev;
-    }
-    const parsedPlan = PlanStepSchema.array().safeParse(data.plan);
-    if (!parsedPlan.success) {
-      return prev;
-    }
-    const artifactId = typeof data.artifactId === "string" ? data.artifactId : "plan";
-    const taskId = typeof data.taskId === "string" ? data.taskId : undefined;
-
-    return {
-      ...prev,
-      artifacts: {
-        ...prev.artifacts,
-        [artifactId]: { type: "plan", steps: parsedPlan.data },
-      },
-      nodes: appendNode(prev.nodes, {
-        id: `plan-${id}`,
-        type: "plan_update",
-        plan: { type: "plan", steps: parsedPlan.data },
-        taskId,
-        timestamp: now,
-      }),
-    };
-  }
-
-  function handleArtifactUpdate(
-    prev: TaskGraph,
-    _id: string,
-    data: unknown,
-    now: string,
-    _taskTitles: Map<string, string>,
-    _taskPrompts: Map<string, string>
-  ): TaskGraph {
-    if (!isRecord(data)) {
-      return prev;
-    }
-    const parsedArtifact = ArtifactPayloadSchema.safeParse(data.artifact);
-    if (!parsedArtifact.success || typeof data.id !== "string") {
-      return prev;
-    }
-
-    const eventTime = typeof data.updatedAt === "number" ? data.updatedAt : new Date(now).getTime();
-    const existing = prev.artifacts[data.id];
-
-    // Version check: only update if newer than current artifact
-    if (existing?.updatedAt && eventTime <= existing.updatedAt) {
-      return prev;
-    }
-
-    return {
-      ...prev,
-      artifacts: {
-        ...prev.artifacts,
-        [data.id]: {
-          ...parsedArtifact.data,
-          updatedAt: eventTime,
-          taskId: typeof data.taskId === "string" ? data.taskId : undefined,
-        },
-      },
-    };
-  }
-
-  function resolveTaskMetadata(data: Record<string, unknown>) {
-    return {
-      modelId: typeof data.modelId === "string" ? data.modelId : undefined,
-      providerId: typeof data.providerId === "string" ? data.providerId : undefined,
-      fallbackNotice: typeof data.fallbackNotice === "string" ? data.fallbackNotice : undefined,
-    };
-  }
-
-  function resolveTaskNodeProps(data: Record<string, unknown>, taskId: string | undefined) {
-    const statusValue = typeof data.status === "string" ? data.status : undefined;
-    const title = resolveTaskTitle(taskId, data.title, taskTitleRef.current);
-    let prompt = typeof data.prompt === "string" ? data.prompt : undefined;
-    if (!prompt && taskId) {
-      prompt = taskPromptRef.current.get(taskId);
-    }
-    if (taskId && prompt) {
-      taskPromptRef.current.set(taskId, prompt);
-    }
-
-    const { modelId, providerId, fallbackNotice } = resolveTaskMetadata(data);
-
-    return {
-      statusValue,
-      title,
-      prompt,
-      mappedStatus: statusValue ? mapTaskStatus(statusValue) : null,
-      modelId,
-      providerId,
-      fallbackNotice,
-    };
-  }
-
-  function createTaskStatusNode(
-    taskId: string,
-    title: string,
-    prompt: string | undefined,
-    statusValue: string,
-    mappedStatus: TaskStatus | null,
-    modelId: string | undefined,
-    providerId: string | undefined,
-    fallbackNotice: string | undefined,
-    now: string
-  ): TaskStatusNode {
-    return {
-      id: `task-${taskId}`,
-      type: "task_status",
-      taskId,
-      title,
-      prompt,
-      status: statusValue as CoworkTaskStatus,
-      mappedStatus,
-      modelId,
-      providerId,
-      fallbackNotice,
-      timestamp: now,
-    };
-  }
-
-  function handleTaskUpdate(
-    prev: TaskGraph,
-    _id: string,
-    data: unknown,
-    now: string,
-    _taskTitles: Map<string, string>,
-    _taskPrompts: Map<string, string>
-  ): TaskGraph {
-    if (!isRecord(data)) {
-      return prev;
-    }
-    const taskId = typeof data.taskId === "string" ? data.taskId : undefined;
-    const props = resolveTaskNodeProps(data, taskId);
-
-    return {
-      ...prev,
-      status: props.mappedStatus ?? prev.status,
-      nodes:
-        taskId && props.statusValue
-          ? upsertNode(
-              prev.nodes,
-              createTaskStatusNode(
-                taskId,
-                props.title,
-                props.prompt,
-                props.statusValue,
-                props.mappedStatus,
-                props.modelId,
-                props.providerId,
-                props.fallbackNotice,
-                now
-              )
-            )
-          : prev.nodes,
-    };
-  }
-
-  function resolveTaskTitle(
-    taskId: string | undefined,
-    dataTitle: unknown,
-    taskTitles: Map<string, string>
-  ): string {
-    const title =
-      typeof dataTitle === "string" ? dataTitle : taskId ? taskTitles.get(taskId) : undefined;
-    if (taskId && title) {
-      taskTitles.set(taskId, title);
-    }
-    return title ?? (taskId ? `Task ${taskId.slice(0, 8)}` : "Task");
-  }
-
-  function buildArtifactMap(
-    existing: Record<string, ArtifactPayload & { updatedAt?: number; taskId?: string }>,
-    records: CoworkArtifact[]
-  ): Record<string, ArtifactPayload & { updatedAt?: number; taskId?: string }> {
-    const next = { ...existing };
-    for (const record of records) {
-      const parsed = ArtifactPayloadSchema.safeParse(record.artifact);
-      if (!parsed.success) {
-        continue;
-      }
-      const existingEntry = next[record.artifactId];
-      // Only update if no existing entry or if the record is newer
-      if (
-        !existingEntry ||
-        (record.updatedAt && record.updatedAt > (existingEntry.updatedAt ?? 0))
-      ) {
-        next[record.artifactId] = {
-          ...parsed.data,
-          updatedAt: record.updatedAt,
-          taskId: record.taskId,
-        };
-      }
-    }
-    return next;
-  }
-
-  function deriveInitialState(
-    prev: TaskGraph,
-    tasks: CoworkTask[],
-    approvals: CoworkApproval[],
-    artifacts: CoworkArtifact[],
-    taskTitles: Map<string, string>,
-    taskPrompts: Map<string, string>
-  ): TaskGraph {
-    const statusNodes = buildTaskNodes(tasks);
-    for (const task of tasks) {
-      taskTitles.set(task.taskId, task.title);
-      taskPrompts.set(task.taskId, task.prompt);
-    }
-
-    const pendingApprovals = approvals.filter((a) => a.status === "pending");
-    const approvalNodes = pendingApprovals.map((approval) => ({
-      id: `approval-${approval.approvalId}`,
-      type: "tool_call" as const,
-      toolName: approval.action,
-      args: { action: approval.action, riskTags: approval.riskTags, reason: approval.reason },
-      requiresApproval: true,
-      approvalId: approval.approvalId,
-      riskLevel: mapRiskLevel(approval.riskTags),
-      taskId: approval.taskId,
-      timestamp: new Date(approval.createdAt).toISOString(),
-    }));
-
-    const latestTask = [...tasks].sort((a, b) => b.updatedAt - a.updatedAt)[0];
-    const mappedStatus = latestTask ? mapTaskStatus(latestTask.status) : null;
-    const latestApproval = pendingApprovals.sort((a, b) => b.createdAt - a.createdAt)[0];
-
-    const nonStatusNodes = prev.nodes.filter((node) => node.type !== "task_status");
-    const mergedStatusNodes = statusNodes.reduce<TaskNode[]>(
-      (acc, node) => upsertNode(acc, node),
-      nonStatusNodes
-    );
-    const nextArtifacts = buildArtifactMap(prev.artifacts, artifacts);
-
-    return {
-      ...prev,
-      status: mappedStatus ?? prev.status,
-      artifacts: nextArtifacts,
-      nodes: approvalNodes.reduce<TaskNode[]>(
-        (acc, node) => appendNode(acc, node),
-        mergedStatusNodes
-      ),
-      pendingApprovalId: latestApproval?.approvalId,
-    };
-  }
-
-  function reduceGraph(
-    prev: TaskGraph,
-    id: string,
-    type: string,
-    data: unknown,
-    now: string,
-    taskTitles: Map<string, string>,
-    taskPrompts: Map<string, string>
-  ): TaskGraph {
-    const handler = EVENT_HANDLERS[type];
-    if (handler) {
-      return handler(prev, id, data, now, taskTitles, taskPrompts);
-    }
-    return prev;
-  }
 
   useEffect(() => {
     let retryTimeout: ReturnType<typeof setTimeout> | undefined;
@@ -891,6 +410,7 @@ export function useTaskStream(sessionId: string) {
         if (signal.aborted) {
           return;
         }
+        // biome-ignore lint/suspicious/noConsole: Expected error logging
         console.error("Stream disconnected", error);
         markDisconnected(true);
         scheduleReconnect();
@@ -931,6 +451,7 @@ export function useTaskStream(sessionId: string) {
       try {
         await resolveApproval(approvalId, "approved");
       } catch (error) {
+        // biome-ignore lint/suspicious/noConsole: Expected error logging
         console.error("Failed to approve", error);
         // Rollback or handle error if needed - for now we'll just log
         // In a real app we might want to refresh state
@@ -952,6 +473,7 @@ export function useTaskStream(sessionId: string) {
       try {
         await resolveApproval(approvalId, "rejected");
       } catch (error) {
+        // biome-ignore lint/suspicious/noConsole: Expected error logging
         console.error("Failed to reject", error);
         void refreshSessionState();
       }
@@ -1052,8 +574,494 @@ async function readStream(
         const parsedData = JSON.parse(msg.data);
         onMessage(msg.id, msg.event, parsedData);
       } catch (error) {
+        // biome-ignore lint/suspicious/noConsole: Expected error logging
         console.error("Failed to parse SSE data", error);
       }
     }
   }
+}
+
+type EventHandler = (
+  prev: TaskGraph,
+  id: string,
+  data: unknown,
+  now: string,
+  taskTitles: Map<string, string>,
+  taskPrompts: Map<string, string>
+) => TaskGraph;
+
+const EVENT_HANDLERS: Record<string, EventHandler> = {
+  "task.created": handleTaskUpdate,
+  "task.updated": handleTaskUpdate,
+  "approval.required": handleApprovalRequired,
+  "approval.resolved": handleApprovalResolved,
+  "agent.think": handleAgentThink,
+  "agent.tool.call": handleToolCall,
+  "agent.tool.result": handleToolResult,
+  "agent.plan": handlePlanUpdate,
+  "agent.artifact": handleArtifactUpdate,
+};
+
+function handleApprovalRequired(
+  prev: TaskGraph,
+  _id: string,
+  data: unknown,
+  now: string,
+  _taskTitles: Map<string, string>,
+  _taskPrompts: Map<string, string>
+): TaskGraph {
+  if (!isRecord(data)) {
+    return prev;
+  }
+  const approvalId = typeof data.approvalId === "string" ? data.approvalId : undefined;
+  if (!approvalId) {
+    return prev;
+  }
+  const action = typeof data.action === "string" ? data.action : "tool";
+  const riskTags = extractRiskTags(data.riskTags);
+  const taskId = typeof data.taskId === "string" ? data.taskId : undefined;
+
+  return {
+    ...prev,
+    status: TaskStatus.AWAITING_APPROVAL,
+    pendingApprovalId: approvalId,
+    nodes: appendNode(prev.nodes, {
+      id: `approval-${approvalId}`,
+      type: "tool_call",
+      toolName: action,
+      args: { action, riskTags },
+      requiresApproval: true,
+      approvalId,
+      riskLevel: mapRiskLevel(riskTags),
+      taskId,
+      timestamp: now,
+    }),
+  };
+}
+
+function handleApprovalResolved(
+  prev: TaskGraph,
+  id: string,
+  data: unknown,
+  now: string,
+  _taskTitles: Map<string, string>,
+  _taskPrompts: Map<string, string>
+): TaskGraph {
+  if (!isRecord(data)) {
+    return prev;
+  }
+  const approvalId = typeof data.approvalId === "string" ? data.approvalId : undefined;
+  const status = typeof data.status === "string" ? data.status : "resolved";
+  const taskId = typeof data.taskId === "string" ? data.taskId : undefined;
+
+  return {
+    ...prev,
+    pendingApprovalId: prev.pendingApprovalId === approvalId ? undefined : prev.pendingApprovalId,
+    status: prev.status === TaskStatus.AWAITING_APPROVAL ? TaskStatus.RUNNING : prev.status,
+    nodes: appendNode(prev.nodes, {
+      id: `event-${id}`,
+      type: "thinking",
+      content: `Approval ${approvalId ? approvalId.slice(0, 8) : ""} ${formatStatus(status)}.`,
+      taskId,
+      timestamp: now,
+    }),
+  };
+}
+
+function handleAgentThink(
+  prev: TaskGraph,
+  id: string,
+  data: unknown,
+  now: string,
+  _taskTitles: Map<string, string>,
+  _taskPrompts: Map<string, string>
+): TaskGraph {
+  if (!isRecord(data) || typeof data.content !== "string") {
+    return prev;
+  }
+  const taskId = typeof data.taskId === "string" ? data.taskId : undefined;
+  return {
+    ...prev,
+    nodes: appendNode(prev.nodes, {
+      id: `think-${id}`,
+      type: "thinking",
+      content: data.content,
+      taskId,
+      timestamp: now,
+    }),
+  };
+}
+
+function handleToolCall(
+  prev: TaskGraph,
+  id: string,
+  data: unknown,
+  now: string,
+  _taskTitles: Map<string, string>,
+  _taskPrompts: Map<string, string>
+): TaskGraph {
+  if (!isRecord(data) || typeof data.tool !== "string") {
+    return prev;
+  }
+
+  const { riskLevel, activity, activityLabel, taskId } = extractToolInvocationMetadata(data);
+
+  return {
+    ...prev,
+    nodes: appendNode(prev.nodes, {
+      id: `call-${id}`,
+      type: "tool_call",
+      toolName: data.tool,
+      args: isRecord(data.args) ? data.args : {},
+      timestamp: now,
+      requiresApproval:
+        typeof data.requiresApproval === "boolean" ? data.requiresApproval : undefined,
+      approvalId: typeof data.approvalId === "string" ? data.approvalId : undefined,
+      riskLevel,
+      activity,
+      activityLabel,
+      taskId,
+    }),
+  };
+}
+
+function handleToolResult(
+  prev: TaskGraph,
+  id: string,
+  data: unknown,
+  now: string,
+  _taskTitles: Map<string, string>,
+  _taskPrompts: Map<string, string>
+): TaskGraph {
+  if (!isRecord(data)) {
+    return prev;
+  }
+
+  const { toolName, activity, activityLabel, taskId } = extractToolResultMetadata(data);
+
+  return {
+    ...prev,
+    nodes: appendNode(prev.nodes, {
+      id: `out-${id}`,
+      type: "tool_output",
+      callId: typeof data.callId === "string" ? data.callId : "unknown",
+      toolName,
+      output: data.result,
+      isError: typeof data.isError === "boolean" ? data.isError : undefined,
+      errorCode: typeof data.errorCode === "string" ? data.errorCode : undefined,
+      durationMs: typeof data.durationMs === "number" ? data.durationMs : undefined,
+      attempts: typeof data.attempts === "number" ? data.attempts : undefined,
+      activity,
+      activityLabel,
+      taskId,
+      timestamp: now,
+    }),
+  };
+}
+
+function extractToolResultMetadata(data: Record<string, unknown>): {
+  toolName?: string;
+  activity?: ToolActivity;
+  activityLabel?: string;
+  taskId?: string;
+} {
+  return {
+    toolName: typeof data.toolName === "string" ? data.toolName : undefined,
+    activity: typeof data.activity === "string" ? (data.activity as ToolActivity) : undefined,
+    activityLabel: typeof data.activityLabel === "string" ? data.activityLabel : undefined,
+    taskId: typeof data.taskId === "string" ? data.taskId : undefined,
+  };
+}
+
+function extractToolInvocationMetadata(data: Record<string, unknown>): {
+  riskLevel?: RiskLevel;
+  activity?: ToolActivity;
+  activityLabel?: string;
+  taskId?: string;
+} {
+  const riskLevel =
+    typeof data.riskLevel === "string" &&
+    Object.values(RiskLevel).includes(data.riskLevel as RiskLevel)
+      ? (data.riskLevel as RiskLevel)
+      : undefined;
+
+  return {
+    riskLevel,
+    activity: typeof data.activity === "string" ? (data.activity as ToolActivity) : undefined,
+    activityLabel: typeof data.activityLabel === "string" ? data.activityLabel : undefined,
+    taskId: typeof data.taskId === "string" ? data.taskId : undefined,
+  };
+}
+
+function handlePlanUpdate(
+  prev: TaskGraph,
+  id: string,
+  data: unknown,
+  now: string,
+  _taskTitles: Map<string, string>,
+  _taskPrompts: Map<string, string>
+): TaskGraph {
+  if (!isRecord(data)) {
+    return prev;
+  }
+  const parsedPlan = PlanStepSchema.array().safeParse(data.plan);
+  if (!parsedPlan.success) {
+    return prev;
+  }
+  const artifactId = typeof data.artifactId === "string" ? data.artifactId : "plan";
+  const taskId = typeof data.taskId === "string" ? data.taskId : undefined;
+
+  return {
+    ...prev,
+    artifacts: {
+      ...prev.artifacts,
+      [artifactId]: { type: "plan", steps: parsedPlan.data },
+    },
+    nodes: appendNode(prev.nodes, {
+      id: `plan-${id}`,
+      type: "plan_update",
+      plan: { type: "plan", steps: parsedPlan.data },
+      taskId,
+      timestamp: now,
+    }),
+  };
+}
+
+function handleArtifactUpdate(
+  prev: TaskGraph,
+  _id: string,
+  data: unknown,
+  now: string,
+  _taskTitles: Map<string, string>,
+  _taskPrompts: Map<string, string>
+): TaskGraph {
+  if (!isRecord(data)) {
+    return prev;
+  }
+  const parsedArtifact = ArtifactPayloadSchema.safeParse(data.artifact);
+  if (!parsedArtifact.success || typeof data.id !== "string") {
+    return prev;
+  }
+
+  const eventTime = typeof data.updatedAt === "number" ? data.updatedAt : new Date(now).getTime();
+  const existing = prev.artifacts[data.id];
+
+  // Version check: only update if newer than current artifact
+  if (existing?.updatedAt && eventTime <= existing.updatedAt) {
+    return prev;
+  }
+
+  return {
+    ...prev,
+    artifacts: {
+      ...prev.artifacts,
+      [data.id]: {
+        ...parsedArtifact.data,
+        updatedAt: eventTime,
+        taskId: typeof data.taskId === "string" ? data.taskId : undefined,
+      },
+    },
+  };
+}
+
+function resolveTaskMetadata(data: Record<string, unknown>) {
+  return {
+    modelId: typeof data.modelId === "string" ? data.modelId : undefined,
+    providerId: typeof data.providerId === "string" ? data.providerId : undefined,
+    fallbackNotice: typeof data.fallbackNotice === "string" ? data.fallbackNotice : undefined,
+  };
+}
+
+function resolveTaskNodeProps(
+  data: Record<string, unknown>,
+  taskId: string | undefined,
+  taskTitles: Map<string, string>,
+  taskPrompts: Map<string, string>
+) {
+  const statusValue = typeof data.status === "string" ? data.status : undefined;
+  const title = resolveTaskTitle(taskId, data.title, taskTitles);
+  let prompt = typeof data.prompt === "string" ? data.prompt : undefined;
+  if (!prompt && taskId) {
+    prompt = taskPrompts.get(taskId);
+  }
+  if (taskId && prompt) {
+    taskPrompts.set(taskId, prompt);
+  }
+
+  const { modelId, providerId, fallbackNotice } = resolveTaskMetadata(data);
+
+  return {
+    statusValue,
+    title,
+    prompt,
+    mappedStatus: statusValue ? mapTaskStatus(statusValue) : null,
+    modelId,
+    providerId,
+    fallbackNotice,
+  };
+}
+
+function createTaskStatusNode(
+  taskId: string,
+  title: string,
+  prompt: string | undefined,
+  statusValue: string,
+  mappedStatus: TaskStatus | null,
+  modelId: string | undefined,
+  providerId: string | undefined,
+  fallbackNotice: string | undefined,
+  now: string
+): TaskStatusNode {
+  return {
+    id: `task-${taskId}`,
+    type: "task_status",
+    taskId,
+    title,
+    prompt,
+    status: statusValue as CoworkTaskStatus,
+    mappedStatus,
+    modelId,
+    providerId,
+    fallbackNotice,
+    timestamp: now,
+  };
+}
+
+function handleTaskUpdate(
+  prev: TaskGraph,
+  _id: string,
+  data: unknown,
+  now: string,
+  taskTitles: Map<string, string>,
+  taskPrompts: Map<string, string>
+): TaskGraph {
+  if (!isRecord(data)) {
+    return prev;
+  }
+  const taskId = typeof data.taskId === "string" ? data.taskId : undefined;
+  const props = resolveTaskNodeProps(data, taskId, taskTitles, taskPrompts);
+
+  return {
+    ...prev,
+    status: props.mappedStatus ?? prev.status,
+    nodes:
+      taskId && props.statusValue
+        ? upsertNode(
+            prev.nodes,
+            createTaskStatusNode(
+              taskId,
+              props.title,
+              props.prompt,
+              props.statusValue,
+              props.mappedStatus,
+              props.modelId,
+              props.providerId,
+              props.fallbackNotice,
+              now
+            )
+          )
+        : prev.nodes,
+  };
+}
+
+function resolveTaskTitle(
+  taskId: string | undefined,
+  dataTitle: unknown,
+  taskTitles: Map<string, string>
+): string {
+  const title =
+    typeof dataTitle === "string" ? dataTitle : taskId ? taskTitles.get(taskId) : undefined;
+  if (taskId && title) {
+    taskTitles.set(taskId, title);
+  }
+  return title ?? (taskId ? `Task ${taskId.slice(0, 8)}` : "Task");
+}
+
+function buildArtifactMap(
+  existing: Record<string, ArtifactPayload & { updatedAt?: number; taskId?: string }>,
+  records: CoworkArtifact[]
+): Record<string, ArtifactPayload & { updatedAt?: number; taskId?: string }> {
+  const next = { ...existing };
+  for (const record of records) {
+    const parsed = ArtifactPayloadSchema.safeParse(record.artifact);
+    if (!parsed.success) {
+      continue;
+    }
+    const existingEntry = next[record.artifactId];
+    // Only update if no existing entry or if the record is newer
+    if (!existingEntry || (record.updatedAt && record.updatedAt > (existingEntry.updatedAt ?? 0))) {
+      next[record.artifactId] = {
+        ...parsed.data,
+        updatedAt: record.updatedAt,
+        taskId: record.taskId,
+      };
+    }
+  }
+  return next;
+}
+
+function deriveInitialState(
+  prev: TaskGraph,
+  tasks: CoworkTask[],
+  approvals: CoworkApproval[],
+  artifacts: CoworkArtifact[],
+  taskTitles: Map<string, string>,
+  taskPrompts: Map<string, string>
+): TaskGraph {
+  const statusNodes = buildTaskNodes(tasks);
+  for (const task of tasks) {
+    taskTitles.set(task.taskId, task.title);
+    taskPrompts.set(task.taskId, task.prompt);
+  }
+
+  const pendingApprovals = approvals.filter((a) => a.status === "pending");
+  const approvalNodes = pendingApprovals.map((approval) => ({
+    id: `approval-${approval.approvalId}`,
+    type: "tool_call" as const,
+    toolName: approval.action,
+    args: { action: approval.action, riskTags: approval.riskTags, reason: approval.reason },
+    requiresApproval: true,
+    approvalId: approval.approvalId,
+    riskLevel: mapRiskLevel(approval.riskTags),
+    taskId: approval.taskId,
+    timestamp: new Date(approval.createdAt).toISOString(),
+  }));
+
+  const latestTask = [...tasks].sort((a, b) => b.updatedAt - a.updatedAt)[0];
+  const mappedStatus = latestTask ? mapTaskStatus(latestTask.status) : null;
+  const latestApproval = pendingApprovals.sort((a, b) => b.createdAt - a.createdAt)[0];
+
+  const nonStatusNodes = prev.nodes.filter((node) => node.type !== "task_status");
+  const mergedStatusNodes = statusNodes.reduce<TaskNode[]>(
+    (acc, node) => upsertNode(acc, node),
+    nonStatusNodes
+  );
+  const nextArtifacts = buildArtifactMap(prev.artifacts, artifacts);
+
+  return {
+    ...prev,
+    status: mappedStatus ?? prev.status,
+    artifacts: nextArtifacts,
+    nodes: approvalNodes.reduce<TaskNode[]>(
+      (acc, node) => appendNode(acc, node),
+      mergedStatusNodes
+    ),
+    pendingApprovalId: latestApproval?.approvalId,
+  };
+}
+
+function reduceGraph(
+  prev: TaskGraph,
+  id: string,
+  type: string,
+  data: unknown,
+  now: string,
+  taskTitles: Map<string, string>,
+  taskPrompts: Map<string, string>
+): TaskGraph {
+  const handler = EVENT_HANDLERS[type];
+  if (handler) {
+    return handler(prev, id, data, now, taskTitles, taskPrompts);
+  }
+  return prev;
 }

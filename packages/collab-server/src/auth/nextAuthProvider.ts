@@ -8,9 +8,9 @@
 import jwt from "jsonwebtoken";
 import {
   type AuthRole,
+  createAuthFailure,
   type SessionAuthProvider,
   type SessionAuthResult,
-  createAuthFailure,
 } from "./sessionAuthProvider";
 
 /** NextAuth provider configuration */

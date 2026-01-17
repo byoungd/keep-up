@@ -3,9 +3,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { RuntimeEvent } from "../events";
+import type { ArtifactEvents, RuntimeEvent } from "../events";
 import { createEventBus } from "../events";
-import type { ArtifactEvents } from "../events";
 import { createKernel } from "../kernel";
 import type { AgentLLMRequest, AgentLLMResponse, IAgentLLM } from "../orchestrator/orchestrator";
 import { createSecurityPolicy } from "../security";

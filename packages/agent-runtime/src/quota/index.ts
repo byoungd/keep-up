@@ -5,17 +5,17 @@
  */
 
 export {
-  QuotaManager,
   createQuotaManager,
   createTieredQuotaManager,
   QUOTA_PRESETS,
-  type ResourceType,
-  type QuotaLimit,
-  type QuotaConfig,
-  type QuotaScopeType,
-  type QuotaScope,
-  type ResourceUsage,
   type QuotaCheckResult,
-  type QuotaUsageSummary,
+  type QuotaConfig,
+  type QuotaLimit,
+  QuotaManager,
   type QuotaManagerConfig,
+  type QuotaScope,
+  type QuotaScopeType,
+  type QuotaUsageSummary,
+  type ResourceType,
+  type ResourceUsage,
 } from "./quotaManager";

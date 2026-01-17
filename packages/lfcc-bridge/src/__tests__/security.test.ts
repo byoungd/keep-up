@@ -1,6 +1,6 @@
 import type { EditorSchemaValidator } from "@ku0/core";
 import { beforeEach, describe, expect, it } from "vitest";
-import { type SecurityValidator, createSecurityValidator } from "../security/validator";
+import { createSecurityValidator, type SecurityValidator } from "../security/validator";
 
 describe("SecurityValidator", () => {
   let validator: SecurityValidator;

@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 import { ToolExecutionPipeline } from "../executor";
-import { type ToolPolicyEngine, createPermissionChecker } from "../security";
+import { createPermissionChecker, type ToolPolicyEngine } from "../security";
 import { createToolRegistry } from "../tools/mcp/registry";
 import type { MCPToolServer, ToolContext } from "../types";
 import { SECURITY_PRESETS } from "../types";

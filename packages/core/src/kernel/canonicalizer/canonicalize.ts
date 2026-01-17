@@ -11,12 +11,12 @@ import type {
   CanonBlock,
   CanonDiag,
   CanonInputNode,
-  CanonMark,
-  CanonNode,
-  CanonText,
   CanonicalizeDocumentInput,
   CanonicalizeResult,
   CanonicalizerPolicyV2,
+  CanonMark,
+  CanonNode,
+  CanonText,
 } from "./types.js";
 import { DEFAULT_CANONICALIZER_POLICY } from "./types.js";
 

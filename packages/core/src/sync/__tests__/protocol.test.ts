@@ -6,12 +6,12 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { computePolicyManifestHash } from "../../kernel/policy/index.js";
 import { createDefaultSyncManifest } from "../negotiate.js";
 import {
+  createMessage,
   type DocUpdatePayload,
+  deserializeMessage,
   type HandshakePayload,
   PROTOCOL_VERSION,
   type PresencePayload,
-  createMessage,
-  deserializeMessage,
   resetSeqCounter,
   serializeMessage,
   validateMessage,

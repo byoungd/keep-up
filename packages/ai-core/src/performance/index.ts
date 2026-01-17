@@ -4,32 +4,31 @@
  * Performance optimization utilities for the AI module.
  */
 
+// Batching
+export {
+  type BatchConfig,
+  batch,
+  batchify,
+  parallelBatch,
+  RequestBatcher,
+} from "./batching";
 // Cache
 export {
-  LRUCache,
-  type LRUCacheConfig,
   type CacheStats,
   cacheKey,
+  LRUCache,
+  type LRUCacheConfig,
   memoize,
   memoizeAsync,
 } from "./cache";
 
-// Batching
-export {
-  RequestBatcher,
-  type BatchConfig,
-  batchify,
-  batch,
-  parallelBatch,
-} from "./batching";
-
 // Lazy Loading
 export {
   Lazy,
-  LazySync,
   LazyFactory,
-  ResourcePool,
+  LazySync,
   lazy,
-  lazySync,
   lazyFactory,
+  lazySync,
+  ResourcePool,
 } from "./lazy";

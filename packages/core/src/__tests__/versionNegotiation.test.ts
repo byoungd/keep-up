@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { type PolicyManifestV09, computePolicyManifestHash } from "../kernel/policy/index.js";
+import { computePolicyManifestHash, type PolicyManifestV09 } from "../kernel/policy/index.js";
 import {
   createDefaultSyncManifest,
   negotiateManifests,

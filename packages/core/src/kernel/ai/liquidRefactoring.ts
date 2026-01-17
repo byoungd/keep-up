@@ -16,19 +16,19 @@ import type { Anchor } from "../mapping/anchors.js";
 import type { BlockMapping } from "../mapping/types.js";
 import {
   type AnnotationId,
+  annotationId,
   type BlockId,
+  blockId,
   CONFIDENCE_THRESHOLDS,
   Err,
   LIMITS,
   Ok,
   type OpId,
+  opId,
   type Result,
   type TraceId,
-  type ValidationError,
-  annotationId,
-  blockId,
-  opId,
   traceId,
+  type ValidationError,
   validationError,
   withTiming,
 } from "./primitives.js";

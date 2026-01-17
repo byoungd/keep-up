@@ -11,27 +11,27 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  GhostCollaborator,
-  type GhostCursor,
   createGhostPeer,
   createGhostPresence,
   createGhostSession,
+  GhostCollaborator,
+  type GhostCursor,
 } from "../kernel/ai/ghostCollaborator.js";
 import {
   type AnnotationMigration,
-  type LiquidOp,
-  type LiquidRefactoringResult,
   applyLiquidRefactoring,
   createLiquidInput,
+  type LiquidOp,
+  type LiquidRefactoringResult,
   planLiquidRefactoring,
   validateLiquidPlan,
 } from "../kernel/ai/liquidRefactoring.js";
 import { annotationId, blockId, snapshotId } from "../kernel/ai/primitives.js";
 import {
-  SemanticTimeTravel,
   createResurrectionRequest,
   createSemanticTimeTravel,
   createShadowViewConfig,
+  SemanticTimeTravel,
 } from "../kernel/ai/semanticTimeTravel.js";
 import type { HistoryState } from "../kernel/shadow/history.js";
 import type { ShadowDocument } from "../kernel/shadow/types.js";

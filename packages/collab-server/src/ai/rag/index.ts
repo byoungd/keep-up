@@ -10,6 +10,32 @@
  * - Verification agent for fact-checking
  */
 
+// HNSW Index (Production - O(log n) search)
+export {
+  createHNSWIndex,
+  type DistanceMetric,
+  type HNSWConfig,
+  HNSWIndex,
+  type HNSWSearchResult,
+} from "./hnswIndex";
+// Hybrid Search
+export {
+  createHybridSearch,
+  HybridSearch,
+  type HybridSearchConfig,
+  KeywordIndex,
+  reciprocalRankFusion,
+} from "./hybridSearch";
+// RAG Pipeline
+export { createRAGPipeline, RAGPipeline } from "./ragPipeline";
+// Reranker
+export {
+  createReranker,
+  type RerankedResult,
+  Reranker,
+  type RerankerConfig,
+  type RerankResponse,
+} from "./reranker";
 // Types
 export type {
   Citation,
@@ -20,36 +46,5 @@ export type {
   SearchResult,
   VectorStore,
 } from "./types";
-
 // Vector Store (In-Memory - for development)
-export { InMemoryVectorStore, createInMemoryStore } from "./vectorStore";
-
-// HNSW Index (Production - O(log n) search)
-export {
-  HNSWIndex,
-  createHNSWIndex,
-  type HNSWConfig,
-  type HNSWSearchResult,
-  type DistanceMetric,
-} from "./hnswIndex";
-
-// RAG Pipeline
-export { RAGPipeline, createRAGPipeline } from "./ragPipeline";
-
-// Hybrid Search
-export {
-  KeywordIndex,
-  HybridSearch,
-  createHybridSearch,
-  reciprocalRankFusion,
-  type HybridSearchConfig,
-} from "./hybridSearch";
-
-// Reranker
-export {
-  Reranker,
-  createReranker,
-  type RerankerConfig,
-  type RerankedResult,
-  type RerankResponse,
-} from "./reranker";
+export { createInMemoryStore, InMemoryVectorStore } from "./vectorStore";

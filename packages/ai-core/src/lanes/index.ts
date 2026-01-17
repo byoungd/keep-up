@@ -31,37 +31,35 @@
  * Track B: Intelligence & Grounding
  */
 
-// Types
-export type {
-  ModelLane,
-  LaneConfig,
-  LaneModelConfig,
-  MultiLaneConfig,
-  LaneRouterConfig,
-  LaneCompletionRequest,
-  LaneCompletionResponse,
-  LaneSelector,
-  LaneSelectionContext,
-  ComplexityHints,
-  ConsensusConfig,
-  ConsensusMergeStrategy,
-  ConsensusResult,
-  ConsensusModelResult,
-  ConsensusDiff,
-  LaneLogger,
-  LaneTelemetryEvent,
-} from "./types";
-
 // Lane Router
-export { LaneRouter, createLaneRouter, type ProviderFactory } from "./laneRouter";
-
+export { createLaneRouter, LaneRouter, type ProviderFactory } from "./laneRouter";
 // Lane Selectors
 export {
-  createComplexityBasedSelector,
-  createPreferenceBasedSelector,
-  createConsensusSelector,
-  combineSelectors,
   type ComplexitySelectorOptions,
-  type PreferenceSelectorOptions,
   type ConsensusSelectorOptions,
+  combineSelectors,
+  createComplexityBasedSelector,
+  createConsensusSelector,
+  createPreferenceBasedSelector,
+  type PreferenceSelectorOptions,
 } from "./laneSelector";
+// Types
+export type {
+  ComplexityHints,
+  ConsensusConfig,
+  ConsensusDiff,
+  ConsensusMergeStrategy,
+  ConsensusModelResult,
+  ConsensusResult,
+  LaneCompletionRequest,
+  LaneCompletionResponse,
+  LaneConfig,
+  LaneLogger,
+  LaneModelConfig,
+  LaneRouterConfig,
+  LaneSelectionContext,
+  LaneSelector,
+  LaneTelemetryEvent,
+  ModelLane,
+  MultiLaneConfig,
+} from "./types";

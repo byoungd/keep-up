@@ -16,68 +16,65 @@
 export {
   // Logger
   ConsoleLogger,
-  type Logger,
-  type LogLevel,
-  type LogEntry,
-  // Metrics
-  InMemoryMetrics,
-  type MetricsCollector,
-  type MetricType,
-  type MetricEntry,
-  // Tracer
-  SimpleTracer,
-  type Tracer,
-  type Span,
-  // Context
-  ObservabilityContext,
   createObservability,
   getObservability,
+  // Metrics
+  InMemoryMetrics,
+  type LogEntry,
+  type Logger,
+  type LogLevel,
+  type MetricEntry,
+  type MetricsCollector,
+  type MetricType,
+  // Context
+  ObservabilityContext,
+  // Tracer
+  SimpleTracer,
+  type Span,
   setObservability,
+  type Tracer,
 } from "../resilience/observability";
-
-// Export new enhanced components
 export {
-  TelemetryContext,
-  createTelemetryContext,
-  type TelemetryContextConfig,
-  type TelemetryExporter,
-  type LogExportEntry,
-  type MetricExportEntry,
-  type SpanExportEntry,
-  type ResourceAttributes,
-  type ScopedContext,
-} from "./telemetryContext";
-
-export {
-  OpenTelemetryTracer,
-  createOpenTelemetryTracer,
-  createConsoleTraceExporter,
   createAlwaysSampler,
+  createConsoleTraceExporter,
   createNeverSampler,
+  createOpenTelemetryTracer,
   createProbabilitySampler,
   createRateLimitingSampler,
-  type OpenTelemetryConfig,
-  type SpanContext,
-  type TraceExporter,
   type ExportResult,
+  type OpenTelemetryConfig,
+  OpenTelemetryTracer,
+  type OTelSpan,
   type Sampler,
   type SamplingResult,
+  type SpanContext,
   type SpanKind,
-  type SpanStatus,
   type SpanLink,
-  type OTelSpan,
+  type SpanStatus,
+  type TraceExporter,
 } from "./openTelemetryTracer";
-
 export {
-  PerformanceProfiler,
   createPerformanceProfiler,
-  type ProfilerConfig,
-  type ProfileEntry,
-  type ProfileReport,
-  type ProfilerMetrics,
   type FunctionStats,
   type HotPath,
-  type MemoryStats,
   type MemorySnapshot,
+  type MemoryStats,
+  PerformanceProfiler,
+  type ProfileEntry,
+  type ProfileReport,
+  type ProfilerConfig,
+  type ProfilerMetrics,
   type ProfileSummary,
 } from "./performanceProfiler";
+// Export new enhanced components
+export {
+  createTelemetryContext,
+  type LogExportEntry,
+  type MetricExportEntry,
+  type ResourceAttributes,
+  type ScopedContext,
+  type SpanExportEntry,
+  TelemetryContext,
+  type TelemetryContextConfig,
+  type TelemetryExporter,
+} from "./telemetryContext";

@@ -5,12 +5,12 @@
  */
 
 export {
-  ModelRouter,
   createModelRouter,
+  type ModelBudget,
+  type ModelRiskLevel,
   type ModelRouteDecision,
   type ModelRouteRule,
-  type ModelRiskLevel,
-  type ModelRoutingRequest,
-  type ModelBudget,
+  ModelRouter,
   type ModelRouterConfig,
+  type ModelRoutingRequest,
 } from "./modelRouter";

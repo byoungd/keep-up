@@ -13,9 +13,9 @@ import {
   selectAnnotation,
   selectBlock,
   showOverlay,
-  toScanReportSummary,
   toggleOverlay,
   togglePanel,
+  toScanReportSummary,
   updateScanReport,
 } from "../state.js";
 

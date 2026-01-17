@@ -7,7 +7,7 @@
 // We use dynamic import or expect the package to be available.
 // Since it's a monorepo package, we import it directly.
 import { type TranscriptParagraph, YouTubeIngestor } from "@ku0/ingest-youtube";
-import type { IngestResult, IngestorFn } from "../types";
+import type { IngestorFn, IngestResult } from "../types";
 
 /**
  * Configure the YouTube ingestor.

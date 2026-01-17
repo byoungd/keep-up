@@ -16,9 +16,9 @@ import { decodeAnchor as decodeLegacyCursorAnchor, resolveAnchor } from "../anch
 import type { LoroRuntime } from "../runtime/loroRuntime";
 import type { SpanList } from "../selection/selectionMapping";
 import {
+  readAnnotation,
   type StoredAnnoState,
   type StoredAnnotationRecord,
-  readAnnotation,
   updateAnnotationState,
 } from "./annotationSchema";
 

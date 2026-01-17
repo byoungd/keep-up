@@ -5,13 +5,13 @@
 import { describe, expect, it } from "vitest";
 import type { CanonBlock } from "../canonicalizer/index.js";
 import {
-  PerformanceTracker,
   compareCanonTrees,
   compareDirtyVsFull,
   createBugReportTemplate,
   createSamplingState,
   formatScanReport,
   generateFullScanReport,
+  PerformanceTracker,
   recordStructuralOp,
   resetAfterFullScan,
   selectSampleBlocks,

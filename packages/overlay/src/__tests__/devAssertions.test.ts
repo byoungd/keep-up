@@ -4,9 +4,9 @@
 
 import { describe, expect, it, vi } from "vitest";
 import {
-  DevAssertionError,
   assertDirtyScanCoverage,
   createDevAssertionsRunner,
+  DevAssertionError,
   formatAssertionResult,
 } from "../devAssertions.js";
 import type { ScanReportSummary } from "../types.js";

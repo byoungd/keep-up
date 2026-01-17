@@ -3,32 +3,32 @@
  */
 
 export {
+  type ClassifyTransactionResult,
+  classifyTransaction,
+  resetTxnCounter,
+  type TransactionInput,
+  type TransactionStep,
+} from "./classifyTransaction.js";
+export {
   applyHistoryEntry,
   createHistoryState,
   getRestoredAnnotationDisplayState,
+  type HistoryEntry,
+  type HistoryRestoreResult,
+  type HistoryState,
   isHistoryRestore,
   processHistoryRestore,
   pushHistory,
   redo,
   undo,
-  type HistoryEntry,
-  type HistoryRestoreResult,
-  type HistoryState,
 } from "./history.js";
 export {
   classifyEvent,
+  type EditorEvent,
   eventToTypedOp,
   isStructuralOp,
   requiresFullScan,
-  type EditorEvent,
 } from "./opClassifier.js";
-export {
-  classifyTransaction,
-  resetTxnCounter,
-  type ClassifyTransactionResult,
-  type TransactionInput,
-  type TransactionStep,
-} from "./classifyTransaction.js";
 export {
   addBlock,
   applyOp,

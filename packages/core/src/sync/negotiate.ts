@@ -5,11 +5,11 @@
  */
 
 import {
+  areManifestsCompatible,
   type CanonMark,
   type NegotiationError,
-  type PolicyManifestV09,
-  areManifestsCompatible,
   negotiate,
+  type PolicyManifestV09,
   validateManifest,
 } from "../kernel/policy/index.js";
 import { DEFAULT_POLICY_MANIFEST } from "../kernel/policy/types.js";

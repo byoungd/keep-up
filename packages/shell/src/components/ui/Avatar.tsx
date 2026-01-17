@@ -1,5 +1,5 @@
 import { cn } from "@ku0/shared/utils";
-import { type VariantProps, cva } from "class-variance-authority";
+import { cva, type VariantProps } from "class-variance-authority";
 import * as React from "react";
 
 const avatarVariants = cva("relative flex shrink-0 overflow-hidden rounded-full", {
@@ -69,6 +69,7 @@ const Avatar = React.forwardRef<HTMLDivElement, AvatarProps>(
               "absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background",
               statusColors[status]
             )}
+            role="img"
             aria-label={`Status: ${status}`}
           />
         )}

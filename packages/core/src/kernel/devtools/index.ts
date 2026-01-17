@@ -3,31 +3,31 @@
  */
 
 export {
-  PerformanceTracker,
   compareCanonTrees,
   compareDirtyVsFull,
   createSamplingState,
   generateFullScanReport,
+  PerformanceTracker,
   recordStructuralOp,
   resetAfterFullScan,
-  selectSampleBlocks,
   type SamplingState,
+  selectSampleBlocks,
 } from "./compareHarness.js";
 export {
   createBugReportTemplate,
-  forceFullScan,
-  formatScanReport,
   type ForceFullScanOptions,
   type ForceFullScanResult,
+  forceFullScan,
+  formatScanReport,
 } from "./forceFullScan.js";
 export {
   compareRenderingKeys,
   createSimpleRenderingKeysProvider,
   getRenderingKeys,
+  type RenderingKey,
+  type RenderingKeysSnapshot,
   registerRenderingKeysProvider,
   unregisterRenderingKeysProvider,
   verifyRenderingKeysDeterminism,
-  type RenderingKey,
-  type RenderingKeysSnapshot,
 } from "./renderingKeys.js";
 export * from "./types.js";

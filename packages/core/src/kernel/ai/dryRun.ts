@@ -8,8 +8,8 @@ import { canonicalizeDocument } from "../canonicalizer/canonicalize.js";
 import type {
   CanonBlock,
   CanonInputNode,
-  CanonNode,
   CanonicalizerPolicyV2,
+  CanonNode,
 } from "../canonicalizer/types.js";
 import { DEFAULT_CANONICALIZER_POLICY, isCanonBlock } from "../canonicalizer/types.js";
 import type {

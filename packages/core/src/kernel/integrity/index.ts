@@ -3,13 +3,13 @@
  */
 
 export {
+  type AnnotationForVerify,
   CheckpointScheduler,
   createCheckpointSchedulerState,
   recordOperation,
   resetAfterCheckpoint,
   runCheckpoint,
   shouldTriggerCheckpoint,
-  type AnnotationForVerify,
 } from "./checkpoint.js";
 export {
   computeChainHash,
@@ -18,25 +18,24 @@ export {
   verifyChainHash,
   verifyContextHash,
 } from "./hash.js";
-export {
-  IntegrityScanner,
-  shouldRunFullScanNow,
-  type AnnotationScanData,
-  type DocumentStateProvider,
-} from "./scanner.js";
-export * from "./types.js";
-
 // P1.2: Large Document Performance Optimizations
 export {
-  DecodeCache,
-  DirtyRegionTracker,
   BlockIndex,
+  type BlockIndexEntry,
+  type CacheStats,
   createPerformanceMonitor,
+  DecodeCache,
   type DecodeCacheConfig,
   type DecodeCacheEntry,
-  type CacheStats,
   type DirtyRegion,
+  DirtyRegionTracker,
   type IncrementalVerificationOptions,
-  type BlockIndexEntry,
   type LargeDocPerformanceMetrics,
 } from "./performanceOptimizations.js";
+export {
+  type AnnotationScanData,
+  type DocumentStateProvider,
+  IntegrityScanner,
+  shouldRunFullScanNow,
+} from "./scanner.js";
+export * from "./types.js";

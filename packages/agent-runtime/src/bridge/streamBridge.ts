@@ -13,7 +13,7 @@ import type {
   StreamBuffer,
   StreamingCommitStrategy,
 } from "@ku0/core";
-import { DEFAULT_COMMIT_STRATEGY, createStreamBuffer, findBestCommitPoint } from "@ku0/core";
+import { createStreamBuffer, DEFAULT_COMMIT_STRATEGY, findBestCommitPoint } from "@ku0/core";
 import type { DocumentEditEvent, StreamEvent, TokenEvent } from "../streaming/types";
 
 // Re-export types for consumers

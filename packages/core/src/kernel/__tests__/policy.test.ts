@@ -4,11 +4,11 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  DEFAULT_POLICY_MANIFEST,
-  type PolicyManifestV09,
   areManifestsCompatible,
+  DEFAULT_POLICY_MANIFEST,
   isPolicyManifestV09,
   negotiate,
+  type PolicyManifestV09,
   validateManifest,
 } from "../policy/index.js";
 

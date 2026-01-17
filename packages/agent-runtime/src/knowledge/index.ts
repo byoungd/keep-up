@@ -5,11 +5,11 @@
  */
 
 export {
-  KnowledgeRegistry,
-  createKnowledgeRegistry,
   BUILTIN_KNOWLEDGE,
+  createKnowledgeRegistry,
   type KnowledgeItem,
-  type KnowledgeScope,
   type KnowledgeMatchContext,
   type KnowledgeMatchResult,
+  KnowledgeRegistry,
+  type KnowledgeScope,
 } from "./knowledgeRegistry";

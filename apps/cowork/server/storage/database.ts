@@ -11,8 +11,8 @@
 
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
-import Database from "better-sqlite3";
 import type { Database as DatabaseInstance } from "better-sqlite3";
+import Database from "better-sqlite3";
 import { resolveStateDir } from "./statePaths";
 
 let db: DatabaseInstance | null = null;

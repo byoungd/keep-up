@@ -6,7 +6,7 @@ import { DeliverableItem } from "./DeliverableItem";
 import { PlanSection } from "./PlanSection";
 import { StepItem } from "./StepItem";
 import { TaskHeader } from "./TaskHeader";
-import { TASK_THEME, buildFallbackStep, getStatusMeta, normalizeSteps } from "./TaskStreamUtils";
+import { buildFallbackStep, getStatusMeta, normalizeSteps, TASK_THEME } from "./TaskStreamUtils";
 import type { AgentTask, ArtifactItem } from "./types";
 
 interface TaskStreamMessageProps {

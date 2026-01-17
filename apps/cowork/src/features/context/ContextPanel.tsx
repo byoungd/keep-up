@@ -1,8 +1,8 @@
 "use client";
 
 import { cn } from "@ku0/shared/utils";
-import { ArtifactPreviewPane } from "@ku0/shell";
 import type { ArtifactItem } from "@ku0/shell";
+import { ArtifactPreviewPane } from "@ku0/shell";
 import { useParams } from "@tanstack/react-router";
 import * as React from "react";
 import { ArtifactsList } from "../artifacts/components/ArtifactsList";

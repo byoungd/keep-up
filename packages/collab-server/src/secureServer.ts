@@ -9,10 +9,10 @@
  */
 
 import {
+  createServer,
   type Server as HttpServer,
   type IncomingMessage,
   type ServerResponse,
-  createServer,
 } from "node:http";
 import { SyncServer, type SyncServerConfig } from "@ku0/core/sync/server";
 import { type RawData, type WebSocket, WebSocketServer } from "ws";

@@ -4,16 +4,16 @@
  * Exports audit logging types and implementations.
  */
 
+export { AuditLogger, type AuditLoggerConfig } from "./auditLogger";
 export type {
-  AuditEventType,
   AuditEvent,
   AuditEventInput,
-  AuditStore,
+  AuditEventType,
   AuditQueryParams,
+  AuditStore,
 } from "./auditTypes";
-export { AuditLogger, type AuditLoggerConfig } from "./auditLogger";
-export { MemoryAuditStore } from "./memoryAuditStore";
 export { FileAuditStore } from "./fileAuditStore";
+export { MemoryAuditStore } from "./memoryAuditStore";
 export {
   RotatingFileAuditStore,
   type RotatingFileAuditStoreConfig,

@@ -260,6 +260,7 @@ export class TranslationService {
         this.setCache(cacheKey, result, provider.name);
         return { text: result, provider: provider.name, success: true, latency };
       } catch (error) {
+        // biome-ignore lint/suspicious/noConsole: Expected warning
         console.warn(
           `[Translation] ${provider.name} failed:`,
           error instanceof Error ? error.message : error

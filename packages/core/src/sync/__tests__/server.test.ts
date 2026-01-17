@@ -8,12 +8,12 @@ import type { AuthAdapter } from "../../security/auth.js";
 import { createDefaultSyncManifest } from "../negotiate.js";
 import {
   type CatchUpResponsePayload,
+  createMessage,
+  deserializeMessage,
   type HandshakeAckPayload,
   type HandshakePayload,
   type PresenceAckPayload,
   type PresencePayload,
-  createMessage,
-  deserializeMessage,
   serializeMessage,
 } from "../protocol.js";
 import { type PersistenceHooks, SyncServer, type WebSocketLike } from "../server.js";

@@ -1,5 +1,5 @@
-import { NavGroup as SharedNavGroup } from "@ku0/shared/ui/nav";
 import type { NavGroupProps } from "@ku0/shared/ui/nav";
+import { NavGroup as SharedNavGroup } from "@ku0/shared/ui/nav";
 import { ChevronRight } from "lucide-react";
 
 export function NavGroup(props: NavGroupProps) {

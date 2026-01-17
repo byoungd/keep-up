@@ -7,10 +7,10 @@
 
 import type { CollabAdapter, CollabAdapterStatus, CollabSession } from "./collabAdapter";
 import {
-  type SyncMessage,
   createJoinMessage,
   createLeaveMessage,
   isValidSyncMessage,
+  type SyncMessage,
   serializeSyncMessage,
 } from "./collabMessages";
 

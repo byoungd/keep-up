@@ -247,6 +247,7 @@ export class TTSEngine {
     if (this.currentProvider?.id !== "browser") {
       const browserProvider = this.providers.get("browser");
       if (browserProvider?.isAvailable()) {
+        // biome-ignore lint/suspicious/noConsole: Expected warning
         console.warn("[TTSEngine] Falling back to browser TTS");
         this.currentProvider = browserProvider;
         this.currentWordTimings = []; // Browser TTS has no word timing

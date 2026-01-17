@@ -9,9 +9,9 @@ import { EditorAdapterPM } from "../adapters/editorAdapterPM";
 import { validateAnchorIntegrity } from "../anchors/loroAnchors";
 import {
   type ApplyPmTransactionResult,
+  applyPmTransactionToLoro,
   BRIDGE_ORIGIN_META,
   LFCC_STRUCTURAL_META,
-  applyPmTransactionToLoro,
 } from "../apply/applyPmTransaction";
 import { createEmptyDoc, getRootBlocks, migrateToSchemaV2, nextBlockId } from "../crdt/crdtSchema";
 import { assertDirtyInfoSuperset, formatDirtyInfoDiff } from "../dirty/assertDirtyInfo";
@@ -20,7 +20,7 @@ import {
   computeDirtyInfo,
   computeDirtyInfoWithPolicy,
 } from "../dirty/dirtyInfo";
-import { type DivergenceDetector, createDivergenceDetector } from "../integrity/divergence";
+import { createDivergenceDetector, type DivergenceDetector } from "../integrity/divergence";
 import { assignMissingBlockIds } from "../pm/validateBlockIds";
 import { projectLoroToPm } from "../projection/projection";
 import type { LoroRuntime } from "../runtime/loroRuntime";
@@ -35,22 +35,22 @@ import {
   hasGatewayMetadata,
   markAIGatewayTransaction,
 } from "../security/aiGatewayWrite";
-import { type RelocationSecurity, createRelocationSecurity } from "../security/relocation";
-import { type SecurityValidator, createSecurityValidator } from "../security/validator";
+import { createRelocationSecurity, type RelocationSecurity } from "../security/relocation";
+import { createSecurityValidator, type SecurityValidator } from "../security/validator";
 import { pmSelectionToSpanList, spanListToPmRanges } from "../selection/selectionMapping";
 import {
   type AIGatewayPlanApplyOptions,
   type AIGatewayPlanApplyResult,
-  type PayloadFragmentResult,
   buildApplyPlanTransaction,
   buildFragmentFromHtml,
   ensureApplyPlanInputs,
+  type PayloadFragmentResult,
   resolveApplyOperations,
 } from "./aiGatewayPlan";
 import {
-  type StructuralOp,
   buildStructuralOpsFromDirtyInfo,
   mergeAndOrderStructuralOps,
+  type StructuralOp,
 } from "./opOrdering";
 
 // Re-export types for external consumers

@@ -10,7 +10,7 @@ import {
 } from "../canonicalizer/index.js";
 import { applyOp } from "../shadow/shadowModel.js";
 import type { ShadowBlock, ShadowDocument, TypedOp } from "../shadow/types.js";
-import { DEFAULT_FUZZ_CONFIG, createRng, generateOp, randomInt } from "./generators.js";
+import { createRng, DEFAULT_FUZZ_CONFIG, generateOp, randomInt } from "./generators.js";
 import {
   advanceNetwork,
   createNetworkSim,

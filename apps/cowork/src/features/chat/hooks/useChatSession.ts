@@ -48,11 +48,10 @@ export function useChatSession(sessionId: string | undefined) {
         }));
         setHistoryMessages((prev) => mergeHistory(prev, mapped));
       })
-      .catch((err) => {
+      .catch((_err) => {
         if (!isActive) {
           return;
         }
-        console.error("Failed to fetch chat history:", err);
         setError("Failed to load chat history");
       })
       .finally(() => {
@@ -208,7 +207,6 @@ export function useChatSession(sessionId: string | undefined) {
           )
         );
       } catch (error) {
-        console.error("Failed to resolve approval:", error);
         const errorMessage = error instanceof Error ? error.message : "Action failed";
 
         // Rollback / Show error
@@ -246,7 +244,6 @@ export function useChatSession(sessionId: string | undefined) {
         }
       } catch (err) {
         const errorDetail = err instanceof Error ? err.message : "Unknown error";
-        console.error("Failed to send message:", err);
         setError(`Failed to send message: ${errorDetail}`);
         setHistoryMessages((prev) =>
           prev.map((m) =>
@@ -261,25 +258,6 @@ export function useChatSession(sessionId: string | undefined) {
     },
     [sessionId, handleSendTask, handleSendChat, addOptimisticMessage]
   );
-
-  function mapTaskStatus(
-    status: string
-  ): "queued" | "running" | "completed" | "paused" | "failed" | "cancelled" {
-    switch (status) {
-      case "running":
-      case "planning":
-      case "ready":
-        return "running";
-      case "completed":
-        return "completed";
-      case "failed":
-        return "failed";
-      case "cancelled":
-        return "cancelled";
-      default:
-        return "queued";
-    }
-  }
 
   return {
     messages,
@@ -317,4 +295,23 @@ function mergeHistory(existing: Message[], history: Message[]): Message[] {
     // Otherwise keep the history version (more authoritative)
   }
   return Array.from(merged.values()).sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
+}
+
+function mapTaskStatus(
+  status: string
+): "queued" | "running" | "completed" | "paused" | "failed" | "cancelled" {
+  switch (status) {
+    case "running":
+    case "planning":
+    case "ready":
+      return "running";
+    case "completed":
+      return "completed";
+    case "failed":
+      return "failed";
+    case "cancelled":
+      return "cancelled";
+    default:
+      return "queued";
+  }
 }

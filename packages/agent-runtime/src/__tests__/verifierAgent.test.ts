@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { VerifierAgent, createAgentManager, createMockLLM, createToolRegistry } from "../index";
+import { createAgentManager, createMockLLM, createToolRegistry, VerifierAgent } from "../index";
 
 describe("VerifierAgent", () => {
   it("fails closed when verifier output omits boolean flag", async () => {

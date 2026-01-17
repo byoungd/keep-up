@@ -4,11 +4,11 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  createQuotaManager,
+  createTieredQuotaManager,
   QUOTA_PRESETS,
   type QuotaManager,
   type QuotaScope,
-  createQuotaManager,
-  createTieredQuotaManager,
 } from "../quota";
 
 describe("QuotaManager", () => {

@@ -3,7 +3,7 @@
  * @see docs/product/LFCC_v0.9_RC_Engineering_Docs/10_Recursive_Canonicalization_Deep_Dive.md
  */
 
-import type { CanonMark, CanonicalizerPolicyV2 } from "./types.js";
+import type { CanonicalizerPolicyV2, CanonMark } from "./types.js";
 
 /** HTML tags that map to marks */
 const TAG_TO_MARK: Record<string, CanonMark> = {

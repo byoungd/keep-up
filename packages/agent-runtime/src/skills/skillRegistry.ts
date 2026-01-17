@@ -3,9 +3,9 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { AuditLogger, SkillIndexEntry, SkillSource } from "../types";
 import {
-  type SkillValidationOptions,
   normalizeSkillName,
   parseSkillMarkdown,
+  type SkillValidationOptions,
 } from "./skillParsing";
 
 export type SkillDirectoryConfig = {

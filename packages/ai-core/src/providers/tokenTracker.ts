@@ -5,7 +5,7 @@
  * Supports rate limiting and budget enforcement.
  */
 
-import { type Tiktoken, type TiktokenEncoding, getEncoding } from "js-tiktoken";
+import { getEncoding, type Tiktoken, type TiktokenEncoding } from "js-tiktoken";
 import type { TokenUsage } from "./types";
 
 /** Pricing per 1M tokens in USD */

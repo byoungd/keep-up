@@ -5,8 +5,7 @@
  */
 
 export * from "./compaction.js";
+export * from "./optimizedStorage.js";
 export * from "./recovery.js";
 export * from "./storage.js";
 export * from "./types.js";
-
-export * from "./optimizedStorage.js";

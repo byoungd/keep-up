@@ -1,5 +1,5 @@
 import React from "react";
-import { type ThemeMode, applyTheme, persistTheme, resolveInitialTheme } from "../theme";
+import { applyTheme, persistTheme, resolveInitialTheme, type ThemeMode } from "../theme";
 
 type ThemeContextValue = {
   theme: ThemeMode;

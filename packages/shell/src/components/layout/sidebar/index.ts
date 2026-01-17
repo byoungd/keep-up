@@ -1,14 +1,14 @@
+export { ResizableSidebar } from "./ResizableSidebar";
+export { SettingsModal } from "./SettingsModal";
 export { Sidebar } from "./Sidebar";
-export { SidebarHeader } from "./SidebarHeader";
 export { SidebarGroup } from "./SidebarGroup";
+export { SidebarHeader } from "./SidebarHeader";
 export { SidebarItem } from "./SidebarItem";
 export { SidebarRail } from "./SidebarRail";
-export { SettingsModal } from "./SettingsModal";
-export { ResizableSidebar } from "./ResizableSidebar";
 export type {
-  SidebarGroupRenderProps,
   SidebarGroupRenderer,
-  SidebarItemRenderProps,
+  SidebarGroupRenderProps,
   SidebarItemRenderer,
+  SidebarItemRenderProps,
   SidebarNewAction,
 } from "./types";

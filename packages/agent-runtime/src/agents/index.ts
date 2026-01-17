@@ -5,28 +5,27 @@
  * Reference: Claude Code's agent architecture.
  */
 
-// Types
-export type {
-  AgentType,
-  AgentProfile,
-  SpawnAgentOptions,
-  AgentResult,
-  AgentStatus,
-  IAgentManager,
-  AgentManagerConfig,
-} from "./types";
+// Manager
+export { AgentManager, createAgentManager } from "./manager";
 
 // Profiles
 export { AGENT_PROFILES, getAgentProfile, listAgentTypes } from "./profiles";
-
-// Manager
-export { AgentManager, createAgentManager } from "./manager";
+// Types
+export type {
+  AgentManagerConfig,
+  AgentProfile,
+  AgentResult,
+  AgentStatus,
+  AgentType,
+  IAgentManager,
+  SpawnAgentOptions,
+} from "./types";
 
 // Verifier
 export {
   VerifierAgent,
+  type VerifierAgentConfig,
   type VerifierRequest,
   type VerifierResult,
   type VerifierSource,
-  type VerifierAgentConfig,
 } from "./verifier";

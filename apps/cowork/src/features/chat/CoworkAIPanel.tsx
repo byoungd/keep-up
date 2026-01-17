@@ -1,8 +1,7 @@
 "use client";
-import { useMemo } from "react";
 
-import { AIPanel as ShellAIPanel, useReaderShell } from "@ku0/shell";
-import type { ArtifactItem } from "@ku0/shell";
+import { type ArtifactItem, AIPanel as ShellAIPanel, useReaderShell } from "@ku0/shell";
+import { useMemo } from "react";
 import { useCoworkAIPanelController } from "./useCoworkAIPanelController";
 
 export interface CoworkAIPanelProps {

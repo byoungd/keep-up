@@ -7,20 +7,19 @@ import { parseArtifactsFromContent } from "../../lib/ai/artifacts";
 import type { ReferenceAnchor, ReferenceRange } from "../../lib/ai/referenceAnchors";
 import { ConfidenceBadge } from "../ai/ConfidenceBadge";
 import { ArtifactList } from "./ArtifactCard";
+import { AskMessage } from "./AskMessage";
 import { ExecutionSteps } from "./ExecutionSteps";
+import { InfoMessage } from "./InfoMessage";
 import { MessageActions } from "./MessageActions";
 import { MessageAlert } from "./MessageAlert";
 import { MessageBubble } from "./MessageBubble";
 import { MessageReferences } from "./MessageReferences";
 import { MessageStatusBadge } from "./MessageStatusBadge";
 import { ModelBadge } from "./ModelBadge";
-import { ThinkingProcess } from "./ThinkingProcess";
-import { TokenUsageDisplay } from "./TokenUsageDisplay";
-
-import { AskMessage } from "./AskMessage";
-import { InfoMessage } from "./InfoMessage";
 import { ResultMessage } from "./ResultMessage";
 import { TaskStreamMessage } from "./TaskStreamMessage";
+import { ThinkingProcess } from "./ThinkingProcess";
+import { TokenUsageDisplay } from "./TokenUsageDisplay";
 import type { AgentTask, ArtifactItem, Message, MessageItemTranslations } from "./types";
 
 export interface MessageItemProps {

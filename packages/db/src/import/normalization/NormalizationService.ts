@@ -6,13 +6,13 @@
 
 import {
   type BlockNode,
-  LoroDoc,
   getMetaMap,
+  LoroDoc,
   nextBlockId,
   serializeAttrs,
   writeBlockTree,
 } from "@ku0/lfcc-bridge";
-import { type Token, type Tokens, lexer } from "marked";
+import { lexer, type Token, type Tokens } from "marked";
 import type { IngestResult } from "../types";
 import type { ContentResult } from "./types";
 

@@ -12,7 +12,7 @@
  */
 
 import { beforeEach, describe, expect, it } from "vitest";
-import { InMemoryStore, createInMemoryStore } from "../memory/memoryStore";
+import { createInMemoryStore, InMemoryStore } from "../memory/memoryStore";
 import type { Memory } from "../memory/types";
 import { cosineSimilarity } from "../memory/types";
 

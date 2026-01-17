@@ -5,10 +5,10 @@
  * Track 2: Intelligence & Logic (AI) - P2
  */
 
-export { TopicClassifier } from "./topicClassifier";
 export type {
   ClassificationResult,
   TopicAssignment,
-  TopicDefinition,
   TopicClassifierConfig,
+  TopicDefinition,
 } from "./topicClassifier";
+export { TopicClassifier } from "./topicClassifier";

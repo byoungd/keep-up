@@ -19,11 +19,11 @@ import { type BackpressureConfig, BackpressureHandler } from "./backpressureHand
 import { MessageBatcher, type MessageBatcherConfig } from "./messageBatcher";
 import { RateLimiter, type RateLimiterConfig } from "./rateLimiter";
 import {
-  type IRedisAdapter,
-  type RoutedMessage,
   createInMemoryMessageBus,
   createStatelessRelay,
   generateServerId,
+  type IRedisAdapter,
+  type RoutedMessage,
 } from "./redisAdapter";
 
 // ============================================================================

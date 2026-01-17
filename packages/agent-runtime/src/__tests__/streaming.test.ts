@@ -4,14 +4,14 @@
 
 import { describe, expect, it, vi } from "vitest";
 import {
-  type StreamChunk,
-  type TextChunkData,
   collectStream,
   collectText,
   createStreamWriter,
   filterStream,
   mergeStreams,
   processStreamWithCallbacks,
+  type StreamChunk,
+  type TextChunkData,
   transformStream,
 } from "../streaming";
 

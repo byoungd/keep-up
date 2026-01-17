@@ -5,7 +5,7 @@
  * Uses Mozilla Readability for content extraction.
  */
 
-import { type ExtractOptions, type ExtractedContent, extractFromHtml } from "./contentExtractor";
+import { type ExtractedContent, type ExtractOptions, extractFromHtml } from "./contentExtractor";
 import { type RetryOptions, withRetry } from "./retry";
 
 export interface FetchFullTextOptions extends ExtractOptions {

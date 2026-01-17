@@ -14,7 +14,7 @@ describe("Policy Negotiation", () => {
   it("should fail on critical mismatch (coords)", () => {
     const m1 = structuredClone(DEFAULT_POLICY_MANIFEST);
     const m2 = structuredClone(DEFAULT_POLICY_MANIFEST);
-    // @ts-ignore
+    // @ts-expect-error
     m2.coords.kind = "cartesian"; // Invalid kind
 
     const result = negotiate([m1, m2]);

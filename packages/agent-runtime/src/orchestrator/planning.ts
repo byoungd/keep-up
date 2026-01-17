@@ -6,7 +6,7 @@
  */
 
 import type { MCPToolCall } from "../types";
-import { type PlanPersistence, createPlanPersistence } from "./planPersistence";
+import { createPlanPersistence, type PlanPersistence } from "./planPersistence";
 
 // ============================================================================
 // Planning Types

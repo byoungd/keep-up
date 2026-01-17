@@ -12,10 +12,10 @@ import type { PolicyManifestV09 } from "@ku0/core";
 import { updateAnnotationState } from "../annotations/annotationSchema";
 import type { LoroRuntime } from "../runtime/loroRuntime";
 import {
+  createDegradationContext,
   type DegradationEvent,
   type DegradationNotification,
   type DegradationState,
-  createDegradationContext,
   transitionDegradationState,
 } from "./degradationStateMachine";
 import type { BridgeAnnotation, DegradationResult } from "./policyManager";

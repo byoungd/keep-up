@@ -4,12 +4,6 @@
  * WebSocket synchronization for Loro + LFCC.
  */
 
-// Protocol types and utilities
-export * from "./protocol.js";
-
-// Policy negotiation
-export * from "./negotiate.js";
-
 // Client adapter
 export {
   SyncClient,
@@ -17,6 +11,11 @@ export {
   type SyncClientEvents,
   type SyncClientState,
 } from "./client.js";
+
+// Policy negotiation
+export * from "./negotiate.js";
+// Protocol types and utilities
+export * from "./protocol.js";
 
 // Server router
 // Server router - REMOVED to avoid 'ws' dependency in browser bundles

@@ -7,7 +7,7 @@
 
 import { type AnnotationVisualizerData, renderAnnotationVisualizer } from "./annotationVisualizer";
 import { type BlockOverlayRenderResult, renderBlockOverlays } from "./blockVisualizer";
-import { type DevAssertionsConfig, createDevAssertionsRunner } from "./devAssertions";
+import { createDevAssertionsRunner, type DevAssertionsConfig } from "./devAssertions";
 import { type IntegrityPanelData, renderIntegrityPanel } from "./integrityPanel";
 import {
   addEvent,
@@ -17,9 +17,9 @@ import {
   selectAnnotation,
   selectBlock,
   showOverlay,
-  toScanReportSummary,
   toggleOverlay,
   togglePanel,
+  toScanReportSummary,
   updateScanReport,
 } from "./state";
 import type {

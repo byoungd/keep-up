@@ -5,7 +5,7 @@
  * Wraps the @ku0/core SyncServer with ws library.
  */
 
-import { type IncomingMessage, type ServerResponse, createServer } from "node:http";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { parse } from "node:url";
 // Import directly from sync/server since it's not re-exported from main to avoid ws in browser bundles
 import { type PersistenceHooks, SyncServer, type WebSocketLike } from "@ku0/core/sync/server";

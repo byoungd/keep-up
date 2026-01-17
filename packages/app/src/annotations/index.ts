@@ -8,39 +8,36 @@
  * - Drag Handle Interaction Shell
  */
 
-// Types
-export * from "./types";
-
-// Visual Spec
+// Drag Handle
 export {
-  ANIMATION,
-  ANNOTATION_HIGHLIGHT_COLORS,
-  BORDER_STYLES,
-  BORDER_WIDTHS,
-  KIND_COLORS,
-  STATUS_COLORS,
-  STATUS_ICONS,
-  STATUS_LABELS,
-  getAnnotationHighlightColor,
-  generateAllCss,
-  generateBadgeCss,
-  generateCssVariables,
-  generateHighlightCss,
-  getBadgeStyle,
-  getHighlightStyle,
-  getKindColor,
-  type AnnotationHighlightColor,
-} from "./visualSpec";
+  DragHandleController,
+  type DragHandleState,
+  destroyDragHandleController,
+  findHandleAtPoint,
+  generateHandleCss,
+  getDragHandleController,
+  type HandleHitTarget,
+  INITIAL_DRAG_STATE,
+  isPointInHandle,
+} from "./dragHandle";
+// Mock Adapter
+export {
+  createMockAdapter,
+  defaultMockAdapter,
+  type MockAdapterCallbacks,
+} from "./mockAdapter";
 
 // Panel State
 export {
-  INITIAL_PANEL_STATE,
+  type AnnotationStats,
   calculateStats,
   clearError,
   closePanel,
   filterAnnotations,
   filterAnnotationsByStatuses,
+  type GroupedAnnotations,
   groupByThread,
+  INITIAL_PANEL_STATE,
   openPanel,
   processAnnotations,
   selectAnnotation,
@@ -51,26 +48,26 @@ export {
   sortAnnotations,
   togglePanel,
   toggleSortDirection,
-  type AnnotationStats,
-  type GroupedAnnotations,
 } from "./panelState";
-
-// Mock Adapter
+// Types
+export * from "./types";
+// Visual Spec
 export {
-  createMockAdapter,
-  defaultMockAdapter,
-  type MockAdapterCallbacks,
-} from "./mockAdapter";
-
-// Drag Handle
-export {
-  DragHandleController,
-  INITIAL_DRAG_STATE,
-  destroyDragHandleController,
-  findHandleAtPoint,
-  generateHandleCss,
-  getDragHandleController,
-  isPointInHandle,
-  type DragHandleState,
-  type HandleHitTarget,
-} from "./dragHandle";
+  ANIMATION,
+  ANNOTATION_HIGHLIGHT_COLORS,
+  type AnnotationHighlightColor,
+  BORDER_STYLES,
+  BORDER_WIDTHS,
+  generateAllCss,
+  generateBadgeCss,
+  generateCssVariables,
+  generateHighlightCss,
+  getAnnotationHighlightColor,
+  getBadgeStyle,
+  getHighlightStyle,
+  getKindColor,
+  KIND_COLORS,
+  STATUS_COLORS,
+  STATUS_ICONS,
+  STATUS_LABELS,
+} from "./visualSpec";

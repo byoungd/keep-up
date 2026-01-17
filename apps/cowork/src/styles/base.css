@@ -33,8 +33,10 @@ body {
   font-weight: 600;
   border: 1px solid transparent;
   cursor: pointer;
-  transition: transform var(--duration-fast) var(--ease-smooth), box-shadow var(--duration-fast)
-    var(--ease-smooth), background var(--duration-fast) var(--ease-smooth);
+  transition:
+    transform var(--duration-fast) var(--ease-smooth),
+    box-shadow var(--duration-fast) var(--ease-smooth),
+    background var(--duration-fast) var(--ease-smooth);
 }
 
 .primary-button {

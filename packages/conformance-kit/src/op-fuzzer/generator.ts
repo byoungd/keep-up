@@ -5,7 +5,7 @@
  */
 
 import type { LoroAdapter } from "../adapters/types";
-import { type RngState, createRng, nextInt, nextString, selectOne, selectWeighted } from "./rng";
+import { createRng, nextInt, nextString, type RngState, selectOne, selectWeighted } from "./rng";
 import type { FuzzOp } from "./types";
 
 /** Generator configuration */

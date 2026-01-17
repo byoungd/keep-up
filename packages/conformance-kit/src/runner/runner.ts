@@ -6,13 +6,13 @@
 
 import type { AdapterFactory } from "../adapters/types";
 import { createArtifactBundle, saveArtifacts } from "../artifacts/serializer";
-import { DoubleBlindHarness, createFailurePredicate } from "../double-blind/harness";
+import { createFailurePredicate, DoubleBlindHarness } from "../double-blind/harness";
 import { DEFAULT_GEN_CONFIG, type GenConfig, generateProgram } from "../op-fuzzer/generator";
 import { shrinkProgram } from "../op-fuzzer/shrinker";
 import {
   DEFAULT_RUNNER_CONFIG,
-  type RunSummary,
   type RunnerConfig,
+  type RunSummary,
   type SeedRunResult,
 } from "./types";
 
@@ -31,7 +31,7 @@ export class ConformanceRunner {
   ) {
     this.factory = factory;
     this.config = { ...DEFAULT_RUNNER_CONFIG, ...config };
-    const hasCheckpointOverride = Object.prototype.hasOwnProperty.call(config, "checkpointPolicy");
+    const hasCheckpointOverride = Object.hasOwn(config, "checkpointPolicy");
     if (!hasCheckpointOverride && this.config.stressMode === "structureStorm") {
       this.config.checkpointPolicy = "structureOnly";
     }

@@ -3,7 +3,7 @@ import type { Schema } from "prosemirror-model";
 import { EditorState } from "prosemirror-state";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { serializeAttrs, writeBlockTree } from "../crdt/crdtSchema";
-import { type DivergenceDetector, createDivergenceDetector } from "../integrity/divergence";
+import { createDivergenceDetector, type DivergenceDetector } from "../integrity/divergence";
 import { pmSchema } from "../pm/pmSchema";
 
 describe("DivergenceDetector", () => {

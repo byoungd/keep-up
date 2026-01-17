@@ -4,9 +4,6 @@
 
 import { beforeEach, describe, expect, it } from "vitest";
 import {
-  type MCPToolCall,
-  SECURITY_PRESETS,
-  type ToolContext,
   createAuditLogger,
   createBashToolServer,
   createCodeToolServer,
@@ -16,7 +13,10 @@ import {
   createOrchestrator,
   createSecurityPolicy,
   createToolRegistry,
+  type MCPToolCall,
+  SECURITY_PRESETS,
   securityPolicy,
+  type ToolContext,
 } from "../index";
 
 // ============================================================================

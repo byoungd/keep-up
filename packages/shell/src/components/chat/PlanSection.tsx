@@ -5,7 +5,10 @@ import type { ArtifactItem } from "./types";
 export function PlanSection({
   artifact,
   onPreview,
-}: { artifact: ArtifactItem; onPreview?: (artifact: ArtifactItem) => void }) {
+}: {
+  artifact: ArtifactItem;
+  onPreview?: (artifact: ArtifactItem) => void;
+}) {
   const steps = useMemo(() => {
     try {
       return JSON.parse(artifact.content || "[]") as Array<{ label: string }>;

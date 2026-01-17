@@ -6,15 +6,15 @@ import { describe, expect, it } from "vitest";
 import type { CanonBlock } from "../canonicalizer/index.js";
 import { addBlock, createShadowDocument } from "../shadow/index.js";
 import {
-  DEFAULT_FUZZ_CONFIG,
-  GOLDEN_FIXTURES,
   checkConvergence,
   compareAgainstGolden,
   createGoldenFixture,
   createRng,
   createTestHarness,
+  DEFAULT_FUZZ_CONFIG,
   deserializeFixture,
   formatSECResult,
+  GOLDEN_FIXTURES,
   generateOp,
   nextRandom,
   randomElement,

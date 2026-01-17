@@ -4,13 +4,13 @@ import type { Node as PMNode, Schema } from "prosemirror-model";
 import {
   type BlockKind,
   type BlockNode,
-  type MarkType,
-  type RichText,
-  type TextSpan,
   isContainerBlock,
+  type MarkType,
   parseAttrs,
+  type RichText,
   readBlockTree,
   serializeAttrs,
+  type TextSpan,
 } from "../crdt/crdtSchema";
 import { pmSchema } from "../pm/pmSchema";
 

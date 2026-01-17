@@ -26,34 +26,33 @@
  * Track B: Intelligence & Grounding
  */
 
-// Types
-export type {
-  ResponseMiddleware,
-  MiddlewareResponse,
-  MiddlewareContext,
-  MiddlewareRequestOptions,
-  ResponseMetadata,
-  CitationRef,
-  SourceContext,
-  ResponseFlag,
-  ResponseFlagType,
-  FlagSeverity,
-  ProcessedResponse,
-  GroundingSummary,
-  MiddlewareChainConfig,
-  CitationMiddlewareConfig,
-  MiddlewareLogger,
-} from "./types";
-
-// Middleware Chain
-export {
-  MiddlewareChain,
-  createMiddlewareChain,
-  createSimpleMiddleware,
-} from "./middlewareChain";
-
 // Citation Middleware
 export {
   CitationMiddleware,
   createCitationMiddleware,
 } from "./citationMiddleware";
+
+// Middleware Chain
+export {
+  createMiddlewareChain,
+  createSimpleMiddleware,
+  MiddlewareChain,
+} from "./middlewareChain";
+// Types
+export type {
+  CitationMiddlewareConfig,
+  CitationRef,
+  FlagSeverity,
+  GroundingSummary,
+  MiddlewareChainConfig,
+  MiddlewareContext,
+  MiddlewareLogger,
+  MiddlewareRequestOptions,
+  MiddlewareResponse,
+  ProcessedResponse,
+  ResponseFlag,
+  ResponseFlagType,
+  ResponseMetadata,
+  ResponseMiddleware,
+  SourceContext,
+} from "./types";

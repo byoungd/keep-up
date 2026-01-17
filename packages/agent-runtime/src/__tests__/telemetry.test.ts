@@ -5,9 +5,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   AGENT_METRICS,
+  createTelemetryContext,
   InMemoryMetricsCollector,
   InMemoryTracer,
-  createTelemetryContext,
   measureAsync,
   traced,
 } from "../telemetry";

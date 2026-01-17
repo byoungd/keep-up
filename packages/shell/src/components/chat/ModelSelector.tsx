@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 // import { useTranslations } from "next-intl"; // Removed next-intl dependency
 import * as React from "react";
+import { useShellTranslations } from "../../hooks/useShellTranslations";
 import { Button } from "../ui/Button";
 import {
   DropdownMenu,
@@ -45,8 +46,6 @@ import {
   ZAIIcon,
 } from "./ProviderIcons";
 import { ProviderDetailView, ProviderListView } from "./ProviderSettingsModal";
-
-import { useShellTranslations } from "../../hooks/useShellTranslations";
 
 export type PanelPosition = "left" | "right" | "main";
 
@@ -601,412 +600,408 @@ export function ModelSelector({
   );
 
   return (
-    <>
-      <DropdownMenu onOpenChange={onOpenChange}>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="compact"
-            className={cn(
-              "group flex items-center gap-1.5 px-2 py-0.5 h-auto text-left rounded-md transition-all duration-300",
-              // Default side view: standard pill
-              panelPosition !== "main" &&
-                "h-10 px-2 rounded-xl bg-surface-2/10 hover:bg-surface-2/60 hover:shadow-sm",
-              // Main/Toolbar view: minimal ghost
-              panelPosition === "main" &&
-                "text-muted-foreground hover:text-foreground hover:bg-surface-2",
-              "data-[state=open]:bg-surface-2 data-[state=open]:text-foreground",
-              "focus-visible:ring-2 focus-visible:ring-primary/20",
-              className
-            )}
-          >
-            <div className="flex items-center gap-2 min-w-0">
-              {selectedModel && (
-                <div
-                  className={cn(
-                    "flex items-center justify-center shrink-0",
-                    // Main: simplified icon
-                    panelPosition === "main"
-                      ? "h-4 w-4"
-                      : "h-7 w-7 rounded-lg transition-all duration-200 group-hover:scale-105 group-data-[state=open]:scale-105",
-                    panelPosition !== "main" && PROVIDER_ACCENTS[selectedModel.provider].chip
-                  )}
-                >
-                  {React.createElement(PROVIDER_ICONS[selectedModel.provider], {
-                    className: cn(
-                      panelPosition === "main" ? "h-3.5 w-3.5" : "h-3.5 w-3.5",
-                      panelPosition !== "main" && PROVIDER_ACCENTS[selectedModel.provider].icon
-                    ),
-                    "aria-hidden": true,
-                  })}
-                </div>
-              )}
-              <div className="flex flex-col items-start leading-none gap-0.5">
-                <div className="flex items-center gap-1 min-w-0">
-                  <span
-                    className={cn(
-                      "font-medium truncate max-w-[140px]",
-                      panelPosition === "main" ? "text-xs" : "text-sm text-foreground"
-                    )}
-                  >
-                    {(() => {
-                      if (selectedModel) {
-                        return selectedModel.shortLabel || selectedModel.label;
-                      }
-
-                      const migratedId = normalizeModelId(model);
-                      if (migratedId) {
-                        const migratedModel = models.find((entry) => entry.id === migratedId);
-                        if (migratedModel) {
-                          return migratedModel.shortLabel || migratedModel.label;
-                        }
-                      }
-
-                      // Fallback: Title Case the ID
-                      return model
-                        .split(/[-_]/)
-                        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-                        .join(" ");
-                    })()}
-                  </span>
-                  <ChevronDown
-                    className={cn(
-                      "text-muted-foreground/50 transition-transform duration-300",
-                      panelPosition === "main" ? "h-3 w-3" : "h-3.5 w-3.5",
-                      "group-data-[state=open]:rotate-180"
-                    )}
-                  />
-                </div>
-              </div>
-            </div>
-          </Button>
-        </DropdownMenuTrigger>
-
-        <DropdownMenuContent
-          align={panelPosition === "right" ? "end" : "start"}
-          sideOffset={12}
+    <DropdownMenu onOpenChange={onOpenChange}>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="compact"
           className={cn(
-            "w-[540px] max-w-[calc(100vw-24px)] p-0 rounded-2xl overflow-hidden",
-            "glass-surface premium-shadow border-border/20",
-            "max-h-[85vh] flex flex-col"
+            "group flex items-center gap-1.5 px-2 py-0.5 h-auto text-left rounded-md transition-all duration-300",
+            // Default side view: standard pill
+            panelPosition !== "main" &&
+              "h-10 px-2 rounded-xl bg-surface-2/10 hover:bg-surface-2/60 hover:shadow-sm",
+            // Main/Toolbar view: minimal ghost
+            panelPosition === "main" &&
+              "text-muted-foreground hover:text-foreground hover:bg-surface-2",
+            "data-[state=open]:bg-surface-2 data-[state=open]:text-foreground",
+            "focus-visible:ring-2 focus-visible:ring-primary/20",
+            className
           )}
         >
-          <div className="relative flex-1 min-h-0 flex flex-col">
-            <div
-              className={cn(
-                "relative flex min-h-0 flex-1",
-                panelPosition === "right" ? "flex-row-reverse" : "flex-row"
-              )}
-            >
-              {/* Provider sidebar */}
+          <div className="flex items-center gap-2 min-w-0">
+            {selectedModel && (
               <div
                 className={cn(
-                  "flex flex-col items-center gap-2 py-4 bg-surface-1/10 backdrop-blur-sm shrink-0",
-                  panelPosition === "right"
-                    ? "border-l border-border/5 w-16"
-                    : "border-r border-border/5 w-16"
+                  "flex items-center justify-center shrink-0",
+                  // Main: simplified icon
+                  panelPosition === "main"
+                    ? "h-4 w-4"
+                    : "h-7 w-7 rounded-lg transition-all duration-200 group-hover:scale-105 group-data-[state=open]:scale-105",
+                  panelPosition !== "main" && PROVIDER_ACCENTS[selectedModel.provider].chip
                 )}
               >
-                {providerMeta.map((provider, index) => {
-                  const isActive = activeProvider === provider.id;
-                  const Icon = provider.icon;
-                  const isDisabled = provider.disabled;
-                  return (
-                    <React.Fragment key={provider.id}>
-                      {index === 1 && (
-                        <div className="h-px w-8 bg-border/10 my-1" aria-hidden="true" />
-                      )}
-                      <Tooltip
-                        content={provider.label}
-                        side={panelPosition === "right" ? "left" : "right"}
-                        sideOffset={12}
-                      >
-                        <button
-                          type="button"
-                          aria-label={provider.label}
-                          aria-pressed={isActive}
-                          disabled={isDisabled}
-                          aria-disabled={isDisabled}
-                          onClick={() => {
-                            if (isDisabled) {
-                              return;
-                            }
-                            setActiveProvider(provider.id);
-                            if (settingsMode) {
-                              // In settings mode, clicking a provider stays in settings mode but switches context
-                              // unless it's "all" or "favorites", in which case we might default to list view
-                            } else {
-                              // Normal mode
-                            }
-                          }}
-                          className={cn(
-                            "group relative h-10 w-10 rounded-lg flex items-center justify-center",
-                            "transition-all duration-200 ease-out",
-                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border/40",
-                            isDisabled && "opacity-20 cursor-not-allowed",
-                            isActive
-                              ? "bg-surface-2 text-foreground"
-                              : "text-muted-foreground/50 hover:bg-surface-2/60 hover:text-foreground"
-                          )}
-                        >
-                          <Icon
-                            className={cn(
-                              "h-4 w-4 transition-colors duration-200",
-                              isActive ? "text-foreground" : ""
-                            )}
-                            aria-hidden="true"
-                          />
-                        </button>
-                      </Tooltip>
-                    </React.Fragment>
-                  );
+                {React.createElement(PROVIDER_ICONS[selectedModel.provider], {
+                  className: cn(
+                    panelPosition === "main" ? "h-3.5 w-3.5" : "h-3.5 w-3.5",
+                    panelPosition !== "main" && PROVIDER_ACCENTS[selectedModel.provider].icon
+                  ),
+                  "aria-hidden": true,
                 })}
-
-                {/* Settings button at bottom */}
-                <div className="mt-auto pt-2">
-                  <div className="h-px w-8 bg-border/10 mb-2" aria-hidden="true" />
-                  <Tooltip
-                    content={t("modelProviderSettings")}
-                    side={panelPosition === "right" ? "left" : "right"}
-                    sideOffset={12}
-                  >
-                    <button
-                      type="button"
-                      aria-label={
-                        settingsMode ? t("modelBackToModels") : t("modelProviderSettings")
-                      }
-                      onClick={() => setSettingsMode(!settingsMode)}
-                      className={cn(
-                        "group relative h-11 w-11 rounded-xl flex items-center justify-center transition-all duration-300",
-                        settingsMode
-                          ? "bg-surface-2 text-foreground shadow-sm"
-                          : "text-muted-foreground/60 hover:bg-surface-2/40 hover:text-foreground hover:scale-105"
-                      )}
-                    >
-                      {settingsMode ? (
-                        <LayoutGrid className="h-5 w-5" />
-                      ) : (
-                        <Settings className="h-5 w-5" />
-                      )}
-                    </button>
-                  </Tooltip>
-                </div>
               </div>
+            )}
+            <div className="flex flex-col items-start leading-none gap-0.5">
+              <div className="flex items-center gap-1 min-w-0">
+                <span
+                  className={cn(
+                    "font-medium truncate max-w-[140px]",
+                    panelPosition === "main" ? "text-xs" : "text-sm text-foreground"
+                  )}
+                >
+                  {(() => {
+                    if (selectedModel) {
+                      return selectedModel.shortLabel || selectedModel.label;
+                    }
 
-              {/* Content area */}
-              <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-                {settingsMode ? (
-                  <div className="flex-1 overflow-hidden flex flex-col">
-                    <div className="px-4 py-3 border-b border-border/30 shrink-0">
-                      <h3 className="text-sm font-semibold">{t("providerSettingsTitle")}</h3>
-                    </div>
-                    <div className="flex-1 overflow-hidden relative">
-                      {activeProvider === "all" || activeProvider === "favorites" ? (
-                        <ProviderListView onSelectProvider={(id) => setActiveProvider(id)} />
-                      ) : (
-                        <ProviderDetailView
-                          // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-                          providerId={activeProvider as any}
-                          onBack={() => setActiveProvider("all")}
-                        />
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    {/* Search header */}
-                    <div className="relative shrink-0">
-                      <div
-                        className={cn(
-                          "flex items-center gap-3 px-3 py-2",
-                          "border-b border-border/40",
-                          "transition-all duration-200 group/search"
-                        )}
-                      >
-                        <Search
-                          className="h-4 w-4 text-muted-foreground/40 group-focus-within/search:text-primary/60 transition-colors"
-                          aria-hidden="true"
-                        />
-                        <input
-                          type="text"
-                          value={search}
-                          onChange={(e) => setSearch(e.target.value)}
-                          placeholder="Search models..."
-                          className="flex-1 bg-transparent border-none p-0 text-xs placeholder:text-muted-foreground/40 focus:outline-none focus:ring-0"
-                        />
-                        {search && (
-                          <button
-                            type="button"
-                            onClick={() => setSearch("")}
-                            className="p-1 rounded-full text-muted-foreground/40 hover:text-foreground hover:bg-surface-3 transition-colors"
-                          >
-                            <span className="sr-only">Clear search</span>
-                            <div className="h-3.5 w-3.5 rounded-full bg-current opacity-70" />
-                          </button>
-                        )}
-                      </div>
+                    const migratedId = normalizeModelId(model);
+                    if (migratedId) {
+                      const migratedModel = models.find((entry) => entry.id === migratedId);
+                      if (migratedModel) {
+                        return migratedModel.shortLabel || migratedModel.label;
+                      }
+                    }
 
-                      {/* Feature filters - Compact Single Line */}
-                      <div className="flex items-center gap-1 overflow-x-auto py-2.5 px-3 scrollbar-none snap-x [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] border-b border-border/20 bg-surface-1/30">
-                        {availableFilters.length > 0 &&
-                          featureDefinitions.map((feature) => {
-                            if (!availableFilters.some((f) => f.id === feature.id)) {
-                              return null;
-                            }
-                            const isActive = activeFilters.has(feature.id);
-                            const Icon = feature.icon;
-
-                            return (
-                              <button
-                                key={feature.id}
-                                type="button"
-                                onClick={() => handleFilterToggle(feature.id)}
-                                className={cn(
-                                  "shrink-0 snap-start flex items-center gap-1 px-1.5 py-1 rounded-full text-[10px] tracking-tight font-medium border transition-all duration-200",
-                                  isActive
-                                    ? "bg-primary/10 border-primary/20 text-primary shadow-sm"
-                                    : "bg-surface-1/50 border-border/10 text-muted-foreground/70 hover:bg-surface-2 hover:text-foreground hover:border-border/30"
-                                )}
-                              >
-                                <Icon className="h-3 w-3" />
-                                {feature.label}
-                              </button>
-                            );
-                          })}
-                      </div>
-                    </div>
-
-                    {/* Model list */}
-                    <div className="flex-1 overflow-y-auto min-h-0 p-2 space-y-1">
-                      {showFavoritesEmpty ? (
-                        <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground/50">
-                          <Star className="h-8 w-8 mb-3 opacity-20" />
-                          <p className="text-sm">No favorite models yet</p>
-                          <Button
-                            variant="link"
-                            size="sm"
-                            className="text-primary/60 h-auto p-0 mt-2 text-xs"
-                            onClick={() => setActiveProvider("all")}
-                          >
-                            Browse all models
-                          </Button>
-                        </div>
-                      ) : currentModels.length === 0 && legacyModels.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground/50">
-                          <Filter className="h-8 w-8 mb-3 opacity-20" />
-                          <p className="text-sm">No models match your filters</p>
-                          <Button
-                            variant="link"
-                            size="sm"
-                            className="text-primary/60 h-auto p-0 mt-2 text-xs"
-                            onClick={handleFilterClear}
-                          >
-                            Clear filters
-                          </Button>
-                        </div>
-                      ) : (
-                        <>
-                          <List
-                            className="space-y-1"
-                            onSelect={(value) => {
-                              const model = currentModels.find((m) => m.id === value);
-                              if (model) {
-                                onSelect(model.id);
-                              }
-                            }}
-                          >
-                            {currentModels.map((entry) => (
-                              <DropdownMenuItem
-                                key={entry.id}
-                                className="gap-2 cursor-pointer"
-                                onClick={() => onSelect(entry.id)}
-                              >
-                                <ModelItem
-                                  model={entry}
-                                  isSelected={entry.id === model}
-                                  isFavorite={favoriteIds.has(entry.id)}
-                                  onSelect={() => onSelect(entry.id)}
-                                  onToggleFavorite={() => handleFavoriteToggle(entry.id)}
-                                  providerName={modelProviderLabels[entry.provider]}
-                                  labels={actionLabels}
-                                />
-                              </DropdownMenuItem>
-                            ))}
-                          </List>
-
-                          {legacyModels.length > 0 && (
-                            <div className="mt-4 pt-4 border-t border-border/20">
-                              <button
-                                type="button"
-                                onClick={() => setIsLegacyExpanded(!isLegacyExpanded)}
-                                className="flex items-center gap-2 px-2 text-xs font-medium text-muted-foreground/50 hover:text-muted-foreground transition-colors w-full"
-                              >
-                                <ChevronDown
-                                  className={cn(
-                                    "h-3 w-3 transition-transform",
-                                    isLegacyExpanded ? "rotate-0" : "-rotate-90"
-                                  )}
-                                />
-                                Legacy Models ({legacyModels.length})
-                              </button>
-                              {isLegacyExpanded && (
-                                <div className="mt-2 space-y-1">
-                                  <List
-                                    className="p-1"
-                                    onSelect={(value) => {
-                                      const model = legacyModels.find((m) => m.id === value);
-                                      if (model) {
-                                        onSelect(model.id);
-                                      }
-                                    }}
-                                  >
-                                    {legacyModels.map((entry) => (
-                                      <DropdownMenuItem
-                                        key={entry.id}
-                                        className="gap-2 cursor-pointer"
-                                        onClick={() => onSelect(entry.id)}
-                                      >
-                                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                                          <div className="shrink-0 text-muted-foreground">
-                                            {entry.provider === "openai" && (
-                                              <Brain className="h-4 w-4" />
-                                            )}
-                                            {entry.provider === "claude" && (
-                                              <Brain className="h-4 w-4" />
-                                            )}
-                                            {entry.provider === "gemini" && (
-                                              <Brain className="h-4 w-4" />
-                                            )}
-                                          </div>
-                                          <div className="flex flex-col overflow-hidden">
-                                            <div className="flex items-center gap-2">
-                                              <span className="font-medium truncate">
-                                                {entry.label}
-                                              </span>
-                                              <span className="text-xs text-muted-foreground shrink-0 border px-1 rounded">
-                                                {modelProviderLabels[entry.provider]}
-                                              </span>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      </DropdownMenuItem>
-                                    ))}
-                                  </List>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </>
-                )}
+                    // Fallback: Title Case the ID
+                    return model
+                      .split(/[-_]/)
+                      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+                      .join(" ");
+                  })()}
+                </span>
+                <ChevronDown
+                  className={cn(
+                    "text-muted-foreground/50 transition-transform duration-300",
+                    panelPosition === "main" ? "h-3 w-3" : "h-3.5 w-3.5",
+                    "group-data-[state=open]:rotate-180"
+                  )}
+                />
               </div>
             </div>
           </div>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </>
+        </Button>
+      </DropdownMenuTrigger>
+
+      <DropdownMenuContent
+        align={panelPosition === "right" ? "end" : "start"}
+        sideOffset={12}
+        className={cn(
+          "w-[540px] max-w-[calc(100vw-24px)] p-0 rounded-2xl overflow-hidden",
+          "glass-surface premium-shadow border-border/20",
+          "max-h-[85vh] flex flex-col"
+        )}
+      >
+        <div className="relative flex-1 min-h-0 flex flex-col">
+          <div
+            className={cn(
+              "relative flex min-h-0 flex-1",
+              panelPosition === "right" ? "flex-row-reverse" : "flex-row"
+            )}
+          >
+            {/* Provider sidebar */}
+            <div
+              className={cn(
+                "flex flex-col items-center gap-2 py-4 bg-surface-1/10 backdrop-blur-sm shrink-0",
+                panelPosition === "right"
+                  ? "border-l border-border/5 w-16"
+                  : "border-r border-border/5 w-16"
+              )}
+            >
+              {providerMeta.map((provider, index) => {
+                const isActive = activeProvider === provider.id;
+                const Icon = provider.icon;
+                const isDisabled = provider.disabled;
+                return (
+                  <React.Fragment key={provider.id}>
+                    {index === 1 && (
+                      <div className="h-px w-8 bg-border/10 my-1" aria-hidden="true" />
+                    )}
+                    <Tooltip
+                      content={provider.label}
+                      side={panelPosition === "right" ? "left" : "right"}
+                      sideOffset={12}
+                    >
+                      <button
+                        type="button"
+                        aria-label={provider.label}
+                        aria-pressed={isActive}
+                        disabled={isDisabled}
+                        aria-disabled={isDisabled}
+                        onClick={() => {
+                          if (isDisabled) {
+                            return;
+                          }
+                          setActiveProvider(provider.id);
+                          if (settingsMode) {
+                            // In settings mode, clicking a provider stays in settings mode but switches context
+                            // unless it's "all" or "favorites", in which case we might default to list view
+                          } else {
+                            // Normal mode
+                          }
+                        }}
+                        className={cn(
+                          "group relative h-10 w-10 rounded-lg flex items-center justify-center",
+                          "transition-all duration-200 ease-out",
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border/40",
+                          isDisabled && "opacity-20 cursor-not-allowed",
+                          isActive
+                            ? "bg-surface-2 text-foreground"
+                            : "text-muted-foreground/50 hover:bg-surface-2/60 hover:text-foreground"
+                        )}
+                      >
+                        <Icon
+                          className={cn(
+                            "h-4 w-4 transition-colors duration-200",
+                            isActive ? "text-foreground" : ""
+                          )}
+                          aria-hidden="true"
+                        />
+                      </button>
+                    </Tooltip>
+                  </React.Fragment>
+                );
+              })}
+
+              {/* Settings button at bottom */}
+              <div className="mt-auto pt-2">
+                <div className="h-px w-8 bg-border/10 mb-2" aria-hidden="true" />
+                <Tooltip
+                  content={t("modelProviderSettings")}
+                  side={panelPosition === "right" ? "left" : "right"}
+                  sideOffset={12}
+                >
+                  <button
+                    type="button"
+                    aria-label={settingsMode ? t("modelBackToModels") : t("modelProviderSettings")}
+                    onClick={() => setSettingsMode(!settingsMode)}
+                    className={cn(
+                      "group relative h-11 w-11 rounded-xl flex items-center justify-center transition-all duration-300",
+                      settingsMode
+                        ? "bg-surface-2 text-foreground shadow-sm"
+                        : "text-muted-foreground/60 hover:bg-surface-2/40 hover:text-foreground hover:scale-105"
+                    )}
+                  >
+                    {settingsMode ? (
+                      <LayoutGrid className="h-5 w-5" />
+                    ) : (
+                      <Settings className="h-5 w-5" />
+                    )}
+                  </button>
+                </Tooltip>
+              </div>
+            </div>
+
+            {/* Content area */}
+            <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+              {settingsMode ? (
+                <div className="flex-1 overflow-hidden flex flex-col">
+                  <div className="px-4 py-3 border-b border-border/30 shrink-0">
+                    <h3 className="text-sm font-semibold">{t("providerSettingsTitle")}</h3>
+                  </div>
+                  <div className="flex-1 overflow-hidden relative">
+                    {activeProvider === "all" || activeProvider === "favorites" ? (
+                      <ProviderListView onSelectProvider={(id) => setActiveProvider(id)} />
+                    ) : (
+                      <ProviderDetailView
+                        // biome-ignore lint/suspicious/noExplicitAny: Provider ID type mismatch
+                        providerId={activeProvider as any}
+                        onBack={() => setActiveProvider("all")}
+                      />
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* Search header */}
+                  <div className="relative shrink-0">
+                    <div
+                      className={cn(
+                        "flex items-center gap-3 px-3 py-2",
+                        "border-b border-border/40",
+                        "transition-all duration-200 group/search"
+                      )}
+                    >
+                      <Search
+                        className="h-4 w-4 text-muted-foreground/40 group-focus-within/search:text-primary/60 transition-colors"
+                        aria-hidden="true"
+                      />
+                      <input
+                        type="text"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Search models..."
+                        className="flex-1 bg-transparent border-none p-0 text-xs placeholder:text-muted-foreground/40 focus:outline-none focus:ring-0"
+                      />
+                      {search && (
+                        <button
+                          type="button"
+                          onClick={() => setSearch("")}
+                          className="p-1 rounded-full text-muted-foreground/40 hover:text-foreground hover:bg-surface-3 transition-colors"
+                        >
+                          <span className="sr-only">Clear search</span>
+                          <div className="h-3.5 w-3.5 rounded-full bg-current opacity-70" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Feature filters - Compact Single Line */}
+                    <div className="flex items-center gap-1 overflow-x-auto py-2.5 px-3 scrollbar-none snap-x [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] border-b border-border/20 bg-surface-1/30">
+                      {availableFilters.length > 0 &&
+                        featureDefinitions.map((feature) => {
+                          if (!availableFilters.some((f) => f.id === feature.id)) {
+                            return null;
+                          }
+                          const isActive = activeFilters.has(feature.id);
+                          const Icon = feature.icon;
+
+                          return (
+                            <button
+                              key={feature.id}
+                              type="button"
+                              onClick={() => handleFilterToggle(feature.id)}
+                              className={cn(
+                                "shrink-0 snap-start flex items-center gap-1 px-1.5 py-1 rounded-full text-[10px] tracking-tight font-medium border transition-all duration-200",
+                                isActive
+                                  ? "bg-primary/10 border-primary/20 text-primary shadow-sm"
+                                  : "bg-surface-1/50 border-border/10 text-muted-foreground/70 hover:bg-surface-2 hover:text-foreground hover:border-border/30"
+                              )}
+                            >
+                              <Icon className="h-3 w-3" />
+                              {feature.label}
+                            </button>
+                          );
+                        })}
+                    </div>
+                  </div>
+
+                  {/* Model list */}
+                  <div className="flex-1 overflow-y-auto min-h-0 p-2 space-y-1">
+                    {showFavoritesEmpty ? (
+                      <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground/50">
+                        <Star className="h-8 w-8 mb-3 opacity-20" />
+                        <p className="text-sm">No favorite models yet</p>
+                        <Button
+                          variant="link"
+                          size="sm"
+                          className="text-primary/60 h-auto p-0 mt-2 text-xs"
+                          onClick={() => setActiveProvider("all")}
+                        >
+                          Browse all models
+                        </Button>
+                      </div>
+                    ) : currentModels.length === 0 && legacyModels.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground/50">
+                        <Filter className="h-8 w-8 mb-3 opacity-20" />
+                        <p className="text-sm">No models match your filters</p>
+                        <Button
+                          variant="link"
+                          size="sm"
+                          className="text-primary/60 h-auto p-0 mt-2 text-xs"
+                          onClick={handleFilterClear}
+                        >
+                          Clear filters
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        <List
+                          className="space-y-1"
+                          onSelect={(value) => {
+                            const model = currentModels.find((m) => m.id === value);
+                            if (model) {
+                              onSelect(model.id);
+                            }
+                          }}
+                        >
+                          {currentModels.map((entry) => (
+                            <DropdownMenuItem
+                              key={entry.id}
+                              className="gap-2 cursor-pointer"
+                              onClick={() => onSelect(entry.id)}
+                            >
+                              <ModelItem
+                                model={entry}
+                                isSelected={entry.id === model}
+                                isFavorite={favoriteIds.has(entry.id)}
+                                onSelect={() => onSelect(entry.id)}
+                                onToggleFavorite={() => handleFavoriteToggle(entry.id)}
+                                providerName={modelProviderLabels[entry.provider]}
+                                labels={actionLabels}
+                              />
+                            </DropdownMenuItem>
+                          ))}
+                        </List>
+
+                        {legacyModels.length > 0 && (
+                          <div className="mt-4 pt-4 border-t border-border/20">
+                            <button
+                              type="button"
+                              onClick={() => setIsLegacyExpanded(!isLegacyExpanded)}
+                              className="flex items-center gap-2 px-2 text-xs font-medium text-muted-foreground/50 hover:text-muted-foreground transition-colors w-full"
+                            >
+                              <ChevronDown
+                                className={cn(
+                                  "h-3 w-3 transition-transform",
+                                  isLegacyExpanded ? "rotate-0" : "-rotate-90"
+                                )}
+                              />
+                              Legacy Models ({legacyModels.length})
+                            </button>
+                            {isLegacyExpanded && (
+                              <div className="mt-2 space-y-1">
+                                <List
+                                  className="p-1"
+                                  onSelect={(value) => {
+                                    const model = legacyModels.find((m) => m.id === value);
+                                    if (model) {
+                                      onSelect(model.id);
+                                    }
+                                  }}
+                                >
+                                  {legacyModels.map((entry) => (
+                                    <DropdownMenuItem
+                                      key={entry.id}
+                                      className="gap-2 cursor-pointer"
+                                      onClick={() => onSelect(entry.id)}
+                                    >
+                                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                                        <div className="shrink-0 text-muted-foreground">
+                                          {entry.provider === "openai" && (
+                                            <Brain className="h-4 w-4" />
+                                          )}
+                                          {entry.provider === "claude" && (
+                                            <Brain className="h-4 w-4" />
+                                          )}
+                                          {entry.provider === "gemini" && (
+                                            <Brain className="h-4 w-4" />
+                                          )}
+                                        </div>
+                                        <div className="flex flex-col overflow-hidden">
+                                          <div className="flex items-center gap-2">
+                                            <span className="font-medium truncate">
+                                              {entry.label}
+                                            </span>
+                                            <span className="text-xs text-muted-foreground shrink-0 border px-1 rounded">
+                                              {modelProviderLabels[entry.provider]}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </DropdownMenuItem>
+                                  ))}
+                                </List>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

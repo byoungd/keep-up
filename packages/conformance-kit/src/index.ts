@@ -13,15 +13,13 @@
 
 // Adapters
 export * from "./adapters";
-
-// Op Fuzzer
-export * from "./op-fuzzer";
+// Artifacts
+export * from "./artifacts";
 
 // Double-Blind Harness
 export * from "./double-blind";
-
-// Artifacts
-export * from "./artifacts";
+// Op Fuzzer
+export * from "./op-fuzzer";
 
 // Runner
 export * from "./runner";
