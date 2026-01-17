@@ -4,7 +4,8 @@
  * API endpoints for project context analysis and AGENTS.md management.
  */
 
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync } from "node:fs";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   type AnalyzeOptions,
@@ -13,12 +14,13 @@ import {
   createProjectContext,
   type GenerateOptions,
   generateAgentsMd,
-  type ProjectContext,
   parseCustomInstructions,
+  parseNotes,
 } from "@ku0/project-context";
 import { Hono } from "hono";
 import { jsonError, readJsonBody } from "../http";
 
+const AGENTS_MD_DIR = ".cowork";
 const AGENTS_MD_FILENAME = "AGENTS.md";
 
 interface ContextRouteDeps {
@@ -74,51 +76,27 @@ export function createContextRoutes(deps: ContextRouteDeps = {}) {
    */
   app.get("/context", async (c) => {
     const projectPath = c.req.query("path") ?? deps.basePath ?? process.cwd();
-    const agentsMdPath = join(projectPath, AGENTS_MD_FILENAME);
+    const agentsMdPath = resolveAgentsMdPath(projectPath);
 
-    // Check if AGENTS.md exists
-    if (existsSync(agentsMdPath)) {
-      const content = readFileSync(agentsMdPath, "utf-8");
-
-      // Parse custom instructions from existing file
-      const customInstructions = parseCustomInstructions(content);
-
-      // Re-analyze to get fresh data
-      const analysis = await analyzeProject(projectPath);
-
-      const context: ProjectContext = {
-        analysis,
-        customInstructions:
-          customInstructions.length > 0
-            ? customInstructions
-            : createProjectContext(analysis).customInstructions,
-        updatedAt: Date.now(),
-        version: 1,
-      };
-
-      return c.json({
-        ok: true,
-        context,
-        rawContent: content,
-        exists: true,
-      });
+    if (!existsSync(projectPath)) {
+      return jsonError(c, 400, "Project path does not exist");
     }
 
-    // Generate new context
-    const analysis = await analyzeProject(projectPath);
-    const context = createProjectContext(analysis);
+    const existing = await readAgentsMdIfExists(agentsMdPath);
+    if (existing) {
+      return c.json({ ok: true, content: existing.content, updatedAt: existing.updatedAt });
+    }
 
-    return c.json({
-      ok: true,
-      context,
-      rawContent: null,
-      exists: false,
-    });
+    const { content } = await generateAgentsMdContent(projectPath, {}, null);
+    await ensureAgentsDir(projectPath);
+    await writeFile(agentsMdPath, content, "utf-8");
+
+    return c.json({ ok: true, content, updatedAt: Date.now() });
   });
 
   /**
    * POST /context/generate
-   * Generate AGENTS.md content (without saving)
+   * Generate AGENTS.md content and persist it
    */
   app.post("/context/generate", async (c) => {
     const body = (await readJsonBody(c)) as GenerateRequestBody | null;
@@ -129,21 +107,19 @@ export function createContextRoutes(deps: ContextRouteDeps = {}) {
       return jsonError(c, 400, "Project path does not exist");
     }
 
-    const analysis = await analyzeProject(projectPath);
-    const context = createProjectContext(analysis);
+    const agentsMdPath = resolveAgentsMdPath(projectPath);
+    const existingContent = await readAgentsMdIfExists(agentsMdPath);
+    const { content } = await generateAgentsMdContent(
+      projectPath,
+      options,
+      existingContent?.content ?? null,
+      body?.customInstructions
+    );
 
-    // Merge custom instructions if provided
-    if (body?.customInstructions && Array.isArray(body.customInstructions)) {
-      context.customInstructions = body.customInstructions as CustomInstruction[];
-    }
+    await ensureAgentsDir(projectPath);
+    await writeFile(agentsMdPath, content, "utf-8");
 
-    const content = generateAgentsMd(context, options);
-
-    return c.json({
-      ok: true,
-      content,
-      context,
-    });
+    return c.json({ ok: true, content, updatedAt: Date.now() });
   });
 
   /**
@@ -163,14 +139,15 @@ export function createContextRoutes(deps: ContextRouteDeps = {}) {
       return jsonError(c, 400, "Project path does not exist");
     }
 
-    const agentsMdPath = join(projectPath, AGENTS_MD_FILENAME);
+    const agentsMdPath = resolveAgentsMdPath(projectPath);
 
     try {
-      writeFileSync(agentsMdPath, content, "utf-8");
+      await ensureAgentsDir(projectPath);
+      await writeFile(agentsMdPath, content, "utf-8");
       return c.json({
         ok: true,
-        path: agentsMdPath,
-        savedAt: Date.now(),
+        content,
+        updatedAt: Date.now(),
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
@@ -190,40 +167,77 @@ export function createContextRoutes(deps: ContextRouteDeps = {}) {
       return jsonError(c, 400, "Project path does not exist");
     }
 
-    const agentsMdPath = join(projectPath, AGENTS_MD_FILENAME);
+    const agentsMdPath = resolveAgentsMdPath(projectPath);
+    const existingContent = await readAgentsMdIfExists(agentsMdPath);
+    const { content } = await generateAgentsMdContent(
+      projectPath,
+      {},
+      existingContent?.content ?? null
+    );
 
-    // Get existing custom instructions if file exists
-    let existingInstructions: CustomInstruction[] = [];
-    if (existsSync(agentsMdPath)) {
-      const existingContent = readFileSync(agentsMdPath, "utf-8");
-      existingInstructions = parseCustomInstructions(existingContent);
-    }
-
-    // Re-analyze project
-    const analysis = await analyzeProject(projectPath);
-    const context = createProjectContext(analysis);
-
-    // Preserve existing custom instructions
-    if (existingInstructions.length > 0) {
-      context.customInstructions = existingInstructions;
-    }
-
-    const content = generateAgentsMd(context);
-
-    // Optionally auto-save
     const autoSave = body?.autoSave === true;
     if (autoSave) {
-      writeFileSync(agentsMdPath, content, "utf-8");
+      await ensureAgentsDir(projectPath);
+      await writeFile(agentsMdPath, content, "utf-8");
     }
 
     return c.json({
       ok: true,
       content,
-      context,
+      updatedAt: Date.now(),
       saved: autoSave,
-      path: autoSave ? agentsMdPath : null,
     });
   });
 
   return app;
+}
+
+function resolveAgentsMdPath(projectPath: string): string {
+  return join(projectPath, AGENTS_MD_DIR, AGENTS_MD_FILENAME);
+}
+
+async function ensureAgentsDir(projectPath: string): Promise<void> {
+  await mkdir(join(projectPath, AGENTS_MD_DIR), { recursive: true });
+}
+
+type AgentsMdContent = { content: string; updatedAt: number };
+
+async function readAgentsMdIfExists(path: string): Promise<AgentsMdContent | null> {
+  if (!existsSync(path)) {
+    return null;
+  }
+
+  const [content, stats] = await Promise.all([readFile(path, "utf-8"), stat(path)]);
+  return {
+    content,
+    updatedAt: stats.mtimeMs,
+  };
+}
+
+async function generateAgentsMdContent(
+  projectPath: string,
+  options: GenerateOptions,
+  existingContent: string | null,
+  customInstructions?: CustomInstruction[]
+): Promise<{ content: string }> {
+  const analysis = await analyzeProject(projectPath);
+  const context = createProjectContext(analysis);
+
+  if (existingContent) {
+    const existingInstructions = parseCustomInstructions(existingContent);
+    if (existingInstructions.length > 0) {
+      context.customInstructions = existingInstructions;
+    }
+    const existingNotes = parseNotes(existingContent);
+    if (existingNotes !== undefined) {
+      context.notes = existingNotes;
+    }
+  }
+
+  if (customInstructions && Array.isArray(customInstructions)) {
+    context.customInstructions = customInstructions;
+  }
+
+  const content = generateAgentsMd(context, options);
+  return { content };
 }

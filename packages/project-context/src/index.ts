@@ -11,6 +11,7 @@ export {
   createProjectContext,
   generateAgentsMd,
   parseCustomInstructions,
+  parseNotes,
 } from "./generator";
 export type {
   AnalyzeOptions,

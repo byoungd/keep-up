@@ -17,6 +17,11 @@ import type {
 } from "./types";
 import { DEFAULT_GENERATE_OPTIONS } from "./types";
 
+const CUSTOM_SECTION_START = "<!-- cowork:custom:start -->";
+const CUSTOM_SECTION_END = "<!-- cowork:custom:end -->";
+const NOTES_SECTION_START = "<!-- cowork:notes:start -->";
+const NOTES_SECTION_END = "<!-- cowork:notes:end -->";
+
 /**
  * Generate AGENTS.md content from project analysis
  */
@@ -57,6 +62,10 @@ export function generateAgentsMd(context: ProjectContext, options: GenerateOptio
   const enabledInstructions = customInstructions.filter((i) => i.enabled);
   if (enabledInstructions.length > 0) {
     sections.push(generateCustomInstructionsSection(enabledInstructions));
+  }
+
+  if (context.notes !== undefined) {
+    sections.push(generateNotesSection(context.notes));
   }
 
   // Footer with metadata
@@ -207,7 +216,7 @@ function generatePatternsSection(patterns: ProjectPattern[]): string {
  * Generate custom instructions section
  */
 function generateCustomInstructionsSection(instructions: CustomInstruction[]): string {
-  const lines: string[] = ["## Custom Instructions\n"];
+  const lines: string[] = ["## Custom Instructions\n", CUSTOM_SECTION_START];
 
   for (const instruction of instructions) {
     lines.push(`### ${instruction.title}\n`);
@@ -215,7 +224,29 @@ function generateCustomInstructionsSection(instructions: CustomInstruction[]): s
     lines.push("");
   }
 
+  lines.push(CUSTOM_SECTION_END, "");
   return lines.join("\n");
+}
+
+function generateNotesSection(notes?: string): string {
+  const lines: string[] = ["## Notes\n", NOTES_SECTION_START];
+  if (notes && notes.trim().length > 0) {
+    lines.push(notes.trim());
+  }
+  lines.push(NOTES_SECTION_END, "");
+  return lines.join("\n");
+}
+
+function extractMarkedSection(content: string, start: string, end: string): string | null {
+  const startIndex = content.indexOf(start);
+  if (startIndex === -1) {
+    return null;
+  }
+  const endIndex = content.indexOf(end, startIndex + start.length);
+  if (endIndex === -1) {
+    return null;
+  }
+  return content.slice(startIndex + start.length, endIndex).trim();
 }
 
 /**
@@ -266,6 +297,7 @@ export function createProjectContext(analysis: ProjectAnalysis): ProjectContext 
   return {
     analysis,
     customInstructions: createDefaultInstructions(),
+    notes: "",
     updatedAt: Date.now(),
     version: 1,
   };
@@ -278,19 +310,16 @@ export function createProjectContext(analysis: ProjectAnalysis): ProjectContext 
 export function parseCustomInstructions(content: string): CustomInstruction[] {
   const instructions: CustomInstruction[] = [];
 
-  // Find the Custom Instructions section
-  const customMatch = content.match(
-    /## Custom Instructions\n\n([\s\S]*?)(?=\n---\n|## Metadata|$)/
-  );
+  const markedContent =
+    extractMarkedSection(content, CUSTOM_SECTION_START, CUSTOM_SECTION_END) ??
+    content.match(/## Custom Instructions\n\n([\s\S]*?)(?=\n---\n|## Metadata|$)/)?.[1];
 
-  if (!customMatch) {
+  if (!markedContent) {
     return instructions;
   }
 
-  const customContent = customMatch[1];
-
   // Split by ### headers
-  const sections = customContent.split(/(?=### )/);
+  const sections = markedContent.split(/(?=### )/);
 
   for (const section of sections) {
     const headerMatch = section.match(/^### (.+)\n\n([\s\S]*)/);
@@ -304,5 +333,22 @@ export function parseCustomInstructions(content: string): CustomInstruction[] {
     }
   }
 
+  if (instructions.length === 0 && markedContent.trim().length > 0) {
+    instructions.push({
+      id: "custom",
+      title: "Custom Instructions",
+      content: markedContent.trim(),
+      enabled: true,
+    });
+  }
+
   return instructions;
+}
+
+export function parseNotes(content: string): string | undefined {
+  const marked = extractMarkedSection(content, NOTES_SECTION_START, NOTES_SECTION_END);
+  if (marked === null) {
+    return undefined;
+  }
+  return marked.trim();
 }

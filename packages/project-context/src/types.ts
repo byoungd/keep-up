@@ -139,6 +139,8 @@ export interface ProjectContext {
   analysis: ProjectAnalysis;
   /** Custom instructions (user-editable sections) */
   customInstructions: CustomInstruction[];
+  /** Free-form notes preserved between regenerations */
+  notes?: string;
   /** Last updated timestamp */
   updatedAt: number;
   /** Version for migrations */
