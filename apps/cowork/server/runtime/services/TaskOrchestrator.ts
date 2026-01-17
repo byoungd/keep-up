@@ -3,7 +3,7 @@
  * Handles task lifecycle, event processing, and orchestration coordination
  */
 
-import type { CoworkTaskStatus, TokenUsageStats } from "@ku0/agent-runtime";
+import type { CoworkTask, CoworkTaskStatus, TokenUsageStats } from "@ku0/agent-runtime";
 import {
   formatToolActivityLabel as formatActivity,
   resolveToolActivity as resolveActivity,
@@ -23,6 +23,8 @@ type PlanStep = {
 };
 
 export class TaskOrchestrator {
+  private taskWriteQueue: Promise<void> = Promise.resolve();
+
   constructor(
     private readonly taskStore: TaskStoreLike,
     private readonly artifactProcessor: ArtifactProcessor,
@@ -30,6 +32,25 @@ export class TaskOrchestrator {
     private readonly sessionManager: SessionLifecycleManager,
     readonly _approvalCoordinator: ApprovalCoordinator
   ) {}
+
+  /**
+   * Create a task record and emit initial event
+   */
+  async createTask(task: CoworkTask): Promise<CoworkTask> {
+    await this.enqueueTaskWrite(() => this.taskStore.create(task));
+    await this.sessionManager.touchSession(task.sessionId);
+    this.eventPublisher.publishTaskCreated({
+      sessionId: task.sessionId,
+      taskId: task.taskId,
+      status: task.status,
+      title: task.title,
+      prompt: task.prompt,
+      modelId: task.modelId,
+      providerId: task.providerId,
+      fallbackNotice: task.fallbackNotice,
+    });
+    return task;
+  }
 
   /**
    * Update task status
@@ -42,16 +63,18 @@ export class TaskOrchestrator {
     const now = Date.now();
     let didChange = false;
 
-    const updated = await this.taskStore.update(taskId, (task) => {
-      if (allowedStatuses && !allowedStatuses.includes(task.status)) {
-        return task;
-      }
-      if (task.status === status) {
-        return task;
-      }
-      didChange = true;
-      return { ...task, status, updatedAt: now };
-    });
+    const updated = await this.enqueueTaskWrite(() =>
+      this.taskStore.update(taskId, (task) => {
+        if (allowedStatuses && !allowedStatuses.includes(task.status)) {
+          return task;
+        }
+        if (task.status === status) {
+          return task;
+        }
+        didChange = true;
+        return { ...task, status, updatedAt: now };
+      })
+    );
 
     if (!updated || !didChange) {
       return;
@@ -159,6 +182,17 @@ export class TaskOrchestrator {
         break;
       case "plan:created":
         await this.handlePlanCreatedEvent(sessionId, activeTaskId, event.data);
+        break;
+      case "confirmation:required":
+        if (activeTaskId) {
+          await this.updateTaskStatus(activeTaskId, "awaiting_confirmation", [
+            "queued",
+            "planning",
+            "ready",
+            "running",
+            "awaiting_confirmation",
+          ]);
+        }
         break;
       case "confirmation:received":
         if (activeTaskId) {
@@ -272,12 +306,30 @@ export class TaskOrchestrator {
       return;
     }
     const steps = this.buildPlanSteps(data.steps);
+    const artifactId = activeTaskId ? `plan-${activeTaskId}` : "plan";
+
+    const persisted = await this.artifactProcessor.persistArtifact(sessionId, {
+      artifactId,
+      artifact: {
+        type: "plan",
+        steps,
+      },
+      taskId: activeTaskId ?? undefined,
+      title: "Plan",
+    });
 
     this.eventPublisher.publishAgentPlan({
       sessionId,
-      artifactId: activeTaskId ? `plan-${activeTaskId}` : "plan",
+      artifactId,
       plan: steps,
       taskId: activeTaskId ?? undefined,
+    });
+    this.eventPublisher.publishAgentArtifact({
+      sessionId,
+      id: persisted.artifactId,
+      artifact: persisted.artifact,
+      taskId: activeTaskId ?? undefined,
+      updatedAt: persisted.updatedAt,
     });
 
     if (activeTaskId) {
@@ -320,5 +372,17 @@ export class TaskOrchestrator {
       default:
         return "pending";
     }
+  }
+
+  /**
+   * Serialize writes to the task store to avoid filesystem races
+   */
+  private enqueueTaskWrite<T>(work: () => Promise<T>): Promise<T> {
+    const next = this.taskWriteQueue.then(work, work);
+    this.taskWriteQueue = next.then(
+      () => undefined,
+      () => undefined
+    );
+    return next;
   }
 }
