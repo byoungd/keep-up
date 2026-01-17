@@ -6,6 +6,7 @@
 
 import type { AgentMode } from "../modes";
 import type { TokenUsageStats } from "../types";
+import type { WorkflowContext, WorkflowPhase, WorkflowTemplate } from "../workflows";
 
 export type CoworkPlatform = "macos";
 export type CoworkMode = "cowork";
@@ -149,3 +150,5 @@ export interface CoworkWorkflowTemplate {
   lastUsedInputs?: Record<string, string>;
   lastUsedSessionId?: string;
 }
+
+export { type WorkflowTemplate, type WorkflowContext, type WorkflowPhase };

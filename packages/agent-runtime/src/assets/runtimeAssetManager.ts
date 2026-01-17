@@ -394,7 +394,7 @@ async function pullDockerImage(
   logger?: Logger
 ): Promise<boolean> {
   return new Promise((resolve) => {
-    docker.pull(image, (error, stream) => {
+    docker.pull(image, (error: Error | null, stream: NodeJS.ReadableStream) => {
       if (error || !stream) {
         logger?.error(
           `Docker pull failed: ${error instanceof Error ? error.message : String(error)}`

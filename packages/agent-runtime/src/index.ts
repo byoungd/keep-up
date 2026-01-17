@@ -130,13 +130,6 @@ export {
   createMessageCompressor,
   createRequestCache,
 } from "./orchestrator";
-export type {
-  ConsensusConfig,
-  ConsensusModelConfig,
-  ConsensusResult,
-  ModelResponse,
-  VotingStrategy,
-} from "./orchestrator/consensusOrchestrator";
 // Consensus Orchestration
 export {
   ConsensusOrchestrator,
@@ -162,6 +155,24 @@ export * from "./plugins";
 // ============================================================================
 // Preflight
 // ============================================================================
+export {
+  runPreflightPlan,
+  summarizePreflightResults,
+  type PreflightRunInput,
+} from "./preflight/runner";
+export {
+  selectPreflightChecks,
+  type PreflightSelectionInput,
+  type PreflightSelectionRule,
+} from "./preflight/selector";
+export type {
+  PreflightCheckDefinition,
+  PreflightCheckKind,
+  PreflightCheckResult,
+  PreflightCheckStatus,
+  PreflightPlan,
+  PreflightReport,
+} from "./preflight/types";
 export * from "./preflight";
 // ============================================================================
 // Prompts
