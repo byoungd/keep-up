@@ -14,6 +14,12 @@
 
 import type { IntentRegistry } from "@ku0/core";
 import { createIntentRegistry } from "@ku0/core";
+import type {
+  ArtifactEmissionContext,
+  ArtifactEmissionResult,
+  ArtifactPipeline,
+} from "../artifacts";
+import { createArtifactPipeline, createArtifactRegistry } from "../artifacts";
 import type { ContextFrameBuilder, ContextItem } from "../context";
 import { type RuntimeEventBus, getGlobalEventBus } from "../events/eventBus";
 import {
@@ -176,6 +182,8 @@ export interface OrchestratorComponents {
   toolResultCache?: ToolResultCache;
   /** Optional runtime event stream bridge */
   streamBridge?: OrchestratorStreamBridge;
+  /** Optional artifact pipeline */
+  artifactPipeline?: ArtifactPipeline;
 }
 
 export interface OrchestratorStreamBridge {
@@ -215,6 +223,7 @@ export class AgentOrchestrator {
   private readonly skillPromptAdapter?: SkillPromptAdapter;
   private readonly taskGraph?: TaskGraphStore;
   private readonly streamBridge?: OrchestratorStreamBridge;
+  private readonly artifactPipeline?: ArtifactPipeline;
   private currentRunId?: string;
   private currentPlanNodeId?: string;
   private readonly taskGraphToolCalls = new WeakMap<MCPToolCall, string>();
@@ -295,6 +304,7 @@ export class AgentOrchestrator {
     this.skillPromptAdapter = components.skillPromptAdapter;
     this.taskGraph = components.taskGraph;
     this.streamBridge = components.streamBridge;
+    this.artifactPipeline = components.artifactPipeline;
 
     this.turnExecutor = createTurnExecutor({
       llm: this.llm,
@@ -322,6 +332,21 @@ export class AgentOrchestrator {
    */
   async runWithRunId(userMessage: string, runId: string): Promise<AgentState> {
     return this.runWithId(userMessage, runId);
+  }
+
+  emitArtifact(
+    artifact: Parameters<ArtifactPipeline["emit"]>[0],
+    context: ArtifactEmissionContext = {}
+  ): ArtifactEmissionResult {
+    if (!this.artifactPipeline) {
+      return { stored: false, valid: false, errors: ["Artifact pipeline not configured"] };
+    }
+
+    return this.artifactPipeline.emit(artifact, {
+      correlationId: context.correlationId ?? this.currentRunId,
+      source: context.source ?? this.config.name,
+      idempotencyKey: context.idempotencyKey ?? artifact.id,
+    });
   }
 
   private async runWithId(userMessage: string, runId: string): Promise<AgentState> {
@@ -1225,6 +1250,14 @@ export function createOrchestrator(
     options.components?.eventBus ??
     (streamBridge ? getGlobalEventBus() : undefined);
   const taskGraph = options.components?.taskGraph ?? createTaskGraphStore();
+  const artifactPipeline =
+    options.components?.artifactPipeline ??
+    createArtifactPipeline({
+      registry: createArtifactRegistry(),
+      taskGraph,
+      eventBus,
+      eventSource: config.name,
+    });
   const executionObserver = mergeExecutionObservers(
     options.toolExecution?.executionObserver,
     taskGraph ? createTaskGraphExecutionObserver(taskGraph) : undefined,
@@ -1249,6 +1282,7 @@ export function createOrchestrator(
     skillPromptAdapter,
     taskGraph,
     streamBridge,
+    artifactPipeline,
   };
 
   const orchestrator = new AgentOrchestrator(config, llm, registry, options.telemetry, components);
