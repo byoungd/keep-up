@@ -34,7 +34,7 @@ export const createProjectSchema = z.object({
   name: z.string().min(1),
   description: z.string().min(1).optional(),
   pathHint: z.string().min(1).optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const createTaskSchema = z.object({

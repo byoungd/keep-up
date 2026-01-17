@@ -212,13 +212,16 @@ describe("AI Sanitizer", () => {
     fc.assert(
       fc.property(
         fc.constantFrom(...unsafeSchemes),
-        fc.stringOf(fc.constantFrom(" ", "\t", "\n"), { maxLength: 3 }),
-        fc.stringOf(
-          fc.constantFrom(
+        fc.string({
+          unit: fc.constantFrom(" ", "\t", "\n"),
+          maxLength: 3,
+        }),
+        fc.string({
+          unit: fc.constantFrom(
             ..."abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~:/?&=%"
           ),
-          { maxLength: 20 }
-        ),
+          maxLength: 20,
+        }),
         (scheme, padding, rest) => {
           const value = `${padding}${scheme}${padding}${rest}`;
           const result = sanitizer.sanitize(

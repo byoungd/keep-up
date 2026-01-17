@@ -1,137 +1,238 @@
-# Cowork Top-Tier Agent Chat Spec
+# Cowork Top-Tier Chat + Agent Alignment Spec
 
 ## Status
 - Owner: Product + Tech Lead
 - Stage: Draft
-- Target: Top-tier chat + agent task experience (Manus-class)
+- Target: Top-tier chat (Cherry Studio class) + agent task UX (Claude Cowork / Manus class)
+- Last Updated: 2025-01-15
 
-## Problem Statement
-The current cowork chat and task UX is MVP-level: user messages can appear late, task progress is fragmented into cards, outputs are hard to find, and model usage is not transparent. This spec defines a top-tier experience that is message-first, streaming-first, and deliverable-first.
+## Purpose
+Align apps/cowork AI chat and agent task experiences with top-tier desktop clients.
+The chat surface should match Cherry Studio level expectations, while task-mode execution
+should feel like a premium, transparent agent workflow.
+
+## Current State (apps/cowork)
+### What exists
+- Chat UI uses `ChatThread` with `ShellAIPanel` for streaming text.
+- Task runtime uses CoworkTaskRuntime and TaskGraph streaming via SSE.
+- Task timeline exists as a separate panel (`TaskContainer` + `TaskTimeline`).
+- Task artifacts are emitted and listed in the right rail (plans, diffs, reports).
+- Model selection is supported via settings and per-message metadata.
+- Optimistic user messages exist in `useChatSession`.
+
+### Key gaps vs top-tier chat clients
+- Chat history persistence is stubbed (`GET /sessions/:id/chat` returns empty).
+- Message actions are no-ops: edit, branch, quote, retry.
+- Attachments are not supported (UI wired but disabled).
+- No conversation search, tagging, pinning, or export.
+- Task progress is fragmented between timeline panel and message stream.
+- Model transparency is not visible in the chat UI (only headers).
+- No explicit per-message model override or system prompt controls.
+- No keyboard shortcuts, quick prompts, or prompt library.
+
+## Benchmark: Cherry Studio parity (chat)
+Cherry-class chat clients typically include:
+- Multi-provider and multi-model switching, often per message.
+- Conversation list with folders, search, tags, and pinning.
+- Message editing, regenerate, branch, and quote.
+- Attachments: images, files, and local knowledge sources.
+- System prompt presets, persona profiles, and quick prompts.
+- Streaming reliability with clear status and retry.
+- Export (markdown, JSON), copy, and share.
+- Keyboard shortcuts and command palette.
 
 ## Goals
-- Immediate user feedback: user messages never disappear or reorder after send.
-- Continuous progress: every task updates in-stream with steps and tool activity.
-- Deliverable clarity: outputs are visible, previewable, and actionable on completion.
-- Model transparency: actual provider and model are displayed; no silent fallback.
-- Consistent narrative: all task progress appears as a single assistant message.
+- Message-first UX: chat is the primary narrative surface.
+- Single narrative: a task equals one assistant message with inline progress.
+- Cherry Studio parity on core chat controls and convenience features.
+- Deliverable-first outputs with preview and actions.
+- Model transparency: show actual provider + model and fallback events.
+- Fast and resilient streaming with clear status.
 
 ## Non-Goals
-- Rewriting core agent runtime architecture.
-- Building a new tool ecosystem.
-- Changing persistence or storage formats.
+- Replacing agent-runtime architecture or tool registry.
+- Adding new CRDT or storage formats.
+- Full multi-tenant or cloud sync.
 
 ## Experience Principles
-- Message-first: everything is a chat message.
-- Single narrative: no duplicate task cards; one task equals one assistant message.
-- Outcome-first: deliverables are front and center.
-- No dead air: show progress within 2 seconds if no tokens arrive.
-- Honest systems: show actual model used and fallback events.
+- Immediate feedback: user message appears instantly, never reorders.
+- No dead air: show visible progress within 2 seconds.
+- Clear accountability: every tool call and approval is visible.
+- Outcome-first: outputs are always discoverable and actionable.
+- Honest routing: show actual model used and fallbacks.
 
-## IA and UI Structure
-### Thread
-- User messages (right aligned).
-- Assistant messages (left aligned).
-- Task execution is rendered inside the assistant message body.
+## Product Requirements
 
-### Assistant Message Layout
-1. Header row
-   - Status pill (Queued/Running/Completed/Failed)
-   - Model badge (provider + model id)
-   - Elapsed time
-2. Live output body
-   - Streaming markdown (no raw-to-render swap)
-3. Execution timeline (collapsible)
-   - Steps with status and timestamps
-   - Tool activity chips
-4. Deliverables section
-   - Cards with preview, size, type, and open action
+### P0 Chat Parity (Cherry class)
+- Session list with search, rename, and delete.
+- Message actions: edit and resend, regenerate, branch, quote, copy.
+- Per-session model selector and per-message override.
+- System prompt and persona presets per session.
+- Input supports slash commands, @mentions, and drag-drop files.
+- Attachment support for images and files (local, max size policy).
+- Stream status: queued, streaming, done, error with retry.
+- Export session to markdown and JSON.
 
-## Interaction Flow
-1. User sends message.
-2. Message renders immediately with optimistic state.
-3. Assistant sends acknowledgment within 150ms.
-4. Streaming response updates in place.
-5. Execution timeline updates in-place (no new cards).
-6. Deliverables appear at task completion with preview and open action.
+### P0 Agent Task Mode (Cowork class)
+- Explicit task vs chat toggle (with auto intent detection fallback).
+- Single assistant message per task with inline timeline:
+  - status pill (queued/running/completed/failed)
+  - model badge (provider + model)
+  - elapsed time
+  - streaming output
+  - collapsible execution timeline
+  - deliverables list
+- Inline approvals with risk labels and reason.
+- Control actions: pause, resume, cancel.
+- Background execution with task queue visibility.
 
-## Streaming Rules
-- First token target: < 800ms.
-- Use rAF batching for chunk updates.
-- Render markdown progressively (no flicker, no raw markdown display).
-- If no tokens for 2 seconds, show "Working..." beneath the active step.
+### P1 Enhancements
+- Conversation folders, tags, pinned sessions.
+- Prompt library and reusable templates.
+- Context window and token usage display.
+- Quick actions and command palette.
+- Inline diff viewer with apply and revert.
+- Artifact preview in main panel with side rail index.
 
-## Execution Timeline
-- Step statuses: queued, running, completed, failed.
-- Active step stays expanded by default.
-- Tool calls render as chips:
-  - Searching ...
-  - Browsing ...
-  - Reading ...
-  - Writing ...
-  - Running ...
-- Tool errors attach to the step with a short error summary.
+### P2 Enhancements
+- Multi-agent parallel tasks with status overview.
+- Workspace knowledge base and retrieval selectors.
+- Cross-session search and analytics.
+- Shared sessions and collaboration (post-MVP).
 
-## Deliverables
-- Always visible after completion.
-- Card layout:
-  - Title
-  - Type
-  - Preview snippet
-  - Open action
-- If missing or empty:
-  - Show "Empty output" state with a retry button.
+## Information Architecture
+- Left rail: sessions, search, folders, pinned.
+- Center: chat thread with message-first timeline.
+- Right rail: artifacts, approvals, context, model and cost summary.
+- Mobile: single-column view with drawers for session list and artifacts.
 
-## Model and Tool Policy
-- A single task binds to one model unless explicitly re-routed by policy.
-- User-selected model is respected by default.
-- Cross-provider fallback must be visible to the user.
-- Model badge appears on every assistant/task response.
+## Interaction Flows
+1. Chat message
+   - User sends message -> optimistic render -> server ack -> stream -> done.
+2. Task mode
+   - User toggles task -> plan -> approval -> execution -> deliverables.
+3. Approval
+   - Tool requires approval -> inline card -> approve/reject -> resume.
+4. Artifact review
+   - Deliverable list appears -> preview -> apply or request revision.
+5. Background run
+   - Task continues -> notifications -> results pinned to chat.
 
-## Routing Strategy (Target)
-- Introduce a model router layer:
-  - fast lane for quick answers
-  - deep lane for long-form or multi-step
-  - vision lane for image/file processing
-  - code lane for code edits
-- Routing inputs:
-  - user selection
-  - task class
-  - tool capability
-  - latency/cost budget
+## Data Model Updates
 
-## Error Handling
-- Stream error shows partial output + retry.
-- Tool error shows inline step error + continue if possible.
-- Failed task shows final status + recovery actions.
+### ChatSession
+```ts
+interface ChatSession {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  mode: "chat" | "task";
+  systemPrompt?: string;
+  personaId?: string;
+  defaultModelId?: string;
+}
+```
+
+### ChatMessage
+```ts
+interface ChatMessage {
+  id: string;
+  sessionId: string;
+  role: "user" | "assistant";
+  content: string;
+  createdAt: number;
+  status: "pending" | "streaming" | "done" | "error" | "canceled";
+  modelId?: string;
+  providerId?: string;
+  fallbackNotice?: string;
+  parentId?: string; // for branches
+  attachments?: ChatAttachmentRef[];
+  taskId?: string; // if this message represents a task
+  metadata?: Record<string, unknown>;
+}
+```
+
+### Attachments
+```ts
+interface ChatAttachmentRef {
+  id: string;
+  kind: "image" | "file";
+  name: string;
+  sizeBytes: number;
+  mimeType: string;
+  storageUri: string;
+}
+```
+
+## API and Event Contracts
+
+### Chat History
+- `GET /sessions/:id/chat` returns ordered messages (server stored).
+- `POST /sessions/:id/chat` accepts message + client_request_id and streams deltas.
+- `PATCH /sessions/:id/messages/:id` updates message (edit/regenerate).
+- `POST /sessions/:id/attachments` uploads and returns attachment refs.
+
+### SSE Stream (chat + tasks)
+- `message.created`, `message.delta`, `message.completed`, `message.error`
+- `task.status`, `task.plan`, `task.step`, `task.tool`, `task.artifact`
+- Each event includes `sessionId`, `messageId`, `taskId` where applicable.
+
+## System Behavior
+- Generate client_request_id per send; map to server message id on ack.
+- Maintain stable ordering: user message stays in place, assistant updates in place.
+- Stream chunks with rAF batching to avoid flicker.
+- Show "Working..." state if no chunk within 2 seconds.
+
+## Model Routing and Policy
+- Default model from settings; per-message override takes precedence.
+- Task mode uses SmartProviderRouter unless explicit model is set.
+- All assistant messages render provider + model and fallback notice.
 
 ## Performance Budgets
 - TTFB (ack): < 150ms
 - First token: < 800ms
 - Timeline update: < 500ms
-- Deliverable preview: < 1s after completion
+- Artifact preview: < 1s after task completion
 
 ## Telemetry
-- Metrics:
-  - time to first token
-  - task duration
-  - tool error rate
-  - fallback rate
-  - deliverable open rate
-- Log the effective provider + model for each response.
+- time_to_first_token
+- time_to_complete
+- fallback_rate
+- tool_error_rate
+- artifact_open_rate
+- task_cancel_rate
 
 ## Accessibility
-- Keyboard navigation for timeline and deliverables.
-- ARIA labels for icon-only buttons.
+- Keyboard navigation for message actions, approvals, and artifact list.
+- ARIA labels for icon-only buttons and status pills.
 - Single main landmark per page.
 
+## Risks and Mitigations
+- Stream drift between chat and task SSE: unify into a single event channel.
+- Message ordering conflicts: require client_request_id and server ack.
+- Attachment size bloat: enforce per-file and per-session limits.
+
+## Phased Rollout
+1. Foundation
+   - Persist chat history and message edits
+   - Unified stream events
+   - Message action wiring
+2. Cherry parity
+   - Model controls, search, export, prompt library
+   - Attachments and @mention context
+3. Agent depth
+   - Inline timeline, approvals, deliverables
+   - Background tasks and queue management
+
 ## Acceptance Criteria
-- User message always appears immediately and never disappears.
-- One task equals one assistant message.
-- Deliverable preview visible for every completed task.
-- Actual model used is visible; fallback is announced.
-- No raw markdown flash before rendering.
+- Chat history persists and reloads without reordering.
+- All message actions (edit, retry, branch, quote) are functional.
+- Attachments render and are available to the model.
+- Task progress appears inside the assistant message.
+- Model and fallback info is visible on every response.
 
 ## Open Questions
-- Should the model router allow per-step model switching?
-- What is the default fallback policy when provider is down?
-- Should deliverables be stored per-step or per-task?
+- Per-message model override UI: inline dropdown or command palette?
+- Default task mode trigger: explicit toggle vs intent-only?
+- Artifact apply workflow: inline or separate review screen?

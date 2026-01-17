@@ -12,11 +12,11 @@
     "test:quality:report": "npx tsx scripts/test-rss-ingest.ts --json"
   },
   "dependencies": {
-    "@mozilla/readability": "^0.5.0",
+    "@mozilla/readability": "^0.6.0",
     "@ku0/core": "workspace:*",
     "jsdom": "^26.0.0",
     "rss-parser": "^3.13.0",
-    "zod": "^3.22.4"
+    "zod": "^4.3.5"
   },
   "devDependencies": {
     "@types/jsdom": "^21.1.7",
