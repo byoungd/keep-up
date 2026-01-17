@@ -2,6 +2,7 @@ import type { Message } from "@ku0/shell";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   createTask,
+  editChatMessage,
   getChatHistory,
   resolveApproval,
   sendChatMessage,
@@ -43,8 +44,14 @@ export function useChatSession(sessionId: string | undefined) {
           role: msg.role,
           content: msg.content,
           createdAt: msg.createdAt,
-          status: "done",
+          status: msg.status ?? "done",
           type: "text",
+          modelId: msg.modelId,
+          providerId: msg.providerId,
+          fallbackNotice: msg.fallbackNotice,
+          metadata: msg.metadata ?? {},
+          requestId:
+            typeof msg.metadata?.requestId === "string" ? msg.metadata.requestId : undefined,
         }));
         setHistoryMessages((prev) => mergeHistory(prev, mapped));
       })
@@ -72,16 +79,35 @@ export function useChatSession(sessionId: string | undefined) {
     return projectGraphToMessages(graph, chatOnlyHistory);
   }, [graph, historyMessages]);
 
-  const addOptimisticMessage = useCallback((content: string, tempId: string) => {
-    const optimisticMsg: Message = {
-      id: tempId,
-      role: "user",
-      content,
-      createdAt: Date.now(),
-      status: "pending",
-      type: "text",
-    };
-    setHistoryMessages((prev) => [...prev, optimisticMsg]);
+  const addOptimisticMessage = useCallback(
+    (content: string, tempId: string, requestId?: string) => {
+      const metadata = requestId ? { requestId } : undefined;
+      const optimisticMsg: Message = {
+        id: tempId,
+        role: "user",
+        content,
+        createdAt: Date.now(),
+        status: "pending",
+        type: "text",
+        requestId,
+        metadata,
+      };
+      setHistoryMessages((prev) => [...prev, optimisticMsg]);
+    },
+    []
+  );
+
+  const markMessageStalled = useCallback((messageId: string, stalled: boolean) => {
+    setHistoryMessages((prev) =>
+      prev.map((m) => (m.id === messageId ? { ...m, metadata: { ...m.metadata, stalled } } : m))
+    );
+  }, []);
+
+  const updateMessageId = useCallback((currentId: string, nextId: string) => {
+    if (currentId === nextId) {
+      return;
+    }
+    setHistoryMessages((prev) => prev.map((m) => (m.id === currentId ? { ...m, id: nextId } : m)));
   }, []);
 
   const handleSendTask = useCallback(
@@ -124,8 +150,15 @@ export function useChatSession(sessionId: string | undefined) {
   );
 
   const handleSendChat = useCallback(
-    async (sessionId: string, content: string, tempId: string, modelId?: string) => {
-      const assistantId = crypto.randomUUID();
+    async (
+      sessionId: string,
+      content: string,
+      userMessageId: string,
+      clientRequestId: string,
+      modelId?: string,
+      parentId?: string
+    ) => {
+      const assistantId = `assistant-${clientRequestId}`;
       setHistoryMessages((prev) => [
         ...prev,
         {
@@ -136,18 +169,48 @@ export function useChatSession(sessionId: string | undefined) {
           status: "streaming",
           type: "text",
           modelId,
+          requestId: clientRequestId,
+          metadata: { requestId: clientRequestId },
         },
       ]);
 
       let fullContent = "";
+      let pendingChunk = "";
+      let rafId: number | null = null;
+      let stallTimeout: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+        markMessageStalled(assistantId, true);
+      }, 2000);
+
+      const flushChunks = () => {
+        if (!pendingChunk) {
+          rafId = null;
+          return;
+        }
+        fullContent += pendingChunk;
+        pendingChunk = "";
+        setHistoryMessages((prev) =>
+          prev.map((m) => (m.id === assistantId ? { ...m, content: fullContent } : m))
+        );
+        rafId = null;
+      };
+
       const response = await sendChatMessage(
         sessionId,
-        { content },
+        { content, parentId, clientRequestId, messageId: userMessageId },
         (chunk) => {
-          fullContent += chunk;
-          setHistoryMessages((prev) =>
-            prev.map((m) => (m.id === assistantId ? { ...m, content: fullContent } : m))
-          );
+          if (stallTimeout) {
+            clearTimeout(stallTimeout);
+            stallTimeout = null;
+            markMessageStalled(assistantId, false);
+          }
+          pendingChunk += chunk;
+          if (rafId === null) {
+            if (typeof requestAnimationFrame === "function") {
+              rafId = requestAnimationFrame(flushChunks);
+            } else {
+              flushChunks();
+            }
+          }
         },
         (meta) => {
           setHistoryMessages((prev) =>
@@ -165,11 +228,29 @@ export function useChatSession(sessionId: string | undefined) {
         }
       );
 
+      if (rafId !== null) {
+        if (typeof cancelAnimationFrame === "function") {
+          cancelAnimationFrame(rafId);
+        }
+        rafId = null;
+      }
+      if (pendingChunk) {
+        fullContent += pendingChunk;
+        pendingChunk = "";
+      }
+      if (stallTimeout) {
+        clearTimeout(stallTimeout);
+        stallTimeout = null;
+        markMessageStalled(assistantId, false);
+      }
+
+      updateMessageId(assistantId, response.id);
+
       setHistoryMessages((prev) =>
         prev
-          .map((m) => (m.id === tempId ? { ...m, status: "done" as const } : m))
+          .map((m) => (m.id === userMessageId ? { ...m, status: "done" as const } : m))
           .map((m) =>
-            m.id === assistantId
+            m.id === response.id || m.id === assistantId
               ? {
                   ...m,
                   content: response.content || fullContent || "No response received.",
@@ -182,7 +263,105 @@ export function useChatSession(sessionId: string | undefined) {
           )
       );
     },
-    []
+    [markMessageStalled, updateMessageId]
+  );
+
+  const editMessage = useCallback(
+    async (messageId: string, newContent: string) => {
+      if (!sessionId) {
+        return;
+      }
+
+      // Optimistic update
+      setHistoryMessages((prev) =>
+        prev.map((m) => (m.id === messageId ? { ...m, content: newContent } : m))
+      );
+
+      try {
+        await editChatMessage(sessionId, messageId, newContent);
+      } catch (_err) {
+        setError("Failed to save edit");
+      }
+    },
+    [sessionId]
+  );
+
+  const sendMessage = useCallback(
+    async (
+      content: string,
+      type: "chat" | "task" = "chat",
+      options?: { modelId?: string; parentId?: string }
+    ) => {
+      if (!sessionId || !content.trim()) {
+        return;
+      }
+
+      setIsSending(true);
+      setError(null);
+
+      const clientRequestId = crypto.randomUUID();
+      const userMessageId = `user-${clientRequestId}`;
+      addOptimisticMessage(content, userMessageId, clientRequestId);
+
+      try {
+        if (type === "task") {
+          // Tasks don't support branching yet in this API, ignoring parentId for now
+          await handleSendTask(sessionId, content, userMessageId, options?.modelId);
+        } else {
+          await handleSendChat(
+            sessionId,
+            content,
+            userMessageId,
+            clientRequestId,
+            options?.modelId,
+            options?.parentId
+          );
+        }
+      } catch (err) {
+        const errorDetail = err instanceof Error ? err.message : "Unknown error";
+        setError(`Failed to send message: ${errorDetail}`);
+        setHistoryMessages((prev) =>
+          prev.map((m) =>
+            m.id === userMessageId || (m.role === "assistant" && m.status === "streaming")
+              ? { ...m, status: "error" as const }
+              : m
+          )
+        );
+      } finally {
+        setIsSending(false);
+      }
+    },
+    [sessionId, handleSendTask, handleSendChat, addOptimisticMessage]
+  );
+
+  const branchMessage = useCallback(
+    async (parentId: string, content: string) => {
+      if (!sessionId) {
+        return;
+      }
+      await sendMessage(content, "chat", { parentId });
+    },
+    [sessionId, sendMessage]
+  );
+
+  const retryMessage = useCallback(
+    async (messageId: string) => {
+      if (!sessionId) {
+        return;
+      }
+      const msg = historyMessages.find((m) => m.id === messageId);
+      if (!msg) {
+        return;
+      }
+
+      // If it's a user message, re-run the prompt
+      if (msg.role === "user") {
+        await sendMessage(msg.content, "chat");
+      }
+      // For assistant messages, ideally find the parent user message
+      // or implement a regenerate API endpoint
+    },
+    [sessionId, historyMessages, sendMessage]
   );
 
   const sendAction = useCallback(
@@ -224,41 +403,6 @@ export function useChatSession(sessionId: string | undefined) {
     []
   );
 
-  const sendMessage = useCallback(
-    async (content: string, type: "chat" | "task" = "chat", options?: { modelId?: string }) => {
-      if (!sessionId || !content.trim()) {
-        return;
-      }
-
-      setIsSending(true);
-      setError(null);
-
-      const tempId = crypto.randomUUID();
-      addOptimisticMessage(content, tempId);
-
-      try {
-        if (type === "task") {
-          await handleSendTask(sessionId, content, tempId, options?.modelId);
-        } else {
-          await handleSendChat(sessionId, content, tempId, options?.modelId);
-        }
-      } catch (err) {
-        const errorDetail = err instanceof Error ? err.message : "Unknown error";
-        setError(`Failed to send message: ${errorDetail}`);
-        setHistoryMessages((prev) =>
-          prev.map((m) =>
-            m.id === tempId || (m.role === "assistant" && m.status === "streaming")
-              ? { ...m, status: "error" as const }
-              : m
-          )
-        );
-      } finally {
-        setIsSending(false);
-      }
-    },
-    [sessionId, handleSendTask, handleSendChat, addOptimisticMessage]
-  );
-
   return {
     messages,
     sendMessage,
@@ -270,6 +414,9 @@ export function useChatSession(sessionId: string | undefined) {
     error,
     workspace,
     session,
+    editMessage,
+    branchMessage,
+    retryMessage,
   };
 }
 

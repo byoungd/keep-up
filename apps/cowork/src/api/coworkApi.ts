@@ -172,13 +172,30 @@ export type ChatMessage = {
   role: "user" | "assistant";
   content: string;
   createdAt: number;
+  status?: "pending" | "streaming" | "done" | "error" | "canceled";
   modelId?: string;
   providerId?: string;
   fallbackNotice?: string;
+  parentId?: string;
+  attachments?: ChatAttachmentRef[];
+  metadata?: Record<string, unknown>;
+};
+
+export type ChatAttachmentRef = {
+  id: string;
+  kind: "image" | "file";
+  name: string;
+  sizeBytes: number;
+  mimeType: string;
+  storageUri: string;
 };
 
 export type SendChatPayload = {
   content: string;
+  clientRequestId?: string;
+  messageId?: string;
+  parentId?: string;
+  attachments?: ChatAttachmentRef[];
 };
 
 export type ChatStreamMeta = {
@@ -191,6 +208,35 @@ export type ChatStreamMeta = {
  * Send a chat message (lightweight, no task creation)
  * Returns streamed response chunks via callback
  */
+async function handleChatError(response: Response): Promise<never> {
+  try {
+    const error = (await response.json()) as { error?: { message?: string } };
+    throw new Error(error.error?.message ?? "Chat request failed");
+  } catch {
+    throw new Error("Chat request failed");
+  }
+}
+
+async function consumeStream(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  onChunk?: (chunk: string) => void
+): Promise<string> {
+  const decoder = new TextDecoder();
+  let fullContent = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    const chunk = decoder.decode(value, { stream: true });
+    fullContent += chunk;
+    onChunk?.(chunk);
+  }
+
+  return fullContent;
+}
+
 export async function sendChatMessage(
   sessionId: string,
   payload: SendChatPayload,
@@ -204,45 +250,25 @@ export async function sendChatMessage(
   });
 
   if (!response.ok) {
-    // Try to parse error as JSON, but handle case where it's not JSON
-    try {
-      const error = (await response.json()) as { error?: { message?: string } };
-      throw new Error(error.error?.message ?? "Chat request failed");
-    } catch {
-      throw new Error("Chat request failed");
-    }
+    await handleChatError(response);
   }
 
   const modelId = response.headers.get("x-cowork-model") ?? undefined;
   const providerId = response.headers.get("x-cowork-provider") ?? undefined;
   const fallbackNotice = response.headers.get("x-cowork-fallback") ?? undefined;
-  if (onMeta) {
-    onMeta({ modelId, providerId, fallbackNotice });
-  }
+  const messageId = response.headers.get("x-cowork-message-id") ?? undefined;
+  const requestId = response.headers.get("x-cowork-request-id") ?? undefined;
 
-  // Server always returns streaming text response
+  onMeta?.({ modelId, providerId, fallbackNotice });
+
   if (!response.body) {
     throw new Error("No response body");
   }
 
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let fullContent = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) {
-      break;
-    }
-    const chunk = decoder.decode(value, { stream: true });
-    fullContent += chunk;
-    if (onChunk) {
-      onChunk(chunk);
-    }
-  }
+  const fullContent = await consumeStream(response.body.getReader(), onChunk);
 
   return {
-    id: crypto.randomUUID(),
+    id: messageId ?? crypto.randomUUID(),
     sessionId,
     role: "assistant",
     content: fullContent,
@@ -250,7 +276,31 @@ export async function sendChatMessage(
     modelId,
     providerId,
     fallbackNotice,
+    status: fullContent ? "done" : "error",
+    metadata: requestId ? { requestId } : undefined,
   };
+}
+
+/**
+ * Edit a message
+ */
+export async function editChatMessage(
+  sessionId: string,
+  messageId: string,
+  content: string
+): Promise<ChatMessage> {
+  const data = await fetchJson<ApiResult<{ message?: ChatMessage }>>(
+    `/api/sessions/${sessionId}/messages/${messageId}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content }),
+    }
+  );
+  if (!data.message) {
+    throw new Error("Message not returned after edit");
+  }
+  return data.message;
 }
 
 /**
@@ -261,6 +311,29 @@ export async function getChatHistory(sessionId: string): Promise<ChatMessage[]> 
     `/api/sessions/${sessionId}/chat`
   );
   return data.messages ?? [];
+}
+
+export async function uploadChatAttachment(
+  sessionId: string,
+  file: File
+): Promise<ChatAttachmentRef> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await fetch(apiUrl(`/api/sessions/${sessionId}/attachments`), {
+    method: "POST",
+    body: formData,
+  });
+  const data = (await response.json()) as ApiResult<{
+    attachment?: ChatAttachmentRef;
+    error?: { message: string };
+  }>;
+  if (!response.ok) {
+    throw new Error(data.error?.message ?? "Attachment upload failed");
+  }
+  if (!data.attachment) {
+    throw new Error("Attachment not returned");
+  }
+  return data.attachment;
 }
 
 export async function listApprovals(sessionId: string): Promise<CoworkApproval[]> {

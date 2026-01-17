@@ -12,6 +12,7 @@ import { useWorkspace } from "../../app/providers/WorkspaceProvider";
 import { detectIntent } from "../../lib/intentDetector";
 import { parseSlashCommand } from "../../lib/slashCommands";
 import { useChatSession } from "./hooks/useChatSession";
+import { downloadFile, exportToJson, exportToMarkdown } from "./utils/chatExport";
 import { generateTaskTitle } from "./utils/textUtils";
 
 export function useCoworkAIPanelController() {
@@ -22,14 +23,25 @@ export function useCoworkAIPanelController() {
   const defaultModelId = useMemo(() => getDefaultModelId(), []);
   const [model, setModel] = useState(defaultModelId);
   const [input, setInput] = useState("");
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const pendingMessageRef = useRef<{ content: string; mode: "chat" | "task" } | null>(null);
 
   // Use unified session hook
-  const { messages, sendMessage, sendAction, isSending, isLoading, isConnected, isLive } =
-    useChatSession(sessionId);
+  const {
+    messages,
+    sendMessage,
+    sendAction,
+    isSending,
+    isLoading,
+    isConnected,
+    isLive,
+    editMessage,
+    branchMessage,
+    retryMessage,
+  } = useChatSession(sessionId);
 
   // Helper to ensure we have a valid session before sending
   const ensureActiveSession = useCallback(
@@ -95,6 +107,23 @@ export function useCoworkAIPanelController() {
     [ensureActiveSession]
   );
 
+  const executeMessageSend = useCallback(
+    async (resolvedContent: string, mode: "chat" | "task") => {
+      if (mode === "task") {
+        setStatusMessage("Initiating task...");
+      }
+
+      if (editingMessageId) {
+        await editMessage(editingMessageId, resolvedContent);
+        setEditingMessageId(null);
+      } else {
+        await sendMessage(resolvedContent, mode, { modelId: model });
+      }
+      setStatusMessage(null);
+    },
+    [editingMessageId, editMessage, sendMessage, model]
+  );
+
   const handleSend = useCallback(async () => {
     const content = input.trim();
     if (!content || isSending) {
@@ -125,12 +154,7 @@ export function useCoworkAIPanelController() {
         return;
       }
 
-      if (mode === "task") {
-        setStatusMessage("Initiating task...");
-      }
-
-      await sendMessage(resolvedContent, mode, { modelId: model });
-      setStatusMessage(null);
+      await executeMessageSend(resolvedContent, mode);
     } catch (_err) {
       setInput(content);
       setStatusMessage(
@@ -143,10 +167,21 @@ export function useCoworkAIPanelController() {
     sessionId,
     prepareSession,
     navigate,
-    sendMessage,
-    model,
+    executeMessageSend,
     resolveMessageMode,
   ]);
+
+  const startEditing = useCallback(
+    (id: string) => {
+      const msg = messages.find((m) => m.id === id);
+      if (msg && msg.role === "user") {
+        setInput(msg.content);
+        setEditingMessageId(id);
+        inputRef.current?.focus();
+      }
+    },
+    [messages]
+  );
 
   const handleSetModel = useCallback(
     (nextModel: string) => {
@@ -166,6 +201,33 @@ export function useCoworkAIPanelController() {
   );
 
   const filteredModels = useMemo<ModelCapability[]>(() => MODEL_CATALOG, []);
+
+  const handleExport = useCallback(
+    (format: "markdown" | "json") => {
+      if (!messages.length) {
+        return;
+      }
+      if (format === "markdown") {
+        const md = exportToMarkdown(messages);
+        downloadFile(`chat-export-${sessionId || "session"}.md`, md, "text/markdown");
+      } else {
+        const json = exportToJson(messages);
+        downloadFile(`chat-export-${sessionId || "session"}.json`, json, "application/json");
+      }
+    },
+    [messages, sessionId]
+  );
+
+  const handleQuote = useCallback((content: string) => {
+    setInput((prev) => {
+      const quoteBlock = content
+        .split("\n")
+        .map((l) => `> ${l}`)
+        .join("\n");
+      return prev ? `${prev}\n\n${quoteBlock}\n\n` : `${quoteBlock}\n\n`;
+    });
+    inputRef.current?.focus();
+  }, []);
 
   return {
     messages,
@@ -202,5 +264,11 @@ export function useCoworkAIPanelController() {
     isLive,
     // Tasks are now embedded in messages, but we can extract them if the UI needs a separate list
     tasks: [], // Deprecated in favor of inline task cards
+    onExport: handleExport,
+    onEdit: startEditing,
+    onBranch: branchMessage,
+    onQuote: handleQuote,
+    onRetry: retryMessage,
+    editingMessageId,
   };
 }

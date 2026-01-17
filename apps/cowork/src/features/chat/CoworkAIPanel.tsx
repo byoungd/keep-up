@@ -1,7 +1,7 @@
 "use client";
 
 import { type ArtifactItem, AIPanel as ShellAIPanel, useReaderShell } from "@ku0/shell";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useCoworkAIPanelController } from "./useCoworkAIPanelController";
 
 export interface CoworkAIPanelProps {
@@ -36,7 +36,22 @@ export function CoworkAIPanel({ onClose, onPreviewArtifact }: CoworkAIPanelProps
     isConnected,
     isLive,
     tasks,
+    onExport,
+    onEdit,
+    onBranch,
+    onQuote,
+    onRetry,
   } = ctrl;
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "e") {
+        // Placeholder for future shortcuts
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
   const panelPosition = aiPanel.position;
 
   // Connection status indicator
@@ -158,7 +173,7 @@ export function CoworkAIPanel({ onClose, onPreviewArtifact }: CoworkAIPanelProps
         }
       }}
       onExport={() => {
-        /* TODO */
+        onExport("markdown");
       }}
       headerTranslations={translations}
       panelPosition={panelPosition}
@@ -166,23 +181,18 @@ export function CoworkAIPanel({ onClose, onPreviewArtifact }: CoworkAIPanelProps
       messages={messages}
       suggestions={[]}
       listRef={listRef}
-      onEdit={() => {
-        /* TODO */
+      onEdit={onEdit}
+      onBranch={(id) => {
+        // TODO: Implement proper branch UI (set replyingTo state then send)
+        onBranch(id, "");
       }}
-      onBranch={() => {
-        /* TODO */
-      }}
-      onQuote={() => {
-        /* TODO */
-      }}
+      onQuote={onQuote}
       onCopy={(content) => {
         if (content) {
           navigator.clipboard.writeText(content);
         }
       }}
-      onRetry={() => {
-        /* TODO */
-      }}
+      onRetry={onRetry}
       onSuggestionClick={() => {
         /* TODO */
       }}
