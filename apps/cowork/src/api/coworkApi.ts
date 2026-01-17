@@ -12,6 +12,7 @@ export type ApiResult<T> = {
   projects?: CoworkProject[];
   project?: CoworkProject;
   settings?: CoworkSettings;
+  providers?: CoworkProvider[];
   result?: ToolCheckResult;
   artifacts?: CoworkArtifact[];
   artifact?: CoworkArtifact;
@@ -32,11 +33,46 @@ export type CoworkApproval = {
 };
 
 export type CoworkSettings = {
-  openAiKey?: string;
-  anthropicKey?: string;
-  geminiKey?: string;
   defaultModel?: string;
   theme?: "light" | "dark";
+};
+
+export type CoworkProviderKeySource = "settings" | "env" | "none";
+
+export type CoworkProviderModel = {
+  id: string;
+  label: string;
+  shortLabel?: string;
+  contextWindow: number;
+  supports: {
+    vision: boolean;
+    tools: boolean;
+    thinking: boolean;
+  };
+  pricing?: {
+    inputTokensPer1M: number;
+    outputTokensPer1M: number;
+  };
+};
+
+export type CoworkProvider = {
+  id: string;
+  name: string;
+  shortName: string;
+  description?: string;
+  accentColor?: string;
+  icon?: string;
+  models: CoworkProviderModel[];
+  hasKey: boolean;
+  lastValidatedAt?: number;
+  source: CoworkProviderKeySource;
+};
+
+export type ProviderKeyStatus = {
+  providerId: string;
+  hasKey: boolean;
+  lastValidatedAt?: number;
+  source: CoworkProviderKeySource;
 };
 
 export type CoworkArtifact = {
@@ -392,13 +428,37 @@ export async function getSettings(): Promise<CoworkSettings> {
   return data.settings ?? {};
 }
 
-export async function updateSettings(patch: CoworkSettings): Promise<CoworkSettings> {
+export async function updateSettings(patch: Partial<CoworkSettings>): Promise<CoworkSettings> {
   const data = await fetchJson<ApiResult<unknown>>("/api/settings", {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(patch),
   });
   return data.settings ?? {};
+}
+
+export async function listProviders(): Promise<CoworkProvider[]> {
+  const data = await fetchJson<ApiResult<unknown>>("/api/providers");
+  return data.providers ?? [];
+}
+
+export async function getProviderKeyStatus(providerId: string): Promise<ProviderKeyStatus> {
+  return fetchJson<ProviderKeyStatus>(`/api/settings/providers/${providerId}/key`);
+}
+
+export async function setProviderKey(providerId: string, key: string): Promise<ProviderKeyStatus> {
+  return fetchJson<ProviderKeyStatus>(`/api/settings/providers/${providerId}/key`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ key }),
+  });
+}
+
+export async function deleteProviderKey(providerId: string): Promise<{ removed: boolean }> {
+  const data = await fetchJson<{ removed: boolean }>(`/api/settings/providers/${providerId}/key`, {
+    method: "DELETE",
+  });
+  return data;
 }
 
 export async function checkTool(
@@ -516,7 +576,9 @@ export async function getProjectContext(): Promise<ProjectContextInfo> {
 }
 
 export async function analyzeProject(): Promise<ProjectAnalysisResult> {
-  return fetchJson<ProjectAnalysisResult>("/api/context/analyze");
+  const data =
+    await fetchJson<ApiResult<{ analysis?: ProjectAnalysisResult }>>("/api/context/analyze");
+  return data.analysis ?? (data as ProjectAnalysisResult);
 }
 
 export async function generateContext(options?: { includePatterns?: boolean }): Promise<string> {

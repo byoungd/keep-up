@@ -1,5 +1,13 @@
 import React from "react";
-import { type CoworkSettings, getSettings, updateSettings } from "../../api/coworkApi";
+import {
+  type CoworkProvider,
+  type CoworkSettings,
+  deleteProviderKey,
+  getSettings,
+  listProviders,
+  setProviderKey,
+  updateSettings,
+} from "../../api/coworkApi";
 import { useTheme } from "../../app/providers/ThemeProvider";
 import { cn } from "../../lib/cn";
 
@@ -11,6 +19,89 @@ type SettingsState = {
   saveError: string | null;
 };
 
+type ProviderState = {
+  providers: CoworkProvider[];
+  inputs: Record<string, string>;
+  isLoading: boolean;
+  error: string | null;
+  saving: Record<string, boolean>;
+};
+
+type ProviderKeyCardProps = {
+  provider: CoworkProvider;
+  inputValue: string;
+  isSaving: boolean;
+  onInputChange: (value: string) => void;
+  onSave: () => void;
+  onDelete: () => void;
+};
+
+function ProviderKeyCard({
+  provider,
+  inputValue,
+  isSaving,
+  onInputChange,
+  onSave,
+  onDelete,
+}: ProviderKeyCardProps) {
+  const canDelete = provider.hasKey && provider.source === "settings";
+  const statusLabel = provider.hasKey ? (provider.source === "env" ? "Env" : "Stored") : "No key";
+  const statusClass = provider.hasKey
+    ? "bg-emerald-100 text-emerald-700"
+    : "bg-surface-100 text-muted-foreground";
+
+  return (
+    <div className="rounded-md border border-border/60 bg-surface-0 p-4 space-y-3">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold text-foreground">{provider.name}</p>
+          {provider.description ? (
+            <p className="text-xs text-muted-foreground">{provider.description}</p>
+          ) : null}
+        </div>
+        <span className={cn("text-[11px] px-2 py-1 rounded-full", statusClass)}>{statusLabel}</span>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          aria-label={`${provider.name} API key`}
+          type="password"
+          className="text-input flex-1 min-w-[220px]"
+          placeholder="Enter API key"
+          value={inputValue}
+          onChange={(event) => onInputChange(event.target.value)}
+          disabled={isSaving}
+        />
+        <button
+          type="button"
+          className="px-3 py-2 text-xs font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 transition-colors disabled:opacity-60"
+          onClick={onSave}
+          disabled={isSaving || inputValue.trim().length === 0}
+        >
+          Save Key
+        </button>
+        {canDelete ? (
+          <button
+            type="button"
+            className="px-3 py-2 text-xs font-medium text-muted-foreground border border-border rounded-md hover:text-foreground hover:bg-surface-100 transition-colors disabled:opacity-60"
+            onClick={onDelete}
+            disabled={isSaving}
+          >
+            Remove
+          </button>
+        ) : null}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+        {provider.lastValidatedAt ? (
+          <span>Last validated {new Date(provider.lastValidatedAt).toLocaleString()}</span>
+        ) : null}
+        {provider.source === "env" ? <span>Key loaded from environment variables.</span> : null}
+      </div>
+    </div>
+  );
+}
+
 export function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const [state, setState] = React.useState<SettingsState>({
@@ -20,44 +111,60 @@ export function SettingsPage() {
     isSaving: false,
     saveError: null,
   });
+  const [providerState, setProviderState] = React.useState<ProviderState>({
+    providers: [],
+    inputs: {},
+    isLoading: true,
+    error: null,
+    saving: {},
+  });
 
-  // Load settings on mount
-  React.useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const settings = await getSettings();
-        if (!cancelled) {
-          setState((prev) => ({
-            ...prev,
-            data: { ...prev.data, ...settings },
-            isLoading: false,
-            error: null,
-          }));
-          // Sync theme from server if present
-          if (settings.theme) {
-            setTheme(settings.theme);
-          }
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setState((prev) => ({
-            ...prev,
-            isLoading: false,
-            error: err instanceof Error ? err.message : "Failed to load settings",
-          }));
-        }
+  const loadSettings = React.useCallback(async () => {
+    try {
+      const settings = await getSettings();
+      setState((prev) => ({
+        ...prev,
+        data: { ...prev.data, ...settings },
+        isLoading: false,
+        error: null,
+      }));
+      if (settings.theme) {
+        setTheme(settings.theme);
       }
+    } catch (err) {
+      setState((prev) => ({
+        ...prev,
+        isLoading: false,
+        error: err instanceof Error ? err.message : "Failed to load settings",
+      }));
     }
-    load();
-    return () => {
-      cancelled = true;
-    };
   }, [setTheme]);
 
-  // Optimistic update helper
+  const loadProviders = React.useCallback(async () => {
+    setProviderState((prev) => ({ ...prev, isLoading: true }));
+    try {
+      const providers = await listProviders();
+      setProviderState((prev) => ({
+        ...prev,
+        providers,
+        isLoading: false,
+        error: null,
+      }));
+    } catch (err) {
+      setProviderState((prev) => ({
+        ...prev,
+        isLoading: false,
+        error: err instanceof Error ? err.message : "Failed to load providers",
+      }));
+    }
+  }, []);
+
+  React.useEffect(() => {
+    void loadSettings();
+    void loadProviders();
+  }, [loadProviders, loadSettings]);
+
   const handleUpdate = React.useCallback(async (patch: Partial<CoworkSettings>) => {
-    // Optimistic update
     setState((prev) => ({
       ...prev,
       data: { ...prev.data, ...patch },
@@ -73,13 +180,11 @@ export function SettingsPage() {
         isSaving: false,
       }));
     } catch (err) {
-      // Revert on error - refetch to get actual state
       setState((prev) => ({
         ...prev,
         isSaving: false,
         saveError: err instanceof Error ? err.message : "Failed to save",
       }));
-      // Refetch to revert optimistic update
       try {
         const settings = await getSettings();
         setState((prev) => ({
@@ -100,6 +205,71 @@ export function SettingsPage() {
     [setTheme, handleUpdate]
   );
 
+  const handleProviderInputChange = React.useCallback((providerId: string, value: string) => {
+    setProviderState((prev) => ({
+      ...prev,
+      inputs: { ...prev.inputs, [providerId]: value },
+    }));
+  }, []);
+
+  const handleProviderSave = React.useCallback(
+    async (providerId: string) => {
+      const key = providerState.inputs[providerId]?.trim();
+      if (!key) {
+        return;
+      }
+      setProviderState((prev) => ({
+        ...prev,
+        saving: { ...prev.saving, [providerId]: true },
+        error: null,
+      }));
+      try {
+        await setProviderKey(providerId, key);
+        setProviderState((prev) => ({
+          ...prev,
+          inputs: { ...prev.inputs, [providerId]: "" },
+        }));
+        await loadProviders();
+      } catch (err) {
+        setProviderState((prev) => ({
+          ...prev,
+          error: err instanceof Error ? err.message : "Failed to save key",
+        }));
+      } finally {
+        setProviderState((prev) => ({
+          ...prev,
+          saving: { ...prev.saving, [providerId]: false },
+        }));
+      }
+    },
+    [loadProviders, providerState.inputs]
+  );
+
+  const handleProviderDelete = React.useCallback(
+    async (providerId: string) => {
+      setProviderState((prev) => ({
+        ...prev,
+        saving: { ...prev.saving, [providerId]: true },
+        error: null,
+      }));
+      try {
+        await deleteProviderKey(providerId);
+        await loadProviders();
+      } catch (err) {
+        setProviderState((prev) => ({
+          ...prev,
+          error: err instanceof Error ? err.message : "Failed to delete key",
+        }));
+      } finally {
+        setProviderState((prev) => ({
+          ...prev,
+          saving: { ...prev.saving, [providerId]: false },
+        }));
+      }
+    },
+    [loadProviders]
+  );
+
   if (state.isLoading) {
     return (
       <div className="page-grid">
@@ -116,61 +286,37 @@ export function SettingsPage() {
       {state.saveError && (
         <div className="text-xs text-destructive px-1 mb-2">{state.saveError}</div>
       )}
+      {providerState.error && (
+        <div className="text-xs text-destructive px-1 mb-2">{providerState.error}</div>
+      )}
 
       <section className="card-panel space-y-6">
         <div>
           <p className="text-sm font-semibold text-foreground">API Keys</p>
           <p className="text-xs text-muted-foreground">
-            Stored securely on the server. Never exposed to client.
+            Stored securely on the server. Environment keys stay server-side.
           </p>
         </div>
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <label htmlFor="openai-key" className="text-xs font-medium text-muted-foreground">
-              OpenAI API Key
-            </label>
-            <input
-              id="openai-key"
-              aria-label="OpenAI API key"
-              type="password"
-              className="text-input"
-              placeholder="sk-..."
-              value={state.data.openAiKey ?? ""}
-              onChange={(event) => handleUpdate({ openAiKey: event.target.value })}
-              disabled={state.isSaving}
-            />
+        {providerState.isLoading ? (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="h-4 w-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+            Loading providers…
           </div>
-          <div className="space-y-2">
-            <label htmlFor="anthropic-key" className="text-xs font-medium text-muted-foreground">
-              Anthropic API Key
-            </label>
-            <input
-              id="anthropic-key"
-              aria-label="Anthropic API key"
-              type="password"
-              className="text-input"
-              placeholder="sk-ant-..."
-              value={state.data.anthropicKey ?? ""}
-              onChange={(event) => handleUpdate({ anthropicKey: event.target.value })}
-              disabled={state.isSaving}
-            />
+        ) : (
+          <div className="space-y-3">
+            {providerState.providers.map((provider) => (
+              <ProviderKeyCard
+                key={provider.id}
+                provider={provider}
+                inputValue={providerState.inputs[provider.id] ?? ""}
+                isSaving={providerState.saving[provider.id] ?? false}
+                onInputChange={(value) => handleProviderInputChange(provider.id, value)}
+                onSave={() => handleProviderSave(provider.id)}
+                onDelete={() => handleProviderDelete(provider.id)}
+              />
+            ))}
           </div>
-          <div className="space-y-2">
-            <label htmlFor="gemini-key" className="text-xs font-medium text-muted-foreground">
-              Gemini API Key
-            </label>
-            <input
-              id="gemini-key"
-              aria-label="Gemini API key"
-              type="password"
-              className="text-input"
-              placeholder="AIza..."
-              value={state.data.geminiKey ?? ""}
-              onChange={(event) => handleUpdate({ geminiKey: event.target.value })}
-              disabled={state.isSaving}
-            />
-          </div>
-        </div>
+        )}
       </section>
 
       <section className="card-panel space-y-4">

@@ -13,19 +13,13 @@ export function CostMeter({ usage, modelId }: CostMeterProps) {
       return null;
     }
     const model = MODEL_CATALOG.find((m) => m.id === modelId);
-    // Cast to any to avoid potential type mismatch if d.ts is stale
-    // biome-ignore lint/suspicious/noExplicitAny: Temporary fix for stale types
-    const pricing = (model as any)?.pricing;
+    const pricing = model?.pricing;
 
-    if (!pricing) {
-      return null;
-    }
-
-    const { inputTokensPer1M, outputTokensPer1M } = pricing;
-    const inputCost = (usage.inputTokens / 1_000_000) * (inputTokensPer1M ?? 0);
-    const outputCost = (usage.outputTokens / 1_000_000) * (outputTokensPer1M ?? 0);
     return {
-      value: inputCost + outputCost,
+      value: pricing
+        ? (usage.inputTokens / 1_000_000) * pricing.inputTokensPer1M +
+          (usage.outputTokens / 1_000_000) * pricing.outputTokensPer1M
+        : null,
       contextWindow: model?.contextWindow,
     };
   }, [usage, modelId]);
@@ -86,12 +80,12 @@ export function CostMeter({ usage, modelId }: CostMeterProps) {
           <span>{utilization.toFixed(0)}%</span>
         </div>
       )}
-      {cost?.value !== undefined && (
+      {cost && (
         <div
           className="flex items-center gap-1 font-medium text-foreground/80 pl-1 border-l border-border/50"
           title="Estimated Cost"
         >
-          <span>${cost.value.toFixed(4)}</span>
+          <span>{cost.value === null ? "N/A" : `$${cost.value.toFixed(4)}`}</span>
         </div>
       )}
     </div>

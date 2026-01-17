@@ -57,12 +57,27 @@ export interface CoworkApproval {
 }
 
 export interface CoworkSettings {
+  /** Encrypted provider keys (preferred storage) */
+  providerKeys?: ProviderKeyMap;
+  /** Legacy plaintext keys (migrated into providerKeys on read) */
   openAiKey?: string;
   anthropicKey?: string;
   geminiKey?: string;
   defaultModel?: string;
   theme?: "light" | "dark";
 }
+
+export type CoworkProviderId = "openai" | "anthropic" | "gemini";
+
+export interface ProviderKeyRecord {
+  providerId: CoworkProviderId;
+  encryptedKey: string;
+  createdAt: number;
+  updatedAt: number;
+  lastValidatedAt?: number;
+}
+
+export type ProviderKeyMap = Partial<Record<CoworkProviderId, ProviderKeyRecord>>;
 
 export type CoworkChatMessageStatus = "pending" | "streaming" | "done" | "error" | "canceled";
 

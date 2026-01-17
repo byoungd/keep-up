@@ -4,7 +4,7 @@
  */
 
 import { getDatabase } from "./database";
-import type { CoworkSettings } from "./types";
+import type { CoworkSettings, ProviderKeyMap } from "./types";
 
 export interface SqliteConfigStore {
   get(): Promise<CoworkSettings>;
@@ -13,22 +13,23 @@ export interface SqliteConfigStore {
 }
 
 const ALLOWED_KEYS = new Set<keyof CoworkSettings>([
+  "providerKeys",
   "openAiKey",
   "anthropicKey",
+  "geminiKey",
   "defaultModel",
   "theme",
 ]);
 
-function parseSettingValue(raw: string): string | undefined {
+function parseSettingValue(raw: string): unknown {
   try {
-    const parsed = JSON.parse(raw) as unknown;
-    return typeof parsed === "string" ? parsed : undefined;
+    return JSON.parse(raw) as unknown;
   } catch {
     return raw;
   }
 }
 
-function applySetting(settings: CoworkSettings, key: string, value: string | undefined): void {
+function applySetting(settings: CoworkSettings, key: string, value: unknown): void {
   if (!ALLOWED_KEYS.has(key as keyof CoworkSettings) || value === undefined) {
     return;
   }
@@ -40,9 +41,15 @@ function applySetting(settings: CoworkSettings, key: string, value: string | und
     return;
   }
 
-  const settingKey = key as keyof CoworkSettings;
-  if (settingKey !== "theme") {
-    settings[settingKey] = value;
+  if (key === "providerKeys") {
+    if (isRecord(value)) {
+      settings.providerKeys = value as ProviderKeyMap;
+    }
+    return;
+  }
+
+  if (typeof value === "string" && isStringSettingKey(key)) {
+    settings[key] = value;
   }
 }
 
@@ -97,4 +104,16 @@ export async function createSqliteConfigStore(): Promise<SqliteConfigStore> {
       return next;
     },
   };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isStringSettingKey(
+  key: string
+): key is "openAiKey" | "anthropicKey" | "geminiKey" | "defaultModel" {
+  return (
+    key === "openAiKey" || key === "anthropicKey" || key === "geminiKey" || key === "defaultModel"
+  );
 }

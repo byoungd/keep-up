@@ -8,11 +8,13 @@ import { createAuditLogRoutes } from "./routes/auditLogs";
 import { createChatRoutes } from "./routes/chat";
 import { createContextRoutes } from "./routes/context";
 import { createProjectRoutes } from "./routes/projects";
+import { createProviderRoutes } from "./routes/providers";
 import { createSessionRoutes } from "./routes/sessions";
 import { createSettingsRoutes } from "./routes/settings";
 import { createStreamRoutes } from "./routes/stream";
 import { CoworkRuntimeBridge } from "./runtime/coworkRuntime";
 import type { CoworkTaskRuntime } from "./runtime/coworkTaskRuntime";
+import { ProviderKeyService } from "./services/providerKeyService";
 import type { StorageLayer } from "./storage/contracts";
 import { SessionEventHub } from "./streaming/eventHub";
 
@@ -23,6 +25,7 @@ export interface CoworkAppDeps {
   runtime?: CoworkRuntimeBridge;
   taskRuntime?: CoworkTaskRuntime;
   logger?: Pick<typeof serverLogger, "info" | "error">;
+  providerKeys?: ProviderKeyService;
 }
 
 export function createCoworkApp(deps: CoworkAppDeps) {
@@ -32,6 +35,7 @@ export function createCoworkApp(deps: CoworkAppDeps) {
     new CoworkRuntimeBridge(deps.storage.approvalStore, undefined, deps.storage.auditLogStore);
   const taskRuntime = deps.taskRuntime;
   const logger = deps.logger ?? serverLogger;
+  const providerKeys = deps.providerKeys ?? new ProviderKeyService(deps.storage.configStore);
 
   const app = new Hono();
 
@@ -78,6 +82,7 @@ export function createCoworkApp(deps: CoworkAppDeps) {
     "/api",
     createSettingsRoutes({
       config: deps.storage.configStore,
+      providerKeys,
     })
   );
 
@@ -112,6 +117,14 @@ export function createCoworkApp(deps: CoworkAppDeps) {
       sessionStore: deps.storage.sessionStore,
       chatMessageStore: deps.storage.chatMessageStore,
       getSettings: () => deps.storage.configStore.get(),
+      providerKeys,
+    })
+  );
+
+  app.route(
+    "/api",
+    createProviderRoutes({
+      providerKeys,
     })
   );
 
@@ -120,7 +133,9 @@ export function createCoworkApp(deps: CoworkAppDeps) {
     return jsonError(c, 500, "Internal server error");
   });
   // Project context routes (AGENTS.md analysis and generation)
-  app.route("/api", createContextRoutes());
+  const contextRoutes = createContextRoutes();
+  app.route("/api", contextRoutes);
+  app.route("/api/project", contextRoutes);
 
   logger.info("Cowork server initialized");
   return app;

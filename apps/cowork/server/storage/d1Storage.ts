@@ -271,22 +271,23 @@ function parseJsonObject(raw: unknown): Record<string, unknown> {
 }
 
 const ALLOWED_SETTINGS = new Set<keyof CoworkSettings>([
+  "providerKeys",
   "openAiKey",
   "anthropicKey",
+  "geminiKey",
   "defaultModel",
   "theme",
 ]);
 
-function parseSettingValue(raw: string): string | undefined {
+function parseSettingValue(raw: string): unknown {
   try {
-    const parsed = JSON.parse(raw) as unknown;
-    return typeof parsed === "string" ? parsed : undefined;
+    return JSON.parse(raw) as unknown;
   } catch {
     return raw;
   }
 }
 
-function applySetting(settings: CoworkSettings, key: string, value: string | undefined): void {
+function applySetting(settings: CoworkSettings, key: string, value: unknown): void {
   if (!ALLOWED_SETTINGS.has(key as keyof CoworkSettings) || value === undefined) {
     return;
   }
@@ -298,10 +299,28 @@ function applySetting(settings: CoworkSettings, key: string, value: string | und
     return;
   }
 
-  const settingKey = key as keyof CoworkSettings;
-  if (settingKey !== "theme") {
-    settings[settingKey] = value;
+  if (key === "providerKeys") {
+    if (isRecord(value)) {
+      settings.providerKeys = value as CoworkSettings["providerKeys"];
+    }
+    return;
   }
+
+  if (typeof value === "string" && isStringSettingKey(key)) {
+    settings[key] = value;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isStringSettingKey(
+  key: string
+): key is "openAiKey" | "anthropicKey" | "geminiKey" | "defaultModel" {
+  return (
+    key === "openAiKey" || key === "anthropicKey" || key === "geminiKey" || key === "defaultModel"
+  );
 }
 
 function rowToSession(row: Record<string, unknown>): CoworkSession {

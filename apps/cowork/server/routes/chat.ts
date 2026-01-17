@@ -13,6 +13,7 @@ import {
 import { Hono } from "hono";
 import { streamText } from "hono/streaming";
 import { jsonError, readJsonBody } from "../http";
+import type { ProviderKeyService } from "../services/providerKeyService";
 import type { ChatMessageStoreLike, SessionStoreLike } from "../storage/contracts";
 import { ensureStateDir } from "../storage/statePaths";
 import type { CoworkChatAttachmentRef, CoworkChatMessage, CoworkSettings } from "../storage/types";
@@ -21,6 +22,7 @@ interface ChatRouteDeps {
   sessionStore: SessionStoreLike;
   chatMessageStore: ChatMessageStoreLike;
   getSettings: () => Promise<CoworkSettings>;
+  providerKeys: ProviderKeyService;
 }
 
 interface ChatRequestBody {
@@ -58,7 +60,7 @@ export function createChatRoutes(deps: ChatRouteDeps) {
     }
 
     const settings = await deps.getSettings();
-    const routerInfo = createChatRouter(settings);
+    const routerInfo = await createChatRouter(settings, deps.providerKeys);
     if (!routerInfo) {
       return jsonError(c, 503, "No AI provider configured");
     }
@@ -404,8 +406,11 @@ function isFileLike(value: unknown): value is FileLike {
 type ChatProviderId = "openai" | "anthropic" | "gemini";
 type ChatProviderEntry = { name: ChatProviderId; provider: LLMProvider };
 
-function createChatRouter(settings: CoworkSettings): ChatRouterInfo | null {
-  const providers = buildChatProviders(settings);
+async function createChatRouter(
+  settings: CoworkSettings,
+  providerKeys: ProviderKeyService
+): Promise<ChatRouterInfo | null> {
+  const providers = await buildChatProviders(providerKeys);
 
   if (providers.length === 0) {
     return null;
@@ -434,13 +439,15 @@ function createChatRouter(settings: CoworkSettings): ChatRouterInfo | null {
   };
 }
 
-function buildChatProviders(settings: CoworkSettings): ChatProviderEntry[] {
+async function buildChatProviders(providerKeys: ProviderKeyService): Promise<ChatProviderEntry[]> {
   const openaiEnv = resolveProviderFromEnv("openai");
   const claudeEnv = resolveProviderFromEnv("claude");
   const geminiEnv = resolveProviderFromEnv("gemini");
-  const openAiKey = settings.openAiKey?.trim() || openaiEnv?.apiKeys[0];
-  const anthropicKey = settings.anthropicKey?.trim() || claudeEnv?.apiKeys[0];
-  const geminiKey = settings.geminiKey?.trim() || geminiEnv?.apiKeys[0];
+  const [openAiKey, anthropicKey, geminiKey] = await Promise.all([
+    providerKeys.getResolvedKey("openai").then((k) => k ?? undefined),
+    providerKeys.getResolvedKey("anthropic").then((k) => k ?? undefined),
+    providerKeys.getResolvedKey("gemini").then((k) => k ?? undefined),
+  ]);
   const geminiBaseUrl =
     geminiEnv?.baseUrl || "https://generativelanguage.googleapis.com/v1beta/openai";
   const providers: ChatProviderEntry[] = [];

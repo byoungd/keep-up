@@ -17,29 +17,31 @@ import {
   type StreamChunk,
   type Tool,
 } from "@ku0/ai-core";
-import type { CoworkSettings } from "../../storage/types";
+import type { ProviderKeyService } from "../../services/providerKeyService";
+import type { CoworkProviderId, CoworkSettings } from "../../storage/types";
 import { SmartProviderRouter } from "../smartProviderRouter";
 import { estimateTokens, inferTaskType } from "../utils";
 
 type Logger = Pick<Console, "info" | "warn" | "error">;
-type CoworkProviderId = "openai" | "anthropic" | "gemini";
-
 export class ProviderManager {
-  constructor(private readonly logger: Logger) {}
+  constructor(
+    private readonly logger: Logger,
+    private readonly providerKeys: ProviderKeyService
+  ) {}
 
   /**
    * Create provider configuration for a session
    */
-  createProvider(
+  async createProvider(
     settings: CoworkSettings,
     selectionHint?: { prompt?: string }
-  ): {
+  ): Promise<{
     provider: unknown;
     model: string;
     providerId: CoworkProviderId;
     fallbackNotice?: string;
-  } {
-    const providers = this.resolveProviders(settings);
+  }> {
+    const providers = await this.resolveProviders();
     this.ensureProviders(providers);
 
     const requestedModel = normalizeModelId(settings.defaultModel ?? undefined) ?? null;
@@ -92,14 +94,16 @@ export class ProviderManager {
   /**
    * Resolve available LLM providers from settings and environment
    */
-  private resolveProviders(settings: CoworkSettings): LLMProvider[] {
+  private async resolveProviders(): Promise<LLMProvider[]> {
     const openaiEnv = resolveProviderFromEnv("openai");
     const claudeEnv = resolveProviderFromEnv("claude");
     const geminiEnv = resolveProviderFromEnv("gemini");
 
-    const openAiKey = settings.openAiKey?.trim() || openaiEnv?.apiKeys[0];
-    const anthropicKey = settings.anthropicKey?.trim() || claudeEnv?.apiKeys[0];
-    const geminiKey = settings.geminiKey?.trim() || geminiEnv?.apiKeys[0];
+    const [openAiKey, anthropicKey, geminiKey] = await Promise.all([
+      this.providerKeys.getResolvedKey("openai"),
+      this.providerKeys.getResolvedKey("anthropic"),
+      this.providerKeys.getResolvedKey("gemini"),
+    ]);
     const geminiBaseUrl =
       geminiEnv?.baseUrl || "https://generativelanguage.googleapis.com/v1beta/openai";
 
