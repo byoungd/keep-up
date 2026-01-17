@@ -15,7 +15,7 @@
 import type { IntentRegistry } from "@ku0/core";
 import { createIntentRegistry } from "@ku0/core";
 import type { ContextFrameBuilder, ContextItem } from "../context";
-import type { RuntimeEventBus } from "../events/eventBus";
+import { type RuntimeEventBus, getGlobalEventBus } from "../events/eventBus";
 import {
   type ToolConfirmationDetailsProvider,
   type ToolConfirmationResolver,
@@ -34,6 +34,7 @@ import { createSkillPromptAdapter } from "../skills/skillPromptAdapter";
 import type { SkillRegistry } from "../skills/skillRegistry";
 import type { SkillSession } from "../skills/skillSession";
 import { createSkillSession } from "../skills/skillSession";
+import { type StreamWriter, attachRuntimeEventStreamBridge } from "../streaming";
 import { type TaskGraphStore, type TaskNodeStatus, createTaskGraphStore } from "../tasks/taskGraph";
 import type { IMetricsCollector, ITracer, SpanContext, TelemetryContext } from "../telemetry";
 import { AGENT_METRICS } from "../telemetry";
@@ -173,6 +174,13 @@ export interface OrchestratorComponents {
   taskGraph?: TaskGraphStore;
   /** Optional tool result cache */
   toolResultCache?: ToolResultCache;
+  /** Optional runtime event stream bridge */
+  streamBridge?: OrchestratorStreamBridge;
+}
+
+export interface OrchestratorStreamBridge {
+  stream: StreamWriter;
+  includeDecisions?: boolean;
 }
 
 // ============================================================================
@@ -206,6 +214,7 @@ export class AgentOrchestrator {
   private readonly skillSession?: SkillSession;
   private readonly skillPromptAdapter?: SkillPromptAdapter;
   private readonly taskGraph?: TaskGraphStore;
+  private readonly streamBridge?: OrchestratorStreamBridge;
   private currentRunId?: string;
   private currentPlanNodeId?: string;
   private readonly taskGraphToolCalls = new WeakMap<MCPToolCall, string>();
@@ -285,6 +294,7 @@ export class AgentOrchestrator {
     this.skillSession = components.skillSession;
     this.skillPromptAdapter = components.skillPromptAdapter;
     this.taskGraph = components.taskGraph;
+    this.streamBridge = components.streamBridge;
 
     this.turnExecutor = createTurnExecutor({
       llm: this.llm,
@@ -319,6 +329,7 @@ export class AgentOrchestrator {
     this.currentRunId = runId;
     this.taskGraph?.setEventContext({ correlationId: runId, source: this.config.name });
     this.currentPlanNodeId = this.createPlanNode(userMessage);
+    const detachStreamBridge = this.attachStreamBridge(runId);
 
     // Add user message
     const userMsg: AgentMessage = { role: "user", content: userMessage };
@@ -332,11 +343,25 @@ export class AgentOrchestrator {
         await this.executeTurn();
       }
     } finally {
+      detachStreamBridge?.();
       this.finalizePlanNode();
       this.metrics?.gauge(AGENT_METRICS.activeAgents.name, 0, {});
     }
 
     return this.state;
+  }
+
+  private attachStreamBridge(runId: string): (() => void) | undefined {
+    if (!this.streamBridge || !this.eventBus) {
+      return undefined;
+    }
+
+    return attachRuntimeEventStreamBridge({
+      eventBus: this.eventBus,
+      stream: this.streamBridge.stream,
+      correlationId: runId,
+      includeDecisions: this.streamBridge.includeDecisions,
+    });
   }
 
   /**
@@ -1194,7 +1219,11 @@ export function createOrchestrator(
     options,
     auditLogger
   );
-  const eventBus = options.eventBus ?? options.components?.eventBus;
+  const streamBridge = options.components?.streamBridge;
+  const eventBus =
+    options.eventBus ??
+    options.components?.eventBus ??
+    (streamBridge ? getGlobalEventBus() : undefined);
   const taskGraph = options.components?.taskGraph ?? createTaskGraphStore();
   const executionObserver = mergeExecutionObservers(
     options.toolExecution?.executionObserver,
@@ -1219,6 +1248,7 @@ export function createOrchestrator(
     skillSession,
     skillPromptAdapter,
     taskGraph,
+    streamBridge,
   };
 
   const orchestrator = new AgentOrchestrator(config, llm, registry, options.telemetry, components);
