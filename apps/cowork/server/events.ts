@@ -33,6 +33,9 @@ export const COWORK_EVENTS = {
 
   // System events
   SYSTEM_HEARTBEAT: "system.heartbeat",
+
+  // Usage events
+  TOKEN_USAGE: "token.usage",
 } as const;
 
 export type CoworkEventType = (typeof COWORK_EVENTS)[keyof typeof COWORK_EVENTS];
@@ -66,6 +69,18 @@ export interface CoworkEventPayloads {
     inputTokens: number;
     outputTokens: number;
     totalTokens: number;
+    totalCostUsd?: number;
+  };
+  [COWORK_EVENTS.TOKEN_USAGE]: {
+    sessionId: string;
+    messageId?: string;
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+    estimatedCostUsd: number;
+    modelId: string;
+    providerId: string;
+    timestamp: number;
   };
   [COWORK_EVENTS.TASK_CREATED]: {
     taskId: string;
