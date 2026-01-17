@@ -266,11 +266,31 @@ export {
 // Prompts - Shared Prompt Templates
 // ============================================================================
 export {
+  // Legacy prompt builders (deprecated)
   buildDigestMapPrompt,
+  // Modern prompt builders (for use with generateObject)
+  buildDigestMapSystemPrompt,
+  buildDigestMapUserPrompt,
   buildDigestReducePrompt,
+  buildDigestReduceSystemPrompt,
+  buildDigestReduceUserPrompt,
   buildVerifierPrompt,
+  buildVerifierSystemPrompt,
+  buildVerifierUserPrompt,
+  type Citation,
+  // Modern Zod schemas
+  CitationSchema,
+  type DigestMapInput,
+  type DigestMapOutput,
+  DigestMapOutputSchema,
   type DigestMapPromptInput,
+  type DigestReduceInput,
+  type DigestReduceOutput,
+  DigestReduceOutputSchema,
   type DigestReducePromptInput,
+  type VerifierInput,
+  type VerifierOutput,
+  VerifierOutputSchema,
   type VerifierPromptInput,
 } from "./prompts";
 // ============================================================================
