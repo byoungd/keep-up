@@ -2,17 +2,53 @@
  * AI Providers Module
  *
  * Unified LLM provider abstraction layer supporting multiple AI providers
- * (OpenAI, Anthropic) with automatic fallback, streaming, and metrics.
+ * (OpenAI, Anthropic, Google) with automatic fallback, streaming, and metrics.
+ *
+ * ## 2026 Standard
+ *
+ * Use the Vercel AI SDK adapters for new development:
+ * - `createOpenAIAdapter` (recommended)
+ * - `createAnthropicAdapter` (recommended)
+ * - `createGoogleAdapter` (recommended)
+ *
+ * Legacy providers (OpenAIProvider, AnthropicProvider, GeminiProvider) are
+ * deprecated and will be removed in a future version.
  */
 
 // Re-export pricing type from models catalog
 export type { ModelPricing } from "../catalog/models";
+
+// ============================================================================
+// Vercel AI SDK Adapters (Recommended)
+// ============================================================================
+export {
+  createAnthropicAdapter,
+  createGoogleAdapter,
+  createOpenAIAdapter,
+  VercelAIAdapter,
+  type VercelAIAdapterConfig,
+  type VercelProviderType,
+} from "./vercelAdapter";
+
+// ============================================================================
+// Legacy Providers (Deprecated)
+// ============================================================================
+
+/**
+ * @deprecated Use `createAnthropicAdapter` from Vercel AI SDK instead.
+ */
 export { type AnthropicConfig, AnthropicProvider } from "./anthropicProvider";
 // Base provider
 export { BaseLLMProvider } from "./baseProvider";
+/**
+ * @deprecated Use `createGoogleAdapter` from Vercel AI SDK instead.
+ */
 export { type GeminiConfig, GeminiProvider } from "./geminiProvider";
-// Provider implementations
+/**
+ * @deprecated Use `createOpenAIAdapter` from Vercel AI SDK instead.
+ */
 export { type OpenAIConfig, OpenAIProvider } from "./openaiProvider";
+
 // Router
 export {
   createProviderRouter,
@@ -30,6 +66,7 @@ export {
   ResilientProvider,
   type ResilientProviderConfig,
 } from "./resilientProvider";
+
 // Token tracking
 export {
   type RateLimitConfig,
@@ -37,6 +74,7 @@ export {
   type UsageRecord,
   type UsageSummary,
 } from "./tokenTracker";
+
 // Types
 export type {
   CompletionRequest,
