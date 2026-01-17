@@ -473,6 +473,23 @@ export interface ToolExecutionRecord {
   error?: string;
 }
 
+// ============================================================================
+// Artifact Types
+// ============================================================================
+
+export type ArtifactType = "PlanCard" | "DiffCard" | "ReportCard" | "ChecklistCard";
+
+export interface ArtifactEnvelope {
+  id: string;
+  type: ArtifactType;
+  schemaVersion: string;
+  title: string;
+  payload: Record<string, unknown>;
+  taskNodeId: string;
+  createdAt: string;
+  renderHints?: Record<string, unknown>;
+}
+
 /** Structured context frame for LLM requests */
 export interface ContextFrame {
   frameId: string;

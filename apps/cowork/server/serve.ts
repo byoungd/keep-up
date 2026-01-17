@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
-import { serveStatic } from "hono/serve-static";
+import { serveStatic } from "@hono/node-server/serve-static";
 import { createCoworkApp } from "./app";
 import { serverConfig } from "./config";
 import { serverLogger } from "./logger";

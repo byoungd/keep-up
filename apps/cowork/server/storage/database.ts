@@ -12,11 +12,12 @@
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import Database from "better-sqlite3";
+import type { Database as DatabaseInstance } from "better-sqlite3";
 import { resolveStateDir } from "./statePaths";
 
-let db: Database | null = null;
+let db: DatabaseInstance | null = null;
 
-export async function getDatabase(): Promise<Database> {
+export async function getDatabase(): Promise<DatabaseInstance> {
   if (db) {
     return db;
   }
@@ -28,8 +29,8 @@ export async function getDatabase(): Promise<Database> {
   db = new Database(dbPath);
 
   // Enable WAL mode for better concurrent access
-  db.run("PRAGMA journal_mode = WAL");
-  db.run("PRAGMA synchronous = NORMAL");
+  db.exec("PRAGMA journal_mode = WAL");
+  db.exec("PRAGMA synchronous = NORMAL");
 
   // Initialize schema
   initSchema(db);
@@ -37,8 +38,8 @@ export async function getDatabase(): Promise<Database> {
   return db;
 }
 
-function initSchema(database: Database): void {
-  database.run(`
+function initSchema(database: DatabaseInstance): void {
+  database.exec(`
     CREATE TABLE IF NOT EXISTS sessions (
       session_id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
@@ -52,7 +53,7 @@ function initSchema(database: Database): void {
     )
   `);
 
-  database.run(`
+  database.exec(`
     CREATE TABLE IF NOT EXISTS tasks (
       task_id TEXT PRIMARY KEY,
       session_id TEXT NOT NULL,
@@ -65,11 +66,11 @@ function initSchema(database: Database): void {
     )
   `);
 
-  database.run(`
+  database.exec(`
     CREATE INDEX IF NOT EXISTS idx_tasks_session ON tasks(session_id)
   `);
 
-  database.run(`
+  database.exec(`
     CREATE TABLE IF NOT EXISTS artifacts (
       artifact_id TEXT PRIMARY KEY,
       session_id TEXT NOT NULL,
@@ -84,15 +85,15 @@ function initSchema(database: Database): void {
     )
   `);
 
-  database.run(`
+  database.exec(`
     CREATE INDEX IF NOT EXISTS idx_artifacts_session ON artifacts(session_id)
   `);
 
-  database.run(`
+  database.exec(`
     CREATE INDEX IF NOT EXISTS idx_artifacts_task ON artifacts(task_id)
   `);
 
-  database.run(`
+  database.exec(`
     CREATE TABLE IF NOT EXISTS approvals (
       approval_id TEXT PRIMARY KEY,
       session_id TEXT NOT NULL,
@@ -107,15 +108,15 @@ function initSchema(database: Database): void {
     )
   `);
 
-  database.run(`
+  database.exec(`
     CREATE INDEX IF NOT EXISTS idx_approvals_session ON approvals(session_id)
   `);
 
-  database.run(`
+  database.exec(`
     CREATE INDEX IF NOT EXISTS idx_approvals_task ON approvals(task_id)
   `);
 
-  database.run(`
+  database.exec(`
     CREATE TABLE IF NOT EXISTS agent_state_checkpoints (
       checkpoint_id TEXT PRIMARY KEY,
       session_id TEXT NOT NULL,
@@ -126,12 +127,12 @@ function initSchema(database: Database): void {
     )
   `);
 
-  database.run(`
+  database.exec(`
     CREATE INDEX IF NOT EXISTS idx_agent_state_checkpoints_session
     ON agent_state_checkpoints(session_id)
   `);
 
-  database.run(`
+  database.exec(`
     CREATE TABLE IF NOT EXISTS projects (
       project_id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -144,18 +145,18 @@ function initSchema(database: Database): void {
   `);
 
   try {
-    database.run("ALTER TABLE sessions ADD COLUMN project_id TEXT");
+    database.exec("ALTER TABLE sessions ADD COLUMN project_id TEXT");
   } catch {
     // Column likely exists
   }
 
   try {
-    database.run("ALTER TABLE approvals ADD COLUMN task_id TEXT");
+    database.exec("ALTER TABLE approvals ADD COLUMN task_id TEXT");
   } catch {
     // Column likely exists
   }
 
-  database.run(`
+  database.exec(`
     CREATE TABLE IF NOT EXISTS settings (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL

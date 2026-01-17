@@ -145,14 +145,14 @@ function buildChatProviders(settings: CoworkSettings): ChatProviderEntry[] {
     geminiEnv?.baseUrl || "https://generativelanguage.googleapis.com/v1beta/openai";
   const providers: ChatProviderEntry[] = [];
 
-  addChatProvider(providers, "openai", openAiKey, () => {
-    return new OpenAIProvider({ apiKey: openAiKey, baseUrl: openaiEnv?.baseUrl });
+  addChatProvider(providers, "openai", openAiKey, (key) => {
+    return new OpenAIProvider({ apiKey: key, baseUrl: openaiEnv?.baseUrl });
   });
-  addChatProvider(providers, "anthropic", anthropicKey, () => {
-    return new AnthropicProvider({ apiKey: anthropicKey, baseUrl: claudeEnv?.baseUrl });
+  addChatProvider(providers, "anthropic", anthropicKey, (key) => {
+    return new AnthropicProvider({ apiKey: key, baseUrl: claudeEnv?.baseUrl });
   });
-  addChatProvider(providers, "gemini", geminiKey, () => {
-    return new GeminiProvider({ apiKey: geminiKey, baseUrl: geminiBaseUrl });
+  addChatProvider(providers, "gemini", geminiKey, (key) => {
+    return new GeminiProvider({ apiKey: key, baseUrl: geminiBaseUrl });
   });
 
   return providers;
@@ -162,12 +162,12 @@ function addChatProvider(
   providers: ChatProviderEntry[],
   name: ChatProviderId,
   apiKey: string | undefined,
-  createProvider: () => LLMProvider
+  createProvider: (key: string) => LLMProvider
 ): void {
   if (!apiKey) {
     return;
   }
-  providers.push({ name, provider: createProvider() });
+  providers.push({ name, provider: createProvider(apiKey) });
 }
 
 function selectChatRouting(

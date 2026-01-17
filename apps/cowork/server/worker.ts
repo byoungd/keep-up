@@ -26,10 +26,10 @@ async function getApp(env: CoworkWorkerEnv) {
 }
 
 export default {
-  async fetch(request: Request, env: CoworkWorkerEnv, _ctx: unknown): Promise<Response> {
+  async fetch(request: Request, env: CoworkWorkerEnv): Promise<Response> {
     try {
       const app = await getApp(env);
-      return app.fetch(request, env, _ctx);
+      return app.fetch(request, env);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Worker initialization failed";
       return new Response(

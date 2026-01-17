@@ -116,6 +116,6 @@ export interface TaskGraph {
   sessionId: string;
   status: TaskStatus;
   nodes: TaskNode[];
-  artifacts: Record<string, ArtifactPayload>; // map of artifactId -> payload
+  artifacts: Record<string, ArtifactPayload & { updatedAt?: number; taskId?: string }>; // map of artifactId -> payload with versioning and task association
   pendingApprovalId?: string;
 }

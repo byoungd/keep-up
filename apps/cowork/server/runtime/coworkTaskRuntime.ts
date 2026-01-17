@@ -697,9 +697,10 @@ function resolveProviderFallback(options: {
   const selectedProviderAvailable = Boolean(
     options.selectedProvider && providerNames.includes(options.selectedProvider)
   );
-  const primary = selectedProviderAvailable
-    ? options.selectedProvider
-    : (providerNames[0] ?? "openai");
+  const primary: CoworkProviderId =
+    selectedProviderAvailable && options.selectedProvider
+      ? options.selectedProvider
+      : (providerNames[0] ?? "openai");
   const fallbackOrder = providerNames.filter((name) => name !== primary);
   const requestedProviderAvailable = Boolean(
     options.preferred && providerNames.includes(options.preferred)
@@ -765,7 +766,7 @@ function convertRequest(request: {
 }): CompletionRequest {
   return {
     model: request.model ?? "",
-    messages: request.messages,
+    messages: request.messages as CompletionRequest["messages"],
     temperature: request.temperature,
     maxTokens: request.maxTokens,
     tools: request.tools?.map((tool) => ({
@@ -794,11 +795,11 @@ function convertResponse(response: CompletionResponse) {
 function convertChunk(chunk: StreamChunk) {
   switch (chunk.type) {
     case "content":
-      return { type: "content", content: chunk.content };
+      return { type: "content" as const, content: chunk.content };
     case "tool_call":
       return chunk.toolCall?.name
         ? {
-            type: "tool_call",
+            type: "tool_call" as const,
             toolCall: {
               id: chunk.toolCall.id ?? crypto.randomUUID(),
               name: chunk.toolCall.name,
@@ -807,9 +808,9 @@ function convertChunk(chunk: StreamChunk) {
           }
         : null;
     case "error":
-      return { type: "error", error: chunk.error ?? "Unknown error" };
+      return { type: "error" as const, error: chunk.error ?? "Unknown error" };
     case "done":
-      return { type: "done" };
+      return { type: "done" as const };
     default:
       return null;
   }
@@ -1041,22 +1042,28 @@ function extractTitle(data: Record<string, unknown> | undefined): string | undef
   return typeof data.task.name === "string" ? data.task.name : undefined;
 }
 
-function buildPlanSteps(rawSteps: unknown): Array<{ id: string; label: string; status: string }> {
+type PlanStep = {
+  id: string;
+  label: string;
+  status: "pending" | "in_progress" | "completed" | "failed";
+};
+
+function buildPlanSteps(rawSteps: unknown): PlanStep[] {
   if (!Array.isArray(rawSteps)) {
     return [];
   }
-  return rawSteps
-    .map((step) => {
-      if (!isRecord(step) || typeof step.id !== "string" || typeof step.description !== "string") {
-        return null;
-      }
-      return {
-        id: step.id,
-        label: step.description,
-        status: mapPlanStatus(step.status),
-      };
-    })
-    .filter((step): step is { id: string; label: string; status: string } => step !== null);
+  const steps: PlanStep[] = [];
+  for (const step of rawSteps) {
+    if (!isRecord(step) || typeof step.id !== "string" || typeof step.description !== "string") {
+      continue;
+    }
+    steps.push({
+      id: step.id,
+      label: step.description,
+      status: mapPlanStatus(step.status),
+    });
+  }
+  return steps;
 }
 
 function mapPlanStatus(status: unknown): "pending" | "in_progress" | "completed" | "failed" {
@@ -1077,7 +1084,7 @@ function extractTaskSummary(data: Record<string, unknown> | undefined): CoworkTa
     return null;
   }
   const summary = data.result.summary;
-  return isRecord(summary) ? (summary as CoworkTaskSummary) : null;
+  return isRecord(summary) ? (summary as unknown as CoworkTaskSummary) : null;
 }
 
 function formatSummary(summary: CoworkTaskSummary): string {

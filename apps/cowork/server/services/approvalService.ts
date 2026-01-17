@@ -41,8 +41,8 @@ export class ApprovalService {
       return pending.promise;
     }
 
-    let resolvePromise: (decision: ApprovalDecision) => void;
-    let rejectPromise: (error: Error) => void;
+    let resolvePromise!: (decision: ApprovalDecision) => void;
+    let rejectPromise!: (error: Error) => void;
     const promise = new Promise<ApprovalDecision>((resolve, reject) => {
       resolvePromise = resolve;
       rejectPromise = reject;

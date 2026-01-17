@@ -267,6 +267,16 @@ export function useTaskStream(sessionId: string) {
   }, [refreshSessionState]);
 
   useEffect(() => {
+    if (isConnected) {
+      const isActiveRef = { current: true };
+      void refreshSessionState(isActiveRef);
+      return () => {
+        isActiveRef.current = false;
+      };
+    }
+  }, [isConnected, refreshSessionState]);
+
+  useEffect(() => {
     if (!isPollingFallback || !sessionId || sessionId === "undefined") {
       return;
     }
@@ -514,7 +524,7 @@ export function useTaskStream(sessionId: string) {
     prev: TaskGraph,
     _id: string,
     data: unknown,
-    _now: string,
+    now: string,
     _taskTitles: Map<string, string>,
     _taskPrompts: Map<string, string>
   ): TaskGraph {
@@ -525,11 +535,24 @@ export function useTaskStream(sessionId: string) {
     if (!parsedArtifact.success || typeof data.id !== "string") {
       return prev;
     }
+
+    const eventTime = new Date(now).getTime();
+    const existing = prev.artifacts[data.id];
+
+    // Version check: only update if newer than current artifact
+    if (existing?.updatedAt && eventTime <= existing.updatedAt) {
+      return prev;
+    }
+
     return {
       ...prev,
       artifacts: {
         ...prev.artifacts,
-        [data.id]: parsedArtifact.data,
+        [data.id]: {
+          ...parsedArtifact.data,
+          updatedAt: eventTime,
+          taskId: typeof data.taskId === "string" ? data.taskId : undefined,
+        },
       },
     };
   }
@@ -643,16 +666,27 @@ export function useTaskStream(sessionId: string) {
   }
 
   function buildArtifactMap(
-    existing: Record<string, ArtifactPayload>,
+    existing: Record<string, ArtifactPayload & { updatedAt?: number; taskId?: string }>,
     records: CoworkArtifact[]
-  ): Record<string, ArtifactPayload> {
+  ): Record<string, ArtifactPayload & { updatedAt?: number; taskId?: string }> {
     const next = { ...existing };
     for (const record of records) {
       const parsed = ArtifactPayloadSchema.safeParse(record.artifact);
       if (!parsed.success) {
         continue;
       }
-      next[record.artifactId] = parsed.data;
+      const existingEntry = next[record.artifactId];
+      // Only update if no existing entry or if the record is newer
+      if (
+        !existingEntry ||
+        (record.updatedAt && record.updatedAt > (existingEntry.updatedAt ?? 0))
+      ) {
+        next[record.artifactId] = {
+          ...parsed.data,
+          updatedAt: record.updatedAt,
+          taskId: record.taskId,
+        };
+      }
     }
     return next;
   }

@@ -52,7 +52,9 @@ export interface ArtifactItem {
   previewUrl?: string;
   content?: string;
   createdAt?: string;
-  /** Optional reference to which step produced this artifact */
+  /** Optional reference to which task produced this artifact */
+  taskId?: string;
+  /** Optional reference to which step produced this artifact (compatibility) */
   stepId?: string;
 }
 

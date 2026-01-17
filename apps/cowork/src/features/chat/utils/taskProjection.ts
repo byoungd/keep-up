@@ -238,7 +238,11 @@ function buildAgentTaskFromGraph(taskNode: TaskStatusNode, graph: TaskGraph): Ag
   // Extract Artifacts
   const allArtifacts = extractArtifactsFromGraph(graph.artifacts);
   const artifacts =
-    taskCount <= 1 ? allArtifacts : allArtifacts.filter((artifact) => artifact.id.includes(taskId));
+    taskCount <= 1
+      ? allArtifacts
+      : allArtifacts.filter(
+          (artifact) => artifact.taskId === taskId || artifact.id.includes(taskId)
+        );
 
   const progress =
     steps.length > 0
@@ -417,17 +421,20 @@ function formatToolName(toolName: string): string {
   return toolName.replace(/[:_]/g, " ").trim();
 }
 
-function extractArtifactsFromGraph(artifacts: Record<string, ArtifactPayload>): ArtifactItem[] {
+function extractArtifactsFromGraph(
+  artifacts: Record<string, ArtifactPayload & { taskId?: string }>
+): ArtifactItem[] {
   return Object.entries(artifacts).map(([id, payload]) => {
+    const base: ArtifactItem = { id, type: "doc", title: "Artifact", taskId: payload.taskId };
     switch (payload.type) {
       case "diff":
-        return { id, type: "diff", title: payload.file, content: payload.diff };
+        return { ...base, type: "diff", title: payload.file, content: payload.diff };
       case "plan":
-        return { id, type: "plan", title: "Plan", content: JSON.stringify(payload.steps) };
+        return { ...base, type: "plan", title: "Plan", content: JSON.stringify(payload.steps) };
       case "markdown":
-        return { id, type: "report", title: "Report", content: payload.content };
+        return { ...base, type: "report", title: "Report", content: payload.content };
       default:
-        return { id, type: "doc", title: "Artifact", content: "" };
+        return base;
     }
   });
 }

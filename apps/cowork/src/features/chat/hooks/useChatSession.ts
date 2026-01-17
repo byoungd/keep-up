@@ -188,15 +188,40 @@ export function useChatSession(sessionId: string | undefined) {
 
   const sendAction = useCallback(
     async (type: "approve" | "reject", metadata: { approvalId: string }) => {
-      const status = type === "approve" ? "approved" : "rejected";
-      await resolveApproval(metadata.approvalId, status);
-
-      // Optimistically update history if there's an "ask" message for this approval
+      // Optimistically update history
       setHistoryMessages((prev) =>
         prev.map((m) =>
-          m.metadata?.approvalId === metadata.approvalId ? { ...m, status: "done" as const } : m
+          m.metadata?.approvalId === metadata.approvalId
+            ? { ...m, status: "pending" as const } // Temporary status if supported, or keep as is but we know it's loading
+            : m
         )
       );
+
+      try {
+        const status = type === "approve" ? "approved" : "rejected";
+        await resolveApproval(metadata.approvalId, status);
+
+        // On success, mark as done
+        setHistoryMessages((prev) =>
+          prev.map((m) =>
+            m.metadata?.approvalId === metadata.approvalId ? { ...m, status: "done" as const } : m
+          )
+        );
+      } catch (error) {
+        console.error("Failed to resolve approval:", error);
+        const errorMessage = error instanceof Error ? error.message : "Action failed";
+
+        // Rollback / Show error
+        setHistoryMessages((prev) =>
+          prev.map((m) =>
+            m.metadata?.approvalId === metadata.approvalId
+              ? { ...m, status: "error" as const, metadata: { ...m.metadata, error: errorMessage } }
+              : m
+          )
+        );
+        // Re-throw to let caller handle generic alerts if needed
+        throw error;
+      }
     },
     []
   );

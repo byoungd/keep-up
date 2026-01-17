@@ -107,7 +107,7 @@ export async function migrateJsonToSqlite(
     VALUES ($key, $value)
   `);
 
-  db.run("BEGIN");
+  db.exec("BEGIN");
   try {
     for (const session of sessions) {
       insertSession.run({
@@ -177,9 +177,9 @@ export async function migrateJsonToSqlite(
       insertSetting.run({ $key: key, $value: value });
     }
 
-    db.run("COMMIT");
+    db.exec("COMMIT");
   } catch (error) {
-    db.run("ROLLBACK");
+    db.exec("ROLLBACK");
     throw error;
   }
 

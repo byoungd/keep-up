@@ -39,7 +39,7 @@ const DEFAULT_SEGMENT_BUDGETS: Record<ContextSegmentType, number> = {
  * for LLM requests with limited context windows.
  */
 export class ContextWindowManager {
-  private readonly config: Required<ContextWindowConfig>;
+  private readonly config: Omit<Required<ContextWindowConfig>, "tokenCounter">;
   private readonly segmentBudgets: Record<ContextSegmentType, number>;
   private readonly tokenCounter: TokenCounter;
 
@@ -51,7 +51,6 @@ export class ContextWindowManager {
       maxTokens: config.maxTokens ?? modelLimits.maxContextTokens,
       outputReserve: config.outputReserve ?? modelLimits.recommendedOutputReserve,
       segmentBudgets: config.segmentBudgets ?? {},
-      tokenCounter: config.tokenCounter,
     };
 
     this.tokenCounter = config.tokenCounter ?? { countTokens: estimateTokens };

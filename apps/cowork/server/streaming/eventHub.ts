@@ -28,7 +28,7 @@ class EventBuffer {
   private readonly events: CoworkEvent[] = [];
   private nextId = 1;
 
-  constructor(limit = 100) {
+  constructor(limit = 1000) {
     this.limit = limit;
   }
 

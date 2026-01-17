@@ -6,7 +6,7 @@
  */
 
 import { getLogger } from "../logging/logger.js";
-import type { ExecutionDecision, ToolExecutionRecord } from "../types";
+import type { ArtifactEnvelope, ExecutionDecision, ToolExecutionRecord } from "../types";
 
 const logger = getLogger("event-bus");
 
@@ -198,13 +198,30 @@ export interface ExecutionEvents {
   "execution:record": ToolExecutionRecord;
 }
 
+/** Artifact lifecycle events */
+export interface ArtifactEvents {
+  "artifact:emitted": {
+    artifact: ArtifactEnvelope;
+    stored: boolean;
+    valid: boolean;
+    errors?: string[];
+    artifactNodeId?: string;
+  };
+  "artifact:quarantined": {
+    artifact: ArtifactEnvelope;
+    errors: string[];
+    artifactNodeId?: string;
+  };
+}
+
 /** Combined event map */
 export interface RuntimeEventMap
   extends AgentEvents,
     ToolEvents,
     PluginEvents,
     SystemEvents,
-    ExecutionEvents {
+    ExecutionEvents,
+    ArtifactEvents {
   // Allow custom events with string index
   [key: string]: unknown;
 }

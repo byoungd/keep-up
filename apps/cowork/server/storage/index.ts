@@ -15,6 +15,7 @@ import { createSqliteAgentStateStore } from "./sqliteAgentStateStore";
 import { createSqliteApprovalStore } from "./sqliteApprovalStore";
 import { createSqliteArtifactStore } from "./sqliteArtifactStore";
 import { createSqliteConfigStore } from "./sqliteConfigStore";
+import { createSqliteProjectStore } from "./sqliteProjectStore";
 import { createSqliteSessionStore } from "./sqliteSessionStore";
 import { createSqliteTaskStore } from "./sqliteTaskStore";
 import { ensureStateDir } from "./statePaths";

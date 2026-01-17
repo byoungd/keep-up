@@ -4,7 +4,23 @@ import type {
   GatewayGenerationStart,
   GatewayTelemetryAdapter,
   GatewayTelemetryGeneration,
+  GatewayTelemetryLevel,
 } from "./telemetry";
+
+type LangfuseLevel = "DEBUG" | "DEFAULT" | "WARNING" | "ERROR";
+
+function toLangfuseLevel(level: GatewayTelemetryLevel | undefined): LangfuseLevel | undefined {
+  if (!level) {
+    return undefined;
+  }
+  const mapping: Record<GatewayTelemetryLevel, LangfuseLevel> = {
+    DEBUG: "DEBUG",
+    INFO: "DEFAULT",
+    WARN: "WARNING",
+    ERROR: "ERROR",
+  };
+  return mapping[level];
+}
 
 function toLangfuseUsage(result: GatewayGenerationResult) {
   if (!result.usage) {
@@ -40,7 +56,7 @@ export function createLangfuseGatewayTelemetryAdapter(): GatewayTelemetryAdapter
             model: result.model,
             metadata: result.metadata,
             statusMessage: result.statusMessage,
-            level: result.level,
+            level: toLangfuseLevel(result.level),
           });
         },
       };

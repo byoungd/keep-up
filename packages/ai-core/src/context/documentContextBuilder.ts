@@ -56,7 +56,7 @@ export interface DocumentContext {
  * optimizing for cursor position and selection.
  */
 export class DocumentContextBuilder {
-  private readonly config: Required<DocumentContextBuilderConfig>;
+  private readonly config: Omit<Required<DocumentContextBuilderConfig>, "tokenCounter">;
   private readonly tokenCounter: TokenCounter;
 
   constructor(config: DocumentContextBuilderConfig = {}) {
@@ -65,7 +65,6 @@ export class DocumentContextBuilder {
       linesBefore: config.linesBefore ?? 50,
       linesAfter: config.linesAfter ?? 20,
       includeStructure: config.includeStructure ?? true,
-      tokenCounter: config.tokenCounter,
     };
     this.tokenCounter = config.tokenCounter ?? { countTokens: estimateTokens };
   }

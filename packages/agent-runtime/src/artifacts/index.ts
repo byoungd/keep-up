@@ -5,19 +5,9 @@
  */
 
 import { z } from "zod";
-
-export type ArtifactType = "PlanCard" | "DiffCard" | "ReportCard" | "ChecklistCard";
-
-export interface ArtifactEnvelope {
-  id: string;
-  type: ArtifactType;
-  schemaVersion: string;
-  title: string;
-  payload: Record<string, unknown>;
-  taskNodeId: string;
-  createdAt: string;
-  renderHints?: Record<string, unknown>;
-}
+import type { RuntimeEventBus } from "../events/eventBus";
+import type { TaskGraphStore } from "../tasks/taskGraph";
+import type { ArtifactEnvelope, ArtifactType } from "../types";
 
 export interface ArtifactValidationResult {
   valid: boolean;
@@ -38,6 +28,8 @@ export interface QuarantinedArtifact {
   artifact: ArtifactEnvelope;
   errors: string[];
 }
+
+export type { ArtifactEnvelope, ArtifactType };
 
 export class ArtifactRegistry {
   private readonly schemas = new Map<string, ArtifactSchema>();
@@ -91,6 +83,132 @@ export class ArtifactRegistry {
   }
 }
 
+export interface ArtifactEmissionContext {
+  correlationId?: string;
+  source?: string;
+  idempotencyKey?: string;
+}
+
+export interface ArtifactEmissionResult extends ArtifactStoreResult {
+  artifactNodeId?: string;
+}
+
+export interface ArtifactPipelineConfig {
+  registry: ArtifactRegistry;
+  taskGraph?: TaskGraphStore;
+  eventBus?: RuntimeEventBus;
+  eventSource?: string;
+}
+
+export class ArtifactPipeline {
+  private readonly registry: ArtifactRegistry;
+  private readonly taskGraph?: TaskGraphStore;
+  private readonly eventBus?: RuntimeEventBus;
+  private readonly eventSource?: string;
+
+  constructor(config: ArtifactPipelineConfig) {
+    this.registry = config.registry;
+    this.taskGraph = config.taskGraph;
+    this.eventBus = config.eventBus;
+    this.eventSource = config.eventSource;
+  }
+
+  emit(artifact: ArtifactEnvelope, context: ArtifactEmissionContext = {}): ArtifactEmissionResult {
+    const result = this.registry.store(artifact);
+    const artifactNodeId = this.recordTaskGraph(artifact, result, context);
+    this.emitEventBus(artifact, result, artifactNodeId, context);
+
+    return { ...result, artifactNodeId };
+  }
+
+  private recordTaskGraph(
+    artifact: ArtifactEnvelope,
+    result: ArtifactStoreResult,
+    context: ArtifactEmissionContext
+  ): string | undefined {
+    if (!this.taskGraph) {
+      return undefined;
+    }
+
+    const status = result.stored ? "completed" : "failed";
+    const node = this.taskGraph.createNode({
+      type: "artifact",
+      title: artifact.title,
+      status,
+      dependsOn: artifact.taskNodeId ? [artifact.taskNodeId] : undefined,
+      artifactId: artifact.id,
+    });
+
+    try {
+      this.taskGraph.recordNodeEvent(
+        node.id,
+        "artifact_emitted",
+        {
+          artifact,
+          stored: result.stored,
+          valid: result.valid,
+          errors: result.errors,
+        },
+        {
+          correlationId: context.correlationId,
+          source: context.source,
+          idempotencyKey: context.idempotencyKey ?? artifact.id,
+        }
+      );
+    } catch {
+      // Avoid breaking artifact emission on task graph errors.
+    }
+
+    return node.id;
+  }
+
+  private emitEventBus(
+    artifact: ArtifactEnvelope,
+    result: ArtifactStoreResult,
+    artifactNodeId: string | undefined,
+    context: ArtifactEmissionContext
+  ): void {
+    if (!this.eventBus) {
+      return;
+    }
+
+    const source = context.source ?? this.eventSource;
+    const correlationId = context.correlationId;
+
+    this.eventBus.emit(
+      "artifact:emitted",
+      {
+        artifact,
+        stored: result.stored,
+        valid: result.valid,
+        errors: result.errors,
+        artifactNodeId,
+      },
+      {
+        source,
+        correlationId,
+        priority: "normal",
+      }
+    );
+
+    if (!result.stored) {
+      this.eventBus.emit(
+        "artifact:quarantined",
+        {
+          artifact,
+          errors: result.errors ?? ["Unknown validation error"],
+          artifactNodeId,
+        },
+        {
+          source,
+          correlationId,
+          priority: "normal",
+        }
+      );
+    }
+  }
+}
+
 export function createArtifactRegistry({
   registerDefaults = true,
 }: { registerDefaults?: boolean } = {}): ArtifactRegistry {
@@ -99,6 +217,10 @@ export function createArtifactRegistry({
     registerDefaultSchemas(registry);
   }
   return registry;
+}
+
+export function createArtifactPipeline(config: ArtifactPipelineConfig): ArtifactPipeline {
+  return new ArtifactPipeline(config);
 }
 
 const planStepSchema = z.object({
