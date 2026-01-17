@@ -9,6 +9,9 @@ import {
   createToolRegistry,
   createWebSearchToolServer,
 } from "@ku0/agent-runtime";
+// Future integrations available:
+// import { createGhostAgent, type GhostAgent } from "@ku0/agent-runtime";
+// import { createMem0MemoryAdapter, type Mem0MemoryAdapter } from "@ku0/agent-runtime";
 import { normalizeModelId } from "@ku0/ai-core";
 import { ApprovalService } from "../services/approvalService";
 import { ProviderKeyService } from "../services/providerKeyService";
@@ -62,6 +65,10 @@ export class CoworkTaskRuntime {
   private readonly projectContextManager: ProjectContextManager;
   private readonly providerKeys: ProviderKeyService;
   private readonly configStore: StorageLayer["configStore"];
+
+  // Optional Advanced Services (available when enabled)
+  // private memoryAdapter?: Mem0MemoryAdapter;
+  // private ghostAgent?: GhostAgent;
 
   constructor(deps: {
     storage: StorageLayer;
