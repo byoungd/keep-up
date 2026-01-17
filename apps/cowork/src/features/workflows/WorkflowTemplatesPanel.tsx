@@ -455,7 +455,11 @@ export function WorkflowTemplatesPanel({
   onRunTemplate,
 }: {
   onClose: () => void;
-  onRunTemplate: (prompt: string, mode: AgentMode) => Promise<void>;
+  onRunTemplate: (
+    prompt: string,
+    mode: AgentMode,
+    metadata?: Record<string, unknown>
+  ) => Promise<void>;
 }) {
   const { sessionId } = useParams({ strict: false }) as { sessionId?: string };
   const resolvedSessionId = sessionId && sessionId !== "undefined" ? sessionId : undefined;
@@ -637,7 +641,14 @@ export function WorkflowTemplatesPanel({
           template.templateId === result.template.templateId ? result.template : template
         )
       );
-      await onRunTemplate(result.prompt, selectedTemplate.mode);
+      await onRunTemplate(result.prompt, result.template.mode, {
+        workflowTemplate: {
+          templateId: result.template.templateId,
+          name: result.template.name,
+          version: result.template.version,
+          mode: result.template.mode,
+        },
+      });
       setSuccessMessage("Template launched.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to run template.";

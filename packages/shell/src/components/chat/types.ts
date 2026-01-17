@@ -75,6 +75,7 @@ export interface AgentTask {
   modelId?: string;
   providerId?: string;
   fallbackNotice?: string;
+  metadata?: Record<string, unknown>;
   // Stats for display
   filesChanged?: number;
   linesAdded?: number;

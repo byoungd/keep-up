@@ -66,6 +66,7 @@ export interface CoworkTask {
   modelId?: string;
   providerId?: string;
   fallbackNotice?: string;
+  metadata?: Record<string, unknown>;
   plan?: CoworkTaskPlan;
   createdAt: number;
   updatedAt: number;

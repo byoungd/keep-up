@@ -189,7 +189,13 @@ export class CoworkTaskRuntime {
    */
   async enqueueTask(
     sessionId: string,
-    task: { prompt: string; title?: string; modelId?: string; files?: string[] }
+    task: {
+      prompt: string;
+      title?: string;
+      modelId?: string;
+      files?: string[];
+      metadata?: Record<string, unknown>;
+    }
   ) {
     const session = await this.getSessionOrThrow(sessionId);
     const settings = await this.configStore.get();
@@ -200,6 +206,7 @@ export class CoworkTaskRuntime {
     const taskId = await runtime.runtime.enqueueTask(task.prompt, task.title);
     runtime.activeTaskId = taskId;
     const now = Date.now();
+    const metadata = this.buildTaskMetadata(task.metadata, runtime.contextPackKey);
     const taskRecord: CoworkTask = {
       taskId,
       sessionId,
@@ -209,6 +216,7 @@ export class CoworkTaskRuntime {
       modelId: task.modelId ?? runtime.modelId ?? undefined,
       providerId: runtime.providerId ?? undefined,
       fallbackNotice: runtime.fallbackNotice ?? undefined,
+      metadata,
       createdAt: now,
       updatedAt: now,
     };
@@ -443,6 +451,17 @@ export class CoworkTaskRuntime {
     }
     const nextPackKey = await this.projectContextManager.getContextPackKey(session);
     return nextPackKey !== runtime.contextPackKey;
+  }
+
+  private buildTaskMetadata(
+    input: Record<string, unknown> | undefined,
+    contextPackKey: string | null
+  ): Record<string, unknown> | undefined {
+    const metadata = input ? { ...input } : {};
+    if (contextPackKey && metadata.contextPackKey === undefined) {
+      metadata.contextPackKey = contextPackKey;
+    }
+    return Object.keys(metadata).length > 0 ? metadata : undefined;
   }
 
   private async registerExecutionTools(input: {
