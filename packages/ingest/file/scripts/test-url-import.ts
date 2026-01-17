@@ -4,6 +4,21 @@
 
 import { FileImporter } from "../src";
 
+function writeLine(line: string): void {
+  process.stdout.write(line.endsWith("\n") ? line : `${line}\n`);
+}
+
+function writeErrorLine(line: string): void {
+  process.stderr.write(line.endsWith("\n") ? line : `${line}\n`);
+}
+
+function formatError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.stack ?? error.message;
+  }
+  return String(error);
+}
+
 // Public test files
 const TEST_URLS = {
   // GitHub raw markdown files
@@ -17,65 +32,67 @@ const TEST_URLS = {
 };
 
 async function testMarkdown() {
-  console.log("\n📝 Testing Markdown import from GitHub...");
+  writeLine("\n📝 Testing Markdown import from GitHub...");
   const importer = new FileImporter();
 
   try {
     const result = await importer.importFromUrl(TEST_URLS.markdown);
-    console.log("✅ Markdown import successful!");
-    console.log(`   Title: ${result.title}`);
-    console.log(`   Content length: ${result.content.length} chars`);
-    console.log(`   SourceId: ${result.sourceId}`);
-    console.log(`   Preview: ${result.content.slice(0, 200)}...`);
+    writeLine("✅ Markdown import successful!");
+    writeLine(`   Title: ${result.title}`);
+    writeLine(`   Content length: ${result.content.length} chars`);
+    writeLine(`   SourceId: ${result.sourceId}`);
+    writeLine(`   Preview: ${result.content.slice(0, 200)}...`);
   } catch (error) {
-    console.error("❌ Markdown import failed:", error);
+    writeErrorLine(`❌ Markdown import failed: ${formatError(error)}`);
   }
 }
 
 async function testTxt() {
-  console.log("\n📄 Testing TXT import from Project Gutenberg...");
+  writeLine("\n📄 Testing TXT import from Project Gutenberg...");
   const importer = new FileImporter();
 
   try {
     const result = await importer.importFromUrl(TEST_URLS.txt, {
       maxFileSize: 10 * 1024 * 1024,
     });
-    console.log("✅ TXT import successful!");
-    console.log(`   Title: ${result.title}`);
-    console.log(`   Content length: ${result.content.length} chars`);
-    console.log(`   Preview: ${result.content.slice(0, 300)}...`);
+    writeLine("✅ TXT import successful!");
+    writeLine(`   Title: ${result.title}`);
+    writeLine(`   Content length: ${result.content.length} chars`);
+    writeLine(`   Preview: ${result.content.slice(0, 300)}...`);
   } catch (error) {
-    console.error("❌ TXT import failed:", error);
+    writeErrorLine(`❌ TXT import failed: ${formatError(error)}`);
   }
 }
 
 async function testPdf() {
-  console.log("\n📕 Testing PDF import from Mozilla PDF.js...");
+  writeLine("\n📕 Testing PDF import from Mozilla PDF.js...");
   const importer = new FileImporter();
 
   try {
     const result = await importer.importFromUrl(TEST_URLS.pdf, {
       timeout: 60000, // PDF might be larger
     });
-    console.log("✅ PDF import successful!");
-    console.log(`   Title: ${result.title}`);
-    console.log(`   Content length: ${result.content.length} chars`);
-    console.log(`   Preview: ${result.content.slice(0, 300)}...`);
+    writeLine("✅ PDF import successful!");
+    writeLine(`   Title: ${result.title}`);
+    writeLine(`   Content length: ${result.content.length} chars`);
+    writeLine(`   Preview: ${result.content.slice(0, 300)}...`);
   } catch (error) {
-    console.error("❌ PDF import failed:", error);
+    writeErrorLine(`❌ PDF import failed: ${formatError(error)}`);
   }
 }
 
 async function main() {
-  console.log("🚀 Testing URL Import Feature\n");
-  console.log("=".repeat(50));
+  writeLine("🚀 Testing URL Import Feature\n");
+  writeLine("=".repeat(50));
 
   await testMarkdown();
   await testTxt();
   await testPdf();
 
-  console.log(`\n${"=".repeat(50)}`);
-  console.log("✨ All tests completed!");
+  writeLine(`\n${"=".repeat(50)}`);
+  writeLine("✨ All tests completed!");
 }
 
-main().catch(console.error);
+main().catch((error) => {
+  writeErrorLine(`Unhandled error: ${formatError(error)}`);
+});

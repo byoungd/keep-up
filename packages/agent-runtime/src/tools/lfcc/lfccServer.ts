@@ -9,8 +9,11 @@
 
 import type { ContentChunk, DataAccessPolicy } from "@ku0/core";
 import { applyDataAccessPolicyToChunks } from "@ku0/core";
+import { getLogger } from "../../logging/logger.js";
 import type { MCPToolResult, ToolContext } from "../../types";
 import { BaseToolServer, errorResult, textResult } from "../mcp/baseServer";
+
+const logger = getLogger("lfcc-tool");
 
 // ============================================================================
 // LFCC Bridge Interface (dependency injection)
@@ -171,7 +174,7 @@ function applyDataAccessPolicyToBlocks(
     const keptIds = new Set(filteredChunks.map((chunk) => chunk.block_id));
     const omitted = chunks.filter((chunk) => !keptIds.has(chunk.block_id)).map((c) => c.block_id);
     if (omitted.length > 0) {
-      console.info("[LFCC][data-access] Omitted blocks from context", {
+      logger.info("Omitted blocks from context", {
         omitted,
         total: chunks.length,
         kept: filteredChunks.length,

@@ -5,6 +5,7 @@
  * Uses IndexedDB to store pending files for reload resilience.
  */
 
+import { observability } from "@ku0/core";
 import { computeHash, getAssetStore } from "../AssetStore";
 import {
   deletePendingFile,
@@ -14,6 +15,8 @@ import {
   storePendingFile,
 } from "../PendingFileStore";
 import type { IngestorFn, IngestResult } from "../types";
+
+const logger = observability.getLogger();
 
 /** Generate a simple hash from content for deduplication */
 function hashContent(content: string): string {
@@ -125,7 +128,10 @@ export async function getPendingFileCount(): Promise<number> {
  */
 export async function registerFile(file: File): Promise<string> {
   // Clean up stale files periodically
-  idbCleanup().catch(console.error);
+  idbCleanup().catch((error) => {
+    const err = error instanceof Error ? error : new Error(String(error));
+    logger.error("ingest", "Failed to cleanup pending file ingest records", err);
+  });
 
   return storePendingFile(file);
 }

@@ -24,6 +24,21 @@ import {
   type IngestNormalizationStats,
 } from "../src";
 
+function writeLine(line: string): void {
+  process.stdout.write(line.endsWith("\n") ? line : `${line}\n`);
+}
+
+function writeErrorLine(line: string): void {
+  process.stderr.write(line.endsWith("\n") ? line : `${line}\n`);
+}
+
+function formatError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.stack ?? error.message;
+  }
+  return String(error);
+}
+
 // ============================================================================
 // Quality Gate Thresholds
 // ============================================================================
@@ -267,7 +282,7 @@ async function runPdfIngestTests(quickMode: boolean): Promise<PdfIngestReport> {
   // Filter fixtures based on mode
   const fixtures = quickMode ? PDF_FIXTURES.filter((f) => f.quick) : PDF_FIXTURES;
 
-  console.log(`  Running ${fixtures.length} fixtures...\n`);
+  writeLine(`  Running ${fixtures.length} fixtures...\n`);
 
   for (const fixture of fixtures) {
     const startTime = Date.now();
@@ -312,7 +327,7 @@ async function runPdfIngestTests(quickMode: boolean): Promise<PdfIngestReport> {
         !fixture.expectedMinChars || stats.totalChars >= fixture.expectedMinChars;
       const success = gatePassed && meetsMinChars;
 
-      console.log(
+      writeLine(
         `${success ? "✓" : "✗"} ${durationMs}ms (${stats.totalChars} chars, ${stats.totalParagraphs} paras)`
       );
 
@@ -332,7 +347,7 @@ async function runPdfIngestTests(quickMode: boolean): Promise<PdfIngestReport> {
       const errorMsg = error instanceof Error ? error.message : String(error);
       const isTimeout = errorMsg.includes("Timeout") || errorMsg.includes("timeout");
 
-      console.log(`✗ ERROR (${durationMs}ms): ${errorMsg.slice(0, 50)}...`);
+      writeLine(`✗ ERROR (${durationMs}ms): ${errorMsg.slice(0, 50)}...`);
 
       const emptyStats: IngestNormalizationStats = {
         totalChars: 0,
@@ -401,27 +416,27 @@ async function runPdfIngestTests(quickMode: boolean): Promise<PdfIngestReport> {
 // ============================================================================
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: test report logic
 function printHumanReport(report: PdfIngestReport): void {
-  console.log(`\n${"=".repeat(80)}`);
-  console.log("📥 PDF INGEST TEST REPORT");
-  console.log("=".repeat(80));
-  console.log(`Timestamp: ${report.timestamp}`);
-  console.log(`Node: ${report.environment.nodeVersion}, Platform: ${report.environment.platform}`);
-  console.log(`Mode: ${report.summary.quickMode ? "QUICK (PR gate)" : "FULL (nightly)"}`);
-  console.log(`Summary: ${report.summary.passed}/${report.summary.total} passed`);
+  writeLine(`\n${"=".repeat(80)}`);
+  writeLine("📥 PDF INGEST TEST REPORT");
+  writeLine("=".repeat(80));
+  writeLine(`Timestamp: ${report.timestamp}`);
+  writeLine(`Node: ${report.environment.nodeVersion}, Platform: ${report.environment.platform}`);
+  writeLine(`Mode: ${report.summary.quickMode ? "QUICK (PR gate)" : "FULL (nightly)"}`);
+  writeLine(`Summary: ${report.summary.passed}/${report.summary.total} passed`);
 
   if (!report.summary.quickMode) {
-    console.log(
+    writeLine(
       `Gate: ${report.summary.gatedFailures} failures, ${report.summary.withWarnings} with warnings`
     );
-    console.log(
+    writeLine(
       `Thresholds: frag<${QUALITY_THRESHOLDS.maxFragmentationRatio * 100}%, nonASCII<${QUALITY_THRESHOLDS.maxNonAsciiRatio * 100}%, avgPara>${QUALITY_THRESHOLDS.minAvgParagraphLength}`
     );
   }
 
   // Summary table
-  console.log("\n┌────────────────────────┬────────┬────────┬────────┬────────┬──────┬─────────┐");
-  console.log("│ Fixture                │ Chars  │ Words  │ Paras  │ Frag%  │ Warn │ Status  │");
-  console.log("├────────────────────────┼────────┼────────┼────────┼────────┼──────┼─────────┤");
+  writeLine("\n┌────────────────────────┬────────┬────────┬────────┬────────┬──────┬─────────┐");
+  writeLine("│ Fixture                │ Chars  │ Words  │ Paras  │ Frag%  │ Warn │ Status  │");
+  writeLine("├────────────────────────┼────────┼────────┼────────┼────────┼──────┼─────────┤");
 
   for (const r of report.results) {
     const chars =
@@ -437,53 +452,51 @@ function printHumanReport(report: PdfIngestReport): void {
     const regMark = r.regression ? "[R]" : "";
     const status = r.success ? "✅ PASS" : "❌ FAIL";
 
-    console.log(
+    writeLine(
       `│ ${(r.fixture + regMark).padEnd(22)} │ ${chars.padStart(6)} │ ${words.padStart(6)} │ ${String(r.stats.totalParagraphs).padStart(6)} │ ${frag.padStart(6)} │ ${warn.padStart(4)} │ ${status.padEnd(7)} │`
     );
   }
 
-  console.log("└────────────────────────┴────────┴────────┴────────┴────────┴──────┴─────────┘");
+  writeLine("└────────────────────────┴────────┴────────┴────────┴────────┴──────┴─────────┘");
 
   // Warnings detail
   const withWarnings = report.results.filter((r) => r.warnings && r.warnings.length > 0);
   if (withWarnings.length > 0) {
-    console.log("\n⚠️  WARNINGS:");
+    writeLine("\n⚠️  WARNINGS:");
     for (const r of withWarnings) {
-      console.log(`   ${r.fixture}: ${r.warnings?.join(", ")}`);
+      writeLine(`   ${r.fixture}: ${r.warnings?.join(", ")}`);
     }
   }
 
   // Gate failures detail
   const gateFailures = report.results.filter((r) => r.gated && !r.gated.passed);
   if (gateFailures.length > 0) {
-    console.log("\n🚫 GATE FAILURES:");
+    writeLine("\n🚫 GATE FAILURES:");
     for (const r of gateFailures) {
-      console.log(
-        `   ${r.fixture}: ${r.gated?.failureReason} (${r.gated?.details || "no details"})`
-      );
+      writeLine(`   ${r.fixture}: ${r.gated?.failureReason} (${r.gated?.details || "no details"})`);
     }
   }
 
   // Other failures
   const otherFailures = report.results.filter((r) => !r.success && (!r.gated || r.gated.passed));
   if (otherFailures.length > 0) {
-    console.log("\n❌ FAILURES:");
+    writeLine("\n❌ FAILURES:");
     for (const f of otherFailures) {
-      console.log(`   ${f.fixture}: ${f.error || "unknown error"}`);
+      writeLine(`   ${f.fixture}: ${f.error || "unknown error"}`);
     }
   }
 
   // Performance
   const totalDuration = report.results.reduce((sum, r) => sum + r.durationMs, 0);
   const avgDuration = report.results.length > 0 ? totalDuration / report.results.length : 0;
-  console.log(`\n⏱️  Performance: Total ${totalDuration}ms, Avg ${avgDuration.toFixed(0)}ms`);
+  writeLine(`\n⏱️  Performance: Total ${totalDuration}ms, Avg ${avgDuration.toFixed(0)}ms`);
 
   // CI gate result
   if (report.summary.failed > 0) {
-    console.log("\n🚨 CI GATE: FAILED");
+    writeLine("\n🚨 CI GATE: FAILED");
     process.exitCode = 1;
   } else {
-    console.log("\n✅ CI GATE: PASSED");
+    writeLine("\n✅ CI GATE: PASSED");
   }
 }
 
@@ -495,7 +508,7 @@ function outputJsonReport(report: PdfIngestReport): void {
 
   const outputPath = join(artifactsDir, "pdf-ingest-report.json");
   writeFileSync(outputPath, JSON.stringify(report, null, 2));
-  console.log(`\nJSON report written to: ${outputPath}`);
+  writeLine(`\nJSON report written to: ${outputPath}`);
 }
 
 // ============================================================================
@@ -506,9 +519,9 @@ async function main(): Promise<void> {
   const isJsonMode = process.argv.includes("--json");
   const isQuickMode = process.argv.includes("--quick");
 
-  console.log("📥 PDF Ingest Test Suite\n");
-  console.log(`Mode: ${isQuickMode ? "QUICK (PR gate)" : "FULL (nightly)"}`);
-  console.log("Testing parsing quality and consistency...\n");
+  writeLine("📥 PDF Ingest Test Suite\n");
+  writeLine(`Mode: ${isQuickMode ? "QUICK (PR gate)" : "FULL (nightly)"}`);
+  writeLine("Testing parsing quality and consistency...\n");
 
   try {
     const report = await runPdfIngestTests(isQuickMode);
@@ -519,12 +532,12 @@ async function main(): Promise<void> {
 
     printHumanReport(report);
   } catch (error) {
-    console.error("\n❌ FATAL ERROR:", error);
+    writeErrorLine(`\n❌ FATAL ERROR: ${formatError(error)}`);
     process.exitCode = 1;
   }
 }
 
 main().catch((error) => {
-  console.error("Unhandled error:", error);
+  writeErrorLine(`Unhandled error: ${formatError(error)}`);
   process.exitCode = 1;
 });

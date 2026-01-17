@@ -128,7 +128,6 @@ export function Sheet({
             )}
 
             {/* Sheet */}
-            {/* biome-ignore lint/a11y/useSemanticElements: Using motion.div for slide animation */}
             <motion.div
               role="dialog"
               aria-modal={showBackdrop}

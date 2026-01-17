@@ -27,6 +27,21 @@ import {
   type RssIngestStats,
 } from "../src/rssStats";
 
+function writeLine(line: string): void {
+  process.stdout.write(line.endsWith("\n") ? line : `${line}\n`);
+}
+
+function writeErrorLine(line: string): void {
+  process.stderr.write(line.endsWith("\n") ? line : `${line}\n`);
+}
+
+function formatError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.stack ?? error.message;
+  }
+  return String(error);
+}
+
 // ============================================================================
 // Quality Gate Thresholds
 // ============================================================================
@@ -374,7 +389,7 @@ async function runRssIngestTests(quickMode: boolean): Promise<RssIngestReport> {
   // Filter fixtures based on mode
   const fixtures = quickMode ? RSS_FIXTURES.filter((f) => f.quick) : RSS_FIXTURES;
 
-  console.log(`  Running ${fixtures.length} fixtures...\n`);
+  writeLine(`  Running ${fixtures.length} fixtures...\n`);
 
   for (const fixture of fixtures) {
     const startTime = Date.now();
@@ -409,7 +424,7 @@ async function runRssIngestTests(quickMode: boolean): Promise<RssIngestReport> {
         !fixture.expectedMinItems || stats.totalItems >= fixture.expectedMinItems;
       const success = gatePassed && meetsMinItems;
 
-      console.log(
+      writeLine(
         `${success ? "✓" : "✗"} ${durationMs}ms (${stats.totalItems} items, ${stats.avgContentLength} avg chars)`
       );
 
@@ -430,7 +445,7 @@ async function runRssIngestTests(quickMode: boolean): Promise<RssIngestReport> {
       const isTimeout = errorMsg.includes("Timeout") || errorMsg.includes("timeout");
       const isFetchError = errorMsg.includes("fetch") || errorMsg.includes("ENOTFOUND");
 
-      console.log(`✗ ERROR (${durationMs}ms): ${errorMsg.slice(0, 60)}...`);
+      writeLine(`✗ ERROR (${durationMs}ms): ${errorMsg.slice(0, 60)}...`);
 
       const emptyStats: RssIngestStats = {
         totalItems: 0,
@@ -498,27 +513,27 @@ async function runRssIngestTests(quickMode: boolean): Promise<RssIngestReport> {
 // ============================================================================
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: test report logic
 function printHumanReport(report: RssIngestReport): void {
-  console.log(`\n${"=".repeat(80)}`);
-  console.log("📡 RSS INGEST TEST REPORT");
-  console.log("=".repeat(80));
-  console.log(`Timestamp: ${report.timestamp}`);
-  console.log(`Node: ${report.environment.nodeVersion}, Platform: ${report.environment.platform}`);
-  console.log(`Mode: ${report.summary.quickMode ? "QUICK (PR gate)" : "FULL (nightly)"}`);
-  console.log(`Summary: ${report.summary.passed}/${report.summary.total} passed`);
+  writeLine(`\n${"=".repeat(80)}`);
+  writeLine("📡 RSS INGEST TEST REPORT");
+  writeLine("=".repeat(80));
+  writeLine(`Timestamp: ${report.timestamp}`);
+  writeLine(`Node: ${report.environment.nodeVersion}, Platform: ${report.environment.platform}`);
+  writeLine(`Mode: ${report.summary.quickMode ? "QUICK (PR gate)" : "FULL (nightly)"}`);
+  writeLine(`Summary: ${report.summary.passed}/${report.summary.total} passed`);
 
   if (!report.summary.quickMode) {
-    console.log(
+    writeLine(
       `Gate: ${report.summary.gatedFailures} failures, ${report.summary.withWarnings} with warnings`
     );
-    console.log(
+    writeLine(
       `Thresholds: content>${QUALITY_THRESHOLDS.minContentExtractionRate * 100}%, title>${QUALITY_THRESHOLDS.minTitleExtractionRate * 100}%, snippet<${QUALITY_THRESHOLDS.maxSnippetRatio * 100}%`
     );
   }
 
   // Summary table
-  console.log("\n┌────────────────────┬───────┬─────────┬─────────┬─────────┬──────┬─────────┐");
-  console.log("│ Fixture            │ Items │ Content │ Title   │ Snippet │ Warn │ Status  │");
-  console.log("├────────────────────┼───────┼─────────┼─────────┼─────────┼──────┼─────────┤");
+  writeLine("\n┌────────────────────┬───────┬─────────┬─────────┬─────────┬──────┬─────────┐");
+  writeLine("│ Fixture            │ Items │ Content │ Title   │ Snippet │ Warn │ Status  │");
+  writeLine("├────────────────────┼───────┼─────────┼─────────┼─────────┼──────┼─────────┤");
 
   for (const r of report.results) {
     const content = `${(r.stats.contentExtractionRate * 100).toFixed(0)}%`;
@@ -528,50 +543,48 @@ function printHumanReport(report: RssIngestReport): void {
     const regMark = r.regression ? "[R]" : "";
     const status = r.success ? "✅ PASS" : "❌ FAIL";
 
-    console.log(
+    writeLine(
       `│ ${(r.fixture + regMark).padEnd(18)} │ ${String(r.stats.totalItems).padStart(5)} │ ${content.padStart(7)} │ ${title.padStart(7)} │ ${snippet.padStart(7)} │ ${warn.padStart(4)} │ ${status.padEnd(7)} │`
     );
   }
 
-  console.log("└────────────────────┴───────┴─────────┴─────────┴─────────┴──────┴─────────┘");
+  writeLine("└────────────────────┴───────┴─────────┴─────────┴─────────┴──────┴─────────┘");
 
   // Warnings detail
   const withWarnings = report.results.filter((r) => r.warnings && r.warnings.length > 0);
   if (withWarnings.length > 0) {
-    console.log("\n⚠️  WARNINGS:");
+    writeLine("\n⚠️  WARNINGS:");
     for (const r of withWarnings) {
-      console.log(`   ${r.fixture}: ${r.warnings?.join(", ")}`);
+      writeLine(`   ${r.fixture}: ${r.warnings?.join(", ")}`);
     }
   }
 
   // Gate failures detail
   const gateFailures = report.results.filter((r) => r.gated && !r.gated.passed);
   if (gateFailures.length > 0) {
-    console.log("\n🚫 GATE FAILURES:");
+    writeLine("\n🚫 GATE FAILURES:");
     for (const r of gateFailures) {
-      console.log(
-        `   ${r.fixture}: ${r.gated?.failureReason} (${r.gated?.details || "no details"})`
-      );
+      writeLine(`   ${r.fixture}: ${r.gated?.failureReason} (${r.gated?.details || "no details"})`);
     }
   }
 
   // Other failures
   const otherFailures = report.results.filter((r) => !r.success && (!r.gated || r.gated.passed));
   if (otherFailures.length > 0) {
-    console.log("\n❌ FAILURES:");
+    writeLine("\n❌ FAILURES:");
     for (const f of otherFailures) {
-      console.log(`   ${f.fixture}: ${f.error || "unknown error"}`);
+      writeLine(`   ${f.fixture}: ${f.error || "unknown error"}`);
     }
   }
 
   // Sample titles
   const withSamples = report.results.filter((r) => r.sampleTitles && r.sampleTitles.length > 0);
   if (withSamples.length > 0 && !report.summary.quickMode) {
-    console.log("\n📰 SAMPLE TITLES:");
+    writeLine("\n📰 SAMPLE TITLES:");
     for (const r of withSamples.slice(0, 3)) {
-      console.log(`   ${r.fixture}:`);
+      writeLine(`   ${r.fixture}:`);
       for (const t of (r.sampleTitles ?? []).slice(0, 2)) {
-        console.log(`     - "${t}..."`);
+        writeLine(`     - "${t}..."`);
       }
     }
   }
@@ -579,14 +592,14 @@ function printHumanReport(report: RssIngestReport): void {
   // Performance
   const totalDuration = report.results.reduce((sum, r) => sum + r.durationMs, 0);
   const avgDuration = report.results.length > 0 ? totalDuration / report.results.length : 0;
-  console.log(`\n⏱️  Performance: Total ${totalDuration}ms, Avg ${avgDuration.toFixed(0)}ms`);
+  writeLine(`\n⏱️  Performance: Total ${totalDuration}ms, Avg ${avgDuration.toFixed(0)}ms`);
 
   // CI gate result
   if (report.summary.failed > 0) {
-    console.log("\n🚨 CI GATE: FAILED");
+    writeLine("\n🚨 CI GATE: FAILED");
     process.exitCode = 1;
   } else {
-    console.log("\n✅ CI GATE: PASSED");
+    writeLine("\n✅ CI GATE: PASSED");
   }
 }
 
@@ -598,7 +611,7 @@ function outputJsonReport(report: RssIngestReport): void {
 
   const outputPath = join(artifactsDir, "rss-ingest-report.json");
   writeFileSync(outputPath, JSON.stringify(report, null, 2));
-  console.log(`\nJSON report written to: ${outputPath}`);
+  writeLine(`\nJSON report written to: ${outputPath}`);
 }
 
 // ============================================================================
@@ -609,9 +622,9 @@ async function main(): Promise<void> {
   const isJsonMode = process.argv.includes("--json");
   const isQuickMode = process.argv.includes("--quick");
 
-  console.log("📡 RSS Ingest Test Suite\n");
-  console.log(`Mode: ${isQuickMode ? "QUICK (PR gate)" : "FULL (nightly)"}`);
-  console.log("Testing parsing quality and consistency...\n");
+  writeLine("📡 RSS Ingest Test Suite\n");
+  writeLine(`Mode: ${isQuickMode ? "QUICK (PR gate)" : "FULL (nightly)"}`);
+  writeLine("Testing parsing quality and consistency...\n");
 
   try {
     const report = await runRssIngestTests(isQuickMode);
@@ -622,12 +635,12 @@ async function main(): Promise<void> {
 
     printHumanReport(report);
   } catch (error) {
-    console.error("\n❌ FATAL ERROR:", error);
+    writeErrorLine(`\n❌ FATAL ERROR: ${formatError(error)}`);
     process.exitCode = 1;
   }
 }
 
 main().catch((error) => {
-  console.error("Unhandled error:", error);
+  writeErrorLine(`Unhandled error: ${formatError(error)}`);
   process.exitCode = 1;
 });

@@ -51,7 +51,10 @@ function logFailureWithSeed(
   testName: string,
   input: { text: string; position?: number; range?: { start: number; end: number } }
 ): void {
-  console.error(`
+  if (typeof process === "undefined") {
+    return;
+  }
+  process.stderr.write(`
 === CONFORMANCE FAILURE ===
 Test: ${testName}
 Seed: ${TEST_SEED}

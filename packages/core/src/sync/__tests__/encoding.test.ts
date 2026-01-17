@@ -115,8 +115,7 @@ describe("base64Encode/base64Decode", () => {
       const avgMs = elapsed / BENCHMARK_ITERATIONS;
 
       // Log benchmark result (visible in verbose test output)
-      // biome-ignore lint/suspicious/noConsole: benchmark output
-      console.log(`[PERF] base64Encode 1MB avg: ${avgMs.toFixed(2)}ms`);
+      process.stdout.write(`[PERF] base64Encode 1MB avg: ${avgMs.toFixed(2)}ms\n`);
       expect(avgMs).toBeLessThan(100);
     });
 
@@ -135,8 +134,7 @@ describe("base64Encode/base64Decode", () => {
       const elapsed = performance.now() - start;
       const avgMs = elapsed / BENCHMARK_ITERATIONS;
 
-      // biome-ignore lint/suspicious/noConsole: benchmark output
-      console.log(`[PERF] base64Decode 1MB avg: ${avgMs.toFixed(2)}ms`);
+      process.stdout.write(`[PERF] base64Decode 1MB avg: ${avgMs.toFixed(2)}ms\n`);
       expect(avgMs).toBeLessThan(100);
     });
 
@@ -157,8 +155,7 @@ describe("base64Encode/base64Decode", () => {
       const totalBytes = size * iterations * 2; // encode + decode
       const throughputMBps = totalBytes / (1024 * 1024) / (elapsed / 1000);
 
-      // biome-ignore lint/suspicious/noConsole: benchmark output
-      console.log(`[PERF] round-trip throughput: ${throughputMBps.toFixed(1)} MB/s`);
+      process.stdout.write(`[PERF] round-trip throughput: ${throughputMBps.toFixed(1)} MB/s\n`);
       expect(throughputMBps).toBeGreaterThan(10);
     });
   });

@@ -5,6 +5,7 @@
  * Handles local update export, remote update import, echo prevention, and presence.
  */
 
+import { observability } from "@ku0/core";
 import type { LoroRuntime } from "../runtime/loroRuntime";
 import type { CollabAdapter, CollabAdapterStatus } from "./collabAdapter";
 import { base64Decode, base64Encode } from "./collabEncoding";
@@ -18,6 +19,8 @@ import {
   type PresencePayload,
   type SyncMessage,
 } from "./collabMessages";
+
+const logger = observability.getLogger();
 
 /** Configuration for CollabManager */
 export type CollabManagerConfig = {
@@ -354,7 +357,11 @@ export class CollabManager {
       try {
         cb(participants);
       } catch (error) {
-        console.error("[CollabManager] Participant listener error:", error);
+        logger.error(
+          "sync",
+          "Participant listener error",
+          error instanceof Error ? error : new Error(String(error))
+        );
       }
     }
   }
@@ -364,7 +371,11 @@ export class CollabManager {
       try {
         cb(status);
       } catch (error) {
-        console.error("[CollabManager] Status listener error:", error);
+        logger.error(
+          "sync",
+          "Status listener error",
+          error instanceof Error ? error : new Error(String(error))
+        );
       }
     }
   }
@@ -374,7 +385,11 @@ export class CollabManager {
       try {
         cb(error);
       } catch (err) {
-        console.error("[CollabManager] Error listener error:", err);
+        logger.error(
+          "sync",
+          "Error listener error",
+          err instanceof Error ? err : new Error(String(err))
+        );
       }
     }
   }
@@ -384,7 +399,11 @@ export class CollabManager {
       try {
         cb(senderId);
       } catch (error) {
-        console.error("[CollabManager] Remote update listener error:", error);
+        logger.error(
+          "sync",
+          "Remote update listener error",
+          error instanceof Error ? error : new Error(String(error))
+        );
       }
     }
   }

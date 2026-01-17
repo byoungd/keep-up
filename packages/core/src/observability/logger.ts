@@ -9,6 +9,35 @@ export type LoggerConfig = {
 
 const LOG_LEVEL_PRIORITY: Record<LogLevel, number> = { debug: 0, info: 1, warn: 2, error: 3 };
 
+function formatLogValue(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (value instanceof Error) {
+    return value.stack ?? value.message;
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function formatLogLine(values: unknown[]): string {
+  return values.map(formatLogValue).join(" ");
+}
+
+function writeLine(output: string, stream: "stdout" | "stderr"): void {
+  if (typeof process === "undefined") {
+    return;
+  }
+  const target = stream === "stderr" ? process.stderr : process.stdout;
+  if (!target) {
+    return;
+  }
+  target.write(`${output}\n`);
+}
+
 export class LFCCLogger {
   private config: LoggerConfig;
   private context: Partial<CorrelationContext>;
@@ -123,15 +152,9 @@ export class LFCCLogger {
     if (e.error) {
       a.push(e.error);
     }
-    if (e.level === "debug") {
-      console.debug(...a);
-    } else if (e.level === "info") {
-      console.info(...a);
-    } else if (e.level === "warn") {
-      console.warn(...a);
-    } else {
-      console.error(...a);
-    }
+    const line = formatLogLine(a);
+    const stream = e.level === "warn" || e.level === "error" ? "stderr" : "stdout";
+    writeLine(line, stream);
   }
 }
 

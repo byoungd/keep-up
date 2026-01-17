@@ -6,6 +6,7 @@
  * too much HTML noise.
  */
 
+import { observability } from "@ku0/core";
 import { Readability } from "@mozilla/readability";
 import { JSDOM } from "jsdom";
 
@@ -26,6 +27,7 @@ export interface ExtractOptions {
 }
 
 const DEFAULT_MIN_CONTENT_LENGTH = 100;
+const logger = observability.getLogger();
 
 /**
  * Extract clean article content from HTML using Mozilla Readability.
@@ -60,7 +62,9 @@ export function extractFromHtml(
       length: textContent.length,
     };
   } catch (error) {
-    console.warn("[ContentExtractor] Failed to extract content:", error);
+    logger.warn("ingest", "Failed to extract content", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
 }
@@ -132,7 +136,9 @@ export function cleanHtmlContent(html: string): string {
 
     return text;
   } catch (error) {
-    console.warn("[ContentExtractor] Failed to clean HTML:", error);
+    logger.warn("ingest", "Failed to clean HTML", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     // Fallback: simple tag stripping
     return stripHtmlTags(html);
   }

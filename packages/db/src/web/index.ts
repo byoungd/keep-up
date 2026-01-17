@@ -12,6 +12,7 @@
  * - Graceful degradation when IndexedDB is unavailable
  */
 
+import { observability } from "@ku0/core";
 import { createIndexedDbDriver, type IndexedDbDriver } from "../driver/idb-dexie";
 import type {
   AnnotationRow,
@@ -28,6 +29,8 @@ import type {
   OutboxRow,
   TopicRow,
 } from "../driver/types";
+
+const logger = observability.getLogger();
 
 // ===========================================================================
 // Types
@@ -244,7 +247,8 @@ class EventEmitter {
       try {
         handler(event);
       } catch (error) {
-        console.error(`[ReaderDb] Event handler error for ${type}:`, error);
+        const err = error instanceof Error ? error : new Error(String(error));
+        logger.error("persistence", "ReaderDb event handler error", err, { type });
       }
     }
   }
@@ -343,7 +347,8 @@ export class ReaderDb {
       this.initialized = true;
       return result;
     } catch (error) {
-      console.error("[ReaderDb] Initialization failed:", error);
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error("persistence", "ReaderDb initialization failed", err);
       throw error;
     }
   }

@@ -6,6 +6,13 @@
 
 import type { YouTubeVideoMetadata } from "./types";
 
+function writeWarn(message: string): void {
+  if (typeof process === "undefined" || !process.stderr) {
+    return;
+  }
+  process.stderr.write(`${message}\n`);
+}
+
 /**
  * Fetches video metadata from YouTube oEmbed API
  *
@@ -52,7 +59,7 @@ export async function fetchVideoMetadata(
   } catch (error) {
     // Graceful degradation: return basic metadata
     if (error instanceof Error && error.name === "AbortError") {
-      console.warn(`[ingest-youtube] Metadata fetch timeout for ${videoId}`);
+      writeWarn(`[ingest-youtube] Metadata fetch timeout for ${videoId}`);
     }
 
     return {

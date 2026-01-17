@@ -2,6 +2,7 @@
  * DB Client - Main thread interface to the DB Worker.
  * This is the primary public API for consumers of @ku0/db.
  */
+import { observability } from "@ku0/core";
 import { IndexedDbDriver } from "./driver/idb-dexie/index";
 import type {
   AnnotationRow,
@@ -16,6 +17,12 @@ import type {
 import type { LeaderChangeCallback, LeaderElectionResult } from "./leaderElection";
 import { acquireLeadership } from "./leaderElection";
 import type { WorkerRequest, WorkerResponse } from "./worker/index";
+
+const logger = observability.getLogger();
+const PREF_KEY = "reader_db_driver_pref";
+const PREF_EXPIRY_KEY = "reader_db_driver_pref_expiry";
+const LAST_FALLBACK_KEY = "reader_db_last_fallback_reason";
+const PREF_TTL_MS = 1000 * 60 * 60 * 6; // 6 hours
 
 type PendingRequest = {
   resolve: (value: unknown) => void;
@@ -730,57 +737,9 @@ export class AutoSwitchDbClient implements DbDriver {
       return this.initPromise;
     }
 
-    // Sticky fallback preference with expiry
-    const PREF_KEY = "reader_db_driver_pref";
-    const PREF_EXPIRY_KEY = "reader_db_driver_pref_expiry";
-    const LAST_FALLBACK_KEY = "reader_db_last_fallback_reason";
-    const PREF_TTL_MS = 1000 * 60 * 60 * 6; // 6 hours
-    const now = Date.now();
-    const storedPref = typeof localStorage !== "undefined" ? localStorage.getItem(PREF_KEY) : null;
-    const storedExpiry =
-      typeof localStorage !== "undefined" ? localStorage.getItem(PREF_EXPIRY_KEY) : null;
-    const prefExpired = storedExpiry !== null && Number.parseInt(storedExpiry, 10) < now;
-    if (prefExpired && typeof localStorage !== "undefined") {
-      localStorage.removeItem(PREF_KEY);
-      localStorage.removeItem(PREF_EXPIRY_KEY);
-    }
-    const forceIdb = storedPref === "idb-dexie";
-
+    const { forceIdb, now } = this.readStickyPreference();
     const start = performance.now();
-    this.initPromise = (async () => {
-      let fallbackReason: string | undefined;
-
-      // 1. Try SQLite OPFS if not forced to IDB
-      if (!forceIdb) {
-        try {
-          const result = await this.tryInitSqlite(start);
-          if (result) {
-            return result;
-          }
-          fallbackReason = "opfs-missing";
-        } catch (err) {
-          console.warn("[AutoSwitchDbClient] SQLite init failed, falling back.", err);
-          fallbackReason = err instanceof Error ? err.message : String(err);
-        }
-      } else {
-        fallbackReason = "sticky-preference";
-      }
-
-      // 2. Fallback to IndexedDB
-      this.activeDriver = new IndexedDbDriver(this.dbName);
-      const idbResult = await this.activeDriver.init();
-      if (typeof localStorage !== "undefined" && fallbackReason) {
-        localStorage.setItem(PREF_KEY, "idb-dexie");
-        localStorage.setItem(PREF_EXPIRY_KEY, String(now + PREF_TTL_MS));
-        localStorage.setItem(LAST_FALLBACK_KEY, fallbackReason);
-      }
-      this.lastFallbackReason = fallbackReason;
-      return {
-        ...idbResult,
-        initTimeMs: performance.now() - start,
-        fallbackReason,
-      };
-    })();
+    this.initPromise = this.initWithFallback(start, now, forceIdb);
 
     // Acquire leadership in parallel (non-blocking)
     this.initPromise.then(() => {
@@ -788,6 +747,84 @@ export class AutoSwitchDbClient implements DbDriver {
     });
 
     return this.initPromise;
+  }
+
+  private readStickyPreference(): { forceIdb: boolean; now: number } {
+    const now = Date.now();
+    if (typeof localStorage === "undefined") {
+      return { forceIdb: false, now };
+    }
+
+    const storedPref = localStorage.getItem(PREF_KEY);
+    const storedExpiry = localStorage.getItem(PREF_EXPIRY_KEY);
+    const prefExpired = storedExpiry !== null && Number.parseInt(storedExpiry, 10) < now;
+    if (prefExpired) {
+      localStorage.removeItem(PREF_KEY);
+      localStorage.removeItem(PREF_EXPIRY_KEY);
+    }
+    return { forceIdb: storedPref === "idb-dexie", now };
+  }
+
+  private async initWithFallback(
+    start: number,
+    now: number,
+    forceIdb: boolean
+  ): Promise<DbInitResult> {
+    let fallbackReason = forceIdb ? "sticky-preference" : undefined;
+
+    if (!forceIdb) {
+      const sqliteInit = await this.tryInitSqliteWithFallback(start);
+      if (sqliteInit.result) {
+        return sqliteInit.result;
+      }
+      fallbackReason = sqliteInit.fallbackReason ?? "opfs-missing";
+    }
+
+    const idbResult = await this.initIndexedDb(now, fallbackReason);
+    return {
+      ...idbResult,
+      initTimeMs: performance.now() - start,
+      fallbackReason,
+    };
+  }
+
+  private async tryInitSqliteWithFallback(start: number): Promise<{
+    result: DbInitResult | null;
+    fallbackReason?: string;
+  }> {
+    try {
+      const result = await this.tryInitSqlite(start);
+      if (result) {
+        return { result };
+      }
+      return { result: null, fallbackReason: "opfs-missing" };
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      logger.warn("persistence", "SQLite init failed, falling back", {
+        reason: error.message,
+      });
+      return { result: null, fallbackReason: error.message };
+    }
+  }
+
+  private async initIndexedDb(
+    now: number,
+    fallbackReason: string | undefined
+  ): Promise<DbInitResult> {
+    this.activeDriver = new IndexedDbDriver(this.dbName);
+    const idbResult = await this.activeDriver.init();
+    this.persistFallbackPreference(now, fallbackReason);
+    this.lastFallbackReason = fallbackReason;
+    return idbResult;
+  }
+
+  private persistFallbackPreference(now: number, fallbackReason?: string): void {
+    if (typeof localStorage === "undefined" || !fallbackReason) {
+      return;
+    }
+    localStorage.setItem(PREF_KEY, "idb-dexie");
+    localStorage.setItem(PREF_EXPIRY_KEY, String(now + PREF_TTL_MS));
+    localStorage.setItem(LAST_FALLBACK_KEY, fallbackReason);
   }
 
   /** Internal: acquire leadership after init */
@@ -1084,7 +1121,7 @@ export class AutoSwitchDbClient implements DbDriver {
       // biome-ignore lint/suspicious/noExplicitAny: Safely checking for method existence
       return (this.activeDriver as any).onEvent(callback);
     }
-    console.warn("[AutoSwitchDbClient] onEvent called but active driver does not support events");
+    logger.warn("persistence", "onEvent called but active driver does not support events");
     // biome-ignore lint/suspicious/noEmptyBlockStatements: Intentional no-op unsubscribe function
     return () => {};
   }

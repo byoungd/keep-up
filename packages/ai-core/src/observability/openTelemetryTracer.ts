@@ -12,7 +12,7 @@
  * - Automatic instrumentation hooks
  */
 
-import type { Span, Tracer } from "../resilience/observability";
+import { ConsoleLogger, type Span, type Tracer } from "../resilience/observability";
 
 // ============================================================================
 // Types
@@ -40,6 +40,8 @@ export interface SpanStatus {
   code: "unset" | "ok" | "error";
   message?: string;
 }
+
+const logger = new ConsoleLogger({ prefix: "[OpenTelemetryTracer]" });
 
 /** Span link */
 export interface SpanLink {
@@ -493,7 +495,7 @@ export class OpenTelemetryTracer implements Tracer {
 
     for (const exporter of this.config.exporters) {
       await exporter.shutdown().catch((e) => {
-        console.error("[OpenTelemetryTracer] Exporter shutdown failed:", e);
+        logger.error("Exporter shutdown failed", e instanceof Error ? e : new Error(String(e)));
       });
     }
   }
@@ -532,7 +534,7 @@ export class OpenTelemetryTracer implements Tracer {
   private startExportInterval(): void {
     this.exportInterval = setInterval(() => {
       this.forceFlush().catch((e) => {
-        console.error("[OpenTelemetryTracer] Auto-export failed:", e);
+        logger.error("Auto-export failed", e instanceof Error ? e : new Error(String(e)));
       });
     }, this.config.exportIntervalMs);
   }
@@ -547,7 +549,7 @@ export class OpenTelemetryTracer implements Tracer {
   private checkBatchExport(): void {
     if (this.pendingExport.length >= this.config.exportBatchSize) {
       this.forceFlush().catch((e) => {
-        console.error("[OpenTelemetryTracer] Batch export failed:", e);
+        logger.error("Batch export failed", e instanceof Error ? e : new Error(String(e)));
       });
     }
   }

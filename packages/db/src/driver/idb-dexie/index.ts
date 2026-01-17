@@ -3,6 +3,7 @@
  * Used when OPFS/SQLite is not available.
  */
 
+import { observability } from "@ku0/core";
 import Dexie, { type Table } from "dexie";
 import type {
   AnnotationRow,
@@ -17,6 +18,8 @@ import type {
   OutboxRow,
   TopicRow,
 } from "../types";
+
+const logger = observability.getLogger();
 
 /** Dexie table row types (matching DB schema) */
 interface DexieDocument {
@@ -281,10 +284,9 @@ export class IndexedDbDriver implements DbDriver {
       // 1. Index type changes that Dexie can't patch in-place
       // 2. Adding indexes on fields that don't exist in old records
       if (error instanceof Dexie.SchemaError || (error as Error)?.name === "SchemaError") {
-        console.warn(
-          "[IndexedDB] Schema migration failed, resetting database:",
-          (error as Error).message
-        );
+        logger.warn("persistence", "[IndexedDB] Schema migration failed, resetting database", {
+          message: (error as Error).message,
+        });
         await this.db.delete();
         this.db = new ReaderDatabase();
         await this.db.open();
@@ -569,13 +571,15 @@ export class IndexedDbDriver implements DbDriver {
   }
 
   async addSubscriptionToTopic(_subscriptionId: string, _topicId: string): Promise<void> {
-    console.warn(
+    logger.warn(
+      "persistence",
       "[IndexedDbDriver] Subscription topic operations not fully supported in fallback driver"
     );
   }
 
   async removeSubscriptionFromTopic(_subscriptionId: string, _topicId: string): Promise<void> {
-    console.warn(
+    logger.warn(
+      "persistence",
       "[IndexedDbDriver] Subscription topic operations not fully supported in fallback driver"
     );
   }
@@ -583,14 +587,16 @@ export class IndexedDbDriver implements DbDriver {
   async listSubscriptionsByTopic(
     _topicId: string
   ): Promise<import("../types").RssSubscriptionRow[]> {
-    console.warn(
+    logger.warn(
+      "persistence",
       "[IndexedDbDriver] Subscription topic operations not fully supported in fallback driver"
     );
     return [];
   }
 
   async listTopicsBySubscription(_subscriptionId: string): Promise<TopicRow[]> {
-    console.warn(
+    logger.warn(
+      "persistence",
       "[IndexedDbDriver] Subscription topic operations not fully supported in fallback driver"
     );
     return [];
@@ -977,27 +983,39 @@ export class IndexedDbDriver implements DbDriver {
   async createRssSubscription(
     _subscription: Omit<import("../types").RssSubscriptionRow, "createdAt" | "updatedAt">
   ): Promise<void> {
-    console.warn("[IndexedDbDriver] RSS operations not fully supported in fallback driver");
+    logger.warn(
+      "persistence",
+      "[IndexedDbDriver] RSS operations not fully supported in fallback driver"
+    );
   }
 
   async listRssSubscriptions(
     _options?: import("../types").ListRssSubscriptionsOptions
   ): Promise<import("../types").RssSubscriptionRow[]> {
-    console.warn("[IndexedDbDriver] RSS operations not fully supported in fallback driver");
+    logger.warn(
+      "persistence",
+      "[IndexedDbDriver] RSS operations not fully supported in fallback driver"
+    );
     return [];
   }
 
   async getRssSubscription(
     _subscriptionId: string
   ): Promise<import("../types").RssSubscriptionRow | null> {
-    console.warn("[IndexedDbDriver] RSS operations not fully supported in fallback driver");
+    logger.warn(
+      "persistence",
+      "[IndexedDbDriver] RSS operations not fully supported in fallback driver"
+    );
     return null;
   }
 
   async getRssSubscriptionByUrl(
     _url: string
   ): Promise<import("../types").RssSubscriptionRow | null> {
-    console.warn("[IndexedDbDriver] RSS operations not fully supported in fallback driver");
+    logger.warn(
+      "persistence",
+      "[IndexedDbDriver] RSS operations not fully supported in fallback driver"
+    );
     return null;
   }
 
@@ -1017,11 +1035,17 @@ export class IndexedDbDriver implements DbDriver {
       >
     >
   ): Promise<void> {
-    console.warn("[IndexedDbDriver] RSS operations not fully supported in fallback driver");
+    logger.warn(
+      "persistence",
+      "[IndexedDbDriver] RSS operations not fully supported in fallback driver"
+    );
   }
 
   async deleteRssSubscription(_subscriptionId: string): Promise<void> {
-    console.warn("[IndexedDbDriver] RSS operations not fully supported in fallback driver");
+    logger.warn(
+      "persistence",
+      "[IndexedDbDriver] RSS operations not fully supported in fallback driver"
+    );
   }
 
   // --- Feed Item operations (stubs for IndexedDB fallback) ---
@@ -1029,14 +1053,20 @@ export class IndexedDbDriver implements DbDriver {
     _subscriptionId: string,
     _guid: string
   ): Promise<import("../types").FeedItemRow | null> {
-    console.warn("[IndexedDbDriver] RSS operations not fully supported in fallback driver");
+    logger.warn(
+      "persistence",
+      "[IndexedDbDriver] RSS operations not fully supported in fallback driver"
+    );
     return null;
   }
 
   async createFeedItem(
     _item: Omit<import("../types").FeedItemRow, "createdAt" | "updatedAt">
   ): Promise<void> {
-    console.warn("[IndexedDbDriver] RSS operations not fully supported in fallback driver");
+    logger.warn(
+      "persistence",
+      "[IndexedDbDriver] RSS operations not fully supported in fallback driver"
+    );
   }
 
   async updateFeedItem(
@@ -1045,54 +1075,81 @@ export class IndexedDbDriver implements DbDriver {
       Pick<import("../types").FeedItemRow, "readState" | "saved" | "documentId" | "contentHtml">
     >
   ): Promise<void> {
-    console.warn("[IndexedDbDriver] RSS operations not fully supported in fallback driver");
+    logger.warn(
+      "persistence",
+      "[IndexedDbDriver] RSS operations not fully supported in fallback driver"
+    );
   }
 
   async listFeedItems(
     _options?: import("../types").ListFeedItemsOptions
   ): Promise<import("../types").FeedItemRow[]> {
-    console.warn("[IndexedDbDriver] RSS operations not fully supported in fallback driver");
+    logger.warn(
+      "persistence",
+      "[IndexedDbDriver] RSS operations not fully supported in fallback driver"
+    );
     return [];
   }
 
   async countUnreadFeedItems(_subscriptionId?: string): Promise<number> {
-    console.warn("[IndexedDbDriver] RSS operations not fully supported in fallback driver");
+    logger.warn(
+      "persistence",
+      "[IndexedDbDriver] RSS operations not fully supported in fallback driver"
+    );
     return 0;
   }
 
   // --- Content Item operations (not implemented for IndexedDB fallback) ---
   async upsertContentItem(_item: import("../types").ContentItemRow): Promise<void> {
-    console.warn("[IndexedDbDriver] Content item operations not supported in fallback driver");
+    logger.warn(
+      "persistence",
+      "[IndexedDbDriver] Content item operations not supported in fallback driver"
+    );
   }
 
   async getContentItem(_itemId: string): Promise<import("../types").ContentItemRow | null> {
-    console.warn("[IndexedDbDriver] Content item operations not supported in fallback driver");
+    logger.warn(
+      "persistence",
+      "[IndexedDbDriver] Content item operations not supported in fallback driver"
+    );
     return null;
   }
 
   async getContentItemByHash(
     _canonicalHash: string
   ): Promise<import("../types").ContentItemRow | null> {
-    console.warn("[IndexedDbDriver] Content item operations not supported in fallback driver");
+    logger.warn(
+      "persistence",
+      "[IndexedDbDriver] Content item operations not supported in fallback driver"
+    );
     return null;
   }
 
   async listContentItems(
     _options?: import("../types").ListContentItemsOptions
   ): Promise<import("../types").ContentItemRow[]> {
-    console.warn("[IndexedDbDriver] Content item operations not supported in fallback driver");
+    logger.warn(
+      "persistence",
+      "[IndexedDbDriver] Content item operations not supported in fallback driver"
+    );
     return [];
   }
 
   async deleteContentItem(_itemId: string): Promise<void> {
-    console.warn("[IndexedDbDriver] Content item operations not supported in fallback driver");
+    logger.warn(
+      "persistence",
+      "[IndexedDbDriver] Content item operations not supported in fallback driver"
+    );
   }
 
   // --- Digest operations (not implemented for IndexedDB fallback) ---
   async createDigest(
     _digest: Omit<import("../types").DigestRow, "createdAt" | "updatedAt">
   ): Promise<void> {
-    console.warn("[IndexedDbDriver] Digest operations not supported in fallback driver");
+    logger.warn(
+      "persistence",
+      "[IndexedDbDriver] Digest operations not supported in fallback driver"
+    );
   }
 
   async updateDigest(
@@ -1104,11 +1161,17 @@ export class IndexedDbDriver implements DbDriver {
       >
     >
   ): Promise<void> {
-    console.warn("[IndexedDbDriver] Digest operations not supported in fallback driver");
+    logger.warn(
+      "persistence",
+      "[IndexedDbDriver] Digest operations not supported in fallback driver"
+    );
   }
 
   async getDigest(_digestId: string): Promise<import("../types").DigestRow | null> {
-    console.warn("[IndexedDbDriver] Digest operations not supported in fallback driver");
+    logger.warn(
+      "persistence",
+      "[IndexedDbDriver] Digest operations not supported in fallback driver"
+    );
     return null;
   }
 
@@ -1116,37 +1179,58 @@ export class IndexedDbDriver implements DbDriver {
     _userId: string,
     _date: string
   ): Promise<import("../types").DigestRow | null> {
-    console.warn("[IndexedDbDriver] Digest operations not supported in fallback driver");
+    logger.warn(
+      "persistence",
+      "[IndexedDbDriver] Digest operations not supported in fallback driver"
+    );
     return null;
   }
 
   async listDigests(
     _options: import("../types").ListDigestsOptions
   ): Promise<import("../types").DigestRow[]> {
-    console.warn("[IndexedDbDriver] Digest operations not supported in fallback driver");
+    logger.warn(
+      "persistence",
+      "[IndexedDbDriver] Digest operations not supported in fallback driver"
+    );
     return [];
   }
 
   async deleteDigest(_digestId: string): Promise<void> {
-    console.warn("[IndexedDbDriver] Digest operations not supported in fallback driver");
+    logger.warn(
+      "persistence",
+      "[IndexedDbDriver] Digest operations not supported in fallback driver"
+    );
   }
 
   // --- Digest Card operations (not implemented for IndexedDB fallback) ---
   async createDigestCard(_card: import("../types").DigestCardRow): Promise<void> {
-    console.warn("[IndexedDbDriver] Digest card operations not supported in fallback driver");
+    logger.warn(
+      "persistence",
+      "[IndexedDbDriver] Digest card operations not supported in fallback driver"
+    );
   }
 
   async listDigestCards(_digestId: string): Promise<import("../types").DigestCardRow[]> {
-    console.warn("[IndexedDbDriver] Digest card operations not supported in fallback driver");
+    logger.warn(
+      "persistence",
+      "[IndexedDbDriver] Digest card operations not supported in fallback driver"
+    );
     return [];
   }
 
   async linkCardSource(_cardId: string, _sourceItemId: string, _sourceType: string): Promise<void> {
-    console.warn("[IndexedDbDriver] Digest card operations not supported in fallback driver");
+    logger.warn(
+      "persistence",
+      "[IndexedDbDriver] Digest card operations not supported in fallback driver"
+    );
   }
 
   async getCardSourceIds(_cardId: string): Promise<string[]> {
-    console.warn("[IndexedDbDriver] Digest card operations not supported in fallback driver");
+    logger.warn(
+      "persistence",
+      "[IndexedDbDriver] Digest card operations not supported in fallback driver"
+    );
     return [];
   }
 
@@ -1154,7 +1238,10 @@ export class IndexedDbDriver implements DbDriver {
   async createBrief(
     _brief: Omit<import("../types").BriefRow, "createdAt" | "updatedAt">
   ): Promise<void> {
-    console.warn("[IndexedDbDriver] Brief operations not supported in fallback driver");
+    logger.warn(
+      "persistence",
+      "[IndexedDbDriver] Brief operations not supported in fallback driver"
+    );
   }
 
   async updateBrief(
@@ -1166,28 +1253,43 @@ export class IndexedDbDriver implements DbDriver {
       >
     >
   ): Promise<void> {
-    console.warn("[IndexedDbDriver] Brief operations not supported in fallback driver");
+    logger.warn(
+      "persistence",
+      "[IndexedDbDriver] Brief operations not supported in fallback driver"
+    );
   }
 
   async getBrief(_briefId: string): Promise<import("../types").BriefRow | null> {
-    console.warn("[IndexedDbDriver] Brief operations not supported in fallback driver");
+    logger.warn(
+      "persistence",
+      "[IndexedDbDriver] Brief operations not supported in fallback driver"
+    );
     return null;
   }
 
   async listBriefs(
     _options?: import("../types").ListBriefsOptions
   ): Promise<import("../types").BriefRow[]> {
-    console.warn("[IndexedDbDriver] Brief operations not supported in fallback driver");
+    logger.warn(
+      "persistence",
+      "[IndexedDbDriver] Brief operations not supported in fallback driver"
+    );
     return [];
   }
 
   async deleteBrief(_briefId: string): Promise<void> {
-    console.warn("[IndexedDbDriver] Brief operations not supported in fallback driver");
+    logger.warn(
+      "persistence",
+      "[IndexedDbDriver] Brief operations not supported in fallback driver"
+    );
   }
 
   // --- Brief Item operations (not implemented for IndexedDB fallback) ---
   async addBriefItem(_item: import("../types").BriefItemRow): Promise<void> {
-    console.warn("[IndexedDbDriver] Brief item operations not supported in fallback driver");
+    logger.warn(
+      "persistence",
+      "[IndexedDbDriver] Brief item operations not supported in fallback driver"
+    );
   }
 
   async updateBriefItem(
@@ -1195,15 +1297,24 @@ export class IndexedDbDriver implements DbDriver {
     _itemId: string,
     _updates: Partial<Pick<import("../types").BriefItemRow, "note" | "orderIndex">>
   ): Promise<void> {
-    console.warn("[IndexedDbDriver] Brief item operations not supported in fallback driver");
+    logger.warn(
+      "persistence",
+      "[IndexedDbDriver] Brief item operations not supported in fallback driver"
+    );
   }
 
   async removeBriefItem(_briefId: string, _itemId: string): Promise<void> {
-    console.warn("[IndexedDbDriver] Brief item operations not supported in fallback driver");
+    logger.warn(
+      "persistence",
+      "[IndexedDbDriver] Brief item operations not supported in fallback driver"
+    );
   }
 
   async listBriefItems(_briefId: string): Promise<import("../types").BriefItemRow[]> {
-    console.warn("[IndexedDbDriver] Brief item operations not supported in fallback driver");
+    logger.warn(
+      "persistence",
+      "[IndexedDbDriver] Brief item operations not supported in fallback driver"
+    );
     return [];
   }
 }

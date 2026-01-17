@@ -1,4 +1,7 @@
+import { getLogger } from "../observability/logger.js";
 import type { DocSnapshot, OpLogEntry, StorageBackend } from "./types.js";
+
+const logger = getLogger();
 
 type DocData = {
   snapshots: DocSnapshot[];
@@ -512,7 +515,12 @@ export class FileStorage implements StorageBackend {
       // Verify checksum
       const checksum = this.calculateChecksum(data as Uint8Array);
       if (checksum !== meta.checksum) {
-        console.warn(`Snapshot ${docId}/${seq} checksum mismatch, skipping`);
+        logger.warn("persistence", "Snapshot checksum mismatch, skipping", {
+          docId,
+          seq,
+          expected: meta.checksum,
+          actual: checksum,
+        });
         return null;
       }
 
@@ -544,7 +552,12 @@ export class FileStorage implements StorageBackend {
       // Verify checksum
       const checksum = this.calculateChecksum(data as Uint8Array);
       if (checksum !== meta.checksum) {
-        console.warn(`Update ${docId}/${seq} checksum mismatch, skipping`);
+        logger.warn("persistence", "Update checksum mismatch, skipping", {
+          docId,
+          seq,
+          expected: meta.checksum,
+          actual: checksum,
+        });
         return null;
       }
 
