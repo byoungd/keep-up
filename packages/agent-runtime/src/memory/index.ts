@@ -3,16 +3,30 @@
  *
  * Persistent cross-session memory system with semantic search.
  * Provides short-term context and long-term knowledge storage.
+ *
+ * Two implementations available:
+ * 1. MemoryManager - Custom lightweight implementation
+ * 2. Mem0MemoryAdapter - Mem0 cloud/oss integration (recommended)
  */
 
-// Memory Manager
+// Mem0 Adapter (recommended for production)
+export {
+  createMem0MemoryAdapter,
+  type Mem0Config,
+  type Mem0Memory,
+  Mem0MemoryAdapter,
+  MemoryClient,
+} from "./mem0Adapter";
+// Memory Manager (legacy)
 export {
   createMemoryManager,
   createMemoryManagerWithStore,
   MemoryManager,
 } from "./memoryManager";
+
 // Memory Store
 export { createInMemoryStore, InMemoryStore } from "./memoryStore";
+
 // Types
 export type {
   ConsolidationResult,
