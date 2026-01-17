@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@hono/node-server": "^1.19.9",
     "@ku0/agent-runtime": "workspace:*",
     "@ku0/ai-core": "workspace:*",
     "@ku0/app": "workspace:*",

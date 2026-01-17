@@ -114,14 +114,14 @@ jobs:
           ls -R packages/lfcc-bridge/dist/ || echo "No lfcc-bridge dist folder!"
           echo "Checking apps/reader - REMOVED"
 
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+      # - name: Cache Playwright browsers
+      #   uses: actions/cache@v4
+      #   with:
+      #     path: ~/.cache/ms-playwright
+      #     key: playwright-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
 
-      - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps
+      # - name: Install Playwright browsers
+      #   run: pnpm exec playwright install --with-deps
 
       - name: Test
         run: pnpm test:ci
@@ -206,14 +206,14 @@ jobs:
           unzip build-output.zip
           rm build-output.zip
 
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+      # - name: Cache Playwright browsers
+      #   uses: actions/cache@v4
+      #   with:
+      #     path: ~/.cache/ms-playwright
+      #     key: playwright-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
 
-      - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps
+      # - name: Install Playwright browsers
+      #   run: pnpm exec playwright install --with-deps
 
       # - name: UI Integration Gate
       #   run: bash scripts/ui-gate.sh
