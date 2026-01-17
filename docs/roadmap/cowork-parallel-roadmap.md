@@ -5,6 +5,7 @@ Reach near-complete top-tier product standard for Cowork chat + agent experience
 by executing ten parallel tracks with clear dependencies and acceptance gates.
 
 > **Updated 2026-01-17**: Added Tracks 7-10 based on competitive analysis of OpenCode and Claude Code success factors.
+> **Updated 2026-01-17**: Track 8 (Project Context) and Track 9 (Plan/Build Modes) core implementation completed.
 
 ## Tracks (Source of Truth)
 
@@ -29,22 +30,26 @@ by executing ten parallel tracks with clear dependencies and acceptance gates.
    - Output: apply/revert workflow + artifact audit trail
 
 ### Phase 2: Competitive Parity Tracks (7-10)
-7) Track 7: Provider Agnostic Architecture ⭐ NEW
+7) Track 7: Provider Agnostic Architecture
    - Doc: `docs/roadmap/cowork-track-7-provider-agnostic.md`
    - Output: multi-model support, API key management, model selector
    - Inspiration: OpenCode's 75+ model support, no vendor lock-in
-8) Track 8: Project Context System (AGENTS.md) ⭐ NEW
+   - Status: 🔲 Not Started
+8) Track 8: Project Context System (AGENTS.md) ✅ COMPLETED
    - Doc: `docs/roadmap/cowork-track-8-project-context.md`
    - Output: auto-generated project context, persistent agent memory
    - Inspiration: OpenCode AGENTS.md, Claude Code CLAUDE.md
-9) Track 9: Plan Mode & Build Mode ⭐ NEW
+   - Status: ✅ Core implementation complete (analyzer, generator, API routes)
+9) Track 9: Plan Mode & Build Mode ✅ CORE COMPLETE
    - Doc: `docs/roadmap/cowork-track-9-plan-build-modes.md`
    - Output: dual agent modes, plan.md generation, mode toggle UI
    - Inspiration: OpenCode plan/build agents, Claude Code Plan Mode
-10) Track 10: Cost & Token Transparency ⭐ NEW
+   - Status: ✅ AgentModeManager + API endpoints complete; UI pending
+10) Track 10: Cost & Token Transparency
     - Doc: `docs/roadmap/cowork-track-10-cost-transparency.md`
     - Output: real-time token/cost display, context meter, session summary
     - Inspiration: OpenCode's always-visible cost display
+    - Status: 🔲 Not Started
 
 ## Contract Freeze (Read Before Coding)
 - `docs/roadmap/cowork-contract-freeze.md`
@@ -81,10 +86,10 @@ Gate B: message actions + task narrative fully in thread
 Gate C: approvals enforced + apply/revert workflow validated
 
 ### Phase D: Competitive Parity (parallel once Gate A passes)
-- Track 7 (provider agnostic - depends on Track 1 message schema)
-- Track 8 (project context - no dependencies, can start immediately)
-- Track 9 (plan/build modes - depends on Track 4 approvals)
-- Track 10 (cost transparency - depends on Track 7 provider pricing)
+- Track 7 (provider agnostic - depends on Track 1 message schema) - 🔲 Not Started
+- Track 8 (project context - no dependencies) - ✅ Complete
+- Track 9 (plan/build modes - depends on Track 4 approvals) - ✅ Core Complete
+- Track 10 (cost transparency - depends on Track 7 provider pricing) - 🔲 Not Started
 Gate D: multi-model support + project context + mode switching + cost visibility
 
 ## Cross-Track Contracts (Must Align)
