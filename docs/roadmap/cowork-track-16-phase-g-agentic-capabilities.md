@@ -107,6 +107,10 @@ interface SandboxPolicy {
 
 ---
 
+
+## Dependencies
+- `@ku0/agent-runtime`: Requires V2 Swarm Refactor (see [Track 15](./cowork-track-15-phase-f-architecture.md)).
+
 ## Dependencies to Add
 
 ```bash

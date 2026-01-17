@@ -45,6 +45,9 @@ To match and exceed 2026 market leaders like **OpenCode (Cisphus)**, **GeminiCLI
 ### 4.1. Architecture: The "Hive" Runtime
 Refactor `CoworkTaskRuntime` to support a **Swarm Architecture**.
 
+> [!NOTE]
+> **Terminology**: "Swarm" here refers to the architectural pattern (Multi-Agent Orchestration), NOT the OpenAI `swarm` Python library. This runtime is **Provider Agnostic** (see Track 7).
+
 ```typescript
 // Proposed Interface
 interface CoworkSwarmRuntime {

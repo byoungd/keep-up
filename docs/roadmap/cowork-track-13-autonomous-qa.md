@@ -3,7 +3,8 @@
 > [!NOTE]
 > **Dependency on Phase F (Track 15)**
 > While the core logic of this track (lint/test parsers) can be built now, the *autonomous* aspect relies heavily on the "Background Jobs" capability from the **Phase F Swarm Runtime**. 
-> Recommendation: Build parsers now; integrate execution loop after Track 15 (F2) lands.
+> - **Event Streaming**: QA Agents must use the **V2 Event Bus** (Recursive Event Bubbling) to stream real-time progress to the UI.
+> - **Recommendation**: Build parsers now; integrate execution loop after Track 15 (F2) lands.
 
 
 ## Mission
