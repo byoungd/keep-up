@@ -1,13 +1,21 @@
+import { join } from "node:path";
 import type { ConfirmationRequest, CoworkSession, CoworkTask } from "@ku0/agent-runtime";
 import {
   AgentModeManager,
+  BrowserManager,
   createAICoreAdapter,
   createBashToolServer,
+  createBrowserToolServer,
   createCodeToolServer,
   createCoworkRuntime,
+  createDockerBashExecutor,
   createFileToolServer,
+  createSandboxToolServer,
+  createSecurityPolicy,
   createToolRegistry,
   createWebSearchToolServer,
+  DockerSandboxManager,
+  ProcessCodeExecutor,
 } from "@ku0/agent-runtime";
 // Future integrations available:
 // import { createGhostAgent, type GhostAgent } from "@ku0/agent-runtime";
@@ -17,6 +25,7 @@ import { ApprovalService } from "../services/approvalService";
 import type { ContextIndexManager } from "../services/contextIndexManager";
 import { ProviderKeyService } from "../services/providerKeyService";
 import type { StorageLayer } from "../storage/contracts";
+import { resolveStateDir } from "../storage/statePaths";
 import type { CoworkSettings } from "../storage/types";
 import type { SessionEventHub } from "../streaming/eventHub";
 // Service Imports
@@ -238,11 +247,15 @@ export class CoworkTaskRuntime {
       prompt: session.title ?? "Cowork Session",
     });
     const modelId = resolved.model ?? requestedModel;
-    const toolRegistry = await this.buildToolRegistry();
+    const toolRegistryResult = await this.buildToolRegistry(session);
+    const toolRegistry = toolRegistryResult.registry;
     const adapter = createAICoreAdapter(resolved.provider, {
       model: modelId || undefined,
     });
     const prompt = await this.buildSystemPromptAddition(session, modeManager);
+    const securityPolicy = toolRegistryResult.dockerAvailable
+      ? buildDockerSecurityPolicy()
+      : undefined;
     const runtime = createCoworkRuntime({
       llm: adapter,
       registry: toolRegistry,
@@ -250,6 +263,7 @@ export class CoworkTaskRuntime {
         session,
         audit: undefined,
         modeManager,
+        securityPolicy,
       },
       taskQueueConfig: { maxConcurrent: 1 },
       outputRoots: collectOutputRoots(session),
@@ -271,13 +285,37 @@ export class CoworkTaskRuntime {
     };
   }
 
-  private async buildToolRegistry(): Promise<ReturnType<typeof createToolRegistry>> {
+  private async buildToolRegistry(session: CoworkSession): Promise<{
+    registry: ReturnType<typeof createToolRegistry>;
+    dockerAvailable: boolean;
+  }> {
     const toolRegistry = createToolRegistry();
     await toolRegistry.register(createFileToolServer());
-    await toolRegistry.register(createBashToolServer());
-    await toolRegistry.register(createCodeToolServer());
+    const workspacePath = process.cwd();
+    const sandboxManager = new DockerSandboxManager({
+      workspacePath,
+      image: process.env.COWORK_SANDBOX_IMAGE,
+    });
+    const dockerAvailable = await sandboxManager.isAvailable();
+    if (dockerAvailable) {
+      const dockerBash = createDockerBashExecutor(sandboxManager, {
+        sessionId: session.sessionId,
+        workspacePath,
+      });
+      await toolRegistry.register(createBashToolServer(dockerBash));
+      const codeExecutor = new ProcessCodeExecutor({ bashExecutor: dockerBash });
+      await toolRegistry.register(createCodeToolServer(codeExecutor));
+      await toolRegistry.register(createSandboxToolServer({ manager: sandboxManager }));
+    } else {
+      await toolRegistry.register(createBashToolServer());
+      await toolRegistry.register(createCodeToolServer());
+      this.logger.warn("Docker sandbox unavailable; using process execution.");
+    }
     await toolRegistry.register(createWebSearchToolServer(createWebSearchProvider(this.logger)));
-    return toolRegistry;
+    const recordingsDir = join(resolveStateDir(), "browser-recordings");
+    const browserManager = new BrowserManager({ recordingDir: recordingsDir });
+    await toolRegistry.register(createBrowserToolServer({ manager: browserManager }));
+    return { registry: toolRegistry, dockerAvailable };
   }
 
   private async buildSystemPromptAddition(
@@ -450,4 +488,16 @@ export class CoworkTaskRuntime {
   async resolveApproval(approvalId: string, decision: "approved" | "rejected") {
     return this.approvalCoordinator.resolveApproval(approvalId, decision);
   }
+}
+
+function buildDockerSecurityPolicy() {
+  const policy = createSecurityPolicy("balanced");
+  return {
+    ...policy,
+    sandbox: {
+      ...policy.sandbox,
+      type: "docker" as const,
+      workingDirectory: "/workspace",
+    },
+  };
 }
