@@ -8,7 +8,7 @@ export class CostTrackerService {
   calculateCost(modelId: string, inputTokens: number, outputTokens: number): number {
     // Find model capabilities in catalog
     const model = getModelCapability(modelId);
-    if (model && model.pricing) {
+    if (model?.pricing) {
       const inputCost = (inputTokens / 1_000_000) * model.pricing.inputTokensPer1M;
       const outputCost = (outputTokens / 1_000_000) * model.pricing.outputTokensPer1M;
       return inputCost + outputCost;
