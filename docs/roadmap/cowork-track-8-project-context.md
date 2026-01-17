@@ -149,7 +149,7 @@ as persistent memory for AI agents. This dramatically improves:
 - [x] Context API routes (`GET/POST /api/context/*`)
 - [ ] AGENTS.md auto-generation on project init
 - [ ] Context injection into agent system prompt
-- [ ] Settings UI for context management
+- [x] Settings UI for context management
 - [ ] CLI commands for context operations
 
 ## Acceptance Criteria
