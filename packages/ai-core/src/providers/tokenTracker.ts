@@ -122,8 +122,14 @@ export class TokenTracker {
     let encoding = this.encodings.get(encodingName);
 
     if (!encoding) {
-      encoding = getEncoding(encodingName);
-      this.encodings.set(encodingName, encoding);
+      try {
+        encoding = getEncoding(encodingName);
+        this.encodings.set(encodingName, encoding);
+      } catch {
+        // Fallback: Use character approximation (roughly 4 chars per token)
+        // This ensures we never crash even if encoding load fails
+        return Math.ceil(text.length / 4);
+      }
     }
 
     return encoding.encode(text).length;

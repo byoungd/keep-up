@@ -133,7 +133,7 @@ export class LaneRouter {
     const model = request.model ?? laneConfig?.models[0]?.modelId;
 
     for await (const chunk of router.stream({
-      model: model ?? this.config.defaultLane,
+      model: model ?? "", // Ensure model is string, validation happens in provider
       messages: request.messages,
       temperature: request.temperature,
       maxTokens: request.maxTokens,
