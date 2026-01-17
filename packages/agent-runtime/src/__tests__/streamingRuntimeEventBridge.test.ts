@@ -84,4 +84,39 @@ describe("RuntimeEventStreamBridge", () => {
     expect(metadataChunks.some((chunk) => chunk.data.key === "artifact:quarantined")).toBe(true);
     expect(errorChunks).toHaveLength(1);
   });
+
+  it("emits tool activity metadata with friendly progress messages", async () => {
+    const eventBus = createEventBus();
+    const writer = createStreamWriter("stream-bridge");
+    attachRuntimeEventStreamBridge({ eventBus, stream: writer, correlationId: "corr-2" });
+
+    eventBus.emit(
+      "execution:record",
+      {
+        toolCallId: "call-2",
+        toolName: "browser.search",
+        status: "started",
+        durationMs: 0,
+        sandboxed: true,
+      },
+      { correlationId: "corr-2", source: "bridge-test" }
+    );
+
+    writer.close();
+
+    const chunks = await collectStream(writer);
+    const activityChunk = chunks.find(
+      (chunk) => chunk.type === "metadata" && chunk.data.key === "tool:activity"
+    );
+    const progressChunk = chunks.find((chunk) => chunk.type === "progress");
+
+    expect(activityChunk?.data.value).toEqual(
+      expect.objectContaining({
+        activity: "search",
+        toolName: "browser.search",
+        status: "started",
+      })
+    );
+    expect(progressChunk?.data).toEqual(expect.objectContaining({ message: "Searching..." }));
+  });
 });

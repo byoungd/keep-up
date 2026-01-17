@@ -9,6 +9,96 @@ import type { ArtifactEvents } from "../events/eventBus";
 import type { ExecutionDecision, ToolExecutionRecord } from "../types";
 import type { StreamWriter } from "./streamWriter";
 
+type ToolActivity = "search" | "browse" | "read" | "write" | "run";
+
+interface ToolActivityMetadata {
+  toolName: string;
+  toolCallId?: string;
+  taskNodeId?: string;
+  activity: ToolActivity;
+  label: string;
+  status: ToolExecutionRecord["status"];
+  durationMs: number;
+  error?: string;
+}
+
+const TOOL_ACTIVITY_RULES: Array<{ activity: ToolActivity; tokens: string[] }> = [
+  {
+    activity: "search",
+    tokens: ["search", "query", "find", "lookup", "serp", "tavily", "bing", "google"],
+  },
+  {
+    activity: "browse",
+    tokens: ["browse", "browser", "navigate", "crawl", "scrape", "page", "url", "http", "fetch"],
+  },
+  {
+    activity: "read",
+    tokens: ["read", "open", "load", "download", "extract", "parse", "ingest"],
+  },
+  {
+    activity: "write",
+    tokens: [
+      "write",
+      "save",
+      "create",
+      "update",
+      "insert",
+      "delete",
+      "remove",
+      "append",
+      "edit",
+      "patch",
+      "replace",
+      "apply",
+      "upload",
+      "persist",
+      "store",
+    ],
+  },
+];
+
+const TOOL_ACTIVITY_LABELS: Record<ToolActivity, string> = {
+  search: "Searching",
+  browse: "Browsing",
+  read: "Reading",
+  write: "Writing",
+  run: "Running",
+};
+
+function tokenizeToolName(toolName: string): string[] {
+  return toolName
+    .toLowerCase()
+    .split(/[:._/\\-]+/)
+    .filter(Boolean);
+}
+
+function resolveToolActivity(toolName: string): ToolActivity {
+  const tokens = tokenizeToolName(toolName);
+  for (const rule of TOOL_ACTIVITY_RULES) {
+    if (rule.tokens.some((token) => tokens.includes(token))) {
+      return rule.activity;
+    }
+  }
+  return "run";
+}
+
+function formatToolActivityMessage(
+  activity: ToolActivity,
+  status: ToolExecutionRecord["status"]
+): string {
+  const label = TOOL_ACTIVITY_LABELS[activity] ?? TOOL_ACTIVITY_LABELS.run;
+  switch (status) {
+    case "started":
+      return `${label}...`;
+    case "completed":
+      return `${label} complete`;
+    case "failed":
+      return `${label} failed`;
+    default:
+      return `${label}...`;
+  }
+}
+
 export interface RuntimeEventStreamBridgeConfig {
   eventBus: RuntimeEventBus;
   stream: StreamWriter;
@@ -48,10 +138,26 @@ export function attachRuntimeEventStreamBridge(config: RuntimeEventStreamBridgeC
         return;
       }
       const record = event.payload as ToolExecutionRecord;
+      const activity = resolveToolActivity(record.toolName);
+      const activityMeta: ToolActivityMetadata = {
+        toolName: record.toolName,
+        toolCallId: record.toolCallId,
+        taskNodeId: record.taskNodeId,
+        activity,
+        label: TOOL_ACTIVITY_LABELS[activity] ?? TOOL_ACTIVITY_LABELS.run,
+        status: record.status,
+        durationMs: record.durationMs,
+        error: record.error,
+      };
+      stream.writeMetadata("tool:activity", activityMeta);
       if (record.status === "started") {
-        stream.writeProgress("tool", `${record.toolName} started`, { percent: 0 });
+        stream.writeProgress("tool", formatToolActivityMessage(activity, record.status), {
+          percent: 0,
+        });
       } else if (record.status === "completed") {
-        stream.writeProgress("tool", `${record.toolName} completed`, { percent: 100 });
+        stream.writeProgress("tool", formatToolActivityMessage(activity, record.status), {
+          percent: 100,
+        });
       } else {
         stream.writeError(record.error ?? `${record.toolName} failed`, "TOOL_FAILED", false);
       }
