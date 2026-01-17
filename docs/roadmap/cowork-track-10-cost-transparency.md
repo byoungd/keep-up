@@ -101,8 +101,12 @@ advantage. Users appreciate:
 - All costs are estimates based on provider pricing.
 - UI never blocks on cost calculation.
 
+## Alignment Notes
+- Source token usage counts from provider adapters (Track 7) when available to avoid double counting.
+- `token.usage` is part of contract freeze v0.2; if counts or pricing are missing, emit `costUsd: null` and show "N/A".
+
 ## Implementation Outline
-1. Add token tracking middleware to LLM adapter layer.
+1. Add token tracking middleware to the provider adapter layer or consume adapter-provided counts.
 2. Create `CostTracker` service with accumulation logic.
 3. Emit `token.usage` SSE events during streaming.
 4. Build `CostDisplay` React component.
@@ -130,8 +134,9 @@ advantage. Users appreciate:
 - `pnpm vitest run --project cowork-server`
 
 ## Dependencies
-- Track 7: Provider pricing metadata.
+- Track 7: Provider pricing metadata and token usage counts.
 - Track 1: Message storage for cost persistence.
+- Contract freeze v0.2 for `token.usage` SSE event.
 
 ## Owner Checklist
 - Follow `CODING_STANDARDS.md` (TypeScript only, no `any`, no `var`).

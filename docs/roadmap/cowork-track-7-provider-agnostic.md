@@ -19,7 +19,7 @@ while Claude Code's Anthropic lock-in has caused user friction during policy cha
 - User-provided API key management (encrypted storage).
 - Model selector UI with capability indicators.
 - Graceful fallback when primary provider fails.
-- Token/cost transparency per provider.
+- Provider pricing metadata and token usage reporting.
 
 ## Contracts and Data Flow
 - Message schema must carry `providerId` + `modelId` for storage and SSE playback.
@@ -91,14 +91,14 @@ while Claude Code's Anthropic lock-in has caused user friction during policy cha
 5. **API Key Management**: Encrypted storage in user settings, never logged.
 6. **Model Selector UI**: Dropdown with provider grouping, capability badges.
 7. **Fallback Logic**: Auto-switch to backup provider on failure (configurable).
-8. **Cost Tracking**: Accumulate token usage per session, display in UI.
+8. **Token Usage Reporting**: Normalize token counts per response and expose to the Track 10 cost tracker.
 
 ## Required Behavior
 - Users can select from all configured providers and models.
 - Model switch mid-conversation preserves context (within limits).
 - API keys are stored securely, never transmitted except to provider.
 - Fallback is transparent with user notification.
-- Token costs are visible in real-time.
+- Token usage counts are available in real-time for cost calculation (Track 10).
 
 ## Implementation Outline
 1. Create `packages/llm-providers/` with adapter pattern.
@@ -115,13 +115,13 @@ while Claude Code's Anthropic lock-in has caused user friction during policy cha
 - Model registry with 10+ models across 4+ providers.
 - API key management API and UI.
 - Model selector with capability badges.
-- Cost transparency widget.
+- Pricing metadata exposed to the cost tracker.
 
 ## Acceptance Criteria
 - [ ] Can complete identical task using OpenAI, Anthropic, and Ollama.
 - [ ] Model switch mid-session works without data loss.
 - [ ] API keys are encrypted at rest.
-- [ ] Token usage and cost displayed per message.
+- [ ] Token usage counts emitted per message for cost calculation.
 - [ ] Fallback triggers and notifies user on provider failure.
 
 ## Testing
