@@ -50,7 +50,406 @@ function parseExpectedArtifacts(value: string): string[] {
     .filter((entry) => entry.length > 0);
 }
 
-// biome-ignore lint:complexity/noExcessiveCognitiveComplexity
+type EditorSectionProps = {
+  draft: WorkflowTemplate;
+  draftInputs: InputDraft[];
+  expectedArtifactsText: string;
+  isSaving: boolean;
+  onDraftChange: (next: WorkflowTemplate) => void;
+  onExpectedArtifactsChange: (value: string) => void;
+  onAddInput: () => void;
+  onUpdateInput: (id: string, next: Partial<InputDraft>) => void;
+  onRemoveInput: (id: string) => void;
+  onSave: () => void;
+  onReset: () => void;
+};
+
+function TemplateEditorSection({
+  draft,
+  draftInputs,
+  expectedArtifactsText,
+  isSaving,
+  onDraftChange,
+  onExpectedArtifactsChange,
+  onAddInput,
+  onUpdateInput,
+  onRemoveInput,
+  onSave,
+  onReset,
+}: EditorSectionProps) {
+  return (
+    <section className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-foreground">Template Editor</h3>
+          <p className="text-xs text-muted-foreground">
+            Use {"{{inputKey}}"} placeholders inside the prompt.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onReset}
+          className="text-xs text-muted-foreground hover:text-foreground"
+        >
+          Clear
+        </button>
+      </div>
+
+      <div className="grid gap-3">
+        <input
+          type="text"
+          value={draft.name}
+          onChange={(event) => onDraftChange({ ...draft, name: event.target.value })}
+          placeholder="Template name"
+          className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+          aria-label="Template name"
+        />
+        <textarea
+          value={draft.description}
+          onChange={(event) => onDraftChange({ ...draft, description: event.target.value })}
+          placeholder="Template description"
+          rows={2}
+          className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+          aria-label="Template description"
+        />
+        <div className="flex flex-wrap gap-2">
+          {(["plan", "build"] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => onDraftChange({ ...draft, mode })}
+              className={cn(
+                "px-3 py-1.5 text-xs font-semibold rounded-full border transition-colors",
+                draft.mode === mode
+                  ? "bg-foreground text-background border-foreground"
+                  : "text-foreground border-border hover:bg-surface-100"
+              )}
+              aria-pressed={draft.mode === mode}
+            >
+              {mode.toUpperCase()} Mode
+            </button>
+          ))}
+        </div>
+        <textarea
+          value={draft.prompt}
+          onChange={(event) => onDraftChange({ ...draft, prompt: event.target.value })}
+          placeholder="Template prompt..."
+          rows={6}
+          className="rounded-md border border-border bg-background px-3 py-2 text-sm font-mono text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+          aria-label="Template prompt"
+        />
+        <input
+          type="text"
+          value={expectedArtifactsText}
+          onChange={(event) => onExpectedArtifactsChange(event.target.value)}
+          placeholder="Expected artifacts (comma separated)"
+          className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+          aria-label="Expected artifacts"
+        />
+        <input
+          type="text"
+          value={draft.version}
+          onChange={(event) => onDraftChange({ ...draft, version: event.target.value })}
+          placeholder="Version"
+          className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+          aria-label="Template version"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-semibold text-foreground">Inputs</p>
+          <button
+            type="button"
+            onClick={onAddInput}
+            className="text-xs text-muted-foreground hover:text-foreground"
+          >
+            Add input
+          </button>
+        </div>
+        <div className="space-y-2">
+          {draftInputs.length === 0 ? (
+            <p className="text-xs text-muted-foreground">No inputs defined.</p>
+          ) : null}
+          {draftInputs.map((input) => (
+            <div key={input.id} className="grid gap-2 md:grid-cols-[140px_140px_1fr_80px]">
+              <input
+                type="text"
+                value={input.key}
+                onChange={(event) => onUpdateInput(input.id, { key: event.target.value })}
+                placeholder="Key"
+                className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                aria-label="Input key"
+              />
+              <input
+                type="text"
+                value={input.label}
+                onChange={(event) => onUpdateInput(input.id, { label: event.target.value })}
+                placeholder="Label"
+                className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                aria-label="Input label"
+              />
+              <input
+                type="text"
+                value={input.placeholder ?? ""}
+                onChange={(event) => onUpdateInput(input.id, { placeholder: event.target.value })}
+                placeholder="Placeholder"
+                className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                aria-label="Input placeholder"
+              />
+              <div className="flex items-center justify-between gap-2">
+                <label className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={input.required}
+                    onChange={(event) =>
+                      onUpdateInput(input.id, { required: event.target.checked })
+                    }
+                    aria-label="Required input"
+                  />
+                  Required
+                </label>
+                <button
+                  type="button"
+                  onClick={() => onRemoveInput(input.id)}
+                  className="text-[11px] text-destructive hover:text-destructive/80"
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={isSaving}
+          className={cn(
+            "px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 transition-colors shadow-sm",
+            isSaving ? "opacity-70 cursor-wait" : ""
+          )}
+        >
+          {draft.templateId ? "Update Template" : "Create Template"}
+        </button>
+        <button
+          type="button"
+          onClick={onReset}
+          className="text-sm text-muted-foreground hover:text-foreground"
+        >
+          Cancel
+        </button>
+      </div>
+    </section>
+  );
+}
+
+type TemplateListSectionProps = {
+  templates: WorkflowTemplate[];
+  selectedId: string | null;
+  isLoading: boolean;
+  isSaving: boolean;
+  onSelect: (templateId: string) => void;
+  onEdit: (template: WorkflowTemplate) => void;
+  onExport: (template: WorkflowTemplate) => void;
+  onDelete: (templateId: string) => void;
+};
+
+function TemplateListSection({
+  templates,
+  selectedId,
+  isLoading,
+  isSaving,
+  onSelect,
+  onEdit,
+  onExport,
+  onDelete,
+}: TemplateListSectionProps) {
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-foreground">Templates</h3>
+          <p className="text-xs text-muted-foreground">
+            Select a template to run it in the current session.
+          </p>
+        </div>
+        {isLoading ? <span className="text-xs text-muted-foreground">Loading...</span> : null}
+      </div>
+
+      {templates.length === 0 && !isLoading ? (
+        <div className="text-xs text-muted-foreground border border-border/40 rounded-md p-3 bg-surface-50">
+          No templates yet. Create one above.
+        </div>
+      ) : null}
+
+      {templates.map((template) => {
+        const isSelected = template.templateId === selectedId;
+        return (
+          <div
+            key={template.templateId}
+            className={cn(
+              "rounded-lg border border-border/40 bg-surface-50/70 p-3 space-y-2",
+              isSelected ? "ring-1 ring-primary/40" : ""
+            )}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1">
+                <button
+                  type="button"
+                  onClick={() => onSelect(template.templateId)}
+                  className="text-sm font-semibold text-foreground hover:underline text-left"
+                >
+                  {template.name}
+                </button>
+                <p className="text-xs text-muted-foreground">{template.description}</p>
+                <p className="text-[11px] text-muted-foreground">
+                  {template.mode.toUpperCase()} | v{template.version} | Used{" "}
+                  {template.usageCount ?? 0} times | Last run {formatTimestamp(template.lastUsedAt)}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => onEdit(template)}
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onExport(template)}
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Export
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDelete(template.templateId)}
+                  disabled={isSaving}
+                  className="text-xs text-destructive hover:text-destructive/80"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
+type RunSectionProps = {
+  selectedTemplate: WorkflowTemplate | null;
+  inputValues: Record<string, string>;
+  onInputChange: (key: string, value: string) => void;
+  onRun: () => void;
+  isRunning: boolean;
+};
+
+function RunTemplateSection({
+  selectedTemplate,
+  inputValues,
+  onInputChange,
+  onRun,
+  isRunning,
+}: RunSectionProps) {
+  return (
+    <section className="space-y-3">
+      <div>
+        <h3 className="text-sm font-semibold text-foreground">Run Template</h3>
+        <p className="text-xs text-muted-foreground">Fill required inputs, then launch a task.</p>
+      </div>
+
+      {!selectedTemplate ? (
+        <div className="text-xs text-muted-foreground border border-border/40 rounded-md p-3 bg-surface-50">
+          Select a template to run.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {selectedTemplate.inputs.length === 0 ? (
+            <p className="text-xs text-muted-foreground">No inputs required.</p>
+          ) : (
+            selectedTemplate.inputs.map((input) => (
+              <div key={input.key} className="space-y-1">
+                <label className="text-xs font-semibold text-foreground" htmlFor={input.key}>
+                  {input.label}
+                  {input.required ? " *" : ""}
+                </label>
+                <input
+                  id={input.key}
+                  type="text"
+                  value={inputValues[input.key] ?? ""}
+                  onChange={(event) => onInputChange(input.key, event.target.value)}
+                  placeholder={input.placeholder}
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                  aria-label={input.label}
+                />
+              </div>
+            ))
+          )}
+          <button
+            type="button"
+            onClick={onRun}
+            disabled={isRunning || !selectedTemplate}
+            className={cn(
+              "px-4 py-2 text-sm font-medium text-white bg-foreground rounded-md hover:bg-foreground/90 transition-colors shadow-sm",
+              isRunning ? "opacity-70 cursor-wait" : ""
+            )}
+          >
+            {isRunning ? "Launching..." : "Run Template"}
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+
+type ImportSectionProps = {
+  importPayload: string;
+  isSaving: boolean;
+  onImportPayloadChange: (value: string) => void;
+  onImport: () => void;
+};
+
+function ImportTemplatesSection({
+  importPayload,
+  isSaving,
+  onImportPayloadChange,
+  onImport,
+}: ImportSectionProps) {
+  return (
+    <section className="space-y-3">
+      <div>
+        <h3 className="text-sm font-semibold text-foreground">Import Templates</h3>
+        <p className="text-xs text-muted-foreground">Paste JSON (single template or array).</p>
+      </div>
+      <textarea
+        value={importPayload}
+        onChange={(event) => onImportPayloadChange(event.target.value)}
+        rows={4}
+        className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs font-mono text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+        placeholder='[{"name":"..."}]'
+        aria-label="Import workflow templates"
+      />
+      <button
+        type="button"
+        onClick={onImport}
+        disabled={isSaving}
+        className={cn(
+          "px-4 py-2 text-sm font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded-md hover:bg-primary-100 transition-colors",
+          isSaving ? "opacity-70 cursor-wait" : ""
+        )}
+      >
+        Import Templates
+      </button>
+    </section>
+  );
+}
+
 export function WorkflowTemplatesPanel({
   onClose,
   onRunTemplate,
@@ -95,7 +494,6 @@ export function WorkflowTemplatesPanel({
       }
     } catch (error) {
       setErrorMessage("Failed to load workflow templates.");
-      // biome-ignore lint/suspicious/noConsole: Expected error logging
       console.error("Failed to load workflow templates", error);
     } finally {
       setIsLoading(false);
@@ -198,7 +596,6 @@ export function WorkflowTemplatesPanel({
       resetDraft();
     } catch (error) {
       setErrorMessage("Failed to save workflow template.");
-      // biome-ignore lint/suspicious/noConsole: Expected error logging
       console.error("Failed to save workflow template", error);
     } finally {
       setIsSaving(false);
@@ -218,7 +615,6 @@ export function WorkflowTemplatesPanel({
         }
       } catch (error) {
         setErrorMessage("Failed to delete workflow template.");
-        // biome-ignore lint/suspicious/noConsole: Expected error logging
         console.error("Failed to delete workflow template", error);
       } finally {
         setIsSaving(false);
@@ -249,7 +645,6 @@ export function WorkflowTemplatesPanel({
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to run template.";
       setErrorMessage(message);
-      // biome-ignore lint/suspicious/noConsole: Expected error logging
       console.error("Failed to run workflow template", error);
     } finally {
       setIsRunning(false);
@@ -262,7 +657,6 @@ export function WorkflowTemplatesPanel({
       setSuccessMessage("Template copied to clipboard.");
     } catch (error) {
       setErrorMessage("Failed to copy template.");
-      // biome-ignore lint/suspicious/noConsole: Expected error logging
       console.error("Failed to copy workflow template", error);
     }
   }, []);
@@ -293,7 +687,6 @@ export function WorkflowTemplatesPanel({
       setSuccessMessage("Templates imported.");
     } catch (error) {
       setErrorMessage("Failed to import templates.");
-      // biome-ignore lint/suspicious/noConsole: Expected error logging
       console.error("Failed to import workflow templates", error);
     } finally {
       setIsSaving(false);
@@ -331,326 +724,45 @@ export function WorkflowTemplatesPanel({
           </div>
         ) : null}
 
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-semibold text-foreground">Template Editor</h3>
-              <p className="text-xs text-muted-foreground">
-                Use {"{{inputKey}}"} placeholders inside the prompt.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={resetDraft}
-              className="text-xs text-muted-foreground hover:text-foreground"
-            >
-              Clear
-            </button>
-          </div>
+        <TemplateEditorSection
+          draft={draft}
+          draftInputs={draftInputs}
+          expectedArtifactsText={expectedArtifactsText}
+          isSaving={isSaving}
+          onDraftChange={setDraft}
+          onExpectedArtifactsChange={setExpectedArtifactsText}
+          onAddInput={handleAddInput}
+          onUpdateInput={handleUpdateInput}
+          onRemoveInput={handleRemoveInput}
+          onSave={handleSaveTemplate}
+          onReset={resetDraft}
+        />
 
-          <div className="grid gap-3">
-            <input
-              type="text"
-              value={draft.name}
-              onChange={(event) => setDraft((prev) => ({ ...prev, name: event.target.value }))}
-              placeholder="Template name"
-              className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-              aria-label="Template name"
-            />
-            <textarea
-              value={draft.description}
-              onChange={(event) =>
-                setDraft((prev) => ({ ...prev, description: event.target.value }))
-              }
-              placeholder="Template description"
-              rows={2}
-              className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-              aria-label="Template description"
-            />
-            <div className="flex flex-wrap gap-2">
-              {(["plan", "build"] as const).map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={() => setDraft((prev) => ({ ...prev, mode }))}
-                  className={cn(
-                    "px-3 py-1.5 text-xs font-semibold rounded-full border transition-colors",
-                    draft.mode === mode
-                      ? "bg-foreground text-background border-foreground"
-                      : "text-foreground border-border hover:bg-surface-100"
-                  )}
-                  aria-pressed={draft.mode === mode}
-                >
-                  {mode.toUpperCase()} Mode
-                </button>
-              ))}
-            </div>
-            <textarea
-              value={draft.prompt}
-              onChange={(event) => setDraft((prev) => ({ ...prev, prompt: event.target.value }))}
-              placeholder="Template prompt..."
-              rows={6}
-              className="rounded-md border border-border bg-background px-3 py-2 text-sm font-mono text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-              aria-label="Template prompt"
-            />
-            <input
-              type="text"
-              value={expectedArtifactsText}
-              onChange={(event) => setExpectedArtifactsText(event.target.value)}
-              placeholder="Expected artifacts (comma separated)"
-              className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-              aria-label="Expected artifacts"
-            />
-            <input
-              type="text"
-              value={draft.version}
-              onChange={(event) => setDraft((prev) => ({ ...prev, version: event.target.value }))}
-              placeholder="Version"
-              className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-              aria-label="Template version"
-            />
-          </div>
+        <TemplateListSection
+          templates={sortedTemplates}
+          selectedId={selectedId}
+          isLoading={isLoading}
+          isSaving={isSaving}
+          onSelect={setSelectedId}
+          onEdit={handleEditTemplate}
+          onExport={handleExport}
+          onDelete={handleDeleteTemplate}
+        />
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold text-foreground">Inputs</p>
-              <button
-                type="button"
-                onClick={handleAddInput}
-                className="text-xs text-muted-foreground hover:text-foreground"
-              >
-                Add input
-              </button>
-            </div>
-            <div className="space-y-2">
-              {draftInputs.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No inputs defined.</p>
-              ) : null}
-              {draftInputs.map((input) => (
-                <div key={input.id} className="grid gap-2 md:grid-cols-[140px_140px_1fr_80px]">
-                  <input
-                    type="text"
-                    value={input.key}
-                    onChange={(event) => handleUpdateInput(input.id, { key: event.target.value })}
-                    placeholder="Key"
-                    className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-                    aria-label="Input key"
-                  />
-                  <input
-                    type="text"
-                    value={input.label}
-                    onChange={(event) => handleUpdateInput(input.id, { label: event.target.value })}
-                    placeholder="Label"
-                    className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-                    aria-label="Input label"
-                  />
-                  <input
-                    type="text"
-                    value={input.placeholder ?? ""}
-                    onChange={(event) =>
-                      handleUpdateInput(input.id, { placeholder: event.target.value })
-                    }
-                    placeholder="Placeholder"
-                    className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-                    aria-label="Input placeholder"
-                  />
-                  <div className="flex items-center justify-between gap-2">
-                    <label className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                      <input
-                        type="checkbox"
-                        checked={input.required}
-                        onChange={(event) =>
-                          handleUpdateInput(input.id, { required: event.target.checked })
-                        }
-                        aria-label="Required input"
-                      />
-                      Required
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveInput(input.id)}
-                      className="text-[11px] text-destructive hover:text-destructive/80"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+        <RunTemplateSection
+          selectedTemplate={selectedTemplate}
+          inputValues={inputValues}
+          onInputChange={(key, value) => setInputValues((prev) => ({ ...prev, [key]: value }))}
+          onRun={handleRunTemplate}
+          isRunning={isRunning}
+        />
 
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={handleSaveTemplate}
-              disabled={isSaving}
-              className={cn(
-                "px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 transition-colors shadow-sm",
-                isSaving ? "opacity-70 cursor-wait" : ""
-              )}
-            >
-              {draft.templateId ? "Update Template" : "Create Template"}
-            </button>
-            <button
-              type="button"
-              onClick={resetDraft}
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
-              Cancel
-            </button>
-          </div>
-        </section>
-
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-semibold text-foreground">Templates</h3>
-              <p className="text-xs text-muted-foreground">
-                Select a template to run it in the current session.
-              </p>
-            </div>
-            {isLoading ? <span className="text-xs text-muted-foreground">Loading...</span> : null}
-          </div>
-
-          {sortedTemplates.length === 0 && !isLoading ? (
-            <div className="text-xs text-muted-foreground border border-border/40 rounded-md p-3 bg-surface-50">
-              No templates yet. Create one above.
-            </div>
-          ) : null}
-
-          {sortedTemplates.map((template) => {
-            const isSelected = template.templateId === selectedId;
-            return (
-              <div
-                key={template.templateId}
-                className={cn(
-                  "rounded-lg border border-border/40 bg-surface-50/70 p-3 space-y-2",
-                  isSelected ? "ring-1 ring-primary/40" : ""
-                )}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-1">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedId(template.templateId)}
-                      className="text-sm font-semibold text-foreground hover:underline text-left"
-                    >
-                      {template.name}
-                    </button>
-                    <p className="text-xs text-muted-foreground">{template.description}</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {template.mode.toUpperCase()} | v{template.version} | Used{" "}
-                      {template.usageCount ?? 0} times | Last run{" "}
-                      {formatTimestamp(template.lastUsedAt)}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleEditTemplate(template)}
-                      className="text-xs text-muted-foreground hover:text-foreground"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleExport(template)}
-                      className="text-xs text-muted-foreground hover:text-foreground"
-                    >
-                      Export
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteTemplate(template.templateId)}
-                      disabled={isSaving}
-                      className="text-xs text-destructive hover:text-destructive/80"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </section>
-
-        <section className="space-y-3">
-          <div>
-            <h3 className="text-sm font-semibold text-foreground">Run Template</h3>
-            <p className="text-xs text-muted-foreground">
-              Fill required inputs, then launch a task.
-            </p>
-          </div>
-
-          {!selectedTemplate ? (
-            <div className="text-xs text-muted-foreground border border-border/40 rounded-md p-3 bg-surface-50">
-              Select a template to run.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {selectedTemplate.inputs.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No inputs required.</p>
-              ) : (
-                selectedTemplate.inputs.map((input) => (
-                  <div key={input.key} className="space-y-1">
-                    <label className="text-xs font-semibold text-foreground" htmlFor={input.key}>
-                      {input.label}
-                      {input.required ? " *" : ""}
-                    </label>
-                    <input
-                      id={input.key}
-                      type="text"
-                      value={inputValues[input.key] ?? ""}
-                      onChange={(event) =>
-                        setInputValues((prev) => ({ ...prev, [input.key]: event.target.value }))
-                      }
-                      placeholder={input.placeholder}
-                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-                      aria-label={input.label}
-                    />
-                  </div>
-                ))
-              )}
-              <button
-                type="button"
-                onClick={handleRunTemplate}
-                disabled={isRunning || !selectedTemplate}
-                className={cn(
-                  "px-4 py-2 text-sm font-medium text-white bg-foreground rounded-md hover:bg-foreground/90 transition-colors shadow-sm",
-                  isRunning ? "opacity-70 cursor-wait" : ""
-                )}
-              >
-                {isRunning ? "Launching..." : "Run Template"}
-              </button>
-            </div>
-          )}
-        </section>
-
-        <section className="space-y-3">
-          <div>
-            <h3 className="text-sm font-semibold text-foreground">Import Templates</h3>
-            <p className="text-xs text-muted-foreground">Paste JSON (single template or array).</p>
-          </div>
-          <textarea
-            value={importPayload}
-            onChange={(event) => setImportPayload(event.target.value)}
-            rows={4}
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs font-mono text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-            placeholder='[{"name":"..."}]'
-            aria-label="Import workflow templates"
-          />
-          <button
-            type="button"
-            onClick={handleImport}
-            disabled={isSaving}
-            className={cn(
-              "px-4 py-2 text-sm font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded-md hover:bg-primary-100 transition-colors",
-              isSaving ? "opacity-70 cursor-wait" : ""
-            )}
-          >
-            Import Templates
-          </button>
-        </section>
+        <ImportTemplatesSection
+          importPayload={importPayload}
+          isSaving={isSaving}
+          onImportPayloadChange={setImportPayload}
+          onImport={handleImport}
+        />
       </div>
     </div>
   );

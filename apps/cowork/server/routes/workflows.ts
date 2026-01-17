@@ -96,7 +96,6 @@ export function createWorkflowRoutes(deps: WorkflowRouteDeps) {
     return c.json({ ok: true });
   });
 
-  // biome-ignore lint:complexity/noExcessiveCognitiveComplexity
   app.post("/workflows/:templateId/run", async (c) => {
     const templateId = c.req.param("templateId");
     const template = await deps.workflowTemplates.getById(templateId);
@@ -105,17 +104,11 @@ export function createWorkflowRoutes(deps: WorkflowRouteDeps) {
     }
 
     const body = (await readJsonBody(c)) as WorkflowRunPayload | null;
-    const rawInputs = body?.inputs ?? {};
-    if (!isRecord(rawInputs)) {
-      return jsonError(c, 400, "inputs must be an object");
+    const parsedInputs = parseRunInputs(body?.inputs);
+    if (!parsedInputs.ok) {
+      return jsonError(c, 400, parsedInputs.error);
     }
-    const inputs: Record<string, string> = {};
-    for (const [key, value] of Object.entries(rawInputs)) {
-      if (typeof value !== "string") {
-        return jsonError(c, 400, `input '${key}' must be a string`);
-      }
-      inputs[key] = value;
-    }
+    const inputs = parsedInputs.value;
 
     const validation = validateInputs(template.inputs, inputs);
     if (!validation.ok) {
@@ -124,29 +117,20 @@ export function createWorkflowRoutes(deps: WorkflowRouteDeps) {
 
     const prompt = renderPrompt(template.prompt, inputs);
     const now = Date.now();
-    const updated = await deps.workflowTemplates.update(templateId, (existing) => ({
-      ...existing,
-      usageCount: (existing.usageCount ?? 0) + 1,
-      lastUsedAt: now,
-      lastUsedInputs: inputs,
-      lastUsedSessionId: body?.sessionId ?? existing.lastUsedSessionId,
-      updatedAt: now,
-    }));
-
-    if (updated && deps.auditLogs && body?.sessionId) {
-      await deps.auditLogs.log({
-        entryId: crypto.randomUUID(),
-        sessionId: body.sessionId,
-        timestamp: now,
-        action: "workflow_run",
-        input: {
-          templateId: updated.templateId,
-          version: updated.version,
-          mode: updated.mode,
-          inputs,
-        },
-      });
-    }
+    const updated = await updateWorkflowUsage({
+      store: deps.workflowTemplates,
+      templateId,
+      inputs,
+      sessionId: body?.sessionId,
+      timestamp: now,
+    });
+    await logWorkflowRun({
+      auditLogs: deps.auditLogs,
+      sessionId: body?.sessionId,
+      template: updated ?? template,
+      inputs,
+      timestamp: now,
+    });
 
     return c.json({ ok: true, prompt, template: updated ?? template });
   });
@@ -245,7 +229,6 @@ function parseWorkflowTemplate(body: WorkflowTemplatePayload | CoworkWorkflowTem
   };
 }
 
-// biome-ignore lint:complexity/noExcessiveCognitiveComplexity
 function parseWorkflowUpdate(body: WorkflowTemplatePayload | null):
   | {
       ok: true;
@@ -257,61 +240,64 @@ function parseWorkflowUpdate(body: WorkflowTemplatePayload | null):
   }
   const update: Partial<CoworkWorkflowTemplate> = {};
 
-  if (body.name !== undefined) {
-    const name = typeof body.name === "string" ? body.name.trim() : "";
-    if (!name) {
-      return { ok: false, error: "Template name is required" };
-    }
-    update.name = name;
-  }
+  const steps: UpdateStep[] = [
+    {
+      parse: () => parseOptionalName(body.name),
+      apply: (value) => {
+        update.name = value as string;
+      },
+    },
+    {
+      parse: () => parseOptionalDescription(body.description),
+      apply: (value) => {
+        update.description = value as string;
+      },
+    },
+    {
+      parse: () => parseOptionalMode(body.mode),
+      apply: (value) => {
+        update.mode = value as CoworkWorkflowTemplate["mode"];
+      },
+    },
+    {
+      parse: () => parseOptionalPrompt(body.prompt),
+      apply: (value) => {
+        update.prompt = value as string;
+      },
+    },
+    {
+      parse: () => parseOptionalInputs(body.inputs),
+      apply: (value) => {
+        update.inputs = value as CoworkWorkflowTemplateInput[];
+      },
+    },
+    {
+      parse: () => parseOptionalExpectedArtifacts(body.expectedArtifacts),
+      apply: (value) => {
+        update.expectedArtifacts = value as string[];
+      },
+    },
+    {
+      parse: () => parseOptionalVersion(body.version),
+      apply: (value) => {
+        update.version = value as string;
+      },
+    },
+  ];
 
-  if (body.description !== undefined) {
-    update.description = typeof body.description === "string" ? body.description.trim() : "";
-  }
-
-  if (body.mode !== undefined) {
-    if (body.mode !== "plan" && body.mode !== "build") {
-      return { ok: false, error: "mode must be 'plan' or 'build'" };
+  for (const step of steps) {
+    const result = step.parse();
+    if (!result.ok) {
+      return result;
     }
-    update.mode = body.mode;
-  }
-
-  if (body.prompt !== undefined) {
-    const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
-    if (!prompt) {
-      return { ok: false, error: "Template prompt is required" };
+    if (result.value !== undefined) {
+      step.apply(result.value);
     }
-    update.prompt = prompt;
-  }
-
-  if (body.inputs !== undefined) {
-    const parsedInputs = parseInputs(body.inputs);
-    if (!parsedInputs.ok) {
-      return parsedInputs;
-    }
-    update.inputs = parsedInputs.value;
-  }
-
-  if (body.expectedArtifacts !== undefined) {
-    const expectedArtifacts = parseExpectedArtifacts(body.expectedArtifacts);
-    if (!expectedArtifacts.ok) {
-      return expectedArtifacts;
-    }
-    update.expectedArtifacts = expectedArtifacts.value;
-  }
-
-  if (body.version !== undefined) {
-    const version = typeof body.version === "string" ? body.version.trim() : "";
-    if (!version) {
-      return { ok: false, error: "Template version is required" };
-    }
-    update.version = version;
   }
 
   return { ok: true, value: update };
 }
 
-// biome-ignore lint:complexity/noExcessiveCognitiveComplexity
 function parseInputs(
   inputs: WorkflowTemplatePayload["inputs"]
 ): { ok: true; value: CoworkWorkflowTemplateInput[] } | { ok: false; error: string } {
@@ -325,28 +311,197 @@ function parseInputs(
   const seenKeys = new Set<string>();
   const result: CoworkWorkflowTemplateInput[] = [];
   for (const input of inputs) {
-    if (!input || typeof input.key !== "string") {
-      return { ok: false, error: "input key must be a string" };
+    const parsed = parseInputEntry(input, seenKeys);
+    if (!parsed.ok) {
+      return parsed;
     }
-    const key = input.key.trim();
-    if (!key) {
-      return { ok: false, error: "input key is required" };
-    }
-    if (!/^[a-zA-Z0-9_-]+$/.test(key)) {
-      return { ok: false, error: `input key '${key}' is invalid` };
-    }
-    if (seenKeys.has(key)) {
-      return { ok: false, error: `input key '${key}' is duplicated` };
-    }
-    seenKeys.add(key);
-    const label = typeof input.label === "string" ? input.label.trim() : key;
-    const required = Boolean(input.required);
-    const placeholder =
-      typeof input.placeholder === "string" ? input.placeholder.trim() : undefined;
-    result.push({ key, label, required, placeholder });
+    result.push(parsed.value);
   }
 
   return { ok: true, value: result };
+}
+
+function parseRunInputs(
+  rawInputs: WorkflowRunPayload["inputs"]
+): { ok: true; value: Record<string, string> } | { ok: false; error: string } {
+  if (rawInputs === undefined || rawInputs === null) {
+    return { ok: true, value: {} };
+  }
+  if (!isRecord(rawInputs)) {
+    return { ok: false, error: "inputs must be an object" };
+  }
+  const inputs: Record<string, string> = {};
+  for (const [key, value] of Object.entries(rawInputs)) {
+    if (typeof value !== "string") {
+      return { ok: false, error: `input '${key}' must be a string` };
+    }
+    inputs[key] = value;
+  }
+  return { ok: true, value: inputs };
+}
+
+async function updateWorkflowUsage(params: {
+  store: WorkflowTemplateStoreLike;
+  templateId: string;
+  inputs: Record<string, string>;
+  sessionId?: string;
+  timestamp: number;
+}): Promise<CoworkWorkflowTemplate | null> {
+  const { store, templateId, inputs, sessionId, timestamp } = params;
+  return store.update(templateId, (existing) => ({
+    ...existing,
+    usageCount: (existing.usageCount ?? 0) + 1,
+    lastUsedAt: timestamp,
+    lastUsedInputs: inputs,
+    lastUsedSessionId: sessionId ?? existing.lastUsedSessionId,
+    updatedAt: timestamp,
+  }));
+}
+
+async function logWorkflowRun(params: {
+  auditLogs?: AuditLogStoreLike;
+  sessionId?: string;
+  template: CoworkWorkflowTemplate;
+  inputs: Record<string, string>;
+  timestamp: number;
+}): Promise<void> {
+  const { auditLogs, sessionId, template, inputs, timestamp } = params;
+  if (!auditLogs || !sessionId) {
+    return;
+  }
+  await auditLogs.log({
+    entryId: crypto.randomUUID(),
+    sessionId,
+    timestamp,
+    action: "workflow_run",
+    input: {
+      templateId: template.templateId,
+      version: template.version,
+      mode: template.mode,
+      inputs,
+    },
+  });
+}
+
+function parseOptionalName(
+  name: WorkflowTemplatePayload["name"]
+): { ok: true; value: string | undefined } | { ok: false; error: string } {
+  if (name === undefined) {
+    return { ok: true, value: undefined };
+  }
+  const trimmed = typeof name === "string" ? name.trim() : "";
+  if (!trimmed) {
+    return { ok: false, error: "Template name is required" };
+  }
+  return { ok: true, value: trimmed };
+}
+
+function parseOptionalDescription(description: WorkflowTemplatePayload["description"]): {
+  ok: true;
+  value: string | undefined;
+} {
+  if (description === undefined) {
+    return { ok: true, value: undefined };
+  }
+  return {
+    ok: true,
+    value: typeof description === "string" ? description.trim() : "",
+  };
+}
+
+function parseOptionalMode(
+  mode: WorkflowTemplatePayload["mode"]
+): { ok: true; value: CoworkWorkflowTemplate["mode"] | undefined } | { ok: false; error: string } {
+  if (mode === undefined) {
+    return { ok: true, value: undefined };
+  }
+  if (mode !== "plan" && mode !== "build") {
+    return { ok: false, error: "mode must be 'plan' or 'build'" };
+  }
+  return { ok: true, value: mode };
+}
+
+function parseOptionalPrompt(
+  prompt: WorkflowTemplatePayload["prompt"]
+): { ok: true; value: string | undefined } | { ok: false; error: string } {
+  if (prompt === undefined) {
+    return { ok: true, value: undefined };
+  }
+  const trimmed = typeof prompt === "string" ? prompt.trim() : "";
+  if (!trimmed) {
+    return { ok: false, error: "Template prompt is required" };
+  }
+  return { ok: true, value: trimmed };
+}
+
+function parseOptionalInputs(
+  inputs: WorkflowTemplatePayload["inputs"]
+): { ok: true; value: CoworkWorkflowTemplateInput[] | undefined } | { ok: false; error: string } {
+  if (inputs === undefined) {
+    return { ok: true, value: undefined };
+  }
+  const parsed = parseInputs(inputs);
+  if (!parsed.ok) {
+    return parsed;
+  }
+  return { ok: true, value: parsed.value };
+}
+
+function parseOptionalExpectedArtifacts(
+  expectedArtifacts: WorkflowTemplatePayload["expectedArtifacts"]
+): { ok: true; value: string[] | undefined } | { ok: false; error: string } {
+  if (expectedArtifacts === undefined) {
+    return { ok: true, value: undefined };
+  }
+  const parsed = parseExpectedArtifacts(expectedArtifacts);
+  if (!parsed.ok) {
+    return parsed;
+  }
+  return { ok: true, value: parsed.value };
+}
+
+function parseOptionalVersion(
+  version: WorkflowTemplatePayload["version"]
+): { ok: true; value: string | undefined } | { ok: false; error: string } {
+  if (version === undefined) {
+    return { ok: true, value: undefined };
+  }
+  const trimmed = typeof version === "string" ? version.trim() : "";
+  if (!trimmed) {
+    return { ok: false, error: "Template version is required" };
+  }
+  return { ok: true, value: trimmed };
+}
+
+type UpdateResult = { ok: true; value: unknown } | { ok: false; error: string };
+
+type UpdateStep = {
+  parse: () => UpdateResult;
+  apply: (value: unknown) => void;
+};
+
+function parseInputEntry(
+  input: unknown,
+  seenKeys: Set<string>
+): { ok: true; value: CoworkWorkflowTemplateInput } | { ok: false; error: string } {
+  if (!isRecord(input) || typeof input.key !== "string") {
+    return { ok: false, error: "input key must be a string" };
+  }
+  const key = input.key.trim();
+  if (!key) {
+    return { ok: false, error: "input key is required" };
+  }
+  if (!/^[a-zA-Z0-9_-]+$/.test(key)) {
+    return { ok: false, error: `input key '${key}' is invalid` };
+  }
+  if (seenKeys.has(key)) {
+    return { ok: false, error: `input key '${key}' is duplicated` };
+  }
+  seenKeys.add(key);
+  const label = typeof input.label === "string" ? input.label.trim() : key;
+  const required = Boolean(input.required);
+  const placeholder = typeof input.placeholder === "string" ? input.placeholder.trim() : undefined;
+  return { ok: true, value: { key, label, required, placeholder } };
 }
 
 function parseExpectedArtifacts(

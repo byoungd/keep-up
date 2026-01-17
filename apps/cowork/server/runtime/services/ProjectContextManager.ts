@@ -10,6 +10,7 @@ import {
   parseNotes,
 } from "@ku0/project-context";
 import { DEFAULT_PROJECT_CONTEXT_TOKEN_BUDGET } from "@ku0/shared";
+import type { ContextIndexManager } from "../../services/contextIndexManager";
 import { truncateToTokenBudget } from "../utils/tokenEstimation";
 
 type Logger = Pick<Console, "info" | "warn" | "error" | "debug">;
@@ -19,15 +20,17 @@ const AGENTS_MD_FILE = "AGENTS.md";
 
 export class ProjectContextManager {
   private readonly logger: Logger;
+  private readonly contextIndexManager?: ContextIndexManager;
 
-  constructor(logger: Logger) {
+  constructor(logger: Logger, contextIndexManager?: ContextIndexManager) {
     this.logger = {
       ...logger,
       debug: logger.debug ? logger.debug.bind(logger) : () => undefined,
     };
+    this.contextIndexManager = contextIndexManager;
   }
 
-  async getContext(session: CoworkSession): Promise<string> {
+  async getContext(session: CoworkSession): Promise<string | undefined> {
     return this.loadProjectContext(session);
   }
 
@@ -109,11 +112,61 @@ export class ProjectContextManager {
       return "";
     }
   }
+
+  async getContextPackPrompt(session: CoworkSession): Promise<{
+    prompt?: string;
+    packKey: string | null;
+  }> {
+    const rootPath = resolveRootPath(session);
+    if (!rootPath || !this.contextIndexManager) {
+      return { prompt: undefined, packKey: null };
+    }
+
+    try {
+      const index = this.contextIndexManager.getIndex(rootPath);
+      const pins = await index.getPins(session.sessionId);
+      if (!pins || pins.packIds.length === 0) {
+        return { prompt: undefined, packKey: null };
+      }
+
+      const packKey = await buildPackKey(index, pins.packIds);
+      const prompt = await index.buildPackPrompt(pins.packIds);
+
+      return { prompt, packKey };
+    } catch (error) {
+      this.logger.warn("Failed to build context pack prompt", { error });
+      return { prompt: undefined, packKey: null };
+    }
+  }
+
+  async getContextPackKey(session: CoworkSession): Promise<string | null> {
+    const rootPath = resolveRootPath(session);
+    if (!rootPath || !this.contextIndexManager) {
+      return null;
+    }
+
+    try {
+      const index = this.contextIndexManager.getIndex(rootPath);
+      const pins = await index.getPins(session.sessionId);
+      if (!pins || pins.packIds.length === 0) {
+        return null;
+      }
+
+      return buildPackKey(index, pins.packIds);
+    } catch (error) {
+      this.logger.warn("Failed to load context pack key", { error });
+      return null;
+    }
+  }
 }
 
 function resolveRootPath(session: CoworkSession): string | null {
-  const rootPath = session.grants?.[0]?.rootPath;
-  return rootPath ?? null;
+  for (const grant of session.grants ?? []) {
+    if (typeof grant.rootPath === "string") {
+      return grant.rootPath;
+    }
+  }
+  return null;
 }
 
 function resolveAgentsMdPath(rootPath: string): string {
@@ -129,4 +182,18 @@ async function readAgentsMdIfExists(path: string): Promise<string | null> {
     return null;
   }
   return readFile(path, "utf-8");
+}
+
+async function buildPackKey(
+  index: { getPack: (packId: string) => Promise<{ id: string; updatedAt: number } | null> },
+  packIds: string[]
+): Promise<string | null> {
+  const parts: string[] = [];
+  for (const packId of packIds) {
+    const pack = await index.getPack(packId);
+    if (pack) {
+      parts.push(`${pack.id}:${pack.updatedAt}`);
+    }
+  }
+  return parts.length > 0 ? parts.join("|") : null;
 }

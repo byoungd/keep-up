@@ -278,7 +278,6 @@ export class ContextIndex {
     return this.store.upsertPins(pins);
   }
 
-  // biome-ignore lint:complexity/noExcessiveCognitiveComplexity
   async buildPackPrompt(
     packIds: string[],
     options: ContextPackPromptOptions = {}
@@ -289,47 +288,26 @@ export class ContextIndex {
 
     await this.ensureIndex();
     const tokenBudget = options.tokenBudget ?? this.config.promptTokenBudget;
-    let remaining = tokenBudget;
-    const lines: string[] = ["<context_packs>"];
-    let chunkCount = 0;
+    const state: PromptState = {
+      remaining: tokenBudget,
+      lines: ["<context_packs>"],
+      chunkCount: 0,
+    };
 
     for (const packId of packIds) {
-      const pack = await this.store.getPack(packId);
-      if (!pack) {
-        continue;
-      }
-
-      lines.push(`<context_pack id="${pack.id}" name="${escapeAttribute(pack.name)}">`);
-      for (const chunkId of pack.chunkIds) {
-        const chunk = await this.store.getChunk(chunkId);
-        if (!chunk) {
-          continue;
-        }
-        if (remaining - chunk.tokenCount < 0) {
-          break;
-        }
-        remaining -= chunk.tokenCount;
-        chunkCount += 1;
-        lines.push(`<chunk source="${escapeAttribute(chunk.sourcePath)}">`);
-        lines.push(chunk.content);
-        lines.push("</chunk>");
-        if (remaining <= 0) {
-          break;
-        }
-      }
-      lines.push("</context_pack>");
-      if (remaining <= 0) {
+      if (!this.hasBudget(state)) {
         break;
       }
+      await this.appendPackPrompt(state, packId);
     }
 
-    lines.push("</context_packs>");
+    state.lines.push("</context_packs>");
 
-    if (chunkCount === 0) {
+    if (state.chunkCount === 0) {
       return undefined;
     }
 
-    return lines.join("\n");
+    return state.lines.join("\n");
   }
 
   private async ensureIndex(): Promise<void> {
@@ -373,6 +351,49 @@ export class ContextIndex {
       }
     }
   }
+
+  private hasBudget(state: PromptState): boolean {
+    return state.remaining > 0;
+  }
+
+  private async appendPackPrompt(state: PromptState, packId: string): Promise<void> {
+    const pack = await this.store.getPack(packId);
+    if (!pack) {
+      return;
+    }
+
+    state.lines.push(`<context_pack id="${pack.id}" name="${escapeAttribute(pack.name)}">`);
+    await this.appendPackChunks(state, pack.chunkIds);
+    state.lines.push("</context_pack>");
+  }
+
+  private async appendPackChunks(state: PromptState, chunkIds: string[]): Promise<void> {
+    for (const chunkId of chunkIds) {
+      const chunk = await this.store.getChunk(chunkId);
+      if (!chunk) {
+        continue;
+      }
+      if (!this.canFitChunk(state, chunk.tokenCount)) {
+        break;
+      }
+      this.appendChunk(state, chunk);
+      if (!this.hasBudget(state)) {
+        break;
+      }
+    }
+  }
+
+  private canFitChunk(state: PromptState, tokenCount: number): boolean {
+    return state.remaining - tokenCount >= 0;
+  }
+
+  private appendChunk(state: PromptState, chunk: ContextChunk): void {
+    state.remaining -= chunk.tokenCount;
+    state.chunkCount += 1;
+    state.lines.push(`<chunk source="${escapeAttribute(chunk.sourcePath)}">`);
+    state.lines.push(chunk.content);
+    state.lines.push("</chunk>");
+  }
 }
 
 export function createContextIndex(options: ContextIndexOptions): ContextIndex {
@@ -405,6 +426,12 @@ function uniqueValues(values: string[]): string[] {
   }
   return result;
 }
+
+type PromptState = {
+  remaining: number;
+  lines: string[];
+  chunkCount: number;
+};
 
 function isBinaryContent(content: string): boolean {
   return content.includes("\u0000");
