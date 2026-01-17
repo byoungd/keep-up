@@ -27,9 +27,17 @@ export class ChatMessageStore {
       .sort((a, b) => a.createdAt - b.createdAt);
   }
 
-  async getByClientRequestId(clientRequestId: string): Promise<CoworkChatMessage | null> {
+  async getByClientRequestId(
+    clientRequestId: string,
+    role?: CoworkChatMessage["role"]
+  ): Promise<CoworkChatMessage | null> {
     const items = await this.store.getAll();
-    return items.find((message) => message.clientRequestId === clientRequestId) ?? null;
+    return (
+      items
+        .filter((message) => message.clientRequestId === clientRequestId)
+        .filter((message) => (role ? message.role === role : true))
+        .sort((a, b) => b.createdAt - a.createdAt)[0] ?? null
+    );
   }
 
   create(message: CoworkChatMessage): Promise<CoworkChatMessage> {

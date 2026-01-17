@@ -35,6 +35,7 @@ export function useCoworkAIPanelController() {
   const [model, setModel] = useState(defaultModelId);
   const [input, setInput] = useState("");
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [branchParentId, setBranchParentId] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<PanelAttachment[]>([]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -58,7 +59,6 @@ export function useCoworkAIPanelController() {
     isConnected,
     isLive,
     editMessage,
-    branchMessage,
     retryMessage,
   } = useChatSession(sessionId);
 
@@ -148,7 +148,8 @@ export function useCoworkAIPanelController() {
     async (
       resolvedContent: string,
       mode: "chat" | "task",
-      nextAttachments: ChatAttachmentRef[]
+      nextAttachments: ChatAttachmentRef[],
+      parentId?: string
     ) => {
       if (mode === "task") {
         setStatusMessage("Initiating task...");
@@ -161,8 +162,10 @@ export function useCoworkAIPanelController() {
         await sendMessage(resolvedContent, mode, {
           modelId: model,
           attachments: mode === "chat" ? nextAttachments : undefined,
+          parentId: mode === "chat" ? parentId : undefined,
         });
       }
+      setBranchParentId(null);
       setStatusMessage(null);
     },
     [editingMessageId, editMessage, sendMessage, model]
@@ -182,6 +185,7 @@ export function useCoworkAIPanelController() {
     async (targetSessionId: string, content: string, mode: "chat" | "task") => {
       const readyRefs = getReadyAttachmentRefs(attachments, attachmentRefs.current);
       pendingMessageRef.current = { content, mode, attachments: readyRefs };
+      setBranchParentId(null);
       await navigate({
         to: "/sessions/$sessionId",
         params: { sessionId: targetSessionId },
@@ -191,9 +195,9 @@ export function useCoworkAIPanelController() {
   );
 
   const sendInSession = useCallback(
-    async (resolvedContent: string, mode: "chat" | "task") => {
+    async (resolvedContent: string, mode: "chat" | "task", parentId?: string) => {
       const readyRefs = getReadyAttachmentRefs(attachments, attachmentRefs.current);
-      await executeMessageSend(resolvedContent, mode, readyRefs);
+      await executeMessageSend(resolvedContent, mode, readyRefs, parentId);
       clearAttachments();
     },
     [attachments, executeMessageSend, clearAttachments]
@@ -231,7 +235,7 @@ export function useCoworkAIPanelController() {
         return;
       }
 
-      await sendInSession(resolvedContent, mode);
+      await sendInSession(resolvedContent, mode, branchParentId ?? undefined);
     } catch (_err) {
       setInput(content);
       setStatusMessage(
@@ -247,6 +251,7 @@ export function useCoworkAIPanelController() {
     getSendBlocker,
     queueSendAfterNavigation,
     sendInSession,
+    branchParentId,
   ]);
 
   const startEditing = useCallback(
@@ -255,11 +260,19 @@ export function useCoworkAIPanelController() {
       if (msg && msg.role === "user") {
         setInput(msg.content);
         setEditingMessageId(id);
+        setBranchParentId(null);
         inputRef.current?.focus();
       }
     },
     [messages]
   );
+
+  const startBranching = useCallback((id: string) => {
+    setEditingMessageId(null);
+    setBranchParentId(id);
+    setStatusMessage("Branching from selected message.");
+    inputRef.current?.focus();
+  }, []);
 
   const handleSetModel = useCallback(
     (nextModel: string) => {
@@ -304,6 +317,8 @@ export function useCoworkAIPanelController() {
         .join("\n");
       return prev ? `${prev}\n\n${quoteBlock}\n\n` : `${quoteBlock}\n\n`;
     });
+    setEditingMessageId(null);
+    setBranchParentId(null);
     inputRef.current?.focus();
   }, []);
 
@@ -426,7 +441,7 @@ export function useCoworkAIPanelController() {
     tasks: [], // Deprecated in favor of inline task cards
     onExport: handleExport,
     onEdit: startEditing,
-    onBranch: branchMessage,
+    onBranch: startBranching,
     onQuote: handleQuote,
     onRetry: retryMessage,
     editingMessageId,

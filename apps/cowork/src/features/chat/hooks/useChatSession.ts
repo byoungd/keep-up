@@ -2,6 +2,7 @@ import type { Message } from "@ku0/shell";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   type ChatAttachmentRef,
+  type ChatMessage,
   createTask,
   editChatMessage,
   getChatHistory,
@@ -40,23 +41,7 @@ export function useChatSession(sessionId: string | undefined) {
         if (!isActive) {
           return;
         }
-        const mapped: Message[] = history.map((msg) => ({
-          id: msg.id,
-          role: msg.role,
-          content: msg.content,
-          createdAt: msg.createdAt,
-          status: msg.status ?? "done",
-          type: "text",
-          modelId: msg.modelId,
-          providerId: msg.providerId,
-          fallbackNotice: msg.fallbackNotice,
-          metadata: {
-            ...(msg.metadata ?? {}),
-            ...(msg.attachments ? { attachments: msg.attachments } : {}),
-          },
-          requestId:
-            typeof msg.metadata?.requestId === "string" ? msg.metadata.requestId : undefined,
-        }));
+        const mapped = mapHistoryMessages(history);
         setHistoryMessages((prev) => mergeHistory(prev, mapped));
       })
       .catch((_err) => {
@@ -84,9 +69,16 @@ export function useChatSession(sessionId: string | undefined) {
   }, [graph, historyMessages]);
 
   const addOptimisticMessage = useCallback(
-    (content: string, tempId: string, requestId?: string, attachments?: ChatAttachmentRef[]) => {
+    (
+      content: string,
+      tempId: string,
+      requestId?: string,
+      attachments?: ChatAttachmentRef[],
+      parentId?: string
+    ) => {
       const metadata = {
         ...(requestId ? { requestId } : {}),
+        ...(parentId ? { parentId } : {}),
         ...(attachments && attachments.length > 0 ? { attachments } : {}),
       };
       const optimisticMsg: Message = {
@@ -168,6 +160,10 @@ export function useChatSession(sessionId: string | undefined) {
     ) => {
       const now = Date.now();
       const assistantId = `assistant-${clientRequestId}`;
+      const assistantMetadata = {
+        requestId: clientRequestId,
+        ...(parentId ? { parentId } : {}),
+      };
       setHistoryMessages((prev) => [
         ...prev,
         {
@@ -179,7 +175,7 @@ export function useChatSession(sessionId: string | undefined) {
           type: "text",
           modelId,
           requestId: clientRequestId,
-          metadata: { requestId: clientRequestId },
+          metadata: assistantMetadata,
         },
       ]);
 
@@ -203,54 +199,64 @@ export function useChatSession(sessionId: string | undefined) {
         rafId = null;
       };
 
-      const response = await sendChatMessage(
-        sessionId,
-        { content, parentId, clientRequestId, messageId: userMessageId, attachments },
-        (chunk) => {
-          if (stallTimeout) {
-            clearTimeout(stallTimeout);
-            stallTimeout = null;
-            markMessageStalled(assistantId, false);
-          }
-          pendingChunk += chunk;
-          if (rafId === null) {
-            if (typeof requestAnimationFrame === "function") {
-              rafId = requestAnimationFrame(flushChunks);
-            } else {
-              flushChunks();
+      let response: Awaited<ReturnType<typeof sendChatMessage>> | null = null;
+      try {
+        response = await sendChatMessage(
+          sessionId,
+          { content, parentId, clientRequestId, messageId: userMessageId, attachments },
+          (chunk) => {
+            if (stallTimeout) {
+              clearTimeout(stallTimeout);
+              stallTimeout = null;
+              markMessageStalled(assistantId, false);
             }
+            pendingChunk += chunk;
+            if (rafId === null) {
+              if (typeof requestAnimationFrame === "function") {
+                rafId = requestAnimationFrame(flushChunks);
+              } else {
+                flushChunks();
+              }
+            }
+          },
+          (meta) => {
+            setHistoryMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantId
+                  ? {
+                      ...m,
+                      modelId: meta.modelId,
+                      providerId: meta.providerId,
+                      fallbackNotice: meta.fallbackNotice,
+                    }
+                  : m
+              )
+            );
           }
-        },
-        (meta) => {
+        );
+      } finally {
+        if (rafId !== null) {
+          if (typeof cancelAnimationFrame === "function") {
+            cancelAnimationFrame(rafId);
+          }
+          rafId = null;
+        }
+        if (pendingChunk) {
+          fullContent += pendingChunk;
+          pendingChunk = "";
           setHistoryMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId
-                ? {
-                    ...m,
-                    modelId: meta.modelId,
-                    providerId: meta.providerId,
-                    fallbackNotice: meta.fallbackNotice,
-                  }
-                : m
-            )
+            prev.map((m) => (m.id === assistantId ? { ...m, content: fullContent } : m))
           );
         }
-      );
-
-      if (rafId !== null) {
-        if (typeof cancelAnimationFrame === "function") {
-          cancelAnimationFrame(rafId);
+        if (stallTimeout) {
+          clearTimeout(stallTimeout);
+          stallTimeout = null;
+          markMessageStalled(assistantId, false);
         }
-        rafId = null;
       }
-      if (pendingChunk) {
-        fullContent += pendingChunk;
-        pendingChunk = "";
-      }
-      if (stallTimeout) {
-        clearTimeout(stallTimeout);
-        stallTimeout = null;
-        markMessageStalled(assistantId, false);
+
+      if (!response) {
+        return;
       }
 
       updateMessageId(assistantId, response.id);
@@ -310,7 +316,13 @@ export function useChatSession(sessionId: string | undefined) {
 
       const clientRequestId = crypto.randomUUID();
       const userMessageId = `user-${clientRequestId}`;
-      addOptimisticMessage(content, userMessageId, clientRequestId, options?.attachments);
+      addOptimisticMessage(
+        content,
+        userMessageId,
+        clientRequestId,
+        options?.attachments,
+        options?.parentId
+      );
 
       try {
         if (type === "task") {
@@ -364,12 +376,47 @@ export function useChatSession(sessionId: string | undefined) {
         return;
       }
 
-      // If it's a user message, re-run the prompt
+      const getAttachments = (message: Message): ChatAttachmentRef[] | undefined => {
+        const attachments = message.metadata?.attachments;
+        if (Array.isArray(attachments)) {
+          return attachments as ChatAttachmentRef[];
+        }
+        return undefined;
+      };
+
+      const findUserById = (id: string) =>
+        historyMessages.find((m) => m.id === id && m.role === "user");
+
+      const findNearestUserBefore = (target: Message) => {
+        const sorted = [...historyMessages].sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
+        const index = sorted.findIndex((m) => m.id === target.id);
+        if (index === -1) {
+          return undefined;
+        }
+        for (let i = index - 1; i >= 0; i -= 1) {
+          if (sorted[i].role === "user") {
+            return sorted[i];
+          }
+        }
+        return undefined;
+      };
+
       if (msg.role === "user") {
-        await sendMessage(msg.content, "chat");
+        await sendMessage(msg.content, "chat", { attachments: getAttachments(msg) });
+        return;
       }
-      // For assistant messages, ideally find the parent user message
-      // or implement a regenerate API endpoint
+
+      const parentId =
+        typeof msg.metadata?.parentId === "string" ? (msg.metadata.parentId as string) : undefined;
+      const parentUser = parentId ? findUserById(parentId) : undefined;
+      const fallbackUser = parentUser ?? findNearestUserBefore(msg);
+      if (!fallbackUser) {
+        return;
+      }
+      await sendMessage(fallbackUser.content, "chat", {
+        parentId: fallbackUser.id,
+        attachments: getAttachments(fallbackUser),
+      });
     },
     [sessionId, historyMessages, sendMessage]
   );
@@ -471,4 +518,30 @@ function mapTaskStatus(
     default:
       return "queued";
   }
+}
+
+function mapHistoryMessages(history: ChatMessage[]): Message[] {
+  return history.map((msg) => {
+    const metadata = {
+      ...(msg.metadata ?? {}),
+      ...(msg.parentId ? { parentId: msg.parentId } : {}),
+      ...(msg.attachments ? { attachments: msg.attachments } : {}),
+    };
+    return {
+      id: msg.id,
+      role: msg.role === "assistant" ? "assistant" : "user",
+      content: msg.content,
+      createdAt: msg.createdAt,
+      status: msg.status ?? "done",
+      type: "text",
+      modelId: msg.modelId,
+      providerId: msg.providerId,
+      fallbackNotice: msg.fallbackNotice,
+      metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+      requestId:
+        typeof msg.metadata?.requestId === "string"
+          ? (msg.metadata.requestId as string)
+          : undefined,
+    };
+  });
 }

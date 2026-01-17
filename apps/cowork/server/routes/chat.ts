@@ -77,7 +77,7 @@ export function createChatRoutes(deps: ChatRouteDeps) {
     });
 
     if (requestId) {
-      const cached = await deps.chatMessageStore.getByClientRequestId(requestId);
+      const cached = await deps.chatMessageStore.getByClientRequestId(requestId, "assistant");
       if (cached) {
         await ensureUserMessage(deps.chatMessageStore, sessionId, userMessageId, body, requestId);
         return streamText(c, async (stream) => {
@@ -115,7 +115,7 @@ export function createChatRoutes(deps: ChatRouteDeps) {
   });
 
   async function executeAIStream(
-    stream: { write: (s: string) => Promise<void>; sleep: (ms: number) => Promise<void> },
+    stream: { write: (s: string) => Promise<unknown> },
     opts: {
       routerInfo: ChatRouterInfo;
       assistantMessageId: string;
@@ -209,9 +209,10 @@ export function createChatRoutes(deps: ChatRouteDeps) {
       return jsonError(c, 404, "Session not found");
     }
 
+    const newContent = body.content;
     const updated = await deps.chatMessageStore.update(messageId, (message) => ({
       ...message,
-      content: body.content,
+      content: newContent,
       updatedAt: Date.now(),
       status: message.status === "error" ? "done" : message.status,
     }));

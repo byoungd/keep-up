@@ -44,21 +44,31 @@ describe("ChatMessageStore", () => {
     expect(messages.map((m) => m.messageId)).toEqual(["m1", "m2"]);
   });
 
-  it("looks up by clientRequestId", async () => {
+  it("looks up by clientRequestId and role", async () => {
     tempDir = await mkdtemp(join(tmpdir(), "cowork-chat-"));
     const store = createChatMessageStore(join(tempDir, "chat.json"));
-    const message: CoworkChatMessage = {
-      messageId: "m3",
+    const userMessage: CoworkChatMessage = {
+      messageId: "m2",
       sessionId: "session-2",
-      role: "assistant",
+      role: "user",
       content: "Hello",
       createdAt: Date.now(),
       status: "done",
       clientRequestId: "req-123",
     };
+    const assistantMessage: CoworkChatMessage = {
+      messageId: "m3",
+      sessionId: "session-2",
+      role: "assistant",
+      content: "Hello",
+      createdAt: Date.now() + 10,
+      status: "done",
+      clientRequestId: "req-123",
+    };
 
-    await store.create(message);
-    const found = await store.getByClientRequestId("req-123");
+    await store.create(userMessage);
+    await store.create(assistantMessage);
+    const found = await store.getByClientRequestId("req-123", "assistant");
     expect(found?.messageId).toBe("m3");
   });
 });

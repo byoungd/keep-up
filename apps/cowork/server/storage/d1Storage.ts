@@ -331,7 +331,9 @@ function rowToChatMessage(row: Record<string, unknown>): CoworkChatMessage {
     fallbackNotice: row.fallback_notice ? String(row.fallback_notice) : undefined,
     parentId: row.parent_id ? String(row.parent_id) : undefined,
     clientRequestId: row.client_request_id ? String(row.client_request_id) : undefined,
-    attachments: parseJsonArray<CoworkChatMessage["attachments"][number]>(row.attachments),
+    attachments: parseJsonArray<NonNullable<CoworkChatMessage["attachments"]>[number]>(
+      row.attachments
+    ),
     metadata: parseJsonObject(row.metadata),
     taskId: row.task_id ? String(row.task_id) : undefined,
   };
@@ -623,11 +625,16 @@ async function createD1ChatMessageStore(db: D1Database): Promise<ChatMessageStor
       return result.results.map(rowToChatMessage);
     },
 
-    async getByClientRequestId(clientRequestId: string): Promise<CoworkChatMessage | null> {
+    async getByClientRequestId(
+      clientRequestId: string,
+      role?: CoworkChatMessage["role"]
+    ): Promise<CoworkChatMessage | null> {
       const row = await prepare(
         db,
-        "SELECT * FROM chat_messages WHERE client_request_id = ? LIMIT 1",
-        [clientRequestId]
+        role
+          ? "SELECT * FROM chat_messages WHERE client_request_id = ? AND role = ? ORDER BY created_at DESC LIMIT 1"
+          : "SELECT * FROM chat_messages WHERE client_request_id = ? ORDER BY created_at DESC LIMIT 1",
+        role ? [clientRequestId, role] : [clientRequestId]
       ).first();
       return row ? rowToChatMessage(row) : null;
     },

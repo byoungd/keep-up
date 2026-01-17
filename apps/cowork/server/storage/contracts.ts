@@ -74,7 +74,10 @@ export interface ChatMessageStoreLike {
   getAll(): Promise<CoworkChatMessage[]>;
   getById(messageId: string): Promise<CoworkChatMessage | null>;
   getBySession(sessionId: string): Promise<CoworkChatMessage[]>;
-  getByClientRequestId(clientRequestId: string): Promise<CoworkChatMessage | null>;
+  getByClientRequestId(
+    clientRequestId: string,
+    role?: CoworkChatMessage["role"]
+  ): Promise<CoworkChatMessage | null>;
   create(message: CoworkChatMessage): Promise<CoworkChatMessage>;
   update(
     messageId: string,

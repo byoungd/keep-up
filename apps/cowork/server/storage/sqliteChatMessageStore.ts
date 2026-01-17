@@ -9,7 +9,10 @@ export interface SqliteChatMessageStore {
   getAll(): Promise<CoworkChatMessage[]>;
   getById(messageId: string): Promise<CoworkChatMessage | null>;
   getBySession(sessionId: string): Promise<CoworkChatMessage[]>;
-  getByClientRequestId(clientRequestId: string): Promise<CoworkChatMessage | null>;
+  getByClientRequestId(
+    clientRequestId: string,
+    role?: CoworkChatMessage["role"]
+  ): Promise<CoworkChatMessage | null>;
   create(message: CoworkChatMessage): Promise<CoworkChatMessage>;
   update(
     messageId: string,
@@ -39,7 +42,17 @@ export async function createSqliteChatMessageStore(): Promise<SqliteChatMessageS
   `);
 
   const selectByRequestStmt = db.prepare(`
-    SELECT * FROM chat_messages WHERE client_request_id = $clientRequestId LIMIT 1
+    SELECT * FROM chat_messages
+    WHERE client_request_id = $clientRequestId
+    ORDER BY created_at DESC
+    LIMIT 1
+  `);
+
+  const selectByRequestAndRoleStmt = db.prepare(`
+    SELECT * FROM chat_messages
+    WHERE client_request_id = $clientRequestId AND role = $role
+    ORDER BY created_at DESC
+    LIMIT 1
   `);
 
   const updateStmt = db.prepare(`
@@ -96,10 +109,17 @@ export async function createSqliteChatMessageStore(): Promise<SqliteChatMessageS
       const rows = selectBySessionStmt.all({ $sessionId: sessionId }) as Record<string, unknown>[];
       return rows.map(rowToMessage);
     },
-    async getByClientRequestId(clientRequestId: string): Promise<CoworkChatMessage | null> {
-      const row = selectByRequestStmt.get({
-        $clientRequestId: clientRequestId,
-      }) as Record<string, unknown> | null;
+    async getByClientRequestId(
+      clientRequestId: string,
+      role?: CoworkChatMessage["role"]
+    ): Promise<CoworkChatMessage | null> {
+      const params = role
+        ? { $clientRequestId: clientRequestId, $role: role }
+        : { $clientRequestId: clientRequestId };
+      const row = (role ? selectByRequestAndRoleStmt : selectByRequestStmt).get(params) as Record<
+        string,
+        unknown
+      > | null;
       return row ? rowToMessage(row) : null;
     },
     async create(message: CoworkChatMessage): Promise<CoworkChatMessage> {
