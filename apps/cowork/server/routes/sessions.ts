@@ -194,6 +194,100 @@ export function createSessionRoutes(deps: SessionRouteDeps) {
     return c.json({ ok: true, session: updated });
   });
 
+  // ============================================================================
+  // Agent Mode API (Plan/Build Mode)
+  // ============================================================================
+
+  /**
+   * GET /sessions/:sessionId/mode
+   * Get the current agent mode for a session
+   */
+  app.get("/sessions/:sessionId/mode", async (c) => {
+    const sessionId = c.req.param("sessionId");
+    const session = await deps.sessionStore.getById(sessionId);
+    if (!session) {
+      return jsonError(c, 404, "Session not found");
+    }
+
+    return c.json({
+      ok: true,
+      mode: session.agentMode ?? "build",
+      sessionId,
+    });
+  });
+
+  /**
+   * PUT /sessions/:sessionId/mode
+   * Set the agent mode for a session
+   */
+  app.put("/sessions/:sessionId/mode", async (c) => {
+    const sessionId = c.req.param("sessionId");
+    const body = await readJsonBody(c);
+
+    const mode = (body as { mode?: string } | null)?.mode;
+    if (mode !== "plan" && mode !== "build") {
+      return jsonError(c, 400, "Invalid mode. Must be 'plan' or 'build'");
+    }
+
+    const updated = await deps.sessionStore.update(sessionId, (prev) => ({
+      ...prev,
+      agentMode: mode,
+      updatedAt: Date.now(),
+    }));
+
+    if (!updated) {
+      return jsonError(c, 404, "Session not found");
+    }
+
+    deps.events.publish(sessionId, COWORK_EVENTS.SESSION_UPDATED, {
+      sessionId,
+      agentMode: mode,
+    });
+
+    return c.json({
+      ok: true,
+      mode: updated.agentMode ?? "build",
+      sessionId,
+    });
+  });
+
+  /**
+   * POST /sessions/:sessionId/mode/toggle
+   * Toggle between plan and build mode
+   */
+  app.post("/sessions/:sessionId/mode/toggle", async (c) => {
+    const sessionId = c.req.param("sessionId");
+    const session = await deps.sessionStore.getById(sessionId);
+    if (!session) {
+      return jsonError(c, 404, "Session not found");
+    }
+
+    const currentMode = session.agentMode ?? "build";
+    const newMode = currentMode === "plan" ? "build" : "plan";
+
+    const updated = await deps.sessionStore.update(sessionId, (prev) => ({
+      ...prev,
+      agentMode: newMode,
+      updatedAt: Date.now(),
+    }));
+
+    if (!updated) {
+      return jsonError(c, 404, "Session not found");
+    }
+
+    deps.events.publish(sessionId, COWORK_EVENTS.SESSION_UPDATED, {
+      sessionId,
+      agentMode: newMode,
+    });
+
+    return c.json({
+      ok: true,
+      previousMode: currentMode,
+      mode: newMode,
+      sessionId,
+    });
+  });
+
   return app;
 }
 

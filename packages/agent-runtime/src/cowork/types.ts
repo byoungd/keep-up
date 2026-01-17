@@ -4,6 +4,8 @@
  * Core types for Cowork sessions, grants, tasks, and summaries.
  */
 
+import type { AgentMode } from "../modes";
+
 export type CoworkPlatform = "macos";
 export type CoworkMode = "cowork";
 
@@ -21,6 +23,8 @@ export interface CoworkSession {
   endedAt?: number;
   title?: string;
   projectId?: string;
+  /** Agent mode: 'plan' for read-only analysis, 'build' for full development access */
+  agentMode?: AgentMode;
 }
 
 export interface CoworkFolderGrant {

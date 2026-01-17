@@ -8,8 +8,10 @@ import type { ToolActivity } from "@ku0/agent-runtime";
 export const COWORK_EVENTS = {
   // Session lifecycle
   SESSION_CREATED: "session.created",
+  SESSION_UPDATED: "session.updated",
   SESSION_ENDED: "session.ended",
   SESSION_DELETED: "session.deleted",
+  SESSION_MODE_CHANGED: "session.mode.changed",
 
   // Task lifecycle
   TASK_CREATED: "task.created",
@@ -42,12 +44,22 @@ export interface CoworkEventPayloads {
     sessionId: string;
     createdAt: number;
   };
+  [COWORK_EVENTS.SESSION_UPDATED]: {
+    sessionId: string;
+    agentMode?: "plan" | "build";
+    title?: string;
+  };
   [COWORK_EVENTS.SESSION_ENDED]: {
     sessionId: string;
     endedAt: number;
   };
   [COWORK_EVENTS.SESSION_DELETED]: {
     sessionId: string;
+  };
+  [COWORK_EVENTS.SESSION_MODE_CHANGED]: {
+    sessionId: string;
+    mode: "plan" | "build";
+    previousMode: "plan" | "build";
   };
   [COWORK_EVENTS.TASK_CREATED]: {
     taskId: string;
