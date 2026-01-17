@@ -1,3 +1,5 @@
+import matter from "gray-matter";
+
 export type SkillFrontmatter = {
   name: string;
   description: string;
@@ -30,25 +32,39 @@ export function parseSkillMarkdown(
   content: string,
   options?: SkillValidationOptions
 ): SkillParseOutcome {
-  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
-  if (!match) {
+  // Use gray-matter for robust YAML frontmatter parsing
+  let parsed: matter.GrayMatterFile<string>;
+  try {
+    parsed = matter(content);
+  } catch (err) {
+    return { success: false, error: `Invalid YAML frontmatter: ${String(err)}` };
+  }
+
+  // Check if frontmatter was present
+  if (Object.keys(parsed.data).length === 0) {
     return { success: false, error: "Missing YAML frontmatter in SKILL.md" };
   }
 
-  const frontmatterText = match[1];
-  const body = match[2].trim();
-
-  const parsed = parseFrontmatter(frontmatterText);
-  if (!parsed.success) {
-    return parsed;
+  // Validate allowed fields
+  for (const key of Object.keys(parsed.data)) {
+    if (!ALLOWED_FIELDS.has(key)) {
+      return { success: false, error: `Unsupported frontmatter field: ${key}` };
+    }
   }
 
-  const validated = validateFrontmatter(parsed.data, options);
+  // Normalize allowed-tools to allowedTools
+  const data = { ...parsed.data };
+  if (data["allowed-tools"] !== undefined) {
+    data.allowedTools = data["allowed-tools"];
+    delete data["allowed-tools"];
+  }
+
+  const validated = validateFrontmatter(data, options);
   if (!validated.success) {
     return validated;
   }
 
-  return { success: true, frontmatter: validated.frontmatter, body };
+  return { success: true, frontmatter: validated.frontmatter, body: parsed.content.trim() };
 }
 
 export function normalizeSkillName(name: string): string {
@@ -70,197 +86,6 @@ export function validateSkillName(name: string): string | null {
     return "Skill name cannot contain consecutive hyphens";
   }
   return null;
-}
-
-function parseFrontmatter(
-  text: string
-): { success: true; data: Record<string, unknown> } | { success: false; error: string } {
-  const data: Record<string, unknown> = {};
-  const lines = text.split("\n");
-  let index = 0;
-
-  while (index < lines.length) {
-    const line = lines[index];
-    const trimmed = line.trim();
-
-    if (isIgnorableLine(trimmed)) {
-      index += 1;
-      continue;
-    }
-
-    const parsedLine = parseFrontmatterLine(line, index);
-    if (!parsedLine.success) {
-      return parsedLine;
-    }
-
-    if (!ALLOWED_FIELDS.has(parsedLine.key)) {
-      return { success: false, error: `Unsupported frontmatter field: ${parsedLine.key}` };
-    }
-
-    const valueResult = parseFrontmatterValue(parsedLine.key, parsedLine.rawValue, lines, index);
-    if (!valueResult.success) {
-      return valueResult;
-    }
-    data[parsedLine.key] = valueResult.value;
-    index = valueResult.nextIndex;
-  }
-
-  return { success: true, data };
-}
-
-function isIgnorableLine(trimmed: string): boolean {
-  return trimmed.length === 0 || trimmed.startsWith("#");
-}
-
-function parseFrontmatterLine(
-  line: string,
-  index: number
-): { success: true; key: string; rawValue: string } | { success: false; error: string } {
-  if (/^\s+/.test(line)) {
-    return { success: false, error: `Unexpected indentation at line ${index + 1}` };
-  }
-
-  const colonIndex = line.indexOf(":");
-  if (colonIndex === -1) {
-    return { success: false, error: `Invalid frontmatter line ${index + 1}` };
-  }
-
-  const key = line.slice(0, colonIndex).trim();
-  const rawValue = line.slice(colonIndex + 1).trim();
-
-  return { success: true, key, rawValue };
-}
-
-function parseFrontmatterValue(
-  key: string,
-  rawValue: string,
-  lines: string[],
-  index: number
-): { success: true; value: unknown; nextIndex: number } | { success: false; error: string } {
-  if (rawValue !== "") {
-    return { success: true, value: parseScalarValue(rawValue), nextIndex: index + 1 };
-  }
-
-  if (key === "metadata") {
-    const metadataResult = parseMetadataBlock(lines, index + 1);
-    if (!metadataResult.success) {
-      return metadataResult;
-    }
-    return {
-      success: true,
-      value: metadataResult.value,
-      nextIndex: metadataResult.nextIndex,
-    };
-  }
-
-  if (key === "allowed-tools") {
-    const listResult = parseListBlock(lines, index + 1);
-    if (!listResult.success) {
-      return listResult;
-    }
-    return { success: true, value: listResult.items, nextIndex: listResult.nextIndex };
-  }
-
-  return { success: true, value: "", nextIndex: index + 1 };
-}
-
-function parseMetadataBlock(
-  lines: string[],
-  startIndex: number
-):
-  | { success: true; value: Record<string, string>; nextIndex: number }
-  | { success: false; error: string } {
-  const metadata: Record<string, string> = {};
-  let index = startIndex;
-
-  while (index < lines.length) {
-    const line = lines[index];
-    if (!/^\s+/.test(line)) {
-      break;
-    }
-
-    const trimmed = line.trim();
-    if (trimmed.length === 0 || trimmed.startsWith("#")) {
-      index += 1;
-      continue;
-    }
-
-    const colonIndex = trimmed.indexOf(":");
-    if (colonIndex === -1) {
-      return { success: false, error: `Invalid metadata line ${index + 1}` };
-    }
-
-    const key = trimmed.slice(0, colonIndex).trim();
-    const rawValue = trimmed.slice(colonIndex + 1).trim();
-
-    if (!key) {
-      return { success: false, error: `Invalid metadata key at line ${index + 1}` };
-    }
-
-    metadata[key] = stringifyScalar(rawValue);
-    index += 1;
-  }
-
-  return { success: true, value: metadata, nextIndex: index };
-}
-
-function parseListBlock(
-  lines: string[],
-  startIndex: number
-): { success: true; items: string[]; nextIndex: number } | { success: false; error: string } {
-  const items: string[] = [];
-  let index = startIndex;
-
-  while (index < lines.length) {
-    const line = lines[index];
-    if (!/^\s+/.test(line)) {
-      break;
-    }
-
-    const trimmed = line.trim();
-    if (trimmed.length === 0 || trimmed.startsWith("#")) {
-      index += 1;
-      continue;
-    }
-
-    if (!trimmed.startsWith("-")) {
-      return { success: false, error: `Invalid list item at line ${index + 1}` };
-    }
-
-    const item = trimmed.slice(1).trim();
-    if (item.length > 0) {
-      items.push(item);
-    }
-    index += 1;
-  }
-
-  return { success: true, items, nextIndex: index };
-}
-
-function parseScalarValue(value: string): string | string[] {
-  const trimmed = value.trim();
-  if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
-    const inner = trimmed.slice(1, -1).trim();
-    if (inner.length === 0) {
-      return [];
-    }
-    return inner
-      .split(",")
-      .map((entry) => entry.trim())
-      .filter((entry) => entry.length > 0);
-  }
-
-  return stringifyScalar(trimmed);
-}
-
-function stringifyScalar(value: string): string {
-  if (
-    (value.startsWith('"') && value.endsWith('"')) ||
-    (value.startsWith("'") && value.endsWith("'"))
-  ) {
-    return value.slice(1, -1);
-  }
-  return value;
 }
 
 function validateFrontmatter(
