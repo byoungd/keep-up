@@ -164,6 +164,7 @@ function buildTaskNodes(tasks: CoworkTask[]): TaskStatusNode[] {
       modelId: task.modelId,
       providerId: task.providerId,
       fallbackNotice: task.fallbackNotice,
+      metadata: task.metadata,
       timestamp: new Date(task.updatedAt).toISOString(),
     }));
 }
@@ -186,6 +187,7 @@ export function useTaskStream(sessionId: string) {
   const seenEventIdsRef = useRef(new Set<string>());
   const taskTitleRef = useRef(new Map<string, string>());
   const taskPromptRef = useRef(new Map<string, string>());
+  const taskMetadataRef = useRef(new Map<string, Record<string, unknown>>());
 
   useEffect(() => {
     graphRef.current = graph;
@@ -220,6 +222,7 @@ export function useTaskStream(sessionId: string) {
     lastEventIdRef.current = null;
     taskTitleRef.current.clear();
     taskPromptRef.current.clear();
+    taskMetadataRef.current.clear();
   }, [sessionId]);
 
   // Persist graph to localStorage on every change
@@ -259,7 +262,8 @@ export function useTaskStream(sessionId: string) {
             artifacts,
             session.agentMode,
             taskTitleRef.current,
-            taskPromptRef.current
+            taskPromptRef.current,
+            taskMetadataRef.current
           );
         });
       } catch (error) {
@@ -351,7 +355,8 @@ export function useTaskStream(sessionId: string) {
         data,
         new Date().toISOString(),
         taskTitleRef.current,
-        taskPromptRef.current
+        taskPromptRef.current,
+        taskMetadataRef.current
       )
     );
   }, []);
@@ -639,7 +644,8 @@ type EventHandler = (
   data: unknown,
   now: string,
   taskTitles: Map<string, string>,
-  taskPrompts: Map<string, string>
+  taskPrompts: Map<string, string>,
+  taskMetadata: Map<string, Record<string, unknown>>
 ) => TaskGraph;
 
 const EVENT_HANDLERS: Record<string, EventHandler> = {
@@ -662,7 +668,8 @@ function handleUsageUpdated(
   data: unknown,
   _now: string,
   _taskTitles: Map<string, string>,
-  _taskPrompts: Map<string, string>
+  _taskPrompts: Map<string, string>,
+  _taskMetadata: Map<string, Record<string, unknown>>
 ): TaskGraph {
   if (
     !isRecord(data) ||
@@ -688,7 +695,8 @@ function handleSessionModeChanged(
   data: unknown,
   _now: string,
   _taskTitles: Map<string, string>,
-  _taskPrompts: Map<string, string>
+  _taskPrompts: Map<string, string>,
+  _taskMetadata: Map<string, Record<string, unknown>>
 ): TaskGraph {
   if (!isRecord(data) || typeof data.mode !== "string") {
     return prev;
@@ -705,7 +713,8 @@ function handleApprovalRequired(
   data: unknown,
   now: string,
   _taskTitles: Map<string, string>,
-  _taskPrompts: Map<string, string>
+  _taskPrompts: Map<string, string>,
+  _taskMetadata: Map<string, Record<string, unknown>>
 ): TaskGraph {
   if (!isRecord(data)) {
     return prev;
@@ -742,7 +751,8 @@ function handleApprovalResolved(
   data: unknown,
   now: string,
   _taskTitles: Map<string, string>,
-  _taskPrompts: Map<string, string>
+  _taskPrompts: Map<string, string>,
+  _taskMetadata: Map<string, Record<string, unknown>>
 ): TaskGraph {
   if (!isRecord(data)) {
     return prev;
@@ -771,7 +781,8 @@ function handleAgentThink(
   data: unknown,
   now: string,
   _taskTitles: Map<string, string>,
-  _taskPrompts: Map<string, string>
+  _taskPrompts: Map<string, string>,
+  _taskMetadata: Map<string, Record<string, unknown>>
 ): TaskGraph {
   if (!isRecord(data) || typeof data.content !== "string") {
     return prev;
@@ -795,7 +806,8 @@ function handleToolCall(
   data: unknown,
   now: string,
   _taskTitles: Map<string, string>,
-  _taskPrompts: Map<string, string>
+  _taskPrompts: Map<string, string>,
+  _taskMetadata: Map<string, Record<string, unknown>>
 ): TaskGraph {
   if (!isRecord(data) || typeof data.tool !== "string") {
     return prev;
@@ -828,7 +840,8 @@ function handleToolResult(
   data: unknown,
   now: string,
   _taskTitles: Map<string, string>,
-  _taskPrompts: Map<string, string>
+  _taskPrompts: Map<string, string>,
+  _taskMetadata: Map<string, Record<string, unknown>>
 ): TaskGraph {
   if (!isRecord(data)) {
     return prev;
@@ -896,7 +909,8 @@ function handlePlanUpdate(
   data: unknown,
   now: string,
   _taskTitles: Map<string, string>,
-  _taskPrompts: Map<string, string>
+  _taskPrompts: Map<string, string>,
+  _taskMetadata: Map<string, Record<string, unknown>>
 ): TaskGraph {
   if (!isRecord(data)) {
     return prev;
@@ -930,7 +944,8 @@ function handleArtifactUpdate(
   data: unknown,
   now: string,
   _taskTitles: Map<string, string>,
-  _taskPrompts: Map<string, string>
+  _taskPrompts: Map<string, string>,
+  _taskMetadata: Map<string, Record<string, unknown>>
 ): TaskGraph {
   if (!isRecord(data)) {
     return prev;
@@ -972,11 +987,28 @@ function resolveTaskMetadata(data: Record<string, unknown>) {
   };
 }
 
+function resolveTaskMetadataRecord(
+  data: Record<string, unknown>,
+  taskId: string | undefined,
+  taskMetadata: Map<string, Record<string, unknown>>
+): Record<string, unknown> | undefined {
+  const incoming = isRecord(data.metadata) ? data.metadata : undefined;
+  if (taskId && incoming) {
+    taskMetadata.set(taskId, incoming);
+    return incoming;
+  }
+  if (taskId) {
+    return taskMetadata.get(taskId);
+  }
+  return incoming;
+}
+
 function resolveTaskNodeProps(
   data: Record<string, unknown>,
   taskId: string | undefined,
   taskTitles: Map<string, string>,
-  taskPrompts: Map<string, string>
+  taskPrompts: Map<string, string>,
+  taskMetadata: Map<string, Record<string, unknown>>
 ) {
   const statusValue = typeof data.status === "string" ? data.status : undefined;
   const title = resolveTaskTitle(taskId, data.title, taskTitles);
@@ -989,6 +1021,7 @@ function resolveTaskNodeProps(
   }
 
   const { modelId, providerId, fallbackNotice } = resolveTaskMetadata(data);
+  const metadata = resolveTaskMetadataRecord(data, taskId, taskMetadata);
 
   return {
     statusValue,
@@ -998,6 +1031,7 @@ function resolveTaskNodeProps(
     modelId,
     providerId,
     fallbackNotice,
+    metadata,
   };
 }
 
@@ -1010,6 +1044,7 @@ function createTaskStatusNode(
   modelId: string | undefined,
   providerId: string | undefined,
   fallbackNotice: string | undefined,
+  metadata: Record<string, unknown> | undefined,
   now: string
 ): TaskStatusNode {
   return {
@@ -1023,6 +1058,7 @@ function createTaskStatusNode(
     modelId,
     providerId,
     fallbackNotice,
+    metadata,
     timestamp: now,
   };
 }
@@ -1033,13 +1069,14 @@ function handleTaskUpdate(
   data: unknown,
   now: string,
   taskTitles: Map<string, string>,
-  taskPrompts: Map<string, string>
+  taskPrompts: Map<string, string>,
+  taskMetadata: Map<string, Record<string, unknown>>
 ): TaskGraph {
   if (!isRecord(data)) {
     return prev;
   }
   const taskId = typeof data.taskId === "string" ? data.taskId : undefined;
-  const props = resolveTaskNodeProps(data, taskId, taskTitles, taskPrompts);
+  const props = resolveTaskNodeProps(data, taskId, taskTitles, taskPrompts, taskMetadata);
 
   return {
     ...prev,
@@ -1057,6 +1094,7 @@ function handleTaskUpdate(
               props.modelId,
               props.providerId,
               props.fallbackNotice,
+              props.metadata,
               now
             )
           )
@@ -1128,12 +1166,16 @@ function deriveInitialState(
   artifacts: CoworkArtifact[],
   agentMode: "plan" | "build" | undefined,
   taskTitles: Map<string, string>,
-  taskPrompts: Map<string, string>
+  taskPrompts: Map<string, string>,
+  taskMetadata: Map<string, Record<string, unknown>>
 ): TaskGraph {
   const statusNodes = buildTaskNodes(tasks);
   for (const task of tasks) {
     taskTitles.set(task.taskId, task.title);
     taskPrompts.set(task.taskId, task.prompt);
+    if (task.metadata) {
+      taskMetadata.set(task.taskId, task.metadata);
+    }
   }
 
   const pendingApprovals = approvals.filter((a) => a.status === "pending");
@@ -1180,11 +1222,12 @@ function reduceGraph(
   data: unknown,
   now: string,
   taskTitles: Map<string, string>,
-  taskPrompts: Map<string, string>
+  taskPrompts: Map<string, string>,
+  taskMetadata: Map<string, Record<string, unknown>>
 ): TaskGraph {
   const handler = EVENT_HANDLERS[type];
   if (handler) {
-    return handler(prev, id, data, now, taskTitles, taskPrompts);
+    return handler(prev, id, data, now, taskTitles, taskPrompts, taskMetadata);
   }
   return prev;
 }

@@ -212,7 +212,7 @@ function getOrCreateTaskMessage(
 // --- Logic Helpers ---
 
 function buildAgentTaskFromGraph(taskNode: TaskStatusNode, graph: TaskGraph): AgentTask {
-  const { taskId, title, status, modelId, providerId, fallbackNotice } = taskNode;
+  const { taskId, title, status, modelId, providerId, fallbackNotice, metadata } = taskNode;
   const taskCount = graph.nodes.filter((node) => node.type === "task_status").length;
   const scopedNodes = filterNodesForTask(graph.nodes, taskId, taskCount);
   // Extract Steps & Actions
@@ -261,6 +261,7 @@ function buildAgentTaskFromGraph(taskNode: TaskStatusNode, graph: TaskGraph): Ag
     modelId,
     providerId,
     fallbackNotice,
+    ...(metadata ? { metadata } : {}),
     startedAt,
     completedAt: isTerminalStatus(status) ? completedAt : undefined,
     goal: taskNode.prompt,

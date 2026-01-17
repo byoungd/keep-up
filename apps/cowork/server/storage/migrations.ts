@@ -93,8 +93,8 @@ export async function migrateJsonToSqlite(
 
   const insertTask = db.prepare(`
     INSERT OR REPLACE INTO tasks
-    (task_id, session_id, title, prompt, status, created_at, updated_at)
-    VALUES ($taskId, $sessionId, $title, $prompt, $status, $createdAt, $updatedAt)
+    (task_id, session_id, title, prompt, status, metadata, created_at, updated_at)
+    VALUES ($taskId, $sessionId, $title, $prompt, $status, $metadata, $createdAt, $updatedAt)
   `);
 
   const insertApproval = db.prepare(`
@@ -208,6 +208,7 @@ function insertTasks(
     title: string;
     prompt: string;
     status: string;
+    metadata?: Record<string, unknown>;
     createdAt: number;
     updatedAt: number;
   }>
@@ -219,6 +220,7 @@ function insertTasks(
       $title: task.title,
       $prompt: task.prompt,
       $status: task.status,
+      $metadata: JSON.stringify(task.metadata ?? {}),
       $createdAt: task.createdAt,
       $updatedAt: task.updatedAt,
     });

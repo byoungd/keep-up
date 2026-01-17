@@ -140,6 +140,7 @@ export function createSessionRoutes(deps: SessionRouteDeps) {
       modelId: updated.modelId,
       providerId: updated.providerId,
       fallbackNotice: updated.fallbackNotice,
+      metadata: updated.metadata,
     });
     // biome-ignore lint/suspicious/noConsole: Server logging
     console.info("[cowork] task updated", {

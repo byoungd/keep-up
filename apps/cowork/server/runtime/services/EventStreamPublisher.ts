@@ -18,6 +18,7 @@ export class EventStreamPublisher {
     modelId?: string;
     providerId?: string;
     fallbackNotice?: string;
+    metadata?: Record<string, unknown>;
   }) {
     this.events.publish(data.sessionId, COWORK_EVENTS.TASK_CREATED, {
       taskId: data.taskId,
@@ -27,6 +28,7 @@ export class EventStreamPublisher {
       modelId: data.modelId,
       providerId: data.providerId,
       fallbackNotice: data.fallbackNotice,
+      metadata: data.metadata,
     });
   }
 
@@ -39,6 +41,7 @@ export class EventStreamPublisher {
     modelId?: string;
     providerId?: string;
     fallbackNotice?: string;
+    metadata?: Record<string, unknown>;
   }) {
     this.events.publish(data.sessionId, COWORK_EVENTS.TASK_UPDATED, {
       taskId: data.taskId,
@@ -48,6 +51,7 @@ export class EventStreamPublisher {
       modelId: data.modelId,
       providerId: data.providerId,
       fallbackNotice: data.fallbackNotice,
+      metadata: data.metadata,
     });
   }
 

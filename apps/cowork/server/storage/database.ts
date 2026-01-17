@@ -69,11 +69,14 @@ function initSchema(database: DatabaseInstance): void {
       title TEXT NOT NULL,
       prompt TEXT NOT NULL,
       status TEXT NOT NULL,
+      metadata TEXT DEFAULT '{}',
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
       FOREIGN KEY (session_id) REFERENCES sessions(session_id)
     )
   `);
+
+  safeExec("ALTER TABLE tasks ADD COLUMN metadata TEXT DEFAULT '{}'");
 
   database.exec(`
     CREATE INDEX IF NOT EXISTS idx_tasks_session ON tasks(session_id)

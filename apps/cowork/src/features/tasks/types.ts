@@ -136,6 +136,7 @@ export interface TaskStatusNode extends BaseNode {
   modelId?: string;
   providerId?: string;
   fallbackNotice?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export type TaskNode =

@@ -48,6 +48,7 @@ export class TaskOrchestrator {
       modelId: task.modelId,
       providerId: task.providerId,
       fallbackNotice: task.fallbackNotice,
+      metadata: task.metadata,
     });
     return task;
   }
@@ -89,6 +90,7 @@ export class TaskOrchestrator {
       modelId: updated.modelId,
       providerId: updated.providerId,
       fallbackNotice: updated.fallbackNotice,
+      metadata: updated.metadata,
     });
   }
 

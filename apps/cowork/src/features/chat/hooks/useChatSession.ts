@@ -110,9 +110,15 @@ export function useChatSession(sessionId: string | undefined) {
   }, []);
 
   const handleSendTask = useCallback(
-    async (sessionId: string, content: string, tempId: string, modelId?: string) => {
+    async (
+      sessionId: string,
+      content: string,
+      tempId: string,
+      modelId?: string,
+      metadata?: Record<string, unknown>
+    ) => {
       const title = generateTaskTitle(content);
-      const task = await createTask(sessionId, { prompt: content, title, modelId });
+      const task = await createTask(sessionId, { prompt: content, title, modelId, metadata });
       const taskStatus = mapTaskStatus(task.status);
       const taskMessage: Message = {
         id: `task-stream-${task.taskId}`,
@@ -137,6 +143,7 @@ export function useChatSession(sessionId: string | undefined) {
               },
             ],
             artifacts: [],
+            ...(task.metadata ? { metadata: task.metadata } : {}),
           },
         },
       };
@@ -305,7 +312,12 @@ export function useChatSession(sessionId: string | undefined) {
     async (
       content: string,
       type: "chat" | "task" = "chat",
-      options?: { modelId?: string; parentId?: string; attachments?: ChatAttachmentRef[] }
+      options?: {
+        modelId?: string;
+        parentId?: string;
+        attachments?: ChatAttachmentRef[];
+        metadata?: Record<string, unknown>;
+      }
     ) => {
       if (!sessionId || !content.trim()) {
         return;
@@ -327,7 +339,13 @@ export function useChatSession(sessionId: string | undefined) {
       try {
         if (type === "task") {
           // Tasks don't support branching yet in this API, ignoring parentId for now
-          await handleSendTask(sessionId, content, userMessageId, options?.modelId);
+          await handleSendTask(
+            sessionId,
+            content,
+            userMessageId,
+            options?.modelId,
+            options?.metadata
+          );
         } else {
           await handleSendChat(
             sessionId,

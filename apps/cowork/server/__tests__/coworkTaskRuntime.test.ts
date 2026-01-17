@@ -132,6 +132,43 @@ describe("CoworkTaskRuntime", () => {
     }
   });
 
+  it("stores task metadata when enqueueing", async () => {
+    const { storage, dir } = await createStorageLayer();
+    try {
+      const eventHub = new SessionEventHub();
+      const rootPath = await realpath(dir);
+      const session = createSession(rootPath);
+      await storage.sessionStore.create(session);
+
+      const runtime = new CoworkTaskRuntime({
+        storage,
+        events: eventHub,
+        runtimeFactory: async (seed) => {
+          const llm = createMockLLM();
+          llm.setDefaultResponse({ content: "All done.", finishReason: "stop" });
+          const registry = createToolRegistry();
+          return createCoworkRuntime({
+            llm,
+            registry,
+            cowork: { session: seed },
+            taskQueueConfig: { maxConcurrent: 1 },
+          });
+        },
+      });
+
+      const metadata = { workflowTemplateId: "template-1", source: "workflow" };
+      const task = await runtime.enqueueTask(session.sessionId, {
+        prompt: "Say hello",
+        metadata,
+      });
+      const stored = await storage.taskStore.getById(task.taskId);
+
+      expect(stored?.metadata).toEqual(metadata);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it("persists summary artifacts for completed tasks", async () => {
     const { storage, dir } = await createStorageLayer();
     try {

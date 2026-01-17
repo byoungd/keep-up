@@ -75,6 +75,7 @@ export interface CoworkEventPayloads {
     modelId?: string;
     providerId?: string;
     fallbackNotice?: string;
+    metadata?: Record<string, unknown>;
   };
   [COWORK_EVENTS.TASK_UPDATED]: {
     taskId: string;
@@ -84,6 +85,7 @@ export interface CoworkEventPayloads {
     modelId?: string;
     providerId?: string;
     fallbackNotice?: string;
+    metadata?: Record<string, unknown>;
   };
   [COWORK_EVENTS.TASK_COMPLETED]: {
     taskId: string;
