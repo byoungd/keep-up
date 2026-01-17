@@ -512,6 +512,13 @@ function extractArtifactsFromGraph(
         return { ...base, type: "plan", title: "Plan", content: JSON.stringify(payload.steps) };
       case "markdown":
         return { ...base, type: "report", title: "Report", content: payload.content };
+      case "preflight":
+        return {
+          ...base,
+          type: "report",
+          title: "Preflight Report",
+          content: payload.report.riskSummary,
+        };
       default:
         return base;
     }

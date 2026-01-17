@@ -7,6 +7,7 @@ import type {
   CoworkAuditFilter,
   CoworkChatMessage,
   CoworkSettings,
+  CoworkWorkflowTemplateRecord,
 } from "./types";
 
 export interface SessionStoreLike {
@@ -85,6 +86,17 @@ export interface AuditLogStoreLike {
   }>;
 }
 
+export interface WorkflowTemplateStoreLike {
+  getAll(): Promise<CoworkWorkflowTemplateRecord[]>;
+  getById(templateId: string): Promise<CoworkWorkflowTemplateRecord | null>;
+  create(template: CoworkWorkflowTemplateRecord): Promise<CoworkWorkflowTemplateRecord>;
+  update(
+    templateId: string,
+    updater: (template: CoworkWorkflowTemplateRecord) => CoworkWorkflowTemplateRecord
+  ): Promise<CoworkWorkflowTemplateRecord | null>;
+  delete(templateId: string): Promise<boolean>;
+}
+
 export interface ChatMessageStoreLike {
   getAll(): Promise<CoworkChatMessage[]>;
   getById(messageId: string): Promise<CoworkChatMessage | null>;
@@ -110,4 +122,5 @@ export interface StorageLayer {
   configStore: ConfigStoreLike;
   projectStore: ProjectStoreLike;
   auditLogStore: AuditLogStoreLike;
+  workflowTemplateStore: WorkflowTemplateStoreLike;
 }

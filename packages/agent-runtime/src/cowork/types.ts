@@ -125,3 +125,27 @@ export interface CoworkProject {
   updatedAt: number;
   metadata?: Record<string, unknown>;
 }
+
+export interface CoworkWorkflowTemplateInput {
+  key: string;
+  label: string;
+  required: boolean;
+  placeholder?: string;
+}
+
+export interface CoworkWorkflowTemplate {
+  templateId: string;
+  name: string;
+  description: string;
+  mode: AgentMode;
+  inputs: CoworkWorkflowTemplateInput[];
+  prompt: string;
+  expectedArtifacts: string[];
+  version: string;
+  createdAt: number;
+  updatedAt: number;
+  usageCount?: number;
+  lastUsedAt?: number;
+  lastUsedInputs?: Record<string, string>;
+  lastUsedSessionId?: string;
+}

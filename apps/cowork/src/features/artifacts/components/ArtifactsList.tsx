@@ -1,6 +1,7 @@
 import type { ArtifactPayload } from "../../tasks/types";
 import { DiffCard } from "./DiffCard";
 import { PlanCard } from "./PlanCard";
+import { PreflightCard } from "./PreflightCard";
 import { ReportCard } from "./ReportCard";
 
 interface ArtifactsListProps {
@@ -44,7 +45,7 @@ export function ArtifactsList({ artifacts, onApply, onRevert }: ArtifactsListPro
 
   const plans = list.filter(([_, a]) => a.type === "plan");
   const diffs = list.filter(([_, a]) => a.type === "diff");
-  const markdowns = list.filter(([_, a]) => a.type === "markdown");
+  const reports = list.filter(([_, a]) => a.type === "markdown" || a.type === "preflight");
 
   interface SectionProps {
     title: string;
@@ -91,6 +92,8 @@ export function ArtifactsList({ artifacts, onApply, onRevert }: ArtifactsListPro
                     content={artifact.content}
                   />
                 );
+              case "preflight":
+                return <PreflightCard key={id} payload={artifact} />;
               default:
                 return null;
             }
@@ -115,7 +118,7 @@ export function ArtifactsList({ artifacts, onApply, onRevert }: ArtifactsListPro
       <Section
         title="Reports"
         icon={<div className="w-1.5 h-1.5 rounded-full bg-accent-indigo" />}
-        items={markdowns}
+        items={reports}
       />
     </div>
   );

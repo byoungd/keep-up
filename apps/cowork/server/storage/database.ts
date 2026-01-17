@@ -225,6 +225,25 @@ function initSchema(database: DatabaseInstance): void {
     )
   `);
 
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS workflow_templates (
+      template_id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT NOT NULL,
+      mode TEXT NOT NULL,
+      inputs TEXT NOT NULL DEFAULT '[]',
+      prompt TEXT NOT NULL,
+      expected_artifacts TEXT NOT NULL DEFAULT '[]',
+      version TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      usage_count INTEGER NOT NULL DEFAULT 0,
+      last_used_at INTEGER,
+      last_used_inputs TEXT,
+      last_used_session_id TEXT
+    )
+  `);
+
   try {
     database.exec("ALTER TABLE sessions ADD COLUMN project_id TEXT");
   } catch {

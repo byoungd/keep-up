@@ -1,4 +1,4 @@
-import type { AgentState, CoworkRiskTag } from "@ku0/agent-runtime";
+import type { AgentState, CoworkRiskTag, CoworkWorkflowTemplate } from "@ku0/agent-runtime";
 
 // ============================================================================
 // Audit Log Types
@@ -12,7 +12,9 @@ export type CoworkAuditAction =
   | "artifact_apply"
   | "artifact_revert"
   | "approval_requested"
-  | "approval_resolved";
+  | "approval_resolved"
+  | "workflow_run"
+  | "preflight_run";
 
 export interface CoworkAuditEntry {
   entryId: string;
@@ -130,6 +132,28 @@ export type CoworkArtifactPayload =
   | {
       type: "markdown";
       content: string;
+    }
+  | {
+      type: "preflight";
+      report: {
+        reportId: string;
+        sessionId: string;
+        checks: Array<{
+          id: string;
+          name: string;
+          kind: "lint" | "typecheck" | "test";
+          command: string;
+          args: string[];
+          status: "pass" | "fail" | "skipped";
+          durationMs: number;
+          exitCode?: number;
+          output: string;
+        }>;
+        riskSummary: string;
+        createdAt: number;
+      };
+      selectionNotes: string[];
+      changedFiles: string[];
     };
 
 export interface CoworkArtifactRecord {
@@ -146,3 +170,5 @@ export interface CoworkArtifactRecord {
   createdAt: number;
   updatedAt: number;
 }
+
+export type CoworkWorkflowTemplateRecord = CoworkWorkflowTemplate;

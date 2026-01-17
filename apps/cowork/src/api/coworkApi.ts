@@ -1,4 +1,12 @@
-import type { CoworkProject, CoworkRiskTag, CoworkSession, CoworkTask } from "@ku0/agent-runtime";
+import type {
+  CoworkProject,
+  CoworkRiskTag,
+  CoworkSession,
+  CoworkTask,
+  PreflightCheckDefinition,
+  PreflightPlan,
+  PreflightReport,
+} from "@ku0/agent-runtime";
 import { apiUrl } from "../lib/config";
 
 export type ApiResult<T> = {
@@ -80,7 +88,7 @@ export type CoworkArtifact = {
   sessionId: string;
   taskId?: string;
   title: string;
-  type: "diff" | "plan" | "markdown";
+  type: "diff" | "plan" | "markdown" | "preflight";
   artifact: unknown;
   sourcePath?: string;
   version: number;
@@ -90,6 +98,64 @@ export type CoworkArtifact = {
   updatedAt: number;
   sessionTitle?: string;
   taskTitle?: string;
+};
+
+export type ContextChunk = {
+  id: string;
+  sourcePath: string;
+  content: string;
+  tokenCount: number;
+  updatedAt: number;
+};
+
+export type ContextSearchResult = {
+  score: number;
+  chunk: ContextChunk;
+};
+
+export type ContextPack = {
+  id: string;
+  name: string;
+  chunkIds: string[];
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type ContextPackPin = {
+  sessionId: string;
+  packIds: string[];
+  updatedAt: number;
+};
+
+export type WorkflowTemplateInput = {
+  key: string;
+  label: string;
+  required: boolean;
+  placeholder?: string;
+};
+
+export type WorkflowTemplate = {
+  templateId: string;
+  name: string;
+  description: string;
+  mode: AgentMode;
+  inputs: WorkflowTemplateInput[];
+  prompt: string;
+  expectedArtifacts: string[];
+  version: string;
+  createdAt: number;
+  updatedAt: number;
+  usageCount?: number;
+  lastUsedAt?: number;
+  lastUsedInputs?: Record<string, string>;
+  lastUsedSessionId?: string;
+};
+
+export type PreflightArtifact = {
+  type: "preflight";
+  report: PreflightReport;
+  selectionNotes: string[];
+  changedFiles: string[];
 };
 
 export type CreateSessionPayload = {
@@ -613,4 +679,191 @@ export async function refreshContext(): Promise<string> {
     method: "POST",
   });
   return data.content;
+}
+
+// ============================================================================
+// Context Packs API (Track 11)
+// ============================================================================
+
+export async function searchContext(
+  query: string,
+  options?: { limit?: number; minScore?: number; path?: string }
+): Promise<ContextSearchResult[]> {
+  const data = await fetchJson<{ results: ContextSearchResult[] }>("/api/context/search", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      query,
+      limit: options?.limit,
+      minScore: options?.minScore,
+      path: options?.path,
+    }),
+  });
+  return data.results ?? [];
+}
+
+export async function listContextPacks(): Promise<ContextPack[]> {
+  const data = await fetchJson<{ packs: ContextPack[] }>("/api/context/packs");
+  return data.packs ?? [];
+}
+
+export async function getContextPack(packId: string): Promise<ContextPack> {
+  const data = await fetchJson<{ pack: ContextPack }>(`/api/context/packs/${packId}`);
+  return data.pack;
+}
+
+export async function createContextPack(payload: {
+  name: string;
+  chunkIds: string[];
+  path?: string;
+}): Promise<ContextPack> {
+  const data = await fetchJson<{ pack: ContextPack }>("/api/context/packs", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return data.pack;
+}
+
+export async function updateContextPack(
+  packId: string,
+  payload: { name?: string; chunkIds?: string[]; path?: string }
+): Promise<ContextPack> {
+  const data = await fetchJson<{ pack: ContextPack }>(`/api/context/packs/${packId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return data.pack;
+}
+
+export async function deleteContextPack(packId: string): Promise<void> {
+  await fetchJson(`/api/context/packs/${packId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function getContextPins(sessionId: string): Promise<ContextPackPin | null> {
+  const data = await fetchJson<{ pins: ContextPackPin | null }>(`/api/context/pins/${sessionId}`);
+  return data.pins ?? null;
+}
+
+export async function setContextPins(
+  sessionId: string,
+  packIds: string[]
+): Promise<ContextPackPin | null> {
+  const data = await fetchJson<{ pins: ContextPackPin | null }>(`/api/context/pins/${sessionId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ packIds }),
+  });
+  return data.pins ?? null;
+}
+
+// ============================================================================
+// Workflow Templates API (Track 12)
+// ============================================================================
+
+export async function listWorkflowTemplates(): Promise<WorkflowTemplate[]> {
+  const data = await fetchJson<{ templates: WorkflowTemplate[] }>("/api/workflows");
+  return data.templates ?? [];
+}
+
+export async function getWorkflowTemplate(templateId: string): Promise<WorkflowTemplate> {
+  const data = await fetchJson<{ template: WorkflowTemplate }>(`/api/workflows/${templateId}`);
+  return data.template;
+}
+
+export async function createWorkflowTemplate(payload: {
+  name: string;
+  description?: string;
+  mode: AgentMode;
+  inputs?: WorkflowTemplateInput[];
+  prompt: string;
+  expectedArtifacts?: string[];
+  version?: string;
+}): Promise<WorkflowTemplate> {
+  const data = await fetchJson<{ template: WorkflowTemplate }>("/api/workflows", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return data.template;
+}
+
+export async function updateWorkflowTemplate(
+  templateId: string,
+  payload: {
+    name?: string;
+    description?: string;
+    mode?: AgentMode;
+    inputs?: WorkflowTemplateInput[];
+    prompt?: string;
+    expectedArtifacts?: string[];
+    version?: string;
+  }
+): Promise<WorkflowTemplate> {
+  const data = await fetchJson<{ template: WorkflowTemplate }>(`/api/workflows/${templateId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return data.template;
+}
+
+export async function deleteWorkflowTemplate(templateId: string): Promise<void> {
+  await fetchJson(`/api/workflows/${templateId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function runWorkflowTemplate(
+  templateId: string,
+  payload: { inputs: Record<string, string>; sessionId?: string }
+): Promise<{ prompt: string; template: WorkflowTemplate }> {
+  return fetchJson<{ prompt: string; template: WorkflowTemplate }>(
+    `/api/workflows/${templateId}/run`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function importWorkflowTemplates(
+  templates: WorkflowTemplate[]
+): Promise<WorkflowTemplate[]> {
+  const data = await fetchJson<{ templates: WorkflowTemplate[] }>("/api/workflows/import", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ templates }),
+  });
+  return data.templates ?? [];
+}
+
+// ============================================================================
+// Preflight API (Track 13)
+// ============================================================================
+
+export async function listPreflightChecks(): Promise<PreflightCheckDefinition[]> {
+  const data = await fetchJson<{ checks: PreflightCheckDefinition[] }>("/api/preflight/checks");
+  return data.checks ?? [];
+}
+
+export async function runPreflight(payload: {
+  sessionId: string;
+  taskId?: string;
+  rootPath?: string;
+  changedFiles?: string[];
+  checkIds?: string[];
+}): Promise<{ report: PreflightReport; plan: PreflightPlan; artifact: CoworkArtifact }> {
+  return fetchJson<{ report: PreflightReport; plan: PreflightPlan; artifact: CoworkArtifact }>(
+    "/api/preflight",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }
+  );
 }

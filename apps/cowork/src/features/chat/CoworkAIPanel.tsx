@@ -2,7 +2,10 @@
 
 import { type ArtifactItem, AIPanel as ShellAIPanel, useReaderShell } from "@ku0/shell";
 import { useEffect, useMemo, useState } from "react";
+import { ContextPacksPanel } from "../context/ContextPacksPanel";
 import { ProjectContextPanel } from "../context/ProjectContextPanel";
+import { PreflightPanel } from "../preflight/PreflightPanel";
+import { WorkflowTemplatesPanel } from "../workflows/WorkflowTemplatesPanel";
 import { CostMeter } from "./components/CostMeter";
 import { ModeToggle } from "./components/ModeToggle";
 import { useCoworkAIPanelController } from "./useCoworkAIPanelController";
@@ -15,7 +18,9 @@ export interface CoworkAIPanelProps {
 export function CoworkAIPanel({ onClose, onPreviewArtifact }: CoworkAIPanelProps) {
   const { aiPanel } = useReaderShell();
   const ctrl = useCoworkAIPanelController();
-  const [showContextPanel, setShowContextPanel] = useState(false);
+  const [contextPanel, setContextPanel] = useState<
+    "project" | "packs" | "workflows" | "preflight" | null
+  >(null);
 
   const {
     messages,
@@ -49,6 +54,7 @@ export function CoworkAIPanel({ onClose, onPreviewArtifact }: CoworkAIPanelProps
     agentMode,
     toggleMode,
     usage,
+    runTemplate,
   } = ctrl;
 
   useEffect(() => {
@@ -166,7 +172,7 @@ export function CoworkAIPanel({ onClose, onPreviewArtifact }: CoworkAIPanelProps
       <div className="flex items-center gap-2">
         <button
           type="button"
-          onClick={() => setShowContextPanel(true)}
+          onClick={() => setContextPanel("project")}
           className="text-xs font-medium text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-surface-100 transition-colors flex items-center gap-1"
           title="Project Context"
         >
@@ -180,6 +186,57 @@ export function CoworkAIPanel({ onClose, onPreviewArtifact }: CoworkAIPanelProps
             />
           </svg>
           Context
+        </button>
+        <button
+          type="button"
+          onClick={() => setContextPanel("packs")}
+          className="text-xs font-medium text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-surface-100 transition-colors flex items-center gap-1"
+          title="Context Packs"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <title>Pack Icon</title>
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 16.5a2.5 2.5 0 01-2.5 2.5h-13A2.5 2.5 0 013 16.5V7.5A2.5 2.5 0 015.5 5h2.086a1 1 0 01.707.293l1.414 1.414A1 1 0 0010.414 7H18.5A2.5 2.5 0 0121 9.5v7z"
+            />
+          </svg>
+          Packs
+        </button>
+        <button
+          type="button"
+          onClick={() => setContextPanel("workflows")}
+          className="text-xs font-medium text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-surface-100 transition-colors flex items-center gap-1"
+          title="Workflow Templates"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <title>Workflow Icon</title>
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M7 8h10M7 12h6m-6 4h10M6 4h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2z"
+            />
+          </svg>
+          Workflows
+        </button>
+        <button
+          type="button"
+          onClick={() => setContextPanel("preflight")}
+          className="text-xs font-medium text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-surface-100 transition-colors flex items-center gap-1"
+          title="Preflight QA"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <title>Preflight Icon</title>
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 12h6m-7 8h8a2 2 0 002-2V8l-6-6H8a2 2 0 00-2 2v14a2 2 0 002 2z"
+            />
+          </svg>
+          Preflight
         </button>
         <div className="h-4 w-px bg-border mx-1" />
         <ModeToggle mode={agentMode} onToggle={toggleMode} />
@@ -210,21 +267,32 @@ export function CoworkAIPanel({ onClose, onPreviewArtifact }: CoworkAIPanelProps
       showHeader={false}
       topContent={headerContent}
       overlayContent={
-        showContextPanel ? (
+        contextPanel ? (
           <div className="absolute inset-0 z-50 flex justify-end">
             <button
               type="button"
               className="absolute inset-0 bg-black/20 w-full h-full border-none cursor-default"
-              onClick={() => setShowContextPanel(false)}
+              onClick={() => setContextPanel(null)}
               onKeyDown={(e) => {
                 if (e.key === "Escape") {
-                  setShowContextPanel(false);
+                  setContextPanel(null);
                 }
               }}
               tabIndex={-1}
               aria-label="Close context panel"
             />
-            <ProjectContextPanel onClose={() => setShowContextPanel(false)} />
+            {contextPanel === "project" ? (
+              <ProjectContextPanel onClose={() => setContextPanel(null)} />
+            ) : contextPanel === "packs" ? (
+              <ContextPacksPanel onClose={() => setContextPanel(null)} />
+            ) : contextPanel === "preflight" ? (
+              <PreflightPanel onClose={() => setContextPanel(null)} />
+            ) : (
+              <WorkflowTemplatesPanel
+                onClose={() => setContextPanel(null)}
+                onRunTemplate={runTemplate}
+              />
+            )}
           </div>
         ) : null
       }

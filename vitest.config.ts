@@ -65,6 +65,10 @@ const aliases = [
     find: "@ku0/conformance-kit",
     replacement: path.resolve(__dirname, "packages/conformance-kit/src/index.ts"),
   },
+  {
+    find: "@ku0/context-index",
+    replacement: path.resolve(__dirname, "packages/context-index/src/index.ts"),
+  },
   { find: "@ku0/core", replacement: path.resolve(__dirname, "packages/core/src/index.ts") },
   { find: "@ku0/crypto", replacement: path.resolve(__dirname, "packages/crypto/src/index.ts") },
   { find: "@ku0/db", replacement: path.resolve(__dirname, "packages/db/src/index.ts") },
@@ -82,6 +86,10 @@ const aliases = [
   },
   { find: "@ku0/overlay", replacement: path.resolve(__dirname, "packages/overlay/src/index.ts") },
   { find: "@ku0/shared", replacement: path.resolve(__dirname, "packages/shared/src/index.ts") },
+  {
+    find: "@ku0/project-context",
+    replacement: path.resolve(__dirname, "packages/project-context/src/index.ts"),
+  },
   { find: "@ku0/token", replacement: path.resolve(__dirname, "packages/token/src/index.ts") },
   {
     find: "@ku0/translator",
@@ -199,6 +207,22 @@ export default defineConfig({
         test: {
           name: "cowork-app",
           include: ["apps/cowork/src/**/*.test.ts"],
+          exclude: defaultExclude,
+          environment: "node",
+          server: {
+            deps: {
+              inline: [/@ku0\/.*/],
+            },
+          },
+        },
+      }),
+      defineProject({
+        resolve: {
+          alias: aliases,
+        },
+        test: {
+          name: "context-index",
+          include: ["packages/context-index/src/**/*.test.ts"],
           exclude: defaultExclude,
           environment: "node",
           server: {

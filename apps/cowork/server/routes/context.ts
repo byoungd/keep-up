@@ -19,6 +19,7 @@ import {
 } from "@ku0/project-context";
 import { Hono } from "hono";
 import { jsonError, readJsonBody } from "../http";
+import type { ContextIndexManager } from "../services/contextIndexManager";
 
 const AGENTS_MD_DIR = ".cowork";
 const AGENTS_MD_FILENAME = "AGENTS.md";
@@ -26,6 +27,7 @@ const AGENTS_MD_FILENAME = "AGENTS.md";
 interface ContextRouteDeps {
   /** Base path for projects (optional, defaults to cwd) */
   basePath?: string;
+  contextIndexManager?: ContextIndexManager;
 }
 
 /** Request body for POST /context/generate */
@@ -47,8 +49,32 @@ interface RefreshRequestBody {
   autoSave?: boolean;
 }
 
+interface SearchRequestBody {
+  path?: string;
+  query?: string;
+  limit?: number;
+  minScore?: number;
+}
+
+interface PackRequestBody {
+  path?: string;
+  name?: string;
+  chunkIds?: string[];
+}
+
+interface PinsRequestBody {
+  packIds?: string[];
+}
+
 export function createContextRoutes(deps: ContextRouteDeps = {}) {
   const app = new Hono();
+  const resolveRootPath = (pathOverride?: string) => pathOverride ?? deps.basePath ?? process.cwd();
+  const resolveIndex = (pathOverride?: string) => {
+    if (!deps.contextIndexManager) {
+      return null;
+    }
+    return deps.contextIndexManager.getIndex(resolveRootPath(pathOverride));
+  };
 
   /**
    * GET /context/analyze
@@ -187,6 +213,183 @@ export function createContextRoutes(deps: ContextRouteDeps = {}) {
       updatedAt: Date.now(),
       saved: autoSave,
     });
+  });
+
+  /**
+   * POST /context/search
+   * Perform semantic search over indexed project context.
+   */
+  app.post("/context/search", async (c) => {
+    const body = (await readJsonBody(c)) as SearchRequestBody | null;
+    const query = body?.query?.trim();
+    if (!query) {
+      return jsonError(c, 400, "Query is required");
+    }
+
+    const rootPath = resolveRootPath(body?.path);
+    if (!existsSync(rootPath)) {
+      return jsonError(c, 400, "Project path does not exist");
+    }
+
+    const index = resolveIndex(body?.path);
+    if (!index) {
+      return jsonError(c, 503, "Context index is unavailable");
+    }
+
+    const results = await index.search(query, {
+      limit: body?.limit,
+      minScore: body?.minScore,
+    });
+
+    return c.json({
+      ok: true,
+      results: results.map((result) => ({
+        score: result.score,
+        chunk: {
+          id: result.chunk.id,
+          sourcePath: result.chunk.sourcePath,
+          content: result.chunk.content,
+          tokenCount: result.chunk.tokenCount,
+          updatedAt: result.chunk.updatedAt,
+        },
+      })),
+    });
+  });
+
+  /**
+   * GET /context/packs
+   * List all context packs.
+   */
+  app.get("/context/packs", async (c) => {
+    const index = resolveIndex();
+    if (!index) {
+      return jsonError(c, 503, "Context index is unavailable");
+    }
+    const packs = await index.listPacks();
+    return c.json({ ok: true, packs });
+  });
+
+  /**
+   * GET /context/packs/:packId
+   * Fetch a single context pack by id.
+   */
+  app.get("/context/packs/:packId", async (c) => {
+    const index = resolveIndex();
+    if (!index) {
+      return jsonError(c, 503, "Context index is unavailable");
+    }
+    const packId = c.req.param("packId");
+    const pack = await index.getPack(packId);
+    if (!pack) {
+      return jsonError(c, 404, "Context pack not found");
+    }
+    return c.json({ ok: true, pack });
+  });
+
+  /**
+   * POST /context/packs
+   * Create a new context pack.
+   */
+  app.post("/context/packs", async (c) => {
+    const body = (await readJsonBody(c)) as PackRequestBody | null;
+    const name = body?.name?.trim();
+    const chunkIds = body?.chunkIds ?? [];
+    if (!name) {
+      return jsonError(c, 400, "Pack name is required");
+    }
+    if (!Array.isArray(chunkIds)) {
+      return jsonError(c, 400, "chunkIds must be an array");
+    }
+
+    const index = resolveIndex(body?.path);
+    if (!index) {
+      return jsonError(c, 503, "Context index is unavailable");
+    }
+
+    const pack = await index.createPack(name, chunkIds);
+    return c.json({ ok: true, pack }, 201);
+  });
+
+  /**
+   * PUT /context/packs/:packId
+   * Update an existing context pack.
+   */
+  app.put("/context/packs/:packId", async (c) => {
+    const body = (await readJsonBody(c)) as PackRequestBody | null;
+    const index = resolveIndex(body?.path);
+    if (!index) {
+      return jsonError(c, 503, "Context index is unavailable");
+    }
+
+    const packId = c.req.param("packId");
+    const update = {
+      name: body?.name?.trim(),
+      chunkIds: body?.chunkIds,
+    };
+
+    if (update.chunkIds && !Array.isArray(update.chunkIds)) {
+      return jsonError(c, 400, "chunkIds must be an array");
+    }
+
+    const pack = await index.updatePack(packId, update);
+    if (!pack) {
+      return jsonError(c, 404, "Context pack not found");
+    }
+
+    return c.json({ ok: true, pack });
+  });
+
+  /**
+   * DELETE /context/packs/:packId
+   * Delete a context pack.
+   */
+  app.delete("/context/packs/:packId", async (c) => {
+    const index = resolveIndex();
+    if (!index) {
+      return jsonError(c, 503, "Context index is unavailable");
+    }
+
+    const packId = c.req.param("packId");
+    const deleted = await index.deletePack(packId);
+    if (!deleted) {
+      return jsonError(c, 404, "Context pack not found");
+    }
+
+    return c.json({ ok: true });
+  });
+
+  /**
+   * GET /context/pins/:sessionId
+   * Fetch pinned context packs for a session.
+   */
+  app.get("/context/pins/:sessionId", async (c) => {
+    const index = resolveIndex();
+    if (!index) {
+      return jsonError(c, 503, "Context index is unavailable");
+    }
+    const sessionId = c.req.param("sessionId");
+    const pins = await index.getPins(sessionId);
+    return c.json({ ok: true, pins });
+  });
+
+  /**
+   * PUT /context/pins/:sessionId
+   * Update pinned context packs for a session.
+   */
+  app.put("/context/pins/:sessionId", async (c) => {
+    const body = (await readJsonBody(c)) as PinsRequestBody | null;
+    if (!body || !Array.isArray(body.packIds)) {
+      return jsonError(c, 400, "packIds must be an array");
+    }
+
+    const index = resolveIndex();
+    if (!index) {
+      return jsonError(c, 503, "Context index is unavailable");
+    }
+
+    const sessionId = c.req.param("sessionId");
+    const pins = await index.setPins(sessionId, body.packIds);
+    return c.json({ ok: true, pins });
   });
 
   return app;

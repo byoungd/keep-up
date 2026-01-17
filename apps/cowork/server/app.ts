@@ -7,14 +7,15 @@ import { createArtifactRoutes } from "./routes/artifacts";
 import { createAuditLogRoutes } from "./routes/auditLogs";
 import { createChatRoutes } from "./routes/chat";
 import { createContextRoutes } from "./routes/context";
+import { createPreflightRoutes } from "./routes/preflight";
 import { createProjectRoutes } from "./routes/projects";
-import { createProviderRoutes } from "./routes/providers";
 import { createSessionRoutes } from "./routes/sessions";
 import { createSettingsRoutes } from "./routes/settings";
 import { createStreamRoutes } from "./routes/stream";
+import { createWorkflowRoutes } from "./routes/workflows";
 import { CoworkRuntimeBridge } from "./runtime/coworkRuntime";
 import type { CoworkTaskRuntime } from "./runtime/coworkTaskRuntime";
-import { ProviderKeyService } from "./services/providerKeyService";
+import type { ContextIndexManager } from "./services/contextIndexManager";
 import type { StorageLayer } from "./storage/contracts";
 import { SessionEventHub } from "./streaming/eventHub";
 
@@ -24,8 +25,8 @@ export interface CoworkAppDeps {
   events?: SessionEventHub;
   runtime?: CoworkRuntimeBridge;
   taskRuntime?: CoworkTaskRuntime;
+  contextIndexManager?: ContextIndexManager;
   logger?: Pick<typeof serverLogger, "info" | "error">;
-  providerKeys?: ProviderKeyService;
 }
 
 export function createCoworkApp(deps: CoworkAppDeps) {
@@ -35,7 +36,6 @@ export function createCoworkApp(deps: CoworkAppDeps) {
     new CoworkRuntimeBridge(deps.storage.approvalStore, undefined, deps.storage.auditLogStore);
   const taskRuntime = deps.taskRuntime;
   const logger = deps.logger ?? serverLogger;
-  const providerKeys = deps.providerKeys ?? new ProviderKeyService(deps.storage.configStore);
 
   const app = new Hono();
 
@@ -43,7 +43,7 @@ export function createCoworkApp(deps: CoworkAppDeps) {
     "*",
     cors({
       origin: deps.corsOrigin ?? "*",
-      allowMethods: ["GET", "POST", "PATCH", "OPTIONS"],
+      allowMethods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
       allowHeaders: ["Content-Type", "Last-Event-ID"],
     })
   );
@@ -82,7 +82,6 @@ export function createCoworkApp(deps: CoworkAppDeps) {
     "/api",
     createSettingsRoutes({
       config: deps.storage.configStore,
-      providerKeys,
     })
   );
 
@@ -97,6 +96,23 @@ export function createCoworkApp(deps: CoworkAppDeps) {
     "/api",
     createProjectRoutes({
       projectStore: deps.storage.projectStore,
+    })
+  );
+
+  app.route(
+    "/api",
+    createWorkflowRoutes({
+      workflowTemplates: deps.storage.workflowTemplateStore,
+      auditLogs: deps.storage.auditLogStore,
+    })
+  );
+
+  app.route(
+    "/api",
+    createPreflightRoutes({
+      sessionStore: deps.storage.sessionStore,
+      artifactStore: deps.storage.artifactStore,
+      auditLogStore: deps.storage.auditLogStore,
     })
   );
 
@@ -117,14 +133,6 @@ export function createCoworkApp(deps: CoworkAppDeps) {
       sessionStore: deps.storage.sessionStore,
       chatMessageStore: deps.storage.chatMessageStore,
       getSettings: () => deps.storage.configStore.get(),
-      providerKeys,
-    })
-  );
-
-  app.route(
-    "/api",
-    createProviderRoutes({
-      providerKeys,
     })
   );
 
@@ -133,9 +141,12 @@ export function createCoworkApp(deps: CoworkAppDeps) {
     return jsonError(c, 500, "Internal server error");
   });
   // Project context routes (AGENTS.md analysis and generation)
-  const contextRoutes = createContextRoutes();
-  app.route("/api", contextRoutes);
-  app.route("/api/project", contextRoutes);
+  app.route(
+    "/api",
+    createContextRoutes({
+      contextIndexManager: deps.contextIndexManager,
+    })
+  );
 
   logger.info("Cowork server initialized");
   return app;

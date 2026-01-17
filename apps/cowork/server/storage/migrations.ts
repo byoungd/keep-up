@@ -12,7 +12,8 @@ import { getDatabase } from "./database";
 import { SessionStore } from "./sessionStore";
 import { ensureStateDir } from "./statePaths";
 import { TaskStore } from "./taskStore";
-import type { CoworkChatMessage, CoworkSettings } from "./types";
+import type { CoworkChatMessage, CoworkSettings, CoworkWorkflowTemplateRecord } from "./types";
+import { WorkflowTemplateStore } from "./workflowTemplateStore";
 
 export interface MigrationResult {
   sessions: number;
@@ -22,6 +23,7 @@ export interface MigrationResult {
   approvals: number;
   agentStateCheckpoints: number;
   settings: number;
+  workflowTemplates: number;
 }
 
 export interface MigrationOptions {
@@ -51,8 +53,11 @@ export async function migrateJsonToSqlite(
     join(stateDir, "agent_state_checkpoints.json")
   );
   const configStore = new ConfigStore(join(stateDir, "settings.json"));
+  const workflowTemplateStore = new WorkflowTemplateStore(
+    join(stateDir, "workflow_templates.json")
+  );
 
-  const [sessions, tasks, artifacts, chatMessages, approvals, checkpoints, settings] =
+  const [sessions, tasks, artifacts, chatMessages, approvals, checkpoints, settings, templates] =
     await Promise.all([
       sessionStore.getAll(),
       taskStore.getAll(),
@@ -61,6 +66,7 @@ export async function migrateJsonToSqlite(
       approvalStore.getAll(),
       agentStateStore.getAll(),
       configStore.get(),
+      workflowTemplateStore.getAll(),
     ]);
 
   const result: MigrationResult = {
@@ -71,6 +77,7 @@ export async function migrateJsonToSqlite(
     approvals: approvals.length,
     agentStateCheckpoints: checkpoints.length,
     settings: Object.keys(settings).length,
+    workflowTemplates: templates.length,
   };
 
   if (options.dryRun) {
@@ -119,6 +126,12 @@ export async function migrateJsonToSqlite(
     VALUES ($key, $value)
   `);
 
+  const insertWorkflowTemplate = db.prepare(`
+    INSERT OR REPLACE INTO workflow_templates
+    (template_id, name, description, mode, inputs, prompt, expected_artifacts, version, created_at, updated_at, usage_count, last_used_at, last_used_inputs, last_used_session_id)
+    VALUES ($templateId, $name, $description, $mode, $inputs, $prompt, $expectedArtifacts, $version, $createdAt, $updatedAt, $usageCount, $lastUsedAt, $lastUsedInputs, $lastUsedSessionId)
+  `);
+
   db.exec("BEGIN");
   try {
     insertSessions(insertSession, sessions);
@@ -128,6 +141,7 @@ export async function migrateJsonToSqlite(
     insertCheckpoints(insertCheckpoint, checkpoints);
     insertApprovals(insertApproval, approvals);
     insertSettings(insertSetting, settings);
+    insertWorkflowTemplates(insertWorkflowTemplate, templates);
 
     db.exec("COMMIT");
   } catch (error) {
@@ -242,6 +256,30 @@ function insertArtifacts(
       $appliedAt: artifact.appliedAt ?? null,
       $createdAt: artifact.createdAt,
       $updatedAt: artifact.updatedAt,
+    });
+  }
+}
+
+function insertWorkflowTemplates(
+  stmt: { run: (params: Record<string, unknown>) => void },
+  templates: CoworkWorkflowTemplateRecord[]
+): void {
+  for (const template of templates) {
+    stmt.run({
+      $templateId: template.templateId,
+      $name: template.name,
+      $description: template.description,
+      $mode: template.mode,
+      $inputs: JSON.stringify(template.inputs ?? []),
+      $prompt: template.prompt,
+      $expectedArtifacts: JSON.stringify(template.expectedArtifacts ?? []),
+      $version: template.version,
+      $createdAt: template.createdAt,
+      $updatedAt: template.updatedAt,
+      $usageCount: template.usageCount ?? 0,
+      $lastUsedAt: template.lastUsedAt ?? null,
+      $lastUsedInputs: template.lastUsedInputs ? JSON.stringify(template.lastUsedInputs) : null,
+      $lastUsedSessionId: template.lastUsedSessionId ?? null,
     });
   }
 }

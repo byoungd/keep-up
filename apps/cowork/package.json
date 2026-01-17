@@ -14,6 +14,7 @@
     "@ku0/agent-runtime": "workspace:*",
     "@ku0/ai-core": "workspace:*",
     "@ku0/app": "workspace:*",
+    "@ku0/context-index": "workspace:*",
     "@ku0/design-system": "workspace:*",
     "@ku0/project-context": "workspace:*",
     "@ku0/shared": "workspace:*",

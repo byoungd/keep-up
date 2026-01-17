@@ -4,15 +4,20 @@ import { createCoworkApp } from "./app";
 import { serverConfig } from "./config";
 import { serverLogger } from "./logger";
 import { CoworkTaskRuntime } from "./runtime/coworkTaskRuntime";
+import { ContextIndexManager } from "./services/contextIndexManager";
 import { createStorageLayer } from "./storage";
+import { ensureStateDir } from "./storage/statePaths";
 import { SessionEventHub } from "./streaming/eventHub";
 
 const storage = await createStorageLayer(serverConfig.storage);
+const stateDir = await ensureStateDir();
 const eventHub = new SessionEventHub();
+const contextIndexManager = new ContextIndexManager({ stateDir });
 const taskRuntime = new CoworkTaskRuntime({
   storage,
   events: eventHub,
   logger: serverLogger,
+  contextIndexManager,
 });
 const app = createCoworkApp({
   storage,
@@ -20,6 +25,7 @@ const app = createCoworkApp({
   logger: serverLogger,
   events: eventHub,
   taskRuntime,
+  contextIndexManager,
 });
 
 export default app;

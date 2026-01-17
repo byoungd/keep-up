@@ -65,6 +65,13 @@ function convertArtifact(id: string, artifact: ArtifactPayload): ArtifactItem {
         title: "Report",
         content: artifact.content,
       };
+    case "preflight":
+      return {
+        id,
+        type: "doc",
+        title: "Preflight Report",
+        content: artifact.report.riskSummary,
+      };
   }
 }
 
@@ -204,6 +211,30 @@ describe("Agent Task Helpers", () => {
         type: "doc",
         title: "Report",
         content: "# Report\n\nThis is the report content.",
+      });
+    });
+
+    it("should convert preflight artifact", () => {
+      const artifact: ArtifactPayload = {
+        type: "preflight",
+        report: {
+          reportId: "report-1",
+          sessionId: "session-1",
+          checks: [],
+          riskSummary: "No preflight checks were selected.",
+          createdAt: Date.now(),
+        },
+        selectionNotes: ["Manual preflight selection applied."],
+        changedFiles: [],
+      };
+
+      const result = convertArtifact("art-4", artifact);
+
+      expect(result).toEqual({
+        id: "art-4",
+        type: "doc",
+        title: "Preflight Report",
+        content: "No preflight checks were selected.",
       });
     });
   });
