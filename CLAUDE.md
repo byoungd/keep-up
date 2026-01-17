@@ -5,7 +5,7 @@
 **Name**: Keep-Up
 **Stack**: TypeScript, React 19, pnpm monorepo, Turbo, Vite (Cowork)
 **Core**: LFCC (Local-First Collaboration Contract) editor with Loro CRDT
-**Namespace**: `@ku0/*`, `@ku0/*`
+**Namespace**: `@ku0/*`
 
 ## Quick Commands
 
@@ -44,7 +44,6 @@
 ```
 apps/
 ├── cowork/              # Vite React collaboration app
-├── collab-server/       # WebSocket collaboration server
 └── desktop/             # Desktop app (Tauri/Electron wrapper)
 
 packages/
@@ -52,7 +51,6 @@ packages/
 ├── lfcc-bridge/         # ProseMirror <-> LFCC adapter
 ├── agent-runtime/       # AI agent orchestration & MCP tools
 ├── ai-core/             # AI provider abstractions (OpenAI, etc.)
-├── collab-server/       # Collaboration server library
 ├── conformance-kit/     # LFCC v0.9 conformance testing (fuzz + semantic)
 ├── overlay/             # Overlay/annotation rendering
 ├── app/                 # Shared React app components
