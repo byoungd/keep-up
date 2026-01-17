@@ -111,14 +111,13 @@ export class ApprovalCoordinator {
    * Wait for approval decision
    */
   private async waitForApprovalDecision(
-    sessionId: string,
+    _sessionId: string,
     approvalId: string
   ): Promise<"approved" | "rejected"> {
     const decision = await this.approvalService.waitForDecision(approvalId);
     const approval = await this.approvalStore.getById(approvalId);
 
     if (!approval) {
-      console.warn("Approval missing, defaulting to rejected", { approvalId, sessionId });
       return "rejected";
     }
 
@@ -139,7 +138,6 @@ export class ApprovalCoordinator {
       if (this.isErrno(error, "ENOENT")) {
         return;
       }
-      console.error("Failed to log audit entry", error);
     }
   }
 
