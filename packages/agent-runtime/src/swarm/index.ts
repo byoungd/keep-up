@@ -9,6 +9,8 @@ export {
   CONDUCTOR_TOOLS,
   createConductorContext,
 } from "./conductorContext";
+// Ghost Agent (Proactive Monitoring)
+export * from "./ghost";
 export {
   createSwarmOrchestrator,
   SwarmOrchestrator,
