@@ -102,7 +102,19 @@ export interface SwarmConfig {
   enableBackground: boolean;
   /** Worker pool size for background tasks */
   backgroundPoolSize: number;
+  /**
+   * Optional executor callback for running worker tasks.
+   * If not provided, workers will be marked complete without execution.
+   */
+  executor?: WorkerExecutor;
 }
+
+/**
+ * Worker execution callback.
+ * Receives the task and should execute the agent logic.
+ * Returns result on success, throws on failure.
+ */
+export type WorkerExecutor = (task: WorkerTask) => Promise<unknown>;
 
 /**
  * Swarm orchestrator interface

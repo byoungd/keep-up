@@ -123,23 +123,27 @@ export class SwarmOrchestrator extends EventEmitter implements ISwarmOrchestrato
     }, task.timeout ?? this.config.defaultTimeout);
 
     try {
-      // TODO: In a real implementation, this would spawn a Worker thread
-      // or use a separate agent instance to execute the task.
-      // For now, we simulate with a placeholder.
-
-      // Simulate work (placeholder for actual agent execution)
       worker.progress = 0;
       worker.statusMessage = "Starting task...";
       this.emitEvent("worker:progress", worker.id, task.id, { progress: 0 });
 
-      // Placeholder: In production, this would invoke the agent
-      // await this.agentPool.execute(task);
+      // Execute using injected executor if provided
+      let result: unknown;
+      if (this.config.executor) {
+        result = await this.config.executor(task);
+      } else {
+        // No executor configured - emit warning event and mark as no-op
+        this.emitEvent("worker:progress", worker.id, task.id, {
+          warning: "No executor configured. Task marked complete without execution.",
+        });
+        result = { status: "no-op", taskId: task.id };
+      }
 
       // Mark as completed
       worker.state = "completed";
       worker.completedAt = new Date();
       worker.progress = 100;
-      worker.result = { status: "completed", taskId: task.id };
+      worker.result = result;
 
       this.recordExecutionTime(worker);
       this.stats.activeCount--;

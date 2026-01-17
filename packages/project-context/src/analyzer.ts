@@ -5,7 +5,7 @@
  * coding conventions, and patterns for AGENTS.md generation.
  */
 
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { access, readdir, readFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import type {
   AnalyzeOptions,
@@ -21,6 +21,18 @@ import type {
 import { DEFAULT_ANALYZE_OPTIONS } from "./types";
 
 /**
+ * Async file existence check
+ */
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Analyze a project directory and return structured analysis
  */
 export async function analyzeProject(
@@ -29,12 +41,12 @@ export async function analyzeProject(
 ): Promise<ProjectAnalysis> {
   const opts = { ...DEFAULT_ANALYZE_OPTIONS, ...options };
 
-  const packageJson = readPackageJson(rootPath);
-  const configFiles = detectConfigFiles(rootPath);
-  const techStack = detectTechStack(rootPath, packageJson);
-  const structure = buildDirectoryTree(rootPath, opts.maxDepth, opts.excludeDirs);
-  const conventions = extractConventions(rootPath, configFiles);
-  const patterns = detectPatterns(rootPath, techStack);
+  const packageJson = await readPackageJson(rootPath);
+  const configFiles = await detectConfigFiles(rootPath);
+  const techStack = await detectTechStack(rootPath, packageJson);
+  const structure = await buildDirectoryTree(rootPath, opts.maxDepth, opts.excludeDirs);
+  const conventions = await extractConventions(rootPath, configFiles);
+  const patterns = await detectPatterns(rootPath, techStack);
 
   return {
     name: packageJson?.name ?? basename(rootPath),
@@ -52,13 +64,13 @@ export async function analyzeProject(
 /**
  * Read and parse package.json
  */
-function readPackageJson(rootPath: string): PackageJson | null {
+async function readPackageJson(rootPath: string): Promise<PackageJson | null> {
   const pkgPath = join(rootPath, "package.json");
-  if (!existsSync(pkgPath)) {
+  if (!(await pathExists(pkgPath))) {
     return null;
   }
   try {
-    const content = readFileSync(pkgPath, "utf-8");
+    const content = await readFile(pkgPath, "utf-8");
     return JSON.parse(content) as PackageJson;
   } catch {
     return null;
@@ -77,7 +89,7 @@ interface PackageJson {
 /**
  * Detect configuration files in project root
  */
-function detectConfigFiles(rootPath: string): ConfigFile[] {
+async function detectConfigFiles(rootPath: string): Promise<ConfigFile[]> {
   const configPatterns: Array<{ pattern: string; type: ConfigFileType }> = [
     { pattern: "package.json", type: "package-json" },
     { pattern: "tsconfig.json", type: "tsconfig" },
@@ -100,7 +112,7 @@ function detectConfigFiles(rootPath: string): ConfigFile[] {
   ];
 
   const files: ConfigFile[] = [];
-  const entries = readdirSync(rootPath, { withFileTypes: true });
+  const entries = await readdir(rootPath, { withFileTypes: true });
 
   for (const entry of entries) {
     if (!entry.isFile()) {
@@ -126,11 +138,11 @@ function detectConfigFiles(rootPath: string): ConfigFile[] {
 
   // Check for CI workflows
   const workflowsPath = join(rootPath, ".github", "workflows");
-  if (existsSync(workflowsPath)) {
+  if (await pathExists(workflowsPath)) {
     try {
-      const workflows = readdirSync(workflowsPath);
+      const workflows = await readdir(workflowsPath);
       for (const wf of workflows) {
-        if (wf.endsWith(".yml") || wf.endsWith(".yaml")) {
+        if (typeof wf === "string" && (wf.endsWith(".yml") || wf.endsWith(".yaml"))) {
           files.push({
             name: wf,
             path: `.github/workflows/${wf}`,
@@ -225,7 +237,7 @@ function detectDepsFromPackageJson(allDeps: Record<string, string>, stack: TechS
 /**
  * Detect package manager from lock files
  */
-function detectPackageManager(rootPath: string): TechStackItem | null {
+async function detectPackageManager(rootPath: string): Promise<TechStackItem | null> {
   const managers: Array<{ file: string; name: string }> = [
     { file: "pnpm-lock.yaml", name: "pnpm" },
     { file: "yarn.lock", name: "Yarn" },
@@ -234,7 +246,7 @@ function detectPackageManager(rootPath: string): TechStackItem | null {
   ];
 
   for (const mgr of managers) {
-    if (existsSync(join(rootPath, mgr.file))) {
+    if (await pathExists(join(rootPath, mgr.file))) {
       return {
         category: "package-manager",
         name: mgr.name,
@@ -248,7 +260,10 @@ function detectPackageManager(rootPath: string): TechStackItem | null {
 /**
  * Detect tech stack from package.json and config files
  */
-function detectTechStack(rootPath: string, packageJson: PackageJson | null): TechStackItem[] {
+async function detectTechStack(
+  rootPath: string,
+  packageJson: PackageJson | null
+): Promise<TechStackItem[]> {
   const stack: TechStackItem[] = [];
 
   if (packageJson) {
@@ -259,7 +274,7 @@ function detectTechStack(rootPath: string, packageJson: PackageJson | null): Tec
     detectDepsFromPackageJson(allDeps, stack);
   }
 
-  const pkgMgr = detectPackageManager(rootPath);
+  const pkgMgr = await detectPackageManager(rootPath);
   if (pkgMgr) {
     stack.push(pkgMgr);
   }
@@ -270,12 +285,12 @@ function detectTechStack(rootPath: string, packageJson: PackageJson | null): Tec
 /**
  * Build directory tree structure
  */
-function buildDirectoryTree(
+async function buildDirectoryTree(
   dirPath: string,
   maxDepth: number,
   excludeDirs: string[],
   currentDepth = 0
-): DirectoryNode {
+): Promise<DirectoryNode> {
   const name = basename(dirPath);
 
   if (currentDepth >= maxDepth) {
@@ -285,7 +300,7 @@ function buildDirectoryTree(
   const children: DirectoryNode[] = [];
 
   try {
-    const entries = readdirSync(dirPath, { withFileTypes: true });
+    const entries = await readdir(dirPath, { withFileTypes: true });
 
     for (const entry of entries) {
       // Skip excluded directories
@@ -300,7 +315,7 @@ function buildDirectoryTree(
 
       if (entry.isDirectory()) {
         const childPath = join(dirPath, entry.name);
-        children.push(buildDirectoryTree(childPath, maxDepth, excludeDirs, currentDepth + 1));
+        children.push(await buildDirectoryTree(childPath, maxDepth, excludeDirs, currentDepth + 1));
       } else if (entry.isFile() && isImportantFile(entry.name)) {
         children.push({ name: entry.name, type: "file" });
       }
@@ -342,13 +357,13 @@ function isImportantFile(name: string): boolean {
 /**
  * Extract conventions from Biome config
  */
-function extractBiomeConventions(
+async function extractBiomeConventions(
   rootPath: string,
   biomeConfig: ConfigFile,
   conventions: CodingConvention[]
-): void {
+): Promise<void> {
   try {
-    const content = readFileSync(join(rootPath, biomeConfig.path), "utf-8");
+    const content = await readFile(join(rootPath, biomeConfig.path), "utf-8");
     const config = JSON.parse(content) as BiomeConfig;
 
     if (config.linter?.rules?.suspicious?.noExplicitAny === "error") {
@@ -382,13 +397,13 @@ function extractBiomeConventions(
 /**
  * Extract conventions from tsconfig
  */
-function extractTsconfigConventions(
+async function extractTsconfigConventions(
   rootPath: string,
   tsconfigFile: ConfigFile,
   conventions: CodingConvention[]
-): void {
+): Promise<void> {
   try {
-    const content = readFileSync(join(rootPath, tsconfigFile.path), "utf-8");
+    const content = await readFile(join(rootPath, tsconfigFile.path), "utf-8");
     const config = JSON.parse(content) as TsConfig;
 
     if (config.compilerOptions?.strict) {
@@ -414,17 +429,20 @@ function extractTsconfigConventions(
 /**
  * Extract coding conventions from config files
  */
-function extractConventions(rootPath: string, configFiles: ConfigFile[]): CodingConvention[] {
+async function extractConventions(
+  rootPath: string,
+  configFiles: ConfigFile[]
+): Promise<CodingConvention[]> {
   const conventions: CodingConvention[] = [];
 
   const biomeConfig = configFiles.find((f) => f.type === "biome");
   if (biomeConfig) {
-    extractBiomeConventions(rootPath, biomeConfig, conventions);
+    await extractBiomeConventions(rootPath, biomeConfig, conventions);
   }
 
   const tsconfigFile = configFiles.find((f) => f.name === "tsconfig.json");
   if (tsconfigFile) {
-    extractTsconfigConventions(rootPath, tsconfigFile, conventions);
+    await extractTsconfigConventions(rootPath, tsconfigFile, conventions);
   }
 
   return conventions;
@@ -452,13 +470,39 @@ interface TsConfig {
 }
 
 /**
+ * Detect feature-based architecture pattern
+ */
+async function detectFeatureBasedArchitecture(appsDir: string): Promise<ProjectPattern | null> {
+  try {
+    const apps = await readdir(appsDir);
+    for (const app of apps) {
+      if (typeof app !== "string") continue;
+      const featuresDir = join(appsDir, app, "src", "features");
+      if (await pathExists(featuresDir)) {
+        return {
+          name: "Feature-based Architecture",
+          description: "Components organized by feature/domain",
+          examples: [`apps/${app}/src/features/`],
+        };
+      }
+    }
+  } catch {
+    // Ignore errors
+  }
+  return null;
+}
+
+/**
  * Detect common project patterns
  */
-function detectPatterns(rootPath: string, techStack: TechStackItem[]): ProjectPattern[] {
+async function detectPatterns(
+  rootPath: string,
+  techStack: TechStackItem[]
+): Promise<ProjectPattern[]> {
   const patterns: ProjectPattern[] = [];
 
   // Monorepo detection
-  if (existsSync(join(rootPath, "pnpm-workspace.yaml"))) {
+  if (await pathExists(join(rootPath, "pnpm-workspace.yaml"))) {
     patterns.push({
       name: "Monorepo (pnpm workspaces)",
       description: "Project uses pnpm workspaces for monorepo management",
@@ -475,7 +519,11 @@ function detectPatterns(rootPath: string, techStack: TechStackItem[]): ProjectPa
   }
 
   // Check for apps/ and packages/ structure
-  if (existsSync(join(rootPath, "apps")) && existsSync(join(rootPath, "packages"))) {
+  const [hasApps, hasPackages] = await Promise.all([
+    pathExists(join(rootPath, "apps")),
+    pathExists(join(rootPath, "packages")),
+  ]);
+  if (hasApps && hasPackages) {
     patterns.push({
       name: "Apps + Packages Structure",
       description: "Separates applications from shared packages",
@@ -485,22 +533,10 @@ function detectPatterns(rootPath: string, techStack: TechStackItem[]): ProjectPa
 
   // Feature-based structure detection
   const appsDir = join(rootPath, "apps");
-  if (existsSync(appsDir)) {
-    try {
-      const apps = readdirSync(appsDir);
-      for (const app of apps) {
-        const featuresDir = join(appsDir, app, "src", "features");
-        if (existsSync(featuresDir)) {
-          patterns.push({
-            name: "Feature-based Architecture",
-            description: "Components organized by feature/domain",
-            examples: [`apps/${app}/src/features/`],
-          });
-          break;
-        }
-      }
-    } catch {
-      // Ignore errors
+  if (hasApps) {
+    const featurePattern = await detectFeatureBasedArchitecture(appsDir);
+    if (featurePattern) {
+      patterns.push(featurePattern);
     }
   }
 

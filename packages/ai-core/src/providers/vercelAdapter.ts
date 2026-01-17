@@ -10,7 +10,8 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
-import { embed as embedText, generateText, streamText } from "ai";
+import type { JSONSchema7 } from "ai";
+import { embed as embedText, generateText, jsonSchema, streamText, tool } from "ai";
 import type {
   CompletionRequest,
   CompletionResponse,
@@ -140,14 +141,14 @@ export class VercelAIAdapter implements LLMProvider {
 
     try {
       const modelId = request.model || this.defaultModel;
+      const tools = request.tools ? this.formatTools(request.tools) : undefined;
       const result = await generateText({
         model: this.providerInstance(modelId),
         messages: this.formatMessages(request.messages),
         temperature: request.temperature,
         maxOutputTokens: request.maxTokens,
         stopSequences: request.stopSequences,
-        // Note: Tool calling with Vercel AI SDK requires proper tool() definitions
-        // For now, we skip tools to ensure basic completion works
+        tools,
         abortSignal: request.signal,
       });
 
@@ -192,13 +193,14 @@ export class VercelAIAdapter implements LLMProvider {
 
     try {
       const modelId = request.model || this.defaultModel;
+      const tools = request.tools ? this.formatTools(request.tools) : undefined;
       const result = streamText({
         model: this.providerInstance(modelId),
         messages: this.formatMessages(request.messages),
         temperature: request.temperature,
         maxOutputTokens: request.maxTokens,
         stopSequences: request.stopSequences,
-        // Note: Tool calling with Vercel AI SDK requires proper tool() definitions
+        tools,
         abortSignal: request.signal,
       });
 
@@ -359,13 +361,18 @@ export class VercelAIAdapter implements LLMProvider {
     }));
   }
 
-  // Note: formatTools is kept for future use when tool calling is fully implemented
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  private formatTools(_tools: ToolDef[]): undefined {
-    // Tool calling requires proper Zod schema conversion from JSON Schema
-    // This is a complex task that requires runtime schema conversion
-    // For now, we return undefined and tools are not passed to the SDK
-    return undefined;
+  /**
+   * Convert tool definitions to Vercel AI SDK format using jsonSchema helper.
+   */
+  private formatTools(tools: ToolDef[]): Record<string, ReturnType<typeof tool>> {
+    const formatted: Record<string, ReturnType<typeof tool>> = {};
+    for (const t of tools) {
+      formatted[t.name] = tool({
+        description: t.description,
+        inputSchema: jsonSchema(t.parameters as JSONSchema7),
+      });
+    }
+    return formatted;
   }
 
   private parseToolCalls(toolCalls?: unknown[]): ToolCall[] | undefined {
