@@ -25,11 +25,32 @@ export const MessageBubble = React.memo(function MessageBubble({
   className,
   density = "default",
 }: MessageBubbleProps) {
-  // If streaming but no content yet, show thinking indicator
+  const [showWorking, setShowWorking] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!isStreaming || content) {
+      setShowWorking(false);
+      return undefined;
+    }
+    setShowWorking(false);
+    const timer = window.setTimeout(() => {
+      setShowWorking(true);
+    }, 2000);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [content, isStreaming]);
+
+  // If streaming but no content yet, show working indicator after a short delay
   if (isStreaming && !content) {
     return (
       <div className="py-2">
-        <ThinkingIndicator />
+        {showWorking && (
+          <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+            <ThinkingIndicator />
+            <span>Working...</span>
+          </div>
+        )}
       </div>
     );
   }

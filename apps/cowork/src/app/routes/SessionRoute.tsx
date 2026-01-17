@@ -1,6 +1,5 @@
 import { Link, useParams } from "@tanstack/react-router";
 import { ArtifactRail } from "../../components/ArtifactRail";
-import { TaskContainer } from "../../components/TaskContainer";
 import { ChatThread } from "../../features/chat/ChatThread";
 import { useTaskStream } from "../../features/tasks/hooks/useTaskStream";
 import { useWorkspace } from "../providers/WorkspaceProvider";
@@ -10,7 +9,7 @@ export function SessionRoute() {
   const { getSession } = useWorkspace();
   const session = getSession(sessionId);
 
-  const { graph, isConnected, approveTool, rejectTool } = useTaskStream(sessionId);
+  const { graph } = useTaskStream(sessionId);
 
   if (!session) {
     return (
@@ -27,12 +26,6 @@ export function SessionRoute() {
   return (
     <div className="session-grid">
       <div className="session-main">
-        <TaskContainer
-          graph={graph}
-          isConnected={isConnected}
-          approveTool={approveTool}
-          rejectTool={rejectTool}
-        />
         <ChatThread sessionId={sessionId} />
       </div>
       <ArtifactRail sessionId={sessionId} graph={graph} />

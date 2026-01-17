@@ -11,7 +11,7 @@ import { useChatSession } from "./hooks/useChatSession";
 // ChatMessage is no longer used, we use Message from @ku0/shell via useChatSession
 
 export function ChatThread({ sessionId }: { sessionId: string }) {
-  const { messages, sendMessage, isSending, isLoading } = useChatSession(sessionId);
+  const { messages, sendMessage, sendAction, isSending, isLoading } = useChatSession(sessionId);
   const [input, setInput] = React.useState("");
   const [model, setModel] = React.useState(getDefaultModelId());
 
@@ -80,7 +80,7 @@ export function ChatThread({ sessionId }: { sessionId: string }) {
       }
       setModel(modelId);
       updateSettings({ defaultModel: modelId }).catch((err) => {
-        console.error("Failed to update model:", err);
+        void err;
         setModel(model);
       });
     },
@@ -155,6 +155,7 @@ export function ChatThread({ sessionId }: { sessionId: string }) {
         onAbort={() => {
           /* no-op */
         }}
+        onTaskAction={(action, metadata) => sendAction(action, { approvalId: metadata.approvalId })}
         attachments={[]}
         onAddAttachment={() => {
           /* no-op */

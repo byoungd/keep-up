@@ -1,12 +1,18 @@
 "use client";
 import { AnimatePresence, motion } from "framer-motion";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ConfirmationSection } from "./ConfirmationSection";
 import { DeliverableItem } from "./DeliverableItem";
 import { PlanSection } from "./PlanSection";
 import { StepItem } from "./StepItem";
 import { TaskHeader } from "./TaskHeader";
-import { buildFallbackStep, getStatusMeta, normalizeSteps, TASK_THEME } from "./TaskStreamUtils";
+import {
+  buildFallbackStep,
+  formatElapsedTime,
+  getStatusMeta,
+  normalizeSteps,
+  TASK_THEME,
+} from "./TaskStreamUtils";
 import type { AgentTask, ArtifactItem } from "./types";
 
 interface TaskStreamMessageProps {
@@ -30,6 +36,7 @@ export function TaskStreamMessage({ task, onPreview, onAction }: TaskStreamMessa
 
   const { displaySteps, deliverables, report, otherArtifacts, plans, statusMeta, summaryText } =
     useTaskState(task);
+  const elapsedLabel = useElapsedLabel(task);
 
   const isPaused = task.status === "paused";
 
@@ -42,6 +49,7 @@ export function TaskStreamMessage({ task, onPreview, onAction }: TaskStreamMessa
           isExpanded={isExpanded}
           onToggle={() => setIsExpanded(!isExpanded)}
           statusMeta={statusMeta}
+          elapsedLabel={elapsedLabel}
         />
 
         <AnimatePresence initial={false}>
@@ -179,4 +187,42 @@ function useTaskState(task: AgentTask) {
     statusMeta,
     summaryText,
   };
+}
+
+function useElapsedLabel(task: AgentTask): string | undefined {
+  const elapsedMs = useElapsedTime(task.startedAt, task.completedAt, task.status);
+  return elapsedMs === null ? undefined : formatElapsedTime(elapsedMs);
+}
+
+function useElapsedTime(
+  startedAt?: string,
+  completedAt?: string,
+  status?: AgentTask["status"]
+): number | null {
+  const startMs = startedAt ? Date.parse(startedAt) : Number.NaN;
+  const endMs = completedAt ? Date.parse(completedAt) : Number.NaN;
+  const isActive =
+    !Number.isNaN(startMs) &&
+    Number.isNaN(endMs) &&
+    (status === "running" || status === "queued" || status === "paused");
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!isActive) {
+      return undefined;
+    }
+    const timer = window.setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [isActive]);
+
+  if (Number.isNaN(startMs)) {
+    return null;
+  }
+
+  const effectiveEnd = !Number.isNaN(endMs) ? endMs : now;
+  return Math.max(0, effectiveEnd - startMs);
 }

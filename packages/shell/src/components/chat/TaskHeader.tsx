@@ -1,5 +1,6 @@
 import { cn } from "@ku0/shared/utils";
 import { ChevronRight } from "lucide-react";
+import { ModelBadge } from "./ModelBadge";
 import type { getStatusMeta } from "./TaskStreamUtils";
 import type { AgentTask } from "./types";
 
@@ -8,11 +9,13 @@ export function TaskHeader({
   isExpanded,
   onToggle,
   statusMeta,
+  elapsedLabel,
 }: {
   task: AgentTask;
   isExpanded: boolean;
   onToggle: () => void;
   statusMeta: ReturnType<typeof getStatusMeta>;
+  elapsedLabel?: string;
 }) {
   return (
     <button
@@ -31,21 +34,32 @@ export function TaskHeader({
         {statusMeta.icon}
       </div>
 
-      <div className="flex-1 min-w-0 flex items-center gap-2">
-        <span className="text-sm font-semibold text-foreground truncate tracking-[-0.01em]">
-          {task.label || "Executing Task"}
-        </span>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-foreground truncate tracking-[-0.01em]">
+            {task.label || "Executing Task"}
+          </span>
 
-        {/* Subtle Status Badge - Linear Style */}
-        <span
-          className={cn(
-            "inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium transition-colors",
-            statusMeta.badgeBg,
-            statusMeta.textClass
-          )}
-        >
-          {statusMeta.label}
-        </span>
+          {/* Subtle Status Badge - Linear Style */}
+          <span
+            className={cn(
+              "inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium transition-colors",
+              statusMeta.badgeBg,
+              statusMeta.textClass
+            )}
+          >
+            {statusMeta.label}
+          </span>
+        </div>
+        <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground/70">
+          {elapsedLabel && <span className="tabular-nums">Elapsed {elapsedLabel}</span>}
+          <ModelBadge
+            modelId={task.modelId}
+            providerId={task.providerId}
+            fallbackNotice={task.fallbackNotice}
+            size="sm"
+          />
+        </div>
       </div>
 
       <div

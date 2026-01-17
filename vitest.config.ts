@@ -192,6 +192,22 @@ export default defineConfig({
           },
         },
       }),
+      defineProject({
+        resolve: {
+          alias: aliases,
+        },
+        test: {
+          name: "cowork-app",
+          include: ["apps/cowork/src/**/*.test.ts"],
+          exclude: defaultExclude,
+          environment: "node",
+          server: {
+            deps: {
+              inline: [/@ku0\/.*/],
+            },
+          },
+        },
+      }),
     ],
   },
 });

@@ -1,3 +1,4 @@
+import { cn } from "@ku0/shared/utils";
 import { Loader2, AlertCircle as LucideAlertCircle } from "lucide-react";
 import { useState } from "react";
 
@@ -9,6 +10,8 @@ export function ConfirmationSection({
     approvalId: string;
     toolName: string;
     args: Record<string, unknown>;
+    riskLevel?: "low" | "medium" | "high";
+    reason?: string;
   };
   onAction?: (
     action: "approve" | "reject",
@@ -35,8 +38,26 @@ export function ConfirmationSection({
         <div className="h-6 w-6 rounded-full bg-orange-500/10 text-orange-600 flex items-center justify-center shrink-0">
           <LucideAlertCircle className="h-3.5 w-3.5" />
         </div>
-        <div className="text-sm font-medium text-foreground">Confirm {metadata.toolName}</div>
+        <div className="flex flex-wrap items-center gap-2 text-sm font-medium text-foreground">
+          <span>Confirm {metadata.toolName}</span>
+          {metadata.riskLevel && (
+            <span
+              className={cn(
+                "text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full border",
+                getRiskBadgeClass(metadata.riskLevel)
+              )}
+            >
+              {metadata.riskLevel} risk
+            </span>
+          )}
+        </div>
       </div>
+
+      {metadata.reason && (
+        <div className="text-xs text-muted-foreground mb-3">
+          Reason: <span className="text-foreground/80">{metadata.reason}</span>
+        </div>
+      )}
 
       {metadata.args && (
         <div className="bg-surface-2/50 rounded-md p-2 mb-3 font-mono text-xs text-muted-foreground overflow-x-auto">
@@ -68,4 +89,15 @@ export function ConfirmationSection({
       </div>
     </div>
   );
+}
+
+function getRiskBadgeClass(riskLevel: "low" | "medium" | "high"): string {
+  switch (riskLevel) {
+    case "high":
+      return "border-red-500/30 text-red-600 bg-red-500/10";
+    case "medium":
+      return "border-amber-500/30 text-amber-600 bg-amber-500/10";
+    default:
+      return "border-emerald-500/30 text-emerald-600 bg-emerald-500/10";
+  }
 }

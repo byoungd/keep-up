@@ -89,6 +89,7 @@ export interface AgentTask {
     toolName: string;
     args: Record<string, unknown>;
     riskLevel?: "low" | "medium" | "high";
+    reason?: string;
   };
 
   // Manus UI Spec (2.1.1)
