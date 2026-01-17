@@ -12,3 +12,12 @@ export {
   type ModeConfig,
   PLAN_MODE,
 } from "./AgentModeManager";
+
+export {
+  createEmptyPlan,
+  generatePlanMd,
+  type PlanArtifact,
+  type PlanFileChange,
+  type PlanStep,
+  parsePlanMd,
+} from "./planGenerator";
