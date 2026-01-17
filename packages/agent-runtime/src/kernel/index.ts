@@ -4,6 +4,11 @@
  * Defines the boundary between control-plane orchestration and data-plane services.
  */
 
+import type {
+  ArtifactEmissionContext,
+  ArtifactEmissionResult,
+  ArtifactPipeline,
+} from "../artifacts";
 import { getGlobalEventBus } from "../events/eventBus";
 import type { RuntimeEvent, RuntimeEventBus } from "../events/eventBus";
 import { createToolExecutor } from "../executor";
@@ -68,6 +73,10 @@ export interface KernelRunOptions {
 export interface Kernel {
   run(input: string, options?: KernelRunOptions): Promise<AgentState>;
   runStream(input: string, options?: KernelRunOptions): AsyncIterable<RuntimeEvent>;
+  emitArtifact(
+    artifact: Parameters<ArtifactPipeline["emit"]>[0],
+    context?: ArtifactEmissionContext
+  ): ArtifactEmissionResult;
 }
 
 export interface KernelConfig {
@@ -141,6 +150,13 @@ export class RuntimeKernel implements Kernel {
     for await (const event of this.orchestrator.runStream(input)) {
       yield this.wrapOrchestratorEvent(event);
     }
+  }
+
+  emitArtifact(
+    artifact: Parameters<ArtifactPipeline["emit"]>[0],
+    context?: ArtifactEmissionContext
+  ): ArtifactEmissionResult {
+    return this.orchestrator.emitArtifact(artifact, context);
   }
 
   private resolveOrchestratorOptions(): CreateOrchestratorOptions {
