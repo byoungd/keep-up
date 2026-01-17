@@ -578,7 +578,17 @@ export async function getProjectContext(): Promise<ProjectContextInfo> {
 export async function analyzeProject(): Promise<ProjectAnalysisResult> {
   const data =
     await fetchJson<ApiResult<{ analysis?: ProjectAnalysisResult }>>("/api/context/analyze");
-  return data.analysis ?? (data as ProjectAnalysisResult);
+  if (data.analysis) {
+    return data.analysis;
+  }
+  // Fallback: API might return result directly
+  return {
+    techStack: (data as unknown as ProjectAnalysisResult).techStack ?? [],
+    structure: (data as unknown as ProjectAnalysisResult).structure ?? {
+      name: "root",
+      type: "directory",
+    },
+  };
 }
 
 export async function generateContext(options?: { includePatterns?: boolean }): Promise<string> {

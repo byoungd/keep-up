@@ -5,8 +5,9 @@
  * (OpenAI, Anthropic) with automatic fallback, streaming, and metrics.
  */
 
+// Re-export pricing type from models catalog
+export type { ModelPricing } from "../catalog/models";
 export { type AnthropicConfig, AnthropicProvider } from "./anthropicProvider";
-
 // Base provider
 export { BaseLLMProvider } from "./baseProvider";
 export { type GeminiConfig, GeminiProvider } from "./geminiProvider";
@@ -31,7 +32,6 @@ export {
 } from "./resilientProvider";
 // Token tracking
 export {
-  type ModelPricing,
   type RateLimitConfig,
   TokenTracker,
   type UsageRecord,
