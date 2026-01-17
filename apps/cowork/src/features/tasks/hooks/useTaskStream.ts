@@ -910,6 +910,9 @@ function handleArtifactUpdate(
         ...parsedArtifact.data,
         updatedAt: eventTime,
         taskId: typeof data.taskId === "string" ? data.taskId : undefined,
+        status: existing?.status,
+        appliedAt: existing?.appliedAt,
+        version: existing?.version,
       },
     },
   };
