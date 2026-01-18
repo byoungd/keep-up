@@ -41,6 +41,7 @@ describe("TurnExecutor", () => {
     messages: [{ role: "system", content: "You are a helpful assistant" }],
     pendingToolCalls: [],
     status: "thinking",
+    agentId: "agent-test",
   });
 
   describe("execute", () => {

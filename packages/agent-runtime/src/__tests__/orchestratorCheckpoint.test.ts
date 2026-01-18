@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CheckpointManager } from "../checkpoint";
 import type { EventLogManager } from "../checkpoint/eventLog";
+import { generateStableToolCallId } from "../checkpoint/replayEngine";
 import {
   createCompletionToolServer,
   createFileToolServer,
@@ -31,7 +32,6 @@ describe("Orchestrator Checkpoint & Event Log Integration", () => {
       advanceStep: vi.fn().mockResolvedValue(1),
       updateStatus: vi.fn().mockResolvedValue(undefined),
       updateMetadata: vi.fn().mockResolvedValue(undefined),
-      // Add other required methods if accessed, but mostly create is used
     } as unknown as CheckpointManager;
 
     // Mock EventLogManager
@@ -61,8 +61,24 @@ describe("Orchestrator Checkpoint & Event Log Integration", () => {
       expect.objectContaining({ type: "turn_start" })
     );
 
-    // Verify checkpoint creation (at turn boundaries and tool execution)
-    expect(checkpointManagerMock.create).toHaveBeenCalled();
+    // Verify checkpoint creation and message recording
+    expect(checkpointManagerMock.create).toHaveBeenCalledWith(
+      expect.objectContaining({ task: "Hello!" })
+    );
+    expect(checkpointManagerMock.addMessage).toHaveBeenCalledWith(
+      "ckpt_test",
+      expect.objectContaining({ role: "system" })
+    );
+    expect(checkpointManagerMock.addMessage).toHaveBeenCalledWith(
+      "ckpt_test",
+      expect.objectContaining({ role: "user", content: "Hello!" })
+    );
+    expect(checkpointManagerMock.advanceStep).toHaveBeenCalled();
+    expect(checkpointManagerMock.updateStatus).toHaveBeenCalledWith(
+      "ckpt_test",
+      "completed",
+      undefined
+    );
   });
 
   it("should emit tool call events and checkpoints", async () => {
@@ -107,10 +123,15 @@ describe("Orchestrator Checkpoint & Event Log Integration", () => {
       })
     );
 
-    // Checkpoint should be created after tool execution
-    expect(checkpointManagerMock.create).toHaveBeenCalled();
-    // At least: Turn 1 start, Tool call (maybe), Turn 1 end, Turn 2 start, Completion, Turn 2 end...
-    // Actually our implementation calls createCheckpoint at turn end and after tool execution.
+    const expectedToolCallId = generateStableToolCallId("file:list", { path: "/tmp" }, 1, 0);
+    expect(checkpointManagerMock.addPendingToolCall).toHaveBeenCalledWith(
+      "ckpt_test",
+      expect.objectContaining({ id: expectedToolCallId, name: "file:list" })
+    );
+    expect(checkpointManagerMock.completeToolCall).toHaveBeenCalledWith(
+      "ckpt_test",
+      expect.objectContaining({ callId: expectedToolCallId, name: "file:list", success: true })
+    );
   });
 
   it("should emit error event on failure", async () => {
@@ -138,6 +159,13 @@ describe("Orchestrator Checkpoint & Event Log Integration", () => {
         payload: expect.objectContaining({
           error: expect.stringContaining("Simulated LLM Failure"),
         }),
+      })
+    );
+    expect(checkpointManagerMock.updateStatus).toHaveBeenCalledWith(
+      "ckpt_test",
+      "failed",
+      expect.objectContaining({
+        message: expect.stringContaining("Simulated LLM Failure"),
       })
     );
   });

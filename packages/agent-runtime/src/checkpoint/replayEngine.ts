@@ -149,7 +149,7 @@ export function generateStableToolCallId(
  * Simple deterministic hash for an object.
  */
 function hashObject(obj: Record<string, unknown>): string {
-  const str = JSON.stringify(obj, Object.keys(obj).sort());
+  const str = stableStringify(obj);
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i);
@@ -157,6 +157,29 @@ function hashObject(obj: Record<string, unknown>): string {
     hash = hash & hash; // Convert to 32-bit integer
   }
   return Math.abs(hash).toString(36);
+}
+
+function stableStringify(value: Record<string, unknown>): string {
+  return JSON.stringify(normalizeValue(value));
+}
+
+function normalizeValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeValue(item));
+  }
+
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) =>
+      a.localeCompare(b)
+    );
+    const normalized: Record<string, unknown> = {};
+    for (const [key, entryValue] of entries) {
+      normalized[key] = normalizeValue(entryValue);
+    }
+    return normalized;
+  }
+
+  return value;
 }
 
 // ============================================================================
@@ -281,7 +304,7 @@ export class ReplayEngine {
       args: Record<string, unknown>
     ) => Promise<{ success: boolean; result: unknown }>
   ): AsyncGenerator<ReplayEvent> {
-    const runId = plan.checkpoint.agentId;
+    const runId = this.resolveRunId(plan.checkpoint);
     const agentId = plan.checkpoint.agentId;
 
     // Emit turn start event
@@ -466,6 +489,11 @@ export class ReplayEngine {
   ): boolean {
     const expectedId = generateStableToolCallId(toolName, args, turn, index);
     return toolCallId === expectedId;
+  }
+
+  private resolveRunId(checkpoint: Checkpoint): string {
+    const runId = checkpoint.metadata?.runId;
+    return typeof runId === "string" && runId.length > 0 ? runId : checkpoint.agentId;
   }
 }
 

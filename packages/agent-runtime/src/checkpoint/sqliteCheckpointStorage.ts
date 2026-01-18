@@ -72,6 +72,26 @@ interface CheckpointRow {
   child_checkpoint_ids: string | null;
 }
 
+function loadBetterSqlite3(): new (path: string) => SQLiteDatabase {
+  try {
+    // Dynamic import to avoid bundling issues
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return require("better-sqlite3") as new (
+      path: string
+    ) => SQLiteDatabase;
+  } catch (error) {
+    const details = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `better-sqlite3 is required for SQLite checkpoint storage. Install it or provide a SQLiteCheckpointStorageConfig.db. (${details})`
+    );
+  }
+}
+
+function resolveThreadId(checkpoint: Checkpoint): string {
+  const runId = checkpoint.metadata?.runId;
+  return typeof runId === "string" && runId.length > 0 ? runId : checkpoint.agentId;
+}
+
 // ============================================================================
 // Schema
 // ============================================================================
@@ -117,9 +137,7 @@ export class SQLiteCheckpointStorage implements ICheckpointStorage {
       this.db = config.db;
       this.ownsDb = false;
     } else {
-      // Dynamic import to avoid bundling issues
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const BetterSqlite3 = require("better-sqlite3") as new (path: string) => SQLiteDatabase;
+      const BetterSqlite3 = loadBetterSqlite3();
       this.db = new BetterSqlite3(config.dbPath ?? ":memory:");
       this.ownsDb = true;
     }
@@ -147,7 +165,7 @@ export class SQLiteCheckpointStorage implements ICheckpointStorage {
 
     stmt.run({
       id: checkpoint.id,
-      threadId: checkpoint.agentId, // Use agentId as threadId for now
+      threadId: resolveThreadId(checkpoint),
       step: checkpoint.currentStep,
       timestamp: new Date(checkpoint.createdAt).toISOString(),
       stateBlob: JSON.stringify({

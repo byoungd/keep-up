@@ -2,8 +2,9 @@
  * Replay Engine Tests
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Checkpoint } from "../checkpoint";
+import type { EventLogManager } from "../checkpoint/eventLog";
 import {
   createReplayEngine,
   generateStableToolCallId,
@@ -61,6 +62,13 @@ describe("ReplayEngine", () => {
     it("should produce consistent hash regardless of object key order", () => {
       const id1 = generateStableToolCallId("tool", { a: 1, b: 2 }, 1, 0);
       const id2 = generateStableToolCallId("tool", { b: 2, a: 1 }, 1, 0);
+
+      expect(id1).toBe(id2);
+    });
+
+    it("should produce consistent hash for nested objects", () => {
+      const id1 = generateStableToolCallId("tool", { nested: { a: 1, b: 2 } }, 1, 0);
+      const id2 = generateStableToolCallId("tool", { nested: { b: 2, a: 1 } }, 1, 0);
 
       expect(id1).toBe(id2);
     });
@@ -254,6 +262,31 @@ describe("ReplayEngine", () => {
       expect(SIDE_EFFECTFUL_TOOLS.has("file_write")).toBe(true);
       expect(SIDE_EFFECTFUL_TOOLS.has("write_file")).toBe(true);
       expect(SIDE_EFFECTFUL_TOOLS.has("delete_file")).toBe(true);
+    });
+  });
+
+  describe("executeReplay", () => {
+    it("uses runId from checkpoint metadata when available", async () => {
+      const append = vi.fn().mockResolvedValue({});
+      const eventLog = { append } as unknown as EventLogManager;
+      const engine = createReplayEngine({ eventLog });
+      const checkpoint = createTestCheckpoint({
+        metadata: { runId: "run-123" },
+        pendingToolCalls: [],
+      });
+
+      const { plan } = engine.prepareReplay(checkpoint);
+      if (!plan) {
+        throw new Error("Plan should be defined");
+      }
+
+      const iterator = engine.executeReplay(plan, {}, async () => ({
+        success: true,
+        result: "ok",
+      }));
+      await iterator.next();
+
+      expect(append).toHaveBeenCalledWith(expect.objectContaining({ runId: "run-123" }));
     });
   });
 });

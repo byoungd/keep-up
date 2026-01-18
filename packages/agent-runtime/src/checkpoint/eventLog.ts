@@ -140,6 +140,21 @@ interface EventRow {
   payload: string;
 }
 
+function loadBetterSqlite3(): new (path: string) => SQLiteDatabase {
+  try {
+    // Dynamic import to avoid bundling issues
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return require("better-sqlite3") as new (
+      path: string
+    ) => SQLiteDatabase;
+  } catch (error) {
+    const details = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `better-sqlite3 is required for SQLite event logs. Install it or provide an EventLogConfig.db. (${details})`
+    );
+  }
+}
+
 class SQLiteEventLogManager implements EventLogManager {
   private readonly db: SQLiteDatabase;
   private readonly ownsDb: boolean;
@@ -150,9 +165,7 @@ class SQLiteEventLogManager implements EventLogManager {
       this.db = config.db;
       this.ownsDb = false;
     } else {
-      // Dynamic import to avoid bundling issues
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const BetterSqlite3 = require("better-sqlite3") as new (path: string) => SQLiteDatabase;
+      const BetterSqlite3 = loadBetterSqlite3();
       this.db = new BetterSqlite3(config.dbPath ?? ":memory:");
       this.ownsDb = true;
     }

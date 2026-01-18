@@ -239,6 +239,7 @@ describe("TurnExecutor skills injection", () => {
       messages: [{ role: "user", content: "hello" }],
       pendingToolCalls: [],
       status: "idle",
+      agentId: "agent-test",
     };
 
     await executor.execute(state);
