@@ -12,7 +12,8 @@
 | **v0.9 RC** | Core | ✅ Stable | `LFCC_v0.9_RC.md` |
 | **v0.9.1** | Extension | ✅ Stable | `proposals/LFCC_v0.9.1_AI_Native_Enhancement.md` |
 | **v0.9.2** | Extension | ✅ Implementable | `proposals/LFCC_v0.9.2_Multi_Document_Support.md` |
-| **v0.9.3+** | Extension | 📋 Planned | Reference store backend standardization |
+| **v0.9.3** | Extension | 📝 Draft | `proposals/LFCC_v0.9.3_Reference_Store_Backend.md` |
+| **v0.9.4+** | Extension | 📋 Planned | Range targets, reference grouping |
 
 ---
 
@@ -93,14 +94,42 @@
 
 ---
 
-## v0.9.3+ (Planned)
+## v0.9.3 (Reference Store Backend)
 
-### Deferred Items from v0.9.2
+**Status:** Draft  
+**Prerequisite:** v0.9.2 (Multi-Document)  
+**Capability Flag:** N/A (infrastructure, not capability-gated)
 
-- Standardize physical reference store backend (e.g., Loro "workspace graph" document)
-- Range targets for cross-document references
+### Features
+
+- Loro "workspace graph" document for reference storage
+- SEC convergence for cross-document references
+- Reference lifecycle: create/update/delete/verify
+- Append-only audit log for lifecycle transitions
+- Query interface for reference lookups
+- Sync protocol using standard Loro updates
+
+### Key Requirements
+
+| ID | Requirement |
+|----|-------------|
+| RS-001 | Reference store MUST converge under SEC |
+| RS-010 | Workspace graph document structure |
+| RS-011 | LoroMap with LWW semantics |
+| RS-013 | Deterministic ref-store doc_id |
+| RS-020-025 | Reference lifecycle operations |
+| RS-030-032 | Sync protocol requirements |
+| RS-040 | State transitions audit logging |
+
+### Key Documents
+
+- Proposal: `proposals/LFCC_v0.9.3_Reference_Store_Backend.md`
 
 ---
+
+## v0.9.4+ (Planned)
+
+### Deferred Items from v0.9.3
 
 ## Conformance Testing
 

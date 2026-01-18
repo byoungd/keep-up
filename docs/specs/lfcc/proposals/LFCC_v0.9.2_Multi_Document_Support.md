@@ -410,4 +410,4 @@ Decisions (v0.9.2):
 - **Result scope:** `results[]` MUST include all target documents and MAY omit non-target documents. If a non-target document is included, `operations_applied` MUST be 0.
 
 Deferred to v0.9.3+:
-- Standardize the physical reference store backend (e.g., a dedicated Loro “workspace graph” document) beyond the logical record contract in §5.3.
+- Standardize the physical reference store backend (e.g., a dedicated Loro “workspace graph” document) beyond the logical record contract in §5.3 (see `proposals/LFCC_v0.9.3_Reference_Store_Backend.md`).
