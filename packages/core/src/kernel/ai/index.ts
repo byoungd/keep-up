@@ -71,6 +71,7 @@ export * from "./opcodes.js";
 export * from "./provenance.js";
 export * from "./provenanceMark.js";
 export * from "./provenanceTracker.js";
+export * from "./referenceStore.js";
 export { createSanitizer } from "./sanitizer.js";
 // Phase 4: Semantic Conflict Resolution
 export * from "./semanticMerge.js";

@@ -285,7 +285,15 @@ export {
 export { createFileToolServer } from "./tools/core/file";
 export { createSubagentToolServer } from "./tools/core/subagent";
 export { createGitToolServer } from "./tools/git/gitServer";
-export { createLFCCToolServer } from "./tools/lfcc/lfccServer";
+export {
+  createLFCCToolServer,
+  type LFCCToolServerOptions,
+  type MultiDocumentGatewayRequest,
+  type MultiDocumentGatewayResponse,
+  type MultiDocumentPolicy,
+  type MultiDocumentRequestDocument,
+  type MultiDocumentRole,
+} from "./tools/lfcc/lfccServer";
 // Quick access to commonly used factories
 export { createToolRegistry } from "./tools/mcp/registry";
 export { createWebSearchToolServer } from "./tools/web/webSearchServer";
