@@ -1,99 +1,128 @@
-# Cowork Motion Spec
+# Cowork Motion Spec (v2 - Functional Motion)
 
-> **Philosophy**: Interfaces should feel "alive" and "physical".
-> We assume **Framer Motion** (React) and **CSS Transitions** (Tailwind).
->
-> **Implementation**: [`packages/design-system/src/motion.ts`](file:///Users/han/Documents/Code/Parallel/keep-up/packages/design-system/src/motion.ts)
+> **Principle**: Motion provides **feedback** and **context**, not decoration.
+> Motion should feel **responsive**, not **elaborate**.
 
-## 1. Physics & Timing
+**Changelog (v2)**:
+- Removed "Thinking Pulse" looping animation
+- Removed "Hover Lift" scale effects
+- Simplified transitions to functional feedback only
 
-We avoid linear easing ("robots"). We use **Springs** for movement and **Ease-Out** for opacity.
+---
 
-### 1.1 Spring Configurations
-Used for layout changes, modals, and sliders.
+## 1. Core Guidelines
 
-| Name | Stiffness | Damping | Mass | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| **`spring.quick`** | 500 | 30 | 0.5 | Snappy. Toggles, Checkboxes. |
-| **`spring.standard`** | 300 | 30 | 1 | The default. Modals, Sheets. |
-| **`spring.slow`** | 180 | 30 | 1 | Large shifts. Page transitions. |
-| **`spring.bouncy`** | 400 | 20 | 1 | "Fun" elements. Badges, Icons. |
-
-### 1.2 Durations (CSS)
-Used for colors, opacity, and transforms where springs are overkill.
-
-| Token | Time | Ease | Use Case |
-| :--- | :--- | :--- | :--- |
-| **`duration-fast`** | `150ms` | `ease-out` | Hover interactions. |
-| **`duration-normal`** | `300ms` | `ease-out` | Fades, Tooltips. |
-| **`duration-slow`** | `500ms` | `ease-in-out` | Background shifts. |
+1.  **Motion is invisible when done right.** The user notices when things are slow or jarring, not when they are smooth.
+2.  **Duration < 200ms for most interactions.** Anything longer feels sluggish.
+3.  **Ease-out for entrances.** Elements appear quickly and settle.
+4.  **No looping animations in resting states.** They distract the user.
 
 ---
 
 ## 2. Standard Transitions
 
-### 2.1 Page / View Transition
-When switching routes or major views.
-*   **Initial**: `opacity: 0`, `scale: 0.98`, `y: 4`
-*   **Animate**: `opacity: 1`, `scale: 1`, `y: 0`
-*   **Exit**: `opacity: 0` (Instant or fast fade)
-*   **Config**: `spring.standard`
+### 2.1 Route / Page Changes
+*   **Effect**: Fade in.
+*   **Duration**: 150ms.
+*   **Easing**: `ease-out`.
+*   **Avoid**: Scale effects. They add visual noise without value.
 
-### 2.2 Modal Entry
-*   **Overlay**: Fade in (`duration-normal`).
-*   **Panel**:
-    *   **Initial**: `opacity: 0`, `scale: 0.95`, `y: 8`
-    *   **Animate**: `opacity: 1`, `scale: 1`, `y: 0`
-    *   **Config**: `spring.quick` (We want modals to feel fast).
+```css
+.page-enter {
+  opacity: 0;
+}
+.page-enter-active {
+  opacity: 1;
+  transition: opacity 150ms ease-out;
+}
+```
 
-### 2.3 List Items (Staggered)
-For lists of artifacts or messages.
-*   **Stagger Children**: `0.05s`
-*   **Variant**: Slide in from left/bottom.
+### 2.2 Modals & Popovers
+*   **Overlay (Backdrop)**: Fade in (150ms).
+*   **Panel**: Fade in + slight slide up (8px).
+*   **Duration**: 150ms.
 
-### 2.4 Hover "Lift"
-Standard interactive hover.
-*   **Scale**: `1.01` or `1.02`
-*   **Y**: `-1px` or `-2px`
-*   **Shadow**: Increase shadow Spread/Opacity.
+```css
+.modal-panel {
+  transform: translateY(8px);
+  opacity: 0;
+  transition: transform 150ms ease-out, opacity 150ms ease-out;
+}
+.modal-panel.open {
+  transform: translateY(0);
+  opacity: 1;
+}
+```
+
+### 2.3 Sidebar Collapse/Expand
+*   **Effect**: Horizontal resize.
+*   **Type**: Spring (CSS or Framer Motion).
+*   **Config**: `stiffness: 400, damping: 30` (fast, no bounce).
+
+### 2.4 List Item Load (Chat Messages)
+*   **Effect**: Fade in, optional stagger (30ms delay per item).
+*   **Duration**: 100ms per item.
+*   **Avoid**: Slide-in effects. They slow reading.
 
 ---
 
-## 3. Micro-Interactions
+## 3. Interaction Feedback
 
-### 3.1 The "Squeeze" (Click)
-Buttons should feel tactile.
-*   **Active/Press**: `scale: 0.96`
-*   **Config**: `spring.quick`
+### 3.1 Button Click
+*   **Effect**: Background color darkens.
+*   **Duration**: Instant (0ms on press, 100ms on release).
+*   **Avoid**: Scale "squeeze" effects.
 
-### 3.2 "Thinking" Pulse
-For AI states.
-*   **Keyframes**:
-    *   `0%`: `opacity: 0.4`, `scale: 0.98`
-    *   `50%`: `opacity: 1`, `scale: 1.02`, `border-color: highlight`
-    *   `100%`: `opacity: 0.4`, `scale: 0.98`
-*   **Loop**: Infinity.
+### 3.2 Hover States
+*   **Effect**: Subtle background shift (e.g., `bg-surface-1` -> `bg-surface-2`).
+*   **Duration**: 100ms.
+*   **Avoid**: Scale > 1.01. Shadow changes on hover.
+
+### 3.3 Focus Ring
+*   **Effect**: Visible ring outline using brand color.
+*   **Duration**: Instant.
 
 ---
 
-## 4. Implementation Snippets (Framer Motion)
+## 4. Status Indicators (Static)
+
+### 4.1 Loading / "Thinking"
+*   **Visual**: A simple spinner icon OR a text label ("Working...").
+*   **Behavior**: **Static** until state changes. No looping gradients or pulses.
 
 ```tsx
-// Generic wrapper for "Page" content
-export const PageTransition = ({ children }: { children: ReactNode }) => (
-  <motion.div
-    initial={{ opacity: 0, scale: 0.99 }}
-    animate={{ opacity: 1, scale: 1 }}
-    transition={{ type: "spring", stiffness: 300, damping: 30 }}
-    className="h-full w-full"
-  >
-    {children}
-  </motion.div>
-);
+// Good
+<span className="text-muted-foreground">Working...</span>
 
-// Standard Button tap
-export const tapAnimation = {
-  scale: 0.97,
-  transition: { duration: 0.05 }
-};
+// Bad (removed)
+// <div className="animate-pulse bg-gradient-to-r from-violet-500 to-pink-500" />
 ```
+
+### 4.2 Streaming Indicator
+*   **Visual**: Blinking cursor at end of text, OR static "Streaming..." label.
+*   **Duration**: Cursor blink: 500ms interval (standard text cursor).
+
+### 4.3 Progress Bar (for long operations)
+*   **Visual**: Thin horizontal bar.
+*   **Behavior**: Width animates smoothly based on progress percentage.
+*   **Duration**: Smooth transition on width change.
+
+---
+
+## 5. Removed Features (from v1)
+
+| Feature | Reason for Removal |
+| :--- | :--- |
+| **Hover "Lift" (scale 1.02)** | Distracting. No functional purpose. |
+| **"Thinking" Pulse Animation** | Looping. Draws attention away from content. |
+| **Spring "Bouncy" config** | Too playful. Conflicts with "Tool" aesthetic. |
+| **Page transition scale (0.98 -> 1)** | Adds unnecessary visual noise. |
+| **Colored shadow glow** | Decorative. Does not convey information. |
+
+---
+
+## 6. Implementation Notes
+
+*   **Prefer CSS Transitions over Framer Motion** for simple effects. Reduces bundle size.
+*   **Use `prefers-reduced-motion` media query** to disable non-essential motion.
+*   **Test on low-end devices.** If motion causes frame drops, remove it.
