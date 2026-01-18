@@ -466,6 +466,8 @@ export interface AgentState {
   error?: string;
   /** Optional checkpoint identifier for persisted state */
   checkpointId?: string;
+  /** Agent instance ID */
+  agentId: string;
 }
 
 /** Agent message types */
