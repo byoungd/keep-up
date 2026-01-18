@@ -1,4 +1,5 @@
-import { gateway } from "@ku0/core";
+import type { ReferenceStore } from "@ku0/core";
+import { documentId, gateway } from "@ku0/core";
 import { describe, expect, it } from "vitest";
 import { createSecurityPolicy } from "../security";
 import { createLFCCToolServer, type MultiDocumentPolicy } from "../tools/lfcc/lfccServer";
@@ -208,5 +209,123 @@ describe("LFCCToolServer multi-document AI Gateway", () => {
     expect(payload.status).toBe(409);
     expect(payload.code).toBe("AI_PRECONDITION_FAILED");
     expect(payload.failed_documents).toHaveLength(1);
+  });
+
+  it("reports reference conflicts for non-target documents in best-effort mode", async () => {
+    const docA = createGatewayFixture("doc-a", "peer-a:1");
+    const docB = createGatewayFixture("doc-b", "peer-b:1");
+
+    const referenceStore: ReferenceStore = {
+      async createReference(record) {
+        if (record.source.doc_id === documentId("doc-b")) {
+          const error = new Error("hash mismatch") as Error & { code?: string };
+          error.code = "REF_CONTEXT_HASH_MISMATCH";
+          throw error;
+        }
+      },
+      async updateReferenceStatus() {
+        return;
+      },
+      async refreshVerification() {
+        return true;
+      },
+      getReference() {
+        return undefined;
+      },
+      getReferencesFromDoc() {
+        return [];
+      },
+      getReferencesToDoc() {
+        return [];
+      },
+      exportUpdates() {
+        return new Uint8Array();
+      },
+      importUpdates() {
+        return;
+      },
+      getFrontier() {
+        return { loro_frontier: [] };
+      },
+    };
+
+    const server = createLFCCToolServer({
+      aiGatewayResolver: (docId) => {
+        if (docId === "doc-a") {
+          return docA.aiGateway;
+        }
+        return undefined;
+      },
+      policyDomainResolver: () => "policy-1",
+      multiDocumentPolicy: multiDocPolicy,
+      referenceStore,
+    });
+
+    const request = {
+      request_id: "req-multi-ref",
+      agent_id: "agent-1",
+      intent_id: "intent-1",
+      atomicity: "best_effort",
+      documents: [
+        {
+          doc_id: "doc-a",
+          role: "target",
+          gateway_request: gateway.createGatewayRequest({
+            docId: "doc-a",
+            docFrontierTag: docA.provider.getFrontierTag(),
+            targetSpans: [
+              {
+                annotation_id: "a1",
+                span_id: "s1",
+                if_match_context_hash: "hash-1",
+              },
+            ],
+            instructions: "Replace greeting",
+            format: "html",
+            payload: "Hi",
+            requestId: "req-a",
+            clientRequestId: "req-a",
+            agentId: "agent-1",
+          }),
+        },
+        {
+          doc_id: "doc-b",
+          role: "source",
+          doc_frontier_tag: docB.provider.getFrontierTag(),
+        },
+      ],
+      references: [
+        {
+          ref_type: "citation",
+          source: {
+            doc_id: documentId("doc-b"),
+            block_id: "block-a",
+            start: { anchor: "anchor-start", bias: "right" },
+            end: { anchor: "anchor-end", bias: "left" },
+            if_match_context_hash: "hash-a",
+          },
+          target: {
+            doc_id: documentId("doc-a"),
+            block_id: "block-b",
+            anchor: { anchor: "anchor-target", bias: "right" },
+          },
+        },
+      ],
+    };
+
+    const result = await server.callTool(
+      { name: "ai_gateway_multi_request", arguments: { request } },
+      baseContext
+    );
+
+    expect(result.success).toBe(true);
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.status).toBe(200);
+    const docBResult = payload.results.find(
+      (entry: { doc_id: string }) => entry.doc_id === "doc-b"
+    );
+    expect(docBResult.success).toBe(false);
+    expect(docBResult.conflict.failed_references).toHaveLength(1);
+    expect(docBResult.conflict.failed_references[0].ref_index).toBe(0);
   });
 });

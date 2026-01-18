@@ -388,6 +388,7 @@ function normalizeTargetGatewayRequest(
     doc_frontier: frontier.tag,
     agent_id: gatewayRequestInput.agent_id ?? request.agent_id,
     intent_id: gatewayRequestInput.intent_id ?? request.intent_id,
+    intent: gatewayRequestInput.intent ?? request.intent,
     policy_context: gatewayRequestInput.policy_context ?? request.policy_context,
   };
 
@@ -949,16 +950,24 @@ function applyFailedReferenceConflicts(
 ): void {
   for (const failed of failedDocuments) {
     const target = results.find((result) => result.doc_id === failed.doc_id);
+    const conflict = {
+      code: "AI_PRECONDITION_FAILED",
+      phase: "ai_gateway",
+      retryable: true,
+      current_frontier: failed.current_frontier,
+      failed_references: failed.failed_references,
+    };
     if (target) {
       target.success = false;
-      target.conflict = {
-        code: "AI_PRECONDITION_FAILED",
-        phase: "ai_gateway",
-        retryable: true,
-        current_frontier: failed.current_frontier,
-        failed_references: failed.failed_references,
-      };
+      target.conflict = conflict;
+      continue;
     }
+    results.push({
+      doc_id: failed.doc_id,
+      success: false,
+      operations_applied: 0,
+      conflict,
+    });
   }
 }
 

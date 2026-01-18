@@ -83,4 +83,26 @@ describe("LoroReferenceStore", () => {
     storeB.store.importUpdates(updates);
     expect(storeB.store.getReference("ref-2")?.status).toBe("orphan");
   });
+
+  it("rejects idempotency conflicts with different record content", async () => {
+    const { store } = createStore();
+    const record = createRecord("ref-3", "req-3");
+
+    await store.createReference(record);
+
+    const mutated = {
+      ...record,
+      target: {
+        ...record.target,
+        block_id: "block-c",
+      },
+    };
+
+    try {
+      await store.createReference(mutated);
+      throw new Error("Expected reference creation to fail");
+    } catch (error) {
+      expect(error).toMatchObject({ code: "REF_ALREADY_EXISTS" });
+    }
+  });
 });
