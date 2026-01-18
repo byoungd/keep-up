@@ -10,6 +10,11 @@ import {
 } from "@ku0/agent-runtime";
 import { isRecord } from "@ku0/shared";
 import type { TaskStoreLike } from "../../storage/contracts";
+import {
+  calculateUsageCostUsd,
+  mergeTokenUsage,
+  normalizeTokenUsage,
+} from "../../utils/tokenUsage";
 import { extractErrorCode, extractTelemetry, isToolError } from "../utils";
 import type { ApprovalCoordinator } from "./ApprovalCoordinator";
 import type { ArtifactProcessor } from "./ArtifactProcessor";
@@ -186,9 +191,8 @@ export class TaskOrchestrator {
       case "usage:update":
         await this.handleUsageUpdate(
           sessionId,
-          event.data as { totalUsage: TokenUsageStats; usage?: TokenUsageStats },
           activeTaskId,
-          context
+          event.data as { usage: TokenUsageStats; totalUsage: TokenUsageStats }
         );
         break;
       case "plan:created":
@@ -292,35 +296,68 @@ export class TaskOrchestrator {
    */
   private async handleUsageUpdate(
     sessionId: string,
-    data: { totalUsage: TokenUsageStats; usage?: TokenUsageStats },
     activeTaskId: string | null,
-    context?: { modelId?: string; providerId?: string }
+    data: { usage: TokenUsageStats; totalUsage: TokenUsageStats }
   ): Promise<void> {
-    // 1. Update session cumulative usage
-    await this.sessionManager.updateSession(sessionId, (s) => ({
+    if (
+      !data ||
+      !data.usage ||
+      typeof data.usage.inputTokens !== "number" ||
+      typeof data.usage.outputTokens !== "number" ||
+      typeof data.usage.totalTokens !== "number"
+    ) {
+      return;
+    }
+
+    const taskId = activeTaskId ?? undefined;
+    const task = taskId ? await this.taskStore.getById(taskId) : null;
+    const modelId = task?.modelId;
+    const providerId = task?.providerId;
+    const usageStats = normalizeTokenUsage(data.usage, modelId);
+    const costUsd = calculateUsageCostUsd(usageStats, modelId);
+
+    const updatedSession = await this.sessionManager.updateSession(sessionId, (s) => ({
       ...s,
-      usage: data.totalUsage,
+      usage: mergeTokenUsage(s.usage, usageStats),
     }));
 
-    // 2. Emit session update (we could add cumulative cost here if we tracked it in storage)
-    this.eventPublisher.publishSessionUsageUpdated({
-      sessionId,
-      usage: data.totalUsage,
-    });
-
-    // 3. Emit granular token usage event if we have delta and context
-    if (data.usage && context?.modelId && context?.providerId) {
-      const record = this.costTracker.createUsageRecord(
+    if (updatedSession?.usage) {
+      this.eventPublisher.publishSessionUsageUpdated({
         sessionId,
-        context.modelId,
-        context.providerId,
-        data.usage.inputTokens,
-        data.usage.outputTokens,
-        activeTaskId ? `task-${activeTaskId}` : undefined // Approximate message ID association
-      );
-
-      this.eventPublisher.publishTokenUsage(record);
+        usage: updatedSession.usage,
+      });
     }
+
+    if (taskId) {
+      await this.taskStore.update(taskId, (taskRecord) => {
+        const existingUsage = readUsageMetadata(taskRecord.metadata);
+        const mergedUsage = mergeTokenUsage(existingUsage, usageStats);
+        const mergedCostUsd = calculateUsageCostUsd(mergedUsage, taskRecord.modelId);
+        const metadata = {
+          ...(taskRecord.metadata ?? {}),
+          usage: {
+            ...mergedUsage,
+            costUsd: mergedCostUsd,
+            ...(taskRecord.modelId ? { modelId: taskRecord.modelId } : {}),
+            ...(taskRecord.providerId ? { providerId: taskRecord.providerId } : {}),
+          },
+        };
+        return {
+          ...taskRecord,
+          metadata,
+          updatedAt: Date.now(),
+        };
+      });
+    }
+
+    this.eventPublisher.publishTokenUsage({
+      sessionId,
+      taskId,
+      usage: usageStats,
+      costUsd: costUsd,
+      modelId,
+      providerId,
+    });
   }
 
   /**
@@ -414,4 +451,28 @@ export class TaskOrchestrator {
     );
     return next;
   }
+}
+
+function readUsageMetadata(
+  metadata: Record<string, unknown> | undefined
+): TokenUsageStats | undefined {
+  if (!metadata || !isRecord(metadata.usage)) {
+    return undefined;
+  }
+  const usage = metadata.usage;
+  if (
+    typeof usage.inputTokens !== "number" ||
+    typeof usage.outputTokens !== "number" ||
+    typeof usage.totalTokens !== "number"
+  ) {
+    return undefined;
+  }
+
+  return {
+    inputTokens: usage.inputTokens,
+    outputTokens: usage.outputTokens,
+    totalTokens: usage.totalTokens,
+    ...(typeof usage.contextWindow === "number" ? { contextWindow: usage.contextWindow } : {}),
+    ...(typeof usage.utilization === "number" ? { utilization: usage.utilization } : {}),
+  };
 }

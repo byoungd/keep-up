@@ -77,6 +77,7 @@ function loadGraphFromStorage(sessionId: string): TaskGraph | null {
       nodes: parsed.nodes,
       artifacts: parsed.artifacts ?? {},
       pendingApprovalId: parsed.pendingApprovalId,
+      messageUsage: parsed.messageUsage ?? {},
     };
   } catch {
     return null;
@@ -175,6 +176,7 @@ export function useTaskStream(sessionId: string) {
     status: TaskStatus.PLANNING,
     nodes: [],
     artifacts: {},
+    messageUsage: {},
   });
 
   const [isConnected, setIsConnected] = useState(false);
@@ -661,6 +663,7 @@ const EVENT_HANDLERS: Record<string, EventHandler> = {
   "agent.plan": handlePlanUpdate,
   "agent.artifact": handleArtifactUpdate,
   "session.usage.updated": handleUsageUpdated,
+  "token.usage": handleTokenUsage,
 };
 
 function handleUsageUpdated(
@@ -686,6 +689,55 @@ function handleUsageUpdated(
       inputTokens: data.inputTokens,
       outputTokens: data.outputTokens,
       totalTokens: data.totalTokens,
+    },
+  };
+}
+
+function handleTokenUsage(
+  prev: TaskGraph,
+  _id: string,
+  data: unknown,
+  _now: string,
+  _taskTitles: Map<string, string>,
+  _taskPrompts: Map<string, string>,
+  _taskMetadata: Map<string, Record<string, unknown>>
+): TaskGraph {
+  if (
+    !isRecord(data) ||
+    typeof data.inputTokens !== "number" ||
+    typeof data.outputTokens !== "number" ||
+    typeof data.totalTokens !== "number"
+  ) {
+    return prev;
+  }
+
+  const messageId =
+    typeof data.messageId === "string"
+      ? data.messageId
+      : typeof data.taskId === "string"
+        ? `task-stream-${data.taskId}`
+        : undefined;
+  if (!messageId) {
+    return prev;
+  }
+
+  const costUsd = typeof data.costUsd === "number" ? data.costUsd : null;
+  const usageEntry = {
+    inputTokens: data.inputTokens,
+    outputTokens: data.outputTokens,
+    totalTokens: data.totalTokens,
+    ...(typeof data.contextWindow === "number" ? { contextWindow: data.contextWindow } : {}),
+    ...(typeof data.utilization === "number" ? { utilization: data.utilization } : {}),
+    ...(typeof data.modelId === "string" ? { modelId: data.modelId } : {}),
+    ...(typeof data.providerId === "string" ? { providerId: data.providerId } : {}),
+    costUsd,
+  };
+
+  return {
+    ...prev,
+    messageUsage: {
+      ...(prev.messageUsage ?? {}),
+      [messageId]: usageEntry,
     },
   };
 }

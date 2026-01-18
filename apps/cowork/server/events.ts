@@ -13,6 +13,7 @@ export const COWORK_EVENTS = {
   SESSION_DELETED: "session.deleted",
   SESSION_MODE_CHANGED: "session.mode.changed",
   SESSION_USAGE_UPDATED: "session.usage.updated",
+  TOKEN_USAGE: "token.usage",
 
   // Task lifecycle
   TASK_CREATED: "task.created",
@@ -33,9 +34,6 @@ export const COWORK_EVENTS = {
 
   // System events
   SYSTEM_HEARTBEAT: "system.heartbeat",
-
-  // Usage events
-  TOKEN_USAGE: "token.usage",
 } as const;
 
 export type CoworkEventType = (typeof COWORK_EVENTS)[keyof typeof COWORK_EVENTS];
@@ -71,16 +69,18 @@ export interface CoworkEventPayloads {
     totalTokens: number;
     totalCostUsd?: number;
   };
+
   [COWORK_EVENTS.TOKEN_USAGE]: {
-    sessionId: string;
     messageId?: string;
+    taskId?: string;
     inputTokens: number;
     outputTokens: number;
     totalTokens: number;
-    estimatedCostUsd: number;
-    modelId: string;
-    providerId: string;
-    timestamp: number;
+    costUsd: number | null;
+    modelId?: string;
+    providerId?: string;
+    contextWindow?: number;
+    utilization?: number;
   };
   [COWORK_EVENTS.TASK_CREATED]: {
     taskId: string;
