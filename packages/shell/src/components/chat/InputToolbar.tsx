@@ -79,7 +79,7 @@ export function InputToolbar({
         {hasContent && (
           <span
             className={cn(
-              "text-[10px] tabular-nums animate-in fade-in duration-200",
+              "text-micro tabular-nums animate-in fade-in duration-200",
               isOverLimit ? "text-destructive font-medium" : "text-muted-foreground/50"
             )}
             aria-hidden="true"

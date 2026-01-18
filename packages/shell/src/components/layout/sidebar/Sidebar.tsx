@@ -92,7 +92,7 @@ export const Sidebar = React.memo(function Sidebar({
     return (
       <Badge
         variant="secondary"
-        className="ml-auto h-5 min-w-5 px-1.5 text-[10px] bg-surface-3 text-muted-foreground"
+        className="ml-auto h-5 min-w-5 px-1.5 text-micro bg-surface-3 text-muted-foreground"
       >
         {item.badgeCount}
       </Badge>
@@ -102,7 +102,7 @@ export const Sidebar = React.memo(function Sidebar({
   if (isLoading) {
     return (
       <aside
-        className={cn("sidebar flex flex-col w-full h-full bg-sidebar", className)}
+        className={cn("sidebar flex flex-col w-full h-full", className)}
         aria-label="Primary sidebar"
       >
         <div className="flex-1 flex items-center justify-center">
@@ -114,7 +114,7 @@ export const Sidebar = React.memo(function Sidebar({
 
   return (
     <aside
-      className={cn("sidebar flex flex-col w-full h-full bg-sidebar", className)}
+      className={cn("sidebar flex flex-col w-full h-full", className)}
       aria-label="Primary sidebar"
     >
       <SidebarHeader
@@ -165,7 +165,7 @@ export const Sidebar = React.memo(function Sidebar({
       <nav
         aria-label="Sidebar navigation"
         className={cn(
-          "flex-1 overflow-y-auto px-2 py-2 space-y-4 outline-none",
+          "flex-1 overflow-y-auto px-3 py-2 space-y-4 outline-none",
           "[&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent",
           "[&::-webkit-scrollbar-thumb]:bg-transparent hover:[&::-webkit-scrollbar-thumb]:bg-border/40",
           "[&::-webkit-scrollbar-thumb]:rounded-full transition-colors"
@@ -200,15 +200,15 @@ export const Sidebar = React.memo(function Sidebar({
       </nav>
 
       {/* Footer */}
-      <div className="px-3 py-3 border-t border-border/40 flex items-center">
+      <div className="px-3 py-3 flex items-center">
         <div className="flex items-center gap-2">
           {groupsWithMoreItems.length > 0 && (
-            <DropdownMenu>
+            <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                  className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05]"
                   aria-label={t("moreItems")}
                   title={t("moreItems")}
                 >
@@ -218,7 +218,7 @@ export const Sidebar = React.memo(function Sidebar({
               <DropdownMenuContent side="top" align="start" className="w-56">
                 {groupsWithMoreItems.map((group, index) => (
                   <React.Fragment key={group.id}>
-                    <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                    <DropdownMenuLabel className="text-micro uppercase tracking-wider text-muted-foreground">
                       {group.label}
                     </DropdownMenuLabel>
                     {group.moreItems.map((item) => (
@@ -241,7 +241,7 @@ export const Sidebar = React.memo(function Sidebar({
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05]"
               onClick={onOpenCustomize}
               aria-label={t("customize")}
             >
@@ -256,7 +256,7 @@ export const Sidebar = React.memo(function Sidebar({
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05]"
               onClick={() =>
                 window.open("https://github.com/Start-Rail/English-level-up-tips", "_blank")
               }

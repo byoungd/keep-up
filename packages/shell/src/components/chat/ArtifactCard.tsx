@@ -134,7 +134,7 @@ function ArtifactReviewBadge({ label }: { label: string | null }) {
   }
 
   return (
-    <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-600">
+    <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-fine text-emerald-600">
       <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
       {label}
     </div>
@@ -167,7 +167,7 @@ function PlanDetails({
   return (
     <div className="mt-3 space-y-3 text-xs text-muted-foreground/90">
       <div className="space-y-2">
-        <div className="text-[11px] uppercase tracking-widest text-muted-foreground/70">
+        <div className="text-fine uppercase tracking-widest text-muted-foreground/70">
           {t("artifactStepsLabel")}
         </div>
         <div className="space-y-2">
@@ -179,7 +179,7 @@ function PlanDetails({
               <div className="flex items-center justify-between gap-2">
                 <div className="font-medium text-foreground">{step.title}</div>
                 {step.status && (
-                  <span className="rounded-full bg-surface-3/60 px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                  <span className="rounded-full bg-surface-3/60 px-2 py-0.5 text-micro uppercase tracking-wide text-muted-foreground">
                     {step.status}
                   </span>
                 )}
@@ -203,13 +203,13 @@ function DiffDetails({
   return (
     <div className="mt-3 space-y-3 text-xs text-muted-foreground/90">
       <div className="space-y-2">
-        <div className="text-[11px] uppercase tracking-widest text-muted-foreground/70">
+        <div className="text-fine uppercase tracking-widest text-muted-foreground/70">
           {t("artifactFilesLabel")}
         </div>
         {artifact.files.map((file) => (
           <div key={file.path} className="rounded-lg border border-border/40 bg-surface-2/40 p-2">
-            <div className="text-[11px] font-medium text-foreground">{file.path}</div>
-            <pre className="mt-2 max-h-64 overflow-auto rounded bg-surface-3/60 p-2 text-[11px] text-foreground/90">
+            <div className="text-fine font-medium text-foreground">{file.path}</div>
+            <pre className="mt-2 max-h-64 overflow-auto rounded bg-surface-3/60 p-2 text-fine text-foreground/90">
               {file.diff}
             </pre>
           </div>
@@ -229,7 +229,7 @@ function ChecklistDetails({
   return (
     <div className="mt-3 space-y-3 text-xs text-muted-foreground/90">
       <div className="space-y-2">
-        <div className="text-[11px] uppercase tracking-widest text-muted-foreground/70">
+        <div className="text-fine uppercase tracking-widest text-muted-foreground/70">
           {t("artifactChecklistItemsLabel")}
         </div>
         <div className="space-y-2">
@@ -265,7 +265,7 @@ function ReportDetails({
   return (
     <div className="mt-3 space-y-3 text-xs text-muted-foreground/90">
       <div className="space-y-2">
-        <div className="text-[11px] uppercase tracking-widest text-muted-foreground/70">
+        <div className="text-fine uppercase tracking-widest text-muted-foreground/70">
           {t("artifactSectionsLabel")}
         </div>
         <div className="space-y-3">
@@ -274,7 +274,7 @@ function ReportDetails({
               key={section.heading}
               className="rounded-lg border border-border/40 bg-surface-2/40 p-2"
             >
-              <div className="text-[11px] font-medium text-foreground">{section.heading}</div>
+              <div className="text-fine font-medium text-foreground">{section.heading}</div>
               <div className="mt-1 text-muted-foreground/80 whitespace-pre-wrap">
                 {section.content}
               </div>

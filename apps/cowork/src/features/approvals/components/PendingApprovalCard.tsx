@@ -33,7 +33,7 @@ export function PendingApprovalCard({
     >
       <div className="flex items-center justify-between mb-3">
         <div className="flex flex-col">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5">
+          <span className="text-micro font-bold uppercase tracking-widest text-muted-foreground mb-0.5">
             Permission Request
           </span>
           <h3 className="font-bold text-foreground flex items-center gap-2 text-lg">
@@ -44,7 +44,7 @@ export function PendingApprovalCard({
           </h3>
         </div>
         <span
-          className={`text-[10px] px-2.5 py-1 rounded-full uppercase font-bold border tracking-wide flex items-center gap-1 ${riskBadge}`}
+          className={`text-micro px-2.5 py-1 rounded-full uppercase font-bold border tracking-wide flex items-center gap-1 ${riskBadge}`}
         >
           <span className="w-1.5 h-1.5 rounded-full bg-current" />
           {riskLevel} Risk

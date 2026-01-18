@@ -43,7 +43,7 @@ export function TaskHeader({
           {/* Subtle Status Badge - Linear Style */}
           <span
             className={cn(
-              "inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium transition-colors",
+              "inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-fine font-medium transition-colors",
               statusMeta.badgeBg,
               statusMeta.textClass
             )}
@@ -51,7 +51,7 @@ export function TaskHeader({
             {statusMeta.label}
           </span>
         </div>
-        <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground/70">
+        <div className="mt-1 flex flex-wrap items-center gap-2 text-fine text-muted-foreground/70">
           {elapsedLabel && <span className="tabular-nums">Elapsed {elapsedLabel}</span>}
           <ModelBadge
             modelId={task.modelId}

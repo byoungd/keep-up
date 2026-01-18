@@ -217,7 +217,7 @@ export function InputArea({
       )}
 
       {attachmentError && (
-        <div className="mb-2 text-[11px] font-medium text-destructive flex items-center gap-2 px-2 py-1.5 rounded-lg bg-destructive/5 border border-destructive/10">
+        <div className="mb-2 text-fine font-medium text-destructive flex items-center gap-2 px-2 py-1.5 rounded-lg bg-destructive/5 border border-destructive/10">
           <AlertTriangle className="h-3.5 w-3.5" />
           <span>{attachmentError}</span>
         </div>
@@ -258,7 +258,7 @@ export function InputArea({
           placeholder={translations.inputPlaceholder}
           aria-label={translations.inputPlaceholder}
           className={cn(
-            "w-full bg-transparent px-3 py-3 text-[15px] resize-none font-medium",
+            "w-full bg-transparent px-3 py-3 text-content resize-none font-medium",
             "focus-visible:outline-none placeholder:text-muted-foreground/40",
             "leading-relaxed text-foreground min-h-[44px]",
             // Hide scrollbar but allow scrolling
@@ -332,7 +332,7 @@ function AttachmentList({
             <img src={att.url} alt={att.name} className="h-full w-full object-cover" />
           </div>
           <span
-            className="text-[10px] font-medium text-foreground/70 truncate max-w-[80px]"
+            className="text-micro font-medium text-foreground/70 truncate max-w-[80px]"
             title={att.name}
           >
             {att.name}

@@ -12,6 +12,7 @@ export type Session = {
   title: string;
   createdAt: number;
   projectId?: string;
+  status?: "running" | "idle" | "completed";
 };
 
 export type Project = {

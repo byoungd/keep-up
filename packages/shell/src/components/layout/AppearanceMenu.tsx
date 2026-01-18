@@ -150,7 +150,7 @@ function Section({ label, value, children }: SectionProps) {
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium text-muted-foreground">{label}</span>
-        {value && <span className="text-[10px] font-mono text-muted-foreground/70">{value}</span>}
+        {value && <span className="text-micro font-mono text-muted-foreground/70">{value}</span>}
       </div>
       {children}
     </div>

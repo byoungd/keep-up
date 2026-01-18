@@ -77,9 +77,9 @@ export const TASK_THEME = {
   },
   // Typography
   type: {
-    stepIndex: "text-[10px] font-mono tabular-nums text-muted-foreground/40 select-none",
-    stepLabel: "text-[13px] font-medium leading-[1.5] tracking-[-0.01em]",
-    meta: "text-[11px] text-muted-foreground/70 font-medium",
+    stepIndex: "text-micro font-mono tabular-nums text-muted-foreground/40 select-none",
+    stepLabel: "text-chrome font-medium leading-[1.5] tracking-[-0.01em]",
+    meta: "text-fine text-muted-foreground/70 font-medium",
   },
 } as const;
 

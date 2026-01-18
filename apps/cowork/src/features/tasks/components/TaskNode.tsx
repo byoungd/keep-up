@@ -22,7 +22,7 @@ export function MinimalTaskView({ task, content }: { task: AgentTask; content?: 
           <button
             type="button"
             onClick={() => setIsDetailsOpen(!isDetailsOpen)}
-            className="group flex items-center gap-2 text-[11px] font-mono text-muted-foreground/60 hover:text-muted-foreground transition-colors select-none"
+            className="group flex items-center gap-2 text-fine font-mono text-muted-foreground/60 hover:text-muted-foreground transition-colors select-none"
           >
             <span className="flex items-center gap-1.5">
               {isRunning ? (
@@ -31,7 +31,7 @@ export function MinimalTaskView({ task, content }: { task: AgentTask; content?: 
                   <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-sky-500" />
                 </span>
               ) : (
-                <span className="text-[10px] opacity-70">Model Process</span>
+                <span className="text-micro opacity-70">Model Process</span>
               )}
               <span>
                 {isDetailsOpen ? "Hide process" : isRunning ? "Thinking..." : "View process chain"}
@@ -61,7 +61,7 @@ export function MinimalTaskView({ task, content }: { task: AgentTask; content?: 
               {task.thoughts?.map((thought, idx) => (
                 <div
                   key={`th-${thought.slice(0, 16)}-${idx}`}
-                  className="font-mono text-[10px] text-muted-foreground/60 truncate"
+                  className="font-mono text-micro text-muted-foreground/60 truncate"
                 >
                   {thought}
                 </div>
@@ -145,7 +145,7 @@ function ThinkingNodeDisplay({ node }: { node: TaskNode & { type: "thinking" } }
           <div className="w-1 h-1 bg-muted-foreground rounded-full animate-bounce [animation-delay:-0.15s]" />
           <div className="w-1 h-1 bg-muted-foreground rounded-full animate-bounce" />
         </div>
-        <span className="text-[10px] uppercase font-bold tracking-widest">Internal Logic</span>
+        <span className="text-micro uppercase font-bold tracking-widest">Internal Logic</span>
       </div>
       <div className="leading-relaxed whitespace-pre-wrap">{node.content}</div>
     </div>
@@ -175,7 +175,7 @@ function ToolCallNodeDisplay({ node }: { node: TaskNode & { type: "tool_call" } 
         {node.riskLevel && (
           <div className="flex items-center gap-1.5">
             <span
-              className={`text-[8px] px-2 py-0.5 rounded-full font-black uppercase tracking-tighter ${
+              className={`text-nano px-2 py-0.5 rounded-full font-black uppercase tracking-tighter ${
                 node.riskLevel === "high"
                   ? "bg-accent-red text-background"
                   : "bg-accent-amber/20 text-accent-amber"
@@ -186,7 +186,7 @@ function ToolCallNodeDisplay({ node }: { node: TaskNode & { type: "tool_call" } 
           </div>
         )}
       </div>
-      <div className="font-mono text-[10px] bg-black/5 dark:bg-white/5 rounded-lg p-2 overflow-x-auto border border-black/5">
+      <div className="font-mono text-micro bg-black/5 dark:bg-white/5 rounded-lg p-2 overflow-x-auto border border-black/5">
         <pre>{JSON.stringify(node.args, null, 2)}</pre>
       </div>
     </div>
@@ -216,7 +216,7 @@ function ToolOutputDisplay({ node }: { node: TaskNode & { type: "tool_output" } 
             />
           </svg>
         </div>
-        <span className="font-black text-[10px] uppercase tracking-widest">
+        <span className="font-black text-micro uppercase tracking-widest">
           {node.activityLabel
             ? node.activityLabel
             : node.isError
@@ -225,7 +225,7 @@ function ToolOutputDisplay({ node }: { node: TaskNode & { type: "tool_output" } 
           {node.activityLabel && (node.isError ? " Failed" : " Complete")}
         </span>
       </div>
-      <div className="opacity-90 font-mono text-[10px] bg-black/5 dark:bg-white/5 p-2 rounded-lg border border-black/5 overflow-hidden">
+      <div className="opacity-90 font-mono text-micro bg-black/5 dark:bg-white/5 p-2 rounded-lg border border-black/5 overflow-hidden">
         <div className="break-all line-clamp-6">
           {typeof node.output === "string" ? node.output : JSON.stringify(node.output)}
         </div>
@@ -263,19 +263,19 @@ function StatusNodeDisplay({
             {node.title}
           </span>
           {duration && (
-            <span className="text-[10px] font-mono text-muted-foreground bg-surface-2 px-1.5 py-0.5 rounded-md border border-border/40">
+            <span className="text-micro font-mono text-muted-foreground bg-surface-2 px-1.5 py-0.5 rounded-md border border-border/40">
               {duration}
             </span>
           )}
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-muted-foreground uppercase font-black tracking-widest opacity-50">
+          <span className="text-micro text-muted-foreground uppercase font-black tracking-widest opacity-50">
             {node.status}
           </span>
           {node.modelId && (
             <>
               <span className="w-1 h-1 bg-border rounded-full" />
-              <span className="text-[9px] font-mono text-muted-foreground/40 italic">
+              <span className="text-tiny font-mono text-muted-foreground/40 italic">
                 {node.modelId}
               </span>
             </>
@@ -291,7 +291,7 @@ function ErrorNodeDisplay({ node }: { node: TaskNode & { type: "error" } }) {
     <div
       className={`${BASE_NODE_CLASSES} bg-accent-red border-accent-red/30 text-background font-bold shadow-accent-red/20`}
     >
-      <div className="flex items-center gap-2 mb-1.5 uppercase font-black tracking-tighter text-[9px]">
+      <div className="flex items-center gap-2 mb-1.5 uppercase font-black tracking-tighter text-tiny">
         <div className="p-1 bg-white/20 rounded-lg">
           <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
             <title>Error icon</title>

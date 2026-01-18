@@ -59,7 +59,7 @@ function ProviderKeyCard({
             <p className="text-xs text-muted-foreground">{provider.description}</p>
           ) : null}
         </div>
-        <span className={cn("text-[11px] px-2 py-1 rounded-full", statusClass)}>{statusLabel}</span>
+        <span className={cn("text-fine px-2 py-1 rounded-full", statusClass)}>{statusLabel}</span>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -92,7 +92,7 @@ function ProviderKeyCard({
         ) : null}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-2 text-fine text-muted-foreground">
         {provider.lastValidatedAt ? (
           <span>Last validated {new Date(provider.lastValidatedAt).toLocaleString()}</span>
         ) : null}

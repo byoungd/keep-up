@@ -89,19 +89,19 @@ export function PreflightCard({ payload }: PreflightCardProps) {
                 <summary className="flex items-center justify-between gap-3 px-3 py-2 cursor-pointer">
                   <div className="flex flex-col">
                     <span className="text-sm font-semibold text-foreground">{check.name}</span>
-                    <span className="text-[11px] text-muted-foreground">
+                    <span className="text-fine text-muted-foreground">
                       {check.command} {check.args.join(" ")}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span
-                      className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border ${statusTone(
+                      className={`text-micro uppercase tracking-wider px-2 py-0.5 rounded-full border ${statusTone(
                         check.status
                       )}`}
                     >
                       {check.status}
                     </span>
-                    <span className="text-[11px] text-muted-foreground">
+                    <span className="text-fine text-muted-foreground">
                       {formatDuration(check.durationMs)}
                     </span>
                   </div>

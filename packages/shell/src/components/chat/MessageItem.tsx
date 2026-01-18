@@ -214,7 +214,7 @@ export const MessageItem = React.memo(function MessageItem({
           onTaskAction={onTaskAction}
         />
         {!isUser && message.fallbackNotice && message.type !== "task_stream" && (
-          <div className="mt-2 text-[11px] text-amber-600/90">{message.fallbackNotice}</div>
+          <div className="mt-2 text-fine text-amber-600/90">{message.fallbackNotice}</div>
         )}
 
         {/* Artifacts (from inline artifact blocks only) */}

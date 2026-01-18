@@ -61,7 +61,7 @@ export function ArtifactsList({ artifacts, onApply, onRevert }: ArtifactsListPro
       <div className="space-y-3">
         <div className="flex items-center gap-2 px-1">
           {icon}
-          <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+          <h3 className="text-micro font-black uppercase tracking-[0.2em] text-muted-foreground/60">
             {title} ({items.length})
           </h3>
         </div>

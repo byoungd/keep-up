@@ -64,10 +64,10 @@ export function DiffCard({ file, diff, status, appliedAt, onApply, onRevert }: D
             </svg>
           </div>
           <div>
-            <div className="text-[10px] text-muted-foreground/50 font-black uppercase tracking-widest leading-none mb-1">
+            <div className="text-micro text-muted-foreground/50 font-black uppercase tracking-widest leading-none mb-1">
               File Modification
             </div>
-            <span className="font-mono text-[13px] text-foreground font-bold tracking-tight">
+            <span className="font-mono text-chrome text-foreground font-bold tracking-tight">
               {file}
             </span>
           </div>
@@ -129,15 +129,15 @@ export function DiffCard({ file, diff, status, appliedAt, onApply, onRevert }: D
           )}
         </div>
         {status === "applied" && appliedAt && (
-          <div className="text-[10px] text-muted-foreground">
+          <div className="text-micro text-muted-foreground">
             Applied {new Date(appliedAt).toLocaleString()}
           </div>
         )}
-        {status === "reverted" && <div className="text-[10px] text-amber-600">Reverted</div>}
+        {status === "reverted" && <div className="text-micro text-amber-600">Reverted</div>}
       </div>
 
       {/* Mock Diff Viewer - in production use Shiki/Prism */}
-      <div className="overflow-x-auto p-0 text-[11px] font-mono bg-surface leading-relaxed">
+      <div className="overflow-x-auto p-0 text-fine font-mono bg-surface leading-relaxed">
         <table className="w-full border-collapse">
           <tbody>
             {diff.split("\n").map((line, cur) => {

@@ -60,7 +60,7 @@ export function ThinkingProcess({
           <span className="font-medium">Thinking Process</span>
         </div>
         {!expanded && (
-          <span className="text-[10px] text-muted-foreground/40 bg-surface-2/60 px-2 py-0.5 rounded-full border border-border/20 font-mono">
+          <span className="text-micro text-muted-foreground/40 bg-surface-2/60 px-2 py-0.5 rounded-full border border-border/20 font-mono">
             {completedThinking.length} step{completedThinking.length !== 1 ? "s" : ""}
           </span>
         )}
@@ -92,7 +92,7 @@ function ThinkingBlockItem({ block }: { block: ThinkingBlock }) {
     return (
       <span
         className={cn(
-          "inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-medium",
+          "inline-flex items-center rounded px-1.5 py-0.5 text-tiny font-medium",
           colors[block.type]
         )}
       >
@@ -105,7 +105,7 @@ function ThinkingBlockItem({ block }: { block: ThinkingBlock }) {
     <div className="space-y-2">
       <div className="flex items-center gap-2">
         <TypeBadge />
-        <span className="text-[10px] text-muted-foreground">
+        <span className="text-micro text-muted-foreground">
           {new Date(block.timestamp).toLocaleTimeString()}
         </span>
       </div>

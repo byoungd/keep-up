@@ -43,7 +43,7 @@ export function ArtifactPreviewPane({ item, onClose, className }: ArtifactPrevie
           </div>
           <div className="min-w-0">
             <h3 className="text-sm font-semibold truncate">{item.title}</h3>
-            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+            <span className="text-micro text-muted-foreground uppercase tracking-wider">
               {item.type}
             </span>
           </div>

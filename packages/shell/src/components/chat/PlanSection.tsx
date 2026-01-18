@@ -26,7 +26,7 @@ export function PlanSection({
       <button
         type="button"
         onClick={() => onPreview?.(artifact)}
-        className="text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors mb-1.5 flex items-center gap-1.5 select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 rounded-sm"
+        className="text-fine font-medium text-muted-foreground hover:text-foreground transition-colors mb-1.5 flex items-center gap-1.5 select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 rounded-sm"
       >
         <FileText className="h-3 w-3" />
         Execution Strategy
@@ -37,7 +37,7 @@ export function PlanSection({
             key={`${s.label}-${i}`}
             className="flex items-start gap-2.5 text-xs text-muted-foreground/80 leading-snug font-normal"
           >
-            <span className="font-mono text-[10px] text-muted-foreground/40 mt-[1px] select-none">
+            <span className="font-mono text-micro text-muted-foreground/40 mt-[1px] select-none">
               {(i + 1).toString().padStart(2, "0")}
             </span>
             <span>{s.label}</span>
@@ -46,7 +46,7 @@ export function PlanSection({
         {steps.length > 4 && (
           <button
             type="button"
-            className="pl-6 text-[10px] text-muted-foreground/40 mt-1 hover:text-primary cursor-pointer transition-colors block text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 rounded-sm"
+            className="pl-6 text-micro text-muted-foreground/40 mt-1 hover:text-primary cursor-pointer transition-colors block text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 rounded-sm"
             onClick={() => onPreview?.(artifact)}
           >
             + {steps.length - 4} more steps

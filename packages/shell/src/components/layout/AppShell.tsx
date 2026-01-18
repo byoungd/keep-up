@@ -58,6 +58,7 @@ export interface AppShellProps {
   };
   headerActions?: React.ReactNode;
   appName?: string;
+  layoutStyle?: "default" | "arc";
 }
 
 const PANEL_MIN_SIZES_PX: [number, number, number] = [240, 400, 380];
@@ -612,7 +613,7 @@ function MobileLayout({
   return (
     <div className="h-full w-full relative">
       {mobilePanel === "left" && (
-        <div className="absolute inset-0 z-20 bg-sidebar flex flex-col">
+        <div className="absolute inset-0 z-20 flex flex-col">
           <SidebarContent
             className="w-full h-full"
             state={state}
@@ -625,9 +626,7 @@ function MobileLayout({
           />
         </div>
       )}
-      {mobilePanel === "right" && (
-        <div className="absolute inset-0 z-20 bg-sidebar">{mobileRightPanel}</div>
-      )}
+      {mobilePanel === "right" && <div className="absolute inset-0 z-20">{mobileRightPanel}</div>}
       <div className={cn("h-full w-full bg-canvas", mobilePanel !== "center" && "hidden")}>
         {children}
       </div>
@@ -650,6 +649,7 @@ export function AppShell(props: AppShellProps) {
     appName,
     headerActions,
     sidebar,
+    layoutStyle = "default",
   } = props;
   const layoutRef = React.useRef<ResizableThreePaneLayoutHandle | null>(null);
   const [mobilePanel, setMobilePanel] = React.useState<MobilePanel>("center");
@@ -703,8 +703,6 @@ export function AppShell(props: AppShellProps) {
   const state = sidebarState!;
   // biome-ignore lint/style/noNonNullAssertion: Guarded by early return
   const actions = sidebarActions!;
-  // biome-ignore lint/style/noNonNullAssertion: Guarded by early return
-  const userConfig = sidebarUserConfig!;
   const isLoading = sidebarIsLoading ?? false;
 
   const workspaceName = user?.fullName ?? user?.email ?? "Workspace";
@@ -775,9 +773,12 @@ export function AppShell(props: AppShellProps) {
 
   const handleSaveConfig = React.useCallback(
     (config: SidebarUserConfig) => {
-      applySidebarConfig(actions, config);
+      if (!sidebarActions) {
+        return;
+      }
+      applySidebarConfig(sidebarActions, config);
     },
-    [actions]
+    [sidebarActions]
   );
 
   const handleLayoutChange = React.useCallback(
@@ -851,12 +852,12 @@ export function AppShell(props: AppShellProps) {
 
   const defaultSidebar = (
     <DefaultSidebar
-      state={state}
-      actions={actions}
-      userConfig={userConfig}
+      state={sidebarState}
+      actions={sidebarActions}
+      userConfig={sidebarUserConfig}
       // biome-ignore lint/style/noNonNullAssertion: Guarded by early return
       groups={sidebarGroups!}
-      isLoading={isLoading}
+      isLoading={sidebarIsLoading ?? false}
       customizeOpen={customizeOpen}
       onCustomizeOpen={handleCustomizeOpen}
       onCustomizeClose={handleCustomizeClose}
@@ -882,43 +883,52 @@ export function AppShell(props: AppShellProps) {
       {commandPalette}
       {createDocumentDialog}
       {importModals}
-      <div className="fixed inset-0 flex w-full overflow-hidden font-sans text-foreground bg-theme">
-        {sidebarElement}
+      <div className="fixed inset-0 w-full overflow-hidden font-sans text-foreground bg-theme">
+        <div className="flex h-full w-full">
+          {sidebarElement}
 
-        {/* Main Content Area */}
-        <div className="flex-1 flex flex-col min-w-0 bg-canvas relative">
-          <Header
-            onToggleLeft={handleToggleLeft}
-            onToggleRight={handleToggleRight}
-            isRightPanelOpen={headerConfig.isRightPanelOpen}
-            rightPanelPosition={headerConfig.rightPanelPosition}
-            rightPanelLabel={headerConfig.rightPanelLabel}
-            globalActions={headerActions}
-            appName={appName}
-            {...headerProps}
-          />
+          {/* Main Content Area */}
+          <div
+            className={cn(
+              "flex-1 flex flex-col min-w-0 relative overflow-hidden transition-all duration-200 ease-in-out",
+              layoutStyle === "arc"
+                ? "bg-canvas rounded-lg shadow-lg border border-border/10 my-2 mr-2"
+                : "bg-canvas rounded-lg shadow-sm"
+            )}
+          >
+            <Header
+              onToggleLeft={handleToggleLeft}
+              onToggleRight={handleToggleRight}
+              isRightPanelOpen={headerConfig.isRightPanelOpen}
+              rightPanelPosition={headerConfig.rightPanelPosition}
+              rightPanelLabel={headerConfig.rightPanelLabel}
+              globalActions={headerActions}
+              appName={appName}
+              {...headerProps}
+            />
 
-          <div className="flex-1 overflow-hidden relative">
-            {renderMainContent({
-              isDesktop,
-              layoutRef,
-              defaultLayout,
-              panelMinSizes,
-              desktopLeftPanel,
-              desktopCenterPanel,
-              desktopRightPanel,
-              handleLayoutChange,
+            <div className="flex-1 overflow-hidden relative shell-canvas">
+              {renderMainContent({
+                isDesktop,
+                layoutRef,
+                defaultLayout,
+                panelMinSizes,
+                desktopLeftPanel,
+                desktopCenterPanel,
+                desktopRightPanel,
+                handleLayoutChange,
 
-              mobilePanel,
-              mobileRightPanel,
-              state,
-              actions,
-              isLoading,
-              handleCustomizeOpen,
-              sidebarProps,
-              workspaceName,
-              workspaceAvatarUrl,
-            })}
+                mobilePanel,
+                mobileRightPanel,
+                state,
+                actions,
+                isLoading,
+                handleCustomizeOpen,
+                sidebarProps,
+                workspaceName,
+                workspaceAvatarUrl,
+              })}
+            </div>
           </div>
         </div>
       </div>

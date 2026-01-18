@@ -48,7 +48,7 @@ export function ModelBadge({
       className={cn(
         "inline-flex items-center gap-1 rounded-full border bg-surface-1/70 text-muted-foreground",
         fallbackNotice ? "border-amber-500/40 text-amber-600/90" : "border-border/50",
-        size === "sm" ? "px-2 py-0.5 text-[10px]" : "px-2.5 py-1 text-[11px]",
+        size === "sm" ? "px-2 py-0.5 text-micro" : "px-2.5 py-1 text-fine",
         className
       )}
       title={fallbackNotice}

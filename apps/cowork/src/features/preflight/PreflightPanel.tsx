@@ -188,7 +188,7 @@ export function PreflightPanel({ onClose }: { onClose: () => void }) {
                       <span className="text-foreground">{check.name}</span>
                       <span
                         className={cn(
-                          "px-2 py-0.5 rounded-full border text-[10px] uppercase tracking-wider",
+                          "px-2 py-0.5 rounded-full border text-micro uppercase tracking-wider",
                           check.status === "pass"
                             ? "border-emerald-500/30 text-emerald-600 bg-emerald-500/10"
                             : check.status === "fail"

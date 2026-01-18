@@ -84,7 +84,7 @@ function StepsSummary({ steps }: { steps: ExecutionStep[] }) {
   );
 
   return (
-    <div className="flex items-center gap-2 text-[10px]">
+    <div className="flex items-center gap-2 text-micro">
       {statusCounts.success > 0 && (
         <span className="flex items-center gap-1 text-success">
           <CheckCircle2 className="h-2.5 w-2.5" />
@@ -156,19 +156,19 @@ function StepItem({ step }: { step: ExecutionStep }) {
           />
           <span className="font-medium">{step.toolName}</span>
           {step.parallel && (
-            <span className="rounded bg-primary/20 px-1 py-0.5 text-[9px] text-primary">
+            <span className="rounded bg-primary/20 px-1 py-0.5 text-tiny text-primary">
               parallel
             </span>
           )}
         </div>
         {step.durationMs !== undefined && (
-          <span className="text-muted-foreground text-[10px]">{step.durationMs}ms</span>
+          <span className="text-muted-foreground text-micro">{step.durationMs}ms</span>
         )}
       </button>
 
       {/* Step Details */}
       {showDetails && (
-        <div className="mt-2 space-y-2 text-[11px]">
+        <div className="mt-2 space-y-2 text-fine">
           {/* Arguments */}
           {Object.keys(step.arguments).length > 0 && (
             <div>

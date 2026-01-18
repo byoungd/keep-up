@@ -94,7 +94,7 @@ export const ListRow = React.forwardRef<HTMLButtonElement, ListRowProps>(
                 <kbd
                   // biome-ignore lint/suspicious/noArrayIndexKey: Static shortcut data
                   key={`${value}-key-${i}`}
-                  className="px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground bg-surface-2 rounded border border-border/30"
+                  className="px-1.5 py-0.5 text-micro font-medium text-muted-foreground bg-surface-2 rounded border border-border/30"
                 >
                   {key}
                 </kbd>

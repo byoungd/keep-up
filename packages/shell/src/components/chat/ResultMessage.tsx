@@ -69,7 +69,7 @@ function AttachmentCard({ artifact, onClick }: { artifact: ArtifactItem; onClick
         <div className="text-sm font-medium truncate group-hover:text-foreground transition-colors text-foreground/80">
           {artifact.title || "Untitled Artifact"}
         </div>
-        <div className="text-[10px] text-muted-foreground capitalize flex items-center gap-1 mb-1.5">
+        <div className="text-micro text-muted-foreground capitalize flex items-center gap-1 mb-1.5">
           <span className="w-1 h-1 rounded-full bg-muted-foreground/40" />
           {artifact.type}
         </div>
@@ -80,7 +80,7 @@ function AttachmentCard({ artifact, onClick }: { artifact: ArtifactItem; onClick
             artifact.type === "code" ||
             artifact.type === "report" ||
             artifact.type === "diff") && (
-            <div className="text-[10px] text-muted-foreground/70 bg-surface-2/50 rounded px-1.5 py-1 font-mono leading-relaxed line-clamp-3 overflow-hidden border border-border/10">
+            <div className="text-micro text-muted-foreground/70 bg-surface-2/50 rounded px-1.5 py-1 font-mono leading-relaxed line-clamp-3 overflow-hidden border border-border/10">
               {artifact.content.slice(0, 150)}
             </div>
           )}

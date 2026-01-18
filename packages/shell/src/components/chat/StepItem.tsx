@@ -134,7 +134,7 @@ export function StepItem({
             {actions.map((action) => (
               <div
                 key={action.id}
-                className="flex items-start gap-2.5 text-[11px] text-muted-foreground/80 font-mono leading-relaxed"
+                className="flex items-start gap-2.5 text-fine text-muted-foreground/80 font-mono leading-relaxed"
               >
                 <span className="mt-[3px] opacity-40 shrink-0">
                   {action.status === "running" ? (
@@ -155,7 +155,7 @@ export function StepItem({
                   e.stopPropagation();
                   onPreview?.(art);
                 }}
-                className="flex items-center gap-2 text-[11px] text-foreground/80 hover:text-primary hover:underline transition-colors w-full text-left font-sans py-0.5"
+                className="flex items-center gap-2 text-fine text-foreground/80 hover:text-primary hover:underline transition-colors w-full text-left font-sans py-0.5"
               >
                 <FileText className="h-3 w-3 opacity-60" />
                 {art.title}

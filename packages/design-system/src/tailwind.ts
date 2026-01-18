@@ -89,6 +89,14 @@ export const sharedThemeExtend: ThemeExtend = {
     "3xl": "var(--radius-3xl)",
     DEFAULT: "var(--radius)",
   },
+  fontSize: {
+    nano: ["var(--font-size-nano)", { lineHeight: "var(--line-height-nano)" }],
+    tiny: ["var(--font-size-tiny)", { lineHeight: "var(--line-height-tiny)" }],
+    micro: ["var(--font-size-micro)", { lineHeight: "var(--line-height-micro)" }],
+    fine: ["var(--font-size-fine)", { lineHeight: "var(--line-height-fine)" }],
+    chrome: ["var(--font-size-chrome)", { lineHeight: "var(--line-height-chrome)" }],
+    content: ["var(--font-size-content)", { lineHeight: "var(--line-height-content)" }],
+  },
   boxShadow: {
     soft: "var(--shadow-soft)",
   },

@@ -305,7 +305,7 @@ export function SidebarConfigSection({
   // --- Previews ---
 
   const badgeCountPreview = (
-    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-surface-3 px-1.5 text-[10px] font-semibold text-foreground">
+    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-surface-3 px-1.5 text-micro font-semibold text-foreground">
       12
     </span>
   );

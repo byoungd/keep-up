@@ -65,7 +65,7 @@ export function TaskTimeline({ graph, isConnected, approveTool, rejectTool }: Ta
                 : "bg-muted-foreground"
             }`}
           />
-          <span className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">
+          <span className="text-micro text-muted-foreground font-black uppercase tracking-widest">
             {graph.status.replace("_", " ")}
           </span>
         </div>
@@ -100,7 +100,7 @@ export function TaskTimeline({ graph, isConnected, approveTool, rejectTool }: Ta
             </div>
             <div className="text-center">
               <p className="text-sm font-bold text-foreground">Waiting for Agent</p>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1">
+              <p className="text-micro text-muted-foreground uppercase tracking-widest mt-1">
                 Standby for execution flow
               </p>
             </div>

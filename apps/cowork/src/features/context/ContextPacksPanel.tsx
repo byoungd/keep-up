@@ -128,7 +128,7 @@ function ContextPacksSearchSection({
                     <p className="text-xs font-semibold text-foreground">
                       {result.chunk.sourcePath}
                     </p>
-                    <p className="text-[10px] text-muted-foreground">
+                    <p className="text-micro text-muted-foreground">
                       Score {result.score.toFixed(2)} | {result.chunk.tokenCount} tokens
                     </p>
                   </div>
@@ -280,7 +280,7 @@ function ContextPacksSavedSection({
                 ) : (
                   <p className="text-sm font-semibold text-foreground">{pack.name}</p>
                 )}
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-fine text-muted-foreground">
                   {pack.chunkIds.length} chunks | Updated {formatTimestamp(pack.updatedAt)}
                 </p>
               </div>

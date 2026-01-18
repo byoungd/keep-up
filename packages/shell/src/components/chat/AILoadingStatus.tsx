@@ -53,7 +53,7 @@ export function AILoadingStatus({ state, className }: AILoadingStatusProps) {
           state === "connecting" ? "animate-spin" : ""
         )}
       />
-      <span className="text-[10px] font-medium tracking-normal opacity-80">{label}</span>
+      <span className="text-micro font-medium tracking-normal opacity-80">{label}</span>
     </div>
   );
 }

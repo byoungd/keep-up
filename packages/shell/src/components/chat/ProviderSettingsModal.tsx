@@ -237,7 +237,7 @@ export function ProviderListView({ onSelectProvider }: ProviderListViewProps) {
                       {config.displayName || DEFAULT_PROVIDER_NAMES[provider.id]}
                     </span>
                     {isConfigured && (
-                      <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-success/10 text-success text-[10px] font-medium">
+                      <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-success/10 text-success text-micro font-medium">
                         <Check className="h-2.5 w-2.5" />
                         {t("providerConfigured")}
                       </span>
@@ -264,7 +264,7 @@ export function ProviderListView({ onSelectProvider }: ProviderListViewProps) {
 
       {/* Footer tip */}
       <div className="px-4 py-3 border-t border-border/30">
-        <div className="flex items-start gap-2 text-[11px] text-muted-foreground/70">
+        <div className="flex items-start gap-2 text-fine text-muted-foreground/70">
           <Sparkles className="h-3.5 w-3.5 shrink-0 mt-0.5 text-accent-amber" />
           <span>{t("providerSettingsTip")}</span>
         </div>
@@ -353,7 +353,7 @@ export function ProviderDetailView({ providerId, onBack, onClose }: ProviderDeta
           <h3 className="text-sm font-semibold text-foreground">
             {config.displayName || DEFAULT_PROVIDER_NAMES[providerId]}
           </h3>
-          <p className="text-[11px] text-muted-foreground/70">{meta.description}</p>
+          <p className="text-fine text-muted-foreground/70">{meta.description}</p>
         </div>
       </div>
 
@@ -397,7 +397,7 @@ export function ProviderDetailView({ providerId, onBack, onClose }: ProviderDeta
             href={meta.apiKeyUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-[11px] text-primary hover:text-primary/80 transition-colors"
+            className="inline-flex items-center gap-1 text-fine text-primary hover:text-primary/80 transition-colors"
           >
             {t("providerGetApiKey")}
             <ExternalLink className="h-3 w-3" />
@@ -432,14 +432,14 @@ export function ProviderDetailView({ providerId, onBack, onClose }: ProviderDeta
               )}
               aria-label={t("providerBaseUrl")}
             />
-            <p className="text-[11px] text-muted-foreground/60">{t("providerBaseUrlHint")}</p>
+            <p className="text-fine text-muted-foreground/60">{t("providerBaseUrlHint")}</p>
           </div>
         )}
 
         {/* OpenAI-compatible notice */}
         <div className="flex items-start gap-2.5 p-3 rounded-xl bg-surface-2/50 border border-border/30">
           <Settings2 className="h-4 w-4 text-muted-foreground/70 shrink-0 mt-0.5" />
-          <div className="text-[11px] text-muted-foreground/80 leading-relaxed">
+          <div className="text-fine text-muted-foreground/80 leading-relaxed">
             <span className="font-medium text-foreground/80">{t("providerCompatibleTitle")}</span>
             <br />
             {t("providerCompatibleDescription")}

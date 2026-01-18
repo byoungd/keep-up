@@ -160,7 +160,7 @@ export function ContextPanel({
                     className="rounded-lg border border-border/30 bg-surface-2/40 p-3 text-sm text-foreground"
                   >
                     <p className="whitespace-pre-wrap">{note.content}</p>
-                    <p className="mt-2 text-[10px] text-muted-foreground">
+                    <p className="mt-2 text-micro text-muted-foreground">
                       {new Date(note.createdAt).toLocaleString()}
                     </p>
                   </div>

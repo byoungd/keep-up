@@ -198,7 +198,7 @@ function TemplateEditorSection({
                 aria-label="Input placeholder"
               />
               <div className="flex items-center justify-between gap-2">
-                <label className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                <label className="flex items-center gap-1 text-fine text-muted-foreground">
                   <input
                     type="checkbox"
                     checked={input.required}
@@ -212,7 +212,7 @@ function TemplateEditorSection({
                 <button
                   type="button"
                   onClick={() => onRemoveInput(input.id)}
-                  className="text-[11px] text-destructive hover:text-destructive/80"
+                  className="text-fine text-destructive hover:text-destructive/80"
                 >
                   Remove
                 </button>
@@ -305,7 +305,7 @@ function TemplateListSection({
                   {template.name}
                 </button>
                 <p className="text-xs text-muted-foreground">{template.description}</p>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-fine text-muted-foreground">
                   {template.mode.toUpperCase()} | v{template.version} | Used{" "}
                   {template.usageCount ?? 0} times | Last run {formatTimestamp(template.lastUsedAt)}
                 </p>

@@ -96,7 +96,7 @@ export function SlashCommandMenu({
             </div>
             <div className="flex flex-col items-start overflow-hidden">
               <span className="truncate font-medium leading-none">{prompt.label}</span>
-              <span className="truncate text-[10px] text-muted-foreground mt-0.5 opacity-80">
+              <span className="truncate text-micro text-muted-foreground mt-0.5 opacity-80">
                 {prompt.description}
               </span>
             </div>

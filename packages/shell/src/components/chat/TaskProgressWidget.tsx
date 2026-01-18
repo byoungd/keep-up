@@ -105,7 +105,7 @@ function TaskDetails({
               <Target className="w-3.5 h-3.5" />
             </div>
             <div className="space-y-1">
-              <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+              <div className="text-micro font-bold text-muted-foreground uppercase tracking-widest">
                 Current Objective
               </div>
               <div className="text-sm text-foreground font-medium leading-relaxed">{goal}</div>
@@ -301,7 +301,7 @@ function TaskAccordionItem({
                   title={`${grouped.docs.length} Documents`}
                 >
                   <FileText className="w-3 h-3" />
-                  <span className="text-[10px] font-mono font-medium">{grouped.docs.length}</span>
+                  <span className="text-micro font-mono font-medium">{grouped.docs.length}</span>
                 </button>
               )}
               {grouped.images.length > 0 && (
@@ -318,7 +318,7 @@ function TaskAccordionItem({
                   title={`${grouped.images.length} Images`}
                 >
                   <ImageIcon className="w-3 h-3" />
-                  <span className="text-[10px] font-mono font-medium">{grouped.images.length}</span>
+                  <span className="text-micro font-mono font-medium">{grouped.images.length}</span>
                 </button>
               )}
               {grouped.links.length > 0 && (
@@ -335,7 +335,7 @@ function TaskAccordionItem({
                   title={`${grouped.links.length} Links`}
                 >
                   <LinkIcon className="w-3 h-3" />
-                  <span className="text-[10px] font-mono font-medium">{grouped.links.length}</span>
+                  <span className="text-micro font-mono font-medium">{grouped.links.length}</span>
                 </button>
               )}
             </div>

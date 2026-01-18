@@ -19,13 +19,13 @@ function MetadataView({ metadata }: { metadata: Record<string, unknown> }) {
   }
 
   return (
-    <div className="text-[11px] font-mono bg-surface-2/50 rounded-lg p-2.5 text-muted-foreground border border-border/10">
+    <div className="text-fine font-mono bg-surface-2/50 rounded-lg p-2.5 text-muted-foreground border border-border/10">
       <div className="flex justify-between items-center mb-1.5">
         <span className="font-semibold text-foreground/80">{String(metadata.toolName)}</span>
         {!!metadata.riskLevel && (
           <span
             className={cn(
-              "uppercase text-[9px] font-bold px-1.5 py-px rounded-[4px] tracking-wider",
+              "uppercase text-tiny font-bold px-1.5 py-px rounded-[4px] tracking-wider",
               (metadata.riskLevel as string) === "high"
                 ? "bg-red-500/10 text-red-500"
                 : "bg-blue-500/10 text-blue-500"

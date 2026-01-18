@@ -864,7 +864,7 @@ export function ModelSelector({
                               type="button"
                               onClick={() => handleFilterToggle(feature.id)}
                               className={cn(
-                                "shrink-0 snap-start flex items-center gap-1 px-1.5 py-1 rounded-full text-[10px] tracking-tight font-medium border transition-all duration-200",
+                                "shrink-0 snap-start flex items-center gap-1 px-1.5 py-1 rounded-full text-micro tracking-tight font-medium border transition-all duration-200",
                                 isActive
                                   ? "bg-primary/10 border-primary/20 text-primary shadow-sm"
                                   : "bg-surface-1/50 border-border/10 text-muted-foreground/70 hover:bg-surface-2 hover:text-foreground hover:border-border/30"
@@ -1077,19 +1077,19 @@ function ModelItem({
               {main}
             </span>
             {model.supports.thinking && (
-              <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">
+              <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-tiny font-medium bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">
                 <Brain className="h-2.5 w-2.5" />
                 Think
               </span>
             )}
             {!isLegacy && suffix && (
-              <span className="text-[10px] text-muted-foreground/60 truncate max-w-[80px]">
+              <span className="text-micro text-muted-foreground/60 truncate max-w-[80px]">
                 {suffix}
               </span>
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2 text-[11px] text-muted-foreground/60">
+        <div className="flex items-center gap-2 text-fine text-muted-foreground/60">
           <span className="truncate">{providerName}</span>
           <span className="text-border/40">|</span>
           <span>{formatContextWindow(model.contextWindow)}</span>

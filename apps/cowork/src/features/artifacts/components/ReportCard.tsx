@@ -71,7 +71,7 @@ export function ReportCard({ title = "Report", content }: ReportCardProps) {
       <div className="p-4">
         <div className="prose prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-muted prose-pre:border prose-pre:border-border">
           {/* In production, use ReactMarkdown */}
-          <div className="whitespace-pre-wrap text-foreground/80 text-[13px] leading-relaxed">
+          <div className="whitespace-pre-wrap text-foreground/80 text-chrome leading-relaxed">
             {content}
           </div>
         </div>

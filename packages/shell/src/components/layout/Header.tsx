@@ -20,6 +20,10 @@ export interface HeaderProps {
   presenceAvatars?: React.ReactNode;
   globalActions?: React.ReactNode;
   appName?: string;
+  /** Custom content to render after the Toggle on the left side */
+  leftSlot?: React.ReactNode;
+  /** Custom content to render before the Panel Toggle on the right side */
+  rightSlot?: React.ReactNode;
 }
 
 export function Header({
@@ -28,15 +32,19 @@ export function Header({
   isRightPanelOpen,
   rightPanelPosition,
   rightPanelLabel,
-  syncIndicator,
-  presenceAvatars,
-  globalActions,
+  leftSlot,
+  rightSlot,
 }: HeaderProps) {
   const { sidebar, aiPanel, i18n } = useReaderShell();
   const t = (key: string, values?: Record<string, string | number>, defaultValue?: string) =>
     i18n.t(`Header.${key}`, values ?? defaultValue ?? key, defaultValue);
-  const { isCollapsed, toggle: toggleCollapsed } = sidebar;
+  const { isCollapsed, setCollapsed } = sidebar;
   const { position: aiPanelPosition } = aiPanel;
+
+  // When in peek mode (sidebar collapsed but hovering), clicking toggle should fully expand
+  const handleToggle = () => {
+    setCollapsed(!isCollapsed);
+  };
 
   const resolvedPanelPosition =
     rightPanelPosition ?? (aiPanelPosition === "left" ? "left" : "right");
@@ -54,18 +62,14 @@ export function Header({
     rightPanelLabel ?? t("toggleAi", { shortcut: "⌘+2" }, "Toggle AI Companion (⌘+2)");
 
   return (
-    <header
-      className={cn(
-        "absolute top-0 left-0 right-0 z-50 flex items-start justify-between p-3 pointer-events-none"
-      )}
-    >
-      <div className="flex items-center gap-2 pointer-events-auto">
-        {/* Sidebar expand button - shows when sidebar is collapsed */}
+    <header className="absolute top-0 left-0 right-0 z-50 pointer-events-none">
+      {/* Left floating control - Toggle + leftSlot */}
+      <div className="absolute top-3 left-3 flex items-center gap-2 pointer-events-auto">
         <Tooltip content={isCollapsed ? expandLabel : collapseLabel} side="right" sideOffset={8}>
           <Button
             variant="ghost"
             size="icon"
-            onClick={toggleCollapsed}
+            onClick={handleToggle}
             className={cn(
               "h-6 w-6 text-muted-foreground hover:text-foreground",
               !isCollapsed && "hidden"
@@ -76,7 +80,7 @@ export function Header({
           </Button>
         </Tooltip>
 
-        {/* Mobile toggle - hidden on desktop */}
+        {/* Mobile toggle */}
         <Button
           variant="ghost"
           size="icon"
@@ -87,34 +91,28 @@ export function Header({
           <PanelLeft className="h-4 w-4" />
         </Button>
 
-        {syncIndicator}
-
-        <div className="hidden md:flex h-3 w-px bg-border/40 mx-2" />
-
-        {presenceAvatars}
+        {leftSlot}
       </div>
 
-      <div className="flex items-center gap-1.5 pointer-events-auto">
-        {globalActions}
-        {/* Panel Toggles */}
-        <div className="flex items-center gap-0.5">
-          <Tooltip content={toggleLabel} side="bottom" align="end" sideOffset={8}>
-            <Button
-              variant={isRightPanelOpen ? "subtle" : "ghost"}
-              size="compact"
-              onClick={onToggleRight}
-              className={cn(
-                "h-8 w-8 p-0 transition-all rounded-md",
-                isRightPanelOpen
-                  ? "bg-surface-2 text-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-surface-2"
-              )}
-              aria-label={toggleLabel}
-            >
-              <GlobalAiIcon className="h-4 w-4" />
-            </Button>
-          </Tooltip>
-        </div>
+      {/* Right floating control - rightSlot + Panel toggle */}
+      <div className="absolute top-3 right-3 flex items-center gap-2 pointer-events-auto">
+        {rightSlot}
+        <Tooltip content={toggleLabel} side="bottom" align="end" sideOffset={8}>
+          <Button
+            variant={isRightPanelOpen ? "subtle" : "ghost"}
+            size="compact"
+            onClick={onToggleRight}
+            className={cn(
+              "h-8 w-8 p-0 transition-all rounded-md",
+              isRightPanelOpen
+                ? "bg-surface-2 text-foreground"
+                : "text-muted-foreground hover:text-foreground hover:bg-surface-2"
+            )}
+            aria-label={toggleLabel}
+          >
+            <GlobalAiIcon className="h-4 w-4" />
+          </Button>
+        </Tooltip>
       </div>
     </header>
   );

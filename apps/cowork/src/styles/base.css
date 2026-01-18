@@ -10,6 +10,14 @@ body,
 
 body {
   margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-chrome);
+  line-height: var(--line-height-chrome);
+}
+
+.shell-canvas {
+  font-size: var(--font-size-content);
+  line-height: var(--line-height-content);
 }
 
 .card-panel {

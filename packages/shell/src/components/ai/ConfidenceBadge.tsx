@@ -86,7 +86,7 @@ export function ConfidenceBadge({
         "inline-flex items-center gap-1 rounded-full font-medium relative overflow-hidden",
         "transition-colors duration-150",
         // Size variants
-        size === "sm" && "px-1.5 py-0.5 text-[10px]",
+        size === "sm" && "px-1.5 py-0.5 text-micro",
         size === "md" && "px-2 py-1 text-xs",
         // Level-based colors
         level === "high" && "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
@@ -181,7 +181,7 @@ export function ConfidenceBar({ score, className }: ConfidenceBarProps): React.R
           style={{ width: `${percentage}%` }}
         />
       </div>
-      <span className="text-[10px] text-muted-foreground tabular-nums">{percentage}%</span>
+      <span className="text-micro text-muted-foreground tabular-nums">{percentage}%</span>
     </div>
   );
 }

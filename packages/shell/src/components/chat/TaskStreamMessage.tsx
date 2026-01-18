@@ -131,7 +131,7 @@ export function TaskStreamMessage({ task, onPreview, onAction }: TaskStreamMessa
                   {/* Deliverables */}
                   {deliverables.length > 0 && (
                     <div className="pt-2 space-y-3">
-                      <div className="uppercase tracking-widest text-[10px] text-muted-foreground/60 font-semibold select-none">
+                      <div className="uppercase tracking-widest text-micro text-muted-foreground/60 font-semibold select-none">
                         Deliverables
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">

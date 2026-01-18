@@ -43,7 +43,7 @@ export function ConfirmationSection({
           {metadata.riskLevel && (
             <span
               className={cn(
-                "text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full border",
+                "text-micro uppercase tracking-wide px-2 py-0.5 rounded-full border",
                 getRiskBadgeClass(metadata.riskLevel)
               )}
             >

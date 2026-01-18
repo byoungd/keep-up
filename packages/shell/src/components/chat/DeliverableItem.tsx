@@ -33,14 +33,14 @@ export function DeliverableItem({
           <div className="text-xs font-medium text-foreground truncate group-hover:text-primary transition-colors">
             {artifact.title || "Untitled"}
           </div>
-          <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
+          <div className="text-micro text-muted-foreground uppercase tracking-wider">
             {artifact.type}
           </div>
         </div>
         {statusLabel && (
           <span
             className={cn(
-              "text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border",
+              "text-micro uppercase tracking-wider px-2 py-0.5 rounded-full border",
               statusClass
             )}
           >
@@ -52,7 +52,7 @@ export function DeliverableItem({
 
       {/* Content Preview if text */}
       {preview && (artifact.type === "doc" || artifact.type === "report") && (
-        <div className="w-full text-[10px] text-muted-foreground/70 line-clamp-2 leading-relaxed">
+        <div className="w-full text-micro text-muted-foreground/70 line-clamp-2 leading-relaxed">
           {preview}
         </div>
       )}

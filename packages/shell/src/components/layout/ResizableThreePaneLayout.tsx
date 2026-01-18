@@ -126,12 +126,7 @@ export const ResizableThreePaneLayout = React.forwardRef<
 
           {/* CENTER PANEL */}
           <div className="h-full flex-1 min-w-0 bg-canvas z-10 relative overflow-hidden">
-            <div
-              className={cn(
-                "h-full w-full overflow-auto bg-canvas scroll-smooth",
-                centerPanelClassName
-              )}
-            >
+            <div className={cn("h-full w-full overflow-auto scroll-smooth", centerPanelClassName)}>
               {centerPanel}
             </div>
           </div>
