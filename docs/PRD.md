@@ -1,12 +1,18 @@
 # KU0 · Keep Up (ku0.com) — Product Requirements Document (PRD)
 
-- **Product:** KU0 · Keep Up  
-- **Document type:** PRD (official, Markdown)  
-- **Version:** v1.0  
-- **Date:** 2026-01-09  
-- **Owner:** (fill)  
-- **Reviewers:** (fill)  
-- **Status:** Draft for review  
+> [!IMPORTANT]
+> **Implementation Active**: This PRD describes the product vision.
+> For technical implementation details, refer to the **[Specifications](./specs/README.md)**.
+> *   **Agent Runtime**: [`specs/agent-runtime-spec-2026.md`](./specs/agent-runtime-spec-2026.md)
+> *   **Cowork App**: [`specs/cowork/cowork-app-spec.md`](./specs/cowork/cowork-app-spec.md)
+
+- **Product:** KU0 · Keep Up
+- **Document type:** PRD (official, Markdown)
+- **Version:** v1.0
+- **Date:** 2026-01-09
+- **Owner:** (fill)
+- **Reviewers:** (fill)
+- **Status:** Draft for review
 
 ---
 

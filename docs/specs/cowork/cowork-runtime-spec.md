@@ -1,7 +1,13 @@
-# Cowork Runtime Spec (Phase 2)
+# Cowork Runtime Configuration (Phase 2)
 
-## Purpose
-Define the runtime behavior required to align Keep-Up agent-runtime with Cowork task mode, without code changes.
+> **Purpose**: Define how the generic **Agent Runtime** is configured and constrained for **Cowork Mode**.
+
+**Related Specs:**
+- [Agent Runtime Spec](file:///Users/han/Documents/Code/Parallel/keep-up/docs/specs/agent-runtime-spec-2026.md) — The Core Engine
+- [Data Flow Spec](file:///Users/han/Documents/Code/Parallel/keep-up/docs/specs/cowork/cowork-data-flow-spec.md) — Event Stream
+- [Persistence Spec](file:///Users/han/Documents/Code/Parallel/keep-up/docs/specs/cowork/cowork-persistence-spec.md) — Session Storage
+
+---
 
 ## Goals
 - Task mode lifecycle: plan -> subtask -> execute -> summary.
