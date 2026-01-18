@@ -109,5 +109,5 @@ describeIf("DockerSandboxManager (e2e)", () => {
       context
     );
     expect(destroyResult.success).toBe(true);
-  });
+  }, 30_000);
 });
