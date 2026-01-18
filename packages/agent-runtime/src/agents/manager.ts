@@ -403,6 +403,7 @@ export class AgentManager implements IAgentManager {
       hasTool: (name: string) => {
         return originalRegistry.hasTool(name) && this.isToolAllowed(name, allowedTools);
       },
+      resolveToolServer: (name: string) => originalRegistry.resolveToolServer?.(name),
       getServer: (name: string) => originalRegistry.getServer(name),
       callTool: async (call, context) => {
         if (!this.isToolAllowed(call.name, allowedTools)) {

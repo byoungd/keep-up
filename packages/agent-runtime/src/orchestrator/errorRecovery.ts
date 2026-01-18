@@ -307,7 +307,6 @@ export class ErrorRecoveryEngine {
     this.recordErrorSignature(errorSignature, errorSignatures);
     return null;
   }
-
   private async attemptRecovery(
     toolCall: MCPToolCall,
     initialError: ToolError,

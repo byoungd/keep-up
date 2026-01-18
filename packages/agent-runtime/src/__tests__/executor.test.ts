@@ -25,10 +25,15 @@ import {
   createToolPolicyEngine,
   type IPermissionChecker,
 } from "../security";
-import type { IMetricsRecorder, TelemetryContext } from "../telemetry";
+import {
+  type IMetricsCollector,
+  InMemoryTracer,
+  type MetricValue,
+  type TelemetryContext,
+} from "../telemetry";
 import type { IToolRegistry } from "../tools/mcp/registry";
 import type {
-  AuditLogEntry,
+  AuditEntry,
   AuditLogger,
   ExecutionDecision,
   MCPTool,
@@ -39,8 +44,9 @@ import type {
   ToolExecutionContext,
   ToolExecutionRecord,
 } from "../types";
-import type { ToolResultCache } from "../utils/cache";
-import type { RateLimitResult, ToolRateLimiter } from "../utils/rateLimit";
+import { ToolResultCache } from "../utils/cache";
+// Actually I need to import the class, so remove 'type'
+import { type RateLimitResult, ToolRateLimiter } from "../utils/rateLimit";
 
 // ============================================================================
 // Mock Implementations
@@ -48,6 +54,7 @@ import type { RateLimitResult, ToolRateLimiter } from "../utils/rateLimit";
 
 class MockToolRegistry implements IToolRegistry {
   private tools: MCPTool[] = [];
+  private toolServers = new Map<string, string>();
   public lastCall?: MCPToolCall;
   public lastContext?: ToolContext;
   public callResult: MCPToolResult = {
@@ -56,17 +63,49 @@ class MockToolRegistry implements IToolRegistry {
   };
   public shouldThrow = false;
   public throwError = new Error("Mock execution error");
+  // biome-ignore lint/complexity/noBannedTypes: Test mock
+  private listeners: Record<string, Function[]> = {};
 
   setTools(tools: MCPTool[]): void {
     this.tools = tools;
+  }
+
+  setToolServer(toolName: string, serverName: string): void {
+    this.toolServers.set(toolName, serverName);
   }
 
   setResult(result: MCPToolResult): void {
     this.callResult = result;
   }
 
+  async register(server: { name: string; listTools: () => MCPTool[] }): Promise<void> {
+    const tools = server.listTools();
+    this.tools.push(...tools);
+    tools.forEach((t) => {
+      this.toolServers.set(t.name, server.name);
+    });
+  }
+
+  // Helper for existing tests that use valid arguments but wrong structure for new interface
+  // We can't overload in interface implementation easily without 'any'.
+  // But we can update the tests.
+
+  async unregister(_serverName: string): Promise<void> {
+    // implementation
+  }
+
   listTools(): MCPTool[] {
     return this.tools;
+  }
+
+  hasTool(name: string): boolean {
+    return this.tools.some((t) => t.name === name);
+  }
+
+  // biome-ignore lint/suspicious/noExplicitAny: Test mock
+  getServer(_toolName: string): any {
+    // Return dummy server if needed or undefined
+    return undefined;
   }
 
   async callTool(call: MCPToolCall, context: ToolContext): Promise<MCPToolResult> {
@@ -79,7 +118,32 @@ class MockToolRegistry implements IToolRegistry {
 
     return this.callResult;
   }
+
+  resolveToolServer(toolName: string): string | undefined {
+    return this.toolServers.get(toolName);
+  }
+
+  // biome-ignore lint/suspicious/noExplicitAny: Test mock
+  on(event: any, handler: any): () => void {
+    if (!this.listeners[event]) {
+      this.listeners[event] = [];
+    }
+    this.listeners[event].push(handler);
+    return () => {
+      // noop unsubscribe
+    };
+  }
 }
+
+// ... MockPermissionChecker ...
+
+// ... MockMetricsRecorder ...
+// Updating later in the file, but I can include it here if the chunk covers it.
+// The instruction says lines 280-285 for metrics.
+// But this tool call is for MockToolRegistry mainly. I'll stick to replacing MockToolRegistry.
+
+// Actually, I should update the usages in text too or I will get errors.
+// There are too many usages to update manually one by one. I should use `multi_replace` or replace specific blocks.
 
 class MockPermissionChecker implements IPermissionChecker {
   public allowAll = true;
@@ -99,16 +163,30 @@ class MockPermissionChecker implements IPermissionChecker {
     }
     return { allowed: false, reason: this.denyReason, escalation: this.escalation };
   }
+
+  getPolicy() {
+    return {
+      name: "mock-policy",
+      permissions: {},
+      resourceLimits: {},
+      sandbox: { type: "none" },
+      // biome-ignore lint/suspicious/noExplicitAny: Test mock
+    } as any;
+  }
 }
 
-class MockRateLimiter implements ToolRateLimiter {
+class MockRateLimiter extends ToolRateLimiter {
   public allowAll = true;
   public resetInMs = 5000;
   public remaining = 10;
   public limit = 100;
   public consumedCalls: Array<{ toolName: string; userId?: string }> = [];
 
-  checkAndConsume(toolName: string, userId?: string): RateLimitResult {
+  constructor() {
+    super({ default: { maxRequests: 100, windowMs: 5000 } });
+  }
+
+  override checkAndConsume(toolName: string, userId?: string): RateLimitResult {
     this.consumedCalls.push({ toolName, userId });
 
     if (this.allowAll) {
@@ -126,61 +204,85 @@ class MockRateLimiter implements ToolRateLimiter {
       limit: this.limit,
     };
   }
+
+  override check(_toolName: string, _userId?: string): RateLimitResult {
+    if (this.allowAll) {
+      return {
+        allowed: true,
+        remaining: this.remaining,
+        resetInMs: this.resetInMs,
+        limit: this.limit,
+      };
+    }
+    return {
+      allowed: false,
+      remaining: 0,
+      resetInMs: this.resetInMs,
+      limit: this.limit,
+    };
+  }
+
+  override reset(): void {
+    // noop for mock
+  }
+  override cleanup(): void {
+    // noop for mock
+  }
 }
 
-class MockToolResultCache implements ToolResultCache {
-  private cache = new Map<string, MCPToolResult>();
+class MockToolResultCache extends ToolResultCache {
   public getCalls: Array<{ toolName: string; args: unknown }> = [];
   public setCalls: Array<{ toolName: string; args: unknown; result: MCPToolResult }> = [];
 
-  private makeKey(toolName: string, args: unknown): string {
-    return `${toolName}:${JSON.stringify(args)}`;
-  }
-
-  get(toolName: string, args: unknown): MCPToolResult | undefined {
+  override get(toolName: string, args: Record<string, unknown>): unknown | undefined {
     this.getCalls.push({ toolName, args });
-    return this.cache.get(this.makeKey(toolName, args));
+    // Delegate to super or just mock behavior? The tests likely expect specific behavior.
+    // The previous implementation used a local Map. Let's keep using a local map but we can't access private 'cache' of super.
+    // Actually, let's just use the super's cache if we can, OR shadow the functionality.
+    // Since we are mocking, we often want to spy.
+    return super.get(toolName, args);
   }
 
-  set(toolName: string, args: unknown, result: MCPToolResult): void {
-    this.setCalls.push({ toolName, args, result });
-    this.cache.set(this.makeKey(toolName, args), result);
+  override set(
+    toolName: string,
+    args: Record<string, unknown>,
+    result: unknown,
+    ttlMs?: number
+  ): void {
+    this.setCalls.push({ toolName, args, result: result as MCPToolResult });
+    super.set(toolName, args, result, ttlMs);
   }
 
-  delete(toolName: string, args: unknown): boolean {
-    return this.cache.delete(this.makeKey(toolName, args));
-  }
+  // The tests use 'cache' property which was local.
+  // We should rely on public methods for tests, or add helper methods.
+  // The original mock had a public 'cache' map? No, private.
 
-  clear(): void {
-    this.cache.clear();
-  }
-
-  size(): number {
-    return this.cache.size;
-  }
-
-  preload(toolName: string, args: unknown, result: MCPToolResult): void {
-    this.cache.set(this.makeKey(toolName, args), result);
+  preload(toolName: string, args: Record<string, unknown>, result: MCPToolResult): void {
+    this.set(toolName, args, result);
   }
 }
 
 class MockAuditLogger implements AuditLogger {
-  public logs: AuditLogEntry[] = [];
+  public logs: AuditEntry[] = [];
 
-  log(entry: AuditLogEntry): void {
+  log(entry: AuditEntry): void {
     this.logs.push(entry);
   }
 
-  getCallLogs(): AuditLogEntry[] {
+  getCallLogs(): AuditEntry[] {
     return this.logs.filter((l) => l.action === "call");
   }
 
-  getResultLogs(): AuditLogEntry[] {
+  getResultLogs(): AuditEntry[] {
     return this.logs.filter((l) => l.action === "result" || l.action === "error");
+  }
+
+  getEntries(): AuditEntry[] {
+    return this.logs;
   }
 }
 
-class MockMetricsRecorder implements IMetricsRecorder {
+class MockMetricsRecorder implements IMetricsCollector {
   public increments: Array<{ name: string; labels?: Record<string, string> }> = [];
   public observations: Array<{ name: string; value: number; labels?: Record<string, string> }> = [];
 
@@ -195,6 +297,14 @@ class MockMetricsRecorder implements IMetricsRecorder {
   gauge(_name: string, _value: number, _labels?: Record<string, string>): void {
     // Not used in executor
   }
+
+  getMetrics(): MetricValue[] {
+    return [];
+  }
+
+  toPrometheus(): string {
+    return "";
+  }
 }
 
 // ============================================================================
@@ -204,39 +314,27 @@ class MockMetricsRecorder implements IMetricsRecorder {
 function createMockContext(overrides?: Partial<ToolContext>): ToolContext {
   return {
     security: {
-      policy: {
-        name: "test",
-        permissions: {
-          bash: { enabled: true },
-          file: { enabled: true, read: true, write: true },
-          network: { enabled: false },
-          code: { enabled: true },
-        },
-        resourceLimits: {
-          maxExecutionTime: 30000,
-          maxMemory: 256 * 1024 * 1024,
-          maxOutputSize: 1024 * 1024,
-          maxConcurrentTools: 5,
-        },
-        sandbox: {
-          enabled: false,
-          workingDirectory: "/test/project",
-        },
-        confirmation: {
-          requireForDestructive: false,
-          requireForNetwork: false,
-          requireForSensitive: false,
-        },
-      },
       sandbox: {
-        enabled: false,
         type: "none",
+        networkAccess: "none",
+        fsIsolation: "none",
         workingDirectory: "/test/project",
       },
+      permissions: {
+        bash: "disabled",
+        file: "read",
+        network: "none",
+        code: "disabled",
+        lfcc: "read",
+      },
+      limits: {
+        maxExecutionTimeMs: 30000,
+        maxMemoryBytes: 256 * 1024 * 1024,
+        maxOutputBytes: 1024 * 1024,
+        maxConcurrentCalls: 5,
+      },
     },
-    permissions: {},
-    traceId: "test-trace-id",
-    agentId: "test-agent",
+    correlationId: "test-trace-id",
     userId: "test-user",
     ...overrides,
   };
@@ -246,7 +344,7 @@ function createMockTool(name: string, options?: { readOnly?: boolean }): MCPTool
   return {
     name,
     description: `Mock tool: ${name}`,
-    inputSchema: { type: "object", properties: {}, required: [] },
+    inputSchema: { type: "object" },
     annotations: {
       readOnly: options?.readOnly ?? false,
     },
@@ -291,7 +389,8 @@ describe("ToolExecutionPipeline", () => {
       const result = await pipeline.execute(call, context);
 
       expect(result.success).toBe(true);
-      expect(result.content[0].text).toBe("Mock result");
+      // biome-ignore lint/suspicious/noExplicitAny: ToolContent union type
+      expect((result.content[0] as any).text).toBe("Mock result");
       expect(registry.lastCall).toEqual(call);
       expect(registry.lastContext).toEqual(context);
     });
@@ -464,6 +563,26 @@ describe("ToolExecutionPipeline", () => {
 
       expect(requiresConfirmation).toBe(true);
     });
+
+    it("allows unqualified tools when the registry resolves the server", async () => {
+      registry.setTools([createMockTool("read")]);
+      registry.setToolServer("read", "file");
+      const toolExecutionContext: ToolExecutionContext = {
+        policy: "interactive",
+        allowedTools: ["file:read"],
+        requiresApproval: [],
+        maxParallel: 1,
+      };
+      const policyEngine = createToolGovernancePolicyEngine(
+        createToolPolicyEngine(policy),
+        toolExecutionContext
+      );
+      pipeline = new ToolExecutionPipeline({ registry, policy, policyEngine });
+
+      const result = await pipeline.execute(createMockCall("read"), context);
+
+      expect(result.success).toBe(true);
+    });
   });
 
   describe("schema validation", () => {
@@ -484,6 +603,139 @@ describe("ToolExecutionPipeline", () => {
 
       expect(result.success).toBe(false);
       expect(result.error?.code).toBe("INVALID_ARGUMENTS");
+      expect(registry.lastCall).toBeUndefined();
+    });
+
+    it("rejects non-object arguments for object schemas", async () => {
+      registry.setTools([
+        {
+          name: "test:tool",
+          description: "test tool",
+          inputSchema: {
+            type: "object",
+            properties: { path: { type: "string" } },
+            required: ["path"],
+          },
+        },
+      ]);
+
+      const call: MCPToolCall = {
+        name: "test:tool",
+        arguments: null as unknown as Record<string, unknown>,
+      };
+      const result = await pipeline.execute(call, context);
+
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe("INVALID_ARGUMENTS");
+      expect(result.error?.message).toBe("Arguments must be an object");
+      expect(registry.lastCall).toBeUndefined();
+    });
+
+    it("rejects unexpected arguments when properties are declared", async () => {
+      registry.setTools([
+        {
+          name: "test:tool",
+          description: "test tool",
+          inputSchema: {
+            type: "object",
+            properties: { path: { type: "string" } },
+            required: [],
+          },
+        },
+      ]);
+
+      const result = await pipeline.execute(
+        createMockCall("test:tool", { path: "/tmp/file.txt", extra: "nope" }),
+        context
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe("INVALID_ARGUMENTS");
+      expect(result.error?.message).toBe("Unexpected argument: extra");
+      expect(registry.lastCall).toBeUndefined();
+    });
+
+    it("validates enum and nested object properties", async () => {
+      registry.setTools([
+        {
+          name: "test:tool",
+          description: "test tool",
+          inputSchema: {
+            type: "object",
+            properties: {
+              mode: { type: "string", enum: ["fast", "slow"] },
+              options: {
+                type: "object",
+                properties: { level: { type: "number" } },
+                required: ["level"],
+              },
+            },
+            required: ["mode", "options"],
+          },
+        },
+      ]);
+
+      const result = await pipeline.execute(
+        createMockCall("test:tool", { mode: "medium", options: { level: 1 } }),
+        context
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe("INVALID_ARGUMENTS");
+      expect(result.error?.message).toBe("Invalid value for mode: expected one of fast, slow");
+      expect(registry.lastCall).toBeUndefined();
+    });
+
+    it("validates array items", async () => {
+      registry.setTools([
+        {
+          name: "test:tool",
+          description: "test tool",
+          inputSchema: {
+            type: "object",
+            properties: {
+              tags: { type: "array", items: { type: "string" } },
+            },
+            required: ["tags"],
+          },
+        },
+      ]);
+
+      const result = await pipeline.execute(
+        createMockCall("test:tool", { tags: ["ok", 2] }),
+        context
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe("INVALID_ARGUMENTS");
+      expect(result.error?.message).toBe("Invalid type for tags[1]: expected string");
+      expect(registry.lastCall).toBeUndefined();
+    });
+
+    it("validates oneOf schemas", async () => {
+      registry.setTools([
+        {
+          name: "test:tool",
+          description: "test tool",
+          inputSchema: {
+            type: "object",
+            properties: {
+              value: {
+                oneOf: [{ type: "string" }, { type: "number" }],
+              },
+            },
+            required: ["value"],
+          },
+        },
+      ]);
+
+      const result = await pipeline.execute(createMockCall("test:tool", { value: true }), context);
+
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe("INVALID_ARGUMENTS");
+      expect(result.error?.message).toBe(
+        "Invalid value for value: does not match any allowed schema"
+      );
       expect(registry.lastCall).toBeUndefined();
     });
   });
@@ -566,12 +818,13 @@ describe("ToolExecutionPipeline", () => {
         success: true,
         content: [{ type: "text", text: "Cached response" }],
       };
-      cache.preload("read_tool", { id: "123" }, cachedResult);
+      (cache as MockToolResultCache).preload("read_tool", { id: "123" }, cachedResult);
 
       const call = createMockCall("read_tool", { id: "123" });
       const result = await pipeline.execute(call, context);
 
-      expect(result.content[0].text).toBe("Cached response");
+      // biome-ignore lint/suspicious/noExplicitAny: ToolContent union type
+      expect((result.content[0] as any).text).toBe("Cached response");
       expect(registry.lastCall).toBeUndefined(); // Tool not actually called
     });
 
@@ -715,7 +968,7 @@ describe("ToolExecutionPipeline", () => {
 
       await pipeline.execute(call, context);
 
-      expect(audit.logs[0].userId).toBe("test-user");
+      expect(audit.logs[0].correlationId).toBe("test-trace-id");
     });
 
     it("should include sandbox status in audit logs", async () => {
@@ -723,8 +976,9 @@ describe("ToolExecutionPipeline", () => {
         security: {
           ...context.security,
           sandbox: {
-            enabled: true,
-            type: "container",
+            type: "docker",
+            networkAccess: "none",
+            fsIsolation: "temp",
             workingDirectory: "/sandbox",
           },
         },
@@ -754,9 +1008,8 @@ describe("ToolExecutionPipeline", () => {
     beforeEach(() => {
       metrics = new MockMetricsRecorder();
       const telemetry: TelemetryContext = {
-        traceId: "test-trace",
-        spanId: "test-span",
         metrics,
+        tracer: new InMemoryTracer(),
       };
 
       pipeline = new ToolExecutionPipeline({
@@ -903,7 +1156,7 @@ describe("ToolExecutionPipeline", () => {
       pipeline = new ToolExecutionPipeline({
         registry,
         policy,
-        retryOptions: { maxAttempts: 3, delayMs: 10 },
+        retryOptions: { maxAttempts: 3, initialDelayMs: 10 },
       });
 
       const controller = new AbortController();

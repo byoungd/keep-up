@@ -52,6 +52,8 @@ export interface IToolRegistry {
   getServer(name: string): MCPToolServer | undefined;
   /** Check if a tool exists */
   hasTool(name: string): boolean;
+  /** Resolve the server for a tool name (if known) */
+  resolveToolServer?(toolName: string): string | undefined;
   /** Subscribe to registry events */
   on(event: RegistryEventType, handler: RegistryEventHandler): () => void;
 }
@@ -257,6 +259,13 @@ export class ToolRegistry implements IToolRegistry {
    */
   hasTool(name: string): boolean {
     return this.toolIndex.has(name);
+  }
+
+  /**
+   * Resolve the server name for a given tool name (qualified or unqualified).
+   */
+  resolveToolServer(toolName: string): string | undefined {
+    return this.toolIndex.get(toolName);
   }
 
   /**
