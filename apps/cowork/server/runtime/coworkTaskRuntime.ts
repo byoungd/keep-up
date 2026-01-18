@@ -10,17 +10,18 @@ import {
   createCoworkRuntime,
   createDockerBashExecutor,
   createFileToolServer,
+  createGhostAgent,
+  createMem0MemoryAdapter,
   createSandboxToolServer,
   createSecurityPolicy,
   createToolRegistry,
   createWebSearchToolServer,
   DockerSandboxManager,
+  type GhostAgent,
+  type Mem0MemoryAdapter,
   ProcessCodeExecutor,
   RuntimeAssetManager,
 } from "@ku0/agent-runtime";
-// Future integrations available:
-// import { createGhostAgent, type GhostAgent } from "@ku0/agent-runtime";
-// import { createMem0MemoryAdapter, type Mem0MemoryAdapter } from "@ku0/agent-runtime";
 import { normalizeModelId } from "@ku0/ai-core";
 import { ApprovalService } from "../services/approvalService";
 import type { ContextIndexManager } from "../services/contextIndexManager";
@@ -54,6 +55,7 @@ type SessionRuntime = {
   eventQueue: Promise<void>;
   unsubscribeQueue: () => void;
   unsubscribeOrchestrator: () => void;
+  ghostAgent?: GhostAgent;
 };
 
 type RuntimeFactory = (
@@ -86,9 +88,8 @@ export class CoworkTaskRuntime {
   private readonly projectContextManager: ProjectContextManager;
   private readonly providerKeys: ProviderKeyService;
   private readonly configStore: StorageLayer["configStore"];
-  // Optional Advanced Services (available when enabled)
-  // private memoryAdapter?: Mem0MemoryAdapter;
-  // private ghostAgent?: GhostAgent;
+  // Optional Advanced Services (enabled per ARCHITECTURE.md standards)
+  private memoryAdapter?: Mem0MemoryAdapter;
 
   constructor(deps: {
     storage: StorageLayer;
@@ -128,6 +129,22 @@ export class CoworkTaskRuntime {
       this.approvalCoordinator
     );
     this.projectContextManager = new ProjectContextManager(logger, deps.contextIndexManager);
+
+    // Initialize Mem0 memory adapter if API key provided (per ARCHITECTURE.md)
+    const mem0ApiKey = process.env.MEM0_API_KEY;
+    if (mem0ApiKey) {
+      try {
+        this.memoryAdapter = createMem0MemoryAdapter({
+          apiKey: mem0ApiKey,
+          host: process.env.MEM0_HOST,
+          organizationName: process.env.MEM0_ORG,
+          projectName: process.env.MEM0_PROJECT ?? "cowork",
+        });
+        logger.info("Mem0 memory adapter initialized");
+      } catch (err) {
+        logger.warn("Failed to initialize Mem0 memory adapter", err);
+      }
+    }
   }
 
   /**
@@ -152,6 +169,30 @@ export class CoworkTaskRuntime {
     const runtimeState = this.createRuntimeState(sessionId, runtimeResult, modeManager);
     this.attachRuntimeHandlers(runtimeState);
 
+    // Initialize GhostAgent for proactive file monitoring (per ARCHITECTURE.md)
+    const workspacePath = initialSession.grants[0]?.rootPath;
+    if (workspacePath) {
+      const enableGhost = parseBooleanEnv(process.env.COWORK_GHOST_ENABLED, false);
+      if (enableGhost) {
+        runtimeState.ghostAgent = createGhostAgent(workspacePath, {
+          enableWatcher: true,
+          enabledChecks: ["typecheck", "lint"],
+        });
+        runtimeState.ghostAgent.start().catch((err) => {
+          this.logger.warn("GhostAgent failed to start", err);
+        });
+        this.logger.info("GhostAgent started for workspace", { path: workspacePath });
+
+        // Wire GhostAgent events to session event stream
+        runtimeState.ghostAgent.onEvent((event) => {
+          if (event.type === "toast:show") {
+            // TODO: Publish to eventPublisher as a toast/notification event
+            // this.eventPublisher.publish(sessionId, "notification", event.data);
+          }
+        });
+      }
+    }
+
     this.runtimes.set(sessionId, runtimeState);
     return runtimeState;
   }
@@ -165,6 +206,12 @@ export class CoworkTaskRuntime {
       runtime.unsubscribeQueue();
       runtime.unsubscribeOrchestrator();
       this.runtimes.delete(sessionId);
+    }
+
+    // Stop GhostAgent if active
+    if (runtime?.ghostAgent) {
+      await runtime.ghostAgent.stop();
+      this.logger.info("GhostAgent stopped for session", { sessionId });
     }
   }
 
@@ -202,8 +249,23 @@ export class CoworkTaskRuntime {
     const requestedModel = normalizeModelId(settings.defaultModel ?? undefined) ?? null;
     const runtime = await this.ensureRuntimeForTask(sessionId, session, settings, requestedModel);
 
+    // Context Injection via Mem0
+    let finalPrompt = task.prompt;
+    if (this.memoryAdapter) {
+      try {
+        const memories = await this.memoryAdapter.recall(task.prompt, { limit: 5 });
+        if (memories.length > 0) {
+          const contextStr = memories.map((m) => `- ${m.content}`).join("\n");
+          finalPrompt = `${task.prompt}\n\n<IncomingContext>\n${contextStr}\n</IncomingContext>`;
+          this.logger.info(" injected Mem0 memories", { count: memories.length });
+        }
+      } catch (err) {
+        this.logger.warn("Failed to recall memories", err);
+      }
+    }
+
     // Trigger execution
-    const taskId = await runtime.runtime.enqueueTask(task.prompt, task.title);
+    const taskId = await runtime.runtime.enqueueTask(finalPrompt, task.title);
     runtime.activeTaskId = taskId;
     const now = Date.now();
     const metadata = this.buildTaskMetadata(task.metadata, runtime.contextPackKey);
@@ -349,6 +411,7 @@ export class CoworkTaskRuntime {
       eventQueue: Promise.resolve(),
       unsubscribeQueue: noop,
       unsubscribeOrchestrator: noop,
+      ghostAgent: undefined,
     };
   }
 
