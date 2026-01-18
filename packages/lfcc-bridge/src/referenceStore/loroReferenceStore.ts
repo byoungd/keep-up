@@ -11,7 +11,7 @@ import type {
   ReferenceStore,
   ReferenceStoreFrontier,
 } from "@ku0/core";
-import { documentId } from "@ku0/core";
+import { documentId, stableStringify } from "@ku0/core";
 import { type LoroFrontiers, LoroList, LoroMap, type LoroRuntime } from "../runtime/loroRuntime";
 
 const REF_STORE_VERSION = "1.0";
@@ -56,6 +56,27 @@ type ReferenceAuditEvent = {
   reason?: string;
 };
 
+function serializeRecordForIdempotency(record: CrossDocReferenceRecord): string {
+  const source: CrossDocReferenceRecord["source"] = {
+    doc_id: record.source.doc_id,
+    block_id: record.source.block_id,
+    start: record.source.start,
+    end: record.source.end,
+    ...(typeof record.source.if_match_context_hash === "string"
+      ? { if_match_context_hash: record.source.if_match_context_hash }
+      : {}),
+  };
+  return stableStringify({
+    ref_id: record.ref_id,
+    ref_type: record.ref_type,
+    source,
+    target: record.target,
+    created_at_ms: record.created_at_ms,
+    created_by: record.created_by,
+    v: record.v,
+  });
+}
+
 export class LoroReferenceStore implements ReferenceStore {
   private readonly runtime: LoroRuntime;
   private readonly policyDomainId: string;
@@ -74,6 +95,14 @@ export class LoroReferenceStore implements ReferenceStore {
     if (existing) {
       const existingRecord = parseRecord(existing.get("record"));
       if (existingRecord?.created_by.request_id === record.created_by.request_id) {
+        const existingHash = serializeRecordForIdempotency(existingRecord);
+        const incomingHash = serializeRecordForIdempotency(record);
+        if (existingHash !== incomingHash) {
+          throw new ReferenceStoreError(
+            "REF_ALREADY_EXISTS",
+            `Reference already exists with different content: ${record.ref_id}`
+          );
+        }
         return Promise.resolve();
       }
       throw new ReferenceStoreError(
