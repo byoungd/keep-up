@@ -289,12 +289,22 @@ export function resolveToolExecutionContext(
     1,
     overrides?.maxParallel ?? security.limits.maxConcurrentCalls ?? 5
   );
+  const approvalTimeoutMs = overrides?.approvalTimeoutMs;
+  const nodeCache = overrides?.nodeCache
+    ? {
+        enabled: overrides.nodeCache.enabled,
+        ttlMs: overrides.nodeCache.ttlMs,
+        includePolicyContext: overrides.nodeCache.includePolicyContext,
+      }
+    : { enabled: false };
 
   return {
     policy,
     allowedTools,
     requiresApproval,
     maxParallel,
+    approvalTimeoutMs,
+    nodeCache,
   };
 }
 
@@ -672,3 +682,23 @@ export function createSecurityPolicy(preset: SecurityPreset): SecurityPolicy {
 export function securityPolicy(): SecurityPolicyBuilder {
   return new SecurityPolicyBuilder();
 }
+
+export {
+  type ApprovalDecision,
+  type ApprovalHandler,
+  type ApprovalKind,
+  ApprovalManager,
+  type ApprovalRecord,
+  type ApprovalRequestOptions,
+  type ApprovalStatus,
+} from "./approvalManager";
+export {
+  DEFAULT_PROMPT_INJECTION_POLICY,
+  DefaultPromptInjectionGuard,
+  type PromptInjectionAssessment,
+  type PromptInjectionGuard,
+  type PromptInjectionGuardResult,
+  type PromptInjectionPolicy,
+  type PromptInjectionRisk,
+  shouldBlockPromptInjection,
+} from "./promptInjection";

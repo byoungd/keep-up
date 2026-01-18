@@ -45,6 +45,7 @@
     "@ku0/core": "workspace:*",
     "@ku0/db": "workspace:*",
     "@ku0/tool-lsp": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.25.2",
     "@openai/agents": "^0.3.9",
     "chokidar": "^5.0.0",
     "dockerode": "^4.0.0",

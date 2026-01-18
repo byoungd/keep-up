@@ -5,6 +5,14 @@
  */
 
 export {
+  type A2AAdapterOptions,
+  A2ACapabilityRegistry,
+  type A2AEnvelope,
+  A2AMessageBusAdapter,
+  type A2AMessageType,
+  type A2ARequestHandler,
+} from "./a2a";
+export {
   type AgentEvents,
   type ArtifactEvents,
   createEventBus,
