@@ -164,11 +164,12 @@ export class EventStreamPublisher {
     });
   }
 
-  publishSessionUsageUpdated(data: { sessionId: string; usage: TokenUsageStats }) {
+  publishSessionUsageUpdated(data: { sessionId: string; usage: TokenUsageStats; cost?: number }) {
     this.events.publish(data.sessionId, COWORK_EVENTS.SESSION_USAGE_UPDATED, {
       inputTokens: data.usage.inputTokens,
       outputTokens: data.usage.outputTokens,
       totalTokens: data.usage.totalTokens,
+      totalCostUsd: data.cost,
     });
   }
 

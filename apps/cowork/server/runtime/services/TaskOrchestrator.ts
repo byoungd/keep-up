@@ -27,8 +27,11 @@ type PlanStep = {
   status: "pending" | "in_progress" | "completed" | "failed";
 };
 
+import { CostTrackerService } from "../../services/CostTrackerService";
+
 export class TaskOrchestrator {
   private taskWriteQueue: Promise<void> = Promise.resolve();
+  private readonly costTracker = new CostTrackerService();
 
   constructor(
     private readonly taskStore: TaskStoreLike,
@@ -172,7 +175,8 @@ export class TaskOrchestrator {
   async handleOrchestratorEvent(
     sessionId: string,
     activeTaskId: string | null,
-    event: { type: string; data: unknown }
+    event: { type: string; data: unknown },
+    context?: { modelId?: string; providerId?: string }
   ): Promise<void> {
     switch (event.type) {
       case "thinking":

@@ -67,7 +67,9 @@ export interface CoworkEventPayloads {
     inputTokens: number;
     outputTokens: number;
     totalTokens: number;
+    totalCostUsd?: number;
   };
+
   [COWORK_EVENTS.TOKEN_USAGE]: {
     messageId?: string;
     taskId?: string;

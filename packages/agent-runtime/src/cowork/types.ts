@@ -152,4 +152,24 @@ export interface CoworkWorkflowTemplate {
   lastUsedSessionId?: string;
 }
 
-export { type WorkflowTemplate, type WorkflowContext, type WorkflowPhase };
+export interface CoworkTokenUsage {
+  messageId?: string;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  estimatedCostUsd: number;
+  modelId: string;
+  providerId: string;
+  timestamp: number;
+}
+
+export interface CoworkSessionCostSummary {
+  sessionId: string;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalCostUsd: number;
+  messageCount: number;
+  byModel: Record<string, CoworkTokenUsage>;
+}
+
+export type { WorkflowTemplate, WorkflowContext, WorkflowPhase };
