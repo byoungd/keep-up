@@ -172,7 +172,7 @@ export class SOPExecutor implements ISOPExecutor {
    * @throws NoMorePhasesError if already in the final phase
    */
   async advancePhase(): Promise<void> {
-    if (this.phaseIndex >= this.role.phases.length - 1) {
+    if (this.phaseIndex >= this.role.phases.length) {
       throw new NoMorePhasesError(this.role.name);
     }
 
@@ -193,7 +193,7 @@ export class SOPExecutor implements ISOPExecutor {
    * Check if all phases are complete.
    */
   isComplete(): boolean {
-    return this.phaseIndex >= this.role.phases.length - 1;
+    return this.phaseIndex >= this.role.phases.length;
   }
 
   /**

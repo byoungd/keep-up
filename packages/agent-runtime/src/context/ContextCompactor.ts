@@ -171,7 +171,7 @@ export class ContextCompactor {
    */
   getMessagesToPreserve(
     messages: Message[],
-    _currentTurnToolResults: ToolResult[] = []
+    currentTurnToolResults: ToolResult[] = []
   ): { preserved: Message[]; toSummarize: Message[] } {
     const preserveCount = this.contextConfig.preserveLastN;
 
@@ -196,7 +196,33 @@ export class ContextCompactor {
     // Messages to summarize (everything before)
     const toSummarize = messages.slice(0, firstPreservedIndex);
 
-    return { preserved, toSummarize };
+    if (currentTurnToolResults.length === 0) {
+      return { preserved, toSummarize };
+    }
+
+    const updatedPreserved = [...preserved];
+    if (updatedPreserved.length === 0) {
+      updatedPreserved.push({
+        role: "assistant",
+        content: "",
+        toolResults: currentTurnToolResults,
+      });
+      return { preserved: updatedPreserved, toSummarize };
+    }
+
+    const lastIndex = updatedPreserved.length - 1;
+    const lastMessage = updatedPreserved[lastIndex];
+    const mergedToolResults = this.mergeToolResults(
+      lastMessage.toolResults ?? [],
+      currentTurnToolResults
+    );
+
+    updatedPreserved[lastIndex] = {
+      ...lastMessage,
+      toolResults: mergedToolResults,
+    };
+
+    return { preserved: updatedPreserved, toSummarize };
   }
 
   /**
@@ -310,6 +336,22 @@ Do NOT include redundant tool outputs or verbose explanations.`;
       }
     }
     return total;
+  }
+
+  private mergeToolResults(existing: ToolResult[], incoming: ToolResult[]): ToolResult[] {
+    if (incoming.length === 0) {
+      return existing;
+    }
+
+    const merged = new Map<string, ToolResult>();
+    for (const result of existing) {
+      merged.set(result.callId, result);
+    }
+    for (const result of incoming) {
+      merged.set(result.callId, result);
+    }
+
+    return Array.from(merged.values());
   }
 
   /**

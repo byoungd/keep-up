@@ -122,6 +122,30 @@ describe("ContextCompactor", () => {
       expect(toSummarize.length).toBe(2); // Old Q&A
       expect(preserved.length).toBe(2); // Recent Q&A
     });
+
+    it("should preserve current turn tool results", () => {
+      const compactor = new ContextCompactor({
+        contextConfig: {
+          maxTokens: 10000,
+          compressionThreshold: 0.8,
+          preserveLastN: 1,
+          compressionStrategy: "hybrid",
+        },
+      });
+
+      const messages: Message[] = [
+        { role: "user", content: "Old question" },
+        { role: "assistant", content: "Old answer" },
+        { role: "user", content: "Recent question" },
+        { role: "assistant", content: "Recent answer" },
+      ];
+
+      const currentToolResults = [{ callId: "tool-1", result: { ok: true } }];
+      const { preserved } = compactor.getMessagesToPreserve(messages, currentToolResults);
+
+      const last = preserved[preserved.length - 1];
+      expect(last.toolResults).toEqual(currentToolResults);
+    });
   });
 
   describe("needsCompaction", () => {

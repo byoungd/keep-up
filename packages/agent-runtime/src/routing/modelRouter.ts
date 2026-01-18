@@ -102,7 +102,7 @@ export class ModelRouter {
         requested: requestedModel,
         resolved: decision.modelId,
         reason: decision.reason,
-        policy,
+        policy: decision.policy,
       };
 
       // Emit for observability

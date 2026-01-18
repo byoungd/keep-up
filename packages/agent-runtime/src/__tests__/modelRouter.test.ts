@@ -91,6 +91,31 @@ describe("ModelRouter", () => {
       expect(decision.policy).toBe("cost");
     });
 
+    it("uses policy from matched rule when provided", () => {
+      const router = createModelRouter({
+        defaultModel: "small",
+        defaultBudget: { maxTokens: 500 },
+        rules: [
+          {
+            id: "force-cost",
+            match: () => true,
+            modelId: "small",
+            reason: "cost-optimized",
+            policy: "cost",
+          },
+        ],
+      });
+
+      const decision = router.resolveForTurn({
+        taskType: "summary",
+        risk: "low",
+        budget: { maxTokens: 1000 },
+        policy: "quality",
+      });
+
+      expect(decision.policy).toBe("cost");
+    });
+
     it("supports phase-aware routing", () => {
       const router = createModelRouter({
         defaultModel: "small",
