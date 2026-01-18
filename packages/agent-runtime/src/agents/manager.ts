@@ -11,7 +11,7 @@ import { createSecurityPolicy } from "../security";
 import { createSessionState, type SessionState } from "../session";
 import type { TelemetryContext } from "../telemetry";
 import type { IToolRegistry } from "../tools/mcp/registry";
-import type { SecurityPolicy } from "../types";
+import type { AgentMessage, MCPToolCall, SecurityPolicy } from "../types";
 import { AGENT_PROFILES, getAgentProfile, listAgentTypes } from "./profiles";
 import type {
   AgentManagerConfig,
@@ -458,15 +458,48 @@ export class AgentManager implements IAgentManager {
     return toolName === "complete_task" || toolName.endsWith(":complete_task");
   }
 
-  private extractOutput(messages: { role: string; content?: string }[]): string {
-    // Get the last assistant message as output
+  private extractOutput(messages: AgentMessage[]): string {
+    // Get the last assistant message as output.
     for (let i = messages.length - 1; i >= 0; i--) {
       const msg = messages[i];
-      if (msg.role === "assistant" && msg.content) {
-        return msg.content;
+      if (msg.role === "assistant") {
+        const content = msg.content.trim();
+        if (content.length > 0) {
+          return msg.content;
+        }
       }
     }
-    return "";
+
+    const completionSummary = this.extractCompletionSummary(messages);
+    return completionSummary ?? "";
+  }
+
+  private extractCompletionSummary(messages: AgentMessage[]): string | null {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      if (msg.role !== "assistant" || !msg.toolCalls) {
+        continue;
+      }
+      for (const call of msg.toolCalls) {
+        if (!this.isCompletionToolName(call.name)) {
+          continue;
+        }
+        const summary = this.extractCompletionSummaryFromCall(call);
+        if (summary) {
+          return summary;
+        }
+      }
+    }
+    return null;
+  }
+
+  private extractCompletionSummaryFromCall(call: MCPToolCall): string | null {
+    const summaryValue = call.arguments.summary;
+    if (typeof summaryValue !== "string") {
+      return null;
+    }
+    const trimmed = summaryValue.trim();
+    return trimmed.length > 0 ? trimmed : null;
   }
 }
 

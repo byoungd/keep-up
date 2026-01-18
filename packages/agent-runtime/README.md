@@ -55,6 +55,7 @@ import {
   createMem0MemoryAdapter,
   createToolRegistry,
   createBashToolServer,
+  createCompletionToolServer,
   createFileToolServer,
   createRuntimeLogger
 } from '@ku0/agent-runtime';
@@ -70,6 +71,7 @@ const memory = createMem0MemoryAdapter({
 // 3. Create tool registry
 const registry = createToolRegistry();
 await registry.register(createBashToolServer());
+await registry.register(createCompletionToolServer());
 await registry.register(createFileToolServer());
 
 // 4. Create Orchestrator (OpenAI Agents SDK)

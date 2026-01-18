@@ -65,13 +65,21 @@ export function extractResultContent(data: Record<string, unknown> | undefined):
     if (content) {
       return content;
     }
+    const completionSummary = extractCompletionSummary(result.messages);
+    if (completionSummary) {
+      return completionSummary;
+    }
   }
 
   const state = result.state;
   if (!isRecord(state) || !Array.isArray(state.messages)) {
     return null;
   }
-  return extractAssistantMessage(state.messages);
+  const stateContent = extractAssistantMessage(state.messages);
+  if (stateContent) {
+    return stateContent;
+  }
+  return extractCompletionSummary(state.messages);
 }
 
 /**
@@ -116,6 +124,63 @@ function extractMessageContent(content: unknown): string | null {
     }
   }
   return null;
+}
+
+function extractCompletionSummary(messages: unknown[]): string | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const summary = extractSummaryFromMessage(messages[i]);
+    if (summary) {
+      return summary;
+    }
+  }
+  return null;
+}
+
+function extractSummaryFromMessage(message: unknown): string | null {
+  if (!isRecord(message) || message.role !== "assistant") {
+    return null;
+  }
+  const toolCalls = message.toolCalls;
+  if (!Array.isArray(toolCalls)) {
+    return null;
+  }
+  return extractSummaryFromToolCalls(toolCalls);
+}
+
+function extractSummaryFromToolCalls(toolCalls: unknown[]): string | null {
+  for (const toolCall of toolCalls) {
+    const summary = extractSummaryFromToolCall(toolCall);
+    if (summary) {
+      return summary;
+    }
+  }
+  return null;
+}
+
+function extractSummaryFromToolCall(toolCall: unknown): string | null {
+  if (!isRecord(toolCall) || typeof toolCall.name !== "string") {
+    return null;
+  }
+  if (!isCompletionToolName(toolCall.name)) {
+    return null;
+  }
+  const args = toolCall.arguments;
+  if (!isRecord(args)) {
+    return null;
+  }
+  return normalizeSummary(args.summary);
+}
+
+function normalizeSummary(summary: unknown): string | null {
+  if (typeof summary !== "string") {
+    return null;
+  }
+  const trimmed = summary.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function isCompletionToolName(toolName: string): boolean {
+  return toolName === "complete_task" || toolName.endsWith(":complete_task");
 }
 
 /**
