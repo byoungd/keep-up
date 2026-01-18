@@ -3,6 +3,7 @@
  *
  * Implements context compaction strategies to handle long-horizon tasks.
  * Based on Anthropic's context engineering best practices.
+ * Implements spec 5.11: Context Management Contract.
  *
  * @see https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents
  */
@@ -42,6 +43,20 @@ export interface ToolResult {
 }
 
 /**
+ * Context management configuration per spec 5.11.
+ */
+export interface ContextManagementConfig {
+  /** Model's context limit (tokens) */
+  maxTokens: number;
+  /** Percentage threshold to trigger compression (0.8 = 80%) */
+  compressionThreshold: number;
+  /** Number of user messages to preserve after compression */
+  preserveLastN: number;
+  /** Compression strategy */
+  compressionStrategy: "summarize" | "truncate" | "hybrid";
+}
+
+/**
  * Compaction options.
  */
 export interface CompactionOptions {
@@ -53,6 +68,8 @@ export interface CompactionOptions {
   preserveToolInputs?: boolean;
   /** Maximum age of tool results to keep in full (in turns) */
   maxToolResultAge?: number;
+  /** Context management config per spec 5.11 */
+  contextConfig?: ContextManagementConfig;
 }
 
 /**
@@ -69,6 +86,24 @@ export interface CompactionResult {
   messagesAfter: number;
   /** Estimated tokens saved */
   tokensSaved?: number;
+  /** Original messages preserved for checkpoint */
+  originalMessages?: Message[];
+}
+
+/**
+ * Threshold check result.
+ */
+export interface ThresholdCheckResult {
+  /** Whether compression is needed */
+  needsCompression: boolean;
+  /** Current token count */
+  currentTokens: number;
+  /** Token limit */
+  maxTokens: number;
+  /** Current usage percentage */
+  usagePercent: number;
+  /** Threshold percentage */
+  thresholdPercent: number;
 }
 
 // ============================================================================
@@ -77,16 +112,48 @@ export interface CompactionResult {
 
 /**
  * Compacts conversation history to manage context window limits.
+ * Implements spec 5.11: Context Management Contract.
  */
 export class ContextCompactor {
-  private readonly options: Required<CompactionOptions>;
+  private readonly options: Required<Omit<CompactionOptions, "contextConfig">>;
+  private readonly contextConfig: ContextManagementConfig;
 
   constructor(options: CompactionOptions = {}) {
+    // Default context config per spec 5.11
+    const defaultContextConfig: ContextManagementConfig = {
+      maxTokens: 128000, // Default for modern models
+      compressionThreshold: 0.8, // 80% as per spec
+      preserveLastN: 5,
+      compressionStrategy: "hybrid",
+    };
+
+    this.contextConfig = options.contextConfig ?? defaultContextConfig;
     this.options = {
-      targetThreshold: options.targetThreshold ?? 20000,
-      maxMessagesToKeep: options.maxMessagesToKeep ?? 5,
+      targetThreshold:
+        options.targetThreshold ??
+        Math.floor(this.contextConfig.maxTokens * this.contextConfig.compressionThreshold),
+      maxMessagesToKeep: options.maxMessagesToKeep ?? this.contextConfig.preserveLastN,
       preserveToolInputs: options.preserveToolInputs ?? true,
       maxToolResultAge: options.maxToolResultAge ?? 3,
+    };
+  }
+
+  /**
+   * Check if compression is needed based on threshold (spec 5.11).
+   * Triggers when tokens exceed threshold (default: 80% of limit).
+   */
+  checkThreshold(messages: Message[], systemPrompt?: string): ThresholdCheckResult {
+    const systemTokens = systemPrompt ? countTokens(systemPrompt) : 0;
+    const messageTokens = this.estimateTokens(messages);
+    const currentTokens = systemTokens + messageTokens;
+    const usagePercent = currentTokens / this.contextConfig.maxTokens;
+
+    return {
+      needsCompression: usagePercent >= this.contextConfig.compressionThreshold,
+      currentTokens,
+      maxTokens: this.contextConfig.maxTokens,
+      usagePercent,
+      thresholdPercent: this.contextConfig.compressionThreshold,
     };
   }
 
@@ -96,6 +163,40 @@ export class ContextCompactor {
   needsCompaction(messages: Message[]): boolean {
     const estimatedTokens = this.estimateTokens(messages);
     return estimatedTokens > this.options.targetThreshold;
+  }
+
+  /**
+   * Get messages to preserve per spec 5.11.
+   * Preserves: system prompt (handled separately), last N user messages, current turn tool results.
+   */
+  getMessagesToPreserve(
+    messages: Message[],
+    _currentTurnToolResults: ToolResult[] = []
+  ): { preserved: Message[]; toSummarize: Message[] } {
+    const preserveCount = this.contextConfig.preserveLastN;
+
+    // Find last N user messages and their responses
+    const lastUserMessageIndices: number[] = [];
+    for (
+      let i = messages.length - 1;
+      i >= 0 && lastUserMessageIndices.length < preserveCount;
+      i--
+    ) {
+      if (messages[i].role === "user") {
+        lastUserMessageIndices.unshift(i);
+      }
+    }
+
+    const firstPreservedIndex =
+      lastUserMessageIndices.length > 0 ? lastUserMessageIndices[0] : messages.length;
+
+    // Messages to preserve (from first preserved user message to end)
+    const preserved = messages.slice(firstPreservedIndex);
+
+    // Messages to summarize (everything before)
+    const toSummarize = messages.slice(0, firstPreservedIndex);
+
+    return { preserved, toSummarize };
   }
 
   /**

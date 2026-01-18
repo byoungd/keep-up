@@ -10,8 +10,10 @@ export {
   type CompactionOptions,
   type CompactionResult,
   ContextCompactor,
+  type ContextManagementConfig,
   createContextCompactor,
   type Message,
+  type ThresholdCheckResult,
   type ToolCall,
   type ToolResult,
 } from "./ContextCompactor";
