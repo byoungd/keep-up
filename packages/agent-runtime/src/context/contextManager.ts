@@ -569,7 +569,6 @@ export class ContextManager {
 
     const snapshot = this.cloneContext(parent);
     this.applyOverlayToContext(snapshot, view);
-
     // Allow overwriting read-only properties for view resolution
     const mutableSnapshot = snapshot as { -readonly [K in keyof AgentContext]: AgentContext[K] };
     mutableSnapshot.id = view.id;

@@ -5,10 +5,8 @@
  * Supports wildcard subscriptions, async handlers, and event replay.
  */
 
-import { getLogger } from "../logging/logger.js";
+import { getLogger, type Logger } from "../logging/logger.js";
 import type { ArtifactEnvelope, ExecutionDecision, ToolExecutionRecord } from "../types";
-
-const logger = getLogger("event-bus");
 
 // ============================================================================
 // Types
@@ -134,6 +132,9 @@ export interface EventBusConfig {
 
   /** Maximum concurrent handlers */
   maxConcurrentHandlers?: number;
+
+  /** Logger override */
+  logger?: Logger;
 }
 
 /** Event bus statistics */
@@ -248,7 +249,8 @@ export interface RuntimeEventMap
 export class EventBus {
   private readonly subscriptions = new Map<string, SubscriptionRecord[]>();
   private readonly history: RuntimeEvent[] = [];
-  private readonly config: Required<EventBusConfig>;
+  private readonly config: Required<Omit<EventBusConfig, "logger">>;
+  private readonly logger: Logger;
 
   private subscriptionIdCounter = 0;
   private totalEmitted = 0;
@@ -256,6 +258,7 @@ export class EventBus {
   private pendingHandlers = 0;
 
   constructor(config: EventBusConfig = {}) {
+    this.logger = config.logger ?? getLogger("event-bus");
     this.config = {
       maxHistorySize: config.maxHistorySize ?? 1000,
       historyTtlMs: config.historyTtlMs ?? 5 * 60 * 1000, // 5 minutes
@@ -536,7 +539,7 @@ export class EventBus {
       if (result instanceof Promise) {
         result
           .catch((error) => {
-            logger.error(`Handler error for ${event.type}`, error as Error, {
+            this.logger.error(`Handler error for ${event.type}`, error as Error, {
               eventType: event.type,
               pattern: record.pattern,
             });
@@ -549,7 +552,7 @@ export class EventBus {
       }
     } catch (error) {
       this.pendingHandlers--;
-      logger.error(`Handler error for ${event.type}`, error as Error, {
+      this.logger.error(`Handler error for ${event.type}`, error as Error, {
         eventType: event.type,
         pattern: record.pattern,
       });

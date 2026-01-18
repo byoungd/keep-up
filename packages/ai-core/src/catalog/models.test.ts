@@ -19,11 +19,11 @@ describe("normalizeModelId", () => {
     expect(normalizeModelId("gemini-3.0-pro")).toBe("gemini-3-pro-high");
     expect(normalizeModelId("gemini-3-pro")).toBe("gemini-3-pro-high");
     expect(normalizeModelId("gpt-5")).toBe("gpt-5.2-auto");
-    expect(normalizeModelId("gpt-5.1")).toBe("gpt-5.1-pro");
+    expect(normalizeModelId("gpt-5.1")).toBe("gpt-5.2-auto");
   });
 
   test("trims input and preserves unknown ids", () => {
-    expect(normalizeModelId(" gpt-5.1 ")).toBe("gpt-5.1-pro");
+    expect(normalizeModelId(" gpt-5.1 ")).toBe("gpt-5.2-auto");
     expect(normalizeModelId("unknown-model")).toBe("unknown-model");
   });
 

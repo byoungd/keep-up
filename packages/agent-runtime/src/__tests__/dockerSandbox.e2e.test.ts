@@ -5,6 +5,7 @@ import { join } from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { RuntimeAssetManager } from "../assets/runtimeAssetManager";
 import { DockerSandboxManager } from "../sandbox/sandboxManager";
 import { SandboxToolServer } from "../tools/sandbox/sandboxToolServer";
 import type { ToolContext } from "../types";
@@ -43,14 +44,22 @@ function createContext(sessionId = "session-docker-e2e"): ToolContext {
 
 describeIf("DockerSandboxManager (e2e)", () => {
   let workspaceDir = "";
+  let assetCacheDir = "";
   let manager: DockerSandboxManager;
+  let assetManager: RuntimeAssetManager;
   let server: SandboxToolServer;
 
   beforeAll(async () => {
     workspaceDir = await mkdtemp(join(tmpdir(), "cowork-docker-e2e-"));
+    assetCacheDir = await mkdtemp(join(tmpdir(), "cowork-docker-assets-"));
+    assetManager = new RuntimeAssetManager({
+      cacheDir: assetCacheDir,
+      docker: { pullOnDemand: true },
+    });
     manager = new DockerSandboxManager({
       workspacePath: workspaceDir,
       image: "node:20-alpine",
+      assetManager,
     });
     server = new SandboxToolServer({ manager });
   });
@@ -61,6 +70,9 @@ describeIf("DockerSandboxManager (e2e)", () => {
     }
     if (workspaceDir) {
       await rm(workspaceDir, { recursive: true, force: true });
+    }
+    if (assetCacheDir) {
+      await rm(assetCacheDir, { recursive: true, force: true });
     }
   });
 
@@ -97,5 +109,5 @@ describeIf("DockerSandboxManager (e2e)", () => {
       context
     );
     expect(destroyResult.success).toBe(true);
-  });
+  }, 30_000);
 });

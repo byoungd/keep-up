@@ -11,7 +11,6 @@
  * - Multiple export formats (OTLP, Jaeger, Zipkin)
  * - Automatic instrumentation hooks
  */
-
 import { ConsoleLogger, type Span, type Tracer } from "../resilience/observability";
 
 // ============================================================================
