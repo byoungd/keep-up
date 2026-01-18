@@ -95,6 +95,8 @@ export class ModelRouter {
   resolveForTurn(request: ModelRoutingRequest): ModelRoutingDecision {
     const requestedModel = request.preferredModels?.[0] ?? this.config.defaultModel;
     const policy = request.policy ?? this.defaultPolicy;
+    const defaultWithinBudget =
+      this.config.defaultBudget.maxTokens <= (request.budget?.maxTokens ?? Number.MAX_SAFE_INTEGER);
 
     try {
       const decision = this.route(request);
@@ -111,10 +113,13 @@ export class ModelRouter {
       return routingDecision;
     } catch {
       // Fallback on routing failure per spec 5.7
+      const resolvedModel = defaultWithinBudget ? this.config.defaultModel : requestedModel;
       const fallbackDecision: ModelRoutingDecision = {
         requested: requestedModel,
-        resolved: this.config.defaultModel,
-        reason: "fallback due to routing failure",
+        resolved: resolvedModel,
+        reason: defaultWithinBudget
+          ? "fallback to default model after routing failure"
+          : "fallback to requested model; default exceeded budget",
         policy,
       };
 

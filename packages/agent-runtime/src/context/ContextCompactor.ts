@@ -9,7 +9,7 @@
  */
 
 import { countTokens } from "../utils/tokenCounter";
-import type { AgentContext, ContextManager } from "./contextManager.js";
+import type { AgentContext, ContextManager } from "./contextManager";
 
 // ============================================================================
 // Types

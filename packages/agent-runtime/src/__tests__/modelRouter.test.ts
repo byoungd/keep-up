@@ -167,8 +167,39 @@ describe("ModelRouter", () => {
       });
 
       expect(decision.resolved).toBe("fallback-model");
-      expect(decision.reason).toBe("fallback due to routing failure");
+      expect(decision.reason).toBe("fallback to requested model; default exceeded budget");
       expect(emittedDecisions).toHaveLength(1);
+    });
+
+    it("falls back to requested model when default exceeds budget", () => {
+      const emittedDecisions: ModelRoutingDecision[] = [];
+      const router = createModelRouter({
+        defaultModel: "expensive-default",
+        defaultBudget: { maxTokens: 4000 },
+        rules: [
+          {
+            id: "error-rule",
+            match: () => {
+              throw new Error("Routing error");
+            },
+            modelId: "unreachable",
+            reason: "should not reach",
+          },
+        ],
+        onRoutingDecision: (decision) => emittedDecisions.push(decision),
+      });
+
+      const decision = router.resolveForTurn({
+        taskType: "test",
+        risk: "low",
+        budget: { maxTokens: 500 },
+        preferredModels: ["budget-safe"],
+      });
+
+      expect(decision.resolved).toBe("budget-safe");
+      expect(decision.reason).toBe("fallback to requested model; default exceeded budget");
+      expect(emittedDecisions).toHaveLength(1);
+      expect(emittedDecisions[0]).toEqual(decision);
     });
   });
 
