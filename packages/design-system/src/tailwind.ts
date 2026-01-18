@@ -9,6 +9,18 @@ export const sharedThemeExtend: ThemeExtend = {
     ring: "var(--color-ring)",
     background: "var(--color-background)",
     foreground: "var(--color-foreground)",
+
+    /* Frame & Layout (v3) */
+    theme: {
+      DEFAULT: "var(--color-theme-base)",
+    },
+    sidebar: {
+      DEFAULT: "var(--color-sidebar)",
+    },
+    canvas: {
+      DEFAULT: "var(--color-canvas)",
+    },
+
     primary: {
       DEFAULT: "var(--color-primary)",
       foreground: "var(--color-primary-foreground)",
@@ -50,6 +62,7 @@ export const sharedThemeExtend: ThemeExtend = {
       indigo: "var(--color-accent-indigo)",
       cyan: "var(--color-accent-cyan)",
       rose: "var(--color-accent-rose)",
+      ai: "var(--color-accent-ai)",
     },
     popover: {
       DEFAULT: "var(--color-popover)",
@@ -78,7 +91,6 @@ export const sharedThemeExtend: ThemeExtend = {
   },
   boxShadow: {
     soft: "var(--shadow-soft)",
-    glow: "var(--shadow-glow)",
   },
   transitionDuration: {
     fast: "var(--duration-fast)",

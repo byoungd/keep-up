@@ -88,7 +88,7 @@ export const SidebarHeader = React.memo(function SidebarHeader({
           size="sm"
           className={cn(
             "w-full justify-start gap-3 h-8 px-3",
-            "bg-background hover:bg-surface-2 text-muted-foreground hover:text-foreground",
+            "bg-canvas hover:bg-surface-2 text-muted-foreground hover:text-foreground",
             "border-border/50 shadow-xs"
           )}
           onClick={handleSearch}

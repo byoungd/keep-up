@@ -80,7 +80,7 @@ export const ResizableThreePaneLayout = React.forwardRef<
 
     return (
       <div
-        className="flex flex-col h-full w-full bg-background overflow-hidden"
+        className="flex flex-col h-full w-full bg-canvas overflow-hidden"
         suppressHydrationWarning
       >
         {nav && <div className="flex-none z-20">{nav}</div>}
@@ -94,7 +94,7 @@ export const ResizableThreePaneLayout = React.forwardRef<
           <div
             className={cn(
               "h-full shrink-0 overflow-hidden",
-              "bg-surface-1",
+              "bg-sidebar",
               leftWidth > 0 && "border-r border-border/40",
               !isDragging && "transition-[width] duration-200 ease-out"
             )}
@@ -125,10 +125,10 @@ export const ResizableThreePaneLayout = React.forwardRef<
           )}
 
           {/* CENTER PANEL */}
-          <div className="h-full flex-1 min-w-0 bg-background z-10 relative overflow-hidden">
+          <div className="h-full flex-1 min-w-0 bg-canvas z-10 relative overflow-hidden">
             <div
               className={cn(
-                "h-full w-full overflow-auto bg-background scroll-smooth",
+                "h-full w-full overflow-auto bg-canvas scroll-smooth",
                 centerPanelClassName
               )}
             >
@@ -153,7 +153,7 @@ export const ResizableThreePaneLayout = React.forwardRef<
               <div
                 className={cn(
                   "h-full shrink-0 overflow-hidden",
-                  "bg-surface-1 border-l border-border/40",
+                  "bg-sidebar border-l border-border/40",
                   !isDragging && "transition-[width] duration-200 ease-out"
                 )}
                 style={{ width: `${rightWidth}${unitSuffix}` }}

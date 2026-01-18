@@ -12,7 +12,7 @@ export function AppHeader() {
   return (
     <header className="glass-panel shell-header">
       <div className="flex items-center gap-3">
-        <div className="h-9 w-9 rounded-full bg-[radial-gradient(circle_at_top,#34d399,transparent_60%)] shadow-glow" />
+        <div className="h-9 w-9 rounded-full bg-[radial-gradient(circle_at_top,var(--color-accent-emerald),transparent_60%)] shadow-sm" />
       </div>
       <div className="flex items-center gap-3">
         <span

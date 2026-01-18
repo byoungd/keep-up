@@ -12,24 +12,8 @@ const config: Config = {
   safelist: ["fixed", "inset-0"],
   theme: {
     extend: {
-      animation: {
-        shine: "shine 8s ease-in-out infinite",
-        "pulse-spring": "pulse-spring 1.8s ease-in-out infinite",
-      },
-      keyframes: {
-        shine: {
-          from: { backgroundPosition: "200% 0" },
-          to: { backgroundPosition: "-200% 0" },
-        },
-        "pulse-spring": {
-          "0%, 100%": { transform: "scale(0.85)" },
-          "15%": { transform: "scale(1.15)" },
-          "25%": { transform: "scale(0.95)" },
-          "35%": { transform: "scale(1.05)" },
-          "45%": { transform: "scale(0.98)" },
-          "60%": { transform: "scale(1)" },
-        },
-      },
+      // Local animations removed to enforce Novelty Budget
+      // Use Design System standard motion tokens instead
     },
   },
 };

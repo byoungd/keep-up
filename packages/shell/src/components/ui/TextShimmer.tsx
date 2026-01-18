@@ -11,10 +11,8 @@ export function TextShimmer({ children, className, duration = 2, ...props }: Tex
   return (
     <span
       className={cn(
-        // Shimmer effect that respects theme foreground color
-        // Light mode: black -> grey -> black
-        // Dark mode: white -> grey -> white
-        "inline-flex animate-shine bg-[linear-gradient(110deg,#000000,45%,#9ca3af,55%,#000000)] bg-[length:200%_100%] bg-clip-text text-transparent dark:bg-[linear-gradient(110deg,#ffffff,45%,#a1a1aa,55%,#ffffff)]",
+        // Shimmer effect derived from theme tokens.
+        "inline-flex animate-shine bg-[linear-gradient(110deg,var(--color-foreground),45%,var(--color-muted-foreground),55%,var(--color-foreground))] bg-[length:200%_100%] bg-clip-text text-transparent",
         className
       )}
       style={{
