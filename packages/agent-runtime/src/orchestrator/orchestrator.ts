@@ -33,6 +33,7 @@ import {
 } from "../executor";
 import type { KnowledgeRegistry } from "../knowledge";
 import { AGENTS_GUIDE_PROMPT } from "../prompts/agentGuidelines";
+import type { ModelRouter, ModelRoutingDecision } from "../routing/modelRouter";
 import {
   createAuditLogger,
   createPermissionChecker,
@@ -46,6 +47,7 @@ import { createSkillPromptAdapter } from "../skills/skillPromptAdapter";
 import type { SkillRegistry } from "../skills/skillRegistry";
 import type { SkillSession } from "../skills/skillSession";
 import { createSkillSession } from "../skills/skillSession";
+import type { ISOPExecutor } from "../sop/types";
 import { attachRuntimeEventStreamBridge, type StreamWriter } from "../streaming";
 import { createTaskGraphStore, type TaskGraphStore, type TaskNodeStatus } from "../tasks/taskGraph";
 import type { IMetricsCollector, ITracer, SpanContext, TelemetryContext } from "../telemetry";
@@ -224,6 +226,10 @@ export interface OrchestratorComponents {
   streamBridge?: OrchestratorStreamBridge;
   /** Optional artifact pipeline */
   artifactPipeline?: ArtifactPipeline;
+  /** SOP executor for phase-gated tool filtering (Track E) */
+  sopExecutor?: ISOPExecutor;
+  /** Model router for per-turn model selection (Track F) */
+  modelRouter?: ModelRouter;
 }
 
 export interface OrchestratorStreamBridge {
@@ -284,6 +290,8 @@ export class AgentOrchestrator {
   private readonly taskGraph?: TaskGraphStore;
   private readonly streamBridge?: OrchestratorStreamBridge;
   private readonly artifactPipeline?: ArtifactPipeline;
+  private readonly sopExecutor?: ISOPExecutor;
+  private readonly modelRouter?: ModelRouter;
   private readonly loopStateMachine: AgentLoopStateMachine;
   private readonly singleStepEnforcer: SingleStepEnforcer;
   private lastObservation?: Observation;
@@ -405,6 +413,8 @@ export class AgentOrchestrator {
     this.taskGraph = components.taskGraph;
     this.streamBridge = components.streamBridge;
     this.artifactPipeline = components.artifactPipeline;
+    this.sopExecutor = components.sopExecutor;
+    this.modelRouter = components.modelRouter;
 
     this.turnExecutor = createTurnExecutor({
       llm: this.llm,
@@ -1061,6 +1071,13 @@ export class AgentOrchestrator {
 
     this.startLoopCycle();
 
+    // Model routing (Track F): Resolve model before LLM call
+    const routingDecision = this.resolveModelForTurn();
+    if (routingDecision) {
+      this.emitRoutingDecision(routingDecision);
+      turnSpan?.setAttribute("model.resolved", routingDecision.resolved);
+    }
+
     const outcomePromise = this.turnExecutor.execute(this.state, turnSpan);
     if (!isRecoveryTurn) {
       return await outcomePromise;
@@ -1071,6 +1088,37 @@ export class AgentOrchestrator {
       this.getRecoveryTimeoutMs(),
       "Recovery timed out before completion."
     );
+  }
+
+  private resolveModelForTurn(): ModelRoutingDecision | undefined {
+    if (!this.modelRouter) {
+      return undefined;
+    }
+
+    const phaseContext = this.sopExecutor?.getCurrentPhase();
+    return this.modelRouter.resolveForTurn({
+      taskType: "agent-turn",
+      risk: "medium",
+      budget: { maxTokens: 4096 },
+      phaseContext,
+      turn: this.state.turn,
+    });
+  }
+
+  private emitRoutingDecision(decision: ModelRoutingDecision): void {
+    this.emit("routing:decision" as OrchestratorEventType, {
+      requested: decision.requested,
+      resolved: decision.resolved,
+      reason: decision.reason,
+      policy: decision.policy,
+      turn: this.state.turn,
+    });
+
+    this.eventBus?.emit("routing:decision", decision, {
+      source: "orchestrator",
+      correlationId: this.currentRunId,
+      priority: "normal",
+    });
   }
 
   private ensureRecoveryReady(): void {
@@ -1290,6 +1338,31 @@ export class AgentOrchestrator {
     const result = this.singleStepEnforcer.validate(toolCalls);
     if (!result.valid) {
       throw new Error(result.error ?? "Interactive policy allows a single tool call per turn.");
+    }
+
+    // SOP phase-gated tool filtering (Track E)
+    this.enforceSOPToolFiltering(toolCalls);
+  }
+
+  private enforceSOPToolFiltering(toolCalls: MCPToolCall[]): void {
+    if (!this.sopExecutor) {
+      return;
+    }
+
+    for (const call of toolCalls) {
+      // Always allow completion tools regardless of phase
+      if (this.isCompletionToolName(call.name)) {
+        continue;
+      }
+
+      if (!this.sopExecutor.isToolAllowed(call.name)) {
+        const currentPhase = this.sopExecutor.getCurrentPhase();
+        const allowedTools = this.sopExecutor.getAllowedTools();
+        throw new Error(
+          `SOP violation: Tool "${call.name}" is not allowed in phase "${currentPhase}". ` +
+            `Allowed tools: [${allowedTools.join(", ")}]`
+        );
+      }
     }
   }
 
