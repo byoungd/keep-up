@@ -270,7 +270,7 @@ export function createToolPolicyEngine(checker: IPermissionChecker): ToolPolicyE
   return new PermissionPolicyEngine(checker);
 }
 
-const DEFAULT_EXECUTION_POLICY: ExecutionPolicy = "interactive";
+const DEFAULT_EXECUTION_POLICY: ExecutionPolicy = "batch";
 const DEFAULT_ALLOWED_TOOLS = ["*"];
 const DEFAULT_INTERACTIVE_APPROVAL_TOOLS = ["bash:execute"];
 
@@ -386,7 +386,7 @@ function matchesToolPattern(toolName: string, pattern: string): boolean {
     return true;
   }
   if (normalizedPattern.endsWith(":*")) {
-    const prefix = normalizedPattern.slice(0, -2);
+    const prefix = normalizedPattern.slice(0, -1);
     return normalizedTool.startsWith(prefix);
   }
   return normalizedTool === normalizedPattern;

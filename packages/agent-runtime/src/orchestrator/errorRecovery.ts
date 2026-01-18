@@ -158,7 +158,6 @@ export class ErrorRecoveryEngine {
   private errorHistory: ErrorHistoryEntry[] = [];
   private readonly maxHistorySize = 100;
   private failedActionSignatures = new Set<string>();
-  private errorSignatureCache = new Set<string>();
 
   constructor(strategies: RecoveryStrategy[] = DEFAULT_STRATEGIES) {
     this.strategies = [...strategies];
@@ -195,12 +194,12 @@ export class ErrorRecoveryEngine {
     return `${toolCall.name}::${error.code}::${error.message}`;
   }
 
-  private hasErrorSignature(signature: string): boolean {
-    return this.errorSignatureCache.has(signature);
+  private hasErrorSignature(signature: string, signatures: Set<string>): boolean {
+    return signatures.has(signature);
   }
 
-  private recordErrorSignature(signature: string): void {
-    this.errorSignatureCache.add(signature);
+  private recordErrorSignature(signature: string, signatures: Set<string>): void {
+    signatures.add(signature);
   }
 
   /**
@@ -208,7 +207,6 @@ export class ErrorRecoveryEngine {
    */
   clearFailedActions(): void {
     this.failedActionSignatures.clear();
-    this.errorSignatureCache.clear();
   }
 
   /**
@@ -229,6 +227,7 @@ export class ErrorRecoveryEngine {
   ): Promise<RecoveryResult> {
     const strategy = this.matchStrategy(initialError);
     const category = this.categorizeError(initialError);
+    const errorSignatures = new Set<string>();
 
     // Check if this exact action has already failed (prevent repeating same action)
     const duplicateResult = this.checkDuplicateAction(toolCall, initialError);
@@ -236,7 +235,13 @@ export class ErrorRecoveryEngine {
       return duplicateResult;
     }
 
-    const signatureResult = this.recordInitialFailure(toolCall, initialError, category, strategy);
+    const signatureResult = this.recordInitialFailure(
+      toolCall,
+      initialError,
+      category,
+      strategy,
+      errorSignatures
+    );
     if (signatureResult) {
       return signatureResult;
     }
@@ -249,7 +254,7 @@ export class ErrorRecoveryEngine {
       };
     }
 
-    return this.attemptRecovery(toolCall, initialError, strategy, executor);
+    return this.attemptRecovery(toolCall, initialError, strategy, executor, errorSignatures);
   }
 
   private checkDuplicateAction(
@@ -275,10 +280,11 @@ export class ErrorRecoveryEngine {
     toolCall: MCPToolCall,
     initialError: ToolError,
     category: ErrorCategory,
-    strategy: RecoveryStrategy | undefined
+    strategy: RecoveryStrategy | undefined,
+    errorSignatures: Set<string>
   ): RecoveryResult | null {
     const errorSignature = this.getErrorSignature(toolCall, initialError);
-    const repeatedSignature = this.hasErrorSignature(errorSignature);
+    const repeatedSignature = this.hasErrorSignature(errorSignature, errorSignatures);
 
     this.recordError({
       timestamp: Date.now(),
@@ -298,7 +304,7 @@ export class ErrorRecoveryEngine {
       };
     }
 
-    this.recordErrorSignature(errorSignature);
+    this.recordErrorSignature(errorSignature, errorSignatures);
     return null;
   }
 
@@ -306,7 +312,8 @@ export class ErrorRecoveryEngine {
     toolCall: MCPToolCall,
     initialError: ToolError,
     strategy: RecoveryStrategy,
-    executor: (call: MCPToolCall) => Promise<MCPToolResult>
+    executor: (call: MCPToolCall) => Promise<MCPToolResult>,
+    errorSignatures: Set<string>
   ): Promise<RecoveryResult> {
     let lastError = initialError;
     let attempts = 0;
@@ -337,10 +344,10 @@ export class ErrorRecoveryEngine {
       } catch (error) {
         lastError = this.toToolError(error);
         const signature = this.getErrorSignature(toolCall, lastError);
-        if (this.hasErrorSignature(signature)) {
+        if (this.hasErrorSignature(signature, errorSignatures)) {
           break;
         }
-        this.recordErrorSignature(signature);
+        this.recordErrorSignature(signature, errorSignatures);
       }
     }
 

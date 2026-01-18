@@ -119,7 +119,7 @@ export function createCoworkOrchestrator(
   registry: IToolRegistry,
   options: CreateCoworkOrchestratorOptions
 ) {
-  const { cowork, toolExecution, components, ...rest } = options;
+  const { cowork, toolExecution, components, toolExecutionContext, ...rest } = options;
   const coworkPolicyEngine = resolveCoworkPolicyEngine(cowork);
   const policy = createCoworkPermissionChecker({ ...cowork, policyEngine: coworkPolicyEngine });
   const coworkContext = buildCoworkContext(cowork, coworkPolicyEngine);
@@ -149,6 +149,7 @@ export function createCoworkOrchestrator(
     ...rest,
     components: sanitizedComponents,
     toolExecution: coworkToolExecution,
+    toolExecutionContext: toolExecutionContext ?? cowork.toolExecutionContext,
   });
 }
 

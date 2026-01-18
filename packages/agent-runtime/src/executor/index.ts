@@ -261,51 +261,102 @@ export class ToolExecutionPipeline
       return cached;
     }
 
-    const simpleName = callName.includes(":") ? callName.split(":")[1] : callName;
+    const isQualified = callName.includes(":");
+    const simpleName = isQualified ? callName.split(":")[1] : callName;
+    const tools = this.registry.listTools();
+
+    if (isQualified) {
+      const exact = tools.find((entry) => entry.name === callName);
+      if (exact) {
+        this.toolCache.set(callName, exact);
+        this.toolCache.set(simpleName, exact);
+        return exact;
+      }
+    }
+
     const cachedSimple = this.toolCache.get(simpleName);
     if (cachedSimple) {
       return cachedSimple;
     }
 
-    const tools = this.registry.listTools();
-    const tool =
-      tools.find((entry) => entry.name === callName) ??
-      tools.find((entry) => entry.name === simpleName);
+    const tool = tools.find((entry) => entry.name === simpleName);
     if (tool) {
-      this.toolCache.set(callName, tool);
+      if (isQualified) {
+        this.toolCache.set(callName, tool);
+      }
       this.toolCache.set(simpleName, tool);
     }
     return tool;
   }
 
-  private validateArguments(
-    args: Record<string, unknown>,
-    schema: MCPTool["inputSchema"]
-  ): ToolError | null {
+  private validateArguments(args: unknown, schema: MCPTool["inputSchema"]): ToolError | null {
     if (schema.type !== "object") {
       return null;
     }
 
-    if (schema.required) {
-      for (const field of schema.required) {
-        if (!(field in args)) {
-          return {
-            code: "INVALID_ARGUMENTS",
-            message: `Missing required argument: ${field}`,
-          };
-        }
+    const recordArgs = this.toArgumentRecord(args);
+    if (!recordArgs) {
+      return {
+        code: "INVALID_ARGUMENTS",
+        message: "Arguments must be an object",
+      };
+    }
+
+    const requiredError = this.validateRequiredFields(recordArgs, schema.required);
+    if (requiredError) {
+      return requiredError;
+    }
+
+    const typeError = this.validatePropertyTypes(recordArgs, schema.properties);
+    if (typeError) {
+      return typeError;
+    }
+
+    return null;
+  }
+
+  private toArgumentRecord(args: unknown): Record<string, unknown> | null {
+    if (!args || typeof args !== "object" || Array.isArray(args)) {
+      return null;
+    }
+    return args as Record<string, unknown>;
+  }
+
+  private validateRequiredFields(
+    args: Record<string, unknown>,
+    required: string[] | undefined
+  ): ToolError | null {
+    if (!required) {
+      return null;
+    }
+
+    for (const field of required) {
+      if (!(field in args)) {
+        return {
+          code: "INVALID_ARGUMENTS",
+          message: `Missing required argument: ${field}`,
+        };
       }
     }
 
-    if (schema.properties) {
-      for (const [key, value] of Object.entries(args)) {
-        const propSchema = schema.properties[key];
-        if (propSchema?.type && !this.checkType(value, propSchema.type)) {
-          return {
-            code: "INVALID_ARGUMENTS",
-            message: `Invalid type for argument "${key}": expected ${propSchema.type}`,
-          };
-        }
+    return null;
+  }
+
+  private validatePropertyTypes(
+    args: Record<string, unknown>,
+    properties: MCPTool["inputSchema"]["properties"] | undefined
+  ): ToolError | null {
+    if (!properties) {
+      return null;
+    }
+
+    for (const [key, value] of Object.entries(args)) {
+      const propSchema = properties[key];
+      if (propSchema?.type && !this.checkType(value, propSchema.type)) {
+        return {
+          code: "INVALID_ARGUMENTS",
+          message: `Invalid type for argument "${key}": expected ${propSchema.type}`,
+        };
       }
     }
 
