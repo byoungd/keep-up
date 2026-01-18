@@ -406,6 +406,10 @@ export interface AgentConfig {
   /** Error recovery configuration */
   recovery?: {
     enabled?: boolean;
+    graceTurns?: number;
+    graceTimeoutMs?: number;
+    warningTemplate?: string;
+    hardLimit?: boolean;
   };
   /** Tool discovery configuration */
   toolDiscovery?: {

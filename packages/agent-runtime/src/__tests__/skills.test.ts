@@ -6,6 +6,7 @@ import {
   type AgentLLMRequest,
   type AgentLLMResponse,
   type AgentState,
+  createCompletionToolServer,
   createKernel,
   createMessageCompressor,
   createPermissionChecker,
@@ -459,6 +460,7 @@ describe("Kernel skills enforcement", () => {
     });
 
     const registry = createToolRegistry();
+    await registry.register(createCompletionToolServer());
     const llm = new ToolCallLLM({
       name: "bash:execute",
       arguments: { command: "echo test" },

@@ -7,6 +7,7 @@ import type { AgentLLMRequest, AgentLLMResponse, IAgentLLM } from "../orchestrat
 import { createOrchestrator } from "../orchestrator/orchestrator";
 import { createSecurityPolicy } from "../security";
 import { createTaskGraphStore } from "../tasks/taskGraph";
+import { createCompletionToolServer } from "../tools/core";
 import { createToolRegistry } from "../tools/mcp/registry";
 import type { MCPToolServer } from "../types";
 
@@ -15,7 +16,11 @@ class OneShotToolLLM implements IAgentLLM {
 
   async complete(_request: AgentLLMRequest): Promise<AgentLLMResponse> {
     if (this.called) {
-      return { content: "Done", finishReason: "stop" };
+      return {
+        content: "Done",
+        finishReason: "tool_use",
+        toolCalls: [{ name: "complete_task", arguments: { summary: "Done" } }],
+      };
     }
 
     this.called = true;
@@ -55,6 +60,7 @@ function createPingServer(): MCPToolServer {
 describe("AgentOrchestrator task graph", () => {
   it("records tool call nodes and completion", async () => {
     const registry = createToolRegistry({ enforceQualifiedNames: false });
+    await registry.register(createCompletionToolServer());
     await registry.register(createPingServer());
 
     const graph = createTaskGraphStore();
@@ -76,6 +82,7 @@ describe("AgentOrchestrator task graph", () => {
 
   it("attaches task node ids to confirmation requests", async () => {
     const registry = createToolRegistry({ enforceQualifiedNames: false });
+    await registry.register(createCompletionToolServer());
     await registry.register(createPingServer());
 
     const graph = createTaskGraphStore();

@@ -7,6 +7,7 @@ import {
   createAuditLogger,
   createBashToolServer,
   createCodeToolServer,
+  createCompletionToolServer,
   createFileToolServer,
   createLFCCToolServer,
   createMockLLM,
@@ -289,6 +290,7 @@ describe("AgentOrchestrator", () => {
 
   beforeEach(async () => {
     registry = createToolRegistry();
+    await registry.register(createCompletionToolServer());
     await registry.register(createFileToolServer());
     await registry.register(createLFCCToolServer());
 
@@ -297,8 +299,9 @@ describe("AgentOrchestrator", () => {
 
   it("should run a simple conversation", async () => {
     llm.setDefaultResponse({
-      content: "I can help you with that.",
-      finishReason: "stop",
+      content: "Task complete.",
+      finishReason: "tool_use",
+      toolCalls: [{ name: "completion:complete_task", arguments: { summary: "Task complete." } }],
     });
 
     const agent = createOrchestrator(llm, registry, {
@@ -314,7 +317,8 @@ describe("AgentOrchestrator", () => {
   it("should emit events during execution", async () => {
     llm.setDefaultResponse({
       content: "Done.",
-      finishReason: "stop",
+      finishReason: "tool_use",
+      toolCalls: [{ name: "completion:complete_task", arguments: { summary: "Done." } }],
     });
 
     const agent = createOrchestrator(llm, registry);
@@ -341,14 +345,20 @@ describe("AgentOrchestrator", () => {
         // First call: trigger tool use
         return {
           content: "Let me list the files.",
-          toolCalls: [{ name: "list", arguments: { path: "/tmp" } }],
+          toolCalls: [{ name: "file:list", arguments: { path: "/tmp" } }],
           finishReason: "tool_use" as const,
         };
       }
       // Second call: complete
       return {
         content: "Here are the files in /tmp.",
-        finishReason: "stop" as const,
+        toolCalls: [
+          {
+            name: "completion:complete_task",
+            arguments: { summary: "Listed files in /tmp." },
+          },
+        ],
+        finishReason: "tool_use" as const,
       };
     };
 
@@ -367,7 +377,7 @@ describe("AgentOrchestrator", () => {
     // LLM always wants to use tools (infinite loop)
     llm.setDefaultResponse({
       content: "Let me check.",
-      toolCalls: [{ name: "list", arguments: { path: "/tmp" } }],
+      toolCalls: [{ name: "file:list", arguments: { path: "/tmp" } }],
       finishReason: "tool_use",
     });
 
@@ -379,12 +389,13 @@ describe("AgentOrchestrator", () => {
     const state = await agent.run("Keep going");
 
     expect(state.turn).toBe(3);
+    expect(state.status).toBe("error");
   });
 
   it("should stop on abort", async () => {
     llm.setDefaultResponse({
       content: "Working...",
-      toolCalls: [{ name: "list", arguments: { path: "/tmp" } }],
+      toolCalls: [{ name: "file:list", arguments: { path: "/tmp" } }],
       finishReason: "tool_use",
     });
 
@@ -400,7 +411,7 @@ describe("AgentOrchestrator", () => {
     agent.stop();
 
     const state = await promise;
-    // Status should be complete after stop, or may still be in executing if stopped mid-loop
-    expect(["complete", "executing"]).toContain(state.status);
+    // Status should be error after stop, or may still be in executing if stopped mid-loop
+    expect(["error", "executing"]).toContain(state.status);
   });
 });

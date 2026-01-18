@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { createAgentManager, createMockLLM, createToolRegistry, VerifierAgent } from "../index";
+import {
+  createAgentManager,
+  createCompletionToolServer,
+  createMockLLM,
+  createToolRegistry,
+  VerifierAgent,
+} from "../index";
 
 describe("VerifierAgent", () => {
   it("fails closed when verifier output omits boolean flag", async () => {
@@ -9,10 +15,17 @@ describe("VerifierAgent", () => {
         evidence: "Alpha launched a new battery on Tuesday.",
         sourceItemId: "item-1",
       }),
-      finishReason: "stop",
+      finishReason: "tool_use",
+      toolCalls: [
+        {
+          name: "completion:complete_task",
+          arguments: { summary: "Verifier response generated." },
+        },
+      ],
     });
 
     const registry = createToolRegistry();
+    await registry.register(createCompletionToolServer());
     const manager = createAgentManager({ llm, registry });
     const verifier = new VerifierAgent(manager);
 

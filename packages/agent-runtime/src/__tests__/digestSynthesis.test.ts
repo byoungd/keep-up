@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createAgentManager,
+  createCompletionToolServer,
   createMockLLM,
   createToolRegistry,
   type DigestSourceItem,
@@ -18,7 +19,13 @@ describe("Digest synthesis pipeline", () => {
         topics: ["battery", "energy"],
         citations: [{ itemId: "item-1", evidence: "Alpha launched a new battery on Tuesday." }],
       }),
-      finishReason: "stop",
+      finishReason: "tool_use",
+      toolCalls: [
+        {
+          name: "completion:complete_task",
+          arguments: { summary: "Digest map completed for item-1." },
+        },
+      ],
     });
     llm.addResponse("digestreduce cluster-1", {
       content: JSON.stringify({
@@ -29,7 +36,13 @@ describe("Digest synthesis pipeline", () => {
         sourceItemIds: ["item-1"],
         citations: [{ itemId: "item-1", evidence: "Alpha launched a new battery on Tuesday." }],
       }),
-      finishReason: "stop",
+      finishReason: "tool_use",
+      toolCalls: [
+        {
+          name: "completion:complete_task",
+          arguments: { summary: "Digest reduce completed for cluster-1." },
+        },
+      ],
     });
     llm.addResponse("verifyclaim", {
       content: JSON.stringify({
@@ -37,10 +50,17 @@ describe("Digest synthesis pipeline", () => {
         evidence: "Alpha launched a new battery on Tuesday.",
         sourceItemId: "item-1",
       }),
-      finishReason: "stop",
+      finishReason: "tool_use",
+      toolCalls: [
+        {
+          name: "completion:complete_task",
+          arguments: { summary: "Verified claim for item-1." },
+        },
+      ],
     });
 
     const registry = createToolRegistry();
+    await registry.register(createCompletionToolServer());
     const manager = createAgentManager({ llm, registry });
     const verifier = new VerifierAgent(manager);
 
@@ -79,7 +99,13 @@ describe("Digest synthesis pipeline", () => {
         topics: ["sdk"],
         citations: [{ itemId: "item-2", evidence: "Beta released a new SDK." }],
       }),
-      finishReason: "stop",
+      finishReason: "tool_use",
+      toolCalls: [
+        {
+          name: "completion:complete_task",
+          arguments: { summary: "Digest map completed for item-2." },
+        },
+      ],
     });
     llm.addResponse("digestreduce cluster-1", {
       content: JSON.stringify({
@@ -90,10 +116,17 @@ describe("Digest synthesis pipeline", () => {
         sourceItemIds: ["missing-item"],
         citations: [{ itemId: "missing-item", evidence: "Beta released a new SDK." }],
       }),
-      finishReason: "stop",
+      finishReason: "tool_use",
+      toolCalls: [
+        {
+          name: "completion:complete_task",
+          arguments: { summary: "Digest reduce completed for cluster-1." },
+        },
+      ],
     });
 
     const registry = createToolRegistry();
+    await registry.register(createCompletionToolServer());
     const manager = createAgentManager({ llm, registry });
     const verifier = new VerifierAgent(manager);
 

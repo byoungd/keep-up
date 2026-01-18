@@ -8,6 +8,7 @@ import { createEventBus } from "../events";
 import type { AgentLLMRequest, AgentLLMResponse, IAgentLLM } from "../orchestrator/orchestrator";
 import { createOrchestrator } from "../orchestrator/orchestrator";
 import { createSecurityPolicy } from "../security";
+import { createCompletionToolServer } from "../tools/core";
 import { createToolRegistry } from "../tools/mcp/registry";
 import type { ExecutionDecision, MCPToolServer, ToolExecutionRecord } from "../types";
 
@@ -35,7 +36,11 @@ class OneShotToolLLM implements IAgentLLM {
 
   async complete(_request: AgentLLMRequest): Promise<AgentLLMResponse> {
     if (this.called) {
-      return { content: "done", finishReason: "stop" };
+      return {
+        content: "done",
+        finishReason: "tool_use",
+        toolCalls: [{ id: "call-2", name: "complete_task", arguments: { summary: "done" } }],
+      };
     }
 
     this.called = true;
@@ -57,6 +62,7 @@ describe("AgentOrchestrator execution event bus", () => {
   it("emits execution decisions and records with correlation metadata", async () => {
     const eventBus = createEventBus();
     const registry = createToolRegistry({ enforceQualifiedNames: false });
+    await registry.register(createCompletionToolServer());
     await registry.register(createPingServer());
 
     const llm = new OneShotToolLLM();

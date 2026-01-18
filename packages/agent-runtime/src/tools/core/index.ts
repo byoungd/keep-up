@@ -19,6 +19,12 @@ export {
   ProcessCodeExecutor,
 } from "./code";
 export {
+  type CompleteTaskInput,
+  type CompletionEvent,
+  CompletionToolServer,
+  createCompletionToolServer,
+} from "./completion";
+export {
   createFileToolServer,
   FileToolServer,
   type IFileSystem,
