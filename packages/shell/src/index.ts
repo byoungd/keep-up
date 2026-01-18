@@ -1,6 +1,7 @@
 // Components
 
 export { AIPanel } from "./components/chat/AIPanel";
+export { BackgroundTaskIndicator } from "./components/chat/BackgroundTaskIndicator";
 export type { PanelPosition } from "./components/chat/ModelSelector";
 export type {
   ActionItem,
