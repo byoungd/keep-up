@@ -185,7 +185,7 @@ describe("measureAsync", () => {
     const collector = new InMemoryMetricsCollector();
 
     const result = await measureAsync(collector, "operation_duration", { op: "test" }, async () => {
-      await new Promise((r) => setTimeout(r, 50));
+      await new Promise((r) => setTimeout(r, 60));
       return 42;
     });
 

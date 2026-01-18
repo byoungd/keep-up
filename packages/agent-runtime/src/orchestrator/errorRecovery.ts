@@ -97,7 +97,7 @@ const DEFAULT_STRATEGIES: RecoveryStrategy[] = [
   {
     errorPattern: /(network|timeout|ECONNRESET|ETIMEDOUT)/i,
     category: "transient",
-    maxRetries: 3,
+    maxRetries: 2,
     baseBackoffMs: 1000,
     backoffMultiplier: 2,
     maxBackoffMs: 10000,
@@ -110,10 +110,10 @@ const DEFAULT_STRATEGIES: RecoveryStrategy[] = [
   {
     errorPattern: /(rate.*limit|too.*many.*requests|429)/i,
     category: "transient",
-    maxRetries: 5,
-    baseBackoffMs: 2000,
-    backoffMultiplier: 3,
-    maxBackoffMs: 60000,
+    maxRetries: 2,
+    baseBackoffMs: 1000,
+    backoffMultiplier: 2,
+    maxBackoffMs: 10000,
     action: "retry",
     contextMessage: (error, attempt) =>
       `Rate limit hit (attempt ${attempt}): ${error.message}. Backing off before retry...`,
@@ -158,6 +158,7 @@ export class ErrorRecoveryEngine {
   private errorHistory: ErrorHistoryEntry[] = [];
   private readonly maxHistorySize = 100;
   private failedActionSignatures = new Set<string>();
+  private errorSignatureCache = new Set<string>();
 
   constructor(strategies: RecoveryStrategy[] = DEFAULT_STRATEGIES) {
     this.strategies = [...strategies];
@@ -188,10 +189,26 @@ export class ErrorRecoveryEngine {
   }
 
   /**
+   * Create a signature for an error (for deduplication).
+   */
+  private getErrorSignature(toolCall: MCPToolCall, error: ToolError): string {
+    return `${toolCall.name}::${error.code}::${error.message}`;
+  }
+
+  private hasErrorSignature(signature: string): boolean {
+    return this.errorSignatureCache.has(signature);
+  }
+
+  private recordErrorSignature(signature: string): void {
+    this.errorSignatureCache.add(signature);
+  }
+
+  /**
    * Clear failed action history (e.g., when starting a new task).
    */
   clearFailedActions(): void {
     this.failedActionSignatures.clear();
+    this.errorSignatureCache.clear();
   }
 
   /**
@@ -214,6 +231,31 @@ export class ErrorRecoveryEngine {
     const category = this.categorizeError(initialError);
 
     // Check if this exact action has already failed (prevent repeating same action)
+    const duplicateResult = this.checkDuplicateAction(toolCall, initialError);
+    if (duplicateResult) {
+      return duplicateResult;
+    }
+
+    const signatureResult = this.recordInitialFailure(toolCall, initialError, category, strategy);
+    if (signatureResult) {
+      return signatureResult;
+    }
+
+    if (!strategy || strategy.maxRetries === 0) {
+      return {
+        recovered: false,
+        error: initialError,
+        attempts: 0,
+      };
+    }
+
+    return this.attemptRecovery(toolCall, initialError, strategy, executor);
+  }
+
+  private checkDuplicateAction(
+    toolCall: MCPToolCall,
+    initialError: ToolError
+  ): RecoveryResult | null {
     if (this.hasActionFailed(toolCall)) {
       return {
         recovered: false,
@@ -225,10 +267,19 @@ export class ErrorRecoveryEngine {
       };
     }
 
-    // Record the failed action
     this.recordFailedAction(toolCall);
+    return null;
+  }
 
-    // Record error
+  private recordInitialFailure(
+    toolCall: MCPToolCall,
+    initialError: ToolError,
+    category: ErrorCategory,
+    strategy: RecoveryStrategy | undefined
+  ): RecoveryResult | null {
+    const errorSignature = this.getErrorSignature(toolCall, initialError);
+    const repeatedSignature = this.hasErrorSignature(errorSignature);
+
     this.recordError({
       timestamp: Date.now(),
       toolName: toolCall.name,
@@ -238,41 +289,44 @@ export class ErrorRecoveryEngine {
       attempts: 0,
     });
 
-    if (!strategy || strategy.maxRetries === 0) {
+    if (repeatedSignature) {
       return {
         recovered: false,
         error: initialError,
         attempts: 0,
+        strategy,
       };
     }
 
-    // Attempt recovery
+    this.recordErrorSignature(errorSignature);
+    return null;
+  }
+
+  private async attemptRecovery(
+    toolCall: MCPToolCall,
+    initialError: ToolError,
+    strategy: RecoveryStrategy,
+    executor: (call: MCPToolCall) => Promise<MCPToolResult>
+  ): Promise<RecoveryResult> {
     let lastError = initialError;
+    let attempts = 0;
     for (let attempt = 1; attempt <= strategy.maxRetries; attempt++) {
-      // Calculate backoff
+      attempts = attempt;
       const backoff = Math.min(
         strategy.baseBackoffMs * strategy.backoffMultiplier ** (attempt - 1),
         strategy.maxBackoffMs
       );
 
-      // Wait before retry
       if (backoff > 0) {
         await this.sleep(backoff);
       }
 
       try {
-        // Execute based on action
-        let result: MCPToolResult;
-
-        if (strategy.action === "retry") {
-          result = await executor(toolCall);
-        } else if (strategy.action === "fallback" && strategy.fallback) {
-          result = await strategy.fallback(toolCall, lastError);
-        } else {
-          break; // Skip or abort
+        const result = await this.executeRecoveryAction(toolCall, strategy, lastError, executor);
+        if (!result) {
+          break;
         }
 
-        // Success!
         this.updateLastError(true, attempt);
         return {
           recovered: true,
@@ -282,17 +336,38 @@ export class ErrorRecoveryEngine {
         };
       } catch (error) {
         lastError = this.toToolError(error);
+        const signature = this.getErrorSignature(toolCall, lastError);
+        if (this.hasErrorSignature(signature)) {
+          break;
+        }
+        this.recordErrorSignature(signature);
       }
     }
 
-    // Recovery failed
-    this.updateLastError(false, strategy.maxRetries);
+    this.updateLastError(false, attempts);
     return {
       recovered: false,
       error: lastError,
-      attempts: strategy.maxRetries,
+      attempts,
       strategy,
     };
+  }
+
+  private async executeRecoveryAction(
+    toolCall: MCPToolCall,
+    strategy: RecoveryStrategy,
+    lastError: ToolError,
+    executor: (call: MCPToolCall) => Promise<MCPToolResult>
+  ): Promise<MCPToolResult | null> {
+    if (strategy.action === "retry") {
+      return executor(toolCall);
+    }
+
+    if (strategy.action === "fallback" && strategy.fallback) {
+      return strategy.fallback(toolCall, lastError);
+    }
+
+    return null;
   }
 
   /**

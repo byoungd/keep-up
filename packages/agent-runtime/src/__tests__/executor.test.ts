@@ -20,7 +20,11 @@ import {
   type ToolExecutorConfig,
 } from "../executor";
 import type { ExecutionSandboxAdapter, ToolExecutionTelemetry } from "../sandbox";
-import type { IPermissionChecker } from "../security";
+import {
+  createToolGovernancePolicyEngine,
+  createToolPolicyEngine,
+  type IPermissionChecker,
+} from "../security";
 import type { IMetricsRecorder, TelemetryContext } from "../telemetry";
 import type { IToolRegistry } from "../tools/mcp/registry";
 import type {
@@ -32,6 +36,7 @@ import type {
   MCPToolResult,
   PermissionEscalation,
   ToolContext,
+  ToolExecutionContext,
   ToolExecutionRecord,
 } from "../types";
 import type { ToolResultCache } from "../utils/cache";
@@ -412,6 +417,73 @@ describe("ToolExecutionPipeline", () => {
       const call = createMockCall("test_tool");
       await pipeline.execute(call, context);
 
+      expect(registry.lastCall).toBeUndefined();
+    });
+  });
+
+  describe("tool governance policy", () => {
+    it("denies tools not in allowlist", async () => {
+      registry.setTools([createMockTool("allowed:tool"), createMockTool("blocked:tool")]);
+      const toolExecutionContext: ToolExecutionContext = {
+        policy: "interactive",
+        allowedTools: ["allowed:*"],
+        requiresApproval: [],
+        maxParallel: 1,
+      };
+      const policyEngine = createToolGovernancePolicyEngine(
+        createToolPolicyEngine(policy),
+        toolExecutionContext
+      );
+      pipeline = new ToolExecutionPipeline({ registry, policy, policyEngine });
+
+      const result = await pipeline.execute(createMockCall("blocked:tool"), context);
+
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe("PERMISSION_DENIED");
+      expect(result.error?.message).toBe('Tool "blocked:tool" not allowed by execution policy');
+    });
+
+    it("marks tools as requiring confirmation when policy requires approval", async () => {
+      registry.setTools([createMockTool("sensitive:tool")]);
+      const toolExecutionContext: ToolExecutionContext = {
+        policy: "interactive",
+        allowedTools: ["*"],
+        requiresApproval: ["sensitive:tool"],
+        maxParallel: 1,
+      };
+      const policyEngine = createToolGovernancePolicyEngine(
+        createToolPolicyEngine(policy),
+        toolExecutionContext
+      );
+      pipeline = new ToolExecutionPipeline({ registry, policy, policyEngine });
+
+      const requiresConfirmation = pipeline.requiresConfirmation(
+        createMockCall("sensitive:tool"),
+        context
+      );
+
+      expect(requiresConfirmation).toBe(true);
+    });
+  });
+
+  describe("schema validation", () => {
+    it("blocks invalid arguments before execution", async () => {
+      registry.setTools([
+        {
+          name: "test:tool",
+          description: "test tool",
+          inputSchema: {
+            type: "object",
+            properties: { path: { type: "string" } },
+            required: ["path"],
+          },
+        },
+      ]);
+
+      const result = await pipeline.execute(createMockCall("test:tool", {}), context);
+
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe("INVALID_ARGUMENTS");
       expect(registry.lastCall).toBeUndefined();
     });
   });

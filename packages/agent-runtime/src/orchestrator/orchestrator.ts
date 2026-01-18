@@ -88,6 +88,7 @@ import {
   type PlanningEngine,
 } from "./planning";
 import { createRequestCache, type RequestCache } from "./requestCache";
+import { createSingleStepEnforcer, type SingleStepEnforcer } from "./singleStepEnforcer";
 import { SmartToolScheduler } from "./smartToolScheduler";
 import { ToolResultCache } from "./toolResultCache";
 import { createTurnExecutor, type ITurnExecutor, type TurnOutcome } from "./turnExecutor";
@@ -278,6 +279,7 @@ export class AgentOrchestrator {
   private readonly streamBridge?: OrchestratorStreamBridge;
   private readonly artifactPipeline?: ArtifactPipeline;
   private readonly loopStateMachine: AgentLoopStateMachine;
+  private readonly singleStepEnforcer: SingleStepEnforcer;
   private lastObservation?: Observation;
   private currentRunId?: string;
   private currentPlanNodeId?: string;
@@ -336,6 +338,10 @@ export class AgentOrchestrator {
     this.tracer = telemetry?.tracer;
     this.sessionState = components.sessionState;
     this.state = this.resolveInitialState();
+    this.singleStepEnforcer = createSingleStepEnforcer({
+      enabled: config.toolExecutionContext?.policy === "interactive",
+      allowZeroToolCalls: true,
+    });
     this.toolExecutor = components.toolExecutor;
     this.eventBus = components.eventBus;
     this.errorRecoveryEngine =
@@ -1157,6 +1163,7 @@ export class AgentOrchestrator {
     turnStart: number,
     turnSpan?: SpanContext
   ): Promise<void> {
+    this.enforceToolExecutionPolicy(toolCalls);
     const decision = this.buildDecisionForToolCalls(toolCalls);
     const shouldExecute = await this.maybeCreatePlan(toolCalls);
     if (!shouldExecute) {
@@ -1267,6 +1274,17 @@ export class AgentOrchestrator {
       artifacts: payload.artifacts,
       nextSteps: payload.nextSteps,
     });
+  }
+
+  private enforceToolExecutionPolicy(toolCalls: MCPToolCall[]): void {
+    if (this.config.toolExecutionContext?.policy !== "interactive") {
+      return;
+    }
+
+    const result = this.singleStepEnforcer.validate(toolCalls);
+    if (!result.valid) {
+      throw new Error(result.error ?? "Interactive policy allows a single tool call per turn.");
+    }
   }
 
   /**

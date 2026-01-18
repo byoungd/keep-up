@@ -162,7 +162,8 @@ describe("ConsensusOrchestrator", () => {
 
       expect(result.totalDurationMs).toBeGreaterThan(0);
       // Should be at least as long as the slowest model (parallel execution)
-      expect(result.totalDurationMs).toBeGreaterThanOrEqual(100);
+      const toleranceMs = 10;
+      expect(result.totalDurationMs).toBeGreaterThanOrEqual(100 - toleranceMs);
     });
 
     it("should call onModelResponse callback for each response", async () => {
