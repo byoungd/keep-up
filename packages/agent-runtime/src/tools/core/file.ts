@@ -196,7 +196,7 @@ export class FileToolServer extends BaseToolServer {
         },
         annotations: {
           category: "core",
-          requiresConfirmation: true,
+          requiresConfirmation: false,
           readOnly: false,
           estimatedDuration: "fast",
         },

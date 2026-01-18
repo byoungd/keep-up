@@ -42,7 +42,7 @@ describe("ErrorRecoveryEngine", () => {
     const initialError: ToolError = { code: "EXECUTION_FAILED", message: "timeout" };
     const retryError: ToolError = { code: "EXECUTION_FAILED", message: "flaky" };
     const executor = vi
-      .fn<Promise<MCPToolResult>, [MCPToolCall]>()
+      .fn<(call: MCPToolCall) => Promise<MCPToolResult>>()
       .mockRejectedValueOnce(retryError)
       .mockResolvedValueOnce(successResult);
 
@@ -74,7 +74,9 @@ describe("ErrorRecoveryEngine", () => {
     ];
     const engine = createErrorRecoveryEngine(strategies);
     const initialError: ToolError = { code: "EXECUTION_FAILED", message: "timeout" };
-    const executor = vi.fn<Promise<MCPToolResult>, [MCPToolCall]>().mockRejectedValue(initialError);
+    const executor = vi
+      .fn<(call: MCPToolCall) => Promise<MCPToolResult>>()
+      .mockRejectedValue(initialError);
 
     const recoveryPromise = engine.recover(toolCall, initialError, executor);
 

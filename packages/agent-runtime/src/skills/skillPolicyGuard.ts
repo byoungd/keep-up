@@ -94,12 +94,15 @@ export class SkillPolicyGuard implements ToolPolicyEngine {
       return { allowed: true };
     }
 
+    const toolName = `${context.tool}:${context.operation}`.toLowerCase();
+    if (toolName === "completion:complete_task" || toolName.endsWith(":complete_task")) {
+      return { allowed: true };
+    }
+
     const activeSkills = context.context.skills?.activeSkills ?? [];
     if (activeSkills.length === 0) {
       return { allowed: true };
     }
-
-    const toolName = `${context.tool}:${context.operation}`.toLowerCase();
 
     for (const activation of activeSkills) {
       const entry = this.registry.get(activation.skillId);

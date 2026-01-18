@@ -612,7 +612,7 @@ function MobileLayout({
   return (
     <div className="h-full w-full relative">
       {mobilePanel === "left" && (
-        <div className="absolute inset-0 z-20 bg-background flex flex-col">
+        <div className="absolute inset-0 z-20 bg-sidebar flex flex-col">
           <SidebarContent
             className="w-full h-full"
             state={state}
@@ -626,9 +626,11 @@ function MobileLayout({
         </div>
       )}
       {mobilePanel === "right" && (
-        <div className="absolute inset-0 z-20 bg-background">{mobileRightPanel}</div>
+        <div className="absolute inset-0 z-20 bg-sidebar">{mobileRightPanel}</div>
       )}
-      <div className={cn("h-full w-full", mobilePanel !== "center" && "hidden")}>{children}</div>
+      <div className={cn("h-full w-full bg-canvas", mobilePanel !== "center" && "hidden")}>
+        {children}
+      </div>
     </div>
   );
 }
@@ -880,11 +882,11 @@ export function AppShell(props: AppShellProps) {
       {commandPalette}
       {createDocumentDialog}
       {importModals}
-      <div className="fixed inset-0 flex w-full overflow-hidden font-sans text-foreground bg-background">
+      <div className="fixed inset-0 flex w-full overflow-hidden font-sans text-foreground bg-theme">
         {sidebarElement}
 
         {/* Main Content Area */}
-        <div className="flex-1 flex flex-col min-w-0 bg-background relative">
+        <div className="flex-1 flex flex-col min-w-0 bg-canvas relative">
           <Header
             onToggleLeft={handleToggleLeft}
             onToggleRight={handleToggleRight}

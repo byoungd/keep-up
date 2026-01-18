@@ -102,7 +102,7 @@ export const Sidebar = React.memo(function Sidebar({
   if (isLoading) {
     return (
       <aside
-        className={cn("sidebar flex flex-col w-full h-full bg-surface-1", className)}
+        className={cn("sidebar flex flex-col w-full h-full bg-sidebar", className)}
         aria-label="Primary sidebar"
       >
         <div className="flex-1 flex items-center justify-center">
@@ -114,7 +114,7 @@ export const Sidebar = React.memo(function Sidebar({
 
   return (
     <aside
-      className={cn("sidebar flex flex-col w-full h-full bg-surface-1", className)}
+      className={cn("sidebar flex flex-col w-full h-full bg-sidebar", className)}
       aria-label="Primary sidebar"
     >
       <SidebarHeader

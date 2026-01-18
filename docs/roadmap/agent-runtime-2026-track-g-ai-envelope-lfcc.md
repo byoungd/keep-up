@@ -1,7 +1,7 @@
 # Track G: AI Envelope and LFCC Alignment
 
 Owner: Tech Lead + Runtime Developer + QA
-Status: Planned
+Status: Completed
 
 ## Objective
 Enforce AI Envelope and LFCC alignment per docs/specs/agent-runtime-spec-2026.md Sections 5.8 and 10.
@@ -42,5 +42,5 @@ Enforce AI Envelope and LFCC alignment per docs/specs/agent-runtime-spec-2026.md
 - Integration tests for conflict and retry behavior
 
 ## Branch and PR Workflow
-- Create branch: feature/agent-runtime-2026-track-g
+- Create branch: feature/agent-runtime-2026-track-g-ai-envelope-lfcc
 - Run required tests, commit, open PR

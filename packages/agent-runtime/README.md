@@ -55,6 +55,7 @@ import {
   createMem0MemoryAdapter,
   createToolRegistry,
   createBashToolServer,
+  createCompletionToolServer,
   createFileToolServer,
   createRuntimeLogger
 } from '@ku0/agent-runtime';
@@ -70,6 +71,7 @@ const memory = createMem0MemoryAdapter({
 // 3. Create tool registry
 const registry = createToolRegistry();
 await registry.register(createBashToolServer());
+await registry.register(createCompletionToolServer());
 await registry.register(createFileToolServer());
 
 // 4. Create Orchestrator (OpenAI Agents SDK)
@@ -228,7 +230,8 @@ Document operations through LFCC:
 ```typescript
 const lfcc = createLFCCToolServer(bridge);
 // Tools: list_documents, get_document, read_content, get_blocks,
-//        insert_block, update_block, delete_block, search
+//        insert_block, update_block, delete_block, search,
+//        ai_gateway_request, ai_gateway_multi_request (when aiGateway is configured)
 ```
 
 ## Events

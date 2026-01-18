@@ -101,6 +101,48 @@
     }
   }
 
+  .animate-shine {
+    animation-name: shine;
+    animation-duration: 1.5s;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+  }
+
+  @keyframes shine {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: -200% 0;
+    }
+  }
+
+  .animate-pulse-spring {
+    animation: pulse-spring 1.8s var(--ease-smooth) infinite;
+  }
+
+  @keyframes pulse-spring {
+    0%,
+    100% {
+      transform: scale(0.85);
+    }
+    15% {
+      transform: scale(1.15);
+    }
+    25% {
+      transform: scale(0.95);
+    }
+    35% {
+      transform: scale(1.05);
+    }
+    45% {
+      transform: scale(0.98);
+    }
+    60% {
+      transform: scale(1);
+    }
+  }
+
   .animate-in-fade-slide {
     animation: enter-fade-slide var(--duration-normal) var(--ease-out-expo) forwards;
   }
@@ -198,6 +240,8 @@
     .animate-in,
     .animate-out,
     .animate-in-fade-slide,
+    .animate-shine,
+    .animate-pulse-spring,
     .ai-thinking-pulse,
     .ai-message-enter,
     .ai-gradient-shimmer,

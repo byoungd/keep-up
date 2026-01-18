@@ -12,5 +12,8 @@ export {
   type ModelRouteRule,
   ModelRouter,
   type ModelRouterConfig,
+  type ModelRoutingDecision,
+  type ModelRoutingPolicy,
   type ModelRoutingRequest,
+  type RoutingDecisionEmitter,
 } from "./modelRouter";

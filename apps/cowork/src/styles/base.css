@@ -40,12 +40,13 @@ body {
 }
 
 .primary-button {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.9), rgba(14, 116, 144, 0.9));
-  color: #ffffff;
-  box-shadow: 0 10px 24px rgba(16, 185, 129, 0.25);
+  background: var(--color-primary);
+  color: var(--color-primary-foreground);
+  box-shadow: var(--shadow-sm);
 }
 
 .primary-button:hover {
+  opacity: 0.9;
   transform: translateY(-1px);
 }
 
@@ -79,7 +80,11 @@ body {
   gap: 1rem;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   align-items: center;
-  background: linear-gradient(140deg, rgba(15, 118, 110, 0.18), rgba(15, 23, 42, 0.02));
+  background: linear-gradient(
+    140deg,
+    color-mix(in srgb, var(--color-accent-emerald) 18%, var(--color-surface-1) 82%),
+    color-mix(in srgb, var(--color-accent-cyan) 6%, var(--color-surface-0) 94%)
+  );
   border-radius: var(--radius-3xl);
   border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
   padding: 2rem;
@@ -239,13 +244,13 @@ body {
 }
 
 .message-bubble--user {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.8), rgba(14, 116, 144, 0.85));
-  color: #ffffff;
-  border-color: rgba(16, 185, 129, 0.4);
+  background: var(--color-surface-2);
+  color: var(--color-foreground);
+  border-color: transparent;
 }
 
 .message-bubble--user .message-meta {
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--color-muted-foreground);
 }
 
 .message-meta {

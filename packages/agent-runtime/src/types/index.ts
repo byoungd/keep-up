@@ -16,7 +16,7 @@ export interface MCPTool {
   /** Optional annotations for UI/security hints */
   annotations?: {
     /** Tool category for grouping */
-    category?: "core" | "knowledge" | "external" | "communication";
+    category?: "core" | "knowledge" | "external" | "communication" | "control";
     /** Whether tool requires confirmation */
     requiresConfirmation?: boolean;
     /** Whether tool can modify state */
@@ -30,6 +30,7 @@ export interface MCPTool {
 export interface JSONSchema {
   type: "object" | "string" | "number" | "boolean" | "array";
   properties?: Record<string, JSONSchemaProperty>;
+  additionalProperties?: boolean;
   required?: string[];
   description?: string;
 }
@@ -45,6 +46,8 @@ export interface JSONSchemaProperty {
   properties?: Record<string, JSONSchemaProperty>;
   /** Required fields for nested objects */
   required?: string[];
+  /** Whether to allow extra properties (default: true) */
+  additionalProperties?: boolean;
 }
 
 /** MCP Tool call request */
@@ -182,6 +185,20 @@ export interface SkillActivation {
 
 export interface SkillToolContext {
   activeSkills: SkillActivation[];
+}
+
+// ============================================================================
+// Completion Contract Types
+// ============================================================================
+
+/** Completion tool input payload */
+export interface CompleteTaskInput {
+  /** Required: final answer/summary */
+  summary: string;
+  /** Optional: list of created file paths */
+  artifacts?: string[];
+  /** Optional: recommendations for follow-up */
+  nextSteps?: string;
 }
 
 // ============================================================================
@@ -425,6 +442,10 @@ export interface AgentConfig {
   /** Error recovery configuration */
   recovery?: {
     enabled?: boolean;
+    graceTurns?: number;
+    graceTimeoutMs?: number;
+    warningTemplate?: string;
+    hardLimit?: boolean;
   };
   /** Tool discovery configuration */
   toolDiscovery?: {

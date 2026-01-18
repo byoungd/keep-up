@@ -5,6 +5,7 @@
 import { describe, expect, it } from "vitest";
 import type { AgentLLMRequest, AgentLLMResponse, IAgentLLM } from "../orchestrator/orchestrator";
 import { createOrchestrator } from "../orchestrator/orchestrator";
+import { createCompletionToolServer } from "../tools/core";
 import { createToolRegistry } from "../tools/mcp/registry";
 import type { MCPTool, MCPToolCall, MCPToolResult, MCPToolServer, ToolContext } from "../types";
 
@@ -49,7 +50,8 @@ const toolCallResponse = (): AgentLLMResponse => ({
 
 const stopResponse: AgentLLMResponse = {
   content: "done",
-  finishReason: "stop",
+  finishReason: "tool_use",
+  toolCalls: [{ name: "completion:complete_task", arguments: { summary: "done" } }],
 };
 
 const waitForTurns = (orchestrator: ReturnType<typeof createOrchestrator>, target: number) =>
@@ -75,6 +77,7 @@ const waitForEvent = (orchestrator: ReturnType<typeof createOrchestrator>, type:
 describe("AgentOrchestrator control plane", () => {
   it("rejects multiple tool calls in interactive policy", async () => {
     const registry = createToolRegistry();
+    await registry.register(createCompletionToolServer());
     await registry.register(noopServer);
     const llm = new SequenceLLM([
       {
@@ -101,6 +104,7 @@ describe("AgentOrchestrator control plane", () => {
 
   it("steps exactly one cycle", async () => {
     const registry = createToolRegistry();
+    await registry.register(createCompletionToolServer());
     await registry.register(noopServer);
     const llm = new SequenceLLM([toolCallResponse(), toolCallResponse(), toolCallResponse()]);
 
@@ -128,6 +132,7 @@ describe("AgentOrchestrator control plane", () => {
 
   it("pauses and resumes without losing state", async () => {
     const registry = createToolRegistry();
+    await registry.register(createCompletionToolServer());
     await registry.register(noopServer);
     const llm = new SequenceLLM([toolCallResponse(), toolCallResponse(), stopResponse]);
 

@@ -281,6 +281,7 @@ export class ToolExecutionPipeline
       const exact = tools.find((entry) => entry.name === callName);
       if (exact) {
         this.toolCache.set(callName, exact);
+
         return exact;
       }
     }
@@ -385,14 +386,16 @@ export class ToolExecutionPipeline
       return requiredError;
     }
 
-    const properties = schema.properties;
-    if (!properties) {
-      return null;
+    const properties = schema.properties ?? {};
+    if (!this.allowsAdditionalProperties(schema)) {
+      const unknownError = this.validateUnexpectedFields(record, properties, path);
+      if (unknownError) {
+        return unknownError;
+      }
     }
 
-    const unknownError = this.validateUnexpectedFields(record, properties, path);
-    if (unknownError) {
-      return unknownError;
+    if (Object.keys(properties).length === 0) {
+      return null;
     }
 
     return this.validateObjectProperties(record, properties, path);
@@ -444,6 +447,10 @@ export class ToolExecutionPipeline
       }
     }
     return null;
+  }
+
+  private allowsAdditionalProperties(schema: ValidationSchema): boolean {
+    return schema.additionalProperties !== false;
   }
 
   private validateArray(
@@ -514,9 +521,9 @@ export class ToolExecutionPipeline
     tool: MCPTool | undefined,
     context: ToolContext
   ): ToolPolicyDecision {
-    const { tool: toolName, operation } = this.parseToolName(call.name);
-    const resource = this.extractResource(call);
     const toolServer = this.registry.resolveToolServer?.(call.name);
+    const { tool: toolName, operation } = this.resolvePolicyTarget(call.name, toolServer);
+    const resource = this.extractResource(call);
 
     return this.policyEngine.evaluate({
       call,
@@ -528,6 +535,17 @@ export class ToolExecutionPipeline
       context,
       taskNodeId: context.taskNodeId,
     });
+  }
+
+  private resolvePolicyTarget(
+    callName: string,
+    toolServer: string | undefined
+  ): { tool: string; operation: string } {
+    const parsed = this.parseToolName(callName);
+    if (!callName.includes(":") && toolServer) {
+      return { tool: toolServer, operation: parsed.operation };
+    }
+    return parsed;
   }
 
   private emitSandboxTelemetry(

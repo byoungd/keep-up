@@ -90,6 +90,43 @@ Notes:
 - v2 adds request idempotency, agent identity, and intent tracking.
 - v2 retains v0.9 preconditions and dry-run requirements.
 
+### 2.4 Multi-Document Request (v0.9.2 optional)
+
+Multi-document AI requests bundle per-document frontiers, preconditions, and ops into a single AI-native v2 envelope. This is an optional extension and MUST be negotiated via capabilities and policy.
+
+See: `docs/specs/lfcc/proposals/LFCC_v0.9.2_Multi_Document_Support.md`.
+
+Minimal example:
+
+```json
+{
+  "request_id": "uuid",
+  "agent_id": "agent_uuid",
+  "intent_id": "intent_uuid",
+  "atomicity": "all_or_nothing",
+  "documents": [
+    {
+      "doc_id": "doc_A",
+      "role": "target",
+      "doc_frontier": { "loro_frontier": ["peerA:10"] },
+      "preconditions": [{ "span_id": "span_1", "if_match_context_hash": "sha256_hex" }],
+      "ops_xml": "<replace_spans annotation=\"anno_uuid\">...</replace_spans>"
+    },
+    {
+      "doc_id": "doc_B",
+      "role": "source",
+      "doc_frontier": { "loro_frontier": ["peerB:7"] }
+    }
+  ],
+  "policy_context": { "policy_id": "policy_uuid" }
+}
+```
+
+Normative notes:
+- Gateways MUST enforce the read barrier per document (each doc state is at least its provided frontier).
+- 409 is reserved for `AI_PRECONDITION_FAILED` (LFCC v0.9 RC Appendix C). Multi-document conflicts MUST be reported per document.
+- `all_or_nothing` MUST be fail-closed (no partial apply). `best_effort` MAY return 200 with mixed per-document outcomes.
+
 ## 3. Success Response (200)
 
 When `return_canonical_tree=true`, gateway SHOULD return canonicalized representation of the applied edit (or of the payload after dry-run).

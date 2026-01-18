@@ -126,6 +126,12 @@ All content equality checks (Shadow Model vs Real Editor) use **Recursive Canoni
     *   On timer fire, check if `stored_token === fired_token`. If not, no-op.
 *   **No Ghosting**: Never allow a stale timer to delete a recovered annotation.
 
+### 6.3 UI & Design System Gates (Strict)
+*   **Specs**: All UI changes MUST adhere to `docs/specs/cowork/cowork-ui-quality-gates.md`.
+*   **No Magic Numbers**: No raw pixels or hex codes. Use `design-system` tokens.
+*   **Physics**: Use `framer-motion` springs for layout interactions.
+*   **Gate Check**: Agents must verify the **5 Quality Gates** (Tokens, Physics, Materials, Icons, A11y) before submitting.
+
 ## 7. Directory Structure
 *   `apps/reader/`: Next.js application with the editor UI.
 *   `packages/core/`: The core LFCC-compliant logic (kernel, sync, annotations).

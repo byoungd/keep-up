@@ -208,6 +208,10 @@ export * from "./session";
 // ============================================================================
 export * from "./skills";
 // ============================================================================
+// SOP (Standard Operating Procedures)
+// ============================================================================
+export * from "./sop";
+// ============================================================================
 // Streaming
 // ============================================================================
 export * from "./streaming";
@@ -267,10 +271,29 @@ export { createAICoreAdapter, createMockLLM } from "./orchestrator/aiCoreAdapter
 export { createOrchestrator } from "./orchestrator/orchestrator";
 export { createBashToolServer } from "./tools/core/bash";
 export { createCodeToolServer } from "./tools/core/code";
+export {
+  COMPLETION_TOOL_DEFINITION,
+  COMPLETION_TOOL_NAME,
+  COMPLETION_TOOL_SCHEMA,
+  type CompleteTaskInput,
+  type CompletionEvent,
+  CompletionToolServer,
+  type CompletionValidationResult,
+  createCompletionToolServer,
+  validateCompletionInput,
+} from "./tools/core/completion";
 export { createFileToolServer } from "./tools/core/file";
 export { createSubagentToolServer } from "./tools/core/subagent";
 export { createGitToolServer } from "./tools/git/gitServer";
-export { createLFCCToolServer } from "./tools/lfcc/lfccServer";
+export {
+  createLFCCToolServer,
+  type LFCCToolServerOptions,
+  type MultiDocumentGatewayRequest,
+  type MultiDocumentGatewayResponse,
+  type MultiDocumentPolicy,
+  type MultiDocumentRequestDocument,
+  type MultiDocumentRole,
+} from "./tools/lfcc/lfccServer";
 // Quick access to commonly used factories
 export { createToolRegistry } from "./tools/mcp/registry";
 export { createWebSearchToolServer } from "./tools/web/webSearchServer";

@@ -1,199 +1,90 @@
-# Cowork API Contracts (Phase 3)
+# Cowork API Contracts
 
-## Purpose
-Define concrete runtime contracts for Cowork mode so the desktop app, orchestration layer, and tools can integrate consistently.
+> **Purpose**: Define concrete HTTP/REST contracts for the Cowork system.
+> **Auth**: All endpoints require `Authorization: Bearer <session_token>` header.
 
-## Core Types
+**Related Specs:**
+- [Data Flow Spec](file:///Users/han/Documents/Code/Parallel/keep-up/docs/specs/cowork/cowork-data-flow-spec.md) — SSE Protocol details
+- [Persistence Spec](file:///Users/han/Documents/Code/Parallel/keep-up/docs/specs/cowork/cowork-persistence-spec.md) — DB schema alignment
+- [Agent Runtime Spec](file:///Users/han/Documents/Code/Parallel/keep-up/docs/specs/agent-runtime-spec-2026.md) — Runtime contracts
 
-### CoworkSession
-```ts
-interface CoworkSession {
-  sessionId: string;
-  userId: string;
-  deviceId: string;
-  platform: "macos";
-  mode: "cowork";
-  grants: FolderGrant[];
-  connectors: ConnectorGrant[];
-  createdAt: number;
-  expiresAt?: number;
-}
-```
+---
 
-### FolderGrant
-```ts
-interface FolderGrant {
-  id: string;
-  rootPath: string;
-  allowWrite: boolean;
-  allowDelete: boolean;
-  allowCreate: boolean;
-  outputRoots?: string[];
-}
-```
+## 1. Sessions & Tasks
 
-### ConnectorGrant
-```ts
-interface ConnectorGrant {
-  id: string;
-  provider: string;
-  scopes: string[];
-  allowActions: boolean;
-}
-```
+### 1.1 Create Session
+`POST /api/cowork/sessions`
+*   **Body**: `{ grants: FolderGrant[], connectors: ConnectorGrant[] }`
+*   **Response**: `201 Created` -> `CoworkSession`
 
-### CoworkTask
-```ts
-interface CoworkTask {
-  taskId: string;
-  sessionId: string;
-  title: string;
-  prompt: string;
-  status:
-    | "queued"
-    | "planning"
-    | "ready"
-    | "running"
-    | "awaiting_confirmation"
-    | "completed"
-    | "failed"
-    | "cancelled";
-  plan?: TaskPlan;
-  createdAt: number;
-  updatedAt: number;
-}
-```
+### 1.2 List Tasks
+`GET /api/cowork/sessions/:sessionId/tasks`
+*   **Query**: `?status=running|completed&limit=50`
+*   **Response**: `200 OK` -> `CoworkTask[]`
 
-### TaskPlan
-```ts
-interface TaskPlan {
-  planId: string;
-  steps: PlanStep[];
-  dependencies: PlanDependency[];
-  riskTags: RiskTag[];
-  estimatedActions: string[];
-}
+### 1.3 Create Task
+`POST /api/cowork/sessions/:sessionId/tasks`
+*   **Body**: `{ prompt: string, model?: string, contextFiles?: string[] }`
+*   **Response**: `201 Created` -> `CoworkTask` (Optimistic)
 
-interface PlanStep {
-  stepId: string;
-  title: string;
-  description: string;
-  requiresConfirmation: boolean;
-}
+### 1.4 Task Control
+*   `POST /api/cowork/tasks/:taskId/stop` -> Stop Execution
+*   `POST /api/cowork/tasks/:taskId/feedback` -> `{ feedback: string }`
 
-interface PlanDependency {
-  stepId: string;
-  dependsOn: string[];
-}
+---
 
-type RiskTag = "delete" | "overwrite" | "network" | "connector" | "batch";
-```
+## 2. Real-Time (SSE)
 
-### TaskSummary
-```ts
-interface TaskSummary {
-  taskId: string;
-  outputs: OutputArtifact[];
-  fileChanges: FileChange[];
-  actionLog: ActionLogEntry[];
-  followups: string[];
-}
+`GET /api/cowork/sessions/:sessionId/events`
+*   **Description**: The persistent event stream.
+*   **Protocol**: See `cowork-data-flow-spec.md`.
 
-interface OutputArtifact {
-  path: string;
-  kind: "document" | "spreadsheet" | "image" | "other";
-}
+---
 
-interface FileChange {
-  path: string;
-  change: "create" | "update" | "delete" | "rename" | "move";
-}
+## 3. Cost & Usage API
 
-interface ActionLogEntry {
-  timestamp: number;
-  action: string;
-  details: string;
-}
-```
+### 3.1 Get Usage Stats
+`GET /api/cowork/sessions/:sessionId/usage`
+*   **Response**:
+    ```ts
+    interface UsageStats {
+      totalTokens: number;
+      totalCostUSD: number;
+      breakdown: {
+        model: string;
+        inputTokens: number;
+        outputTokens: number;
+        cost: number;
+      }[];
+    }
+    ```
 
-## Event Contracts
+### 3.2 Get Token Budget
+`GET /api/cowork/config/budget`
+*   **Response**: `{ dailyLimitUSD: number, remainingUSD: number }`
 
-### Session Events
-```ts
-interface SessionEvent {
-  type: "session.start" | "session.end" | "session.error";
-  sessionId: string;
-  timestamp: number;
-  data?: Record<string, unknown>;
-}
-```
+---
 
-### Task Events
-```ts
-interface TaskEvent {
-  type:
-    | "task.queued"
-    | "task.planning"
-    | "task.plan_ready"
-    | "task.running"
-    | "task.confirmation_required"
-    | "task.confirmation_received"
-    | "task.progress"
-    | "task.completed"
-    | "task.failed"
-    | "task.cancelled";
-  taskId: string;
-  timestamp: number;
-  data?: Record<string, unknown>;
-}
-```
+## 4. Project Context API
 
-### Subagent Events
-```ts
-interface SubagentEvent {
-  type: "subagent.spawned" | "subagent.completed" | "subagent.failed";
-  taskId: string;
-  agentId: string;
-  timestamp: number;
-  data?: Record<string, unknown>;
-}
-```
+### 4.1 Sync Context
+`POST /api/cowork/context/sync`
+*   **Body**: `{ files: string[] }` (List of file paths changed/added)
+*   **Response**: `200 OK` (Accepted for background indexing)
 
-### Tool Events
-```ts
-interface ToolEvent {
-  type: "tool.call" | "tool.result" | "tool.error";
-  taskId: string;
-  toolName: string;
-  timestamp: number;
-  data?: Record<string, unknown>;
-}
-```
+### 4.2 Query Context
+`POST /api/cowork/context/query`
+*   **Body**: `{ query: string, topK: number }`
+*   **Response**: `ContextItem[]`
 
-## Confirmation Contract
-```ts
-interface ConfirmationRequest {
-  requestId: string;
-  taskId: string;
-  reason: string;
-  riskTags: RiskTag[];
-  proposedActions: string[];
-}
+---
 
-interface ConfirmationResponse {
-  requestId: string;
-  approved: boolean;
-  notes?: string;
-}
-```
+## 5. Artifacts API
 
-## API Surface (Draft)
-- `createCoworkSession(grants, connectors)`
-- `enqueueCoworkTask(sessionId, prompt)`
-- `pauseTask(taskId)`, `resumeTask(taskId)`, `cancelTask(taskId)`
-- `streamTaskEvents(taskId)`
-- `submitConfirmation(response)`
+### 5.1 Get Artifact Content
+`GET /api/cowork/artifacts/:artifactId/content`
+*   **Response**: Raw bytes (Octet Stream) or JSON.
 
-## Open Questions
-- Should a task have multiple confirmations or one per plan step?
-- How should partial outputs be exposed during execution?
+### 5.2 List Artifacts
+`GET /api/cowork/tasks/:taskId/artifacts`
+*   **Response**: `ArtifactMetadata[]`

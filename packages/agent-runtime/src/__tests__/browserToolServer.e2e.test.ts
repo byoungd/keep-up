@@ -159,5 +159,11 @@ describeIf("BrowserToolServer (e2e)", () => {
     const screenshot = screenshotResult.content[0];
     expect(screenshot?.type).toBe("image");
     expect(screenshot?.data?.length).toBeGreaterThan(0);
+
+    const closeResult = await toolServer.callTool(
+      { name: "close", arguments: { sessionId: context.sessionId } },
+      context
+    );
+    expect(closeResult.success).toBe(true);
   });
 });

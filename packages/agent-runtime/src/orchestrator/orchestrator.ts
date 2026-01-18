@@ -33,12 +33,12 @@ import {
 } from "../executor";
 import type { KnowledgeRegistry } from "../knowledge";
 import { AGENTS_GUIDE_PROMPT } from "../prompts/agentGuidelines";
+import type { ModelRouter, ModelRoutingDecision } from "../routing/modelRouter";
 import {
   createAuditLogger,
   createPermissionChecker,
   createToolGovernancePolicyEngine,
   createToolPolicyEngine,
-  resolveToolExecutionContext,
 } from "../security";
 import type { SessionState } from "../session";
 import { createSkillPolicyGuard } from "../skills/skillPolicyGuard";
@@ -47,10 +47,12 @@ import { createSkillPromptAdapter } from "../skills/skillPromptAdapter";
 import type { SkillRegistry } from "../skills/skillRegistry";
 import type { SkillSession } from "../skills/skillSession";
 import { createSkillSession } from "../skills/skillSession";
+import type { ISOPExecutor } from "../sop/types";
 import { attachRuntimeEventStreamBridge, type StreamWriter } from "../streaming";
 import { createTaskGraphStore, type TaskGraphStore, type TaskNodeStatus } from "../tasks/taskGraph";
 import type { IMetricsCollector, ITracer, SpanContext, TelemetryContext } from "../telemetry";
 import { AGENT_METRICS } from "../telemetry";
+import { COMPLETION_TOOL_NAME, validateCompletionInput } from "../tools/core/completion";
 import {
   createToolDiscoveryEngine,
   type ToolDiscoveryEngine,
@@ -165,6 +167,8 @@ export type OrchestratorEventType =
   | "control:resumed"
   | "control:step"
   | "control:injected"
+  | "recovery"
+  | "completion"
   | "error"
   | "complete"
   | "usage:update";
@@ -222,6 +226,10 @@ export interface OrchestratorComponents {
   streamBridge?: OrchestratorStreamBridge;
   /** Optional artifact pipeline */
   artifactPipeline?: ArtifactPipeline;
+  /** SOP executor for phase-gated tool filtering (Track E) */
+  sopExecutor?: ISOPExecutor;
+  /** Model router for per-turn model selection (Track F) */
+  modelRouter?: ModelRouter;
 }
 
 export interface OrchestratorStreamBridge {
@@ -230,6 +238,24 @@ export interface OrchestratorStreamBridge {
 }
 
 type ToolMessage = Extract<AgentMessage, { role: "tool" }>;
+
+const DEFAULT_MAX_TURNS = 50;
+const DEFAULT_RECOVERY_GRACE_TURNS = 2;
+const DEFAULT_RECOVERY_TIMEOUT_MS = 60_000;
+const DEFAULT_RECOVERY_WARNING_TEMPLATE =
+  "Final warning: turn limit reached. Call complete_task now with a summary, artifacts, and next steps. Do not call any other tools.";
+
+type CompletionPayload = {
+  summary: string;
+  artifacts?: string[];
+  nextSteps?: string;
+};
+
+type RecoveryState = {
+  active: boolean;
+  warned: boolean;
+  deadlineMs?: number;
+};
 
 // ============================================================================
 // Agent Orchestrator
@@ -264,6 +290,8 @@ export class AgentOrchestrator {
   private readonly taskGraph?: TaskGraphStore;
   private readonly streamBridge?: OrchestratorStreamBridge;
   private readonly artifactPipeline?: ArtifactPipeline;
+  private readonly sopExecutor?: ISOPExecutor;
+  private readonly modelRouter?: ModelRouter;
   private readonly loopStateMachine: AgentLoopStateMachine;
   private readonly singleStepEnforcer: SingleStepEnforcer;
   private lastObservation?: Observation;
@@ -273,6 +301,8 @@ export class AgentOrchestrator {
   private totalUsage: TokenUsageStats = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
   private readonly controlState: ControlStateSnapshot = { paused: false, stepMode: false };
   private controlGate?: { promise: Promise<void>; resolve: () => void };
+  private recoveryState: RecoveryState = { active: false, warned: false };
+  private forceCompletionToolsOnly = false;
 
   private state: AgentState;
 
@@ -383,6 +413,8 @@ export class AgentOrchestrator {
     this.taskGraph = components.taskGraph;
     this.streamBridge = components.streamBridge;
     this.artifactPipeline = components.artifactPipeline;
+    this.sopExecutor = components.sopExecutor;
+    this.modelRouter = components.modelRouter;
 
     this.turnExecutor = createTurnExecutor({
       llm: this.llm,
@@ -432,6 +464,8 @@ export class AgentOrchestrator {
   private async runWithId(userMessage: string, runId: string): Promise<AgentState> {
     this.abortController = new AbortController();
     this.currentRunId = runId;
+    this.recoveryState = { active: false, warned: false };
+    this.forceCompletionToolsOnly = false;
     this.taskGraph?.setEventContext({ correlationId: runId, source: this.config.name });
     this.currentPlanNodeId = this.createPlanNode(userMessage);
     const detachStreamBridge = this.attachStreamBridge(runId);
@@ -444,6 +478,14 @@ export class AgentOrchestrator {
     this.loopStateMachine.stop();
 
     try {
+      if (!this.hasCompletionTool()) {
+        this.state.status = "error";
+        this.state.error = "Completion tool not registered.";
+        this.emit("error", { error: this.state.error });
+        this.metrics?.increment(AGENT_METRICS.turnsTotal.name, { status: "error" });
+        return this.state;
+      }
+
       // Run the agentic loop
       while (this.shouldContinue()) {
         await this.awaitControlGate();
@@ -457,6 +499,16 @@ export class AgentOrchestrator {
       detachStreamBridge?.();
       this.finalizePlanNode();
       this.metrics?.gauge(AGENT_METRICS.activeAgents.name, 0, {});
+    }
+
+    if (
+      this.state.status !== "complete" &&
+      this.state.status !== "waiting_confirmation" &&
+      this.state.status !== "error"
+    ) {
+      this.state.status = "error";
+      this.state.error = this.state.error ?? "Task terminated without calling complete_task.";
+      this.emit("error", { error: this.state.error });
     }
 
     return this.state;
@@ -530,7 +582,11 @@ export class AgentOrchestrator {
    */
   stop(): void {
     this.abortController?.abort();
-    this.state.status = "complete";
+    if (this.state.status !== "error") {
+      this.state.status = "error";
+      this.state.error = this.state.error ?? "Execution aborted before completion.";
+      this.emit("error", { error: this.state.error });
+    }
     this.loopStateMachine.stop();
     this.releaseControlGate();
   }
@@ -713,13 +769,15 @@ export class AgentOrchestrator {
   }
 
   private shouldContinue(): boolean {
-    const maxTurns = this.config.maxTurns ?? 50;
+    const maxTurns = this.config.maxTurns ?? DEFAULT_MAX_TURNS;
+    const hardLimit = this.config.recovery?.hardLimit ?? true;
+    const withinLimit = hardLimit ? this.state.turn < maxTurns : true;
 
     return (
       this.state.status !== "complete" &&
       this.state.status !== "error" &&
       this.state.status !== "waiting_confirmation" &&
-      this.state.turn < maxTurns &&
+      withinLimit &&
       !this.abortController?.signal.aborted
     );
   }
@@ -747,10 +805,10 @@ export class AgentOrchestrator {
 
     if (outcome.type === "complete") {
       return {
-        nextStep: "respond_to_user",
-        reasoning: "Model returned a final response.",
+        nextStep: "handle_error",
+        reasoning: "Completion tool required for termination.",
         shouldUpdatePlan: false,
-        shouldAdvancePhase: true,
+        shouldAdvancePhase: false,
       };
     }
 
@@ -780,47 +838,6 @@ export class AgentOrchestrator {
       },
       rationale: "Model requested multiple tool calls.",
       expectedOutcome: `Results from ${toolCalls.length} tool calls`,
-    };
-  }
-
-  private buildDecisionForResponse(response?: AgentLLMResponse): ToolDecision {
-    return {
-      toolName: "assistant_response",
-      parameters: { content: response?.content ?? "" },
-      rationale: "Model returned a final response.",
-      expectedOutcome: "Response delivered to user.",
-    };
-  }
-
-  private buildResponseObservation(
-    response: AgentLLMResponse | undefined,
-    turnStart: number
-  ): Observation {
-    const content = response?.content ?? "";
-    const toolCall: MCPToolCall = {
-      name: "assistant_response",
-      arguments: { content },
-    };
-    const duration = Date.now() - turnStart;
-    const result: MCPToolResult = {
-      success: true,
-      content: content ? [{ type: "text", text: content }] : [],
-      meta: {
-        durationMs: duration,
-        toolName: toolCall.name,
-        sandboxed: false,
-      },
-    };
-
-    return {
-      toolCall,
-      result,
-      success: true,
-      timestamp: Date.now(),
-      metadata: {
-        duration,
-        attemptNumber: 1,
-      },
     };
   }
 
@@ -894,99 +911,423 @@ export class AgentOrchestrator {
     return undefined;
   }
 
+  private getLatestToolResult(toolName: string): MCPToolResult | undefined {
+    for (let i = this.state.messages.length - 1; i >= 0; i--) {
+      const message = this.state.messages[i];
+      if (message.role === "tool" && message.toolName === toolName) {
+        return message.result;
+      }
+    }
+    return undefined;
+  }
+
+  private parseCompletionPayload(args: unknown): { payload?: CompletionPayload; error?: string } {
+    const validation = validateCompletionInput(args);
+    if (!validation.ok) {
+      return { error: validation.error.message };
+    }
+
+    return { payload: validation.value };
+  }
+
+  private validateCompletionToolCalls(toolCalls: MCPToolCall[]): {
+    status: "none" | "valid" | "invalid";
+    call?: MCPToolCall;
+    reason?: string;
+  } {
+    const completionCalls = toolCalls.filter((call) => this.isCompletionToolName(call.name));
+    if (completionCalls.length === 0) {
+      return { status: "none" };
+    }
+    if (completionCalls.length > 1) {
+      return {
+        status: "invalid",
+        reason: "Completion tool must only be called once per turn.",
+      };
+    }
+    if (toolCalls.length > 1) {
+      return {
+        status: "invalid",
+        reason: "Completion tool must be called alone in its turn.",
+      };
+    }
+    return { status: "valid", call: completionCalls[0] };
+  }
+
+  private shouldEnterRecoveryTurn(): boolean {
+    if (!this.config.recovery?.enabled) {
+      return false;
+    }
+    if (this.recoveryState.warned) {
+      return false;
+    }
+    const maxTurns = this.config.maxTurns ?? DEFAULT_MAX_TURNS;
+    const graceTurns = Math.max(0, this.config.recovery.graceTurns ?? DEFAULT_RECOVERY_GRACE_TURNS);
+    const threshold = Math.max(1, maxTurns - graceTurns);
+    return this.state.turn >= threshold;
+  }
+
+  private beginRecoveryTurn(): void {
+    const warning = this.config.recovery?.warningTemplate ?? DEFAULT_RECOVERY_WARNING_TEMPLATE;
+    const graceTimeoutMs = this.config.recovery?.graceTimeoutMs ?? DEFAULT_RECOVERY_TIMEOUT_MS;
+    const maxTurns = this.config.maxTurns ?? DEFAULT_MAX_TURNS;
+    const graceTurns = this.config.recovery?.graceTurns ?? DEFAULT_RECOVERY_GRACE_TURNS;
+    const deadlineMs = Date.now() + graceTimeoutMs;
+
+    const message: AgentMessage = {
+      role: "system",
+      content: warning,
+    };
+    this.state.messages.push(message);
+    this.recordMessage(message);
+
+    this.recoveryState = { active: true, warned: true, deadlineMs };
+    this.forceCompletionToolsOnly = true;
+    this.emit("recovery", {
+      phase: "final_warning",
+      maxTurns,
+      graceTurns,
+      deadlineMs,
+    });
+  }
+
+  private resetRecoveryState(): void {
+    this.recoveryState.active = false;
+    this.recoveryState.deadlineMs = undefined;
+    this.forceCompletionToolsOnly = false;
+  }
+
+  private hasCompletionTool(): boolean {
+    return Boolean(this.findCompletionTool(this.registry.listTools()));
+  }
+
+  private async executeWithTimeout<T>(
+    task: Promise<T>,
+    timeoutMs: number,
+    errorMessage: string
+  ): Promise<T> {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        reject(new Error(errorMessage));
+      }, timeoutMs);
+    });
+
+    try {
+      return await Promise.race([task, timeout]);
+    } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    }
+  }
+
   private async executeTurn(): Promise<void> {
     this.state.turn++;
     this.state.status = "thinking";
     this.emit("turn:start", { turn: this.state.turn });
 
     const turnStart = Date.now();
-    let turnSpan: SpanContext | undefined;
-
-    if (this.tracer) {
-      turnSpan = this.tracer.startSpan(`agent.turn.${this.state.turn}`, {
-        attributes: { turn: this.state.turn },
-      });
-    }
+    const isRecoveryTurn = this.shouldEnterRecoveryTurn();
+    const turnSpan = this.startTurnSpan();
 
     try {
-      this.startLoopCycle();
+      const outcome = await this.runTurnCycle(isRecoveryTurn, turnSpan);
+      this.updateStateFromOutcome(outcome);
 
-      const outcome = await this.turnExecutor.execute(this.state, turnSpan);
-
-      // Update state with used messages and new assistant message
-      if (outcome.compressedMessages && outcome.assistantMessage) {
-        // Create new history from compressed messages + new assistant message
-        this.state.messages = [...outcome.compressedMessages, outcome.assistantMessage];
-        this.recordMessage(outcome.assistantMessage);
-      }
-
-      // Track usage
-      if (outcome.usage) {
-        this.accumulateUsage(outcome.usage);
-      }
-
-      const thinkingResult = this.buildThinkingResult(outcome);
-      this.loopStateMachine.transitionToDecision(thinkingResult);
-
-      // Handle outcome
-      if (outcome.type === "complete") {
-        const decision = this.buildDecisionForResponse(outcome.response);
-        this.loopStateMachine.transitionToAction(decision);
-        const observation = this.buildResponseObservation(outcome.response, turnStart);
-        this.loopStateMachine.transitionToObservation(observation);
-        this.lastObservation = observation;
-        this.loopStateMachine.completeCycle();
-
-        this.state.status = "complete";
-        this.emit("complete", { content: outcome.response?.content });
-        this.metrics?.increment(AGENT_METRICS.turnsTotal.name, { status: "complete" });
-        turnSpan?.setStatus("ok");
+      if (isRecoveryTurn) {
+        await this.finalizeRecoveryTurn(outcome, turnStart, turnSpan);
         return;
       }
 
-      if (outcome.type === "tool_use" && outcome.toolCalls) {
-        this.enforceToolExecutionPolicy(outcome.toolCalls);
-        const decision = this.buildDecisionForToolCalls(outcome.toolCalls);
-        const shouldExecute = await this.maybeCreatePlan(outcome.toolCalls);
-        if (!shouldExecute) {
-          const observation = this.buildPlanRejectionObservation(outcome.toolCalls, turnStart);
-          this.loopStateMachine.transitionToAction(decision);
-          this.loopStateMachine.transitionToObservation(observation);
-          this.lastObservation = observation;
-          this.loopStateMachine.completeCycle();
-
-          this.state.status = "complete";
-          this.emit("turn:end", { turn: this.state.turn });
-          this.metrics?.increment(AGENT_METRICS.turnsTotal.name, { status: "success" });
-          turnSpan?.setStatus("ok");
-          return;
-        }
-
-        this.state.status = "executing";
-        this.loopStateMachine.transitionToAction(decision);
-        await this.executeToolCalls(outcome.toolCalls, turnSpan);
-        const observation = this.buildToolObservation(outcome.toolCalls, turnStart);
-        this.loopStateMachine.transitionToObservation(observation);
-        this.lastObservation = observation;
-        this.loopStateMachine.completeCycle();
-      } else if (outcome.type === "error") {
-        throw new Error(outcome.error ?? "Unknown execution error");
-      }
-
-      this.emit("turn:end", { turn: this.state.turn });
-      this.metrics?.increment(AGENT_METRICS.turnsTotal.name, { status: "success" });
-      turnSpan?.setStatus("ok");
+      await this.finalizeStandardTurn(outcome, turnStart, turnSpan);
     } catch (err) {
-      this.state.status = "error";
-      this.state.error = err instanceof Error ? err.message : String(err);
-      this.emit("error", { error: this.state.error });
-      this.metrics?.increment(AGENT_METRICS.turnsTotal.name, { status: "error" });
-      turnSpan?.setStatus("error", this.state.error);
-      this.loopStateMachine.stop();
+      this.handleTurnError(err, turnSpan);
     } finally {
+      this.resetRecoveryState();
       this.metrics?.observe(AGENT_METRICS.turnDuration.name, Date.now() - turnStart, {});
       turnSpan?.end();
     }
+  }
+
+  private startTurnSpan(): SpanContext | undefined {
+    if (!this.tracer) {
+      return undefined;
+    }
+
+    return this.tracer.startSpan(`agent.turn.${this.state.turn}`, {
+      attributes: { turn: this.state.turn },
+    });
+  }
+
+  private async runTurnCycle(
+    isRecoveryTurn: boolean,
+    turnSpan?: SpanContext
+  ): Promise<TurnOutcome> {
+    if (isRecoveryTurn) {
+      this.ensureRecoveryReady();
+      this.beginRecoveryTurn();
+    }
+
+    this.startLoopCycle();
+
+    // Model routing (Track F): Resolve model before LLM call
+    const routingDecision = this.resolveModelForTurn();
+    if (routingDecision) {
+      this.emitRoutingDecision(routingDecision);
+      turnSpan?.setAttribute("model.resolved", routingDecision.resolved);
+    }
+
+    const outcomePromise = this.turnExecutor.execute(this.state, turnSpan);
+    if (!isRecoveryTurn) {
+      return await outcomePromise;
+    }
+
+    return await this.executeWithTimeout(
+      outcomePromise,
+      this.getRecoveryTimeoutMs(),
+      "Recovery timed out before completion."
+    );
+  }
+
+  private resolveModelForTurn(): ModelRoutingDecision | undefined {
+    if (!this.modelRouter) {
+      return undefined;
+    }
+
+    const phaseContext = this.sopExecutor?.getCurrentPhase();
+    return this.modelRouter.resolveForTurn({
+      taskType: "agent-turn",
+      risk: "medium",
+      budget: { maxTokens: 4096 },
+      phaseContext,
+      turn: this.state.turn,
+    });
+  }
+
+  private emitRoutingDecision(decision: ModelRoutingDecision): void {
+    this.emit("routing:decision" as OrchestratorEventType, {
+      requested: decision.requested,
+      resolved: decision.resolved,
+      reason: decision.reason,
+      policy: decision.policy,
+      turn: this.state.turn,
+    });
+
+    this.eventBus?.emit("routing:decision", decision, {
+      source: "orchestrator",
+      correlationId: this.currentRunId,
+      priority: "normal",
+    });
+  }
+
+  private ensureRecoveryReady(): void {
+    if (!this.hasCompletionTool()) {
+      throw new Error("Completion tool not registered for recovery.");
+    }
+  }
+
+  private getRecoveryTimeoutMs(): number {
+    if (this.recoveryState.deadlineMs) {
+      return Math.max(0, this.recoveryState.deadlineMs - Date.now());
+    }
+
+    return DEFAULT_RECOVERY_TIMEOUT_MS;
+  }
+
+  private updateStateFromOutcome(outcome: TurnOutcome): void {
+    if (outcome.compressedMessages && outcome.assistantMessage) {
+      this.state.messages = [...outcome.compressedMessages, outcome.assistantMessage];
+      this.recordMessage(outcome.assistantMessage);
+    }
+
+    if (outcome.usage) {
+      this.accumulateUsage(outcome.usage);
+    }
+
+    const thinkingResult = this.buildThinkingResult(outcome);
+    this.loopStateMachine.transitionToDecision(thinkingResult);
+  }
+
+  private async finalizeRecoveryTurn(
+    outcome: TurnOutcome,
+    turnStart: number,
+    turnSpan?: SpanContext
+  ): Promise<void> {
+    await this.handleRecoveryOutcome(outcome, turnStart, turnSpan);
+    this.emit("turn:end", { turn: this.state.turn });
+  }
+
+  private async finalizeStandardTurn(
+    outcome: TurnOutcome,
+    turnStart: number,
+    turnSpan?: SpanContext
+  ): Promise<void> {
+    if (outcome.type === "complete") {
+      throw new Error("Completion tool required for termination.");
+    }
+
+    if (outcome.type === "error") {
+      throw new Error(outcome.error ?? "Unknown execution error");
+    }
+
+    if (outcome.type === "tool_use" && outcome.toolCalls) {
+      const handled = await this.tryHandleCompletionToolCalls(
+        outcome.toolCalls,
+        turnStart,
+        turnSpan
+      );
+      if (handled) {
+        return;
+      }
+
+      await this.handleToolUseOutcome(outcome.toolCalls, turnStart, turnSpan);
+    }
+
+    this.emitTurnSuccess(turnSpan);
+  }
+
+  private async tryHandleCompletionToolCalls(
+    toolCalls: MCPToolCall[],
+    turnStart: number,
+    turnSpan?: SpanContext
+  ): Promise<boolean> {
+    const completionValidation = this.validateCompletionToolCalls(toolCalls);
+    if (completionValidation.status === "invalid") {
+      throw new Error(completionValidation.reason ?? "Invalid completion tool call.");
+    }
+
+    if (completionValidation.status !== "valid" || !completionValidation.call) {
+      return false;
+    }
+
+    await this.handleCompletionToolTurn(
+      completionValidation.call,
+      toolCalls,
+      turnStart,
+      turnSpan,
+      false
+    );
+    this.emit("turn:end", { turn: this.state.turn });
+    return true;
+  }
+
+  private async handleToolUseOutcome(
+    toolCalls: MCPToolCall[],
+    turnStart: number,
+    turnSpan?: SpanContext
+  ): Promise<void> {
+    this.enforceToolExecutionPolicy(toolCalls);
+    const decision = this.buildDecisionForToolCalls(toolCalls);
+    const shouldExecute = await this.maybeCreatePlan(toolCalls);
+    if (!shouldExecute) {
+      this.recordPlanRejection(decision, toolCalls, turnStart);
+      throw new Error("Plan approval denied.");
+    }
+
+    this.state.status = "executing";
+    this.loopStateMachine.transitionToAction(decision);
+    await this.executeToolCalls(toolCalls, turnSpan);
+    const observation = this.buildToolObservation(toolCalls, turnStart);
+    this.loopStateMachine.transitionToObservation(observation);
+    this.lastObservation = observation;
+    this.loopStateMachine.completeCycle();
+  }
+
+  private recordPlanRejection(
+    decision: ToolDecision,
+    toolCalls: MCPToolCall[],
+    turnStart: number
+  ): void {
+    const observation = this.buildPlanRejectionObservation(toolCalls, turnStart);
+    this.loopStateMachine.transitionToAction(decision);
+    this.loopStateMachine.transitionToObservation(observation);
+    this.lastObservation = observation;
+    this.loopStateMachine.completeCycle();
+  }
+
+  private emitTurnSuccess(turnSpan?: SpanContext): void {
+    this.emit("turn:end", { turn: this.state.turn });
+    this.metrics?.increment(AGENT_METRICS.turnsTotal.name, { status: "success" });
+    turnSpan?.setStatus("ok");
+  }
+
+  private handleTurnError(err: unknown, turnSpan?: SpanContext): void {
+    this.state.status = "error";
+    this.state.error = err instanceof Error ? err.message : String(err);
+    this.emit("error", { error: this.state.error });
+    this.metrics?.increment(AGENT_METRICS.turnsTotal.name, { status: "error" });
+    turnSpan?.setStatus("error", this.state.error);
+    this.loopStateMachine.stop();
+  }
+
+  private async handleRecoveryOutcome(
+    outcome: TurnOutcome,
+    turnStart: number,
+    turnSpan?: SpanContext
+  ): Promise<void> {
+    if (outcome.type !== "tool_use" || !outcome.toolCalls) {
+      throw new Error("Recovery failed: completion tool must be called.");
+    }
+
+    const validation = this.validateCompletionToolCalls(outcome.toolCalls);
+    if (validation.status !== "valid" || !validation.call) {
+      throw new Error(`Recovery failed: ${validation.reason ?? "completion tool must be called."}`);
+    }
+
+    await this.handleCompletionToolTurn(
+      validation.call,
+      outcome.toolCalls,
+      turnStart,
+      turnSpan,
+      true
+    );
+  }
+
+  private async handleCompletionToolTurn(
+    completionCall: MCPToolCall,
+    toolCalls: MCPToolCall[],
+    turnStart: number,
+    turnSpan: SpanContext | undefined,
+    isRecovery: boolean
+  ): Promise<boolean> {
+    const decision = this.buildDecisionForToolCalls(toolCalls);
+    this.state.status = "executing";
+    this.loopStateMachine.transitionToAction(decision);
+    await this.executeToolCalls(toolCalls, turnSpan);
+    const observation = this.buildToolObservation(toolCalls, turnStart);
+    this.loopStateMachine.transitionToObservation(observation);
+    this.lastObservation = observation;
+    this.loopStateMachine.completeCycle();
+
+    const result = this.getLatestToolResult(completionCall.name);
+    if (!result?.success) {
+      const reason = isRecovery
+        ? "Recovery failed: completion tool execution failed."
+        : "Completion tool execution failed.";
+      throw new Error(reason);
+    }
+
+    const parsedPayload = this.parseCompletionPayload(completionCall.arguments);
+    if (!parsedPayload.payload) {
+      throw new Error(parsedPayload.error ?? "Completion payload missing required fields.");
+    }
+
+    this.state.status = "complete";
+    this.emitCompletion(parsedPayload.payload);
+    this.metrics?.increment(AGENT_METRICS.turnsTotal.name, { status: "complete" });
+    turnSpan?.setStatus("ok");
+    return true;
+  }
+
+  private emitCompletion(payload: CompletionPayload): void {
+    this.emit("completion", { ...payload });
+    this.emit("complete", {
+      content: payload.summary,
+      summary: payload.summary,
+      artifacts: payload.artifacts,
+      nextSteps: payload.nextSteps,
+    });
   }
 
   private enforceToolExecutionPolicy(toolCalls: MCPToolCall[]): void {
@@ -997,6 +1338,31 @@ export class AgentOrchestrator {
     const result = this.singleStepEnforcer.validate(toolCalls);
     if (!result.valid) {
       throw new Error(result.error ?? "Interactive policy allows a single tool call per turn.");
+    }
+
+    // SOP phase-gated tool filtering (Track E)
+    this.enforceSOPToolFiltering(toolCalls);
+  }
+
+  private enforceSOPToolFiltering(toolCalls: MCPToolCall[]): void {
+    if (!this.sopExecutor) {
+      return;
+    }
+
+    for (const call of toolCalls) {
+      // Always allow completion tools regardless of phase
+      if (this.isCompletionToolName(call.name)) {
+        continue;
+      }
+
+      if (!this.sopExecutor.isToolAllowed(call.name)) {
+        const currentPhase = this.sopExecutor.getCurrentPhase();
+        const allowedTools = this.sopExecutor.getAllowedTools();
+        throw new Error(
+          `SOP violation: Tool "${call.name}" is not allowed in phase "${currentPhase}". ` +
+            `Allowed tools: [${allowedTools.join(", ")}]`
+        );
+      }
     }
   }
 
@@ -1551,7 +1917,15 @@ export class AgentOrchestrator {
   }
 
   private getToolDefinitions(): AgentToolDefinition[] {
-    const tools = this.selectToolsForPrompt(this.registry.listTools());
+    const allTools = this.registry.listTools();
+    let tools = this.selectToolsForPrompt(allTools);
+    const completionTool = this.findCompletionTool(allTools);
+    if (completionTool && !tools.some((tool) => tool.name === completionTool.name)) {
+      tools = [...tools, completionTool];
+    }
+    if (this.forceCompletionToolsOnly) {
+      tools = completionTool ? [completionTool] : [];
+    }
     return tools.map((tool) => ({
       name: tool.name,
       description: tool.description,
@@ -1580,6 +1954,14 @@ export class AgentOrchestrator {
 
     const filtered = tools.filter((tool) => selected.has(tool.name));
     return filtered.length > 0 ? filtered : tools;
+  }
+
+  private findCompletionTool(tools: MCPTool[]): MCPTool | undefined {
+    return tools.find((tool) => this.isCompletionToolName(tool.name));
+  }
+
+  private isCompletionToolName(name: string): boolean {
+    return name === COMPLETION_TOOL_NAME || name.endsWith(`:${COMPLETION_TOOL_NAME}`);
   }
 
   private ensureTaskGraphToolNode(call: MCPToolCall, status: TaskNodeStatus): string | undefined {
@@ -1778,7 +2160,13 @@ export interface CreateOrchestratorOptions {
   toolExecution?: ToolExecutionOptions;
   eventBus?: RuntimeEventBus;
   planApprovalHandler?: PlanApprovalHandler;
-  recovery?: { enabled?: boolean };
+  recovery?: {
+    enabled?: boolean;
+    graceTurns?: number;
+    graceTimeoutMs?: number;
+    warningTemplate?: string;
+    hardLimit?: boolean;
+  };
   toolDiscovery?: { enabled?: boolean; maxResults?: number; minScore?: number };
   skills?: {
     registry?: SkillRegistry;
@@ -1871,13 +2259,20 @@ function buildAgentConfig(
     systemPrompt: options.systemPrompt ?? DEFAULT_SYSTEM_PROMPT,
     security,
     toolServers: [],
-    maxTurns: options.maxTurns ?? 50,
+    maxTurns: options.maxTurns ?? DEFAULT_MAX_TURNS,
     requireConfirmation: options.requireConfirmation ?? true,
-    toolExecutionContext: resolveToolExecutionContext(options.toolExecutionContext, security),
     parallelExecution,
     planning: buildPlanningConfig(options.planning),
-    recovery: { enabled: options.recovery?.enabled ?? false },
+    recovery: buildRecoveryConfig(options.recovery),
     toolDiscovery: buildToolDiscoveryConfig(options.toolDiscovery),
+    toolExecutionContext: options.toolExecutionContext
+      ? {
+          policy: options.toolExecutionContext.policy ?? "batch",
+          allowedTools: options.toolExecutionContext.allowedTools ?? [],
+          requiresApproval: options.toolExecutionContext.requiresApproval ?? [],
+          maxParallel: options.toolExecutionContext.maxParallel ?? 1,
+        }
+      : undefined,
   };
 }
 
@@ -1900,6 +2295,18 @@ function buildToolDiscoveryConfig(
     enabled: toolDiscovery?.enabled ?? false,
     maxResults: toolDiscovery?.maxResults,
     minScore: toolDiscovery?.minScore,
+  };
+}
+
+function buildRecoveryConfig(
+  recovery: CreateOrchestratorOptions["recovery"]
+): AgentConfig["recovery"] {
+  return {
+    enabled: recovery?.enabled ?? false,
+    graceTurns: recovery?.graceTurns ?? DEFAULT_RECOVERY_GRACE_TURNS,
+    graceTimeoutMs: recovery?.graceTimeoutMs ?? DEFAULT_RECOVERY_TIMEOUT_MS,
+    warningTemplate: recovery?.warningTemplate ?? DEFAULT_RECOVERY_WARNING_TEMPLATE,
+    hardLimit: recovery?.hardLimit ?? true,
   };
 }
 

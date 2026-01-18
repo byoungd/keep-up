@@ -265,7 +265,6 @@ export class ErrorRecoveryEngine {
       attempts: 0,
     });
   }
-
   private async attemptRecovery(
     toolCall: MCPToolCall,
     initialError: ToolError,

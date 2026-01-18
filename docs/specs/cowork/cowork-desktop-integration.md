@@ -1,7 +1,14 @@
 # Cowork Desktop Integration Spec (Phase 2)
 
-## Purpose
-Describe how Cowork should integrate with the Claude Desktop environment and local execution runtime.
+> [!NOTE]
+> This specification describes the future integration with a Desktop App wrapper (e.g. Tauri/Electron).
+> It relies on the core contracts defined in Phase 1 & 2.
+
+**Related Specs:**
+- [Agent Runtime Spec](file:///Users/han/Documents/Code/Parallel/keep-up/docs/specs/agent-runtime-spec-2026.md) — Core Sandbox Interfaces
+- [Cowork App Architecture](file:///Users/han/Documents/Code/Parallel/keep-up/docs/specs/cowork/cowork-app-architecture.md) — The App Structure
+
+---
 
 ## Platform Gate
 - Cowork mode is enabled only on macOS in the research preview.

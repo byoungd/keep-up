@@ -138,7 +138,7 @@ export function ResizableSidebar({
     return (
       // biome-ignore lint/a11y/noStaticElementInteractions: Mouse interaction needed for auto-collapse
       <div
-        className={cn("relative shrink-0 z-overlay border-r bg-surface-1", className)}
+        className={cn("relative shrink-0 z-overlay border-r bg-sidebar", className)}
         style={{ width: collapsedWidth }}
         onMouseLeave={() => {
           if (autoExpanded && !isDragging) {
@@ -177,7 +177,7 @@ export function ResizableSidebar({
     // biome-ignore lint/a11y/noStaticElementInteractions: Mouse interaction needed for auto-collapse
     <div
       className={cn(
-        "relative shrink-0 z-overlay border-r bg-surface-1",
+        "relative shrink-0 z-overlay border-r bg-sidebar",
         isDragging && "select-none",
         isFloating && "fixed left-0 top-0 bottom-0 shadow-2xl z-50",
         className

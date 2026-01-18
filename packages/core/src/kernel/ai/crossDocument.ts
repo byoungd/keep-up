@@ -1,10 +1,10 @@
 /**
- * LFCC v0.9.1+ — Cross-Document AI Operations
+ * LFCC v0.9.2+ — Cross-Document AI Operations
  *
  * Protocol for AI operations spanning multiple documents.
  * Enables document linking, cross-references, and atomic multi-doc edits.
  *
- * @see docs/specs/proposals/LFCC_v0.9.1_AI_Native_Enhancement.md
+ * @see docs/specs/lfcc/LFCC_v0.9_RC.md
  */
 
 import type { EditIntent } from "./intent.js";
@@ -27,17 +27,21 @@ export function documentId(id: string): DocumentId {
 }
 
 /**
- * Stable anchor within a document.
+ * Anchor bias for position resolution.
+ * @see LFCC v0.9.2 §5 Stable Anchors
+ */
+export type AnchorBias = "left" | "right";
+
+/**
+ * Stable anchor within a document (LFCC v0.9.2 format).
+ * Uses Base64-encoded stable position from CRDT engine.
  */
 export interface StableAnchor {
-  /** Block ID */
-  block_id: string;
+  /** Base64-encoded stable anchor from CRDT engine */
+  anchor: string;
 
-  /** Character offset within block */
-  offset?: number;
-
-  /** Anchor stability version */
-  version: number;
+  /** Bias for position resolution */
+  bias: AnchorBias;
 }
 
 // ============================================================================
@@ -65,8 +69,11 @@ export interface CrossDocReference {
   source: {
     doc_id: DocumentId;
     block_id: string;
-    anchor: StableAnchor;
+    start: StableAnchor;
+    end: StableAnchor;
     excerpt?: string;
+    /** Context hash for precondition validation (LFCC v0.9.2 §11.1) */
+    if_match_context_hash?: string;
   };
 
   /** Target document and location */
@@ -75,6 +82,12 @@ export interface CrossDocReference {
     block_id: string;
     anchor: StableAnchor;
     excerpt?: string;
+  };
+
+  /** Creator metadata (LFCC v0.9.2) */
+  created_by?: {
+    agent_id: string;
+    request_id: string;
   };
 
   /** Reference type */
@@ -152,11 +165,11 @@ export interface DocumentOp {
 
 /**
  * Atomicity level for cross-document operations.
+ * @see LFCC v0.9.2 — only all_or_nothing and best_effort are conformant
  */
 export type AtomicityLevel =
   | "all_or_nothing" // All docs succeed or all rollback
-  | "best_effort" // Apply what succeeds
-  | "independent"; // Each doc is independent
+  | "best_effort"; // Apply what succeeds
 
 /**
  * Complete cross-document AI operation.
