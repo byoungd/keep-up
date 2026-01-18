@@ -96,6 +96,12 @@ export interface SpawnAgentOptions {
   /** Agent type to spawn */
   type: AgentType;
 
+  /**
+   * Optional agent ID override (internal use).
+   * @internal
+   */
+  agentId?: string;
+
   /** Task description for the agent */
   task: string;
 
