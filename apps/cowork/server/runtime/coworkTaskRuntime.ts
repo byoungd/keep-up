@@ -22,6 +22,7 @@ import {
 // import { createGhostAgent, type GhostAgent } from "@ku0/agent-runtime";
 // import { createMem0MemoryAdapter, type Mem0MemoryAdapter } from "@ku0/agent-runtime";
 import { normalizeModelId } from "@ku0/ai-core";
+import { DEFAULT_PROJECT_CONTEXT_TOKEN_BUDGET } from "@ku0/shared";
 import { ApprovalService } from "../services/approvalService";
 import type { ContextIndexManager } from "../services/contextIndexManager";
 import { ProviderKeyService } from "../services/providerKeyService";
@@ -37,7 +38,12 @@ import { ProjectContextManager } from "./services/ProjectContextManager";
 import { ProviderManager } from "./services/ProviderManager";
 import { SessionLifecycleManager } from "./services/SessionLifecycleManager";
 import { TaskOrchestrator } from "./services/TaskOrchestrator";
-import { collectOutputRoots, combinePromptAdditions } from "./utils";
+import {
+  collectOutputRoots,
+  combinePromptAdditions,
+  estimateTokens,
+  truncateToTokenBudget,
+} from "./utils";
 import { createWebSearchProvider } from "./webSearchProvider";
 
 type Logger = Pick<Console, "info" | "warn" | "error" | "debug">;
@@ -318,8 +324,25 @@ export class CoworkTaskRuntime {
     session: CoworkSession,
     modeManager: AgentModeManager
   ): Promise<{ addition?: string; contextPackKey: string | null }> {
-    const projectContext = await this.projectContextManager.getContext(session);
-    const packPrompt = await this.projectContextManager.getContextPackPrompt(session);
+    const totalBudget = DEFAULT_PROJECT_CONTEXT_TOKEN_BUDGET + DEFAULT_CONTEXT_PACK_TOKEN_BUDGET;
+    const rawProjectContext = await this.projectContextManager.getContext(
+      session,
+      Number.POSITIVE_INFINITY
+    );
+    const projectTokens = rawProjectContext ? estimateTokens(rawProjectContext) : 0;
+    const baseProjectBudget = Math.min(projectTokens, DEFAULT_PROJECT_CONTEXT_TOKEN_BUDGET);
+    const packBudget = Math.max(totalBudget - baseProjectBudget, 0);
+
+    const packPrompt = await this.projectContextManager.getContextPackPrompt(session, {
+      tokenBudget: packBudget,
+    });
+    const packTokens = packPrompt.prompt ? estimateTokens(packPrompt.prompt) : 0;
+    const projectBudget = Math.min(projectTokens, Math.max(totalBudget - packTokens, 0));
+    const projectContext =
+      rawProjectContext && projectBudget > 0
+        ? truncateToTokenBudget(rawProjectContext, projectBudget)
+        : "";
+
     const addition = combinePromptAdditions(
       projectContext ? projectContext : undefined,
       packPrompt.prompt,
@@ -633,6 +656,7 @@ function buildDockerSecurityPolicy() {
 }
 
 const DEFAULT_DOCKER_IMAGE = "node:20-alpine";
+const DEFAULT_CONTEXT_PACK_TOKEN_BUDGET = 1500;
 
 function resolveRuntimeAssetDir(): string {
   return process.env.COWORK_RUNTIME_ASSET_DIR

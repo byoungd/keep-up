@@ -171,4 +171,27 @@ export class EventStreamPublisher {
       totalTokens: data.usage.totalTokens,
     });
   }
+
+  publishTokenUsage(data: {
+    sessionId: string;
+    messageId?: string;
+    taskId?: string;
+    usage: TokenUsageStats;
+    costUsd: number | null;
+    modelId?: string;
+    providerId?: string;
+  }) {
+    this.events.publish(data.sessionId, COWORK_EVENTS.TOKEN_USAGE, {
+      messageId: data.messageId,
+      taskId: data.taskId,
+      inputTokens: data.usage.inputTokens,
+      outputTokens: data.usage.outputTokens,
+      totalTokens: data.usage.totalTokens,
+      costUsd: data.costUsd,
+      modelId: data.modelId,
+      providerId: data.providerId,
+      contextWindow: data.usage.contextWindow,
+      utilization: data.usage.utilization,
+    });
+  }
 }

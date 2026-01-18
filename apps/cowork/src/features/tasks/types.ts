@@ -165,4 +165,11 @@ export interface TaskGraph {
   savedAt?: number;
   agentMode?: "plan" | "build";
   usage?: TokenUsageStats;
+  messageUsage?: Record<string, MessageUsage>;
 }
+
+export type MessageUsage = TokenUsageStats & {
+  costUsd?: number | null;
+  modelId?: string;
+  providerId?: string;
+};

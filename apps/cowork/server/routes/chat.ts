@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import type { TokenUsageStats } from "@ku0/agent-runtime";
 import {
   createAnthropicAdapter,
   createGoogleAdapter,
@@ -17,12 +18,15 @@ import type { ProviderKeyService } from "../services/providerKeyService";
 import type { ChatMessageStoreLike, SessionStoreLike } from "../storage/contracts";
 import { ensureStateDir } from "../storage/statePaths";
 import type { CoworkChatAttachmentRef, CoworkChatMessage, CoworkSettings } from "../storage/types";
+import { COWORK_EVENTS, type SessionEventHub } from "../streaming/eventHub";
+import { calculateUsageCostUsd, mergeTokenUsage, normalizeTokenUsage } from "../utils/tokenUsage";
 
 interface ChatRouteDeps {
   sessionStore: SessionStoreLike;
   chatMessageStore: ChatMessageStoreLike;
   getSettings: () => Promise<CoworkSettings>;
   providerKeys: ProviderKeyService;
+  events: SessionEventHub;
 }
 
 interface ChatRequestBody {
@@ -109,6 +113,7 @@ export function createChatRoutes(deps: ChatRouteDeps) {
     return streamText(c, async (stream) => {
       await executeAIStream(stream, {
         routerInfo,
+        sessionId,
         assistantMessageId,
         userContent: body.content,
         chatMessageStore: deps.chatMessageStore,
@@ -120,60 +125,170 @@ export function createChatRoutes(deps: ChatRouteDeps) {
     stream: { write: (s: string) => Promise<unknown> },
     opts: {
       routerInfo: ChatRouterInfo;
+      sessionId: string;
       assistantMessageId: string;
       userContent: string;
       chatMessageStore: ChatMessageStoreLike;
     }
   ) {
-    const { routerInfo, assistantMessageId, userContent, chatMessageStore } = opts;
-    const startTime = Date.now();
-    let firstChunkAt: number | null = null;
-    let fullContent = "";
+    const { routerInfo, sessionId, assistantMessageId, userContent, chatMessageStore } = opts;
     const model = routerInfo.model;
+    const startTime = Date.now();
+    const state: StreamState = { fullContent: "", firstChunkAt: null, usage: null };
 
     try {
-      const response = routerInfo.router.stream({
-        model,
-        messages: [
-          { role: "system", content: "You are a helpful AI assistant." },
-          { role: "user", content: userContent },
-        ],
+      await streamAssistantResponse(stream, routerInfo, userContent, state);
+      const usageStats = state.usage ? normalizeTokenUsage(state.usage, model) : null;
+      const costUsd = usageStats ? calculateUsageCostUsd(usageStats, model) : null;
+
+      await persistAssistantMessage(chatMessageStore, assistantMessageId, {
+        content: state.fullContent,
+        usageStats,
+        costUsd,
+        modelId: model,
+        providerId: routerInfo.providerId,
+        startTime,
+        firstChunkAt: state.firstChunkAt,
       });
 
-      for await (const chunk of response) {
-        if (chunk.type === "content" && chunk.content) {
-          if (!firstChunkAt) {
-            firstChunkAt = Date.now();
-          }
-          fullContent += chunk.content;
-          await stream.write(chunk.content);
-        }
+      if (usageStats) {
+        await publishUsageEvents(sessionId, assistantMessageId, usageStats, {
+          modelId: model,
+          providerId: routerInfo.providerId,
+          costUsd,
+        });
       }
-
-      await chatMessageStore.update(assistantMessageId, (message) => ({
-        ...message,
-        content: fullContent,
-        status: fullContent ? "done" : "error",
-        updatedAt: Date.now(),
-        metadata: {
-          ...message.metadata,
-          telemetry: {
-            ttfbMs: firstChunkAt ? firstChunkAt - startTime : null,
-            ttftMs: firstChunkAt ? firstChunkAt - startTime : null,
-            durationMs: Date.now() - startTime,
-          },
-        },
-      }));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Chat failed";
-      await stream.write(`\n\nError: ${message}`);
-      await chatMessageStore.update(assistantMessageId, (prev) => ({
-        ...prev,
-        content: `${fullContent}\n\nError: ${message}`.trim(),
-        status: "error",
-        updatedAt: Date.now(),
-      }));
+      await handleStreamFailure(stream, chatMessageStore, assistantMessageId, {
+        error,
+        content: state.fullContent,
+      });
     }
+  }
+
+  type StreamState = {
+    fullContent: string;
+    firstChunkAt: number | null;
+    usage: TokenUsageStats | null;
+  };
+
+  async function streamAssistantResponse(
+    stream: { write: (s: string) => Promise<unknown> },
+    routerInfo: ChatRouterInfo,
+    userContent: string,
+    state: StreamState
+  ): Promise<void> {
+    const response = routerInfo.router.stream({
+      model: routerInfo.model,
+      messages: [
+        { role: "system", content: "You are a helpful AI assistant." },
+        { role: "user", content: userContent },
+      ],
+    });
+
+    for await (const chunk of response) {
+      if (chunk.type === "content" && chunk.content) {
+        if (!state.firstChunkAt) {
+          state.firstChunkAt = Date.now();
+        }
+        state.fullContent += chunk.content;
+        await stream.write(chunk.content);
+        continue;
+      }
+      if (chunk.type === "usage" && chunk.usage) {
+        state.usage = chunk.usage;
+      }
+    }
+  }
+
+  async function persistAssistantMessage(
+    chatMessageStore: ChatMessageStoreLike,
+    assistantMessageId: string,
+    data: {
+      content: string;
+      usageStats: TokenUsageStats | null;
+      costUsd: number | null;
+      modelId: string;
+      providerId?: string;
+      startTime: number;
+      firstChunkAt: number | null;
+    }
+  ): Promise<void> {
+    const usageMetadata = data.usageStats
+      ? {
+          usage: {
+            ...data.usageStats,
+            costUsd: data.costUsd,
+            modelId: data.modelId,
+            providerId: data.providerId,
+          },
+        }
+      : {};
+    const telemetry = {
+      ttfbMs: data.firstChunkAt ? data.firstChunkAt - data.startTime : null,
+      ttftMs: data.firstChunkAt ? data.firstChunkAt - data.startTime : null,
+      durationMs: Date.now() - data.startTime,
+    };
+
+    await chatMessageStore.update(assistantMessageId, (message) => ({
+      ...message,
+      content: data.content,
+      status: data.content ? "done" : "error",
+      updatedAt: Date.now(),
+      metadata: {
+        ...message.metadata,
+        ...usageMetadata,
+        telemetry,
+      },
+    }));
+  }
+
+  async function handleStreamFailure(
+    stream: { write: (s: string) => Promise<unknown> },
+    chatMessageStore: ChatMessageStoreLike,
+    assistantMessageId: string,
+    data: { error: unknown; content: string }
+  ): Promise<void> {
+    const message = data.error instanceof Error ? data.error.message : "Chat failed";
+    await stream.write(`\n\nError: ${message}`);
+    await chatMessageStore.update(assistantMessageId, (prev) => ({
+      ...prev,
+      content: `${data.content}\n\nError: ${message}`.trim(),
+      status: "error",
+      updatedAt: Date.now(),
+    }));
+  }
+
+  async function publishUsageEvents(
+    sessionId: string,
+    messageId: string,
+    usage: TokenUsageStats,
+    meta: { modelId?: string; providerId?: string; costUsd: number | null }
+  ) {
+    const updated = await deps.sessionStore.update(sessionId, (session) => ({
+      ...session,
+      usage: mergeTokenUsage(session.usage, usage),
+    }));
+
+    if (updated?.usage) {
+      deps.events.publish(sessionId, COWORK_EVENTS.SESSION_USAGE_UPDATED, {
+        inputTokens: updated.usage.inputTokens,
+        outputTokens: updated.usage.outputTokens,
+        totalTokens: updated.usage.totalTokens,
+      });
+    }
+
+    deps.events.publish(sessionId, COWORK_EVENTS.TOKEN_USAGE, {
+      messageId,
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      totalTokens: usage.totalTokens,
+      costUsd: meta.costUsd,
+      modelId: meta.modelId,
+      providerId: meta.providerId,
+      contextWindow: usage.contextWindow,
+      utilization: usage.utilization,
+    });
   }
 
   function setChatResponseHeaders(

@@ -13,6 +13,7 @@ export const COWORK_EVENTS = {
   SESSION_DELETED: "session.deleted",
   SESSION_MODE_CHANGED: "session.mode.changed",
   SESSION_USAGE_UPDATED: "session.usage.updated",
+  TOKEN_USAGE: "token.usage",
 
   // Task lifecycle
   TASK_CREATED: "task.created",
@@ -66,6 +67,18 @@ export interface CoworkEventPayloads {
     inputTokens: number;
     outputTokens: number;
     totalTokens: number;
+  };
+  [COWORK_EVENTS.TOKEN_USAGE]: {
+    messageId?: string;
+    taskId?: string;
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+    costUsd: number | null;
+    modelId?: string;
+    providerId?: string;
+    contextWindow?: number;
+    utilization?: number;
   };
   [COWORK_EVENTS.TASK_CREATED]: {
     taskId: string;
