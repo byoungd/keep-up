@@ -195,9 +195,13 @@ export function countOpsFromXml(xml: string): number {
 }
 
 export function countTargetOps(document: MultiDocumentRequestDocument): number {
-  if (document.ops_xml) {
-    return countOpsFromXml(document.ops_xml);
+  const spanCount = document.gateway_request?.target_spans?.length;
+  const xmlCount = document.ops_xml ? countOpsFromXml(document.ops_xml) : 0;
+  if (typeof spanCount === "number") {
+    return Math.max(1, Math.max(spanCount, xmlCount));
   }
-  const spanCount = document.gateway_request?.target_spans?.length ?? 0;
-  return Math.max(1, spanCount);
+  if (document.ops_xml) {
+    return Math.max(1, xmlCount);
+  }
+  return 1;
 }

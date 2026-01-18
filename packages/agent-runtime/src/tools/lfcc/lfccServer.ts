@@ -335,6 +335,64 @@ function normalizeGatewayRequestInput(
     : undefined;
 }
 
+function extractIntentId(request: MultiDocumentGatewayRequest): string | undefined {
+  if (typeof request.intent_id === "string" && request.intent_id.trim().length > 0) {
+    return request.intent_id;
+  }
+  if (isRecord(request.intent) && typeof request.intent.id === "string") {
+    const intentId = request.intent.id.trim();
+    return intentId.length > 0 ? intentId : undefined;
+  }
+  return undefined;
+}
+
+function policyContextMatches(
+  left: gateway.AIGatewayRequest["policy_context"] | undefined,
+  right: gateway.AIGatewayRequest["policy_context"] | undefined
+): boolean {
+  if (!left || !right) {
+    return true;
+  }
+  return stableStringify(left) === stableStringify(right);
+}
+
+function validateGatewayRequestOverrides(
+  docId: string,
+  gatewayRequestInput: gateway.AIGatewayRequest,
+  request: MultiDocumentGatewayRequest
+): { ok: true } | { ok: false; error: string } {
+  if (gatewayRequestInput.agent_id && gatewayRequestInput.agent_id !== request.agent_id) {
+    return {
+      ok: false,
+      error: `gateway_request agent_id does not match request agent_id for ${docId}`,
+    };
+  }
+  const intentId = extractIntentId(request);
+  if (gatewayRequestInput.intent_id && intentId && gatewayRequestInput.intent_id !== intentId) {
+    return {
+      ok: false,
+      error: `gateway_request intent_id does not match request intent_id for ${docId}`,
+    };
+  }
+  if (!policyContextMatches(gatewayRequestInput.policy_context, request.policy_context)) {
+    return {
+      ok: false,
+      error: `gateway_request policy_context does not match request policy_context for ${docId}`,
+    };
+  }
+  return { ok: true };
+}
+
+function sanitizeGatewayRequestForFingerprint(
+  gatewayRequest: gateway.AIGatewayRequest | undefined
+): gateway.AIGatewayRequest | undefined {
+  if (!gatewayRequest) {
+    return undefined;
+  }
+  const { request_id: _requestId, client_request_id: _clientRequestId, ...rest } = gatewayRequest;
+  return rest;
+}
+
 function normalizeDocumentFrontier(
   doc: Record<string, unknown>,
   gatewayRequestInput: gateway.AIGatewayRequest | undefined,
@@ -366,6 +424,11 @@ function normalizeTargetGatewayRequest(
     return { ok: false, error: `gateway_request doc_id mismatch for ${docId}` };
   }
 
+  const overridesResult = validateGatewayRequestOverrides(docId, gatewayRequestInput, request);
+  if (!overridesResult.ok) {
+    return { ok: false, error: overridesResult.error };
+  }
+
   const requestFrontierInput =
     gatewayRequestInput.doc_frontier ?? gatewayRequestInput.doc_frontier_tag;
   if (requestFrontierInput !== undefined) {
@@ -381,14 +444,16 @@ function normalizeTargetGatewayRequest(
     }
   }
 
+  const resolvedIntentId = extractIntentId(request) ?? gatewayRequestInput.intent_id;
+  const resolvedPolicyContext = request.policy_context ?? gatewayRequestInput.policy_context;
   const hydratedRequest: gateway.AIGatewayRequest = {
     ...gatewayRequestInput,
     doc_id: docId,
     doc_frontier_tag: frontier.tag,
     doc_frontier: frontier.tag,
-    agent_id: gatewayRequestInput.agent_id ?? request.agent_id,
-    intent_id: gatewayRequestInput.intent_id ?? request.intent_id,
-    policy_context: gatewayRequestInput.policy_context ?? request.policy_context,
+    agent_id: request.agent_id,
+    intent_id: resolvedIntentId,
+    policy_context: resolvedPolicyContext,
   };
 
   const parsed = gateway.parseGatewayRequest(hydratedRequest);
@@ -1623,9 +1688,15 @@ export class LFCCToolServer extends BaseToolServer {
   }
 
   private buildMultiDocFingerprint(request: MultiDocumentGatewayRequest): string {
+    const documents = [...request.documents]
+      .map((doc) => ({
+        ...doc,
+        gateway_request: sanitizeGatewayRequestForFingerprint(doc.gateway_request),
+      }))
+      .sort((a, b) => a.doc_id.localeCompare(b.doc_id));
     return stableStringify({
       ...request,
-      documents: [...request.documents].sort((a, b) => a.doc_id.localeCompare(b.doc_id)),
+      documents,
     });
   }
 

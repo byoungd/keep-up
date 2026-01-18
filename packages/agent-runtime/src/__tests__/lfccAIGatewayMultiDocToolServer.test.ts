@@ -209,4 +209,178 @@ describe("LFCCToolServer multi-document AI Gateway", () => {
     expect(payload.code).toBe("AI_PRECONDITION_FAILED");
     expect(payload.failed_documents).toHaveLength(1);
   });
+
+  it("treats per-doc request id changes as idempotent", async () => {
+    const docA = createGatewayFixture("doc-a", "peer-a:1");
+    const server = createLFCCToolServer({
+      aiGatewayResolver: (docId) => (docId === "doc-a" ? docA.aiGateway : undefined),
+      policyDomainResolver: () => "policy-1",
+      multiDocumentPolicy: multiDocPolicy,
+    });
+
+    const baseGatewayRequest = gateway.createGatewayRequest({
+      docId: "doc-a",
+      docFrontierTag: docA.provider.getFrontierTag(),
+      targetSpans: [
+        {
+          annotation_id: "a1",
+          span_id: "s1",
+          if_match_context_hash: "hash-1",
+        },
+      ],
+      instructions: "Replace greeting",
+      format: "html",
+      payload: "Hi",
+      requestId: "req-a",
+      clientRequestId: "req-a",
+      agentId: "agent-1",
+    });
+
+    const request = {
+      request_id: "req-multi-idem",
+      agent_id: "agent-1",
+      intent_id: "intent-1",
+      atomicity: "best_effort",
+      documents: [
+        {
+          doc_id: "doc-a",
+          role: "target",
+          gateway_request: baseGatewayRequest,
+        },
+      ],
+    };
+
+    const first = await server.callTool(
+      { name: "ai_gateway_multi_request", arguments: { request } },
+      baseContext
+    );
+    expect(first.success).toBe(true);
+    const firstPayload = JSON.parse(first.content[0].text);
+    expect(firstPayload.status).toBe(200);
+
+    const replayRequest = {
+      ...request,
+      documents: [
+        {
+          ...request.documents[0],
+          gateway_request: {
+            ...baseGatewayRequest,
+            request_id: "req-a-2",
+            client_request_id: "req-a-2",
+          },
+        },
+      ],
+    };
+
+    const replay = await server.callTool(
+      { name: "ai_gateway_multi_request", arguments: { request: replayRequest } },
+      baseContext
+    );
+    expect(replay.success).toBe(true);
+    const replayPayload = JSON.parse(replay.content[0].text);
+    expect(replayPayload.status).toBe(200);
+    expect(replayPayload.operation_id).toBe(firstPayload.operation_id);
+  });
+
+  it("rejects per-doc agent_id overrides", async () => {
+    const docA = createGatewayFixture("doc-a", "peer-a:1");
+    const server = createLFCCToolServer({
+      aiGatewayResolver: (docId) => (docId === "doc-a" ? docA.aiGateway : undefined),
+      policyDomainResolver: () => "policy-1",
+      multiDocumentPolicy: multiDocPolicy,
+    });
+
+    const request = {
+      request_id: "req-multi-agent",
+      agent_id: "agent-1",
+      intent_id: "intent-1",
+      atomicity: "best_effort",
+      documents: [
+        {
+          doc_id: "doc-a",
+          role: "target",
+          gateway_request: gateway.createGatewayRequest({
+            docId: "doc-a",
+            docFrontierTag: docA.provider.getFrontierTag(),
+            targetSpans: [
+              {
+                annotation_id: "a1",
+                span_id: "s1",
+                if_match_context_hash: "hash-1",
+              },
+            ],
+            instructions: "Replace greeting",
+            format: "html",
+            payload: "Hi",
+            requestId: "req-a",
+            clientRequestId: "req-a",
+            agentId: "agent-2",
+          }),
+        },
+      ],
+    };
+
+    const result = await server.callTool(
+      { name: "ai_gateway_multi_request", arguments: { request } },
+      baseContext
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error?.code).toBe("INVALID_ARGUMENTS");
+  });
+
+  it("counts gateway_request spans even when ops_xml undercounts", async () => {
+    const docA = createGatewayFixture("doc-a", "peer-a:1");
+    const server = createLFCCToolServer({
+      aiGatewayResolver: (docId) => (docId === "doc-a" ? docA.aiGateway : undefined),
+      policyDomainResolver: () => "policy-1",
+      multiDocumentPolicy: { ...multiDocPolicy, max_total_ops: 1 },
+    });
+
+    const request = {
+      request_id: "req-multi-ops",
+      agent_id: "agent-1",
+      intent_id: "intent-1",
+      atomicity: "best_effort",
+      documents: [
+        {
+          doc_id: "doc-a",
+          role: "target",
+          ops_xml: '<replace_spans><span span_id="s1"></span></replace_spans>',
+          gateway_request: gateway.createGatewayRequest({
+            docId: "doc-a",
+            docFrontierTag: docA.provider.getFrontierTag(),
+            targetSpans: [
+              {
+                annotation_id: "a1",
+                span_id: "s1",
+                if_match_context_hash: "hash-1",
+              },
+              {
+                annotation_id: "a1",
+                span_id: "s2",
+                if_match_context_hash: "hash-2",
+              },
+            ],
+            instructions: "Replace greeting",
+            format: "html",
+            payload: "Hi",
+            requestId: "req-a",
+            clientRequestId: "req-a",
+            agentId: "agent-1",
+          }),
+        },
+      ],
+    };
+
+    const result = await server.callTool(
+      { name: "ai_gateway_multi_request", arguments: { request } },
+      baseContext
+    );
+
+    expect(result.success).toBe(true);
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.status).toBe(400);
+    expect(payload.code).toBe("AI_MULTI_DOCUMENT_LIMIT_EXCEEDED");
+  });
 });
