@@ -19,8 +19,8 @@ export async function createSqliteTaskStore(): Promise<SqliteTaskStore> {
   const db = await getDatabase();
 
   const insertStmt = db.prepare(`
-    INSERT INTO tasks (task_id, session_id, title, prompt, status, created_at, updated_at)
-    VALUES ($taskId, $sessionId, $title, $prompt, $status, $createdAt, $updatedAt)
+    INSERT INTO tasks (task_id, session_id, title, prompt, status, metadata, created_at, updated_at)
+    VALUES ($taskId, $sessionId, $title, $prompt, $status, $metadata, $createdAt, $updatedAt)
   `);
 
   const selectAllStmt = db.prepare(`
@@ -37,7 +37,7 @@ export async function createSqliteTaskStore(): Promise<SqliteTaskStore> {
 
   const updateStmt = db.prepare(`
     UPDATE tasks
-    SET title = $title, prompt = $prompt, status = $status, updated_at = $updatedAt
+    SET title = $title, prompt = $prompt, status = $status, metadata = $metadata, updated_at = $updatedAt
     WHERE task_id = $taskId
   `);
 
@@ -52,6 +52,7 @@ export async function createSqliteTaskStore(): Promise<SqliteTaskStore> {
       title: row.title as string,
       prompt: row.prompt as string,
       status: row.status as CoworkTask["status"],
+      metadata: parseMetadata(row.metadata),
       createdAt: row.created_at as number,
       updatedAt: row.updated_at as number,
     };
@@ -84,6 +85,7 @@ export async function createSqliteTaskStore(): Promise<SqliteTaskStore> {
         $title: task.title,
         $prompt: task.prompt,
         $status: task.status,
+        $metadata: JSON.stringify(task.metadata ?? {}),
         $createdAt: task.createdAt,
         $updatedAt: task.updatedAt,
       });
@@ -105,6 +107,7 @@ export async function createSqliteTaskStore(): Promise<SqliteTaskStore> {
         $title: updated.title,
         $prompt: updated.prompt,
         $status: updated.status,
+        $metadata: JSON.stringify(updated.metadata ?? {}),
         $updatedAt: updated.updatedAt,
       });
       return updated;
@@ -115,4 +118,16 @@ export async function createSqliteTaskStore(): Promise<SqliteTaskStore> {
       return result.changes > 0;
     },
   };
+}
+
+function parseMetadata(raw: unknown): Record<string, unknown> {
+  if (typeof raw !== "string") {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
 }

@@ -66,6 +66,7 @@ export interface CoworkTask {
   modelId?: string;
   providerId?: string;
   fallbackNotice?: string;
+  metadata?: Record<string, unknown>;
   plan?: CoworkTaskPlan;
   createdAt: number;
   updatedAt: number;
@@ -149,6 +150,26 @@ export interface CoworkWorkflowTemplate {
   lastUsedAt?: number;
   lastUsedInputs?: Record<string, string>;
   lastUsedSessionId?: string;
+}
+
+export interface CoworkTokenUsage {
+  messageId?: string;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  estimatedCostUsd: number;
+  modelId: string;
+  providerId: string;
+  timestamp: number;
+}
+
+export interface CoworkSessionCostSummary {
+  sessionId: string;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalCostUsd: number;
+  messageCount: number;
+  byModel: Record<string, CoworkTokenUsage>;
 }
 
 export type { WorkflowTemplate, WorkflowContext, WorkflowPhase };

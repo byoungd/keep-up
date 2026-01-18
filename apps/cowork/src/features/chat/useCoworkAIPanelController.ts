@@ -50,6 +50,7 @@ export function useCoworkAIPanelController() {
     content: string;
     mode: "chat" | "task";
     attachments?: ChatAttachmentRef[];
+    metadata?: Record<string, unknown>;
   } | null>(null);
   const pendingAttachmentRef = useRef<FileList | null>(null);
   const attachmentRefs = useRef(new Map<string, ChatAttachmentRef>());
@@ -147,6 +148,7 @@ export function useCoworkAIPanelController() {
     void sendMessage(pending.content, pending.mode, {
       modelId: model,
       attachments: pending.attachments,
+      metadata: pending.metadata,
     });
     if (pending.attachments && pending.attachments.length > 0) {
       clearAttachments();
@@ -158,7 +160,8 @@ export function useCoworkAIPanelController() {
       resolvedContent: string,
       mode: "chat" | "task",
       nextAttachments: ChatAttachmentRef[],
-      parentId?: string
+      parentId?: string,
+      metadata?: Record<string, unknown>
     ) => {
       if (mode === "task") {
         setStatusMessage("Initiating task...");
@@ -172,6 +175,7 @@ export function useCoworkAIPanelController() {
           modelId: model,
           attachments: mode === "chat" ? nextAttachments : undefined,
           parentId: mode === "chat" ? parentId : undefined,
+          metadata: mode === "task" ? metadata : undefined,
         });
       }
       setBranchParentId(null);
@@ -191,9 +195,14 @@ export function useCoworkAIPanelController() {
   }, [editingMessageId, attachments]);
 
   const queueSendAfterNavigation = useCallback(
-    async (targetSessionId: string, content: string, mode: "chat" | "task") => {
+    async (
+      targetSessionId: string,
+      content: string,
+      mode: "chat" | "task",
+      metadata?: Record<string, unknown>
+    ) => {
       const readyRefs = getReadyAttachmentRefs(attachments, attachmentRefs.current);
-      pendingMessageRef.current = { content, mode, attachments: readyRefs };
+      pendingMessageRef.current = { content, mode, attachments: readyRefs, metadata };
       setBranchParentId(null);
       await navigate({
         to: "/sessions/$sessionId",
@@ -204,25 +213,30 @@ export function useCoworkAIPanelController() {
   );
 
   const sendInSession = useCallback(
-    async (resolvedContent: string, mode: "chat" | "task", parentId?: string) => {
+    async (
+      resolvedContent: string,
+      mode: "chat" | "task",
+      parentId?: string,
+      metadata?: Record<string, unknown>
+    ) => {
       const readyRefs = getReadyAttachmentRefs(attachments, attachmentRefs.current);
-      await executeMessageSend(resolvedContent, mode, readyRefs, parentId);
+      await executeMessageSend(resolvedContent, mode, readyRefs, parentId, metadata);
       clearAttachments();
     },
     [attachments, executeMessageSend, clearAttachments]
   );
 
   const runTemplate = useCallback(
-    async (prompt: string, mode: "plan" | "build") => {
+    async (prompt: string, mode: "plan" | "build", metadata?: Record<string, unknown>) => {
       const targetSessionId = await prepareSession(prompt);
       if (targetSessionId) {
         await setSessionMode(targetSessionId, mode);
       }
       if (targetSessionId !== sessionId) {
-        await queueSendAfterNavigation(targetSessionId, prompt, "task");
+        await queueSendAfterNavigation(targetSessionId, prompt, "task", metadata);
         return;
       }
-      await sendInSession(prompt, "task");
+      await sendInSession(prompt, "task", undefined, metadata);
     },
     [prepareSession, queueSendAfterNavigation, sendInSession, sessionId]
   );

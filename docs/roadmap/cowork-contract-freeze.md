@@ -4,7 +4,7 @@
 Lock the minimum shared contracts so Tracks 1–6 can proceed in parallel
 without blocking each other.
 
-## Contract Freeze v0.1 (Required)
+## Contract Freeze v0.2 (Required)
 
 ### ChatMessage Schema
 ```ts
@@ -40,6 +40,7 @@ interface ChatAttachmentRef {
 ### SSE Events (Chat + Task)
 - `message.created`, `message.delta`, `message.completed`, `message.error`
 - `task.status`, `task.plan`, `task.step`, `task.tool`, `task.artifact`
+- `token.usage` (Phase 2+; see Track 10 payload)
 - Required fields: `sessionId`, `messageId?`, `taskId?`, `timestamp`, `id`
 
 ### Approval Metadata

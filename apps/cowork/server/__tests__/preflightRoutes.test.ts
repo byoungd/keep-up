@@ -215,4 +215,37 @@ describe("Preflight routes", () => {
     expect(auditStore.entries.length).toBe(1);
     expect(data.artifact.type).toBe("preflight");
   });
+
+  it("blocks preflight when session is in plan mode", async () => {
+    const planSession: CoworkSession = {
+      sessionId: "session-plan",
+      userId: "user-1",
+      deviceId: "device-1",
+      platform: "macos",
+      mode: "cowork",
+      agentMode: "plan",
+      grants: [
+        {
+          id: "grant-2",
+          rootPath,
+          allowWrite: false,
+          allowDelete: false,
+          allowCreate: false,
+        },
+      ],
+      connectors: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    await sessionStore.create(planSession);
+
+    const res = await app.request("/preflight", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId: "session-plan" }),
+    });
+    expect(res.status).toBe(409);
+    const data = (await res.json()) as { error?: { message?: string } };
+    expect(data.error?.message).toBe("Preflight requires Build Mode");
+  });
 });

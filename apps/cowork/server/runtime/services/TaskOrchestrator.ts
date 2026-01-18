@@ -10,6 +10,11 @@ import {
 } from "@ku0/agent-runtime";
 import { isRecord } from "@ku0/shared";
 import type { TaskStoreLike } from "../../storage/contracts";
+import {
+  calculateUsageCostUsd,
+  mergeTokenUsage,
+  normalizeTokenUsage,
+} from "../../utils/tokenUsage";
 import { extractErrorCode, extractTelemetry, isToolError } from "../utils";
 import type { ApprovalCoordinator } from "./ApprovalCoordinator";
 import type { ArtifactProcessor } from "./ArtifactProcessor";
@@ -22,8 +27,11 @@ type PlanStep = {
   status: "pending" | "in_progress" | "completed" | "failed";
 };
 
+import { CostTrackerService } from "../../services/CostTrackerService";
+
 export class TaskOrchestrator {
   private taskWriteQueue: Promise<void> = Promise.resolve();
+  private readonly costTracker = new CostTrackerService();
 
   constructor(
     private readonly taskStore: TaskStoreLike,
@@ -48,6 +56,7 @@ export class TaskOrchestrator {
       modelId: task.modelId,
       providerId: task.providerId,
       fallbackNotice: task.fallbackNotice,
+      metadata: task.metadata,
     });
     return task;
   }
@@ -89,6 +98,7 @@ export class TaskOrchestrator {
       modelId: updated.modelId,
       providerId: updated.providerId,
       fallbackNotice: updated.fallbackNotice,
+      metadata: updated.metadata,
     });
   }
 
@@ -165,7 +175,8 @@ export class TaskOrchestrator {
   async handleOrchestratorEvent(
     sessionId: string,
     activeTaskId: string | null,
-    event: { type: string; data: unknown }
+    event: { type: string; data: unknown },
+    context?: { modelId?: string; providerId?: string }
   ): Promise<void> {
     switch (event.type) {
       case "thinking":
@@ -178,7 +189,11 @@ export class TaskOrchestrator {
         this.handleToolResultEvent(sessionId, activeTaskId, event.data);
         break;
       case "usage:update":
-        await this.handleUsageUpdate(sessionId, event.data as { totalUsage: TokenUsageStats });
+        await this.handleUsageUpdate(
+          sessionId,
+          activeTaskId,
+          event.data as { usage: TokenUsageStats; totalUsage: TokenUsageStats }
+        );
         break;
       case "plan:created":
         await this.handlePlanCreatedEvent(sessionId, activeTaskId, event.data);
@@ -281,16 +296,67 @@ export class TaskOrchestrator {
    */
   private async handleUsageUpdate(
     sessionId: string,
-    data: { totalUsage: TokenUsageStats }
+    activeTaskId: string | null,
+    data: { usage: TokenUsageStats; totalUsage: TokenUsageStats }
   ): Promise<void> {
-    await this.sessionManager.updateSession(sessionId, (s) => ({
+    if (
+      !data ||
+      !data.usage ||
+      typeof data.usage.inputTokens !== "number" ||
+      typeof data.usage.outputTokens !== "number" ||
+      typeof data.usage.totalTokens !== "number"
+    ) {
+      return;
+    }
+
+    const taskId = activeTaskId ?? undefined;
+    const task = taskId ? await this.taskStore.getById(taskId) : null;
+    const modelId = task?.modelId;
+    const providerId = task?.providerId;
+    const usageStats = normalizeTokenUsage(data.usage, modelId);
+    const costUsd = calculateUsageCostUsd(usageStats, modelId);
+
+    const updatedSession = await this.sessionManager.updateSession(sessionId, (s) => ({
       ...s,
-      usage: data.totalUsage,
+      usage: mergeTokenUsage(s.usage, usageStats),
     }));
 
-    this.eventPublisher.publishSessionUsageUpdated({
+    if (updatedSession?.usage) {
+      this.eventPublisher.publishSessionUsageUpdated({
+        sessionId,
+        usage: updatedSession.usage,
+      });
+    }
+
+    if (taskId) {
+      await this.taskStore.update(taskId, (taskRecord) => {
+        const existingUsage = readUsageMetadata(taskRecord.metadata);
+        const mergedUsage = mergeTokenUsage(existingUsage, usageStats);
+        const mergedCostUsd = calculateUsageCostUsd(mergedUsage, taskRecord.modelId);
+        const metadata = {
+          ...(taskRecord.metadata ?? {}),
+          usage: {
+            ...mergedUsage,
+            costUsd: mergedCostUsd,
+            ...(taskRecord.modelId ? { modelId: taskRecord.modelId } : {}),
+            ...(taskRecord.providerId ? { providerId: taskRecord.providerId } : {}),
+          },
+        };
+        return {
+          ...taskRecord,
+          metadata,
+          updatedAt: Date.now(),
+        };
+      });
+    }
+
+    this.eventPublisher.publishTokenUsage({
       sessionId,
-      usage: data.totalUsage,
+      taskId,
+      usage: usageStats,
+      costUsd: costUsd,
+      modelId,
+      providerId,
     });
   }
 
@@ -385,4 +451,28 @@ export class TaskOrchestrator {
     );
     return next;
   }
+}
+
+function readUsageMetadata(
+  metadata: Record<string, unknown> | undefined
+): TokenUsageStats | undefined {
+  if (!metadata || !isRecord(metadata.usage)) {
+    return undefined;
+  }
+  const usage = metadata.usage;
+  if (
+    typeof usage.inputTokens !== "number" ||
+    typeof usage.outputTokens !== "number" ||
+    typeof usage.totalTokens !== "number"
+  ) {
+    return undefined;
+  }
+
+  return {
+    inputTokens: usage.inputTokens,
+    outputTokens: usage.outputTokens,
+    totalTokens: usage.totalTokens,
+    ...(typeof usage.contextWindow === "number" ? { contextWindow: usage.contextWindow } : {}),
+    ...(typeof usage.utilization === "number" ? { utilization: usage.utilization } : {}),
+  };
 }

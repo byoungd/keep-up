@@ -54,9 +54,11 @@ autonomous edits.
 
 ## Required Behavior
 - Preflight runs only approved commands.
+- Preflight runs only in Build Mode; Plan Mode must block execution and suggest switching modes.
 - Report is attached to the session and diff artifacts.
 - Failures do not block manual override but require confirmation.
 - Results are visible in the message timeline.
+- When the Phase G sandbox runtime is enabled, run checks inside the sandbox execution path.
 
 ## Implementation Outline
 1. Add preflight runner in agent-runtime.
@@ -85,6 +87,8 @@ autonomous edits.
 ## Dependencies
 - Track 4 for approvals.
 - Track 5 for telemetry.
+- Track 9 for Build Mode gating.
+- Track 15 (Phase F2) for background jobs + V2 event bus in autonomous runs.
 
 ## Owner Checklist
 - Follow `CODING_STANDARDS.md`.
