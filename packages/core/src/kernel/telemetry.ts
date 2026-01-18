@@ -131,7 +131,7 @@ export const noopTelemetryAdapter: TelemetryAdapter = {
 
 /**
  * Console telemetry adapter for development.
- * Logs all metrics to console.
+ * Logs all metrics to stdout.
  */
 export function createConsoleTelemetryAdapter(options?: {
   prefix?: string;
@@ -140,29 +140,42 @@ export function createConsoleTelemetryAdapter(options?: {
   const prefix = options?.prefix ?? "[LFCC Telemetry]";
   const minDurationMs = options?.minDurationMs ?? 0;
 
+  function formatPayload(value: unknown): string {
+    if (value === undefined || value === null || value === "") {
+      return "";
+    }
+    try {
+      return ` ${JSON.stringify(value)}`;
+    } catch {
+      return ` ${String(value)}`;
+    }
+  }
+
+  function writeLine(message: string): void {
+    if (typeof process === "undefined" || !process.stdout) {
+      return;
+    }
+    process.stdout.write(`${message}\n`);
+  }
+
   return {
     trackDuration(metric, durationMs, tags) {
       if (durationMs >= minDurationMs) {
-        // biome-ignore lint/suspicious/noConsole: dev adapter
-        console.log(`${prefix} DURATION ${metric}=${durationMs}ms`, tags ?? "");
+        writeLine(`${prefix} DURATION ${metric}=${durationMs}ms${formatPayload(tags)}`);
       }
     },
     count(metric, count, tags) {
       const actualCount = count ?? 1;
-      // biome-ignore lint/suspicious/noConsole: dev adapter
-      console.log(`${prefix} COUNT ${metric}=${actualCount}`, tags ?? "");
+      writeLine(`${prefix} COUNT ${metric}=${actualCount}${formatPayload(tags)}`);
     },
     gauge(metric, value, tags) {
-      // biome-ignore lint/suspicious/noConsole: dev adapter
-      console.log(`${prefix} GAUGE ${metric}=${value}`, tags ?? "");
+      writeLine(`${prefix} GAUGE ${metric}=${value}${formatPayload(tags)}`);
     },
     histogram(metric, value, tags) {
-      // biome-ignore lint/suspicious/noConsole: dev adapter
-      console.log(`${prefix} HISTOGRAM ${metric}=${value}`, tags ?? "");
+      writeLine(`${prefix} HISTOGRAM ${metric}=${value}${formatPayload(tags)}`);
     },
     event(eventName, data) {
-      // biome-ignore lint/suspicious/noConsole: dev adapter
-      console.log(`${prefix} EVENT ${eventName}`, data);
+      writeLine(`${prefix} EVENT ${eventName}${formatPayload(data)}`);
     },
   };
 }

@@ -86,7 +86,9 @@ export class DoubleBlindHarness {
       completedSteps++;
 
       if (this.config.verbose) {
-        console.log(`Step ${i}: ${op.type} - ${stepResult.mismatch ? "MISMATCH" : "OK"}`);
+        process.stdout.write(
+          `Step ${i}: ${op.type} - ${stepResult.mismatch ? "MISMATCH" : "OK"}\n`
+        );
       }
     }
     return { stepResults, completedSteps, mismatch };

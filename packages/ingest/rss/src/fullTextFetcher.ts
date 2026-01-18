@@ -5,6 +5,7 @@
  * Uses Mozilla Readability for content extraction.
  */
 
+import { observability } from "@ku0/core";
 import { type ExtractedContent, type ExtractOptions, extractFromHtml } from "./contentExtractor";
 import { type RetryOptions, withRetry } from "./retry";
 
@@ -19,6 +20,7 @@ export interface FetchFullTextOptions extends ExtractOptions {
 
 const DEFAULT_TIMEOUT = 15000;
 const DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; LinguaStream/1.0; +https://example.com)";
+const logger = observability.getLogger();
 
 /**
  * Fetch and extract full article content from a URL.
@@ -90,7 +92,10 @@ export async function fetchFullTextBatch(
         const content = await fetchFullText(url, options);
         results.set(url, content);
       } catch (error) {
-        console.warn(`[FullTextFetcher] Failed to fetch ${url}:`, error);
+        logger.warn("ingest", "Failed to fetch full text", {
+          url,
+          error: error instanceof Error ? error.message : String(error),
+        });
         results.set(url, null);
       }
     });

@@ -22,6 +22,17 @@ const LOG_LEVEL_PRIORITY: Record<LogLevel, number> = {
   fatal: 5,
 };
 
+function writeLine(output: string, stream: "stdout" | "stderr"): void {
+  if (typeof process === "undefined") {
+    return;
+  }
+  const target = stream === "stderr" ? process.stderr : process.stdout;
+  if (!target) {
+    return;
+  }
+  target.write(`${output}\n`);
+}
+
 /** Structured log entry */
 export interface LogEntry {
   /** Log level */
@@ -162,13 +173,8 @@ export class ConsoleTransport implements ILogTransport {
   write(entry: LogEntry): void {
     const output = this.options.pretty ? this.formatPretty(entry) : this.formatJson(entry);
 
-    if (entry.level === "error" || entry.level === "fatal") {
-      // biome-ignore lint/suspicious/noConsole: Logger transport
-      console.error(output);
-    } else {
-      // biome-ignore lint/suspicious/noConsole: Logger transport
-      console.info(output);
-    }
+    const stream = entry.level === "error" || entry.level === "fatal" ? "stderr" : "stdout";
+    writeLine(output, stream);
   }
 
   private formatJson(entry: LogEntry): string {

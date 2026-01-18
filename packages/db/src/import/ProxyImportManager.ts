@@ -5,10 +5,13 @@
  * Maintains the same public API as the original ImportManager.
  */
 
+import { observability } from "@ku0/core";
 import type { WorkerDbClient } from "../client";
 import type { ImportSourceType } from "../driver/types";
 import type { WorkerEvent } from "../worker/index";
 import type { CreateImportJobInput, ImportManagerEvents, IngestorFn } from "./types";
+
+const logger = observability.getLogger();
 
 export class ProxyImportManager {
   private eventListeners: {
@@ -66,7 +69,8 @@ export class ProxyImportManager {
       try {
         (handler as unknown as (...args: unknown[]) => void)(...args);
       } catch (err) {
-        console.error("[ProxyImportManager] Event handler error:", err);
+        const error = err instanceof Error ? err : new Error(String(err));
+        logger.error("ingest", "ProxyImportManager event handler error", error);
       }
     }
   }
@@ -131,7 +135,8 @@ export class ProxyImportManager {
       this.emit("onJobDeleted", jobId);
       return true;
     } catch (error) {
-      console.error("[ProxyImportManager] deleteJob failed", error);
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error("ingest", "ProxyImportManager deleteJob failed", err, { jobId });
       return false;
     }
   }
@@ -140,8 +145,9 @@ export class ProxyImportManager {
    * Register ingestor (No-op on client side, as ingestors run in worker).
    */
   registerIngestor(_sourceType: ImportSourceType, _ingestor: IngestorFn): void {
-    console.warn(
-      "[ProxyImportManager] registerIngestor called on client. Ingestors should be registered in the worker."
+    logger.warn(
+      "ingest",
+      "registerIngestor called on client; ingestors should be registered in the worker"
     );
   }
 }

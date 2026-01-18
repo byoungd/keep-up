@@ -350,24 +350,30 @@ export class TelemetryContext {
       if (exporter.exportLogs && logs.length > 0) {
         exportPromises.push(
           exporter.exportLogs(logs).catch((e) => {
-            const err = e instanceof Error ? e : new Error(String(e));
-            this.logger.error("Log export failed", err, { exporter: exporter.name });
+            this.logger.error(
+              `Log export failed for ${exporter.name}`,
+              e instanceof Error ? e : new Error(String(e))
+            );
           })
         );
       }
       if (exporter.exportMetrics && metrics.length > 0) {
         exportPromises.push(
           exporter.exportMetrics(metrics).catch((e) => {
-            const err = e instanceof Error ? e : new Error(String(e));
-            this.logger.error("Metric export failed", err, { exporter: exporter.name });
+            this.logger.error(
+              `Metric export failed for ${exporter.name}`,
+              e instanceof Error ? e : new Error(String(e))
+            );
           })
         );
       }
       if (exporter.exportTraces && spans.length > 0) {
         exportPromises.push(
           exporter.exportTraces(spans).catch((e) => {
-            const err = e instanceof Error ? e : new Error(String(e));
-            this.logger.error("Trace export failed", err, { exporter: exporter.name });
+            this.logger.error(
+              `Trace export failed for ${exporter.name}`,
+              e instanceof Error ? e : new Error(String(e))
+            );
           })
         );
       }
@@ -389,8 +395,10 @@ export class TelemetryContext {
     for (const exporter of this.exporters) {
       if (exporter.shutdown) {
         await exporter.shutdown().catch((e) => {
-          const err = e instanceof Error ? e : new Error(String(e));
-          this.logger.error("Exporter shutdown failed", err, { exporter: exporter.name });
+          this.logger.error(
+            `Exporter shutdown failed for ${exporter.name}`,
+            e instanceof Error ? e : new Error(String(e))
+          );
         });
       }
     }
@@ -422,8 +430,7 @@ export class TelemetryContext {
   private startExportInterval(): void {
     this.exportInterval = setInterval(() => {
       this.flush().catch((e) => {
-        const err = e instanceof Error ? e : new Error(String(e));
-        this.logger.error("Auto-flush failed", err);
+        this.logger.error("Auto-flush failed", e instanceof Error ? e : new Error(String(e)));
       });
     }, this.config.exportIntervalMs);
   }
@@ -510,8 +517,10 @@ export class TelemetryContext {
 
     if (totalBuffered >= this.config.maxBufferSize) {
       this.flush().catch((e) => {
-        const err = e instanceof Error ? e : new Error(String(e));
-        this.logger.error("Buffer overflow flush failed", err);
+        this.logger.error(
+          "Buffer overflow flush failed",
+          e instanceof Error ? e : new Error(String(e))
+        );
       });
     }
   }

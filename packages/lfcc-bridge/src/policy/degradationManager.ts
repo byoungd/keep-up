@@ -8,7 +8,7 @@
  * - Transactional migration execution
  */
 
-import type { PolicyManifestV09 } from "@ku0/core";
+import { observability, type PolicyManifestV09 } from "@ku0/core";
 import { updateAnnotationState } from "../annotations/annotationSchema";
 import type { LoroRuntime } from "../runtime/loroRuntime";
 import {
@@ -19,6 +19,8 @@ import {
   transitionDegradationState,
 } from "./degradationStateMachine";
 import type { BridgeAnnotation, DegradationResult } from "./policyManager";
+
+const logger = observability.getLogger();
 
 /**
  * Degradation Manager Options
@@ -160,8 +162,11 @@ export class DegradationManager {
       this.context = transitionDegradationState(this.context, event);
     } catch (error) {
       // Migration failed - rollback would be handled by Loro's transaction system
-      // For now, we just log the error
-      console.error("Migration execution failed:", error);
+      logger.error(
+        "mapping",
+        "Migration execution failed",
+        error instanceof Error ? error : new Error(String(error))
+      );
       throw error;
     }
   }

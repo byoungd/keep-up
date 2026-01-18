@@ -11,9 +11,7 @@
  * - Multiple export formats (OTLP, Jaeger, Zipkin)
  * - Automatic instrumentation hooks
  */
-
-import type { Logger, Span, Tracer } from "../resilience/observability";
-import { ConsoleLogger } from "../resilience/observability";
+import { ConsoleLogger, type Span, type Tracer } from "../resilience/observability";
 
 // ============================================================================
 // Types
@@ -41,6 +39,8 @@ export interface SpanStatus {
   code: "unset" | "ok" | "error";
   message?: string;
 }
+
+const logger = new ConsoleLogger({ prefix: "[OpenTelemetryTracer]" });
 
 /** Span link */
 export interface SpanLink {
@@ -124,8 +124,6 @@ export interface OpenTelemetryConfig {
   exportIntervalMs?: number;
   /** Resource attributes */
   resource?: Record<string, unknown>;
-  /** Optional logger for export errors */
-  logger?: Logger;
 }
 
 // ============================================================================
@@ -230,7 +228,6 @@ export function createRateLimitingSampler(maxPerSecond: number): Sampler {
  */
 export class OpenTelemetryTracer implements Tracer {
   private readonly config: Required<OpenTelemetryConfig>;
-  private readonly logger: Logger;
   private readonly spans = new Map<string, OTelSpan[]>();
   private readonly pendingExport: OTelSpan[] = [];
   private currentSpan: OTelSpan | null = null;
@@ -246,9 +243,7 @@ export class OpenTelemetryTracer implements Tracer {
       exportBatchSize: config.exportBatchSize ?? DEFAULT_CONFIG.exportBatchSize,
       exportIntervalMs: config.exportIntervalMs ?? DEFAULT_CONFIG.exportIntervalMs,
       resource: config.resource ?? {},
-      logger: config.logger ?? new ConsoleLogger({ prefix: "[OpenTelemetry]" }),
     };
-    this.logger = this.config.logger;
 
     // Start export interval if exporters configured
     if (this.config.exporters.length > 0) {
@@ -499,8 +494,7 @@ export class OpenTelemetryTracer implements Tracer {
 
     for (const exporter of this.config.exporters) {
       await exporter.shutdown().catch((e) => {
-        const err = e instanceof Error ? e : new Error(String(e));
-        this.logger.error("Exporter shutdown failed", err);
+        logger.error("Exporter shutdown failed", e instanceof Error ? e : new Error(String(e)));
       });
     }
   }
@@ -539,8 +533,7 @@ export class OpenTelemetryTracer implements Tracer {
   private startExportInterval(): void {
     this.exportInterval = setInterval(() => {
       this.forceFlush().catch((e) => {
-        const err = e instanceof Error ? e : new Error(String(e));
-        this.logger.error("Auto-export failed", err);
+        logger.error("Auto-export failed", e instanceof Error ? e : new Error(String(e)));
       });
     }, this.config.exportIntervalMs);
   }
@@ -555,8 +548,7 @@ export class OpenTelemetryTracer implements Tracer {
   private checkBatchExport(): void {
     if (this.pendingExport.length >= this.config.exportBatchSize) {
       this.forceFlush().catch((e) => {
-        const err = e instanceof Error ? e : new Error(String(e));
-        this.logger.error("Batch export failed", err);
+        logger.error("Batch export failed", e instanceof Error ? e : new Error(String(e)));
       });
     }
   }

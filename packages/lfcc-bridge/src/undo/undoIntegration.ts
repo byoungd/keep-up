@@ -1,3 +1,4 @@
+import { observability } from "@ku0/core";
 import type { LoroRuntime } from "../runtime/loroRuntime";
 
 /**
@@ -53,6 +54,8 @@ const UNDO_DEBOUNCE_MS = 20;
  */
 const SYNC_TIMEOUT_MS = 500;
 
+const logger = observability.getLogger();
+
 export function createUndoController(
   runtime: LoroRuntime,
   excludeOriginPrefix = "lfcc:"
@@ -85,7 +88,7 @@ export function createUndoController(
     syncTimeoutId = setTimeout(() => {
       // P0-1: Auto-recover from stuck sync state
       if (state === "syncing") {
-        console.warn("[UndoController] Sync timeout, auto-recovering");
+        logger.warn("undo", "Sync timeout, auto-recovering");
         resetState();
       }
     }, SYNC_TIMEOUT_MS);
@@ -101,7 +104,7 @@ export function createUndoController(
 
     // P0-1: Block if sync is in progress
     if (state === "syncing") {
-      console.warn(`[UndoController] ${direction} blocked: sync in progress`);
+      logger.warn("undo", "Undo/redo blocked: sync in progress", { direction });
       return false;
     }
 

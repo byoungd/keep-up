@@ -29,8 +29,10 @@ export function initializeLangfuse(): void {
       });
       // console.log("Langfuse initialized");
     } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      logger.error("Failed to initialize Langfuse", err);
+      logger.error(
+        "Failed to initialize Langfuse",
+        error instanceof Error ? error : new Error(String(error))
+      );
     }
   } else {
     // console.warn("Langfuse credentials missing. Skipping initialization.");

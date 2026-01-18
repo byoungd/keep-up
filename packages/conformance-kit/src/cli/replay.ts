@@ -23,8 +23,23 @@ type ReplayOptions = {
   showHelp: boolean;
 };
 
+function writeLine(line: string): void {
+  process.stdout.write(line.endsWith("\n") ? line : `${line}\n`);
+}
+
+function writeErrorLine(line: string): void {
+  process.stderr.write(line.endsWith("\n") ? line : `${line}\n`);
+}
+
+function formatError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.stack ?? error.message;
+  }
+  return String(error);
+}
+
 function printHelp(): void {
-  console.log(`
+  writeLine(`
 LFCC Conformance Kit - Replay
 
 Usage:
@@ -121,17 +136,17 @@ async function main(): Promise<void> {
   const { opsFile, snapshotBytes } = await resolveReplayInput(inputPath);
 
   // Load ops
-  console.log(`Loading ops from: ${opsFile}`);
+  writeLine(`Loading ops from: ${opsFile}`);
   const opsJson = await fs.promises.readFile(opsFile, "utf-8");
   let ops = deserializeOps(opsJson);
 
   if (stopAtStep !== undefined) {
     ops = ops.slice(0, stopAtStep);
-    console.log(`Stopping at step ${stopAtStep}`);
+    writeLine(`Stopping at step ${stopAtStep}`);
   }
 
-  console.log(`Replaying ${ops.length} operations...`);
-  console.log("");
+  writeLine(`Replaying ${ops.length} operations...`);
+  writeLine("");
 
   // Create adapters
   const factory = new MockAdapterFactory();
@@ -158,37 +173,37 @@ async function main(): Promise<void> {
   const result = await harness.run(0, ops, initialSnapshot);
 
   // Print results
-  console.log("");
-  console.log("=".repeat(60));
-  console.log("REPLAY RESULT");
-  console.log("=".repeat(60));
-  console.log(`Steps: ${result.completedSteps}/${result.totalSteps}`);
-  console.log(`Duration: ${result.durationMs}ms`);
-  console.log(`Result: ${result.passed ? "PASSED" : "FAILED"}`);
+  writeLine("");
+  writeLine("=".repeat(60));
+  writeLine("REPLAY RESULT");
+  writeLine("=".repeat(60));
+  writeLine(`Steps: ${result.completedSteps}/${result.totalSteps}`);
+  writeLine(`Duration: ${result.durationMs}ms`);
+  writeLine(`Result: ${result.passed ? "PASSED" : "FAILED"}`);
 
   if (result.firstMismatch) {
-    console.log("");
-    console.log("MISMATCH DETAILS:");
-    console.log(`  Step: ${result.firstMismatch.stepIndex}`);
-    console.log(`  Path: ${result.firstMismatch.path}`);
-    console.log(`  Description: ${result.firstMismatch.description}`);
-    console.log("");
-    console.log("Loro value:", JSON.stringify(result.firstMismatch.loroValue, null, 2));
-    console.log("Shadow value:", JSON.stringify(result.firstMismatch.shadowValue, null, 2));
+    writeLine("");
+    writeLine("MISMATCH DETAILS:");
+    writeLine(`  Step: ${result.firstMismatch.stepIndex}`);
+    writeLine(`  Path: ${result.firstMismatch.path}`);
+    writeLine(`  Description: ${result.firstMismatch.description}`);
+    writeLine("");
+    writeLine(`Loro value: ${JSON.stringify(result.firstMismatch.loroValue, null, 2)}`);
+    writeLine(`Shadow value: ${JSON.stringify(result.firstMismatch.shadowValue, null, 2)}`);
   }
 
   if (result.canonLoro && result.canonShadow) {
-    console.log("");
-    console.log("CANONICAL DIFF:");
-    console.log(generateCanonDiff(result.canonLoro, result.canonShadow));
+    writeLine("");
+    writeLine("CANONICAL DIFF:");
+    writeLine(generateCanonDiff(result.canonLoro, result.canonShadow));
   }
 
-  console.log("=".repeat(60));
+  writeLine("=".repeat(60));
 
   process.exit(result.passed ? 0 : 1);
 }
 
 main().catch((error) => {
-  console.error("Fatal error:", error);
+  writeErrorLine(`Fatal error: ${formatError(error)}`);
   process.exit(1);
 });

@@ -95,7 +95,15 @@ export class ProviderRouter {
       enableFallback: config.enableFallback ?? true,
       maxConsecutiveFailures: config.maxConsecutiveFailures ?? 3,
     };
-    this.logger = config.logger ?? new ConsoleLogger({ prefix: "[ProviderRouter]" });
+    const defaultLogger = new ConsoleLogger({ prefix: "[ProviderRouter]" });
+    this.logger = config.logger ?? {
+      warn: (message, context) => {
+        defaultLogger.warn(message, context ?? {});
+      },
+      error: (message, error, context) => {
+        defaultLogger.error(message, error, context ?? {});
+      },
+    };
     this.selector = config.selector;
   }
 

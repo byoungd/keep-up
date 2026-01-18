@@ -294,23 +294,30 @@ export class ConsoleOutput implements LogOutput {
     switch (entry.level) {
       case "trace":
       case "debug":
-        // biome-ignore lint/suspicious/noConsole: Console output transport.
-        console.debug(output);
+        this.writeLine(output, "stdout");
         break;
       case "info":
-        // biome-ignore lint/suspicious/noConsole: Console output transport.
-        console.info(output);
+        this.writeLine(output, "stdout");
         break;
       case "warn":
-        // biome-ignore lint/suspicious/noConsole: Console output transport.
-        console.warn(output);
+        this.writeLine(output, "stderr");
         break;
       case "error":
       case "fatal":
-        // biome-ignore lint/suspicious/noConsole: Console output transport.
-        console.error(output);
+        this.writeLine(output, "stderr");
         break;
     }
+  }
+
+  private writeLine(output: string, stream: "stdout" | "stderr"): void {
+    if (typeof process === "undefined") {
+      return;
+    }
+    const target = stream === "stderr" ? process.stderr : process.stdout;
+    if (!target) {
+      return;
+    }
+    target.write(`${output}\n`);
   }
 
   private formatPretty(entry: LogEntry): string {

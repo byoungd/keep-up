@@ -60,7 +60,6 @@ export function SlashCommandMenu({
         transform: "translateY(-100%)", // Show above the cursor/input
         marginTop: "-8px",
       }}
-      // biome-ignore lint/a11y/useSemanticElements: Custom dropdown
       role="listbox"
       aria-label="Slash commands"
       aria-activedescendant={activeId}
@@ -88,7 +87,6 @@ export function SlashCommandMenu({
                 ? "bg-accent text-accent-foreground"
                 : "hover:bg-accent/50 hover:text-accent-foreground"
             )}
-            // biome-ignore lint/a11y/useSemanticElements: Custom option
             role="option"
             id={optionId}
             aria-selected={isSelected}

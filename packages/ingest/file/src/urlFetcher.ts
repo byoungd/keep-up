@@ -71,7 +71,7 @@ export async function fetchFromUrl(
 
     // Check content length
     const contentLength = response.headers.get("content-length");
-    if (contentLength && Number.parseInt(contentLength) > maxSize) {
+    if (contentLength && Number.parseInt(contentLength, 10) > maxSize) {
       throw new UrlFetchError(
         `File too large: ${contentLength} bytes exceeds ${maxSize} bytes`,
         url

@@ -1,5 +1,5 @@
 import type { DirtyInfo, EditorSchemaValidator, RelocationPolicy } from "@ku0/core";
-import { DEFAULT_POLICY_MANIFEST, gateway } from "@ku0/core";
+import { DEFAULT_POLICY_MANIFEST, gateway, observability } from "@ku0/core";
 import type { Node as PMNode } from "prosemirror-model";
 import type { EditorState, Transaction } from "prosemirror-state";
 import { ReplaceAroundStep, ReplaceStep } from "prosemirror-transform";
@@ -38,6 +38,9 @@ import {
 import { createRelocationSecurity, type RelocationSecurity } from "../security/relocation";
 import { createSecurityValidator, type SecurityValidator } from "../security/validator";
 import { pmSelectionToSpanList, spanListToPmRanges } from "../selection/selectionMapping";
+
+const logger = observability.getLogger();
+
 import {
   type AIGatewayPlanApplyOptions,
   type AIGatewayPlanApplyResult,
@@ -690,8 +693,7 @@ export class BridgeController {
       return;
     }
 
-    // eslint-disable-next-line no-console
-    console.warn("[LFCC][structural-ordering]", event, data);
+    logger.warn("mapping", "Structural ordering event", { event, data });
   }
 
   private enforceAIGateway(tr: Transaction): { isAIIntent: boolean; hasGatewayMeta: boolean } {
@@ -707,15 +709,13 @@ export class BridgeController {
         hasGatewayMeta,
       };
       this.onError?.(error as Error);
-      // eslint-disable-next-line no-console
-      console.error("[LFCC][ai-gateway] rejected AI write without gateway metadata");
+      logger.error("gateway", "Rejected AI write without gateway metadata");
       throw error;
     }
 
     // Dev-only signal for suspicious (unguarded) large insertions
     if (!hasGatewayMeta && detectUnvalidatedAIWrite(tr) && process.env.NODE_ENV !== "production") {
-      // eslint-disable-next-line no-console
-      console.warn("[LFCC][ai-gateway] suspicious unvalidated write detected");
+      logger.warn("gateway", "Suspicious unvalidated write detected");
     }
 
     return { isAIIntent, hasGatewayMeta };
@@ -829,9 +829,10 @@ export class BridgeController {
   private applyTransactionToLoro(tr: Transaction): void {
     try {
       if (process.env.NODE_ENV !== "production") {
-        console.info(
-          `[LFCC Bridge] Syncing transaction to Loro. docChanged: ${tr.docChanged}, steps: ${tr.steps.length}`
-        );
+        logger.info("mapping", "Syncing transaction to Loro", {
+          docChanged: tr.docChanged,
+          steps: tr.steps.length,
+        });
       }
       const originTag = this.buildOriginTag(tr);
       this.applyTransactionWithUndo(tr, originTag);
@@ -991,7 +992,7 @@ export class BridgeController {
     }
 
     this.perfLastLogMs = now;
-    console.info("[LFCC Bridge][perf]", {
+    logger.info("mapping", "Bridge perf stats", {
       localSyncs: this.perfStats.localSyncs,
       localFastText: this.perfStats.localFastText,
       localTextBatch: this.perfStats.localTextBatch,
@@ -1004,14 +1005,6 @@ export class BridgeController {
       remoteFull: this.perfStats.remoteFull,
       remoteEqSkip: this.perfStats.remoteEqSkip,
     });
-  }
-
-  /**
-   * PERF-007: Get cached position for a block ID.
-   * Returns null if not found (block may be new or cache stale).
-   */
-  private getBlockPosition(blockId: string): { pos: number; size: number } | null {
-    return this.blockIdCache.get(blockId) ?? null;
   }
 
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: sync path coordinates projection, dirty tracking, and selection preservation
@@ -1055,9 +1048,10 @@ export class BridgeController {
     this.recordRemoteSync(patchMode);
 
     if (process.env.NODE_ENV !== "production") {
-      console.info(
-        `[LFCC Bridge] syncFromLoro: projected doc has ${pmDoc.childCount} blocks. Patch: ${patchMode}`
-      );
+      logger.info("mapping", "syncFromLoro projection stats", {
+        blockCount: pmDoc.childCount,
+        patchMode,
+      });
     }
     const remoteDirtyInfo = computeDirtyInfo(tr);
     if (remoteDirtyInfo.opCodes.length > 0) {
@@ -1184,7 +1178,9 @@ export class BridgeController {
 
     // P0-2: Log selection restoration tier for debugging/telemetry
     if (process.env.NODE_ENV !== "production" && !oldSelection.empty) {
-      console.info(`[LFCC Bridge] Selection restored via Tier ${selectionRestorationTier}`);
+      logger.info("mapping", "Selection restored", {
+        tier: selectionRestorationTier,
+      });
     }
 
     // Apply the transaction (this will not trigger handleTransaction
@@ -1233,7 +1229,7 @@ export class BridgeController {
     // Development only verification
     if (process.env.NODE_ENV !== "production") {
       if (!tr.doc.eq(nextDoc)) {
-        console.warn("[LFCC] Patch transaction resulted in divergent document state");
+        logger.warn("mapping", "Patch transaction resulted in divergent document state");
         return null;
       }
     }
@@ -1283,7 +1279,7 @@ export class BridgeController {
 
     if (process.env.NODE_ENV !== "production") {
       if (!tr.doc.eq(nextDoc)) {
-        console.warn("[LFCC] Multi-range patch resulted in divergent document state");
+        logger.warn("mapping", "Multi-range patch resulted in divergent document state");
         return null;
       }
     }

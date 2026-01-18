@@ -68,6 +68,17 @@ export interface Tracer {
   getTrace(traceId: string): Span[];
 }
 
+function writeLine(output: string, stream: "stdout" | "stderr"): void {
+  if (typeof process === "undefined") {
+    return;
+  }
+  const target = stream === "stderr" ? process.stderr : process.stdout;
+  if (!target) {
+    return;
+  }
+  target.write(`${output}\n`);
+}
+
 /**
  * Default console logger with structured output.
  */
@@ -111,8 +122,7 @@ export class ConsoleLogger implements Logger {
       return;
     }
     const ctx = this.traceId ? { ...context, traceId: this.traceId } : context;
-    // biome-ignore lint/suspicious/noConsole: Console logger output.
-    console.debug(`${this.prefix} [DEBUG] ${message}${this.formatContext(ctx)}`);
+    writeLine(`${this.prefix} [DEBUG] ${message}${this.formatContext(ctx)}`, "stdout");
   }
 
   info(message: string, context: Record<string, unknown> = {}): void {
@@ -120,8 +130,7 @@ export class ConsoleLogger implements Logger {
       return;
     }
     const ctx = this.traceId ? { ...context, traceId: this.traceId } : context;
-    // biome-ignore lint/suspicious/noConsole: Console logger output.
-    console.info(`${this.prefix} [INFO] ${message}${this.formatContext(ctx)}`);
+    writeLine(`${this.prefix} [INFO] ${message}${this.formatContext(ctx)}`, "stdout");
   }
 
   warn(message: string, context: Record<string, unknown> = {}): void {
@@ -129,8 +138,7 @@ export class ConsoleLogger implements Logger {
       return;
     }
     const ctx = this.traceId ? { ...context, traceId: this.traceId } : context;
-    // biome-ignore lint/suspicious/noConsole: Console logger output.
-    console.warn(`${this.prefix} [WARN] ${message}${this.formatContext(ctx)}`);
+    writeLine(`${this.prefix} [WARN] ${message}${this.formatContext(ctx)}`, "stderr");
   }
 
   error(message: string, error?: Error, context: Record<string, unknown> = {}): void {
@@ -139,11 +147,9 @@ export class ConsoleLogger implements Logger {
     }
     const ctx = this.traceId ? { ...context, traceId: this.traceId } : context;
     const errorInfo = error ? ` error=${error.message}` : "";
-    // biome-ignore lint/suspicious/noConsole: Console logger output.
-    console.error(`${this.prefix} [ERROR] ${message}${errorInfo}${this.formatContext(ctx)}`);
+    writeLine(`${this.prefix} [ERROR] ${message}${errorInfo}${this.formatContext(ctx)}`, "stderr");
     if (error?.stack) {
-      // biome-ignore lint/suspicious/noConsole: Console logger output.
-      console.error(error.stack);
+      writeLine(error.stack, "stderr");
     }
   }
 }

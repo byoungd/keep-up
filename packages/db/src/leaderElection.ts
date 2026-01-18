@@ -8,8 +8,11 @@
  * background jobs to avoid duplicate work.
  */
 
+import { observability } from "@ku0/core";
+
 /** Lock name used for leader election */
 const LEADER_LOCK_NAME = "reader-db-leader";
+const logger = observability.getLogger();
 
 /** Result of leader election */
 export interface LeaderElectionResult {
@@ -47,7 +50,7 @@ export async function acquireLeadership(
 ): Promise<LeaderElectionResult> {
   if (!isWebLocksAvailable()) {
     // Fallback: if locks unavailable, assume single-tab and become leader
-    console.warn("[leaderElection] Web Locks API not available, assuming leader");
+    logger.warn("persistence", "Web Locks API not available, assuming leader");
     return {
       isLeader: true,
       release: () => {
@@ -96,7 +99,8 @@ export async function acquireLeadership(
       startLeadershipWatch(onChange);
     }
   } catch (err) {
-    console.error("[leaderElection] Failed to acquire lock:", err);
+    const error = err instanceof Error ? err : new Error(String(err));
+    logger.error("persistence", "Failed to acquire lock", error);
     // On error, assume single-tab scenario
     isLeader = true;
     onChange?.(true); // Notify callback of leader status
@@ -131,7 +135,8 @@ function startLeadershipWatch(onChange?: LeaderChangeCallback): void {
       });
     })
     .catch((err) => {
-      console.error("[leaderElection] Leadership watch failed:", err);
+      const error = err instanceof Error ? err : new Error(String(err));
+      logger.error("persistence", "Leadership watch failed", error);
     });
 }
 

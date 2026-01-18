@@ -90,8 +90,10 @@ export async function encryptApiKey(plaintext: string): Promise<string> {
     // Encode as base64 for storage
     return btoa(String.fromCharCode(...combined));
   } catch (error) {
-    // biome-ignore lint/suspicious/noConsole: Encryption error logging
-    console.error("[keyEncryption] Encryption failed:", error);
+    if (typeof reportError === "function") {
+      const err = error instanceof Error ? error : new Error(String(error));
+      reportError(err);
+    }
     // Fallback: return empty to avoid storing plaintext
     return "";
   }
@@ -121,8 +123,10 @@ export async function decryptApiKey(encrypted: string): Promise<string> {
 
     return new TextDecoder().decode(decrypted);
   } catch (error) {
-    // biome-ignore lint/suspicious/noConsole: Decryption error logging
-    console.error("[keyEncryption] Decryption failed:", error);
+    if (typeof reportError === "function") {
+      const err = error instanceof Error ? error : new Error(String(error));
+      reportError(err);
+    }
     // Return empty on failure - key may be from different device
     return "";
   }

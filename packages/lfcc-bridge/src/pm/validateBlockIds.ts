@@ -1,3 +1,4 @@
+import { observability } from "@ku0/core";
 import type { Node as PMNode } from "prosemirror-model";
 import type { EditorState, Transaction } from "prosemirror-state";
 
@@ -14,6 +15,8 @@ const isBlockNode = (node: PMNode): boolean => {
   const group = node.type.spec.group ?? "";
   return node.isBlock && group.split(" ").includes("block");
 };
+
+const logger = observability.getLogger();
 
 export function validateBlockIds(doc: PMNode): BlockIdValidation {
   const missing: Array<{ pos: number; type: string }> = [];
@@ -84,9 +87,12 @@ export function assignMissingBlockIds(
     }
 
     const newId = nextId();
-    console.info(
-      `[LFCC] Assigning ID ${newId} to ${node.type.name} (hasBlockId: ${hasBlockId}, isDuplicate: ${isDuplicate})`
-    );
+    logger.info("mapping", "Assigning missing block id", {
+      blockId: newId,
+      nodeType: node.type.name,
+      hasBlockId,
+      isDuplicate,
+    });
 
     const attrs = { ...node.attrs, block_id: newId };
     tr = tr.setNodeMarkup(pos, node.type, attrs, node.marks);

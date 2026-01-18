@@ -5,6 +5,7 @@
  * Direct Loro access (doc.getMap/getList) bypasses validation and audit.
  */
 
+import { observability } from "@ku0/core";
 import {
   readAllAnnotations,
   readAnnotation as readAnnotationFromSchema,
@@ -51,6 +52,7 @@ import type {
 // ============================================================================
 
 const COMMENTS_KEY = "comments";
+const logger = observability.getLogger();
 
 // ============================================================================
 // Implementation
@@ -662,7 +664,7 @@ export class LoroDocumentFacade implements DocumentFacade {
     const { messageId, chunk, isFinal, aiContext, origin } = intent;
     const block = this.getBlock(messageId);
     if (!block) {
-      console.warn(`[Facade] appendStreamChunk: message ${messageId} not found`);
+      logger.warn("mapping", "appendStreamChunk: message not found", { messageId });
       return;
     }
 
@@ -756,7 +758,8 @@ export class LoroDocumentFacade implements DocumentFacade {
       try {
         callback(event);
       } catch (error) {
-        console.error("[Facade] Subscriber error:", error);
+        const err = error instanceof Error ? error : new Error(String(error));
+        logger.error("mapping", "Facade subscriber error", err);
       }
     }
   }

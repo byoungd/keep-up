@@ -49,8 +49,6 @@ export class DivergenceDetector {
   private onDivergence?: (result: DivergenceCheckResult) => void;
   private onError?: (error: Error) => void;
   private checkTimer: ReturnType<typeof setInterval> | null = null;
-  private lastEditorChecksum: string | null = null;
-  private lastLoroChecksum: string | null = null;
   private lastEditorDoc: EditorState["doc"] | null = null;
   private lastLoroFrontierKey: string | null = null;
   private lastResult: DivergenceCheckResult | null = null;
@@ -153,8 +151,6 @@ export class DivergenceDetector {
       };
 
       // Store checksums and state for next iteration
-      this.lastEditorChecksum = editorChecksum;
-      this.lastLoroChecksum = loroChecksum;
       this.lastEditorDoc = editorState.doc;
       this.lastLoroFrontierKey = frontierKey;
       this.lastResult = result;
@@ -183,27 +179,6 @@ export class DivergenceDetector {
   private computeEditorChecksum(editorState: EditorState): string {
     const canonicalInput = getChecksumInput(editorState.doc);
     return this.simpleHash(canonicalInput);
-  }
-
-  /**
-   * Serialize marks from a node for checksum
-   */
-  private serializeMarks(node: ReturnType<EditorState["doc"]["nodeAt"]>): string {
-    if (!node || node.isText) {
-      return "";
-    }
-
-    const markSet: string[] = [];
-    node.descendants((child, pos) => {
-      if (child.isText && child.marks.length > 0) {
-        const markNames = child.marks
-          .map((m) => m.type.name)
-          .sort()
-          .join(",");
-        markSet.push(`${pos}:${markNames}`);
-      }
-    });
-    return markSet.join("&");
   }
 
   /**

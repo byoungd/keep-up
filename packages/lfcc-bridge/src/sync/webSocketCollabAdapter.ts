@@ -5,6 +5,7 @@
  * Handles connection lifecycle, message serialization, and reconnection.
  */
 
+import { observability } from "@ku0/core";
 import type { CollabAdapter, CollabAdapterStatus, CollabSession } from "./collabAdapter";
 import {
   createJoinMessage,
@@ -13,6 +14,8 @@ import {
   type SyncMessage,
   serializeSyncMessage,
 } from "./collabMessages";
+
+const logger = observability.getLogger();
 
 /** Configuration for WebSocketCollabAdapter */
 export type WebSocketCollabAdapterConfig = {
@@ -221,12 +224,14 @@ export class WebSocketCollabAdapter implements CollabAdapter {
       const parsed: unknown = JSON.parse(data);
       if (!isValidSyncMessage(parsed)) {
         // Log warning but don't emit error for invalid messages
-        console.warn("[WebSocketCollabAdapter] Received invalid message:", data);
+        logger.warn("sync", "Received invalid message", { data });
         return;
       }
       this.emitMessage(parsed);
     } catch (error) {
-      console.warn("[WebSocketCollabAdapter] Failed to parse message:", error);
+      logger.warn("sync", "Failed to parse message", {
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
@@ -308,7 +313,11 @@ export class WebSocketCollabAdapter implements CollabAdapter {
         try {
           cb(status);
         } catch (error) {
-          console.error("[WebSocketCollabAdapter] Status listener error:", error);
+          logger.error(
+            "sync",
+            "Status listener error",
+            error instanceof Error ? error : new Error(String(error))
+          );
         }
       }
     }
@@ -319,7 +328,11 @@ export class WebSocketCollabAdapter implements CollabAdapter {
       try {
         cb(msg);
       } catch (error) {
-        console.error("[WebSocketCollabAdapter] Message listener error:", error);
+        logger.error(
+          "sync",
+          "Message listener error",
+          error instanceof Error ? error : new Error(String(error))
+        );
       }
     }
   }
@@ -329,7 +342,11 @@ export class WebSocketCollabAdapter implements CollabAdapter {
       try {
         cb(error);
       } catch (err) {
-        console.error("[WebSocketCollabAdapter] Error listener error:", err);
+        logger.error(
+          "sync",
+          "Error listener error",
+          err instanceof Error ? err : new Error(String(err))
+        );
       }
     }
   }

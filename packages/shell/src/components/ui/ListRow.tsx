@@ -54,7 +54,6 @@ export const ListRow = React.forwardRef<HTMLButtonElement, ListRowProps>(
       <button
         ref={ref}
         type="button"
-        // biome-ignore lint/a11y/useSemanticElements: Custom listbox button
         role="option"
         id={_index !== undefined ? `list-item-${_index}` : undefined}
         aria-selected={selected}

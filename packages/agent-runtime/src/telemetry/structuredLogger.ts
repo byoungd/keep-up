@@ -158,30 +158,36 @@ function formatForConsole(entry: LogEntry): string {
   return `${timestamp} ${level.toUpperCase().padEnd(5)}${contextStr} ${message}${dataStr}${errorStr}`;
 }
 
+function writeLine(output: string, stream: "stdout" | "stderr"): void {
+  if (typeof process === "undefined") {
+    return;
+  }
+  const target = stream === "stderr" ? process.stderr : process.stdout;
+  if (!target) {
+    return;
+  }
+  target.write(`${output}\n`);
+}
+
 /** Default console handler */
 export const consoleHandler: LogHandler = (entry) => {
   const formatted = formatForConsole(entry);
   switch (entry.level) {
     case "trace":
     case "debug":
-      // biome-ignore lint/suspicious/noConsole: Console log handler.
-      console.debug(formatted);
+      writeLine(formatted, "stdout");
       break;
     case "info":
-      // biome-ignore lint/suspicious/noConsole: Console log handler.
-      console.info(formatted);
+      writeLine(formatted, "stdout");
       break;
     case "warn":
-      // biome-ignore lint/suspicious/noConsole: Console log handler.
-      console.warn(formatted);
+      writeLine(formatted, "stderr");
       break;
     case "error":
     case "fatal":
-      // biome-ignore lint/suspicious/noConsole: Console log handler.
-      console.error(formatted);
+      writeLine(formatted, "stderr");
       if (entry.error?.stack) {
-        // biome-ignore lint/suspicious/noConsole: Console log handler.
-        console.error(entry.error.stack);
+        writeLine(entry.error.stack, "stderr");
       }
       break;
   }
@@ -189,9 +195,7 @@ export const consoleHandler: LogHandler = (entry) => {
 
 /** JSON handler for machine-readable output */
 export const jsonHandler: LogHandler = (entry) => {
-  // Using console.info to satisfy lint rules while still outputting to stdout
-  // biome-ignore lint/suspicious/noConsole: Console log handler.
-  console.info(JSON.stringify(entry));
+  writeLine(JSON.stringify(entry), "stdout");
 };
 
 // ============================================================================

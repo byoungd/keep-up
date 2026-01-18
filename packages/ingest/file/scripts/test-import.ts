@@ -4,6 +4,21 @@
 
 import { FileImporter } from "../src";
 
+function writeLine(line: string): void {
+  process.stdout.write(line.endsWith("\n") ? line : `${line}\n`);
+}
+
+function writeErrorLine(line: string): void {
+  process.stderr.write(line.endsWith("\n") ? line : `${line}\n`);
+}
+
+function formatError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.stack ?? error.message;
+  }
+  return String(error);
+}
+
 async function main() {
   const importer = new FileImporter();
 
@@ -26,12 +41,12 @@ This is a **test** document with some *markdown* content.
 Here is some \`inline code\` and a [link](https://example.com).
 `);
 
-  console.log("Testing Markdown parsing...");
+  writeLine("Testing Markdown parsing...");
   const mdResult = await importer.importFile({
     buffer: mdContent,
     filename: "test.md",
   });
-  console.log("Markdown Result:", JSON.stringify(mdResult, null, 2));
+  writeLine(`Markdown Result: ${JSON.stringify(mdResult, null, 2)}`);
 
   // Test TXT parsing
   const txtContent = Buffer.from(`This is a plain text file.
@@ -41,14 +56,16 @@ It has multiple paragraphs.
 And some more content here.
 `);
 
-  console.log("\nTesting TXT parsing...");
+  writeLine("\nTesting TXT parsing...");
   const txtResult = await importer.importFile({
     buffer: txtContent,
     filename: "test.txt",
   });
-  console.log("TXT Result:", JSON.stringify(txtResult, null, 2));
+  writeLine(`TXT Result: ${JSON.stringify(txtResult, null, 2)}`);
 
-  console.log("\n✅ All tests passed!");
+  writeLine("\n✅ All tests passed!");
 }
 
-main().catch(console.error);
+main().catch((error) => {
+  writeErrorLine(`Unhandled error: ${formatError(error)}`);
+});

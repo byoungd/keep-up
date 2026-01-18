@@ -7,7 +7,7 @@
  * and schema dry-run validation (LFCC §11.2) for AI payloads.
  */
 
-import type { EditorSchemaValidator } from "@ku0/core";
+import { type EditorSchemaValidator, observability } from "@ku0/core";
 
 export type SecurityValidationResult = {
   ok: boolean;
@@ -41,6 +41,8 @@ export type SecurityValidatorOptions = {
    */
   schemaValidator?: EditorSchemaValidator;
 };
+
+const logger = observability.getLogger();
 
 const DEFAULT_OPTIONS: Omit<Required<SecurityValidatorOptions>, "schemaValidator"> & {
   schemaValidator: EditorSchemaValidator | undefined;
@@ -185,9 +187,10 @@ export class SecurityValidator {
     }
     const durationMs = performance.now() - startTime;
     if (durationMs > 10) {
-      console.warn(
-        `[SecurityValidator] Slow validation: ${durationMs.toFixed(2)}ms for payload size ${payloadLength}`
-      );
+      logger.warn("gateway", "Slow validation", {
+        durationMs,
+        payloadLength,
+      });
     }
   }
 
@@ -199,7 +202,12 @@ export class SecurityValidator {
       return;
     }
     const durationMs = performance.now() - startTime;
-    console.error(`[SecurityValidator] Validation error after ${durationMs.toFixed(2)}ms:`, error);
+    logger.error(
+      "gateway",
+      "Validation error",
+      error instanceof Error ? error : new Error(String(error)),
+      { durationMs }
+    );
   }
 
   /**

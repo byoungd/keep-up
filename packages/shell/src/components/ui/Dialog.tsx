@@ -120,7 +120,6 @@ export function Dialog({
             />
 
             {/* Dialog Content */}
-            {/* biome-ignore lint/a11y/useSemanticElements: Using motion.div for animation control */}
             <motion.div
               role="dialog"
               aria-modal="true"

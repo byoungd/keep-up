@@ -49,7 +49,6 @@ class InMemoryMessageBus {
  */
 class InMemoryCollabAdapter implements CollabAdapter {
   status: CollabAdapterStatus = "idle";
-  private session: CollabSession | null = null;
   private messageCallbacks = new Set<(msg: SyncMessage) => void>();
   private statusCallbacks = new Set<(status: CollabAdapterStatus) => void>();
   private errorCallbacks = new Set<(error: Error) => void>();
@@ -61,8 +60,7 @@ class InMemoryCollabAdapter implements CollabAdapter {
     this.clientId = clientId;
   }
 
-  async connect(session: CollabSession): Promise<void> {
-    this.session = session;
+  async connect(_session: CollabSession): Promise<void> {
     this.bus.register(this.clientId, this);
     this.setStatus("connected");
   }

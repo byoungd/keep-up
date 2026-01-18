@@ -41,11 +41,9 @@ export interface DocumentStateProvider {
  */
 export class IntegrityScanner {
   private provider: DocumentStateProvider;
-  private policy: DevComparePolicy;
 
-  constructor(provider: DocumentStateProvider, policy: DevComparePolicy) {
+  constructor(provider: DocumentStateProvider, _policy: DevComparePolicy) {
     this.provider = provider;
-    this.policy = policy;
   }
 
   /**

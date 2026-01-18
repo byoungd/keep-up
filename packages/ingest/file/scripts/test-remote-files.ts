@@ -4,6 +4,21 @@
 
 import { FileImporter } from "../src";
 
+function writeLine(line: string): void {
+  process.stdout.write(line.endsWith("\n") ? line : `${line}\n`);
+}
+
+function writeErrorLine(line: string): void {
+  process.stderr.write(line.endsWith("\n") ? line : `${line}\n`);
+}
+
+function formatError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.stack ?? error.message;
+  }
+  return String(error);
+}
+
 async function fetchBuffer(url: string): Promise<Buffer> {
   const response = await fetch(url);
   if (!response.ok) {
@@ -14,7 +29,7 @@ async function fetchBuffer(url: string): Promise<Buffer> {
 }
 
 async function testMarkdown() {
-  console.log("\n📝 Testing Markdown (GitHub README)...");
+  writeLine("\n📝 Testing Markdown (GitHub README)...");
 
   // Fetch a popular GitHub README
   const url = "https://raw.githubusercontent.com/microsoft/TypeScript/main/README.md";
@@ -26,14 +41,14 @@ async function testMarkdown() {
     filename: "README.md",
   });
 
-  console.log("Title:", result.title);
-  console.log("Content length:", result.content.length, "chars");
-  console.log("Preview:", `${result.content.slice(0, 200)}...`);
-  console.log("SourceId:", result.sourceId);
+  writeLine(`Title: ${result.title}`);
+  writeLine(`Content length: ${result.content.length} chars`);
+  writeLine(`Preview: ${result.content.slice(0, 200)}...`);
+  writeLine(`SourceId: ${result.sourceId}`);
 }
 
 async function testPDF() {
-  console.log("\n📄 Testing PDF (Sample PDF)...");
+  writeLine("\n📄 Testing PDF (Sample PDF)...");
 
   // Use a small public domain PDF
   const url = "https://www.w3.org/WAI/WCAG21/Techniques/pdf/img/table-word.pdf";
@@ -47,18 +62,18 @@ async function testPDF() {
       filename: "sample.pdf",
     });
 
-    console.log("Title:", result.title);
-    console.log("Content length:", result.content.length, "chars");
-    console.log("Preview:", `${result.content.slice(0, 200)}...`);
-    console.log("SourceId:", result.sourceId);
+    writeLine(`Title: ${result.title}`);
+    writeLine(`Content length: ${result.content.length} chars`);
+    writeLine(`Preview: ${result.content.slice(0, 200)}...`);
+    writeLine(`SourceId: ${result.sourceId}`);
     // biome-ignore lint/suspicious/noExplicitAny: script catch
   } catch (error: any) {
-    console.log("PDF test error:", error.message);
+    writeLine(`PDF test error: ${error.message}`);
   }
 }
 
 async function testTXT() {
-  console.log("\n📃 Testing TXT (Project Gutenberg)...");
+  writeLine("\n📃 Testing TXT (Project Gutenberg)...");
 
   // Fetch a classic text from Project Gutenberg (Romeo and Juliet excerpt)
   const url = "https://www.gutenberg.org/files/1112/1112-0.txt";
@@ -72,18 +87,18 @@ async function testTXT() {
       filename: "romeo-and-juliet.txt",
     });
 
-    console.log("Title:", result.title);
-    console.log("Content length:", result.content.length, "chars");
-    console.log("Preview:", `${result.content.slice(0, 300)}...`);
-    console.log("SourceId:", result.sourceId);
+    writeLine(`Title: ${result.title}`);
+    writeLine(`Content length: ${result.content.length} chars`);
+    writeLine(`Preview: ${result.content.slice(0, 300)}...`);
+    writeLine(`SourceId: ${result.sourceId}`);
     // biome-ignore lint/suspicious/noExplicitAny: script catch
   } catch (error: any) {
-    console.log("TXT test error:", error.message);
+    writeLine(`TXT test error: ${error.message}`);
   }
 }
 
 async function testEPUB() {
-  console.log("\n📚 Testing EPUB (Standard Ebooks)...");
+  writeLine("\n📚 Testing EPUB (Standard Ebooks)...");
 
   // Standard Ebooks provides free, well-formatted EPUBs
   // Using a small public domain book
@@ -99,27 +114,29 @@ async function testEPUB() {
       filename: "the-time-machine.epub",
     });
 
-    console.log("Title:", result.title);
-    console.log("Content length:", result.content.length, "chars");
-    console.log("Preview:", `${result.content.slice(0, 300)}...`);
-    console.log("SourceId:", result.sourceId);
+    writeLine(`Title: ${result.title}`);
+    writeLine(`Content length: ${result.content.length} chars`);
+    writeLine(`Preview: ${result.content.slice(0, 300)}...`);
+    writeLine(`SourceId: ${result.sourceId}`);
     // biome-ignore lint/suspicious/noExplicitAny: script catch
   } catch (error: any) {
-    console.log("EPUB test error:", error.message);
+    writeLine(`EPUB test error: ${error.message}`);
   }
 }
 
 async function main() {
-  console.log("🧪 Testing File Import with Remote Files\n");
-  console.log("=".repeat(50));
+  writeLine("🧪 Testing File Import with Remote Files\n");
+  writeLine("=".repeat(50));
 
   await testMarkdown();
   await testPDF();
   await testTXT();
   await testEPUB();
 
-  console.log(`\n${"=".repeat(50)}`);
-  console.log("✅ Remote file tests completed!");
+  writeLine(`\n${"=".repeat(50)}`);
+  writeLine("✅ Remote file tests completed!");
 }
 
-main().catch(console.error);
+main().catch((error) => {
+  writeErrorLine(`Unhandled error: ${formatError(error)}`);
+});
