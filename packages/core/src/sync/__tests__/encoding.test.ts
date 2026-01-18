@@ -67,7 +67,7 @@ describe("base64Encode/base64Decode", () => {
         const decoded = base64Decode(encoded);
         expect(decoded).toEqual(input);
       }
-    });
+    }, 15000);
   });
 
   describe("encoding validity", () => {

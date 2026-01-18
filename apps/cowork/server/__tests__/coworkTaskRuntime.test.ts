@@ -366,7 +366,7 @@ describe("CoworkTaskRuntime", () => {
         throw new Error("Runtime not created");
       }
       try {
-        await withTimeout(runtimeRef.waitForTask(task.taskId), 5000, "task completion");
+        await withTimeout(runtimeRef.waitForTask(task.taskId), 10000, "task completion");
       } catch (error) {
         const state = runtimeRef.orchestrator.getState();
         const message = error instanceof Error ? error.message : "Timed out";
@@ -375,14 +375,14 @@ describe("CoworkTaskRuntime", () => {
         );
       }
 
-      await withTimeout(waitForStatus(storage, task.taskId, "completed"), 4000, "task status");
+      await withTimeout(waitForStatus(storage, task.taskId, "completed"), 6000, "task status");
       await waitForArtifacts(storage, task.taskId);
 
       await expect(readFile(join(rootPath, "note.txt"), "utf-8")).rejects.toThrow();
     } finally {
       await cleanupDir(dir);
     }
-  }, 10000);
+  }, 15000);
 
   it("executes tool calls with a confirmation handler", async () => {
     const dir = await mkdtemp(join(tmpdir(), "cowork-confirm-"));

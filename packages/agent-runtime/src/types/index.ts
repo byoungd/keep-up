@@ -30,6 +30,7 @@ export interface MCPTool {
 export interface JSONSchema {
   type: "object" | "string" | "number" | "boolean" | "array";
   properties?: Record<string, JSONSchemaProperty>;
+  additionalProperties?: boolean;
   required?: string[];
   description?: string;
 }
@@ -45,6 +46,8 @@ export interface JSONSchemaProperty {
   properties?: Record<string, JSONSchemaProperty>;
   /** Required fields for nested objects */
   required?: string[];
+  /** Whether to allow extra properties (default: true) */
+  additionalProperties?: boolean;
 }
 
 /** MCP Tool call request */

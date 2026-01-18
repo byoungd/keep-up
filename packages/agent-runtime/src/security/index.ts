@@ -310,6 +310,10 @@ export class ToolGovernancePolicyEngine implements ToolPolicyEngine {
       return baseDecision;
     }
 
+    if (isCompletionToolCall(context)) {
+      return baseDecision;
+    }
+
     const executionContext = context.context.toolExecution ?? this.defaults;
     const requiresApproval = mergeToolPatterns(
       executionContext.policy === "interactive" ? DEFAULT_INTERACTIVE_APPROVAL_TOOLS : [],
@@ -400,6 +404,17 @@ function resolveToolNameCandidates(context: ToolPolicyContext): string[] {
     names.add(`${context.toolServer}:${context.operation}`);
   }
   return Array.from(names);
+}
+
+function isCompletionToolCall(context: ToolPolicyContext): boolean {
+  if (context.operation !== "complete_task") {
+    return false;
+  }
+  return (
+    context.tool === "completion" ||
+    context.toolServer === "completion" ||
+    context.call.name === "complete_task"
+  );
 }
 
 function isAnyToolAllowed(toolNames: string[], patterns: string[]): boolean {

@@ -494,6 +494,20 @@ describe("ToolExecutionPipeline", () => {
       });
     });
 
+    it("uses resolved server name for unqualified tool permissions", async () => {
+      registry.setTools([createMockTool("read")]);
+      registry.setToolServer("read", "file");
+      const call = createMockCall("read");
+
+      await pipeline.execute(call, context);
+
+      expect(policy.checkedOperations[0]).toEqual({
+        tool: "file",
+        operation: "read",
+        resource: undefined,
+      });
+    });
+
     it("should extract path resource from arguments", async () => {
       const call = createMockCall("file:read", { path: "/etc/passwd" });
 
@@ -583,6 +597,25 @@ describe("ToolExecutionPipeline", () => {
 
       expect(result.success).toBe(true);
     });
+
+    it("allows completion tool calls even when allowlist is empty", async () => {
+      registry.setTools([createMockTool("completion:complete_task")]);
+      const toolExecutionContext: ToolExecutionContext = {
+        policy: "interactive",
+        allowedTools: [],
+        requiresApproval: [],
+        maxParallel: 1,
+      };
+      const policyEngine = createToolGovernancePolicyEngine(
+        createToolPolicyEngine(policy),
+        toolExecutionContext
+      );
+      pipeline = new ToolExecutionPipeline({ registry, policy, policyEngine });
+
+      const result = await pipeline.execute(createMockCall("completion:complete_task"), context);
+
+      expect(result.success).toBe(true);
+    });
   });
 
   describe("schema validation", () => {
@@ -631,7 +664,7 @@ describe("ToolExecutionPipeline", () => {
       expect(registry.lastCall).toBeUndefined();
     });
 
-    it("rejects unexpected arguments when properties are declared", async () => {
+    it("rejects unexpected arguments when additionalProperties is false", async () => {
       registry.setTools([
         {
           name: "test:tool",
@@ -639,6 +672,7 @@ describe("ToolExecutionPipeline", () => {
           inputSchema: {
             type: "object",
             properties: { path: { type: "string" } },
+            additionalProperties: false,
             required: [],
           },
         },
@@ -653,6 +687,28 @@ describe("ToolExecutionPipeline", () => {
       expect(result.error?.code).toBe("INVALID_ARGUMENTS");
       expect(result.error?.message).toBe("Unexpected argument: extra");
       expect(registry.lastCall).toBeUndefined();
+    });
+
+    it("allows unexpected arguments when additionalProperties is not false", async () => {
+      registry.setTools([
+        {
+          name: "test:tool",
+          description: "test tool",
+          inputSchema: {
+            type: "object",
+            properties: { path: { type: "string" } },
+            required: [],
+          },
+        },
+      ]);
+
+      const result = await pipeline.execute(
+        createMockCall("test:tool", { path: "/tmp/file.txt", extra: "ok" }),
+        context
+      );
+
+      expect(result.success).toBe(true);
+      expect(registry.lastCall).toBeDefined();
     });
 
     it("validates enum and nested object properties", async () => {
