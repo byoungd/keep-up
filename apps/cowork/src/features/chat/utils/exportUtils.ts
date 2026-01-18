@@ -21,14 +21,13 @@ export function exportToMarkdown(session: ExportableSession, messages: Message[]
 
   for (const msg of messages) {
     const role = msg.role === "user" ? "User" : "Assistant";
-    const modelInfo =
-      msg.role === "assistant" && msg.metadata?.modelId ? ` (${msg.metadata.modelId})` : "";
+    const modelInfo = msg.role === "assistant" && msg.modelId ? ` (${msg.modelId})` : "";
 
     md += `## ${role}${modelInfo}\n\n`;
     md += `${msg.content}\n\n`;
 
-    if (msg.role === "assistant" && msg.metadata?.usage) {
-      const usage = msg.metadata.usage;
+    if (msg.role === "assistant" && msg.tokenUsage) {
+      const usage = msg.tokenUsage;
       md += `> Tokens: ${usage.totalTokens} (In: ${usage.inputTokens}, Out: ${usage.outputTokens})\n\n`;
     }
 
@@ -60,7 +59,7 @@ export function exportToJson(session: ExportableSession, messages: Message[]): s
   return JSON.stringify(exportData, null, 2);
 }
 
-export function downloadFile(content: string, filename: string, type: string) {
+export function downloadFile(filename: string, content: string, type: string) {
   const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
