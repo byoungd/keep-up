@@ -4,7 +4,15 @@ import {
   MODEL_CATALOG,
   normalizeModelId,
 } from "@ku0/ai-core";
-import { AIPanel as ShellAIPanel } from "@ku0/shell";
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  AIPanel as ShellAIPanel,
+} from "@ku0/shell";
+import { Download } from "lucide-react";
 import React, { useCallback, useMemo } from "react";
 import { type ChatAttachmentRef, updateSettings, uploadChatAttachment } from "../../api/coworkApi";
 import { CostMeter } from "./components/CostMeter";
@@ -26,6 +34,59 @@ type PanelAttachment = {
   previewUrl?: string;
 };
 
+const TRANSLATIONS = {
+  title: "Session Chat",
+  statusStreaming: "Streaming...",
+  statusDone: "Done",
+  statusError: "Error",
+  statusCanceled: "Canceled",
+  emptyTitle: "What can I do for you?",
+  emptyDescription: "Assign a task or ask anything.",
+  you: "You",
+  assistant: "Assistant",
+  actionEdit: "Edit",
+  actionBranch: "Branch",
+  actionQuote: "Quote",
+  actionCopy: "Copy",
+  actionRetry: "Retry",
+  requestIdLabel: "Request ID",
+  copyLast: "Copy Last",
+  newChat: "New Chat",
+  closePanel: "Close",
+  exportChat: "Export",
+  attachmentsLabel: "Attachments",
+  addImage: "Add Image",
+  runBackground: "Run in Background",
+  removeAttachment: "Remove",
+  inputPlaceholder: "Message current session...",
+  attachmentsMeta: "",
+  referenceLabel: "Ref",
+  referenceResolved: "Resolved",
+  referenceRemapped: "Remapped",
+  referenceUnresolved: "Unresolved",
+  referenceFind: "Find",
+  referenceUnavailable: "Unavailable",
+  alertTitleError: "Error",
+  alertTitleCanceled: "Canceled",
+  alertBodyError: "Something went wrong.",
+  alertBodyCanceled: "Request was canceled.",
+  alertRetry: "Retry",
+  statusLabels: {
+    streaming: "Streaming",
+    done: "Done",
+    error: "Error",
+    canceled: "Canceled",
+    pending: "Pending",
+  },
+  alertLabels: {
+    titleError: "Error",
+    titleCanceled: "Canceled",
+    bodyError: "Error",
+    bodyCanceled: "Canceled",
+    retry: "Retry",
+  },
+} as const;
+
 export function ChatThread({ sessionId }: { sessionId: string }) {
   const {
     messages,
@@ -34,6 +95,7 @@ export function ChatThread({ sessionId }: { sessionId: string }) {
     isSending,
     isLoading,
     retryMessage,
+    editMessage,
     agentMode,
     toggleMode,
     usage,
@@ -42,6 +104,8 @@ export function ChatThread({ sessionId }: { sessionId: string }) {
   const [input, setInput] = React.useState("");
   const [model, setModel] = React.useState(getDefaultModelId());
   const [branchParentId, setBranchParentId] = React.useState<string | null>(null);
+  const [editingMessageId, setEditingMessageId] = React.useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
   const [attachments, setAttachments] = React.useState<PanelAttachment[]>([]);
   const inputRef = React.useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
@@ -63,60 +127,6 @@ export function ChatThread({ sessionId }: { sessionId: string }) {
       // Handled globally or by router
     },
   });
-
-  // Reuse the translations from CoworkAIPanel (ideally shared)
-  const translations = {
-    title: "Session Chat",
-    statusStreaming: "Streaming...",
-    statusDone: "Done",
-    statusError: "Error",
-    statusCanceled: "Canceled",
-    emptyTitle: "What can I do for you?",
-    emptyDescription: "Assign a task or ask anything.",
-    you: "You",
-    assistant: "Assistant",
-    actionEdit: "Edit",
-    actionBranch: "Branch",
-    actionQuote: "Quote",
-    actionCopy: "Copy",
-    actionRetry: "Retry",
-    requestIdLabel: "Request ID",
-    copyLast: "Copy Last",
-    newChat: "New Chat",
-    closePanel: "Close",
-    exportChat: "Export",
-    attachmentsLabel: "Attachments",
-    addImage: "Add Image",
-    runBackground: "Run in Background",
-    removeAttachment: "Remove",
-    inputPlaceholder: "Message current session...",
-    attachmentsMeta: "",
-    referenceLabel: "Ref",
-    referenceResolved: "Resolved",
-    referenceRemapped: "Remapped",
-    referenceUnresolved: "Unresolved",
-    referenceFind: "Find",
-    referenceUnavailable: "Unavailable",
-    alertTitleError: "Error",
-    alertTitleCanceled: "Canceled",
-    alertBodyError: "Something went wrong.",
-    alertBodyCanceled: "Request was canceled.",
-    alertRetry: "Retry",
-    statusLabels: {
-      streaming: "Streaming",
-      done: "Done",
-      error: "Error",
-      canceled: "Canceled",
-      pending: "Pending",
-    },
-    alertLabels: {
-      titleError: "Error",
-      titleCanceled: "Canceled",
-      bodyError: "Error",
-      bodyCanceled: "Canceled",
-      retry: "Retry",
-    },
-  };
 
   const filteredModels = useMemo(() => MODEL_CATALOG, []);
   const handleSetModel = useCallback(
@@ -248,8 +258,108 @@ export function ChatThread({ sessionId }: { sessionId: string }) {
   );
 
   const handleBranch = useCallback((id: string) => {
+    setEditingMessageId(null);
+    setStatusMessage(null);
     setBranchParentId(id);
     inputRef.current?.focus();
+  }, []);
+
+  const submitEditIfNeeded = useCallback(
+    async (draft: string) => {
+      if (!editingMessageId) {
+        return false;
+      }
+      if (attachments.length > 0) {
+        setStatusMessage("Attachments are not supported while editing a message.");
+        return true;
+      }
+      setStatusMessage(null);
+      const targetMessageId = editingMessageId;
+      setEditingMessageId(null);
+      setInput("");
+      try {
+        await editMessage(targetMessageId, draft);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to edit message.";
+        setStatusMessage(message);
+        setEditingMessageId(targetMessageId);
+        setInput(draft);
+        inputRef.current?.focus();
+      }
+      return true;
+    },
+    [attachments.length, editMessage, editingMessageId]
+  );
+
+  const submitNewMessage = useCallback(
+    async (draft: string) => {
+      setStatusMessage(null);
+      const content = draft;
+      setInput("");
+      const readyAttachments = getReadyAttachmentRefs();
+      await sendMessage(content, "chat", {
+        modelId: model,
+        attachments: readyAttachments.length > 0 ? readyAttachments : undefined,
+        parentId: branchParentId ?? undefined,
+      });
+      clearAttachments();
+      setBranchParentId(null);
+    },
+    [branchParentId, clearAttachments, getReadyAttachmentRefs, model, sendMessage]
+  );
+
+  const handleSend = useCallback(async () => {
+    const trimmedInput = input.trim();
+    if (!trimmedInput) {
+      return;
+    }
+    if (isAttachmentBusy) {
+      return;
+    }
+    if (await submitEditIfNeeded(input)) {
+      return;
+    }
+    await submitNewMessage(input);
+  }, [input, isAttachmentBusy, submitEditIfNeeded, submitNewMessage]);
+
+  const handleEdit = useCallback(
+    (id: string) => {
+      const message = messages.find((msg) => msg.id === id);
+      if (!message || message.role !== "user") {
+        return;
+      }
+      setEditingMessageId(id);
+      setBranchParentId(null);
+      setStatusMessage(null);
+      setInput(message.content);
+      inputRef.current?.focus();
+    },
+    [messages]
+  );
+
+  const handleQuote = useCallback((content: string) => {
+    setInput((prev) => {
+      const quoteBlock = content
+        .split("\n")
+        .map((line) => `> ${line}`)
+        .join("\n");
+      return prev ? `${prev}\n\n${quoteBlock}\n\n` : `${quoteBlock}\n\n`;
+    });
+    setEditingMessageId(null);
+    setBranchParentId(null);
+    setStatusMessage(null);
+    inputRef.current?.focus();
+  }, []);
+
+  const clearEditState = useCallback(() => {
+    setEditingMessageId(null);
+    setStatusMessage(null);
+    setInput("");
+  }, []);
+
+  const clearBranchState = useCallback(() => {
+    setBranchParentId(null);
+    setStatusMessage(null);
   }, []);
 
   const handleExport = useCallback(
@@ -270,6 +380,54 @@ export function ChatThread({ sessionId }: { sessionId: string }) {
     [messages, sessionId, session]
   );
 
+  const contextStatus = useMemo(() => {
+    if (editingMessageId) {
+      return (
+        <div className="text-fine font-medium text-foreground flex items-center justify-between gap-3 px-2 py-1.5 rounded-lg bg-surface-2/60 border border-border/40">
+          <div className="flex flex-col">
+            <span>Editing message. Send to save changes.</span>
+            {statusMessage ? (
+              <span className="text-xs text-destructive">{statusMessage}</span>
+            ) : null}
+          </div>
+          <Button variant="ghost" size="compact" onClick={clearEditState}>
+            Cancel
+          </Button>
+        </div>
+      );
+    }
+    if (branchParentId) {
+      return (
+        <div className="text-fine font-medium text-foreground flex items-center justify-between gap-3 px-2 py-1.5 rounded-lg bg-surface-2/60 border border-border/40">
+          <span>Branching from selected message.</span>
+          <Button variant="ghost" size="compact" onClick={clearBranchState}>
+            Cancel
+          </Button>
+        </div>
+      );
+    }
+    if (statusMessage) {
+      return (
+        <div className="text-fine font-medium text-destructive flex items-center gap-2 px-2 py-1.5 rounded-lg bg-destructive/5 border border-destructive/10">
+          <span>{statusMessage}</span>
+        </div>
+      );
+    }
+    return null;
+  }, [branchParentId, clearBranchState, clearEditState, editingMessageId, statusMessage]);
+
+  const inputTranslations = useMemo(
+    () => ({
+      ...TRANSLATIONS,
+      inputPlaceholder: editingMessageId
+        ? "Edit your message..."
+        : branchParentId
+          ? "Reply to branch..."
+          : TRANSLATIONS.inputPlaceholder,
+    }),
+    [branchParentId, editingMessageId]
+  );
+
   const headerContent = (
     <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200/50 dark:border-gray-800/50 bg-surface-0 min-h-[48px]">
       <div className="flex items-center gap-2">
@@ -279,6 +437,32 @@ export function ChatThread({ sessionId }: { sessionId: string }) {
         <CostMeter usage={usage} modelId={model} />
         <div className="h-4 w-px bg-border mx-1" />
         <ModeToggle mode={agentMode} onToggle={toggleMode} />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-surface-2/60"
+              aria-label="Export chat"
+            >
+              <Download className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" sideOffset={6} className="w-44 rounded-lg p-1">
+            <DropdownMenuItem
+              onSelect={() => handleExport("markdown")}
+              className="gap-2 rounded-md px-2 py-1.5 text-[13px] focus:bg-foreground/[0.05] focus:text-foreground cursor-pointer outline-none"
+            >
+              Export Markdown
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => handleExport("json")}
+              className="gap-2 rounded-md px-2 py-1.5 text-[13px] focus:bg-foreground/[0.05] focus:text-foreground cursor-pointer outline-none"
+            >
+              Export JSON
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );
@@ -288,7 +472,7 @@ export function ChatThread({ sessionId }: { sessionId: string }) {
       <ShellAIPanel
         showHeader={false}
         topContent={headerContent}
-        title={translations.title}
+        title={TRANSLATIONS.title}
         model={model}
         setModel={handleSetModel}
         models={filteredModels}
@@ -309,19 +493,15 @@ export function ChatThread({ sessionId }: { sessionId: string }) {
         onExport={() => {
           handleExport("markdown");
         }}
-        headerTranslations={translations}
+        headerTranslations={TRANSLATIONS}
         panelPosition="main"
         // Messages
         messages={messages}
         suggestions={[]}
         listRef={listRef}
-        onEdit={() => {
-          /* no-op */
-        }}
+        onEdit={handleEdit}
         onBranch={(id) => handleBranch(id)}
-        onQuote={() => {
-          /* no-op */
-        }}
+        onQuote={handleQuote}
         onCopy={(content) => {
           navigator.clipboard.writeText(content);
         }}
@@ -329,30 +509,11 @@ export function ChatThread({ sessionId }: { sessionId: string }) {
         onSuggestionClick={() => {
           /* no-op */
         }}
-        messageListTranslations={translations}
+        messageListTranslations={TRANSLATIONS}
         // Input
         input={input}
         setInput={setInput}
-        onSend={async () => {
-          if (!input.trim()) {
-            return;
-          }
-          if (isAttachmentBusy) {
-            return;
-          }
-          const content = input;
-          setInput("");
-          const readyAttachments = getReadyAttachmentRefs();
-          await sendMessage(content, "chat", {
-            modelId: model,
-            attachments: readyAttachments.length > 0 ? readyAttachments : undefined,
-            parentId: branchParentId ?? undefined,
-          }); // Default to chat execution in thread? Or strict task?
-          clearAttachments();
-          setBranchParentId(null);
-          // Ideally we share the intent detection from controller, but for now
-          // let's assume direct chat works. The unified hook handles optimistic updates.
-        }}
+        onSend={handleSend}
         onRunBackground={() => {
           /* no-op */
         }}
@@ -366,7 +527,8 @@ export function ChatThread({ sessionId }: { sessionId: string }) {
         fileInputRef={fileInputRef}
         inputRef={inputRef}
         onFileChange={handleFileChange}
-        inputTranslations={translations}
+        inputTranslations={inputTranslations}
+        contextStatus={contextStatus ?? undefined}
         isAttachmentBusy={isAttachmentBusy}
         // Features
         tasks={[]} // Tasks are embedded in messages now, but widget might need them if separated.

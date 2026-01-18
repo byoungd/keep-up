@@ -14,6 +14,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
   Input,
+  SearchInput,
   Tooltip,
   useReaderShell,
 } from "@ku0/shell";
@@ -91,11 +92,26 @@ export function CoworkSidebarSections() {
   const [favoriteIds, setFavoriteIds] = React.useState<Set<string>>(new Set());
   const [pinnedProjectIds, setPinnedProjectIds] = React.useState<Set<string>>(new Set());
   const [expandedProjectIds, setExpandedProjectIds] = React.useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [pendingRenameSessionId, setPendingRenameSessionId] = React.useState<string | null>(null);
+  const [renameValue, setRenameValue] = React.useState("");
+  const [pendingDeleteSessionId, setPendingDeleteSessionId] = React.useState<string | null>(null);
+  const renameInputRef = React.useRef<HTMLInputElement | null>(null);
 
   React.useEffect(() => {
     setFavoriteIds(readStorageSet(FAVORITES_STORAGE_KEY));
     setPinnedProjectIds(readStorageSet(PINNED_PROJECTS_STORAGE_KEY));
   }, []);
+
+  React.useEffect(() => {
+    if (!pendingRenameSessionId) {
+      return;
+    }
+    const rafId = requestAnimationFrame(() => {
+      renameInputRef.current?.focus();
+    });
+    return () => cancelAnimationFrame(rafId);
+  }, [pendingRenameSessionId]);
 
   const sortedProjects = React.useMemo(() => {
     return [...projects].sort((a, b) => {
@@ -115,6 +131,18 @@ export function CoworkSidebarSections() {
   /* const activeProject = React.useMemo(() => {
     return projects.find((p) => p.id === activeProjectId) ?? null;
   }, [projects, activeProjectId]); */
+
+  const normalizedSearch = searchQuery.trim().toLowerCase();
+  const hasSearch = normalizedSearch.length > 0;
+  const matchesSearch = React.useCallback(
+    (session: { title?: string }) => {
+      if (!normalizedSearch) {
+        return true;
+      }
+      return (session.title ?? "").toLowerCase().includes(normalizedSearch);
+    },
+    [normalizedSearch]
+  );
 
   const sortedSessions = React.useMemo(
     () => [...sessions].sort((a, b) => b.createdAt - a.createdAt),
@@ -146,8 +174,12 @@ export function CoworkSidebarSections() {
       return [];
     }
 
+    if (normalizedSearch) {
+      filtered = filtered.filter(matchesSearch);
+    }
+
     return filtered;
-  }, [favoriteIds, sortedSessions, taskFilter, activeProjectId]);
+  }, [favoriteIds, sortedSessions, taskFilter, activeProjectId, normalizedSearch, matchesSearch]);
 
   const handleSelectProject = React.useCallback(
     (projectId: string) => {
@@ -232,29 +264,71 @@ export function CoworkSidebarSections() {
     [moveSessionToProject]
   );
 
-  const handleDeleteSession = React.useCallback(
-    async (sessionId: string) => {
-      if (window.confirm("Are you sure you want to delete this session?")) {
-        try {
-          await deleteSession(sessionId);
-        } catch (_e) {
-          void _e;
-        }
-      }
+  const openRenameDialog = React.useCallback(
+    (sessionId: string) => {
+      const target = sessions.find((session) => session.id === sessionId);
+      setPendingRenameSessionId(sessionId);
+      setRenameValue(target?.title ?? "");
     },
-    [deleteSession]
+    [sessions]
   );
 
-  const handleRenamePrompt = React.useCallback(
-    (sessionId: string) => {
-      const s = sessions.find((x) => x.id === sessionId);
-      const newName = window.prompt("Enter new session name", s?.title);
-      if (newName) {
-        renameSession(sessionId, newName);
-      }
-    },
-    [sessions, renameSession]
-  );
+  const closeRenameDialog = React.useCallback(() => {
+    setPendingRenameSessionId(null);
+    setRenameValue("");
+  }, []);
+
+  const confirmRenameSession = React.useCallback(async () => {
+    if (!pendingRenameSessionId) {
+      return;
+    }
+    const trimmed = renameValue.trim();
+    if (!trimmed) {
+      return;
+    }
+    try {
+      await renameSession(pendingRenameSessionId, trimmed);
+    } catch (_err) {
+      void _err;
+    } finally {
+      closeRenameDialog();
+    }
+  }, [pendingRenameSessionId, renameValue, renameSession, closeRenameDialog]);
+
+  const openDeleteDialog = React.useCallback((sessionId: string) => {
+    setPendingDeleteSessionId(sessionId);
+  }, []);
+
+  const closeDeleteDialog = React.useCallback(() => {
+    setPendingDeleteSessionId(null);
+  }, []);
+
+  const confirmDeleteSession = React.useCallback(async () => {
+    if (!pendingDeleteSessionId) {
+      return;
+    }
+    try {
+      await deleteSession(pendingDeleteSessionId);
+    } catch (_e) {
+      void _e;
+    } finally {
+      closeDeleteDialog();
+    }
+  }, [pendingDeleteSessionId, deleteSession, closeDeleteDialog]);
+
+  const pendingRenameSession = React.useMemo(() => {
+    if (!pendingRenameSessionId) {
+      return null;
+    }
+    return sessions.find((session) => session.id === pendingRenameSessionId) ?? null;
+  }, [pendingRenameSessionId, sessions]);
+
+  const pendingDeleteSession = React.useMemo(() => {
+    if (!pendingDeleteSessionId) {
+      return null;
+    }
+    return sessions.find((session) => session.id === pendingDeleteSessionId) ?? null;
+  }, [pendingDeleteSessionId, sessions]);
 
   const handlePlaceholderAction = React.useCallback(() => {
     /* TODO */
@@ -323,7 +397,7 @@ export function CoworkSidebarSections() {
           {sortedProjects.map((project) => {
             const isExpanded = expandedProjectIds.has(project.id);
             const isPinned = pinnedProjectIds.has(project.id);
-            const projectTasks = getSessionsForProject(project.id);
+            const projectTasks = getSessionsForProject(project.id).filter(matchesSearch);
             const hasTasks = projectTasks.length > 0;
 
             return (
@@ -554,18 +628,33 @@ export function CoworkSidebarSections() {
           )}
           aria-hidden={!isTasksExpanded}
         >
+          <div className="px-3 pb-1">
+            <SearchInput
+              placeholder="Search sessions..."
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              onClear={() => setSearchQuery("")}
+              aria-label="Search sessions"
+            />
+          </div>
           {filteredSessions.length === 0 ? (
-            <button
-              type="button"
-              className="flex items-center gap-2.5 w-full rounded-md px-3 py-1.5 text-[13px] text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05] transition-colors cursor-pointer group"
-              onClick={() => router.push("/new-session")}
-            >
-              <Sparkles
-                className="h-4 w-4 text-muted-foreground opacity-70 group-hover:opacity-100 group-hover:text-foreground transition-all"
-                aria-hidden="true"
-              />
-              <span>{activeProjectId ? "New task in project" : "New task"}</span>
-            </button>
+            hasSearch ? (
+              <div className="px-3 py-2 text-[13px] text-muted-foreground">
+                No sessions match your search.
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="flex items-center gap-2.5 w-full rounded-md px-3 py-1.5 text-[13px] text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05] transition-colors cursor-pointer group"
+                onClick={() => router.push("/new-session")}
+              >
+                <Sparkles
+                  className="h-4 w-4 text-muted-foreground opacity-70 group-hover:opacity-100 group-hover:text-foreground transition-all"
+                  aria-hidden="true"
+                />
+                <span>{activeProjectId ? "New task in project" : "New task"}</span>
+              </button>
+            )
           ) : (
             filteredSessions.map((session) => {
               const isActive = activeSessionId === session.id;
@@ -624,7 +713,7 @@ export function CoworkSidebarSections() {
                         <span>Share</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onSelect={() => handleRenamePrompt(session.id)}
+                        onSelect={() => openRenameDialog(session.id)}
                         className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-foreground/[0.05] focus:text-foreground cursor-pointer outline-none"
                       >
                         <PencilLine className="h-4 w-4" aria-hidden="true" />
@@ -690,7 +779,7 @@ export function CoworkSidebarSections() {
 
                       <DropdownMenuSeparator className="mx-2" />
                       <DropdownMenuItem
-                        onSelect={() => handleDeleteSession(session.id)}
+                        onSelect={() => openDeleteDialog(session.id)}
                         className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] text-destructive focus:text-destructive focus:bg-foreground/[0.05] cursor-pointer outline-none"
                       >
                         <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -704,6 +793,85 @@ export function CoworkSidebarSections() {
           )}
         </div>
       </section>
+
+      <Dialog
+        open={pendingRenameSessionId !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeRenameDialog();
+          }
+        }}
+        title="Rename session"
+        description={
+          pendingRenameSession?.title
+            ? `Update the name for "${pendingRenameSession.title}".`
+            : "Update the session name."
+        }
+        className="rounded-2xl bg-surface-1/95 border-border/30"
+      >
+        <div className="space-y-3">
+          <label className="text-sm font-medium text-foreground" htmlFor="session-rename">
+            Session name
+          </label>
+          <Input
+            id="session-rename"
+            ref={renameInputRef}
+            value={renameValue}
+            onChange={(event) => setRenameValue(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                void confirmRenameSession();
+              }
+            }}
+            aria-label="Session name"
+          />
+        </div>
+
+        <DialogFooter className="bg-transparent border-none px-0 -mx-0 mt-6">
+          <Button variant="secondary" type="button" onClick={closeRenameDialog}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            onClick={() => void confirmRenameSession()}
+            disabled={!renameValue.trim()}
+          >
+            Rename
+          </Button>
+        </DialogFooter>
+      </Dialog>
+
+      <Dialog
+        open={pendingDeleteSessionId !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeDeleteDialog();
+          }
+        }}
+        title="Delete session"
+        description="This action cannot be undone."
+        className="rounded-2xl bg-surface-1/95 border-border/30"
+      >
+        <div className="space-y-3 text-sm text-muted-foreground">
+          <p>
+            Are you sure you want to delete{" "}
+            <span className="font-medium text-foreground">
+              {pendingDeleteSession?.title ?? "this session"}
+            </span>
+            ?
+          </p>
+        </div>
+
+        <DialogFooter className="bg-transparent border-none px-0 -mx-0 mt-6">
+          <Button variant="secondary" type="button" onClick={closeDeleteDialog}>
+            Cancel
+          </Button>
+          <Button variant="destructive" type="button" onClick={() => void confirmDeleteSession()}>
+            Delete
+          </Button>
+        </DialogFooter>
+      </Dialog>
 
       <Dialog
         open={isDialogOpen}
