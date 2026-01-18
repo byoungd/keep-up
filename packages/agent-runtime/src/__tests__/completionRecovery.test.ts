@@ -53,6 +53,32 @@ class InvalidCompletionLLM implements IAgentLLM {
   }
 }
 
+class MixedCompletionLLM implements IAgentLLM {
+  async complete(_request: AgentLLMRequest): Promise<AgentLLMResponse> {
+    return {
+      content: "",
+      finishReason: "tool_use",
+      toolCalls: [
+        { name: "complete_task", arguments: { summary: "done" } },
+        { name: "ping", arguments: {} },
+      ],
+    };
+  }
+}
+
+class DuplicateCompletionLLM implements IAgentLLM {
+  async complete(_request: AgentLLMRequest): Promise<AgentLLMResponse> {
+    return {
+      content: "",
+      finishReason: "tool_use",
+      toolCalls: [
+        { name: "complete_task", arguments: { summary: "first" } },
+        { name: "complete_task", arguments: { summary: "second" } },
+      ],
+    };
+  }
+}
+
 function createPingServer(): MCPToolServer {
   return {
     name: "ping",
@@ -149,5 +175,35 @@ describe("Completion and recovery contracts", () => {
     expect(state.turn).toBe(2);
     expect(state.status).toBe("error");
     expect(state.error).toContain("Recovery failed");
+  });
+
+  it("errors when completion is combined with other tool calls", async () => {
+    const registry = createToolRegistry({ enforceQualifiedNames: false });
+    await registry.register(createCompletionToolServer());
+
+    const orchestrator = createOrchestrator(new MixedCompletionLLM(), registry, {
+      maxTurns: 1,
+      requireConfirmation: false,
+    });
+
+    const state = await orchestrator.run("hello");
+
+    expect(state.status).toBe("error");
+    expect(state.error).toContain("Completion tool must be called alone");
+  });
+
+  it("errors when completion is called multiple times in one turn", async () => {
+    const registry = createToolRegistry({ enforceQualifiedNames: false });
+    await registry.register(createCompletionToolServer());
+
+    const orchestrator = createOrchestrator(new DuplicateCompletionLLM(), registry, {
+      maxTurns: 1,
+      requireConfirmation: false,
+    });
+
+    const state = await orchestrator.run("hello");
+
+    expect(state.status).toBe("error");
+    expect(state.error).toContain("Completion tool must only be called once");
   });
 });

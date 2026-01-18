@@ -137,6 +137,29 @@ describe("AgentManager", () => {
     expect(result.durationMs).toBeGreaterThanOrEqual(0);
   });
 
+  it("uses completion summary when assistant content is empty", async () => {
+    llm.setDefaultResponse({
+      content: "",
+      finishReason: "tool_use",
+      toolCalls: [
+        {
+          name: "completion:complete_task",
+          arguments: { summary: "Summary only" },
+        },
+      ],
+    });
+
+    const manager = createAgentManager({ llm, registry });
+
+    const result = await manager.spawn({
+      type: "explore",
+      task: "Return summary only",
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.output).toBe("Summary only");
+  });
+
   it("should handle agent errors gracefully", async () => {
     llm.complete = async () => {
       throw new Error("LLM connection failed");
