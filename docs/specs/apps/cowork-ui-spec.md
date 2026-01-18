@@ -1,149 +1,182 @@
-# Cowork UI Spec
+# Cowork UI Spec (v3 — Final)
 
-> UI specification for the Cowork app (apps/cowork). Task-mode coworking with artifacts, approvals, and transparent agent execution. Desktop-first; adaptive to tablet/mobile later.
+> **Purpose**: Defines the UI for the Cowork App — a task-mode agentic workspace with transparent execution, artifacts, and approvals. Desktop-first; adaptive to tablet/mobile.
 
-## Goals
-- Make task-mode transparent: show plan, execution, artifacts, approvals, and logs without context loss.
-- Keep agents on-rails: approvals by risk, scoped file access, deterministic TaskGraph visibility.
-- Maintain flow speed: command-first navigation, quick task submission, fast artifact preview.
-- Honor Keep-Up design standards (a11y, timing, tokens) and Cowork architecture (SSE, policy DSL, LFCC principles).
-
-## Non-Goals
-- Full Reader/Brief authoring (covered elsewhere).
-- Building a marketplace UI; only support local connectors and BYOK setup.
-- Mobile parity; only essential responsive adjustments for narrow viewports.
+**Design System Reference**: [`docs/specs/cowork/cowork-visual-design-system.md`](file:///Users/han/Documents/Code/Parallel/keep-up/docs/specs/cowork/cowork-visual-design-system.md) (v3)
 
 ---
 
-## Visual Direction
-- **Palette**: Neutral graphite surfaces with bright cyan for AI/command actions and amber for risk/approvals. Avoid purple. Use shared tokens from `design-system`.
-- **Typography**: Purposeful sans with weight contrast (body 14 regular, headings 16-20 semi). Monospace for logs and TaskGraph IDs.
-- **Density**: Default density for lists; compact rows for timeline/log panes; generous spacing in artifact readers.
-- **Background**: Layered cards; workspace shell stays light, task/timeline panes use slightly darker surface bands for separation.
-- **Iconography**: Line icons with 1.5px stroke; badges for status (running, blocked, needs-approval).
+## 1. Design Philosophy
+
+### 1.1 The "Novelty Budget" (Dia Principle)
+We spend our limited "Novelty Budget" **exclusively on AI features**. The rest is "Tuesday Morning" familiar.
+
+| Scope | Rule |
+| :--- | :--- |
+| **Shell (Sidebar, Nav, Settings)** | Familiar, calm, solid. No decorations. No gradients. |
+| **AI (Thinking, Artifacts, Chat)** | Expressive. Use **Violet** brand color, subtle motion, and playful stacking. |
+
+### 1.2 "Calm Chrome" (Arc Principle)
+*   **Default View**: **Left Rail + Canvas only**. Right Rail and Bottom Drawer are hidden by default.
+*   **Focus Mode**: Hides all rails for reading/review.
+*   The UI reads "quiet" at rest. Color/attention spikes **only** on exceptions (Approval Required, Error, Conflict).
+
+### 1.3 "Peek → Pin → Split" (Arc Flow Continuity)
+*   Default artifact interaction: **Peek** (overlay, ESC closes).
+*   **Pin**: Opens artifact in Right Rail or Split View.
+*   **Split**: Side-by-side Chat + Artifact for sustained reference.
+*   State (scroll, selection) is preserved on promote/demote.
 
 ---
 
-## Layout & IA
-- **Left Rail (72px collapsed -> 240px expanded)**: Workspace switcher, Sessions, Tasks, Artifacts, Approvals, Settings. Color stripe per workspace. Hover/focus expands.
-- **Primary Workspace (center)**: Two modes:
-  - **Chat + Task Canvas**: Messages, prompts, task outputs.
-  - **Artifact View**: Large card renderer (plan, diff, checklist, report) with action bar.
-- **Right Rail (320px)**: Context/AI panel, approval summary, model lane selector, run status. Dock/undock toggle; hides in focus mode.
-- **Secondary Drawer (bottom 30-40% height)**: Timeline/logs and TaskGraph view; resizable; collapsed by default on small screens.
-- **Top Bar**: Breadcrumb (Workspace / Session), command button (CmdK), connection status (online/offline/SSE resumable), BYOK/model lane chip.
-- **Bottom Input Bar**: Task prompt input with attachments (files, paths, artifacts), presets, run button with risk badge.
+## 2. Visual Direction
+
+| Element | Value | Notes |
+| :--- | :--- | :--- |
+| **Theme Frame** | `zinc-100` (Light) / `zinc-900` (Dark) | The App's background tint. User-customizable per Workspace. |
+| **Canvas** | `white` (Light) / `gray-950` (Dark) | Solid. Elevated with `shadow-sm` and `rounded-lg`. |
+| **AI/Magic** | **`violet-600`** | Reserved for AI thinking, generation, and interactive artifacts. **No cyan**. |
+| **Risk/Approval** | **`amber-500`** | Unmissable. High contrast. |
+| **Typography** | `13px` UI / `15px` Chat / `Inter` | Weight as hierarchy. |
+| **Corner Radius** | `12px` ("Squircle") | All panels, cards, modals. |
 
 ---
 
-## Core Flows
+## 3. Layout & Information Architecture
 
-1) **Start a Session**
-   - From Sessions list -> open session -> shell loads chat + task canvas.
-   - Command palette (CmdK) supports "New task", "Open artifact", "Switch workspace".
+### 3.1 Structural Zones
 
-2) **Submit a Task**
-   - Enter prompt; attach files/paths/artifacts; select lane (fast/deep/consensus) and risk disclosure.
-   - On submit: show TaskGraph node placeholders; right rail shows context chips; bottom drawer opens timeline.
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Top Bar: Breadcrumb | CmdK | Status                         │
+├──────────────┬──────────────────────────────────────────────┤
+│              │                                              │
+│   Sidebar    │               Content Canvas                 │
+│   (240px)    │         (Chat / Artifact Split)              │
+│              │                                              │
+├──────────────┴──────────────────────────────────────────────┤
+│ (Optional) Bottom Drawer: Timeline / Logs / TaskGraph       │
+└─────────────────────────────────────────────────────────────┘
+```
 
-3) **Approval Gate**
-   - When a node requires approval: inline card appears with risk tag (read/write/file/system). Primary actions: Approve, Deny, Edit scope.
-   - Approvals also list in the right rail and in /approvals route for batch review.
+*   **Left Sidebar (240px, collapsible to 72px)**: Workspace Switcher, Pinned Sessions, Recent Sessions.
+*   **Content Canvas**: Chat Thread (default). Expands to Split View for Artifacts.
+*   **Right Rail (320px, opt-in)**: AI Panel, Context Chips, Approval Summary. Hidden by default.
+*   **Bottom Drawer (30%, opt-in)**: Timeline / Logs / TaskGraph. Collapsed by default.
 
-4) **Execution & Streaming**
-   - SSE stream updates timeline (Queued -> Running -> Succeeded/Failed) and chat responses.
-   - Context chips show active grants; conflicts or retries surface as chips with tooltips.
-
-5) **Artifacts**
-   - Rendered in central pane; header shows type (plan, diff, checklist, report), created time, status.
-   - Action bar: Apply (when applicable), Download, Copy, Open in new tab, Send to chat (preload context).
-   - Diff artifacts use side-by-side split toggle; checklist uses interactive checkboxes.
-
-6) **Logs & TaskGraph**
-   - Bottom drawer tabs: Timeline, Logs, TaskGraph.
-   - TaskGraph tab shows DAG nodes with status chips; click node -> right rail details (inputs, outputs, tool run logs).
-
-7) **Error Recovery**
-   - Failed nodes show retry button; approval rescopes if needed.
-   - Conflict banner links to troubleshooting (AI Envelope expectations, missing grant).
-
-8) **Session Summary**
-   - End-of-run summary card: what changed, approvals granted, artifacts produced, costs/time. Export to Markdown/PDF.
+### 3.2 Routes
+*   `/`: Sessions List.
+*   `/sessions/:id`: Chat / Task Workspace.
+*   `/sessions/:id/artifacts`: Full Artifact Gallery.
+*   `/sessions/:id/logs`: Full Logs View.
+*   `/approvals`: Batch Approval Review.
+*   `/settings`: Workspace and Model Settings.
 
 ---
 
-## Navigation & Information Architecture
-- Routes: `/` (sessions list), `/sessions/:id` (chat/task), `/sessions/:id/artifacts`, `/sessions/:id/logs`, `/approvals`, `/settings`.
-- Tabs inside session: **Chat**, **Artifacts**, **Approvals**, **Logs**; maintain state per tab.
-- Command palette categories: Navigate, Create, Run AI, Approvals, Settings, Help.
-- Saved views: filters for sessions (Active, Completed, Needs approval).
+## 4. Core Flows
+
+### 4.1 Submit a Task
+1.  User enters prompt in **Input Capsule** (floating bottom).
+2.  Attaches files/paths using `@mention` syntax.
+3.  Selects Model Lane (optional).
+4.  On submit: Task appears in Chat as a Processing Message with status indicator.
+
+### 4.2 Approval Gate
+1.  Approval card appears **inline in Chat** (not a separate panel).
+2.  Risk badge: **Amber** (High), **Yellow** (Medium).
+3.  Scope list: Affected paths/tools.
+4.  Actions: **Approve**, **Deny**, **Edit Scope**.
+5.  Keyboard: `Enter` to Approve, `Esc` or `Shift+Enter` to Deny.
+
+### 4.3 Artifact Interaction (Peek → Pin → Split)
+1.  **Click artifact link in Chat**: Opens **Peek Overlay** (420px, ESC closes).
+2.  **Click "Pin"**: Opens in **Right Rail**.
+3.  **Click "Split"**: Opens **Split View** (Chat | Artifact).
+
+### 4.4 Execution & Streaming
+1.  SSE stream updates Chat messages and Timeline (if visible).
+2.  **Thinking State**: Violet shimmer bar below the message being generated.
+3.  **Tool Call**: Inline expandable card showing tool name, args, and result.
 
 ---
 
-## Components & States
+## 5. Components
 
-- **Session List**: Rows with title, last updated, status pill, unread badge; supports quick actions (Resume, Open artifacts).
-- **Prompt Bar**: Input + attachment chips; presets dropdown; lane selector; run button with spinner on submit; disabled when offline or approval pending.
-- **Message Bubbles**: User vs Agent with subtle background difference; inline citations; action bar on hover (copy, pin, open artifact).
-- **Artifacts**: Card container with secondary metadata stripe; interactive controls per type (checklist, diff view toggle, apply).
-- **Approvals Card**: Risk tag, scope list, rationale text area, Approve/Deny buttons with type="button" and keyboard shortcuts.
-- **Timeline**: Vertical list; each entry shows timestamp, node ID, status, duration; keyboard scrollable.
-- **TaskGraph Mini-map**: Compact DAG with node badges; click to focus node in detail drawer.
-- **Status Chips**: Synced, Offline, Reconnecting (SSE resume), Pending Approval, Blocked.
-- **Notifications/Toasts**: Success/failure and approval required; auto-dismiss except approvals.
+### 5.1 Input Capsule
+*   **Shape**: `rounded-full` pill.
+*   **Position**: Empty state = Centered. Active state = Fixed Bottom.
+*   **Elevation**: `shadow-lg`.
+*   **Attachments**: Use `@mention` chips for files/artifacts.
 
----
+### 5.2 Sidebar Item
+*   **Active State**: `bg-surface-2`, solid highlight.
+*   **Hover**: `bg-surface-2/50`.
+*   See Reference Implementation: `docs/specs/cowork/reference-implementation/README.md`.
 
-## Command & AI Surfaces
-- **Command Palette (CmdK or /)**: Search sessions, artifacts, approvals; run quick actions (retry node, open TaskGraph, toggle density); shows preview pane with effect.
-- **Right Rail AI Panel**: Chat-style, context-aware. Chips: session, selected message/task, attached artifacts, file paths. Mode toggles: Tone (neutral/brief/technical), Lane (fast/deep/consensus), Privacy (local-only vs outbound). Responses show citations and linked artifacts.
-- **Inline Actions**: Message hover -> "Turn into task", "Send to approvals", "Create checklist". Artifact hover -> "Send to chat", "Apply", "Pin".
-- **Selection Menu**: In logs or artifacts, selecting text opens small pill menu (copy, send to AI, add note). Use CSS transitions; no Framer Motion in editor contexts.
+### 5.3 Approval Card
+*   **Background**: `bg-amber-500/10`.
+*   **Border**: `border-amber-500`.
+*   **Content**: Risk Badge, Scope List, Rationale (optional), Action Buttons.
 
----
-
-## Interaction & Motion
-- Durations: 120-150ms for hover/focus; 200-260ms for drawers/panels. Easing `ease-out` (enter) and `ease-in-out` (layout).
-- Drawer resize with smooth width/height transitions; remember last height per session.
-- Command palette: scale 0.98 -> 1 + opacity; focus trap active.
-- Approval banners slide down 12px with opacity; closing reverses motion.
-- TaskGraph node status changes pulse once (200ms) to draw attention, then settle.
-- Respect prefers-reduced-motion: switch to opacity-only.
+### 5.4 Status Indicators
+*   **Synced**: Static green dot.
+*   **Offline**: Static gray dot + text.
+*   **Streaming**: Static text "Streaming..." (no infinite pulse).
+*   **Thinking**: Violet shimmer bar (the **one** place we use decorative motion).
 
 ---
 
-## Accessibility
-- Landmarks: `nav` for rails, `main` for content, `aside` for right rail, `footer` for bottom drawer when visible.
-- Keyboard: Tab order through rails -> content -> drawer; shortcuts CmdK (command), / (focus prompt), Shift+L (open logs), Shift+T (toggle TaskGraph), ESC closes overlays/drawers.
-- ARIA: Icon-only buttons get `aria-label`; live region for streaming responses and approvals; status role for sync chip; associate error text with inputs.
-- Contrast: Text 4.5:1, UI 3:1; ensure cyan/amber meet contrast on surfaces.
-- Forms: Buttons use `type="button"`; inputs with visible labels or `aria-label`.
+## 6. Command & AI Surfaces
+
+### 6.1 Command Palette (`Cmd+K` or `/`)
+*   **Primary interface**. Fastest path to everything.
+*   Actions: Navigate, Open Artifact, Approve, Retry Node, Toggle Panels.
+*   Inline hints: Show `Cmd+K` in empty states.
+
+### 6.2 Right Rail AI Panel (opt-in)
+*   Chat-style context-aware assistant.
+*   **Context Chips**: Session, Task, Artifact, File Path.
+*   **Controls**: Lane (Fast/Deep/Consensus), Tone, Privacy.
+
+### 6.3 Inline Actions (Hover)
+*   Message: "Turn into Task", "Pin", "Copy".
+*   Artifact: "Send to Chat", "Apply", "Open in Split".
 
 ---
 
-## Data & AI Envelope Hooks
-- Context chips carry session/task IDs, artifact IDs, and path scopes; sent to AI Gateway with preconditions.
-- Approvals display the scope (path/tool) and risk tier tied to TaskGraph node IDs.
-- Logs and TaskGraph nodes show `Last-Event-ID` from SSE for debugging resumability.
-- Artifact apply uses deterministic diff pipeline; no direct file mutation without approval.
+## 7. Motion
+
+| Interaction | Duration | Easing | Notes |
+| :--- | :--- | :--- | :--- |
+| **Route Change** | 150ms | `ease-out` | Fade only. No scale. |
+| **Modal/Drawer** | 150ms | `ease-out` | Fade + SlideY(8px). |
+| **Sidebar Collapse** | 200ms | Spring (stiff) | Fast, no bounce. |
+| **Hover** | 100ms | `ease-out` | Background color shift only. No scale. |
+| **Thinking** | Loop | N/A | The **ONLY** looping animation. Violet shimmer. |
+
+> **`prefers-reduced-motion`**: Disable shimmer. Use static "Working..." text.
 
 ---
 
-## Offline, Sync, and Conflict Handling
-- Offline state disables run/approve buttons; prompt bar shows queued badge; SSE auto-resume with Last-Event-ID.
-- Conflict banner links to retry with refreshed frontier/context chips.
-- Pending approvals persist locally; retry once connection restores.
+## 8. Accessibility
+
+*   **Landmarks**: `nav` (Sidebar), `main` (Canvas), `aside` (Right Rail), `footer` (Drawer).
+*   **Keyboard**: Tab order: Rails → Canvas → Drawer. `Esc` closes overlays.
+*   **Shortcuts**: `Cmd+K` (Command), `/` (Focus Input), `Shift+L` (Logs), `Shift+T` (TaskGraph).
+*   **ARIA**: `aria-label` for icon buttons. Live region for streaming responses.
+*   **Contrast**: Text 4.5:1, UI 3:1.
 
 ---
 
-## Desktop -> Narrow View Adaptation
-- Left rail collapses to icons; top bar gains overflow menu for routes.
-- Right rail becomes overlay drawer; bottom logs collapse to tabbed sheet.
-- Split/diff views fall back to stacked toggles.
+## 9. Quality Gates
+
+See: [`docs/specs/cowork/cowork-ui-quality-gates.md`](file:///Users/han/Documents/Code/Parallel/keep-up/docs/specs/cowork/cowork-ui-quality-gates.md).
 
 ---
 
-## Open Questions
-- Should approvals support batch Approve with shared scope notes? (recommend scoped batch by risk tier)
-- Do we persist command palette recent actions per workspace? (recommend yes, local-only)
-- Should TaskGraph mini-map show tool-specific icons or generic nodes? (lean generic with tooltip for clarity)
+## 10. Open Questions (Deferred)
+
+*   Batch Approve with shared scope notes? (Defer)
+*   Persist Command Palette recents per workspace? (Recommend: Yes, local-only)
+*   TaskGraph mini-map: Tool icons vs generic nodes? (Lean generic)
