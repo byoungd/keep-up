@@ -81,12 +81,20 @@ describe("AgentOrchestrator execution event bus", () => {
 
     await orchestrator.run("Run ping");
 
-    expect(decisions).toHaveLength(1);
-    expect(records.map((event) => event.payload.status)).toEqual(["started", "completed"]);
-    const correlationId = decisions[0]?.meta.correlationId;
+    expect(decisions).toHaveLength(2);
+    const pingDecision = decisions.find((event) => event.payload.toolName === "ping");
+    expect(pingDecision).toBeDefined();
+    const pingRecords = records.filter((event) => event.payload.toolName === "ping");
+    const completionRecords = records.filter((event) => event.payload.toolName === "complete_task");
+    expect(pingRecords.map((event) => event.payload.status)).toEqual(["started", "completed"]);
+    expect(completionRecords.map((event) => event.payload.status)).toEqual([
+      "started",
+      "completed",
+    ]);
+    const correlationId = pingDecision?.meta.correlationId;
     expect(correlationId).toBeDefined();
     expect(records[0]?.meta.correlationId).toBe(correlationId);
-    expect(decisions[0]?.meta.source).toBe("execution-agent");
+    expect(pingDecision?.meta.source).toBe("execution-agent");
     expect(records[0]?.meta.source).toBe("execution-agent");
   });
 });

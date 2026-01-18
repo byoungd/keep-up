@@ -200,6 +200,7 @@ describe("CoworkTaskRuntime", () => {
       const session = createSession(rootPath);
       await storage.sessionStore.create(session);
 
+      let runtimeRef: ReturnType<typeof createCoworkRuntime> | undefined;
       const runtime = new CoworkTaskRuntime({
         storage,
         events: eventHub,
@@ -212,12 +213,14 @@ describe("CoworkTaskRuntime", () => {
           });
           const registry = createToolRegistry();
           await registry.register(createCompletionToolServer());
-          return createCoworkRuntime({
+          const runtimeInstance = createCoworkRuntime({
             llm,
             registry,
             cowork: { session: seed },
             taskQueueConfig: { maxConcurrent: 1 },
           });
+          runtimeRef = runtimeInstance;
+          return runtimeInstance;
         },
       });
 
@@ -229,8 +232,12 @@ describe("CoworkTaskRuntime", () => {
       const stored = await storage.taskStore.getById(task.taskId);
 
       expect(stored?.metadata).toEqual(metadata);
+      if (!runtimeRef) {
+        throw new Error("Runtime not created");
+      }
+      await runtimeRef.waitForTask(task.taskId);
     } finally {
-      await rm(dir, { recursive: true, force: true });
+      await cleanupDir(dir);
     }
   });
 
