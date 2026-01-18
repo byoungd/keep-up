@@ -18,20 +18,20 @@ function MetadataView({ metadata }: { metadata: Record<string, unknown> }) {
     return null;
   }
 
+  const riskLevel = typeof metadata.riskLevel === "string" ? metadata.riskLevel : undefined;
+
   return (
     <div className="text-fine font-mono bg-surface-2/50 rounded-lg p-2.5 text-muted-foreground border border-border/10">
       <div className="flex justify-between items-center mb-1.5">
         <span className="font-semibold text-foreground/80">{String(metadata.toolName)}</span>
-        {!!metadata.riskLevel && (
+        {riskLevel && (
           <span
             className={cn(
               "uppercase text-tiny font-bold px-1.5 py-px rounded-[4px] tracking-wider",
-              (metadata.riskLevel as string) === "high"
-                ? "bg-red-500/10 text-red-500"
-                : "bg-blue-500/10 text-blue-500"
+              resolveRiskBadgeClass(riskLevel)
             )}
           >
-            {String(metadata.riskLevel)}
+            {riskLevel}
           </span>
         )}
       </div>
@@ -156,6 +156,21 @@ const IconWrapper = ({ suggestedAction }: { suggestedAction: string }) => {
     </div>
   );
 };
+
+function resolveRiskBadgeClass(riskLevel: string): string {
+  switch (riskLevel) {
+    case "critical":
+      return "bg-destructive/10 text-destructive";
+    case "high":
+      return "bg-accent-rose/10 text-accent-rose";
+    case "medium":
+      return "bg-accent-amber/10 text-accent-amber";
+    case "low":
+      return "bg-accent-emerald/10 text-accent-emerald";
+    default:
+      return "bg-surface-2 text-muted-foreground";
+  }
+}
 
 export function AskMessage({
   content,

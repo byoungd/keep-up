@@ -1,7 +1,7 @@
 # Track UI-A: Controls and Approvals Wiring
 
 Owner: Agent Developer
-Status: Proposed
+Status: Completed
 Branch: `feature/ui-2026-track-a-controls`
 Dependencies: None (can start immediately)
 

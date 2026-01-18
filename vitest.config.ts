@@ -167,6 +167,23 @@ export default defineConfig({
           alias: aliases,
         },
         test: {
+          name: "shell-jsdom",
+          include: ["packages/shell/src/**/*.test.ts", "packages/shell/src/**/*.test.tsx"],
+          exclude: defaultExclude,
+          environment: "jsdom",
+          setupFiles: ["packages/shell/src/test/setup.ts"],
+          server: {
+            deps: {
+              inline: [/@ku0\/.*/],
+            },
+          },
+        },
+      }),
+      defineProject({
+        resolve: {
+          alias: aliases,
+        },
+        test: {
           name: "packages-default",
           include: [
             "packages/lfcc-bridge/src/**/*.test.ts",

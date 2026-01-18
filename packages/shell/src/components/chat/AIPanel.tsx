@@ -2,11 +2,13 @@
 
 import { cn } from "@ku0/shared/utils";
 import * as React from "react";
+import { ApprovalCard } from "../ai/ApprovalCard";
+import { Dialog } from "../ui/Dialog";
 import { AIPanelHeader, type AIPanelHeaderProps } from "./AIPanelHeader";
 import { InputArea, type InputAreaProps } from "./InputArea";
 import { MessageList, type MessageListProps } from "./MessageList";
 import { TaskProgressWidget } from "./TaskProgressWidget";
-import type { AgentTask, ArtifactItem } from "./types";
+import type { AgentTask, ApprovalRiskLevel, ArtifactItem, Message } from "./types";
 
 // Combine props from child components, omitting duplicates that are shared
 // We use Omit/Pick to avoid conflicts if definitions diverge slightly, though they verify as identical.
@@ -52,6 +54,80 @@ export interface AIPanelProps
   tasks?: AgentTask[];
   /** Whether to show the top header bar. Defaults to true. */
   showHeader?: boolean;
+}
+
+type PendingApproval = {
+  approvalId: string;
+  toolName: string;
+  args: Record<string, unknown>;
+  riskLevel?: ApprovalRiskLevel;
+  reason?: string;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isRiskLevel(value: unknown): value is ApprovalRiskLevel {
+  return typeof value === "string" && ["low", "medium", "high", "critical"].includes(value);
+}
+
+function extractApprovalFromMessage(message: Message): PendingApproval | null {
+  if (message.type !== "ask" || message.status !== "pending") {
+    return null;
+  }
+  if (!message.metadata || !isRecord(message.metadata)) {
+    return null;
+  }
+  const approvalId =
+    typeof message.metadata.approvalId === "string" ? message.metadata.approvalId : undefined;
+  const toolName =
+    typeof message.metadata.toolName === "string" ? message.metadata.toolName : undefined;
+  const args = isRecord(message.metadata.args) ? message.metadata.args : undefined;
+  if (!approvalId || !toolName || !args) {
+    return null;
+  }
+  const riskLevel = isRiskLevel(message.metadata.riskLevel)
+    ? message.metadata.riskLevel
+    : undefined;
+  const reason = typeof message.metadata.reason === "string" ? message.metadata.reason : undefined;
+  return { approvalId, toolName, args, riskLevel, reason };
+}
+
+function extractApprovalFromTask(message: Message): PendingApproval | null {
+  if (message.type !== "task_stream") {
+    return null;
+  }
+  if (!message.metadata || !isRecord(message.metadata)) {
+    return null;
+  }
+  const task = message.metadata.task as AgentTask | null;
+  if (!task || task.status !== "paused" || !task.approvalMetadata) {
+    return null;
+  }
+  const approval = task.approvalMetadata;
+  return {
+    approvalId: approval.approvalId,
+    toolName: approval.toolName,
+    args: approval.args,
+    riskLevel: isRiskLevel(approval.riskLevel) ? approval.riskLevel : undefined,
+    reason: approval.reason,
+  };
+}
+
+function findPendingApproval(messages: Message[]): PendingApproval | null {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const message = messages[i];
+    const taskApproval = extractApprovalFromTask(message);
+    if (taskApproval) {
+      return taskApproval;
+    }
+    const messageApproval = extractApprovalFromMessage(message);
+    if (messageApproval) {
+      return messageApproval;
+    }
+  }
+  return null;
 }
 
 export function AIPanel({
@@ -115,12 +191,38 @@ export function AIPanel({
   showHeader = true,
 }: AIPanelProps) {
   const [focusedTaskId, setFocusedTaskId] = React.useState<string | null>("task-1");
+  const pendingApproval = React.useMemo(() => findPendingApproval(messages), [messages]);
+  const [approvalAction, setApprovalAction] = React.useState<"approve" | "reject" | null>(null);
+  const shouldShowApprovalModal = Boolean(pendingApproval && onTaskAction);
+
+  React.useEffect(() => {
+    setApprovalAction(null);
+  }, [pendingApproval?.approvalId]);
 
   // Always notify parent about artifact clicks
   // Parent (RootLayout) manages the preview in the resizable right panel
   const handleArtifactClick = (item: ArtifactItem) => {
     onPreviewArtifact?.(item);
   };
+
+  const handleApprovalAction = React.useCallback(
+    async (action: "approve" | "reject") => {
+      if (!pendingApproval || !onTaskAction) {
+        return;
+      }
+      setApprovalAction(action);
+      try {
+        await onTaskAction(action, {
+          approvalId: pendingApproval.approvalId,
+          toolName: pendingApproval.toolName,
+          args: pendingApproval.args,
+        });
+      } finally {
+        setApprovalAction(null);
+      }
+    },
+    [onTaskAction, pendingApproval]
+  );
 
   return (
     <aside
@@ -192,6 +294,33 @@ export function AIPanel({
             onTaskAction={onTaskAction}
             isMain={panelPosition === "main"}
           />
+
+          {shouldShowApprovalModal && pendingApproval && (
+            <Dialog
+              open
+              onOpenChange={(_open) => undefined}
+              title="Approval required"
+              description="Review the tool call details before approving."
+              size="sm"
+              closeOnBackdropClick={false}
+              closeOnEsc={false}
+              showCloseButton={false}
+              className="border-transparent shadow-none"
+            >
+              <ApprovalCard
+                toolName={pendingApproval.toolName}
+                toolDescription={
+                  pendingApproval.reason ?? `Approval required to run ${pendingApproval.toolName}.`
+                }
+                parameters={pendingApproval.args}
+                riskLevel={pendingApproval.riskLevel ?? "medium"}
+                onApprove={() => handleApprovalAction("approve")}
+                onReject={() => handleApprovalAction("reject")}
+                pendingAction={approvalAction}
+                isDisabled={!onTaskAction}
+              />
+            </Dialog>
+          )}
 
           {overlayContent}
 
