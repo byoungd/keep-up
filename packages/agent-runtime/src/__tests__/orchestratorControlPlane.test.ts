@@ -77,6 +77,7 @@ const waitForEvent = (orchestrator: ReturnType<typeof createOrchestrator>, type:
 describe("AgentOrchestrator control plane", () => {
   it("rejects multiple tool calls in interactive policy", async () => {
     const registry = createToolRegistry();
+    await registry.register(createCompletionToolServer());
     await registry.register(noopServer);
     const llm = new SequenceLLM([
       {

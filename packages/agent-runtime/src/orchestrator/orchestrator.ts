@@ -67,6 +67,7 @@ import type {
   TokenUsageStats,
   ToolContext,
   ToolError,
+  ToolExecutionContext,
 } from "../types";
 import { countTokens } from "../utils/tokenCounter";
 import {
@@ -2033,6 +2034,7 @@ export interface CreateOrchestratorOptions {
   };
   components?: OrchestratorComponents;
   toolExecution?: ToolExecutionOptions;
+  toolExecutionContext?: Partial<ToolExecutionContext>;
   eventBus?: RuntimeEventBus;
   planApprovalHandler?: PlanApprovalHandler;
   recovery?: {
@@ -2133,6 +2135,14 @@ function buildAgentConfig(
     planning: buildPlanningConfig(options.planning),
     recovery: buildRecoveryConfig(options.recovery),
     toolDiscovery: buildToolDiscoveryConfig(options.toolDiscovery),
+    toolExecutionContext: options.toolExecutionContext
+      ? {
+          policy: options.toolExecutionContext.policy ?? "batch",
+          allowedTools: options.toolExecutionContext.allowedTools ?? [],
+          requiresApproval: options.toolExecutionContext.requiresApproval ?? [],
+          maxParallel: options.toolExecutionContext.maxParallel ?? 5,
+        }
+      : undefined,
   };
 }
 
