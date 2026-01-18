@@ -83,7 +83,7 @@ function ThemePreview({ title, style }: ThemePreviewProps) {
                     <p className="text-chrome font-semibold text-foreground">Session health</p>
                     <p className="text-fine text-muted-foreground">All checks passing.</p>
                   </div>
-                  <StatusDot tone="success" ariaLabel="Healthy" />
+                  <StatusDot tone="success" aria-label="Healthy" />
                 </div>
                 <ThinkingBar />
               </div>
@@ -92,7 +92,7 @@ function ThemePreview({ title, style }: ThemePreviewProps) {
             <Card tone="subtle">
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
-                  <StatusDot tone="warning" ariaLabel="Pending" />
+                  <StatusDot tone="warning" aria-label="Pending" />
                   <p className="text-chrome font-semibold text-foreground">Approvals</p>
                 </div>
                 <p className="text-content text-muted-foreground">
