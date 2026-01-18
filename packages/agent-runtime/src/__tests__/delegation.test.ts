@@ -13,9 +13,10 @@ import { createDelegationToolServer, type DelegationToolServer } from "../tools/
 // ============================================================================
 
 function createMockAgentManager(): IAgentManager & {
-  spawnCalls: { type: AgentType; task: string; allowedTools?: string[] }[];
+  spawnCalls: { type: AgentType; task: string; allowedTools?: string[]; agentId?: string }[];
 } {
-  const spawnCalls: { type: AgentType; task: string; allowedTools?: string[] }[] = [];
+  const spawnCalls: { type: AgentType; task: string; allowedTools?: string[]; agentId?: string }[] =
+    [];
 
   return {
     spawnCalls,
@@ -24,9 +25,10 @@ function createMockAgentManager(): IAgentManager & {
         type: options.type,
         task: options.task,
         allowedTools: options.allowedTools,
+        agentId: options.agentId,
       });
       return {
-        agentId: `${options.type}-123`,
+        agentId: options.agentId ?? `${options.type}-123`,
         type: options.type,
         success: true,
         output: `Completed task: ${options.task}`,
@@ -153,6 +155,19 @@ describe("DelegationToolServer", () => {
       expect(result.success).toBe(false);
       expect(result.error?.code).toBe("INVALID_ARGUMENTS");
     });
+
+    it("should reject invalid constraints", async () => {
+      const result = await server.callTool(
+        {
+          name: "delegate",
+          arguments: { role: "coder", task: "Write code", constraints: [1, "file:read"] },
+        },
+        { security }
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe("INVALID_ARGUMENTS");
+    });
   });
 
   describe("lineage tracking", () => {
@@ -162,7 +177,9 @@ describe("DelegationToolServer", () => {
         { security }
       );
 
-      const entry = lineageManager.get("research-123");
+      const childAgentId = manager.spawnCalls[0].agentId;
+      expect(childAgentId).toBeDefined();
+      const entry = lineageManager.get(childAgentId as string);
       expect(entry).toBeDefined();
       expect(entry?.parentId).toBe("parent-1");
       expect(entry?.role).toBe("researcher");
@@ -175,7 +192,9 @@ describe("DelegationToolServer", () => {
         { security }
       );
 
-      const entry = lineageManager.get("code-123");
+      const childAgentId = manager.spawnCalls[0].agentId;
+      expect(childAgentId).toBeDefined();
+      const entry = lineageManager.get(childAgentId as string);
       expect(entry?.status).toBe("completed");
     });
 
@@ -214,16 +233,24 @@ describe("DelegationToolServer", () => {
 
       expect(result.success).toBe(true);
       const text = (result.content[0] as { text: string }).text;
+      const childAgentId = manager.spawnCalls[0].agentId;
+      expect(childAgentId).toBeDefined();
       expect(text).toContain("Delegation Result");
       expect(text).toContain("researcher");
-      expect(text).toContain("research-123");
+      expect(text).toContain(childAgentId as string);
       expect(text).toContain("Completed task");
     });
   });
 
   describe("error handling", () => {
     it("should handle spawn failure gracefully", async () => {
-      manager.spawn = vi.fn(async () => {
+      manager.spawn = vi.fn(async (options) => {
+        manager.spawnCalls.push({
+          type: options.type,
+          task: options.task,
+          allowedTools: options.allowedTools,
+          agentId: options.agentId,
+        });
         throw new Error("Spawn failed: max depth exceeded");
       });
 
@@ -235,6 +262,10 @@ describe("DelegationToolServer", () => {
       expect(result.success).toBe(false);
       expect(result.error?.code).toBe("EXECUTION_FAILED");
       expect(result.error?.message).toContain("max depth exceeded");
+      const childAgentId = manager.spawnCalls[0].agentId;
+      expect(childAgentId).toBeDefined();
+      const entry = lineageManager.get(childAgentId as string);
+      expect(entry?.status).toBe("failed");
     });
   });
 });

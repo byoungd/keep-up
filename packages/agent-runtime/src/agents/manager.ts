@@ -92,8 +92,11 @@ export class AgentManager implements IAgentManager {
    * Spawn a specialized agent.
    */
   async spawn(options: SpawnAgentOptions): Promise<AgentResult> {
+    const agentId = options.agentId ?? this.generateAgentId(options.type);
+    if (this.runningAgents.has(agentId)) {
+      throw new Error(`Agent ID already in use: ${agentId}`);
+    }
     this.assertSpawnAllowed(options);
-    const agentId = this.generateAgentId(options.type);
     const profile = getAgentProfile(options.type);
     const allowedTools = this.resolveAllowedTools(profile.allowedTools, options.allowedTools);
     const scopedEventBus = this.eventBus

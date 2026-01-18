@@ -129,6 +129,11 @@ export class DelegationToolServer extends BaseToolServer {
     const { role, task, constraints } = validation;
     const agentType = ROLE_TO_AGENT_TYPE[role];
     const childDepth = this.parentDepth + 1;
+    const agentId = this.lineageManager ? this.createChildAgentId(agentType) : undefined;
+
+    if (agentId) {
+      this.trackLineageStart(agentId, role, childDepth);
+    }
 
     try {
       const result = await this.manager.spawn({
@@ -136,12 +141,16 @@ export class DelegationToolServer extends BaseToolServer {
         task: this.buildTaskPrompt(task, args.expectedOutput as string | undefined),
         allowedTools: constraints,
         _depth: childDepth,
+        agentId,
         signal: toolContext.signal,
       });
 
-      this.trackLineageSuccess(result.agentId, role, childDepth, result.success);
+      this.updateLineageStatus(agentId ?? result.agentId, result.success);
       return this.formatResult(result, role);
     } catch (error) {
+      if (agentId) {
+        this.updateLineageStatus(agentId, false);
+      }
       const message = error instanceof Error ? error.message : String(error);
       return errorResult("EXECUTION_FAILED", `Delegation failed: ${message}`);
     }
@@ -170,27 +179,41 @@ export class DelegationToolServer extends BaseToolServer {
       };
     }
 
+    const constraintsResult = this.parseConstraints(args.constraints);
+    if (!constraintsResult.valid) {
+      return {
+        error: errorResult("INVALID_ARGUMENTS", "Constraints must be an array of tool identifiers"),
+      };
+    }
+
     return {
       role,
       task,
-      constraints: this.parseConstraints(args.constraints),
+      constraints: constraintsResult.constraints,
     };
   }
 
   /**
-   * Track successful lineage for a delegated agent.
+   * Track lineage for a delegated agent.
    */
-  private trackLineageSuccess(
-    agentId: string,
-    role: DelegationRole,
-    depth: number,
-    success: boolean
-  ): void {
+  private trackLineageStart(agentId: string, role: DelegationRole, depth: number): void {
     if (!this.lineageManager) {
       return;
     }
 
-    this.lineageManager.track(agentId, this.parentAgentId ?? null, role, depth);
+    if (!this.lineageManager.get(agentId)) {
+      this.lineageManager.track(agentId, this.parentAgentId ?? null, role, depth);
+    }
+  }
+
+  /**
+   * Update lineage status after completion.
+   */
+  private updateLineageStatus(agentId: string, success: boolean): void {
+    if (!this.lineageManager) {
+      return;
+    }
+
     this.lineageManager.updateStatus(agentId, success ? "completed" : "failed");
 
     if (this.parentAgentId) {
@@ -250,14 +273,16 @@ export class DelegationToolServer extends BaseToolServer {
     return null;
   }
 
-  private parseConstraints(value: unknown): string[] | undefined {
-    if (!value) {
-      return undefined;
+  private parseConstraints(
+    value: unknown
+  ): { valid: true; constraints?: string[] } | { valid: false } {
+    if (value === undefined) {
+      return { valid: true };
     }
-    if (Array.isArray(value) && value.every((v) => typeof v === "string")) {
-      return value as string[];
+    if (Array.isArray(value) && value.every((item) => typeof item === "string")) {
+      return { valid: true, constraints: value };
     }
-    return undefined;
+    return { valid: false };
   }
 
   private buildTaskPrompt(task: string, expectedOutput?: string): string {
@@ -282,6 +307,11 @@ export class DelegationToolServer extends BaseToolServer {
       "EXECUTION_FAILED",
       `Delegation failed after ${result.turns} turns (${result.durationMs}ms): ${result.error ?? "Unknown error"}`
     );
+  }
+
+  private createChildAgentId(agentType: AgentType): string {
+    const nonce = Math.random().toString(36).slice(2, 8);
+    return `${agentType}-${Date.now().toString(36)}-${nonce}`;
   }
 }
 
