@@ -234,6 +234,7 @@ function processToolCallNode(node: ToolCallNode, messages: Message[]) {
       args: node.args,
       riskLevel: node.riskLevel,
       approvalId: node.approvalId,
+      reason: resolveApprovalReason(node),
     },
   });
 }
@@ -509,6 +510,10 @@ function formatToolName(toolName: string): string {
 }
 
 function resolveApprovalReason(node: ToolCallNode): string {
+  const argsReason = typeof node.args.reason === "string" ? node.args.reason : undefined;
+  if (argsReason) {
+    return argsReason;
+  }
   if (node.activityLabel) {
     return node.activityLabel;
   }
