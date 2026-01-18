@@ -19,10 +19,15 @@ export {
   ProcessCodeExecutor,
 } from "./code";
 export {
+  COMPLETION_TOOL_DEFINITION,
+  COMPLETION_TOOL_NAME,
+  COMPLETION_TOOL_SCHEMA,
   type CompleteTaskInput,
   type CompletionEvent,
   CompletionToolServer,
+  type CompletionValidationResult,
   createCompletionToolServer,
+  validateCompletionInput,
 } from "./completion";
 export {
   createFileToolServer,

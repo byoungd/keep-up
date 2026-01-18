@@ -16,7 +16,7 @@ export interface MCPTool {
   /** Optional annotations for UI/security hints */
   annotations?: {
     /** Tool category for grouping */
-    category?: "core" | "knowledge" | "external" | "communication";
+    category?: "core" | "knowledge" | "external" | "communication" | "control";
     /** Whether tool requires confirmation */
     requiresConfirmation?: boolean;
     /** Whether tool can modify state */
@@ -180,6 +180,20 @@ export interface SkillActivation {
 
 export interface SkillToolContext {
   activeSkills: SkillActivation[];
+}
+
+// ============================================================================
+// Completion Contract Types
+// ============================================================================
+
+/** Completion tool input payload */
+export interface CompleteTaskInput {
+  /** Required: final answer/summary */
+  summary: string;
+  /** Optional: list of created file paths */
+  artifacts?: string[];
+  /** Optional: recommendations for follow-up */
+  nextSteps?: string;
 }
 
 // ============================================================================

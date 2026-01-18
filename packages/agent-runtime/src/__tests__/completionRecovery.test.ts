@@ -38,6 +38,21 @@ class PingLLM implements IAgentLLM {
   }
 }
 
+class InvalidCompletionLLM implements IAgentLLM {
+  async complete(_request: AgentLLMRequest): Promise<AgentLLMResponse> {
+    return {
+      content: "",
+      finishReason: "tool_use",
+      toolCalls: [
+        {
+          name: "complete_task",
+          arguments: { summary: " ", extra: "nope" },
+        },
+      ],
+    };
+  }
+}
+
 function createPingServer(): MCPToolServer {
   return {
     name: "ping",
@@ -95,6 +110,27 @@ describe("Completion and recovery contracts", () => {
       (message) => message.role === "system" && message.content.includes("Final warning")
     );
     expect(warning).toBeDefined();
+  });
+
+  it("errors when completion payload fails schema validation", async () => {
+    const registry = createToolRegistry({ enforceQualifiedNames: false });
+    await registry.register(createCompletionToolServer());
+
+    const orchestrator = createOrchestrator(new InvalidCompletionLLM(), registry, {
+      maxTurns: 1,
+      requireConfirmation: false,
+    });
+
+    const state = await orchestrator.run("hello");
+
+    expect(state.status).toBe("error");
+    expect(state.error).toContain("Completion tool execution failed");
+
+    const toolMessage = state.messages.find((message) => message.role === "tool");
+    if (!toolMessage || toolMessage.role !== "tool") {
+      throw new Error("Expected a tool message for completion validation.");
+    }
+    expect(toolMessage.result.error?.code).toBe("INVALID_ARGUMENTS");
   });
 
   it("errors when recovery turn does not complete", async () => {

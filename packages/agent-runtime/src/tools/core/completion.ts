@@ -4,27 +4,193 @@
  * Provides the completion contract for task termination.
  */
 
-import type { MCPToolResult, ToolContext } from "../../types";
+import type {
+  CompleteTaskInput,
+  MCPTool,
+  MCPToolResult,
+  ToolContext,
+  ToolError,
+} from "../../types";
 import { BaseToolServer, errorResult, textResult } from "../mcp/baseServer";
 
 // ============================================================================
 // Types
 // ============================================================================
 
-export interface CompleteTaskInput {
-  /** Required: final summary of work */
-  summary: string;
-  /** Optional: list of created/modified artifacts */
-  artifacts?: string[];
-  /** Optional: recommended follow-up steps */
-  nextSteps?: string;
-}
+export type { CompleteTaskInput };
 
 export interface CompletionEvent {
   summary: string;
   artifacts?: string[];
   nextSteps?: string;
   timestamp: number;
+}
+
+export type CompletionValidationResult =
+  | { ok: true; value: CompleteTaskInput }
+  | { ok: false; error: ToolError };
+
+export const COMPLETION_TOOL_NAME = "complete_task";
+const COMPLETION_ALLOWED_KEYS = new Set(["summary", "artifacts", "nextSteps"]);
+
+export const COMPLETION_TOOL_SCHEMA: MCPTool["inputSchema"] = {
+  type: "object",
+  properties: {
+    summary: {
+      type: "string",
+      description: "Required summary of what was completed.",
+    },
+    artifacts: {
+      type: "array",
+      items: { type: "string" },
+      description: "Optional list of created or modified file paths.",
+    },
+    nextSteps: {
+      type: "string",
+      description: "Optional recommended follow-up actions.",
+    },
+  },
+  required: ["summary"],
+};
+
+export const COMPLETION_TOOL_DEFINITION: MCPTool = {
+  name: COMPLETION_TOOL_NAME,
+  description: "Declare task completion with a required summary and optional artifacts/next steps.",
+  inputSchema: COMPLETION_TOOL_SCHEMA,
+  annotations: {
+    category: "control",
+    requiresConfirmation: false,
+    readOnly: true,
+    estimatedDuration: "instant",
+  },
+};
+
+export function validateCompletionInput(args: unknown): CompletionValidationResult {
+  const recordResult = validateCompletionRecord(args);
+  if (!recordResult.ok) {
+    return recordResult;
+  }
+
+  const summaryResult = validateCompletionSummary(recordResult.value);
+  if (!summaryResult.ok) {
+    return summaryResult;
+  }
+
+  const artifactsResult = validateCompletionArtifacts(recordResult.value);
+  if (!artifactsResult.ok) {
+    return artifactsResult;
+  }
+
+  const nextStepsResult = validateCompletionNextSteps(recordResult.value);
+  if (!nextStepsResult.ok) {
+    return nextStepsResult;
+  }
+
+  return {
+    ok: true,
+    value: {
+      summary: summaryResult.value,
+      artifacts:
+        artifactsResult.value && artifactsResult.value.length > 0
+          ? artifactsResult.value
+          : undefined,
+      nextSteps: nextStepsResult.value,
+    },
+  };
+}
+
+function validateCompletionRecord(
+  args: unknown
+): { ok: true; value: Record<string, unknown> } | { ok: false; error: ToolError } {
+  if (!args || typeof args !== "object" || Array.isArray(args)) {
+    return {
+      ok: false,
+      error: { code: "INVALID_ARGUMENTS", message: "Completion payload must be an object." },
+    };
+  }
+
+  const record = args as Record<string, unknown>;
+  for (const key of Object.keys(record)) {
+    if (!COMPLETION_ALLOWED_KEYS.has(key)) {
+      return {
+        ok: false,
+        error: {
+          code: "INVALID_ARGUMENTS",
+          message: `Unknown completion field: ${key}`,
+        },
+      };
+    }
+  }
+
+  return { ok: true, value: record };
+}
+
+function validateCompletionSummary(
+  record: Record<string, unknown>
+): { ok: true; value: string } | { ok: false; error: ToolError } {
+  const summaryValue = record.summary;
+  if (typeof summaryValue !== "string" || summaryValue.trim().length === 0) {
+    return {
+      ok: false,
+      error: { code: "INVALID_ARGUMENTS", message: "Summary is required for completion." },
+    };
+  }
+  return { ok: true, value: summaryValue.trim() };
+}
+
+function validateCompletionArtifacts(
+  record: Record<string, unknown>
+): { ok: true; value?: string[] } | { ok: false; error: ToolError } {
+  if (!("artifacts" in record)) {
+    return { ok: true };
+  }
+
+  if (!Array.isArray(record.artifacts)) {
+    return {
+      ok: false,
+      error: { code: "INVALID_ARGUMENTS", message: "Artifacts must be an array of strings." },
+    };
+  }
+
+  const artifactsValue = record.artifacts;
+  for (const item of artifactsValue) {
+    if (typeof item !== "string" || item.trim().length === 0) {
+      return {
+        ok: false,
+        error: {
+          code: "INVALID_ARGUMENTS",
+          message: "Artifacts must be an array of non-empty strings.",
+        },
+      };
+    }
+  }
+
+  return { ok: true, value: artifactsValue.map((item) => item.trim()) };
+}
+
+function validateCompletionNextSteps(
+  record: Record<string, unknown>
+): { ok: true; value?: string } | { ok: false; error: ToolError } {
+  if (!("nextSteps" in record)) {
+    return { ok: true };
+  }
+
+  if (typeof record.nextSteps !== "string") {
+    return {
+      ok: false,
+      error: { code: "INVALID_ARGUMENTS", message: "Next steps must be a string." },
+    };
+  }
+
+  const trimmed = record.nextSteps.trim();
+  if (trimmed.length === 0) {
+    return {
+      ok: false,
+      error: { code: "INVALID_ARGUMENTS", message: "Next steps must be a non-empty string." },
+    };
+  }
+
+  return { ok: true, value: trimmed };
 }
 
 // ============================================================================
@@ -44,54 +210,27 @@ export class CompletionToolServer extends BaseToolServer {
   }
 
   private registerTools(): void {
-    this.registerTool(
-      {
-        name: "complete_task",
-        description:
-          "Declare task completion with a required summary and optional artifacts/next steps.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            summary: {
-              type: "string",
-              description: "Required summary of what was completed.",
-            },
-            artifacts: {
-              type: "array",
-              items: { type: "string" },
-              description: "Optional list of created or modified file paths.",
-            },
-            nextSteps: {
-              type: "string",
-              description: "Optional recommended follow-up actions.",
-            },
-          },
-          required: ["summary"],
-        },
-        annotations: {
-          category: "control",
-          requiresConfirmation: false,
-          readOnly: true,
-          estimatedDuration: "instant",
-        },
-      },
-      this.handleComplete.bind(this)
-    );
+    this.registerTool(COMPLETION_TOOL_DEFINITION, this.handleComplete.bind(this));
+  }
+
+  protected validateArguments(
+    args: Record<string, unknown>,
+    _schema: MCPTool["inputSchema"]
+  ): ToolError | null {
+    const validation = validateCompletionInput(args);
+    return validation.ok ? null : validation.error;
   }
 
   private async handleComplete(
     args: Record<string, unknown>,
     _context: ToolContext
   ): Promise<MCPToolResult> {
-    const summary = args.summary;
-    if (typeof summary !== "string" || summary.trim().length === 0) {
-      return errorResult("INVALID_ARGUMENTS", "Summary is required for completion.");
+    const validation = validateCompletionInput(args);
+    if (!validation.ok) {
+      return errorResult(validation.error.code, validation.error.message, validation.error.details);
     }
 
-    const artifacts = Array.isArray(args.artifacts)
-      ? args.artifacts.filter((item): item is string => typeof item === "string")
-      : undefined;
-    const nextSteps = typeof args.nextSteps === "string" ? args.nextSteps : undefined;
+    const { summary, artifacts, nextSteps } = validation.value;
 
     this.recordCompletion({
       summary,

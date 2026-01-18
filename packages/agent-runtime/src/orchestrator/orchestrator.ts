@@ -45,6 +45,7 @@ import { attachRuntimeEventStreamBridge, type StreamWriter } from "../streaming"
 import { createTaskGraphStore, type TaskGraphStore, type TaskNodeStatus } from "../tasks/taskGraph";
 import type { IMetricsCollector, ITracer, SpanContext, TelemetryContext } from "../telemetry";
 import { AGENT_METRICS } from "../telemetry";
+import { COMPLETION_TOOL_NAME, validateCompletionInput } from "../tools/core/completion";
 import {
   createToolDiscoveryEngine,
   type ToolDiscoveryEngine,
@@ -230,7 +231,6 @@ const DEFAULT_RECOVERY_GRACE_TURNS = 2;
 const DEFAULT_RECOVERY_TIMEOUT_MS = 60_000;
 const DEFAULT_RECOVERY_WARNING_TEMPLATE =
   "Final warning: turn limit reached. Call complete_task now with a summary, artifacts, and next steps. Do not call any other tools.";
-const COMPLETION_TOOL_NAME = "complete_task";
 
 type CompletionPayload = {
   summary: string;
@@ -899,20 +899,13 @@ export class AgentOrchestrator {
     return undefined;
   }
 
-  private parseCompletionPayload(args: Record<string, unknown>): CompletionPayload | undefined {
-    const summary = args.summary;
-    if (typeof summary !== "string" || summary.trim().length === 0) {
-      return undefined;
+  private parseCompletionPayload(args: unknown): { payload?: CompletionPayload; error?: string } {
+    const validation = validateCompletionInput(args);
+    if (!validation.ok) {
+      return { error: validation.error.message };
     }
-    const artifacts = Array.isArray(args.artifacts)
-      ? args.artifacts.filter((item): item is string => typeof item === "string")
-      : undefined;
-    const nextSteps = typeof args.nextSteps === "string" ? args.nextSteps : undefined;
-    return {
-      summary,
-      artifacts: artifacts && artifacts.length > 0 ? artifacts : undefined,
-      nextSteps,
-    };
+
+    return { payload: validation.value };
   }
 
   private validateCompletionToolCalls(toolCalls: MCPToolCall[]): {
@@ -1148,7 +1141,7 @@ export class AgentOrchestrator {
       return false;
     }
 
-    const completed = await this.handleCompletionToolTurn(
+    await this.handleCompletionToolTurn(
       completionValidation.call,
       toolCalls,
       turnStart,
@@ -1156,12 +1149,6 @@ export class AgentOrchestrator {
       false
     );
     this.emit("turn:end", { turn: this.state.turn });
-
-    if (!completed) {
-      this.metrics?.increment(AGENT_METRICS.turnsTotal.name, { status: "success" });
-      turnSpan?.setStatus("ok");
-    }
-
     return true;
   }
 
@@ -1227,17 +1214,13 @@ export class AgentOrchestrator {
       throw new Error(`Recovery failed: ${validation.reason ?? "completion tool must be called."}`);
     }
 
-    const completed = await this.handleCompletionToolTurn(
+    await this.handleCompletionToolTurn(
       validation.call,
       outcome.toolCalls,
       turnStart,
       turnSpan,
       true
     );
-
-    if (!completed) {
-      throw new Error("Recovery failed: completion tool execution failed.");
-    }
   }
 
   private async handleCompletionToolTurn(
@@ -1258,19 +1241,19 @@ export class AgentOrchestrator {
 
     const result = this.getLatestToolResult(completionCall.name);
     if (!result?.success) {
-      if (isRecovery) {
-        throw new Error("Recovery failed: completion tool execution failed.");
-      }
-      return false;
+      const reason = isRecovery
+        ? "Recovery failed: completion tool execution failed."
+        : "Completion tool execution failed.";
+      throw new Error(reason);
     }
 
-    const payload = this.parseCompletionPayload(completionCall.arguments);
-    if (!payload) {
-      throw new Error("Completion payload missing required fields.");
+    const parsedPayload = this.parseCompletionPayload(completionCall.arguments);
+    if (!parsedPayload.payload) {
+      throw new Error(parsedPayload.error ?? "Completion payload missing required fields.");
     }
 
     this.state.status = "complete";
-    this.emitCompletion(payload);
+    this.emitCompletion(parsedPayload.payload);
     this.metrics?.increment(AGENT_METRICS.turnsTotal.name, { status: "complete" });
     turnSpan?.setStatus("ok");
     return true;
