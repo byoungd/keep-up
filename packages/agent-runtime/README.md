@@ -230,7 +230,8 @@ Document operations through LFCC:
 ```typescript
 const lfcc = createLFCCToolServer(bridge);
 // Tools: list_documents, get_document, read_content, get_blocks,
-//        insert_block, update_block, delete_block, search
+//        insert_block, update_block, delete_block, search,
+//        ai_gateway_request, ai_gateway_multi_request (when aiGateway is configured)
 ```
 
 ## Events
