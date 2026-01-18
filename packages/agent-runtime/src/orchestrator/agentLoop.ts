@@ -14,7 +14,10 @@
  * Parallel function calling is strictly forbidden.
  */
 
+import { getLogger } from "../logging/logger.js";
 import type { AgentMessage, MCPToolCall, MCPToolResult } from "../types";
+
+const logger = getLogger("agent-loop");
 
 // ============================================================================
 // Agent Loop Types
@@ -155,6 +158,8 @@ export interface AgentLoopConfig {
   /** Callback for cycle completion */
   onCycleComplete?: (cycle: AgentLoopCycle) => void;
 }
+
+export type AgentLoopControlSignal = "PAUSE" | "RESUME" | "STEP" | "INJECT_THOUGHT";
 
 // ============================================================================
 // Agent Loop State Machine
@@ -297,6 +302,19 @@ export class AgentLoopStateMachine {
     this.state.isPaused = false;
   }
 
+  /**
+   * Apply a control signal to the loop state.
+   */
+  applyControlSignal(signal: AgentLoopControlSignal): void {
+    if (signal === "PAUSE") {
+      this.pause();
+      return;
+    }
+    if (signal === "RESUME" || signal === "STEP") {
+      this.resume();
+    }
+  }
+
   // ============================================================================
   // State Queries
   // ============================================================================
@@ -395,10 +413,10 @@ export class AgentLoopStateMachine {
 
   private logPhaseTransition(phase: AgentLoopPhase): void {
     if (this.config.enableCycleLogging) {
-      // Using console.info for agent loop diagnostics
-      console.info(
-        `[Agent Loop] Cycle ${this.state.currentCycle.cycleNumber} → ${phase.toUpperCase()}`
-      );
+      logger.info(`Cycle ${this.state.currentCycle.cycleNumber} -> ${phase.toUpperCase()}`, {
+        cycle: this.state.currentCycle.cycleNumber,
+        phase,
+      });
     }
   }
 }

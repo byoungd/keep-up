@@ -171,5 +171,4 @@ export interface CoworkSessionCostSummary {
   messageCount: number;
   byModel: Record<string, CoworkTokenUsage>;
 }
-
 export type { WorkflowTemplate, WorkflowContext, WorkflowPhase };

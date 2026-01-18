@@ -10,6 +10,7 @@
 // Agent Loop (Manus Spec)
 export {
   type AgentLoopConfig,
+  type AgentLoopControlSignal,
   type AgentLoopCycle,
   type AgentLoopPhase,
   type AgentLoopState,
@@ -81,11 +82,13 @@ export {
   MessageCompressor,
 } from "./messageCompression";
 export {
+  type AgentControlSignal,
   type AgentLLMChunk,
   type AgentLLMRequest,
   type AgentLLMResponse,
   AgentOrchestrator,
   type AgentToolDefinition,
+  type ControlStateSnapshot,
   type CreateOrchestratorOptions,
   createOrchestrator,
   type IAgentLLM,

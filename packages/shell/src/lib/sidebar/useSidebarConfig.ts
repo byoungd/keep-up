@@ -221,8 +221,9 @@ function saveUserConfig(config: SidebarUserConfig, storageKey: string): void {
   try {
     localStorage.setItem(storageKey, JSON.stringify(config));
   } catch {
-    // biome-ignore lint/suspicious/noConsole: Storage error logging
-    console.error("Failed to save sidebar config");
+    if (typeof reportError === "function") {
+      reportError(new Error("Failed to save sidebar config"));
+    }
   }
 }
 

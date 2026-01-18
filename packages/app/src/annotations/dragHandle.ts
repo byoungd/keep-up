@@ -197,7 +197,10 @@ export class DragHandleController {
       try {
         callback(event);
       } catch (error) {
-        console.error("[DragHandleController] Callback error:", error);
+        if (typeof reportError === "function") {
+          const err = error instanceof Error ? error : new Error(String(error));
+          reportError(err);
+        }
       }
     }
   }

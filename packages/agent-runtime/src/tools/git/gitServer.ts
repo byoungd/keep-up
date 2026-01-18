@@ -20,7 +20,6 @@ import type {
   IGitOperations,
   SemanticDiffAnalysis,
 } from "./types";
-import { DEFAULT_GIT_CONFIG } from "./types";
 
 // ============================================================================
 // Git Tool Server
@@ -34,11 +33,9 @@ export class GitToolServer implements MCPToolServer, IGitOperations {
   readonly version = "1.0.0";
   readonly description = "Git operations with intelligent diff analysis";
 
-  private readonly config: GitConfig;
   private readonly executor: IGitExecutor;
 
-  constructor(config: Partial<GitConfig> = {}, executor?: IGitExecutor) {
-    this.config = { ...DEFAULT_GIT_CONFIG, ...config };
+  constructor(_config: Partial<GitConfig> = {}, executor?: IGitExecutor) {
     this.executor = executor ?? new MockGitExecutor();
   }
 

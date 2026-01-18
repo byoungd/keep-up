@@ -1,5 +1,8 @@
+import { observability } from "@ku0/core";
 import { type LoroDoc, LoroList, type LoroMap, LoroMovableList, LoroText } from "loro-crdt";
 import { validateRange } from "../utils/unicode";
+
+const logger = observability.getLogger();
 
 export type BlockKind =
   | "paragraph"
@@ -808,8 +811,11 @@ function syncMovableList(list: LoroMovableList, desired: string[]): void {
         list.delete(i, 1);
         current.splice(i, 1);
       } catch (error) {
-        console.error(
-          `[LFCC] syncMovableList delete failed: ${error}. index: ${i}, len: ${list.length}`
+        logger.error(
+          "mapping",
+          "syncMovableList delete failed",
+          error instanceof Error ? error : new Error(String(error)),
+          { index: i, length: list.length }
         );
         throw error;
       }
@@ -825,8 +831,11 @@ function syncMovableList(list: LoroMovableList, desired: string[]): void {
         list.insert(index, id);
         current.splice(index, 0, id);
       } catch (error) {
-        console.error(
-          `[LFCC] syncMovableList insert failed: ${error}. index: ${index}, id: ${id}, len: ${list.length}`
+        logger.error(
+          "mapping",
+          "syncMovableList insert failed",
+          error instanceof Error ? error : new Error(String(error)),
+          { index, id, length: list.length }
         );
         throw error;
       }
@@ -838,8 +847,11 @@ function syncMovableList(list: LoroMovableList, desired: string[]): void {
         list.move(existingIndex, index);
         current.splice(index, 0, current.splice(existingIndex, 1)[0]);
       } catch (error) {
-        console.error(
-          `[LFCC] syncMovableList move failed: ${error}. from: ${existingIndex}, to: ${index}, len: ${list.length}`
+        logger.error(
+          "mapping",
+          "syncMovableList move failed",
+          error instanceof Error ? error : new Error(String(error)),
+          { from: existingIndex, to: index, length: list.length }
         );
         throw error;
       }

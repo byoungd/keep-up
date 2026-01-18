@@ -321,7 +321,10 @@ export function ProviderConfigProvider({ children }: { children: React.ReactNode
 
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify(toStore));
       } catch (error) {
-        console.error("[ProviderConfig] Failed to save config:", error);
+        if (typeof reportError === "function") {
+          const err = error instanceof Error ? error : new Error(String(error));
+          reportError(err);
+        }
       }
     };
 

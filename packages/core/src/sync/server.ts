@@ -412,7 +412,8 @@ export class SyncServer {
           break;
       }
     } catch (error) {
-      console.error("Error handling message:", error);
+      const err = error instanceof Error ? error : new Error(String(error));
+      getLogger().error("sync", "Error handling message", err);
     }
   }
 

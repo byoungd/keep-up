@@ -12,61 +12,78 @@ import { runVerifyPassBench } from "./scenarios/verifyPass";
 
 const isJson = process.argv.includes("--json");
 
+function writeLine(line: string): void {
+  process.stdout.write(line.endsWith("\n") ? line : `${line}\n`);
+}
+
+function writeErrorLine(line: string): void {
+  process.stderr.write(line.endsWith("\n") ? line : `${line}\n`);
+}
+
+function formatError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.stack ?? error.message;
+  }
+  return String(error);
+}
+
 async function main() {
-  console.log("🚀 LFCC v0.9 RC Benchmark Suite\n");
+  writeLine("🚀 LFCC v0.9 RC Benchmark Suite\n");
 
   const allResults: BenchmarkResult[] = [];
 
   // Fast Path
-  console.log("━━━ Fast Path Benchmarks ━━━");
+  writeLine("━━━ Fast Path Benchmarks ━━━");
   const fastPathResults = runFastPathBench();
   allResults.push(...fastPathResults);
   for (const r of fastPathResults) {
-    console.log(formatResult(r));
-    console.log();
+    writeLine(formatResult(r));
+    writeLine("");
   }
 
   // Verify Pass
-  console.log("━━━ Verify Pass Benchmarks ━━━");
+  writeLine("━━━ Verify Pass Benchmarks ━━━");
   const verifyResults = runVerifyPassBench();
   allResults.push(...verifyResults);
   for (const r of verifyResults) {
-    console.log(formatResult(r));
-    console.log();
+    writeLine(formatResult(r));
+    writeLine("");
   }
 
   // Stress Tests
-  console.log("━━━ Stress Test Benchmarks ━━━");
+  writeLine("━━━ Stress Test Benchmarks ━━━");
   const stressResults = runStressBench();
   allResults.push(...stressResults);
   for (const r of stressResults) {
-    console.log(formatResult(r));
-    console.log();
+    writeLine(formatResult(r));
+    writeLine("");
   }
 
   // Collaboration Sync
-  console.log("━━━ Collaboration Sync Benchmarks ━━━");
+  writeLine("━━━ Collaboration Sync Benchmarks ━━━");
   const collabResults = runCollabBench();
   allResults.push(...collabResults);
   for (const r of collabResults) {
-    console.log(formatResult(r));
-    console.log();
+    writeLine(formatResult(r));
+    writeLine("");
   }
 
   // Summary
-  console.log("━━━ Summary ━━━");
-  console.log(`Total benchmarks: ${allResults.length}`);
+  writeLine("━━━ Summary ━━━");
+  writeLine(`Total benchmarks: ${allResults.length}`);
   const totalTime = allResults.reduce((acc, r) => acc + r.totalMs, 0);
-  console.log(`Total time: ${(totalTime / 1000).toFixed(2)}s`);
+  writeLine(`Total time: ${(totalTime / 1000).toFixed(2)}s`);
 
   if (isJson) {
     const output = {
       timestamp: new Date().toISOString(),
       results: allResults,
     };
-    console.log("\n📄 JSON Output:");
-    console.log(JSON.stringify(output, null, 2));
+    writeLine("\n📄 JSON Output:");
+    writeLine(JSON.stringify(output, null, 2));
   }
 }
 
-main().catch(console.error);
+main().catch((error) => {
+  writeErrorLine(`Unhandled error: ${formatError(error)}`);
+});

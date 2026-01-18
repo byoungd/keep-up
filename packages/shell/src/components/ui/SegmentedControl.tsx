@@ -41,6 +41,8 @@ export function SegmentedControl({
   "aria-labelledby": ariaLabelledBy,
 }: SegmentedControlProps) {
   const groupId = React.useId();
+  const groupName = `${groupId}-segmented-control`;
+  const inputRefs = React.useRef(new Map<string, HTMLInputElement>());
 
   // Keyboard navigation for roving tabindex pattern
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -76,7 +78,9 @@ export function SegmentedControl({
     }
 
     if (nextIndex !== currentIndex && enabledItems[nextIndex]) {
-      onValueChange(enabledItems[nextIndex].value);
+      const nextValue = enabledItems[nextIndex].value;
+      onValueChange(nextValue);
+      inputRefs.current.get(nextValue)?.focus();
     }
   };
 
@@ -94,34 +98,47 @@ export function SegmentedControl({
       {items.map((item, index) => {
         const isSelected = item.value === value;
         const optionId = `${groupId}-option-${index}`;
+        const accessibleLabel = typeof item.label === "string" ? item.label : item.value;
 
         return (
-          <button
-            key={item.value}
-            id={optionId}
-            type="button"
-            // biome-ignore lint/a11y/useSemanticElements: Custom radio behavior using button
-            role="radio"
-            aria-checked={isSelected}
-            tabIndex={isSelected ? 0 : -1}
-            onClick={() => !item.disabled && onValueChange(item.value)}
-            disabled={item.disabled}
-            className={cn(
-              "flex-1 flex items-center justify-center gap-2 rounded-md font-medium transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background z-10",
-              size === "sm" ? "px-2 py-1 text-xs" : "px-3 py-1.5 text-sm",
-              isSelected
-                ? "bg-surface-0 text-foreground shadow-sm ring-1 ring-border/10"
-                : "text-muted-foreground hover:text-foreground hover:bg-surface-0/60",
-              item.disabled && "opacity-50 cursor-not-allowed"
-            )}
-          >
-            {item.icon && (
-              <span className={cn("shrink-0", size === "sm" ? "h-3.5 w-3.5" : "h-4 w-4")}>
-                {item.icon}
-              </span>
-            )}
-            {item.label && <span>{item.label}</span>}
-          </button>
+          <div key={item.value} className="flex-1">
+            <input
+              ref={(node) => {
+                if (node) {
+                  inputRefs.current.set(item.value, node);
+                } else {
+                  inputRefs.current.delete(item.value);
+                }
+              }}
+              id={optionId}
+              type="radio"
+              name={groupName}
+              value={item.value}
+              checked={isSelected}
+              onChange={() => onValueChange(item.value)}
+              disabled={item.disabled}
+              aria-label={accessibleLabel}
+              className="sr-only"
+            />
+            <label
+              htmlFor={optionId}
+              className={cn(
+                "flex w-full items-center justify-center gap-2 rounded-md font-medium transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background z-10",
+                size === "sm" ? "px-2 py-1 text-xs" : "px-3 py-1.5 text-sm",
+                isSelected
+                  ? "bg-surface-0 text-foreground shadow-sm ring-1 ring-border/10"
+                  : "text-muted-foreground hover:text-foreground hover:bg-surface-0/60",
+                item.disabled && "opacity-50 cursor-not-allowed"
+              )}
+            >
+              {item.icon && (
+                <span className={cn("shrink-0", size === "sm" ? "h-3.5 w-3.5" : "h-4 w-4")}>
+                  {item.icon}
+                </span>
+              )}
+              {item.label && <span>{item.label}</span>}
+            </label>
+          </div>
         );
       })}
     </div>

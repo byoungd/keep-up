@@ -157,24 +157,35 @@ export class ScriptExecutor {
     const toolProxy = new ToolProxy(context.registry, context.toolContext);
     const tools = toolProxy.createProxy();
 
-    // Capture console output
-    const originalLog = console.log;
-    if (this.config.captureConsole) {
-      console.log = (...args: unknown[]) => {
+    const scriptConsole = {
+      log: (...args: unknown[]) => {
         logs.push(args.map((a) => String(a)).join(" "));
-      };
-    }
+      },
+      info: (...args: unknown[]) => {
+        logs.push(args.map((a) => String(a)).join(" "));
+      },
+      warn: (...args: unknown[]) => {
+        logs.push(args.map((a) => String(a)).join(" "));
+      },
+      error: (...args: unknown[]) => {
+        logs.push(args.map((a) => String(a)).join(" "));
+      },
+    };
 
     try {
       // Create async function from script
       // Variables available in script:
       // - tools: Tool registry proxy
       // - variables: Script state
-      const asyncFunc = new Function("tools", "variables", `return (async () => { ${script} })();`);
+      const asyncFunc = this.config.captureConsole
+        ? new Function("tools", "variables", "console", `return (async () => { ${script} })();`)
+        : new Function("tools", "variables", `return (async () => { ${script} })();`);
 
       // Execute with timeout
       const result = await this.executeWithTimeout(
-        asyncFunc(tools, context.variables),
+        this.config.captureConsole
+          ? asyncFunc(tools, context.variables, scriptConsole)
+          : asyncFunc(tools, context.variables),
         this.config.timeoutMs
       );
 
@@ -193,11 +204,6 @@ export class ScriptExecutor {
         durationMs: Date.now() - startTime,
         logs,
       };
-    } finally {
-      // Restore console.log
-      if (this.config.captureConsole) {
-        console.log = originalLog;
-      }
     }
   }
 

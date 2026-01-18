@@ -20,6 +20,21 @@ type CLIConfig = {
   adapterKind: AdapterKind;
 };
 
+function writeLine(line: string): void {
+  process.stdout.write(line.endsWith("\n") ? line : `${line}\n`);
+}
+
+function writeErrorLine(line: string): void {
+  process.stderr.write(line.endsWith("\n") ? line : `${line}\n`);
+}
+
+function formatError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.stack ?? error.message;
+  }
+  return String(error);
+}
+
 function parseArgs(): CLIConfig {
   const args = process.argv.slice(2);
   const config: Partial<RunnerConfig> = {};
@@ -109,7 +124,7 @@ function parseArgs(): CLIConfig {
 }
 
 function printHelp(): void {
-  console.log(`
+  writeLine(`
 LFCC Conformance Kit - Test Runner
 
 Usage:
@@ -145,9 +160,9 @@ Examples:
 async function main(): Promise<void> {
   const { runner: config, adapterKind } = parseArgs();
 
-  console.log("LFCC Conformance Kit v0.9 RC");
-  console.log("============================");
-  console.log("");
+  writeLine("LFCC Conformance Kit v0.9 RC");
+  writeLine("============================");
+  writeLine("");
 
   const factory = adapterKind === "mock" ? new MockAdapterFactory() : new RealAdapterFactory();
 
@@ -159,6 +174,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error) => {
-  console.error("Fatal error:", error);
+  writeErrorLine(`Fatal error: ${formatError(error)}`);
   process.exit(1);
 });

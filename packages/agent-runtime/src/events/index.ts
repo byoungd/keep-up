@@ -22,8 +22,16 @@ export {
   type RuntimeEventMap,
   type RuntimeEventOptions,
   resetGlobalEventBus,
+  type SubagentEventPayload,
+  type SubagentEvents,
   type Subscription,
   type SubscriptionOptions,
   type SystemEvents,
   type ToolEvents,
 } from "./eventBus";
+
+export {
+  createScopedEventBus,
+  type ScopedEventBus,
+  type ScopedEventBusOptions,
+} from "./scopedEventBus";

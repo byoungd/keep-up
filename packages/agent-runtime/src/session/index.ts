@@ -74,6 +74,7 @@ export interface SessionState {
   setState(state: AgentState): void;
   recordMessage(message: AgentMessage): void;
   getSummary(): string;
+  getContextId(): string;
 
   // Planning integration
   getPlanningSnapshot(): PlanningSnapshot;
@@ -107,6 +108,7 @@ export interface SessionSnapshot {
 
 export interface SessionStateConfig {
   id?: string;
+  contextId?: string;
   contextManager?: ContextManager;
   memoryManager?: IMemoryManager;
   toolCache?: ToolResultCache;
@@ -166,8 +168,15 @@ export class InMemorySessionState implements SessionState {
     this.memory = config.memoryManager ?? createMemoryManager();
     this.toolCache = config.toolCache;
 
-    const context = this.context.create({ parentId: undefined });
-    this.contextId = context.id;
+    if (config.contextId) {
+      if (!this.context.has(config.contextId)) {
+        throw new Error(`Unknown context ID: ${config.contextId}`);
+      }
+      this.contextId = config.contextId;
+    } else {
+      const context = this.context.create({ parentId: undefined });
+      this.contextId = context.id;
+    }
 
     // Initialize from snapshot if provided
     if (config.initialSnapshot) {
@@ -211,6 +220,10 @@ export class InMemorySessionState implements SessionState {
 
   getSummary(): string {
     return this.context.getSummary(this.contextId);
+  }
+
+  getContextId(): string {
+    return this.contextId;
   }
 
   // ============================================================================

@@ -388,56 +388,6 @@ ${example ? `<example_workflow>\n${example}\n</example_workflow>` : ""}
   }
 
   /**
-   * Build task-specific guidance section.
-   */
-  private buildTaskSpecificSection(context: PromptContext): string {
-    const taskType = context.taskType ?? this.inferTaskType(context.task);
-    const baseGuidance = TASK_PROMPTS[taskType];
-
-    // Add workflow-specific guidance if present
-    if (context.workflow) {
-      return `${baseGuidance}\n\n**Workflow: ${context.workflow}**\nFollow the phases of this workflow carefully, completing each before moving to the next.`;
-    }
-
-    return baseGuidance;
-  }
-
-  /**
-   * Build tool guidance section.
-   */
-  private buildToolGuidanceSection(context: PromptContext): string {
-    if (context.tools.length === 0) {
-      return "";
-    }
-
-    const toolList = context.tools
-      .map((tool) => `- **${tool.name}**: ${tool.description}`)
-      .join("\n");
-
-    let guidance = `**Available Tools:**\n${toolList}`;
-
-    // Add error-specific guidance if there are recent errors
-    if (context.recentErrors && context.recentErrors.length > 0) {
-      guidance += `\n\n**Recent Issues:**\nYou encountered errors recently. Be extra careful with:\n${context.recentErrors.map((e) => `- ${e}`).join("\n")}`;
-    }
-
-    // Add tool examples if available
-    const relevantExamples = this.getRelevantToolExamples(context.tools);
-    if (relevantExamples.length > 0) {
-      guidance += `\n\n**Tool Usage Examples:**\n${relevantExamples.join("\n\n")}`;
-    }
-
-    return guidance;
-  }
-
-  /**
-   * Build phase-specific guidance section.
-   */
-  private buildPhaseGuidanceSection(context: PromptContext): string {
-    return PHASE_PROMPTS[context.phase];
-  }
-
-  /**
    * Build examples section based on task type.
    */
   private buildExamplesSection(context: PromptContext): string | undefined {

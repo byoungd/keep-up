@@ -141,12 +141,10 @@ export class FileToolServer extends BaseToolServer {
   readonly description = "Read, write, and manage files within the workspace";
 
   private readonly fileSystem: IFileSystem;
-  private readonly pathValidator: PathValidator;
 
   constructor(options: { fileSystem?: IFileSystem; validator?: PathValidator } = {}) {
     super();
     this.fileSystem = options.fileSystem ?? new NodeFileSystem();
-    this.pathValidator = options.validator ?? new PathValidator();
 
     this.registerTools();
   }

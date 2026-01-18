@@ -117,7 +117,8 @@ export class ImportManager {
       try {
         (handler as unknown as (...args: unknown[]) => void)(...args);
       } catch (err) {
-        console.error("[ImportManager] Event handler error:", err);
+        const error = err instanceof Error ? err : new Error(String(err));
+        logger.error("ingest", "ImportManager event handler error", error);
       }
     }
   }

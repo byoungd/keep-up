@@ -1,4 +1,5 @@
 import { Langfuse } from "langfuse";
+import { ConsoleLogger } from "../resilience/observability";
 
 /**
  * Singleton Langfuse client wrapper.
@@ -7,6 +8,7 @@ import { Langfuse } from "langfuse";
 
 let langfuseInstance: Langfuse | null = null;
 let isInitialized = false;
+const logger = new ConsoleLogger({ prefix: "[Langfuse]" });
 
 export function initializeLangfuse(): void {
   if (isInitialized) {
@@ -27,7 +29,10 @@ export function initializeLangfuse(): void {
       });
       // console.log("Langfuse initialized");
     } catch (error) {
-      console.error("Failed to initialize Langfuse:", error);
+      logger.error(
+        "Failed to initialize Langfuse",
+        error instanceof Error ? error : new Error(String(error))
+      );
     }
   } else {
     // console.warn("Langfuse credentials missing. Skipping initialization.");

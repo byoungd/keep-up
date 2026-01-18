@@ -6,6 +6,7 @@
  * Throws hard errors in dev mode when full scan finds issues missed by dirty scan.
  */
 
+import { observability } from "@ku0/core";
 import type { ScanReportSummary } from "./types";
 
 /** Dev assertion result */
@@ -34,6 +35,8 @@ export const DEFAULT_DEV_ASSERTIONS_CONFIG: DevAssertionsConfig = {
   logToConsole: true,
 };
 
+const logger = observability.getLogger();
+
 /**
  * Assert that dirty scan covers all issues found by full scan
  */
@@ -60,7 +63,7 @@ export function assertDirtyScanCoverage(
 
   if (!passed) {
     if (config.logToConsole) {
-      console.error("[LFCC Dev Assertion Failed]", result);
+      logger.error("mapping", "LFCC dev assertion failed", undefined, { result });
     }
 
     if (config.onFailure) {

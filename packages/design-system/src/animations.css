@@ -204,9 +204,9 @@
     .animate-pulse,
     .animate-ping,
     .animate-spin {
-      animation-duration: 1ms !important;
-      animation-iteration-count: 1 !important;
-      transition-duration: 0ms !important;
+      animation-duration: 1ms;
+      animation-iteration-count: 1;
+      transition-duration: 0ms;
     }
 
     .ai-button-press:active {

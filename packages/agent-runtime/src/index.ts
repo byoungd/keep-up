@@ -152,18 +152,19 @@ export * from "./pipeline";
 // Plugins
 // ============================================================================
 export * from "./plugins";
+export * from "./preflight";
 // ============================================================================
 // Preflight
 // ============================================================================
 export {
+  type PreflightRunInput,
   runPreflightPlan,
   summarizePreflightResults,
-  type PreflightRunInput,
 } from "./preflight/runner";
 export {
-  selectPreflightChecks,
   type PreflightSelectionInput,
   type PreflightSelectionRule,
+  selectPreflightChecks,
 } from "./preflight/selector";
 export type {
   PreflightCheckDefinition,
@@ -173,7 +174,6 @@ export type {
   PreflightPlan,
   PreflightReport,
 } from "./preflight/types";
-export * from "./preflight";
 // ============================================================================
 // Prompts
 // ============================================================================

@@ -80,6 +80,13 @@ interface RateLimitState {
 /** Helper function to get environment variables (supports lazy evaluation) */
 const getEnv = (key: string): string | undefined => process.env[key];
 
+function writeWarn(message: string): void {
+  if (typeof process === "undefined" || !process.stderr) {
+    return;
+  }
+  process.stderr.write(`${message}\n`);
+}
+
 const DEFAULT_PROVIDERS: ProviderConfig[] = [
   {
     name: "microsoft_edge",
@@ -260,11 +267,8 @@ export class TranslationService {
         this.setCache(cacheKey, result, provider.name);
         return { text: result, provider: provider.name, success: true, latency };
       } catch (error) {
-        // biome-ignore lint/suspicious/noConsole: Expected warning
-        console.warn(
-          `[Translation] ${provider.name} failed:`,
-          error instanceof Error ? error.message : error
-        );
+        const detail = error instanceof Error ? error.message : String(error);
+        writeWarn(`[Translation] ${provider.name} failed: ${detail}`);
       }
     }
 

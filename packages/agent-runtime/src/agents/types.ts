@@ -5,6 +5,7 @@
  * Inspired by Claude Code's agent architecture.
  */
 
+import type { ContextManager } from "../context";
 import type { RuntimeEventBus } from "../events/eventBus";
 import type { IAgentLLM } from "../orchestrator/orchestrator";
 import type { IToolRegistry } from "../tools/mcp/registry";
@@ -107,6 +108,12 @@ export interface SpawnAgentOptions {
   /** Parent context for tracing */
   parentTraceId?: string;
 
+  /** Explicit context ID for this agent */
+  contextId?: string;
+
+  /** Parent context ID for live context views */
+  parentContextId?: string;
+
   /** Custom security policy override */
   security?: SecurityPolicy;
 
@@ -195,6 +202,9 @@ export interface AgentManagerConfig {
 
   /** Optional event bus for lifecycle events */
   eventBus?: RuntimeEventBus;
+
+  /** Optional context manager for live context views */
+  contextManager?: ContextManager;
 
   /**
    * Maximum recursion depth for nested agent spawning.

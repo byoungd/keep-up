@@ -16,6 +16,10 @@ import {
   type SeedRunResult,
 } from "./types";
 
+function writeLine(line: string): void {
+  process.stdout.write(line.endsWith("\n") ? line : `${line}\n`);
+}
+
 /**
  * Conformance test runner
  */
@@ -51,20 +55,18 @@ export class ConformanceRunner {
     const results: SeedRunResult[] = [];
     const failures: SeedRunResult[] = [];
 
-    console.log(
-      `Starting conformance run: ${this.config.seeds} seeds × ${this.config.steps} steps`
-    );
-    console.log(`Checkpoint policy: ${this.config.checkpointPolicy}`);
+    writeLine(`Starting conformance run: ${this.config.seeds} seeds × ${this.config.steps} steps`);
+    writeLine(`Checkpoint policy: ${this.config.checkpointPolicy}`);
     if (this.config.stressMode) {
-      console.log(`Stress mode: ${this.config.stressMode}`);
+      writeLine(`Stress mode: ${this.config.stressMode}`);
     }
-    console.log("");
+    writeLine("");
 
     for (let i = 0; i < this.config.seeds; i++) {
       const seed = this.config.startSeed + i;
 
       if (this.config.verbose) {
-        console.log(`Running seed ${seed}...`);
+        writeLine(`Running seed ${seed}...`);
       }
 
       const result = await this.runSeed(seed);
@@ -72,10 +74,10 @@ export class ConformanceRunner {
 
       if (!result.passed) {
         failures.push(result);
-        console.log(`❌ Seed ${seed} FAILED at step ${result.failStep}`);
+        writeLine(`❌ Seed ${seed} FAILED at step ${result.failStep}`);
 
         if (result.artifactPath) {
-          console.log(`   Artifacts: ${result.artifactPath}`);
+          writeLine(`   Artifacts: ${result.artifactPath}`);
         }
 
         if (this.config.stopOnFirstFailure) {
@@ -83,18 +85,18 @@ export class ConformanceRunner {
         }
 
         if (failures.length >= this.config.maxFailures) {
-          console.log(`Max failures (${this.config.maxFailures}) reached, stopping.`);
+          writeLine(`Max failures (${this.config.maxFailures}) reached, stopping.`);
           break;
         }
       } else if (this.config.verbose) {
-        console.log(`✓ Seed ${seed} passed (${result.durationMs}ms)`);
+        writeLine(`✓ Seed ${seed} passed (${result.durationMs}ms)`);
       }
 
       // Progress indicator
       if (!this.config.verbose && (i + 1) % 10 === 0) {
         const passed = results.filter((r) => r.passed).length;
         const failed = results.filter((r) => !r.passed).length;
-        console.log(`Progress: ${i + 1}/${this.config.seeds} (${passed} passed, ${failed} failed)`);
+        writeLine(`Progress: ${i + 1}/${this.config.seeds} (${passed} passed, ${failed} failed)`);
       }
     }
 
@@ -174,7 +176,7 @@ export class ConformanceRunner {
         shrunkOps = shrinkResult.shrunkOps;
 
         if (this.config.verbose) {
-          console.log(
+          writeLine(
             `  Shrunk from ${shrinkResult.originalLength} to ${shrinkResult.shrunkLength} ops`
           );
         }
@@ -243,37 +245,37 @@ export class ConformanceRunner {
    * Print run summary
    */
   private printSummary(summary: RunSummary): void {
-    console.log("");
-    console.log("=".repeat(60));
-    console.log("CONFORMANCE RUN SUMMARY");
-    console.log("=".repeat(60));
-    console.log(`Total seeds:    ${summary.totalSeeds}`);
-    console.log(`Passed:         ${summary.passedSeeds}`);
-    console.log(`Failed:         ${summary.failedSeeds}`);
-    console.log(`Total steps:    ${summary.totalSteps}`);
-    console.log(`Duration:       ${(summary.totalDurationMs / 1000).toFixed(2)}s`);
-    console.log("");
+    writeLine("");
+    writeLine("=".repeat(60));
+    writeLine("CONFORMANCE RUN SUMMARY");
+    writeLine("=".repeat(60));
+    writeLine(`Total seeds:    ${summary.totalSeeds}`);
+    writeLine(`Passed:         ${summary.passedSeeds}`);
+    writeLine(`Failed:         ${summary.failedSeeds}`);
+    writeLine(`Total steps:    ${summary.totalSteps}`);
+    writeLine(`Duration:       ${(summary.totalDurationMs / 1000).toFixed(2)}s`);
+    writeLine("");
 
     if (summary.failures.length > 0) {
-      console.log("FAILURES:");
+      writeLine("FAILURES:");
       for (const f of summary.failures) {
-        console.log(`  - Seed ${f.seed}: step ${f.failStep ?? "?"}`);
+        writeLine(`  - Seed ${f.seed}: step ${f.failStep ?? "?"}`);
         if (f.artifactPath) {
-          console.log(`    Artifacts: ${f.artifactPath}`);
+          writeLine(`    Artifacts: ${f.artifactPath}`);
         }
         if (f.error) {
-          console.log(`    Error: ${f.error}`);
+          writeLine(`    Error: ${f.error}`);
         }
       }
-      console.log("");
+      writeLine("");
     }
 
     if (summary.failedSeeds === 0) {
-      console.log("✓ ALL TESTS PASSED");
+      writeLine("✓ ALL TESTS PASSED");
     } else {
-      console.log(`✗ ${summary.failedSeeds} TESTS FAILED`);
+      writeLine(`✗ ${summary.failedSeeds} TESTS FAILED`);
     }
-    console.log("=".repeat(60));
+    writeLine("=".repeat(60));
   }
 }
 

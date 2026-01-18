@@ -26,9 +26,9 @@ export function generateBlockMapping(
     case "block_join":
       return new JoinMapping(op, docState.getBlockLength(op.leftBlockId));
     case "block_convert":
-      return new IdentityMapping(op.blockId); // ID stays same, content stays same
+      return new IdentityMapping(); // ID stays same, content stays same
     default:
-      return new IdentityMapping(""); // Fallback
+      return new IdentityMapping(); // Fallback
   }
 }
 
@@ -127,8 +127,6 @@ class JoinMapping implements BlockMapping {
 }
 
 class IdentityMapping implements BlockMapping {
-  constructor(private _targetBlockId: string) {} // Optimization hint kept for future
-
   mapOldToNew(oldBlockId: string, oldAbsInBlock: number): MappedPosition {
     return { newBlockId: oldBlockId, newAbsInBlock: oldAbsInBlock };
   }

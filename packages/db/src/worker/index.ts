@@ -4,6 +4,7 @@
  * This worker hosts the SQLite WASM engine and handles RPC requests from the main thread.
  */
 
+import { observability } from "@ku0/core";
 import type {
   AnnotationRow,
   CrdtUpdateRow,
@@ -20,6 +21,8 @@ import type {
 import { CURRENT_SCHEMA_VERSION, runMigrations } from "../schema";
 import { handleWorkerRequest } from "./rpcHandler";
 import type { WorkerRequest } from "./rpcTypes";
+
+const logger = observability.getLogger();
 
 // We'll dynamically import @sqlite.org/sqlite-wasm when available.
 // For now, define a placeholder interface.
@@ -90,7 +93,8 @@ async function initSqlite(): Promise<void> {
 
     driverReady = true;
   } catch (error) {
-    console.error("[db-worker] initSqlite failed", error);
+    const err = error instanceof Error ? error : new Error(String(error));
+    logger.error("persistence", "db-worker initSqlite failed", err);
     throw error;
   }
 }

@@ -14,6 +14,14 @@ import {
 } from "../src/defaultFeeds";
 import { RSSIngestor } from "../src/index";
 
+function writeLine(line: string): void {
+  process.stdout.write(line.endsWith("\n") ? line : `${line}\n`);
+}
+
+function writeErrorLine(line: string): void {
+  process.stderr.write(line.endsWith("\n") ? line : `${line}\n`);
+}
+
 interface TestResult {
   name: string;
   url: string;
@@ -71,29 +79,29 @@ async function testRSSHubInstance(instance: string): Promise<boolean> {
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: test runner logic
 async function main() {
-  console.log("🔍 Testing Default RSS Feeds\n");
-  console.log("=".repeat(60));
+  writeLine("🔍 Testing Default RSS Feeds\n");
+  writeLine("=".repeat(60));
 
   const ingestor = new RSSIngestor();
   const feeds = getAllDefaultFeeds();
   const results: TestResult[] = [];
 
   // First, test RSSHub instances
-  console.log("\n📡 Testing RSSHub Instances:\n");
+  writeLine("\n📡 Testing RSSHub Instances:\n");
   let workingRSSHubInstance: string | null = null;
 
   for (const instance of RSSHUB_INSTANCES) {
     const isWorking = await testRSSHubInstance(instance);
     const status = isWorking ? "✅" : "❌";
-    console.log(`  ${status} ${instance}`);
+    writeLine(`  ${status} ${instance}`);
 
     if (isWorking && !workingRSSHubInstance) {
       workingRSSHubInstance = instance;
     }
   }
 
-  console.log(`\n${"=".repeat(60)}`);
-  console.log("\n📰 Testing Individual Feeds:\n");
+  writeLine(`\n${"=".repeat(60)}`);
+  writeLine("\n📰 Testing Individual Feeds:\n");
 
   for (const feed of feeds) {
     let url = feed.url;
@@ -109,38 +117,41 @@ async function main() {
     results.push(result);
 
     if (result.success) {
-      console.log(`✅ ${result.itemCount} items (${result.duration}ms)`);
+      writeLine(`✅ ${result.itemCount} items (${result.duration}ms)`);
       if (result.sampleTitle) {
-        console.log(`     Sample: "${result.sampleTitle}..."`);
+        writeLine(`     Sample: "${result.sampleTitle}..."`);
       }
     } else {
-      console.log(`❌ ${result.error}`);
+      writeLine(`❌ ${result.error}`);
     }
   }
 
   // Summary
-  console.log(`\n${"=".repeat(60)}`);
-  console.log("\n📊 Summary:\n");
+  writeLine(`\n${"=".repeat(60)}`);
+  writeLine("\n📊 Summary:\n");
 
   const successful = results.filter((r) => r.success);
   const failed = results.filter((r) => !r.success);
 
-  console.log(`  Total feeds: ${results.length}`);
-  console.log(`  Successful: ${successful.length}`);
-  console.log(`  Failed: ${failed.length}`);
+  writeLine(`  Total feeds: ${results.length}`);
+  writeLine(`  Successful: ${successful.length}`);
+  writeLine(`  Failed: ${failed.length}`);
 
   if (failed.length > 0) {
-    console.log("\n  Failed feeds:");
+    writeLine("\n  Failed feeds:");
     for (const f of failed) {
-      console.log(`    - ${f.name}: ${f.error}`);
+      writeLine(`    - ${f.name}: ${f.error}`);
     }
   }
 
   const avgDuration = results.reduce((sum, r) => sum + r.duration, 0) / results.length;
-  console.log(`\n  Average fetch time: ${Math.round(avgDuration)}ms`);
+  writeLine(`\n  Average fetch time: ${Math.round(avgDuration)}ms`);
 
   // Exit with error if any feeds failed
   process.exit(failed.length > 0 ? 1 : 0);
 }
 
-main().catch(console.error);
+main().catch((error) => {
+  const message = error instanceof Error ? error.message : String(error);
+  writeErrorLine(`Unhandled error: ${message}`);
+});
