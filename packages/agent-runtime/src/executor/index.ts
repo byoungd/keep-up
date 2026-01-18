@@ -430,14 +430,23 @@ export class ToolExecutionPipeline
     decisionId: string;
   }): ExecutionPreparationResult {
     const { call, tool, context, startTime, toolCallId, decisionId } = input;
-    const validationError = tool ? this.validateArguments(call.arguments, tool.inputSchema) : null;
-    if (validationError) {
-      return this.handleValidationFailure(validationError, call, context, startTime, toolCallId);
-    }
     const policyDecision = this.evaluatePolicy(call, tool, context);
 
     if (!policyDecision.allowed) {
       return this.handlePolicyDenied(
+        policyDecision,
+        call,
+        context,
+        startTime,
+        toolCallId,
+        decisionId
+      );
+    }
+
+    const validationError = tool ? this.validateArguments(call.arguments, tool.inputSchema) : null;
+    if (validationError) {
+      return this.handleValidationFailure(
+        validationError,
         policyDecision,
         call,
         context,
@@ -506,11 +515,26 @@ export class ToolExecutionPipeline
 
   private handleValidationFailure(
     validationError: ToolError,
+    policyDecision: ToolPolicyDecision,
     call: MCPToolCall,
     context: ToolContext,
     startTime: number,
-    toolCallId: string
+    toolCallId: string,
+    decisionId: string
   ): ExecutionPreparationResult {
+    const decision = this.createExecutionDecision({
+      decisionId,
+      toolName: call.name,
+      toolCallId,
+      taskNodeId: context.taskNodeId,
+      allowed: false,
+      requiresConfirmation: false,
+      reason: validationError.message,
+      riskTags: policyDecision.riskTags,
+      sandboxed: context.security.sandbox.type !== "none",
+    });
+    this.emitDecision(decision, context);
+
     const invalidResult: MCPToolResult = {
       success: false,
       content: [{ type: "text", text: validationError.message }],
@@ -523,7 +547,8 @@ export class ToolExecutionPipeline
         taskNodeId: context.taskNodeId,
         status: "failed",
         durationMs: Date.now() - startTime,
-        sandboxed: context.security.sandbox.type !== "none",
+        policyDecisionId: decisionId,
+        sandboxed: decision.sandboxed,
         error: validationError.message,
       }),
       context
