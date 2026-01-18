@@ -161,6 +161,8 @@ export type AiNativeCapabilities = {
   ai_transactions?: boolean;
   semantic_merge?: boolean;
   multi_agent?: boolean;
+  /** v0.9.2+ optional: Multi-document AI envelopes */
+  multi_document?: boolean;
 };
 
 export type AiNativePolicyV1 = {
@@ -219,6 +221,36 @@ export type PolicyManifestV091 = PolicyManifestV09 & {
 ```
 
 See `23_AI_Native_Extension.md` for negotiation rules and normative requirements, including the audit requirement when `ai_autonomy` is `full`.
+
+### 1.2.1 Multi-document Extension (v0.9.2 optional)
+
+Multi-document support is an optional extension that allows AI-native v2 envelopes to carry multiple documents (per-doc frontiers, preconditions, and ops) with explicit atomicity semantics.
+
+See: `docs/specs/lfcc/proposals/LFCC_v0.9.2_Multi_Document_Support.md`.
+
+Recommended TypeScript types:
+
+```ts
+export type MultiDocumentAtomicity = "all_or_nothing" | "best_effort";
+
+export type MultiDocumentPolicyV1 = {
+  version: "v1";
+  enabled: boolean;
+  max_documents_per_request: number;
+  max_total_ops: number;
+  allowed_atomicity: MultiDocumentAtomicity[];
+  allow_atomicity_downgrade: boolean;
+  max_reference_creations: number;
+  require_target_preconditions: boolean;
+  require_citation_preconditions: boolean;
+};
+
+export type PolicyManifestV092 = PolicyManifestV091 & {
+  lfcc_version: "0.9.2";
+  ai_native_policy?: AiNativePolicyV1 & { multi_document?: MultiDocumentPolicyV1 };
+  capabilities: PolicyManifestV091["capabilities"] & { multi_document?: boolean };
+};
+```
 
 ### 1.3 Extensions (Normative)
 
@@ -568,3 +600,27 @@ Rules:
 - Extensions are negotiated via intersection; incompatible versions or config mismatches disable that extension without hard-refusal.
 ### 3.1 AI-native Negotiation (Optional)
 If AI-native fields are present and supported by all participants, negotiate them using the restriction rules in `23_AI_Native_Extension.md`. If any participant lacks AI-native support, treat AI-native as disabled and fall back to v0.9 behavior.
+
+### 3.2 Multi-document Negotiation (v0.9.2 optional)
+
+When all participants support `capabilities.multi_document=true`, negotiate multi-document policy:
+
+```ts
+function negotiateMultiDocument(
+  policies: MultiDocumentPolicyV1[]
+): MultiDocumentPolicyV1 {
+  return {
+    version: "v1",
+    enabled: policies.every(p => p.enabled),
+    max_documents_per_request: Math.min(...policies.map(p => p.max_documents_per_request)),
+    max_total_ops: Math.min(...policies.map(p => p.max_total_ops)),
+    allowed_atomicity: setIntersection(policies.map(p => p.allowed_atomicity)),
+    allow_atomicity_downgrade: policies.every(p => p.allow_atomicity_downgrade),
+    max_reference_creations: Math.min(...policies.map(p => p.max_reference_creations)),
+    require_target_preconditions: policies.some(p => p.require_target_preconditions),
+    require_citation_preconditions: policies.some(p => p.require_citation_preconditions),
+  };
+}
+```
+
+Additionally, when `multi_document.enabled=true`, `gateway.idempotency_window_ms` MUST be >= 604800000 (7 days) per LFCC v0.9.2 MD-043-A.
