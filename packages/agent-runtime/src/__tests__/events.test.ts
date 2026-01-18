@@ -10,12 +10,19 @@ import {
   getGlobalEventBus,
   resetGlobalEventBus,
 } from "../events";
+import { createLogger, createMemoryTransport, type MemoryTransport } from "../logging/logger";
 
 describe("EventBus", () => {
   let eventBus: EventBus;
+  let memoryTransport: MemoryTransport;
 
   beforeEach(() => {
-    eventBus = createEventBus();
+    memoryTransport = createMemoryTransport();
+    const testLogger = createLogger({
+      name: "event-bus",
+      transports: [memoryTransport],
+    });
+    eventBus = createEventBus({ logger: testLogger });
   });
 
   afterEach(() => {
@@ -286,10 +293,6 @@ describe("EventBus", () => {
     });
 
     it("should catch async handler errors", async () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {
-        // Swallow expected error in test
-      });
-
       eventBus.subscribe("test:error", async () => {
         throw new Error("Async error");
       });
@@ -297,9 +300,10 @@ describe("EventBus", () => {
       eventBus.emitRaw("test:error", {});
 
       await new Promise((r) => setTimeout(r, 20));
-      expect(consoleSpy).toHaveBeenCalled();
-
-      consoleSpy.mockRestore();
+      const errorEntries = memoryTransport.getEntriesByLevel("error");
+      expect(
+        errorEntries.some((entry) => entry.message.includes("Handler error for test:error"))
+      ).toBe(true);
     });
   });
 
