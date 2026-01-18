@@ -41,6 +41,7 @@ export const createTaskSchema = z.object({
   title: z.string().min(1).optional(),
   prompt: z.string().min(1),
   modelId: z.string().min(1).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const updateTaskStatusSchema = z.object({

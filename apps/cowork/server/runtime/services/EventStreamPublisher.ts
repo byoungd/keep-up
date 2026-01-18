@@ -18,6 +18,7 @@ export class EventStreamPublisher {
     modelId?: string;
     providerId?: string;
     fallbackNotice?: string;
+    metadata?: Record<string, unknown>;
   }) {
     this.events.publish(data.sessionId, COWORK_EVENTS.TASK_CREATED, {
       taskId: data.taskId,
@@ -27,6 +28,7 @@ export class EventStreamPublisher {
       modelId: data.modelId,
       providerId: data.providerId,
       fallbackNotice: data.fallbackNotice,
+      metadata: data.metadata,
     });
   }
 
@@ -39,6 +41,7 @@ export class EventStreamPublisher {
     modelId?: string;
     providerId?: string;
     fallbackNotice?: string;
+    metadata?: Record<string, unknown>;
   }) {
     this.events.publish(data.sessionId, COWORK_EVENTS.TASK_UPDATED, {
       taskId: data.taskId,
@@ -48,6 +51,7 @@ export class EventStreamPublisher {
       modelId: data.modelId,
       providerId: data.providerId,
       fallbackNotice: data.fallbackNotice,
+      metadata: data.metadata,
     });
   }
 
@@ -160,11 +164,35 @@ export class EventStreamPublisher {
     });
   }
 
-  publishSessionUsageUpdated(data: { sessionId: string; usage: TokenUsageStats }) {
+  publishSessionUsageUpdated(data: { sessionId: string; usage: TokenUsageStats; cost?: number }) {
     this.events.publish(data.sessionId, COWORK_EVENTS.SESSION_USAGE_UPDATED, {
       inputTokens: data.usage.inputTokens,
       outputTokens: data.usage.outputTokens,
       totalTokens: data.usage.totalTokens,
+      totalCostUsd: data.cost,
+    });
+  }
+
+  publishTokenUsage(data: {
+    sessionId: string;
+    messageId?: string;
+    taskId?: string;
+    usage: TokenUsageStats;
+    costUsd: number | null;
+    modelId?: string;
+    providerId?: string;
+  }) {
+    this.events.publish(data.sessionId, COWORK_EVENTS.TOKEN_USAGE, {
+      messageId: data.messageId,
+      taskId: data.taskId,
+      inputTokens: data.usage.inputTokens,
+      outputTokens: data.usage.outputTokens,
+      totalTokens: data.usage.totalTokens,
+      costUsd: data.costUsd,
+      modelId: data.modelId,
+      providerId: data.providerId,
+      contextWindow: data.usage.contextWindow,
+      utilization: data.usage.utilization,
     });
   }
 }

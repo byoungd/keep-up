@@ -71,6 +71,7 @@ async function ensureSchema(db: D1Database): Promise<void> {
         title TEXT NOT NULL,
         prompt TEXT NOT NULL,
         status TEXT NOT NULL,
+        metadata TEXT DEFAULT '{}',
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
       )
@@ -235,6 +236,7 @@ async function ensureSchema(db: D1Database): Promise<void> {
     "ALTER TABLE artifacts ADD COLUMN version INTEGER DEFAULT 1",
     "ALTER TABLE artifacts ADD COLUMN status TEXT DEFAULT 'pending'",
     "ALTER TABLE artifacts ADD COLUMN applied_at INTEGER",
+    "ALTER TABLE tasks ADD COLUMN metadata TEXT DEFAULT '{}'",
   ];
 
   for (const statement of optionalStatements) {
@@ -364,6 +366,7 @@ function rowToTask(row: Record<string, unknown>): CoworkTask {
     title: String(row.title),
     prompt: String(row.prompt),
     status: row.status as CoworkTask["status"],
+    metadata: parseJsonObject(row.metadata),
     createdAt: Number(row.created_at),
     updatedAt: Number(row.updated_at),
   };
@@ -590,14 +593,15 @@ async function createD1TaskStore(db: D1Database): Promise<TaskStoreLike> {
       await prepare(
         db,
         `INSERT INTO tasks
-          (task_id, session_id, title, prompt, status, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          (task_id, session_id, title, prompt, status, metadata, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           task.taskId,
           task.sessionId,
           task.title,
           task.prompt,
           task.status,
+          JSON.stringify(task.metadata ?? {}),
           task.createdAt,
           task.updatedAt,
         ]
@@ -617,9 +621,16 @@ async function createD1TaskStore(db: D1Database): Promise<TaskStoreLike> {
       await prepare(
         db,
         `UPDATE tasks
-          SET title = ?, prompt = ?, status = ?, updated_at = ?
+          SET title = ?, prompt = ?, status = ?, metadata = ?, updated_at = ?
           WHERE task_id = ?`,
-        [updated.title, updated.prompt, updated.status, updated.updatedAt, updated.taskId]
+        [
+          updated.title,
+          updated.prompt,
+          updated.status,
+          JSON.stringify(updated.metadata ?? {}),
+          updated.updatedAt,
+          updated.taskId,
+        ]
       ).run();
       return updated;
     },

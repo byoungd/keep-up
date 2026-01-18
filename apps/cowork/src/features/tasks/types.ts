@@ -136,6 +136,7 @@ export interface TaskStatusNode extends BaseNode {
   modelId?: string;
   providerId?: string;
   fallbackNotice?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export type TaskNode =
@@ -164,4 +165,11 @@ export interface TaskGraph {
   savedAt?: number;
   agentMode?: "plan" | "build";
   usage?: TokenUsageStats;
+  messageUsage?: Record<string, MessageUsage>;
 }
+
+export type MessageUsage = TokenUsageStats & {
+  costUsd?: number | null;
+  modelId?: string;
+  providerId?: string;
+};

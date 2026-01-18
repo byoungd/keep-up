@@ -1,6 +1,7 @@
 import type { ActionItem, AgentTask, ArtifactItem, Message, TaskStep } from "@ku0/shell";
 import type {
   ArtifactPayload,
+  MessageUsage,
   PlanUpdateNode,
   TaskGraph,
   TaskStatusNode,
@@ -23,7 +24,7 @@ export function projectGraphToMessages(
   graph: TaskGraph,
   baseChatMessages: Message[] = []
 ): Message[] {
-  const messages: Message[] = [...baseChatMessages];
+  let messages: Message[] = [...baseChatMessages];
   const context = buildProjectionContext(messages);
 
   for (const node of graph.nodes) {
@@ -34,6 +35,8 @@ export function projectGraphToMessages(
     }
   }
 
+  messages = applyMessageUsage(messages, graph.messageUsage);
+
   return messages.sort((a, b) => {
     const timeDiff = (a.createdAt || 0) - (b.createdAt || 0);
     if (timeDiff !== 0) {
@@ -42,6 +45,61 @@ export function projectGraphToMessages(
     // Stable secondary sort by ID when timestamps are equal
     return a.id.localeCompare(b.id);
   });
+}
+
+function applyMessageUsage(
+  messages: Message[],
+  usageMap?: Record<string, MessageUsage>
+): Message[] {
+  if (!usageMap) {
+    return messages;
+  }
+
+  return messages.map((message) => {
+    const usage = usageMap[message.id] ?? extractUsageFromMetadata(message.metadata);
+    if (!usage) {
+      return message;
+    }
+    return {
+      ...message,
+      tokenUsage: {
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        totalTokens: usage.totalTokens,
+        ...(typeof usage.contextWindow === "number" ? { contextWindow: usage.contextWindow } : {}),
+        ...(typeof usage.utilization === "number" ? { utilization: usage.utilization } : {}),
+      },
+    };
+  });
+}
+
+function extractUsageFromMetadata(
+  metadata: Message["metadata"] | undefined
+): MessageUsage | undefined {
+  const usage = metadata?.usage;
+  if (!usage || typeof usage !== "object") {
+    return undefined;
+  }
+  const record = usage as Record<string, unknown>;
+  if (
+    typeof record.inputTokens !== "number" ||
+    typeof record.outputTokens !== "number" ||
+    typeof record.totalTokens !== "number"
+  ) {
+    return undefined;
+  }
+  return {
+    inputTokens: record.inputTokens,
+    outputTokens: record.outputTokens,
+    totalTokens: record.totalTokens,
+    ...(typeof record.contextWindow === "number" ? { contextWindow: record.contextWindow } : {}),
+    ...(typeof record.utilization === "number" ? { utilization: record.utilization } : {}),
+    ...(typeof record.costUsd === "number" || record.costUsd === null
+      ? { costUsd: record.costUsd as number | null }
+      : {}),
+    ...(typeof record.modelId === "string" ? { modelId: record.modelId } : {}),
+    ...(typeof record.providerId === "string" ? { providerId: record.providerId } : {}),
+  };
 }
 
 function buildProjectionContext(messages: Message[]): ProjectionContext {
@@ -212,7 +270,7 @@ function getOrCreateTaskMessage(
 // --- Logic Helpers ---
 
 function buildAgentTaskFromGraph(taskNode: TaskStatusNode, graph: TaskGraph): AgentTask {
-  const { taskId, title, status, modelId, providerId, fallbackNotice } = taskNode;
+  const { taskId, title, status, modelId, providerId, fallbackNotice, metadata } = taskNode;
   const taskCount = graph.nodes.filter((node) => node.type === "task_status").length;
   const scopedNodes = filterNodesForTask(graph.nodes, taskId, taskCount);
   // Extract Steps & Actions
@@ -261,6 +319,7 @@ function buildAgentTaskFromGraph(taskNode: TaskStatusNode, graph: TaskGraph): Ag
     modelId,
     providerId,
     fallbackNotice,
+    ...(metadata ? { metadata } : {}),
     startedAt,
     completedAt: isTerminalStatus(status) ? completedAt : undefined,
     goal: taskNode.prompt,

@@ -182,6 +182,7 @@ export type CreateTaskPayload = {
   title?: string;
   prompt: string;
   modelId?: string;
+  metadata?: Record<string, unknown>;
 };
 
 export type ToolCheckRequest =

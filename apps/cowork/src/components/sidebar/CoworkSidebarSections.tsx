@@ -139,7 +139,7 @@ export function CoworkSidebarSections() {
       setProjectInstructions("");
       setIsDialogOpen(false);
     } catch (_err) {
-      // Ignore failures to keep the dialog responsive.
+      void _err;
     }
   }, [projectInstructions, projectName, createProject]);
 
@@ -180,7 +180,7 @@ export function CoworkSidebarSections() {
       try {
         await moveSessionToProject(sessionId, projectId);
       } catch (_err) {
-        // Ignore failures to keep the UI responsive.
+        void _err;
       }
     },
     [moveSessionToProject]
@@ -192,7 +192,7 @@ export function CoworkSidebarSections() {
         try {
           await deleteSession(sessionId);
         } catch (_e) {
-          // Ignore failures to keep the list usable.
+          void _e;
         }
       }
     },

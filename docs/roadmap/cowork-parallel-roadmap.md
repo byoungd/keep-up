@@ -51,7 +51,7 @@ by executing ten parallel tracks with clear dependencies and acceptance gates.
     - Inspiration: OpenCode's always-visible cost display
     - Status: 🏗️ UI Implemented / Backend Integration In Progress
 
-### Phase 3: Agentic Excellence Tracks (11-14)
+### Phase 3: Agentic Excellence Tracks (11-13)
 11) Track 11: Semantic Context Indexing
     - Doc: `docs/roadmap/cowork-track-11-semantic-context-index.md`
     - Output: local codebase index, context packs, retrieval API
@@ -67,11 +67,14 @@ by executing ten parallel tracks with clear dependencies and acceptance gates.
     - Output: auto-lint/test selection, preflight reports, change summaries
     - Inspiration: Cursor/Devin preflight checks + Claude Code review loop
     - Status: Not Started
-14) Track 14: Multi-Agent Orchestration
-    - Doc: `docs/roadmap/cowork-track-14-multi-agent-orchestration.md`
-    - Output: role-based subagents, delegation, aggregated summaries
-    - Inspiration: Claude Code planner/implementer/reviewer split
-    - Status: 🛑 SUPERSEDED by Track 15 (Phase F)
+
+Note: Track 14 (Multi-Agent Orchestration) is deprecated and superseded by Track 15.
+
+### Phase F: Architecture Track (15)
+15) Track 15: Phase F - Autonomous Swarm Architecture
+    - Doc: `docs/roadmap/cowork-track-15-phase-f-architecture.md`
+    - Output: swarm runtime + deep semantic tooling + background jobs
+    - Status: Planned (2026 Q1)
 
 ## Phase E Trend Drivers (Why These Tracks)
 - Context indexing and retrieval are now baseline in top IDE agents (Cursor, OpenCode).
@@ -101,7 +104,9 @@ by executing ten parallel tracks with clear dependencies and acceptance gates.
 - Track 11: Follow "Execution Steps" in `docs/roadmap/cowork-track-11-semantic-context-index.md`
 - Track 12: Follow "Execution Steps" in `docs/roadmap/cowork-track-12-workflow-templates.md`
 - Track 13: Follow "Execution Steps" in `docs/roadmap/cowork-track-13-autonomous-qa.md`
-- Track 14: Follow "Execution Steps" in `docs/roadmap/cowork-track-14-multi-agent-orchestration.md`
+
+### Phase F Track (Architecture)
+- Track 15: Follow "Execution Steps" in `docs/roadmap/cowork-track-15-phase-f-architecture.md`
 
 ## Best-Order Execution (Parallel + Gates)
 ### Phase A: Foundation (must land first)
@@ -130,8 +135,9 @@ Gate D: multi-model support + project context + mode switching + cost visibility
 - Track 11 (semantic context index - depends on Track 8 context baseline)
 - Track 12 (workflow templates - depends on Track 9 plan/build modes)
 - Track 13 (autonomous QA - depends on Track 4 approvals + Track 5 telemetry)
-- Track 14 (multi-agent orchestration - depends on Track 9 mode system)
-Gate E: context packs + skills + preflight QA + multi-agent delegation
+- Track 15 (Phase F swarm runtime - required for background execution)
+Note: Track 13 parsers can land in Phase E, but autonomous execution requires Track 15 (Phase F2).
+Gate E: context packs + skills + preflight QA + swarm runtime delegation
 
 ## Cross-Track Contracts (Must Align)
 - Message schema: status, modelId, providerId, fallbackNotice, parentId
@@ -144,6 +150,12 @@ Gate E: context packs + skills + preflight QA + multi-agent delegation
 - Workflow templates: skillId, version, inputs, expectedOutputs
 - Preflight reports: preflightId, checks, failures, riskSummary
 - Multi-agent: agentId, role, parentTaskId
+
+## Cross-Track Alignment Notes
+- Prompt budget: Track 8 and Track 11 must use a shared prompt budget manager; do not inject independently.
+- Working indicator: Track 5 owns stall detection; Track 3 renders the UI state.
+- Cost tracking: Track 7 owns pricing metadata and token counts; Track 10 owns cost calculation, token.usage SSE, persistence, and UI.
+- Preflight execution: Track 13 runs only in Build Mode with Track 4 approvals; use MCP + sandbox when Phase G is enabled.
 
 ## Ownership and Handoff
 - Each track owner updates `task.md` and `walkthrough.md` for their scope.

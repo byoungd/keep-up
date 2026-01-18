@@ -22,7 +22,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   componentDidCatch(_error: Error, _errorInfo: React.ErrorInfo) {
-    // Intentionally noop: error details handled via state for fallback rendering.
+    void _error;
+    void _errorInfo;
   }
 
   handleRetry = () => {

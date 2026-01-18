@@ -42,6 +42,9 @@ export function createPreflightRoutes(deps: PreflightRouteDeps) {
     if (!session) {
       return jsonError(c, 404, "Session not found");
     }
+    if ((session.agentMode ?? "build") !== "build") {
+      return jsonError(c, 409, "Preflight requires Build Mode");
+    }
 
     const grantRoots = session.grants.map((grant) => grant.rootPath).filter(Boolean);
     const resolvedRoot = resolveRootPath(body.rootPath, grantRoots);

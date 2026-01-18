@@ -30,8 +30,8 @@ export class ProjectContextManager {
     this.contextIndexManager = contextIndexManager;
   }
 
-  async getContext(session: CoworkSession): Promise<string | undefined> {
-    return this.loadProjectContext(session);
+  async getContext(session: CoworkSession, tokenBudget?: number): Promise<string | undefined> {
+    return this.loadProjectContext(session, tokenBudget);
   }
 
   async regenerateContext(session: CoworkSession): Promise<string> {
@@ -78,20 +78,21 @@ export class ProjectContextManager {
     return content;
   }
 
-  private async loadProjectContext(session: CoworkSession): Promise<string> {
+  private async loadProjectContext(session: CoworkSession, tokenBudget?: number): Promise<string> {
     const rootPath = resolveRootPath(session);
     if (!rootPath) {
       this.logger.warn("No root path found in session grants, skipping project context");
       return "";
     }
 
+    const budget = tokenBudget ?? DEFAULT_PROJECT_CONTEXT_TOKEN_BUDGET;
     const agentsMdPath = resolveAgentsMdPath(rootPath);
 
     try {
       if (existsSync(agentsMdPath)) {
         this.logger.debug("Loading project context from AGENTS.md");
         const content = await readFile(agentsMdPath, "utf-8");
-        return truncateToTokenBudget(content, DEFAULT_PROJECT_CONTEXT_TOKEN_BUDGET);
+        return truncateToTokenBudget(content, budget);
       }
 
       this.logger.info("AGENTS.md not found, analyzing project...");
@@ -106,7 +107,7 @@ export class ProjectContextManager {
         this.logger.warn("Failed to write AGENTS.md", { error: writeErr });
       }
 
-      return truncateToTokenBudget(agentsMd, DEFAULT_PROJECT_CONTEXT_TOKEN_BUDGET);
+      return truncateToTokenBudget(agentsMd, budget);
     } catch (error) {
       this.logger.error("Error loading project context", { error });
       return "";
@@ -114,6 +115,20 @@ export class ProjectContextManager {
   }
 
   async getContextPackPrompt(session: CoworkSession): Promise<{
+    prompt?: string;
+    packKey: string | null;
+  }>;
+  async getContextPackPrompt(
+    session: CoworkSession,
+    options: { tokenBudget?: number }
+  ): Promise<{
+    prompt?: string;
+    packKey: string | null;
+  }>;
+  async getContextPackPrompt(
+    session: CoworkSession,
+    options?: { tokenBudget?: number }
+  ): Promise<{
     prompt?: string;
     packKey: string | null;
   }> {
@@ -130,7 +145,13 @@ export class ProjectContextManager {
       }
 
       const packKey = await buildPackKey(index, pins.packIds);
-      const prompt = await index.buildPackPrompt(pins.packIds);
+      const tokenBudget = options?.tokenBudget;
+      if (tokenBudget !== undefined && tokenBudget <= 0) {
+        return { prompt: undefined, packKey };
+      }
+      const prompt = await index.buildPackPrompt(pins.packIds, {
+        ...(tokenBudget !== undefined ? { tokenBudget } : {}),
+      });
 
       return { prompt, packKey };
     } catch (error) {

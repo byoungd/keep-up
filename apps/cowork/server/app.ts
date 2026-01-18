@@ -115,6 +115,8 @@ export function createCoworkApp(deps: CoworkAppDeps) {
     "/api",
     createCostRoutes({
       sessionStore: deps.storage.sessionStore,
+      chatMessageStore: deps.storage.chatMessageStore,
+      taskStore: deps.storage.taskStore,
     })
   );
 
@@ -170,6 +172,7 @@ export function createCoworkApp(deps: CoworkAppDeps) {
       chatMessageStore: deps.storage.chatMessageStore,
       getSettings: () => deps.storage.configStore.get(),
       providerKeys,
+      events: eventHub,
     })
   );
 

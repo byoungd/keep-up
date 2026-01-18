@@ -121,4 +121,54 @@ describe("projectGraphToMessages", () => {
     expect(startedAt).toBeDefined();
     expect(completedAt).toBeDefined();
   });
+
+  it("applies token usage from stream updates and metadata", () => {
+    const graph = buildBaseGraph([]);
+    graph.messageUsage = {
+      "assistant-1": {
+        inputTokens: 4,
+        outputTokens: 2,
+        totalTokens: 6,
+        contextWindow: 100,
+        utilization: 6,
+      },
+    };
+
+    const baseMessages: Message[] = [
+      {
+        id: "assistant-1",
+        role: "assistant",
+        content: "Hello",
+        createdAt: 100,
+        status: "done",
+        type: "text",
+      },
+      {
+        id: "assistant-2",
+        role: "assistant",
+        content: "World",
+        createdAt: 200,
+        status: "done",
+        type: "text",
+        metadata: {
+          usage: {
+            inputTokens: 3,
+            outputTokens: 1,
+            totalTokens: 4,
+            contextWindow: 50,
+            utilization: 8,
+          },
+        },
+      },
+    ];
+
+    const result = projectGraphToMessages(graph, baseMessages);
+    const first = result.find((msg) => msg.id === "assistant-1");
+    const second = result.find((msg) => msg.id === "assistant-2");
+
+    expect(first?.tokenUsage?.totalTokens).toBe(6);
+    expect(first?.tokenUsage?.contextWindow).toBe(100);
+    expect(second?.tokenUsage?.totalTokens).toBe(4);
+    expect(second?.tokenUsage?.contextWindow).toBe(50);
+  });
 });
