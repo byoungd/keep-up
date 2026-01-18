@@ -19,6 +19,11 @@ export {
   ProcessCodeExecutor,
 } from "./code";
 export {
+  createDelegationToolServer,
+  type DelegateToAgentInput,
+  DelegationToolServer,
+} from "./delegation";
+export {
   createFileToolServer,
   FileToolServer,
   type IFileSystem,

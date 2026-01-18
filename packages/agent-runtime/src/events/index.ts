@@ -29,7 +29,13 @@ export {
   type SystemEvents,
   type ToolEvents,
 } from "./eventBus";
-
+export {
+  createMessageBus,
+  type MessageEnvelope,
+  type MessageHandler,
+  type MessageSubscription,
+  RuntimeMessageBus,
+} from "./messageBus";
 export {
   createScopedEventBus,
   type ScopedEventBus,

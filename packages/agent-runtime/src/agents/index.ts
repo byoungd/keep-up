@@ -5,6 +5,16 @@
  * Reference: Claude Code's agent architecture.
  */
 
+// Lineage
+export {
+  type AgentLineageEntry,
+  AgentLineageManager,
+  type AgentUsage,
+  createLineageManager,
+  type DelegationRole,
+  type LineageAgentStatus,
+  type LineageChain,
+} from "./lineage";
 // Manager
 export { AgentManager, createAgentManager } from "./manager";
 
