@@ -11,8 +11,8 @@ import type {
   ReferenceStore,
   ReferenceStoreFrontier,
 } from "@ku0/core";
-import { stableStringify } from "@ku0/core";
-import { LoroList, LoroMap, type LoroRuntime } from "../runtime/loroRuntime";
+import { documentId } from "@ku0/core";
+import { type LoroFrontiers, LoroList, LoroMap, type LoroRuntime } from "../runtime/loroRuntime";
 
 const REF_STORE_VERSION = "1.0";
 const REF_STORE_ORIGIN_PREFIX = "ref_store";
@@ -56,27 +56,6 @@ type ReferenceAuditEvent = {
   reason?: string;
 };
 
-function serializeRecordForIdempotency(record: CrossDocReferenceRecord): string {
-  const source: CrossDocReferenceRecord["source"] = {
-    doc_id: record.source.doc_id,
-    block_id: record.source.block_id,
-    start: record.source.start,
-    end: record.source.end,
-    ...(typeof record.source.if_match_context_hash === "string"
-      ? { if_match_context_hash: record.source.if_match_context_hash }
-      : {}),
-  };
-  return stableStringify({
-    ref_id: record.ref_id,
-    ref_type: record.ref_type,
-    source,
-    target: record.target,
-    created_at_ms: record.created_at_ms,
-    created_by: record.created_by,
-    v: record.v,
-  });
-}
-
 export class LoroReferenceStore implements ReferenceStore {
   private readonly runtime: LoroRuntime;
   private readonly policyDomainId: string;
@@ -95,14 +74,6 @@ export class LoroReferenceStore implements ReferenceStore {
     if (existing) {
       const existingRecord = parseRecord(existing.get("record"));
       if (existingRecord?.created_by.request_id === record.created_by.request_id) {
-        const existingHash = serializeRecordForIdempotency(existingRecord);
-        const incomingHash = serializeRecordForIdempotency(record);
-        if (existingHash !== incomingHash) {
-          throw new ReferenceStoreError(
-            "REF_ALREADY_EXISTS",
-            `Reference already exists with different content: ${record.ref_id}`
-          );
-        }
         return Promise.resolve();
       }
       throw new ReferenceStoreError(
@@ -200,7 +171,7 @@ export class LoroReferenceStore implements ReferenceStore {
     updatedBy.set("request_id", "reference-store");
 
     if (verification.ok) {
-      recordMap.set("verified_at_ms", Date.now());
+      (recordMap as LoroMap).set("verified_at_ms", Date.now());
     }
 
     const audit = entry.getOrCreateContainer("audit", new LoroList());
@@ -390,7 +361,7 @@ function parseSource(value: unknown): CrossDocReferenceRecord["source"] | null {
   }
   const contextHash = map.get("if_match_context_hash");
   return {
-    doc_id: docId,
+    doc_id: documentId(docId),
     block_id: blockId,
     start,
     end,
@@ -414,7 +385,7 @@ function parseTarget(value: unknown): CrossDocReferenceRecord["target"] | null {
     return null;
   }
   return {
-    doc_id: docId,
+    doc_id: documentId(docId),
     block_id: blockId,
     anchor,
   };
@@ -492,17 +463,19 @@ function writeRecord(map: LoroMap, record: CrossDocReferenceRecord): void {
   targetAnchor.set("bias", record.target.anchor.bias);
 }
 
-function parseFrontier(frontier: ReferenceStoreFrontier): Array<{ peer: string; counter: number }> {
-  const entries: Array<{ peer: string; counter: number }> = [];
+function parseFrontier(frontier: ReferenceStoreFrontier): LoroFrontiers {
+  const entries: LoroFrontiers = [];
   const seen = new Set<string>();
   for (const item of frontier.loro_frontier) {
     const [peer, counterText] = item.split(":");
     const counter = Number(counterText);
-    if (!peer || !Number.isFinite(counter) || seen.has(peer)) {
+    const peerNumber = Number(peer);
+    if (!peer || !Number.isFinite(counter) || !Number.isFinite(peerNumber) || seen.has(peer)) {
       continue;
     }
-    seen.add(peer);
-    entries.push({ peer, counter });
+    const peerId = `${peerNumber}` as `${number}`;
+    seen.add(peerId);
+    entries.push({ peer: peerId, counter });
   }
   return entries;
 }
@@ -514,10 +487,7 @@ function serializeFrontier(frontiers: Array<{ peer: string | number; counter: nu
     .map((entry) => `${entry.peer}:${entry.counter}`);
 }
 
-function filterKnownFrontiers(
-  frontiers: Array<{ peer: string; counter: number }>,
-  known: Array<{ peer: string | number; counter: number }>
-): Array<{ peer: string; counter: number }> {
+function filterKnownFrontiers(frontiers: LoroFrontiers, known: LoroFrontiers): LoroFrontiers {
   const knownPeers = new Set(known.map((entry) => String(entry.peer)));
   return frontiers.filter((entry) => knownPeers.has(entry.peer));
 }
