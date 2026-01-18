@@ -264,6 +264,64 @@ export function ChatThread({ sessionId }: { sessionId: string }) {
     inputRef.current?.focus();
   }, []);
 
+  const submitEditIfNeeded = useCallback(
+    async (draft: string) => {
+      if (!editingMessageId) {
+        return false;
+      }
+      if (attachments.length > 0) {
+        setStatusMessage("Attachments are not supported while editing a message.");
+        return true;
+      }
+      setStatusMessage(null);
+      const targetMessageId = editingMessageId;
+      setEditingMessageId(null);
+      setInput("");
+      try {
+        await editMessage(targetMessageId, draft);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to edit message.";
+        setStatusMessage(message);
+        setEditingMessageId(targetMessageId);
+        setInput(draft);
+        inputRef.current?.focus();
+      }
+      return true;
+    },
+    [attachments.length, editMessage, editingMessageId]
+  );
+
+  const submitNewMessage = useCallback(
+    async (draft: string) => {
+      setStatusMessage(null);
+      const content = draft;
+      setInput("");
+      const readyAttachments = getReadyAttachmentRefs();
+      await sendMessage(content, "chat", {
+        modelId: model,
+        attachments: readyAttachments.length > 0 ? readyAttachments : undefined,
+        parentId: branchParentId ?? undefined,
+      });
+      clearAttachments();
+      setBranchParentId(null);
+    },
+    [branchParentId, clearAttachments, getReadyAttachmentRefs, model, sendMessage]
+  );
+
+  const handleSend = useCallback(async () => {
+    const trimmedInput = input.trim();
+    if (!trimmedInput) {
+      return;
+    }
+    if (isAttachmentBusy) {
+      return;
+    }
+    if (await submitEditIfNeeded(input)) {
+      return;
+    }
+    await submitNewMessage(input);
+  }, [input, isAttachmentBusy, submitEditIfNeeded, submitNewMessage]);
+
   const handleEdit = useCallback(
     (id: string) => {
       const message = messages.find((msg) => msg.id === id);
@@ -455,40 +513,7 @@ export function ChatThread({ sessionId }: { sessionId: string }) {
         // Input
         input={input}
         setInput={setInput}
-        onSend={async () => {
-          const trimmedInput = input.trim();
-          if (!trimmedInput) {
-            return;
-          }
-          if (isAttachmentBusy) {
-            return;
-          }
-          if (editingMessageId) {
-            if (attachments.length > 0) {
-              setStatusMessage("Attachments are not supported while editing a message.");
-              return;
-            }
-            setStatusMessage(null);
-            const targetMessageId = editingMessageId;
-            setEditingMessageId(null);
-            setInput("");
-            await editMessage(targetMessageId, input);
-            return;
-          }
-          setStatusMessage(null);
-          const content = input;
-          setInput("");
-          const readyAttachments = getReadyAttachmentRefs();
-          await sendMessage(content, "chat", {
-            modelId: model,
-            attachments: readyAttachments.length > 0 ? readyAttachments : undefined,
-            parentId: branchParentId ?? undefined,
-          }); // Default to chat execution in thread? Or strict task?
-          clearAttachments();
-          setBranchParentId(null);
-          // Ideally we share the intent detection from controller, but for now
-          // let's assume direct chat works. The unified hook handles optimistic updates.
-        }}
+        onSend={handleSend}
         onRunBackground={() => {
           /* no-op */
         }}
