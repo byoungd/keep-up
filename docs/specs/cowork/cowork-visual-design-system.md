@@ -1,145 +1,86 @@
-# Cowork Visual Design System (v2 - Arc/Dia Aligned)
+# Cowork Visual Design System (v3 - Definitive)
 
-> **Philosophy**: **Organization** (Arc) + **Simplicity** (Dia) + **Speed**.
->
-> **Core Principle**: The interface is a **tool**, not a canvas. Content (user work, AI output) is the focus. The UI recedes. Every element must earn its place.
-
-**Changelog (v2)**:
-- Removed "Magic/Gradient" emphasis
-- De-emphasized decorative blur ("Glassmorphism")
-- Removed looping animations
-- Refocused on Organization, Simplicity, Speed
+> **Core Philosophy**: **Tuesday Morning Familiarity** + **AI Precision Power**.
+> **Influences**: Arc (Structure/Theming), Dia (Simplicity/Restraint), Linear (Precision).
 
 ---
 
-## 1. Design Philosophy
+## 1. The "Novelty Budget" Strategy
 
-### 1.1 The "Piano" Principle (Dia)
-*   **Core Idea**: Simple inputs produce complex outputs. Complexity is **hidden**, not displayed.
-*   **Application**:
-    *   Standard, familiar layouts. Left Sidebar. Center Content. Right Context (optional).
-    *   Advanced settings are tucked away. The main surface is clean.
-    *   AI does the heavy lifting. The user stays in flow.
-*   **Anti-pattern**: Exposing internal AI states (routing decisions, phase changes) unless user explicitly requests them. "Thinking..." text is enough.
+We spend our limited "Novelty Budget" **exclusively** on AI features.
 
-### 1.2 The "Internet Computer" Principle (Arc)
-*   **Core Idea**: The app is a **Workspace**. It manages state and context, not just displays content.
-*   **Application**:
-    *   **Sidebar-First**: The sidebar holds the user's "world state" (Sessions, Artifacts, Approvals).
-    *   **Spaces**: Allow context-switching (e.g., "Project A" vs "Project B"). Each space remembers its state.
-    *   **Command Bar (`Cmd+K`)**: The universal search and action interface. Should be the fastest way to do anything.
-*   **Anti-pattern**: Hiding the sidebar to be "minimalist". The sidebar IS the organization.
+### 1.1 "Tuesday Morning" (The Shell)
+*   **Goal**: Familiar, Invisible, Calm.
+*   **Rules**:
+    *   No "Magic" gradients on navigation or sidebars.
+    *   Standard icons (Lucide).
+    *   Predictable physics (Collapsing sidebar behaves like a physical object).
 
-### 1.3 Speed is a Feature
-*   Latency is the enemy.
-*   UI updates must be **optimistic** (appear instantly, reconcile later).
-*   Interaction response: **< 16ms** (instant).
-*   Data fetch to render: **< 100ms**.
+### 1.2 "The Novelty Spend" (The AI)
+*   **Goal**: Signal Intelligence and Power.
+*   **Rules**:
+    *   **Violet/Indigo** is reserved for AI.
+    *   **Motion**: Tools "stack" playfully. Input bar "morphs" when processing.
+    *   **Thinking**: A subtle, beautiful indicator (e.g., a shifting hue line, not a strobe light).
 
 ---
 
-## 2. Visual Language
+## 2. Surfaces & Framing (Arc Style)
 
-### 2.1 Surfaces
-The UI is **layered**, not **flat**. Layers are distinguished by **opacity and blur**, used **functionally**.
+The app is defined by **Frames (Spaces)**.
 
-| Layer | Purpose | Technique |
-| :--- | :--- | :--- |
-| **Background** | The root. Static. | Solid color. Subtle noise allowed for texture, but not required. |
-| **Surface 1 (Sidebar/Panels)** | Persistent navigation. | Slightly elevated. `bg-surface/50` + `backdrop-blur-sm`. Blur is functional (readability over varied backgrounds), not decorative. |
-| **Surface 2 (Cards/Inputs)** | Content containers. | Higher opacity. Solid or near-solid fill. |
-| **Overlays (Modals/Popovers)** | Demand attention. | Full blur behind. Modal surface is solid. |
+### 2.1 The Theme Frame
+*   The "Background" is actually a **Theme Frame**.
+*   **Boosts Concept**: Users can tint this frame.
+*   **Default**: `zinc-100` (Light) / `zinc-900` (Dark).
+*   **Role**: Differentiates context (e.g., "Work" = Blue Tint, "Personal" = Pink Tint).
 
-> **Guideline**: If an element doesn't float, it probably doesn't need blur.
-
-### 2.2 Typography
-*   **Font**: `Inter` (UI), `JetBrains Mono` (Code/Data).
-*   **Hierarchy via Weight**: Use **font-weight** to create hierarchy, not size.
-    *   Headings: Semibold (600).
-    *   Body: Regular (400).
-    *   Muted: Regular (400) + lighter color.
-*   **Keep it readable**: Avoid light text on light backgrounds. Contrast ratio ≥ 4.5:1.
-
-### 2.3 Color
-
-**Principle**: **90% Neutral, 10% Meaningful**.
-
-*   **Neutral Foundation**: Backgrounds and most UI elements are monochrome (Grays, Black, White).
-*   **Meaningful Color**: Reserved for **status** and **action**.
-
-| Role | Color | Usage |
-| :--- | :--- | :--- |
-| **Primary Action** | Brand Blue/Indigo | Primary buttons, active states. Solid, not gradient. |
-| **Success** | Emerald/Green | Completed tasks, saved states. |
-| **Error** | Rose/Red | Failures, validation errors. |
-| **Warning** | Amber/Orange | Requires attention (approvals, limits). |
-| **AI Status** | Muted Violet/Gray | "Thinking" indicator. **Static text or icon**, not animated glow. |
-
-> **Removed**: "Magic Gradient", "Colored Shadow Glow". These are decorative and distract from content.
+### 2.2 The Canvas (The Web)
+*   Sitting *on top* of the Frame.
+*   **White** (Light) / **Gray-950** (Dark).
+*   **Elevation**: `shadow-sm`.
+*   **Border Radius**: `12px` (Squircle).
 
 ---
 
-## 3. Component Specifications
+## 3. Typography
 
-### 3.1 The Sidebar (Arc Style)
-*   **Purpose**: The user's "state container". Always visible (unless minimized).
-*   **Structure**:
-    *   **Top**: Workspace/Profile switcher.
-    *   **Middle**: Pinned Sessions, Favorites.
-    *   **Bottom**: Recent items, Settings link.
-*   **Interaction**: Collapsible to icons. Resizable width.
-*   **Visual**: Subtle background difference from content area. **No hard border**; use whitespace or shadow.
+**Font**: `Inter` (Variable).
 
-### 3.2 The Chat Input
-*   **Position**: Fixed at bottom (or centered when canvas is empty).
-*   **Visual**: A "capsule" or "bar" that feels like a focused input field, not a toolbar.
-*   **Behavior**: Large, inviting. Auto-focuses on page load.
-*   **Actions**: Minimal. Send button (Arrow/Stop).
+### 3.1 Weight as Hierarchy
+*   **Heavy (600)**: Primary Headings.
+*   **Regular (400)**: Body.
+*   **Medium (500)**: UI Labels (Sidebar, Buttons).
 
-### 3.3 The Content Canvas
-*   **Purpose**: Where user work and AI output live.
-*   **Behavior**:
-    *   Default: Chat messages flow vertically.
-    *   Artifact: Large outputs (Code, Plans) expand into a **Split View** or a **Sheet**. Chat shifts to make room.
-*   **Cards**: Artifacts appear as expandable cards within the stream.
+### 3.2 Size Scale
+*   `13px`: Sidebar / Meta (High density).
+*   `15px`: Body / Chat (Readability).
+*   `24px`: Headings.
 
-### 3.4 Command Palette (`Cmd+K`)
-*   **Purpose**: The power-user's primary interface.
-*   **Features**: Search sessions, run actions, switch spaces.
-*   **Visual**: Centered modal. Clean list. Fast filtering.
-*   **Priority**: Recent items first.
+> **Note**: We use `13px` for UI chrome to feel "Pro/Dense" (like VS Code/Linear), and `15px` for Chat to feel "Readable" (like Medium/Arc Reader).
 
 ---
 
-## 4. Motion & Interaction
+## 4. Color System
 
-**Principle**: Motion is for **feedback**, not **decoration**.
+### 4.1 Semantic Roles
+| Role | Token | Color | Usage |
+| :--- | :--- | :--- | :--- |
+| **Theme Base** | `bg-theme` | User-defined Tint | The App Frame. |
+| **Canvas** | `bg-canvas` | White / Gray-950 | The main work area. |
+| **Sidebar** | `bg-sidebar` | Transparent / Tinted | Sits on Theme Base. |
+| **Primary** | `accent-primary` | Indigo-600 | Buttons, Active State. |
+| **AI (Magic)** | `accent-ai` | **Violet-500** | Only for AI generation. |
 
-### 4.1 Transitions
-*   **Route Changes**: Fade in (150ms, ease-out). No scaling.
-*   **Modals**: Fade in + subtle slide up (150ms).
-*   **Sidebar Collapse**: Horizontal slide (fast, spring-based).
-
-### 4.2 Hover States
-*   **Buttons/Cards**: Subtle background color shift.
-*   **Scale**: **Avoid** or use sparingly (1.01 max). Can feel gimmicky.
-*   **Cursor**: `pointer` on interactive elements.
-
-### 4.3 Status Indicators
-*   **"Thinking" / Loading**: Static spinner or progress bar. Text: "Working..."
-*   **Streaming**: Static "Streaming..." text with optional progress indicator.
-*   **Removed**: Looping pulse animations, gradient borders.
-
-### 4.4 Click Feedback
-*   Buttons: Brief `active` state (darker background). No "squeeze" effect.
+### 4.2 Status Colors (Restrained)
+*   **Success**: `emerald-600` (Text/Icon) - No full green backgrounds.
+*   **Error**: `rose-600`.
+*   **Warning**: `amber-500`.
 
 ---
 
-## 5. Implementation Checklist
+## 5. Definition of "Done" (Visual)
 
-1.  [x] **Remove decorative borders.** Use whitespace and background shifts.
-2.  [x] **Use blur functionally.** Only for overlays and floating elements over varied backgrounds.
-3.  [x] **Static status indicators.** No looping "pulse" or "shimmer".
-4.  [x] **Solid colors for actions.** No gradients for buttons or status.
-5.  [x] **Deep Dark Mode.** `#0a0a0a` or similar. Not pure black.
-6.  [x] **Speed.** Every interaction feels instant.
+1.  **The "Squint Test"**: If you squint, the most prominent thing should be the **Content (Chat/Artifact)**, not the Sidebar or Buttons.
+2.  **No Grey Walls**: The UI is structured by **spacing and frames**, not 1px grey borders everywhere.
+3.  **Themeable**: Changing `bg-theme` should change the "vibe" of the entire app without breaking contrast.

@@ -1,143 +1,100 @@
-# Cowork UI Layout Spec
+# Cowork Layout Spec (v3 - Structural Foundation)
 
-> **Purpose**: Detailed specification for the Cowork App Shell, Navigation, and Layout.
-
-**Related Specs:**
-- [Visual Design System](file:///Users/han/Documents/Code/Parallel/keep-up/docs/specs/cowork/cowork-visual-design-system.md) (Philosophy & Tokens)
-- [App Spec](file:///Users/han/Documents/Code/Parallel/keep-up/docs/specs/cowork/cowork-app-spec.md) (Product Goals)
-- [Top-Tier Chat Spec](file:///Users/han/Documents/Code/Parallel/keep-up/docs/specs/cowork/cowork-top-tier-agent-chat-spec.md) (Chat Interaction)
+> **Philosophy**: **Structure** provides calm. **Geometry** provides softness.
+> **Reference**: Arc (Sidebar/Spaces), iOS (Squircles).
 
 ---
 
-## Visual Direction (Alignment)
-*Note: Refer to `cowork-visual-design-system.md` for authoritative design tokens.*
+## 1. The Container Geometry
 
-- **Philosophy**: "Piano" (Fast/Tools) + "Internet Computer" (Fluid/Organized).
-- **Surfaces**: Glassmorphic, light-by-default (or system), vibrant AI accents.
-- **Density**: Compact rails, spacious content.
+The application window itself dictates the feel. We use **Squircles** (super-ellipses) to reduce visual tension.
 
----
+### 1.1 Window & Panels
+*   **Window Border Radius**: `12px` (Mac standard) or `16px` (Frameless).
+*   **Panel Border Radius**: `12px` (nested panels).
+*   **Shape**: Avoid sharp 90-degree corners on floating elements. Use `border-radius: 12px` (`rounded-lg`) consistently.
 
-## Layout & IA
-- **Left Rail (72px collapsed -> 240px expanded)**: Workspace switcher, Sessions, Tasks, Artifacts, Approvals, Settings. Color stripe per workspace. Hover/focus expands.
-- **Primary Workspace (center)**: Two modes:
-  - **Chat + Task Canvas**: Messages, prompts, task outputs.
-  - **Artifact View**: Large card renderer (plan, diff, checklist, report) with action bar.
-- **Right Rail (320px)**: Context/AI panel, approval summary, model lane selector, run status. Dock/undock toggle; hides in focus mode.
-- **Secondary Drawer (bottom 30-40% height)**: Timeline/logs and TaskGraph view; resizable; collapsed by default on small screens.
-- **Top Bar**: Breadcrumb (Workspace / Session), command button (CmdK), connection status (online/offline/SSE resumable), BYOK/model lane chip.
-- **Bottom Input Bar**: Task prompt input with attachments (files, paths, artifacts), presets, run button with risk badge.
+### 1.2 The "Border" Concept (Arc-like)
+*   **The Frame**: The app content is "framed" by a border that represents the **current Space/Context**.
+*   **Implementation**:
+    *   A `4px` - `8px` padding around the main content area (Canvas).
+    *   The background color of this frame creates the "Theme".
+*   **Why**: separation of App Chrome (Sidebar) from Web Content (Canvas).
 
 ---
 
-## Core Flows
+## 2. The Sidebar (The Nervous System)
 
-1) **Start a Session**
-   - From Sessions list -> open session -> shell loads chat + task canvas.
-   - Command palette (CmdK) supports "New task", "Open artifact", "Switch workspace".
+**Role**: Holds the user's state. Always anchored.
 
-2) **Submit a Task**
-   - Enter prompt; attach files/paths/artifacts; select lane (fast/deep/consensus) and risk disclosure.
-   - On submit: show TaskGraph node placeholders; right rail shows context chips; bottom drawer opens timeline.
+### 2.1 Dimensions
+*   **Collapsed**: `72px` (Icon only + Notification Badge).
+*   **Expanded**: `240px` (Standard).
+*   **Max**: `400px` (User resizable).
 
-3) **Approval Gate**
-   - When a node requires approval: inline card appears with risk tag (read/write/file/system). Primary actions: Approve, Deny, Edit scope.
-   - Approvals also list in the right rail and in /approvals route for batch review.
+### 2.2 Sections
+1.  **Space Switcher (Top)**:
+    *   Horizontal scroll or Grid of Icons (Work, Personal, Dev).
+    *   Theme Color indicator surrounds the active space icon.
+2.  **Pinned Contexts (Middle)**:
+    *   "Favorites". Always available.
+    *   Height: Auto.
+3.  **Active Tree (Bottom/Fill)**:
+    *   Current session history.
+    *   Tree structure (Folders/Tasks).
 
-4) **Execution & Streaming**
-   - SSE stream updates timeline (Queued -> Running -> Succeeded/Failed) and chat responses.
-   - Context chips show active grants; conflicts or retries surface as chips with tooltips.
-
-5) **Artifacts**
-   - Rendered in central pane; header shows type (plan, diff, checklist, report), created time, status.
-   - Action bar: Apply (when applicable), Download, Copy, Open in new tab, Send to chat (preload context).
-   - Diff artifacts use side-by-side split toggle; checklist uses interactive checkboxes.
-
-6) **Logs & TaskGraph**
-   - Bottom drawer tabs: Timeline, Logs, TaskGraph.
-   - TaskGraph tab shows DAG nodes with status chips; click node -> right rail details (inputs, outputs, tool run logs).
-
-7) **Error Recovery**
-   - Failed nodes show retry button; approval rescopes if needed.
-   - Conflict banner links to troubleshooting (AI Envelope expectations, missing grant).
-
-8) **Session Summary**
-   - End-of-run summary card: what changed, approvals granted, artifacts produced, costs/time. Export to Markdown/PDF.
+### 2.3 Visual Material
+*   **Background**: `bg-surface-1` (See Design System v3).
+*   **Transparency**: `98%` (Almost solid) or `bg-opacity-90` + `backdrop-blur-md` (If user enabled).
+*   **No Border constraint**: The sidebar blends into the "Frame".
 
 ---
 
-## Navigation & Information Architecture
-- Routes: `/` (sessions list), `/sessions/:id` (chat/task), `/sessions/:id/artifacts`, `/sessions/:id/logs`, `/approvals`, `/settings`.
-- Tabs inside session: **Chat**, **Artifacts**, **Approvals**, **Logs**; maintain state per tab.
-- Command palette categories: Navigate, Create, Run AI, Approvals, Settings, Help.
-- Saved views: filters for sessions (Active, Completed, Needs approval).
+## 3. The Content Canvas (The "Web View")
+
+**Role**: The "Page". It should feel independent of the chrome.
+
+### 3.1 Layout
+*   **Inset**: The canvas is a "Card" floating *inside* the App Frame.
+*   **Shadow**: `shadow-sm` (Subtle lift) to separate from the Theme Frame.
+*   **Background**: `bg-background` (Solid).
+
+### 3.2 Split View (Task Mode)
+*   **Ratio**: default 50/50, resizable.
+*   **Left**: Chat / Command Stream.
+*   **Right**: Artifact / Browser / Tool Output.
+*   **Divider**: `1px` transparent hit area (`w-4` hover).
 
 ---
 
-## Components & States
+## 4. The Input Capsule (Dia-Style)
 
-- **Session List**: Rows with title, last updated, status pill, unread badge; supports quick actions (Resume, Open artifacts).
-- **Prompt Bar**: Input + attachment chips; presets dropdown; lane selector; run button with spinner on submit; disabled when offline or approval pending.
-- **Message Bubbles**: User vs Agent with subtle background difference; inline citations; action bar on hover (copy, pin, open artifact).
-- **Artifacts**: Card container with secondary metadata stripe; interactive controls per type (checklist, diff view toggle, apply).
-- **Approvals Card**: Risk tag, scope list, rationale text area, Approve/Deny buttons with type="button" and keyboard shortcuts.
-- **Timeline**: Vertical list; each entry shows timestamp, node ID, status, duration; keyboard scrollable.
-- **TaskGraph Mini-map**: Compact DAG with node badges; click to focus node in detail drawer.
-- **Status Chips**: Synced, Offline, Reconnecting (SSE resume), Pending Approval, Blocked.
-- **Notifications/Toasts**: Success/failure and approval required; auto-dismiss except approvals.
+**Role**: The "Spotlight".
 
----
+### 4.1 Positioning
+*   **State: Empty**: Centered in the Canvas (Hero mode).
+*   **State: Active**: Pinned to bottom `24px`.
 
-## Command & AI Surfaces
-- **Command Palette (CmdK or /)**: Search sessions, artifacts, approvals; run quick actions (retry node, open TaskGraph, toggle density); shows preview pane with effect.
-- **Right Rail AI Panel**: Chat-style, context-aware. Chips: session, selected message/task, attached artifacts, file paths. Mode toggles: Tone (neutral/brief/technical), Lane (fast/deep/consensus), Privacy (local-only vs outbound). Responses show citations and linked artifacts.
-- **Inline Actions**: Message hover -> "Turn into task", "Send to approvals", "Create checklist". Artifact hover -> "Send to chat", "Apply", "Pin".
-- **Selection Menu**: In logs or artifacts, selecting text opens small pill menu (copy, send to AI, add note). Use CSS transitions; no Framer Motion in editor contexts.
+### 4.2 Geometry
+*   **Shape**: Pill / Stadia (`rounded-full` or `rounded-xl`).
+*   **Width**: `max-w-3xl` (never full width).
+*   **Elevation**: `shadow-lg` (Floating).
 
 ---
 
-## Interaction & Motion
-- Durations: 120-150ms for hover/focus; 200-260ms for drawers/panels. Easing `ease-out` (enter) and `ease-in-out` (layout).
-- Drawer resize with smooth width/height transitions; remember last height per session.
-- Command palette: scale 0.98 -> 1 + opacity; focus trap active.
-- Approval banners slide down 12px with opacity; closing reverses motion.
-- TaskGraph node status changes pulse once (200ms) to draw attention, then settle.
-- Respect prefers-reduced-motion: switch to opacity-only.
+## 5. Responsive Breakpoints
+
+| Breakpoint | Sidebar | Canvas | Input |
+| :--- | :--- | :--- | :--- |
+| **Mobile (<768px)** | Hidden (Drawer) | Full Screen | Fixed Bottom |
+| **Tablet (<1024px)** | Icons (72px) | Inset | Floating |
+| **Desktop (>1024px)** | Expanded (240px) | Inset | Floating |
 
 ---
 
-## Accessibility
-- Landmarks: `nav` for rails, `main` for content, `aside` for right rail, `footer` for bottom drawer when visible.
-- Keyboard: Tab order through rails -> content -> drawer; shortcuts CmdK (command), / (focus prompt), Shift+L (open logs), Shift+T (toggle TaskGraph), ESC closes overlays/drawers.
-- ARIA: Icon-only buttons get `aria-label`; live region for streaming responses and approvals; status role for sync chip; associate error text with inputs.
-- Contrast: Text 4.5:1, UI 3:1; ensure cyan/amber meet contrast on surfaces.
-- Forms: Buttons use `type="button"`; inputs with visible labels or `aria-label`.
+## 6. Implementation Checklist
 
----
-
-## Data & AI Envelope Hooks
-- Context chips carry session/task IDs, artifact IDs, and path scopes; sent to AI Gateway with preconditions.
-- Approvals display the scope (path/tool) and risk tier tied to TaskGraph node IDs.
-- Logs and TaskGraph nodes show `Last-Event-ID` from SSE for debugging resumability.
-- Artifact apply uses deterministic diff pipeline; no direct file mutation without approval.
-
----
-
-## Offline, Sync, and Conflict Handling
-- Offline state disables run/approve buttons; prompt bar shows queued badge; SSE auto-resume with Last-Event-ID.
-- Conflict banner links to retry with refreshed frontier/context chips.
-- Pending approvals persist locally; retry once connection restores.
-
----
-
-## Desktop -> Narrow View Adaptation
-- Left rail collapses to icons; top bar gains overflow menu for routes.
-- Right rail becomes overlay drawer; bottom logs collapse to tabbed sheet.
-- Split/diff views fall back to stacked toggles.
-
----
-
-## Open Questions
-- Should approvals support batch Approve with shared scope notes? (recommend scoped batch by risk tier)
-- Do we persist command palette recent actions per workspace? (recommend yes, local-only)
-- Should TaskGraph mini-map show tool-specific icons or generic nodes? (lean generic with tooltip for clarity)
+- [ ] **Frame**: Main content is wrapped in a `p-2` container with the Theme Background.
+- [ ] **Squircles**: Use `figma-squircle` or CSS `clip-path` if possible, else standard `border-radius`.
+- [ ] **Sidebar**: Resizable handle implementation.
+- [ ] **Input Capsule**: Transitions between Center and Bottom positions using Layout Projection (Framer Motion).

@@ -1,60 +1,47 @@
 # Cowork UI Quality Gates
 
-> **Role**: This document serves as the **Definition of Done** for any agent performing UI work on Cowork.
-> **Enforcement**: Agents must explicitly check these 5 gates before requesting user review.
-
-## Gate 1: The "No Magic Numbers" Check
-*   **Rule**: No hardcoded pixel values for layout, padding, margin, or colors.
-*   **Check**:
-    *   `grep -r "px" .` (Should only return 0 matches in component logic, strictly limited to `1px` borders or SVG strokes).
-    *   `grep -r "#" .` (Should return 0 matches for hex colors. Use `bg-surface-1`, `text-primary`, etc.).
-*   **Corrective Action**: Replace with reference tokens (`spacing.4`, `text-sm`, `bg-surface-1`).
-
-## Gate 2: The "Interaction Physics" Check
-*   **Rule**: All interactive state changes (hover, click, mount) must be animated.
-*   **Check**:
-    *   Does the component use `framer-motion` (`<motion.div>`) for layout changes?
-    *   Do hover states have `transition-colors duration-fast`?
-*   **Corrective Action**: Wrap conditional rendering in `<AnimatePresence>` and use `layout` prop.
-
-## Gate 3: The "Semantic Material" Check
-*   **Rule**: Surfaces must follow the hierarchy.
-*   **Check**:
-    *   **Sidebar/Panels**: Must use `bg-surface-1` + `backdrop-blur`.
-    *   **Cards/Inputs**: Must use `bg-surface-2` (higher opacity).
-    *   **Text**: Primary is `text-foreground`, Secondary is `text-muted-foreground`.
-*   **Corrective Action**: Refactor `bg-gray-100` or `bg-white` to `bg-surface-1`.
-
-## Gate 4: The "Iconography" Check
-*   **Rule**: All icons must be **Lucide React**.
-*   **Check**:
-    *   `import { ... } from "lucide-react"` used?
-    *   Are custom SVGs used only for branding/logos?
-*   **Corrective Action**: Replace ad-hoc SVGs with Lucide equivalents.
-
-## Gate 5: The "Responsive & Accessible" Check
-*   **Rule**: Controls must be hit-testable and keyboard accessible.
-*   **Check**:
-    *   Are clickable areas at least `h-8` / `h-10`?
-    *   Do inputs have `focus:ring` states?
-    *   Do buttons handle `disabled` and `loading` states visually?
-*   **Corrective Action**: Add `disabled:opacity-50` and focus rings.
+**Purpose**: Measurable standards for "Arc/Dia-level" quality.
 
 ---
 
-## Agent Verification Commands
+## 1. Perception Metrics (Speed)
 
-Run these commands from the `apps/cowork/src` directory before requesting review:
+| Metric | Target | Measurement Method |
+| :--- | :--- | :--- |
+| **Input Latency** | **< 16ms** | Frame drops in DevTools during typing. |
+| **Optimistic UI** | **100%** | Message send / Sidebar toggle must update DOM instantly before network. |
+| **Sidebar Resize** | **60fps** | Heavy operations must use `requestAnimationFrame`. |
+| **App Load** | **< 600ms** | LCP (Largest Contentful Paint) in Lighthouse. |
 
-```bash
-# Gate 1: No Hex Colors (Should return 0 matches)
-grep -rn '#[0-9A-Fa-f]\{3,6\}' --include="*.tsx" . | grep -v 'node_modules'
+---
 
-# Gate 2: No Arbitrary Spacing (Should return 0 matches)
-grep -rn 'p-\[\|m-\[\|gap-\[\|w-\[\|h-\[' --include="*.tsx" . | grep -v 'node_modules'
+## 2. Visual Fidelity Standards
 
-# Gate 4: Lucide Icons Present (Should return matches if icons used)
-grep -rn 'lucide-react' --include="*.tsx" . | head -5
-```
+### 2.1 The "Pixel Perfect" Check
+*   [ ] **Theme Frame**: Content must be inset by `4px` - `8px` from window edge (Desktop).
+*   [ ] **Squircles**: All visible corners must use `rounded-lg` (12px) or `rounded-xl` (16px). NO sharp corners on floating elements.
+*   **Fonts**: Chrome must use `13px`. Chat must use `15px+`.
 
-If any gate fails, fix before proceeding.
+### 2.2 The "Novelty Budget" Audit
+*   [ ] **Count the Gradients**: Max **1** visible gradient at rest (The AI input or status). If Sidebar has a gradient -> FAIL.
+*   [ ] **Animation Loop**: NO infinite loops allowed (except `Thinking` spinner).
+
+---
+
+## 3. Interaction Standards
+
+### 3.1 "Tuesday Morning" (Boring)
+*   **Sidebar**: Must collapse/expand with a solid physical feel (Spring damping > 20). No "bouncy" sidebars.
+*   **Settings**: Must open in a modal or inset, preserving context.
+
+### 3.2 "AI Power" (Magic)
+*   **Artifact Open**: Must feel "expansive". Transition from Chat -> Split View should be seamless (Layout Projection).
+*   **Input Morph**: Typing long text should expand the capsule smoothly.
+
+---
+
+## 4. Engineering Standards
+
+*   **Tailwind**: No arbitrary values (`w-[237px]`). Use design tokens (`w-64`, `w-72`).
+*   **Dark Mode**: Must support System/Light/Dark preference.
+*   **Bundle Size**: Logic split. `tasks` chunk < 50KB.
