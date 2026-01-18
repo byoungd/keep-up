@@ -14,6 +14,7 @@
  * Parallel function calling is strictly forbidden.
  */
 
+import { getLogger } from "../logging";
 import type { AgentMessage, MCPToolCall, MCPToolResult } from "../types";
 
 // ============================================================================
@@ -170,6 +171,7 @@ export class AgentLoopStateMachine {
   private state: AgentLoopState;
   private config: AgentLoopConfig;
   private consecutiveFailures = 0;
+  private readonly logger = getLogger("agent.loop");
 
   constructor(config: Partial<AgentLoopConfig> = {}) {
     this.config = {
@@ -410,10 +412,10 @@ export class AgentLoopStateMachine {
 
   private logPhaseTransition(phase: AgentLoopPhase): void {
     if (this.config.enableCycleLogging) {
-      // Using console.info for agent loop diagnostics
-      console.info(
-        `[Agent Loop] Cycle ${this.state.currentCycle.cycleNumber} → ${phase.toUpperCase()}`
-      );
+      this.logger.info("Agent loop phase transition", {
+        cycle: this.state.currentCycle.cycleNumber,
+        phase: phase.toUpperCase(),
+      });
     }
   }
 }

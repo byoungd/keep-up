@@ -294,16 +294,20 @@ export class ConsoleOutput implements LogOutput {
     switch (entry.level) {
       case "trace":
       case "debug":
+        // biome-ignore lint/suspicious/noConsole: Console output transport.
         console.debug(output);
         break;
       case "info":
+        // biome-ignore lint/suspicious/noConsole: Console output transport.
         console.info(output);
         break;
       case "warn":
+        // biome-ignore lint/suspicious/noConsole: Console output transport.
         console.warn(output);
         break;
       case "error":
       case "fatal":
+        // biome-ignore lint/suspicious/noConsole: Console output transport.
         console.error(output);
         break;
     }

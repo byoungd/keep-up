@@ -111,6 +111,7 @@ export class ConsoleLogger implements Logger {
       return;
     }
     const ctx = this.traceId ? { ...context, traceId: this.traceId } : context;
+    // biome-ignore lint/suspicious/noConsole: Console logger output.
     console.debug(`${this.prefix} [DEBUG] ${message}${this.formatContext(ctx)}`);
   }
 
@@ -119,6 +120,7 @@ export class ConsoleLogger implements Logger {
       return;
     }
     const ctx = this.traceId ? { ...context, traceId: this.traceId } : context;
+    // biome-ignore lint/suspicious/noConsole: Console logger output.
     console.info(`${this.prefix} [INFO] ${message}${this.formatContext(ctx)}`);
   }
 
@@ -127,6 +129,7 @@ export class ConsoleLogger implements Logger {
       return;
     }
     const ctx = this.traceId ? { ...context, traceId: this.traceId } : context;
+    // biome-ignore lint/suspicious/noConsole: Console logger output.
     console.warn(`${this.prefix} [WARN] ${message}${this.formatContext(ctx)}`);
   }
 
@@ -136,8 +139,10 @@ export class ConsoleLogger implements Logger {
     }
     const ctx = this.traceId ? { ...context, traceId: this.traceId } : context;
     const errorInfo = error ? ` error=${error.message}` : "";
+    // biome-ignore lint/suspicious/noConsole: Console logger output.
     console.error(`${this.prefix} [ERROR] ${message}${errorInfo}${this.formatContext(ctx)}`);
     if (error?.stack) {
+      // biome-ignore lint/suspicious/noConsole: Console logger output.
       console.error(error.stack);
     }
   }

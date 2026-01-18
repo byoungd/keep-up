@@ -164,18 +164,23 @@ export const consoleHandler: LogHandler = (entry) => {
   switch (entry.level) {
     case "trace":
     case "debug":
+      // biome-ignore lint/suspicious/noConsole: Console log handler.
       console.debug(formatted);
       break;
     case "info":
+      // biome-ignore lint/suspicious/noConsole: Console log handler.
       console.info(formatted);
       break;
     case "warn":
+      // biome-ignore lint/suspicious/noConsole: Console log handler.
       console.warn(formatted);
       break;
     case "error":
     case "fatal":
+      // biome-ignore lint/suspicious/noConsole: Console log handler.
       console.error(formatted);
       if (entry.error?.stack) {
+        // biome-ignore lint/suspicious/noConsole: Console log handler.
         console.error(entry.error.stack);
       }
       break;
@@ -185,6 +190,7 @@ export const consoleHandler: LogHandler = (entry) => {
 /** JSON handler for machine-readable output */
 export const jsonHandler: LogHandler = (entry) => {
   // Using console.info to satisfy lint rules while still outputting to stdout
+  // biome-ignore lint/suspicious/noConsole: Console log handler.
   console.info(JSON.stringify(entry));
 };
 

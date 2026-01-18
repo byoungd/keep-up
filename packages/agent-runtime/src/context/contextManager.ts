@@ -569,10 +569,12 @@ export class ContextManager {
 
     const snapshot = this.cloneContext(parent);
     this.applyOverlayToContext(snapshot, view);
-    snapshot.id = view.id;
-    snapshot.parentId = view.parentId;
-    snapshot.createdAt = view.createdAt;
-    return snapshot;
+    return {
+      ...snapshot,
+      id: view.id,
+      parentId: view.parentId,
+      createdAt: view.createdAt,
+    };
   }
 
   private cloneContext(context: AgentContext): AgentContext {

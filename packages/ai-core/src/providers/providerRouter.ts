@@ -5,6 +5,7 @@
  * fallback, load balancing, and health-aware routing.
  */
 
+import { ConsoleLogger } from "../resilience/observability";
 import type {
   CompletionRequest,
   CompletionResponse,
@@ -94,22 +95,7 @@ export class ProviderRouter {
       enableFallback: config.enableFallback ?? true,
       maxConsecutiveFailures: config.maxConsecutiveFailures ?? 3,
     };
-    this.logger = config.logger ?? {
-      warn: (message, context) => {
-        if (context) {
-          console.warn(message, context);
-        } else {
-          console.warn(message);
-        }
-      },
-      error: (message, error, context) => {
-        if (context) {
-          console.error(message, error?.message ?? "", context);
-        } else {
-          console.error(message, error?.message ?? "");
-        }
-      },
-    };
+    this.logger = config.logger ?? new ConsoleLogger({ prefix: "[ProviderRouter]" });
     this.selector = config.selector;
   }
 

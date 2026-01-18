@@ -33,8 +33,12 @@ interface ParseContext {
  */
 function parseStatus(char: string): TaskCheckboxStatus {
   const lower = char.toLowerCase();
-  if (lower === "x") return "completed";
-  if (lower === "/") return "in_progress";
+  if (lower === "x") {
+    return "completed";
+  }
+  if (lower === "/") {
+    return "in_progress";
+  }
   return "pending";
 }
 
@@ -56,9 +60,13 @@ function parseFrontmatter(lines: string[]): {
       const key = line.slice(0, colonIndex).trim();
       let value: unknown = line.slice(colonIndex + 1).trim();
 
-      if (value === "true") value = true;
-      else if (value === "false") value = false;
-      else if (!Number.isNaN(Number(value)) && value !== "") value = Number(value);
+      if (value === "true") {
+        value = true;
+      } else if (value === "false") {
+        value = false;
+      } else if (!Number.isNaN(Number(value)) && value !== "") {
+        value = Number(value);
+      }
 
       metadata[key] = value;
     }
@@ -106,7 +114,9 @@ function processCheckbox(match: RegExpMatchArray, lineNumber: number, ctx: Parse
 
   if (ctx.taskStack.length > 0) {
     const parent = ctx.taskStack[ctx.taskStack.length - 1].item;
-    if (!parent.children) parent.children = [];
+    if (!parent.children) {
+      parent.children = [];
+    }
     parent.children.push(task);
   } else if (ctx.currentSection) {
     ctx.currentSection.tasks.push(task);
@@ -131,7 +141,9 @@ function getAllTasks(sections: TaskSection[]): TaskItem[] {
   function collectTasks(tasks: TaskItem[]) {
     for (const task of tasks) {
       result.push(task);
-      if (task.children) collectTasks(task.children);
+      if (task.children) {
+        collectTasks(task.children);
+      }
     }
   }
 
@@ -225,7 +237,9 @@ export function hasResumableState(state: WorkflowState): boolean {
  * Generate a resume prompt from workflow state
  */
 export function generateResumePrompt(state: WorkflowState, thoughtSummary?: string): string {
-  if (!hasResumableState(state)) return "";
+  if (!hasResumableState(state)) {
+    return "";
+  }
 
   const lines: string[] = [
     "## Session Resume Context",

@@ -158,6 +158,7 @@ export class ScriptExecutor {
     const tools = toolProxy.createProxy();
 
     // Capture console output
+    // biome-ignore lint/suspicious/noConsole: Capturing script console output.
     const originalLog = console.log;
     if (this.config.captureConsole) {
       console.log = (...args: unknown[]) => {

@@ -9,6 +9,7 @@
 
 import type { ContentChunk, DataAccessPolicy } from "@ku0/core";
 import { applyDataAccessPolicyToChunks } from "@ku0/core";
+import { getLogger } from "../../logging";
 import type { MCPToolResult, ToolContext } from "../../types";
 import { BaseToolServer, errorResult, textResult } from "../mcp/baseServer";
 
@@ -160,6 +161,7 @@ function applyDataAccessPolicyToBlocks(
   blocks: LFCCBlock[],
   policy?: DataAccessPolicy
 ): { content: string; blocks: LFCCBlock[] } {
+  const logger = getLogger("lfcc.data-access");
   const effectivePolicy: DataAccessPolicy = policy ?? {
     max_context_chars: 8000,
     redaction_strategy: "mask",
@@ -171,7 +173,7 @@ function applyDataAccessPolicyToBlocks(
     const keptIds = new Set(filteredChunks.map((chunk) => chunk.block_id));
     const omitted = chunks.filter((chunk) => !keptIds.has(chunk.block_id)).map((c) => c.block_id);
     if (omitted.length > 0) {
-      console.info("[LFCC][data-access] Omitted blocks from context", {
+      logger.info("Omitted blocks from context", {
         omitted,
         total: chunks.length,
         kept: filteredChunks.length,
