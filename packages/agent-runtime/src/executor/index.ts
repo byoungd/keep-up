@@ -268,20 +268,21 @@ export class ToolExecutionPipeline
 
     const isQualified = callName.includes(":");
     const simpleName = isQualified ? callName.split(":")[1] : callName;
+    if (!isQualified) {
+      const cachedSimple = this.toolCache.get(simpleName);
+      if (cachedSimple) {
+        return cachedSimple;
+      }
+    }
+
     const tools = this.registry.listTools();
 
     if (isQualified) {
       const exact = tools.find((entry) => entry.name === callName);
       if (exact) {
         this.toolCache.set(callName, exact);
-        this.toolCache.set(simpleName, exact);
         return exact;
       }
-    }
-
-    const cachedSimple = this.toolCache.get(simpleName);
-    if (cachedSimple) {
-      return cachedSimple;
     }
 
     const tool = tools.find((entry) => entry.name === simpleName);
@@ -515,6 +516,7 @@ export class ToolExecutionPipeline
   ): ToolPolicyDecision {
     const { tool: toolName, operation } = this.parseToolName(call.name);
     const resource = this.extractResource(call);
+    const toolServer = this.registry.resolveToolServer?.(call.name);
 
     return this.policyEngine.evaluate({
       call,
@@ -522,6 +524,7 @@ export class ToolExecutionPipeline
       operation,
       resource,
       toolDefinition: tool,
+      toolServer,
       context,
       taskNodeId: context.taskNodeId,
     });

@@ -48,6 +48,7 @@ import type { RateLimitResult, ToolRateLimiter } from "../utils/rateLimit";
 
 class MockToolRegistry implements IToolRegistry {
   private tools: MCPTool[] = [];
+  private toolServers = new Map<string, string>();
   public lastCall?: MCPToolCall;
   public lastContext?: ToolContext;
   public callResult: MCPToolResult = {
@@ -59,6 +60,10 @@ class MockToolRegistry implements IToolRegistry {
 
   setTools(tools: MCPTool[]): void {
     this.tools = tools;
+  }
+
+  setToolServer(toolName: string, serverName: string): void {
+    this.toolServers.set(toolName, serverName);
   }
 
   setResult(result: MCPToolResult): void {
@@ -78,6 +83,10 @@ class MockToolRegistry implements IToolRegistry {
     }
 
     return this.callResult;
+  }
+
+  resolveToolServer(toolName: string): string | undefined {
+    return this.toolServers.get(toolName);
   }
 }
 
@@ -463,6 +472,26 @@ describe("ToolExecutionPipeline", () => {
       );
 
       expect(requiresConfirmation).toBe(true);
+    });
+
+    it("allows unqualified tools when the registry resolves the server", async () => {
+      registry.setTools([createMockTool("read")]);
+      registry.setToolServer("read", "file");
+      const toolExecutionContext: ToolExecutionContext = {
+        policy: "interactive",
+        allowedTools: ["file:read"],
+        requiresApproval: [],
+        maxParallel: 1,
+      };
+      const policyEngine = createToolGovernancePolicyEngine(
+        createToolPolicyEngine(policy),
+        toolExecutionContext
+      );
+      pipeline = new ToolExecutionPipeline({ registry, policy, policyEngine });
+
+      const result = await pipeline.execute(createMockCall("read"), context);
+
+      expect(result.success).toBe(true);
     });
   });
 

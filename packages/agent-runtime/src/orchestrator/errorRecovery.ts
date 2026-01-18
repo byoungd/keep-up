@@ -188,21 +188,6 @@ export class ErrorRecoveryEngine {
   }
 
   /**
-   * Create a signature for an error (for deduplication).
-   */
-  private getErrorSignature(toolCall: MCPToolCall, error: ToolError): string {
-    return `${toolCall.name}::${error.code}::${error.message}`;
-  }
-
-  private hasErrorSignature(signature: string, signatures: Set<string>): boolean {
-    return signatures.has(signature);
-  }
-
-  private recordErrorSignature(signature: string, signatures: Set<string>): void {
-    signatures.add(signature);
-  }
-
-  /**
    * Clear failed action history (e.g., when starting a new task).
    */
   clearFailedActions(): void {
@@ -227,7 +212,6 @@ export class ErrorRecoveryEngine {
   ): Promise<RecoveryResult> {
     const strategy = this.matchStrategy(initialError);
     const category = this.categorizeError(initialError);
-    const errorSignatures = new Set<string>();
 
     // Check if this exact action has already failed (prevent repeating same action)
     const duplicateResult = this.checkDuplicateAction(toolCall, initialError);
@@ -235,16 +219,7 @@ export class ErrorRecoveryEngine {
       return duplicateResult;
     }
 
-    const signatureResult = this.recordInitialFailure(
-      toolCall,
-      initialError,
-      category,
-      strategy,
-      errorSignatures
-    );
-    if (signatureResult) {
-      return signatureResult;
-    }
+    this.recordInitialFailure(toolCall, initialError, category);
 
     if (!strategy || strategy.maxRetries === 0) {
       return {
@@ -254,7 +229,7 @@ export class ErrorRecoveryEngine {
       };
     }
 
-    return this.attemptRecovery(toolCall, initialError, strategy, executor, errorSignatures);
+    return this.attemptRecovery(toolCall, initialError, strategy, executor);
   }
 
   private checkDuplicateAction(
@@ -279,13 +254,8 @@ export class ErrorRecoveryEngine {
   private recordInitialFailure(
     toolCall: MCPToolCall,
     initialError: ToolError,
-    category: ErrorCategory,
-    strategy: RecoveryStrategy | undefined,
-    errorSignatures: Set<string>
-  ): RecoveryResult | null {
-    const errorSignature = this.getErrorSignature(toolCall, initialError);
-    const repeatedSignature = this.hasErrorSignature(errorSignature, errorSignatures);
-
+    category: ErrorCategory
+  ): void {
     this.recordError({
       timestamp: Date.now(),
       toolName: toolCall.name,
@@ -294,26 +264,13 @@ export class ErrorRecoveryEngine {
       recovered: false,
       attempts: 0,
     });
-
-    if (repeatedSignature) {
-      return {
-        recovered: false,
-        error: initialError,
-        attempts: 0,
-        strategy,
-      };
-    }
-
-    this.recordErrorSignature(errorSignature, errorSignatures);
-    return null;
   }
 
   private async attemptRecovery(
     toolCall: MCPToolCall,
     initialError: ToolError,
     strategy: RecoveryStrategy,
-    executor: (call: MCPToolCall) => Promise<MCPToolResult>,
-    errorSignatures: Set<string>
+    executor: (call: MCPToolCall) => Promise<MCPToolResult>
   ): Promise<RecoveryResult> {
     let lastError = initialError;
     let attempts = 0;
@@ -343,11 +300,6 @@ export class ErrorRecoveryEngine {
         };
       } catch (error) {
         lastError = this.toToolError(error);
-        const signature = this.getErrorSignature(toolCall, lastError);
-        if (this.hasErrorSignature(signature, errorSignatures)) {
-          break;
-        }
-        this.recordErrorSignature(signature, errorSignatures);
       }
     }
 

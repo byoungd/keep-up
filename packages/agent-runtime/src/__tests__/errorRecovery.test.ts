@@ -59,7 +59,7 @@ describe("ErrorRecoveryEngine", () => {
     expect(recovery.attempts).toBe(2);
   });
 
-  it("stops retries when error signatures repeat", async () => {
+  it("continues retries when errors repeat", async () => {
     const strategies: RecoveryStrategy[] = [
       {
         errorPattern: /timeout/i,
@@ -79,12 +79,14 @@ describe("ErrorRecoveryEngine", () => {
     const recoveryPromise = engine.recover(toolCall, initialError, executor);
 
     await vi.advanceTimersByTimeAsync(10);
+    await vi.advanceTimersByTimeAsync(10);
+    await vi.advanceTimersByTimeAsync(10);
 
     const recovery = await recoveryPromise;
 
-    expect(executor).toHaveBeenCalledTimes(1);
+    expect(executor).toHaveBeenCalledTimes(3);
     expect(recovery.recovered).toBe(false);
-    expect(recovery.attempts).toBe(1);
+    expect(recovery.attempts).toBe(3);
   });
 
   it("aborts on permanent errors without retry", async () => {

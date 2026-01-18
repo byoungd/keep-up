@@ -223,6 +223,7 @@ export interface ToolPolicyContext {
   operation: string;
   resource?: string;
   toolDefinition?: MCPTool;
+  toolServer?: string;
   context: ToolContext;
   taskNodeId?: string;
 }
@@ -311,18 +312,18 @@ export class ToolGovernancePolicyEngine implements ToolPolicyEngine {
       executionContext.policy === "interactive" ? DEFAULT_INTERACTIVE_APPROVAL_TOOLS : [],
       executionContext.requiresApproval
     );
-    const toolName = context.call.name;
+    const toolNames = resolveToolNameCandidates(context);
 
-    if (!isToolAllowed(toolName, executionContext.allowedTools)) {
+    if (!isAnyToolAllowed(toolNames, executionContext.allowedTools)) {
       return {
         allowed: false,
         requiresConfirmation: false,
-        reason: `Tool "${toolName}" not allowed by execution policy`,
+        reason: `Tool "${context.call.name}" not allowed by execution policy`,
         riskTags: mergeRiskTags(baseDecision.riskTags, ["policy:allowlist"]),
       };
     }
 
-    const approvalRequired = isToolAllowed(toolName, requiresApproval);
+    const approvalRequired = isAnyToolAllowed(toolNames, requiresApproval);
     const requiresConfirmation = baseDecision.requiresConfirmation || approvalRequired;
     const reason =
       baseDecision.reason ??
@@ -387,6 +388,24 @@ function matchesToolPattern(toolName: string, pattern: string): boolean {
     return normalizedTool.startsWith(prefix);
   }
   return normalizedTool === normalizedPattern;
+}
+
+function resolveToolNameCandidates(context: ToolPolicyContext): string[] {
+  const names = new Set<string>();
+  names.add(context.call.name);
+  if (context.toolServer) {
+    names.add(`${context.toolServer}:${context.operation}`);
+  }
+  return Array.from(names);
+}
+
+function isAnyToolAllowed(toolNames: string[], patterns: string[]): boolean {
+  for (const toolName of toolNames) {
+    if (isToolAllowed(toolName, patterns)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function mergeRiskTags(...tags: Array<string[] | undefined>): string[] | undefined {
