@@ -412,6 +412,19 @@ export const MODEL_CATALOG: ModelCapability[] = [
     tags: ["balanced"],
   },
 
+  // --- Ollama (Local) ---
+  {
+    id: "ollama-llama3",
+    label: "Llama 3 (Local)",
+    shortLabel: "Llama 3 Local",
+    description: "Local Ollama model for offline inference.",
+    provider: "ollama",
+    group: "Llama 3",
+    contextWindow: 8_192,
+    supports: { vision: false, tools: true, thinking: false },
+    tags: ["local", "balanced"],
+  },
+
   // --- Legacy Models ---
   // (Removed during Technical Debt Cleanup)
 ];
