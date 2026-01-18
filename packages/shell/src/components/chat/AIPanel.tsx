@@ -193,6 +193,7 @@ export function AIPanel({
   const [focusedTaskId, setFocusedTaskId] = React.useState<string | null>("task-1");
   const pendingApproval = React.useMemo(() => findPendingApproval(messages), [messages]);
   const [approvalAction, setApprovalAction] = React.useState<"approve" | "reject" | null>(null);
+  const shouldShowApprovalModal = Boolean(pendingApproval && onTaskAction);
 
   React.useEffect(() => {
     setApprovalAction(null);
@@ -294,7 +295,7 @@ export function AIPanel({
             isMain={panelPosition === "main"}
           />
 
-          {pendingApproval && (
+          {shouldShowApprovalModal && pendingApproval && (
             <Dialog
               open
               onOpenChange={(_open) => undefined}
