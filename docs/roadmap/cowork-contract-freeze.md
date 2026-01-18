@@ -4,7 +4,9 @@
 Lock the minimum shared contracts so Tracks 1–6 can proceed in parallel
 without blocking each other.
 
-## Contract Freeze v0.2 (Required)
+## Contract Freeze v0.3 (Aligned with Agent Spec 2026.1)
+
+> **Normative Reference**: `docs/specs/agent-runtime-spec-2026.md` takes precedence for runtime behavior.
 
 ### ChatMessage Schema
 ```ts
@@ -40,6 +42,8 @@ interface ChatAttachmentRef {
 ### SSE Events (Chat + Task)
 - `message.created`, `message.delta`, `message.completed`, `message.error`
 - `task.status`, `task.plan`, `task.step`, `task.tool`, `task.artifact`
+- `task.recovery` (New: Final Warning turn per Spec 5.2)
+- `task.completion` (New: Validated completion output per Spec 5.1)
 - `token.usage` (Phase 2+; see Track 10 payload)
 - Required fields: `sessionId`, `messageId?`, `taskId?`, `timestamp`, `id`
 
@@ -54,7 +58,7 @@ interface ApprovalMetadata {
 }
 ```
 
-### Artifact Metadata
+### Artifact Metadata (Aligns with Spec 8.3)
 ```ts
 interface ArtifactMeta {
   id: string;
@@ -81,6 +85,7 @@ interface ArtifactMeta {
 - Track 5 owns event idempotency and ordering guarantees.
 - Track 3 consumes ApprovalMetadata + ArtifactMeta for inline rendering.
 - Track 6 produces artifact status changes; Track 3 displays them.
+- **Agent Runtime** produces `task.*` events following Spec 5.7 contracts.
 
 ## Change Control
 Any change to this contract must:

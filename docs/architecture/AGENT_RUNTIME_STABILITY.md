@@ -1,5 +1,9 @@
 # Agent Runtime Stability Assessment
 
+> **NOTE:** This is a comprehensive status report as of Jan 13, 2026. Future architecture development follows the specification in `docs/specs/agent-runtime-spec-2026.md`.
+
+# Agent Runtime Stability Assessment
+
 > **Date**: 2026-01-13
 > **Status**: Active
 > **Overall Readiness**: 70%

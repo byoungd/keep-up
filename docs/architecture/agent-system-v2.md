@@ -1,5 +1,9 @@
 # Agent System v2 Architecture
 
+> **NOTE:** The Core Agent Runtime architecture is now strictly defined in `docs/specs/agent-runtime-spec-2026.md`. This document outlines the broader system vision (Thinking, Memory, UI), but runtime implementation details (loops, recovery, state) should follow the Spec.
+
+# Agent System v2 Architecture
+
 > Upgrade plan inspired by Claude Code, Codex, and top-tier AI coding assistants.
 
 ## Executive Summary
