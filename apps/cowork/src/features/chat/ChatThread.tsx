@@ -5,6 +5,8 @@ import {
   normalizeModelId,
 } from "@ku0/ai-core";
 import {
+  type AgentTask,
+  BackgroundTaskIndicator,
   Button,
   DropdownMenu,
   DropdownMenuContent,
@@ -87,6 +89,13 @@ const TRANSLATIONS = {
   },
 } as const;
 
+function isAgentTask(value: unknown): value is AgentTask {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  return "id" in value && "status" in value;
+}
+
 export function ChatThread({ sessionId }: { sessionId: string }) {
   const {
     messages,
@@ -129,6 +138,20 @@ export function ChatThread({ sessionId }: { sessionId: string }) {
   });
 
   const filteredModels = useMemo(() => MODEL_CATALOG, []);
+  const backgroundTasks = useMemo(() => {
+    const tasks = new Map<string, AgentTask>();
+    for (const message of messages) {
+      if (message.type !== "task_stream") {
+        continue;
+      }
+      const taskCandidate = message.metadata?.task;
+      if (!isAgentTask(taskCandidate)) {
+        continue;
+      }
+      tasks.set(taskCandidate.id, taskCandidate);
+    }
+    return Array.from(tasks.values());
+  }, [messages]);
   const handleSetModel = useCallback(
     (nextModel: string) => {
       const normalized = normalizeModelId(nextModel) ?? nextModel;
@@ -434,6 +457,7 @@ export function ChatThread({ sessionId }: { sessionId: string }) {
         <span className="font-semibold text-sm">Cowork Session</span>
       </div>
       <div className="flex items-center gap-2">
+        <BackgroundTaskIndicator tasks={backgroundTasks} />
         <CostMeter usage={usage} modelId={model} />
         <div className="h-4 w-px bg-border mx-1" />
         <ModeToggle mode={agentMode} onToggle={toggleMode} />
