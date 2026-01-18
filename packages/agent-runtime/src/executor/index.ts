@@ -22,6 +22,7 @@ import type { IToolRegistry } from "../tools/mcp/registry";
 import type {
   AuditLogger,
   ExecutionDecision,
+  JSONSchemaProperty,
   MCPTool,
   MCPToolCall,
   MCPToolResult,
@@ -92,6 +93,10 @@ export interface ToolExecutionOptions {
 type ExecutionPreparationResult =
   | { ok: true; sandboxDecision: ExecutionSandboxDecision }
   | { ok: false; result: MCPToolResult };
+
+type ValidationSchema = MCPTool["inputSchema"] | JSONSchemaProperty;
+type ValidationPathSegment = string | number;
+type ValidationType = MCPTool["inputSchema"]["type"];
 
 export class ToolExecutionPipeline
   implements ToolExecutor, ToolConfirmationResolver, ToolConfirmationDetailsProvider
@@ -290,29 +295,15 @@ export class ToolExecutionPipeline
   }
 
   private validateArguments(args: unknown, schema: MCPTool["inputSchema"]): ToolError | null {
-    if (schema.type !== "object") {
+    const error = this.validateValueAgainstSchema(args, schema, []);
+    if (!error) {
       return null;
     }
 
-    const recordArgs = this.toArgumentRecord(args);
-    if (!recordArgs) {
-      return {
-        code: "INVALID_ARGUMENTS",
-        message: "Arguments must be an object",
-      };
-    }
-
-    const requiredError = this.validateRequiredFields(recordArgs, schema.required);
-    if (requiredError) {
-      return requiredError;
-    }
-
-    const typeError = this.validatePropertyTypes(recordArgs, schema.properties);
-    if (typeError) {
-      return typeError;
-    }
-
-    return null;
+    return {
+      code: "INVALID_ARGUMENTS",
+      message: error,
+    };
   }
 
   private toArgumentRecord(args: unknown): Record<string, unknown> | null {
@@ -322,48 +313,185 @@ export class ToolExecutionPipeline
     return args as Record<string, unknown>;
   }
 
-  private validateRequiredFields(
-    args: Record<string, unknown>,
-    required: string[] | undefined
-  ): ToolError | null {
-    if (!required) {
+  private validateValueAgainstSchema(
+    value: unknown,
+    schema: ValidationSchema,
+    path: ValidationPathSegment[]
+  ): string | null {
+    if ("oneOf" in schema && schema.oneOf && schema.oneOf.length > 0) {
+      const matches = schema.oneOf.some(
+        (option) => this.validateValueAgainstSchema(value, option, path) === null
+      );
+      if (matches) {
+        return null;
+      }
+      return `Invalid value for ${this.formatPath(path)}: does not match any allowed schema`;
+    }
+
+    if ("enum" in schema && schema.enum && schema.enum.length > 0) {
+      if (typeof value !== "string" || !schema.enum.includes(value)) {
+        return `Invalid value for ${this.formatPath(path)}: expected one of ${schema.enum.join(
+          ", "
+        )}`;
+      }
+    }
+
+    const expectedType = this.resolveExpectedType(schema);
+    if (!expectedType) {
       return null;
     }
 
-    for (const field of required) {
-      if (!(field in args)) {
-        return {
-          code: "INVALID_ARGUMENTS",
-          message: `Missing required argument: ${field}`,
-        };
-      }
+    if (expectedType === "object") {
+      return this.validateObject(value, schema, path);
+    }
+
+    if (expectedType === "array") {
+      return this.validateArray(value, schema, path);
+    }
+
+    if (!this.checkType(value, expectedType)) {
+      return this.invalidTypeMessage(path, expectedType);
     }
 
     return null;
   }
 
-  private validatePropertyTypes(
-    args: Record<string, unknown>,
-    properties: MCPTool["inputSchema"]["properties"] | undefined
-  ): ToolError | null {
+  private resolveExpectedType(schema: ValidationSchema): ValidationType | undefined {
+    if (schema.type) {
+      return schema.type;
+    }
+    if ("items" in schema && schema.items) {
+      return "array";
+    }
+    if (schema.properties || schema.required) {
+      return "object";
+    }
+    return undefined;
+  }
+
+  private validateObject(
+    value: unknown,
+    schema: ValidationSchema,
+    path: ValidationPathSegment[]
+  ): string | null {
+    const record = this.toArgumentRecord(value);
+    if (!record) {
+      return this.invalidTypeMessage(path, "object");
+    }
+
+    const requiredError = this.validateRequiredFields(record, schema.required, path);
+    if (requiredError) {
+      return requiredError;
+    }
+
+    const properties = schema.properties;
     if (!properties) {
       return null;
     }
 
-    for (const [key, value] of Object.entries(args)) {
-      const propSchema = properties[key];
-      if (propSchema?.type && !this.checkType(value, propSchema.type)) {
-        return {
-          code: "INVALID_ARGUMENTS",
-          message: `Invalid type for argument "${key}": expected ${propSchema.type}`,
-        };
+    const unknownError = this.validateUnexpectedFields(record, properties, path);
+    if (unknownError) {
+      return unknownError;
+    }
+
+    return this.validateObjectProperties(record, properties, path);
+  }
+
+  private validateRequiredFields(
+    record: Record<string, unknown>,
+    required: string[] | undefined,
+    path: ValidationPathSegment[]
+  ): string | null {
+    if (!required || required.length === 0) {
+      return null;
+    }
+
+    for (const field of required) {
+      if (!(field in record)) {
+        return `Missing required argument: ${this.formatPath([...path, field])}`;
       }
     }
 
     return null;
   }
 
-  private checkType(value: unknown, expectedType: string): boolean {
+  private validateUnexpectedFields(
+    record: Record<string, unknown>,
+    properties: Record<string, JSONSchemaProperty>,
+    path: ValidationPathSegment[]
+  ): string | null {
+    for (const key of Object.keys(record)) {
+      if (!(key in properties)) {
+        return `Unexpected argument: ${this.formatPath([...path, key])}`;
+      }
+    }
+    return null;
+  }
+
+  private validateObjectProperties(
+    record: Record<string, unknown>,
+    properties: Record<string, JSONSchemaProperty>,
+    path: ValidationPathSegment[]
+  ): string | null {
+    for (const [key, propSchema] of Object.entries(properties)) {
+      if (!(key in record)) {
+        continue;
+      }
+      const error = this.validateValueAgainstSchema(record[key], propSchema, [...path, key]);
+      if (error) {
+        return error;
+      }
+    }
+    return null;
+  }
+
+  private validateArray(
+    value: unknown,
+    schema: ValidationSchema,
+    path: ValidationPathSegment[]
+  ): string | null {
+    if (!Array.isArray(value)) {
+      return this.invalidTypeMessage(path, "array");
+    }
+
+    if (!("items" in schema) || !schema.items) {
+      return null;
+    }
+
+    for (let index = 0; index < value.length; index++) {
+      const error = this.validateValueAgainstSchema(value[index], schema.items, [...path, index]);
+      if (error) {
+        return error;
+      }
+    }
+
+    return null;
+  }
+
+  private invalidTypeMessage(path: ValidationPathSegment[], expectedType: ValidationType): string {
+    if (path.length === 0 && expectedType === "object") {
+      return "Arguments must be an object";
+    }
+    return `Invalid type for ${this.formatPath(path)}: expected ${expectedType}`;
+  }
+
+  private formatPath(path: ValidationPathSegment[]): string {
+    if (path.length === 0) {
+      return "arguments";
+    }
+
+    let output = "";
+    for (const segment of path) {
+      if (typeof segment === "number") {
+        output += `[${segment}]`;
+      } else {
+        output = output ? `${output}.${segment}` : segment;
+      }
+    }
+    return output;
+  }
+
+  private checkType(value: unknown, expectedType: ValidationType): boolean {
     switch (expectedType) {
       case "string":
         return typeof value === "string";
@@ -813,7 +941,10 @@ export class ToolExecutionPipeline
   }
 
   private extractResource(call: MCPToolCall): string | undefined {
-    const args = call.arguments as Record<string, unknown>;
+    const args = this.toArgumentRecord(call.arguments);
+    if (!args) {
+      return undefined;
+    }
     if (typeof args.path === "string") {
       return args.path;
     }

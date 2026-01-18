@@ -246,7 +246,7 @@ function createMockTool(name: string, options?: { readOnly?: boolean }): MCPTool
   return {
     name,
     description: `Mock tool: ${name}`,
-    inputSchema: { type: "object", properties: {}, required: [] },
+    inputSchema: { type: "object" },
     annotations: {
       readOnly: options?.readOnly ?? false,
     },
@@ -484,6 +484,139 @@ describe("ToolExecutionPipeline", () => {
 
       expect(result.success).toBe(false);
       expect(result.error?.code).toBe("INVALID_ARGUMENTS");
+      expect(registry.lastCall).toBeUndefined();
+    });
+
+    it("rejects non-object arguments for object schemas", async () => {
+      registry.setTools([
+        {
+          name: "test:tool",
+          description: "test tool",
+          inputSchema: {
+            type: "object",
+            properties: { path: { type: "string" } },
+            required: ["path"],
+          },
+        },
+      ]);
+
+      const call: MCPToolCall = {
+        name: "test:tool",
+        arguments: null as unknown as Record<string, unknown>,
+      };
+      const result = await pipeline.execute(call, context);
+
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe("INVALID_ARGUMENTS");
+      expect(result.error?.message).toBe("Arguments must be an object");
+      expect(registry.lastCall).toBeUndefined();
+    });
+
+    it("rejects unexpected arguments when properties are declared", async () => {
+      registry.setTools([
+        {
+          name: "test:tool",
+          description: "test tool",
+          inputSchema: {
+            type: "object",
+            properties: { path: { type: "string" } },
+            required: [],
+          },
+        },
+      ]);
+
+      const result = await pipeline.execute(
+        createMockCall("test:tool", { path: "/tmp/file.txt", extra: "nope" }),
+        context
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe("INVALID_ARGUMENTS");
+      expect(result.error?.message).toBe("Unexpected argument: extra");
+      expect(registry.lastCall).toBeUndefined();
+    });
+
+    it("validates enum and nested object properties", async () => {
+      registry.setTools([
+        {
+          name: "test:tool",
+          description: "test tool",
+          inputSchema: {
+            type: "object",
+            properties: {
+              mode: { type: "string", enum: ["fast", "slow"] },
+              options: {
+                type: "object",
+                properties: { level: { type: "number" } },
+                required: ["level"],
+              },
+            },
+            required: ["mode", "options"],
+          },
+        },
+      ]);
+
+      const result = await pipeline.execute(
+        createMockCall("test:tool", { mode: "medium", options: { level: 1 } }),
+        context
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe("INVALID_ARGUMENTS");
+      expect(result.error?.message).toBe("Invalid value for mode: expected one of fast, slow");
+      expect(registry.lastCall).toBeUndefined();
+    });
+
+    it("validates array items", async () => {
+      registry.setTools([
+        {
+          name: "test:tool",
+          description: "test tool",
+          inputSchema: {
+            type: "object",
+            properties: {
+              tags: { type: "array", items: { type: "string" } },
+            },
+            required: ["tags"],
+          },
+        },
+      ]);
+
+      const result = await pipeline.execute(
+        createMockCall("test:tool", { tags: ["ok", 2] }),
+        context
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe("INVALID_ARGUMENTS");
+      expect(result.error?.message).toBe("Invalid type for tags[1]: expected string");
+      expect(registry.lastCall).toBeUndefined();
+    });
+
+    it("validates oneOf schemas", async () => {
+      registry.setTools([
+        {
+          name: "test:tool",
+          description: "test tool",
+          inputSchema: {
+            type: "object",
+            properties: {
+              value: {
+                oneOf: [{ type: "string" }, { type: "number" }],
+              },
+            },
+            required: ["value"],
+          },
+        },
+      ]);
+
+      const result = await pipeline.execute(createMockCall("test:tool", { value: true }), context);
+
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe("INVALID_ARGUMENTS");
+      expect(result.error?.message).toBe(
+        "Invalid value for value: does not match any allowed schema"
+      );
       expect(registry.lastCall).toBeUndefined();
     });
   });
