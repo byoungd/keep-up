@@ -31,6 +31,7 @@ describe("CoworkRuntime", () => {
           messages: [],
           pendingToolCalls: [],
           status: "complete",
+          agentId: "agent-test",
         } satisfies AgentState;
       }),
     } as unknown as AgentOrchestrator;

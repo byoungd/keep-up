@@ -180,17 +180,18 @@ export class InMemorySessionState implements SessionState {
 
     // Initialize from snapshot if provided
     if (config.initialSnapshot) {
-      this.state = config.initialSnapshot.state;
+      this.state = this.ensureAgentId(config.initialSnapshot.state);
       this.planningSnapshot = config.initialSnapshot.planning;
       this.errorRecoverySnapshot = config.initialSnapshot.errorRecovery;
       this.toolDiscoverySnapshot = config.initialSnapshot.toolDiscovery;
     } else {
-      this.state = config.initialState ?? {
+      const initialState = config.initialState ?? {
         turn: 0,
         messages: [],
         pendingToolCalls: [],
         status: "idle",
       };
+      this.state = this.ensureAgentId(initialState);
       this.planningSnapshot = createDefaultPlanningSnapshot();
       this.errorRecoverySnapshot = createDefaultErrorRecoverySnapshot();
       this.toolDiscoverySnapshot = createDefaultToolDiscoverySnapshot();
@@ -206,7 +207,7 @@ export class InMemorySessionState implements SessionState {
   }
 
   setState(state: AgentState): void {
-    this.state = state;
+    this.state = this.ensureAgentId(state);
   }
 
   recordMessage(message: AgentMessage): void {
@@ -293,7 +294,7 @@ export class InMemorySessionState implements SessionState {
   }
 
   restoreFromSnapshot(snapshot: SessionSnapshot): void {
-    this.state = snapshot.state;
+    this.state = this.ensureAgentId(snapshot.state);
     this.planningSnapshot = snapshot.planning;
     this.errorRecoverySnapshot = snapshot.errorRecovery;
     this.toolDiscoverySnapshot = snapshot.toolDiscovery;
@@ -305,6 +306,11 @@ export class InMemorySessionState implements SessionState {
 
   private generateSessionId(): string {
     return `session_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  }
+
+  private ensureAgentId(state: Partial<AgentState>): AgentState {
+    const agentId = state.agentId ?? this.id;
+    return { ...state, agentId } as AgentState;
   }
 }
 

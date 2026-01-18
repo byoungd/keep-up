@@ -21,6 +21,17 @@ import type {
   ArtifactPipeline,
 } from "../artifacts";
 import { createArtifactPipeline, createArtifactRegistry } from "../artifacts";
+import type { CheckpointManager } from "../checkpoint";
+import {
+  createCompletionEvent,
+  createErrorEvent,
+  createToolCallEndEvent,
+  createToolCallStartEvent,
+  createTurnEndEvent,
+  createTurnStartEvent,
+  type EventLogManager,
+} from "../checkpoint/eventLog";
+import { generateStableToolCallId } from "../checkpoint/replayEngine";
 import type { ContextFrameBuilder, ContextItem } from "../context";
 import { getGlobalEventBus, type RuntimeEventBus } from "../events/eventBus";
 import {
@@ -32,6 +43,7 @@ import {
   type ToolExecutor,
 } from "../executor";
 import type { KnowledgeRegistry } from "../knowledge";
+import { getLogger } from "../logging/logger";
 import { AGENTS_GUIDE_PROMPT } from "../prompts/agentGuidelines";
 import { createAuditLogger, createPermissionChecker, createToolPolicyEngine } from "../security";
 import type { SessionState } from "../session";
@@ -219,6 +231,10 @@ export interface OrchestratorComponents {
   streamBridge?: OrchestratorStreamBridge;
   /** Optional artifact pipeline */
   artifactPipeline?: ArtifactPipeline;
+  /** Optional checkpoint manager for state persistence (Spec 5.5) */
+  checkpointManager?: CheckpointManager;
+  /** Optional event log for runtime event recording (Spec 5.6) */
+  runtimeEventLog?: EventLogManager;
 }
 
 export interface OrchestratorStreamBridge {
@@ -257,6 +273,7 @@ export class AgentOrchestrator {
   private readonly eventHandlers = new Set<OrchestratorEventHandler>();
   private readonly metrics?: IMetricsCollector;
   private readonly tracer?: ITracer;
+  private readonly logger = getLogger("orchestrator");
 
   // Performance optimizations
   private readonly messageCompressor: MessageCompressor;
@@ -279,6 +296,8 @@ export class AgentOrchestrator {
   private readonly taskGraph?: TaskGraphStore;
   private readonly streamBridge?: OrchestratorStreamBridge;
   private readonly artifactPipeline?: ArtifactPipeline;
+  private readonly checkpointManager?: CheckpointManager;
+  private readonly runtimeEventLog?: EventLogManager;
   private readonly loopStateMachine: AgentLoopStateMachine;
   private readonly singleStepEnforcer: SingleStepEnforcer;
   private lastObservation?: Observation;
@@ -376,6 +395,16 @@ export class AgentOrchestrator {
         maxSize: 1000,
       });
 
+    components.requestCache ??
+      createRequestCache({
+        enabled: true,
+        ttlMs: 300000, // 5 minutes
+        maxSize: 1000,
+      });
+
+    this.checkpointManager = components.checkpointManager;
+    this.runtimeEventLog = components.runtimeEventLog;
+
     this.dependencyAnalyzer = components.dependencyAnalyzer ?? createDependencyAnalyzer();
     this.toolScheduler =
       components.toolScheduler ??
@@ -455,10 +484,14 @@ export class AgentOrchestrator {
     this.currentPlanNodeId = this.createPlanNode(userMessage);
     const detachStreamBridge = this.attachStreamBridge(runId);
 
+    this.state.checkpointId = undefined;
+    this.sessionState?.setState(this.state);
+
     // Add user message
     const userMsg: AgentMessage = { role: "user", content: userMessage };
     this.state.messages.push(userMsg);
     this.recordMessage(userMsg);
+    await this.initializeCheckpoint(userMessage);
     this.metrics?.gauge(AGENT_METRICS.activeAgents.name, 1, {});
     this.loopStateMachine.stop();
 
@@ -468,6 +501,11 @@ export class AgentOrchestrator {
         this.state.error = "Completion tool not registered.";
         this.emit("error", { error: this.state.error });
         this.metrics?.increment(AGENT_METRICS.turnsTotal.name, { status: "error" });
+        await this.updateCheckpointStatus("failed", {
+          message: this.state.error,
+          code: "NO_COMPLETION_TOOL",
+          recoverable: false,
+        });
         return this.state;
       }
 
@@ -494,6 +532,14 @@ export class AgentOrchestrator {
       this.state.status = "error";
       this.state.error = this.state.error ?? "Task terminated without calling complete_task.";
       this.emit("error", { error: this.state.error });
+    }
+
+    if (this.state.status === "error") {
+      await this.updateCheckpointStatus("failed", {
+        message: this.state.error ?? "Agent terminated with error.",
+        code: "RUN_TERMINATED",
+        recoverable: this.config.recovery?.enabled ?? false,
+      });
     }
 
     return this.state;
@@ -645,6 +691,7 @@ export class AgentOrchestrator {
       messages: [{ role: "system", content: this.config.systemPrompt }],
       pendingToolCalls: [],
       status: "idle",
+      agentId: this.resolveAgentId(),
     };
   }
 
@@ -653,11 +700,16 @@ export class AgentOrchestrator {
       return this.createInitialState();
     }
 
-    const existing = this.sessionState.getState();
+    const stored = this.sessionState.getState();
+    const existing = this.ensureAgentId(stored);
     if (existing.messages.length === 0) {
-      const initial = this.createInitialState();
+      const initial = { ...this.createInitialState(), agentId: existing.agentId };
       this.sessionState.setState(initial);
       return initial;
+    }
+
+    if (stored.agentId !== existing.agentId) {
+      this.sessionState.setState(existing);
     }
 
     return existing;
@@ -666,6 +718,170 @@ export class AgentOrchestrator {
   private recordMessage(message: AgentMessage): void {
     this.sessionState?.recordMessage(message);
     this.sessionState?.setState(this.state);
+    void this.recordCheckpointMessage(message);
+  }
+
+  private async appendRuntimeEvent(event: Parameters<EventLogManager["append"]>[0]): Promise<void> {
+    if (!this.runtimeEventLog) {
+      return;
+    }
+
+    try {
+      await this.runtimeEventLog.append(event);
+    } catch (error) {
+      this.logger.warn("Runtime event log append failed.", {
+        eventType: event.type,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  private async initializeCheckpoint(task: string): Promise<void> {
+    if (!this.checkpointManager) {
+      return;
+    }
+
+    try {
+      const checkpoint = await this.checkpointManager.create({
+        task,
+        agentType: "orchestrator",
+        agentId: this.state.agentId,
+        maxSteps: this.config.maxTurns,
+        metadata: {
+          runId: this.currentRunId,
+          turn: this.state.turn,
+          status: this.state.status,
+        },
+      });
+
+      this.state.checkpointId = checkpoint.id;
+      this.sessionState?.setState(this.state);
+      await this.recordCheckpointMessages(this.state.messages);
+    } catch (error) {
+      this.logger.warn("Checkpoint initialization failed.", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  private async recordCheckpointMessages(messages: AgentMessage[]): Promise<void> {
+    for (const message of messages) {
+      await this.recordCheckpointMessage(message);
+    }
+  }
+
+  private async recordCheckpointMessage(message: AgentMessage): Promise<void> {
+    if (message.role === "tool") {
+      return;
+    }
+
+    await this.runCheckpointAction("record message", async (checkpointId) => {
+      await this.checkpointManager?.addMessage(checkpointId, {
+        role: message.role,
+        content: message.content,
+      });
+    });
+  }
+
+  private async recordCheckpointToolCallStart(call: MCPToolCall): Promise<void> {
+    const toolCallId = call.id;
+    if (!toolCallId) {
+      return;
+    }
+
+    await this.runCheckpointAction("record tool call start", async (checkpointId) => {
+      await this.checkpointManager?.addPendingToolCall(checkpointId, {
+        id: toolCallId,
+        name: call.name,
+        arguments: call.arguments,
+      });
+    });
+  }
+
+  private async recordCheckpointToolCallEnd(
+    call: MCPToolCall,
+    result: MCPToolResult,
+    durationMs: number
+  ): Promise<void> {
+    const toolCallId = call.id;
+    if (!toolCallId) {
+      return;
+    }
+
+    await this.runCheckpointAction("record tool call end", async (checkpointId) => {
+      await this.checkpointManager?.completeToolCall(checkpointId, {
+        callId: toolCallId,
+        name: call.name,
+        arguments: call.arguments,
+        result,
+        success: result.success,
+        durationMs,
+      });
+    });
+  }
+
+  private async advanceCheckpointTurn(): Promise<void> {
+    await this.runCheckpointAction("advance turn", async (checkpointId) => {
+      await this.checkpointManager?.updateMetadata(checkpointId, {
+        runId: this.currentRunId,
+        turn: this.state.turn,
+        status: this.state.status,
+      });
+      await this.checkpointManager?.advanceStep(checkpointId);
+    });
+  }
+
+  private async updateCheckpointStatus(
+    status: "completed" | "failed",
+    error?: { message: string; code?: string; recoverable?: boolean }
+  ): Promise<void> {
+    await this.runCheckpointAction("update status", async (checkpointId) => {
+      await this.checkpointManager?.updateStatus(checkpointId, status, error);
+    });
+  }
+
+  private async runCheckpointAction(
+    action: string,
+    handler: (checkpointId: string) => Promise<void>
+  ): Promise<void> {
+    const checkpointId = this.state.checkpointId;
+    if (!this.checkpointManager || !checkpointId) {
+      return;
+    }
+
+    try {
+      await handler(checkpointId);
+    } catch (error) {
+      this.logger.warn(`Checkpoint ${action} failed.`, {
+        checkpointId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  private assignToolCallIds(toolCalls: MCPToolCall[]): void {
+    toolCalls.forEach((call, index) => {
+      if (!call.id) {
+        call.id = generateStableToolCallId(call.name, call.arguments, this.state.turn, index);
+      }
+    });
+  }
+
+  private ensureAgentId(state: AgentState): AgentState {
+    const agentId = (state as Partial<AgentState>).agentId ?? this.resolveAgentId();
+    return { ...state, agentId };
+  }
+
+  private resolveAgentId(currentId?: string): string {
+    if (currentId) {
+      return currentId;
+    }
+
+    if (this.sessionState?.id) {
+      return this.sessionState.id;
+    }
+
+    return `agent_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
   }
 
   private async awaitControlGate(): Promise<void> {
@@ -1012,6 +1228,13 @@ export class AgentOrchestrator {
     this.state.status = "thinking";
     this.emit("turn:start", { turn: this.state.turn });
 
+    // Spec 5.6: Emit turn_start event
+    if (this.currentRunId) {
+      await this.appendRuntimeEvent(
+        createTurnStartEvent(this.currentRunId, this.state.agentId, this.state.turn, {})
+      );
+    }
+
     const turnStart = Date.now();
     const isRecoveryTurn = this.shouldEnterRecoveryTurn();
     const turnSpan = this.startTurnSpan();
@@ -1026,6 +1249,22 @@ export class AgentOrchestrator {
       }
 
       await this.finalizeStandardTurn(outcome, turnStart, turnSpan);
+
+      // Spec 5.6: Emit turn_end event
+      if (this.currentRunId) {
+        await this.appendRuntimeEvent(
+          createTurnEndEvent(this.currentRunId, this.state.agentId, this.state.turn, {
+            status: this.state.status,
+          })
+        );
+      }
+
+      // Spec 5.5: Save checkpoint at turn boundary
+      await this.advanceCheckpointTurn();
+
+      if (this.state.status === "complete") {
+        await this.updateCheckpointStatus("completed");
+      }
     } catch (err) {
       this.handleTurnError(err, turnSpan);
     } finally {
@@ -1200,12 +1439,35 @@ export class AgentOrchestrator {
   }
 
   private handleTurnError(err: unknown, turnSpan?: SpanContext): void {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+
+    // Spec 5.6: Emit error event
+    if (this.currentRunId) {
+      // Use void promise to not block error handling
+      void this.appendRuntimeEvent(
+        createErrorEvent(
+          this.currentRunId,
+          this.state.agentId,
+          this.state.turn,
+          errorMsg,
+          "TURN_ERROR",
+          true // Assume recoverable for turn errors generally
+        )
+      );
+    }
+
     this.state.status = "error";
-    this.state.error = err instanceof Error ? err.message : String(err);
+    this.state.error = errorMsg;
     this.emit("error", { error: this.state.error });
     this.metrics?.increment(AGENT_METRICS.turnsTotal.name, { status: "error" });
     turnSpan?.setStatus("error", this.state.error);
     this.loopStateMachine.stop();
+
+    void this.updateCheckpointStatus("failed", {
+      message: errorMsg,
+      code: "TURN_ERROR",
+      recoverable: this.config.recovery?.enabled ?? false,
+    });
   }
 
   private async handleRecoveryOutcome(
@@ -1261,13 +1523,26 @@ export class AgentOrchestrator {
     }
 
     this.state.status = "complete";
-    this.emitCompletion(parsedPayload.payload);
+    await this.emitCompletion(parsedPayload.payload);
     this.metrics?.increment(AGENT_METRICS.turnsTotal.name, { status: "complete" });
     turnSpan?.setStatus("ok");
     return true;
   }
 
-  private emitCompletion(payload: CompletionPayload): void {
+  private async emitCompletion(payload: CompletionPayload): Promise<void> {
+    // Spec 5.6: Emit completion event
+    if (this.currentRunId) {
+      await this.appendRuntimeEvent(
+        createCompletionEvent(
+          this.currentRunId,
+          this.state.agentId,
+          this.state.turn,
+          payload.summary,
+          payload.artifacts
+        )
+      );
+    }
+
     this.emit("completion", { ...payload });
     this.emit("complete", {
       content: payload.summary,
@@ -1298,6 +1573,7 @@ export class AgentOrchestrator {
     toolCalls: MCPToolCall[],
     parentSpan?: SpanContext
   ): Promise<void> {
+    this.assignToolCallIds(toolCalls);
     const parallelConfig = this.config.parallelExecution ?? {
       enabled: true,
       maxConcurrent: this.config.security?.limits?.maxConcurrentCalls ?? 5,
@@ -1522,6 +1798,29 @@ export class AgentOrchestrator {
     const taskNodeId = this.ensureTaskGraphToolNode(call, "running");
     this.emit("tool:calling", { toolName: call.name, arguments: call.arguments });
 
+    // Spec 5.6: Emit tool_call_start
+    const toolCallId = call.id ?? `call_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    if (!call.id) {
+      call.id = toolCallId;
+    }
+
+    await this.recordCheckpointToolCallStart(call);
+
+    // Narrow runId inside block to satisfy TS
+    const runId = this.currentRunId;
+    if (runId) {
+      await this.appendRuntimeEvent(
+        createToolCallStartEvent(
+          runId,
+          this.state.agentId,
+          this.state.turn,
+          toolCallId,
+          call.name,
+          call.arguments
+        )
+      );
+    }
+
     if (!this.toolExecutor) {
       this.metrics?.increment(AGENT_METRICS.toolCallsTotal.name, {
         tool_name: call.name,
@@ -1532,12 +1831,34 @@ export class AgentOrchestrator {
     const context = this.createToolContext(call);
     const result = await this.getToolResultWithCache(call, context);
 
+    const durationMs = Date.now() - toolStart;
+
+    // Spec 5.6: Emit tool_call_end
+    const currentRunId = this.currentRunId; // Capture for narrowing
+    if (currentRunId) {
+      const toolContent = result.content as unknown;
+      await this.appendRuntimeEvent(
+        createToolCallEndEvent(
+          currentRunId,
+          this.state.agentId,
+          this.state.turn,
+          toolCallId,
+          call.name,
+          result.success,
+          durationMs,
+          toolContent // Use content as result payload
+        )
+      );
+    }
+
+    await this.recordCheckpointToolCallEnd(call, result, durationMs);
+
     this.emit("tool:result", { toolName: call.name, result });
     this.addToolResult(call.name, result);
     this.updateTaskGraphStatus(taskNodeId, result.success ? "completed" : "failed");
 
     this.recordToolMetrics(call, result, toolStart);
-    this.toolScheduler.recordExecution(call.name, Date.now() - toolStart);
+    this.toolScheduler.recordExecution(call.name, durationMs);
 
     toolSpan?.setAttribute("result.success", result.success);
     toolSpan?.setStatus(result.success ? "ok" : "error", result.error?.message);
