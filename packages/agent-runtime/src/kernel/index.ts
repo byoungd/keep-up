@@ -25,7 +25,12 @@ import type {
 } from "../orchestrator";
 import { createOrchestrator } from "../orchestrator";
 import type { IPermissionChecker, ToolPolicyEngine } from "../security";
-import { createToolPolicyEngine } from "../security";
+import {
+  createSecurityPolicy,
+  createToolGovernancePolicyEngine,
+  createToolPolicyEngine,
+  resolveToolExecutionContext,
+} from "../security";
 import type { SessionState } from "../session";
 import { createSessionState } from "../session";
 import type { SkillPromptAdapter, SkillRegistry, SkillSession } from "../skills";
@@ -114,9 +119,18 @@ export class RuntimeKernel implements Kernel {
       skillOptions?.promptAdapter ?? (this.skillRegistry ? createSkillPromptAdapter() : undefined);
 
     const basePolicyEngine = createToolPolicyEngine(services.policy);
-    const policyEngine = this.skillRegistry
+    const skillPolicyEngine = this.skillRegistry
       ? createSkillPolicyGuard(basePolicyEngine, this.skillRegistry)
       : basePolicyEngine;
+    const securityPolicy =
+      typeof services.policy.getPolicy === "function"
+        ? services.policy.getPolicy()
+        : createSecurityPolicy("balanced");
+    const toolExecutionContext = resolveToolExecutionContext(
+      this.config.orchestrator?.toolExecutionContext,
+      securityPolicy
+    );
+    const policyEngine = createToolGovernancePolicyEngine(skillPolicyEngine, toolExecutionContext);
     const defaultExecutor = createToolExecutor({
       registry: services.registry,
       policy: services.policy,

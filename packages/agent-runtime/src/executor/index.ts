@@ -256,17 +256,77 @@ export class ToolExecutionPipeline
   }
 
   private resolveTool(callName: string): MCPTool | undefined {
-    const simpleName = callName.includes(":") ? callName.split(":")[1] : callName;
-    const cached = this.toolCache.get(simpleName);
+    const cached = this.toolCache.get(callName);
     if (cached) {
       return cached;
     }
 
-    const tool = this.registry.listTools().find((entry) => entry.name === simpleName);
+    const simpleName = callName.includes(":") ? callName.split(":")[1] : callName;
+    const cachedSimple = this.toolCache.get(simpleName);
+    if (cachedSimple) {
+      return cachedSimple;
+    }
+
+    const tools = this.registry.listTools();
+    const tool =
+      tools.find((entry) => entry.name === callName) ??
+      tools.find((entry) => entry.name === simpleName);
     if (tool) {
+      this.toolCache.set(callName, tool);
       this.toolCache.set(simpleName, tool);
     }
     return tool;
+  }
+
+  private validateArguments(
+    args: Record<string, unknown>,
+    schema: MCPTool["inputSchema"]
+  ): ToolError | null {
+    if (schema.type !== "object") {
+      return null;
+    }
+
+    if (schema.required) {
+      for (const field of schema.required) {
+        if (!(field in args)) {
+          return {
+            code: "INVALID_ARGUMENTS",
+            message: `Missing required argument: ${field}`,
+          };
+        }
+      }
+    }
+
+    if (schema.properties) {
+      for (const [key, value] of Object.entries(args)) {
+        const propSchema = schema.properties[key];
+        if (propSchema?.type && !this.checkType(value, propSchema.type)) {
+          return {
+            code: "INVALID_ARGUMENTS",
+            message: `Invalid type for argument "${key}": expected ${propSchema.type}`,
+          };
+        }
+      }
+    }
+
+    return null;
+  }
+
+  private checkType(value: unknown, expectedType: string): boolean {
+    switch (expectedType) {
+      case "string":
+        return typeof value === "string";
+      case "number":
+        return typeof value === "number";
+      case "boolean":
+        return typeof value === "boolean";
+      case "array":
+        return Array.isArray(value);
+      case "object":
+        return typeof value === "object" && value !== null && !Array.isArray(value);
+      default:
+        return true;
+    }
   }
 
   private evaluatePolicy(
@@ -319,88 +379,34 @@ export class ToolExecutionPipeline
     decisionId: string;
   }): ExecutionPreparationResult {
     const { call, tool, context, startTime, toolCallId, decisionId } = input;
+    const validationError = tool ? this.validateArguments(call.arguments, tool.inputSchema) : null;
+    if (validationError) {
+      return this.handleValidationFailure(validationError, call, context, startTime, toolCallId);
+    }
     const policyDecision = this.evaluatePolicy(call, tool, context);
 
     if (!policyDecision.allowed) {
-      const escalation = policyDecision.escalation;
-      const decision = this.createExecutionDecision({
-        decisionId,
-        toolName: call.name,
+      return this.handlePolicyDenied(
+        policyDecision,
+        call,
+        context,
+        startTime,
         toolCallId,
-        taskNodeId: context.taskNodeId,
-        allowed: false,
-        requiresConfirmation: policyDecision.requiresConfirmation,
-        reason: policyDecision.reason ?? "Permission denied",
-        riskTags: policyDecision.riskTags,
-        escalation,
-        sandboxed: context.security.sandbox.type !== "none",
-      });
-      this.emitDecision(decision, context);
-
-      const denied = this.createErrorResult(
-        escalation ? "PERMISSION_ESCALATION_REQUIRED" : "PERMISSION_DENIED",
-        policyDecision.reason ?? "Permission denied",
-        escalation ? { escalation } : undefined
+        decisionId
       );
-      this.emitRecord(
-        this.createExecutionRecord({
-          toolCallId,
-          toolName: call.name,
-          taskNodeId: context.taskNodeId,
-          status: "failed",
-          durationMs: Date.now() - startTime,
-          policyDecisionId: decisionId,
-          sandboxed: decision.sandboxed,
-          error: denied.error?.message ?? "Permission denied",
-        }),
-        context
-      );
-      this.recordDenied(call, startTime, policyDecision.reason);
-      this.recordToolMetric(call.name, "error");
-      this.emitSandboxTelemetry(call, context, denied, startTime);
-      this.auditResult(call, context, denied);
-      return { ok: false, result: denied };
     }
 
     const sandboxDecision = this.sandboxAdapter.preflight(call, context);
     if (!sandboxDecision.allowed) {
-      const decision = this.createExecutionDecision({
-        decisionId,
-        toolName: call.name,
+      return this.handleSandboxDenied(
+        policyDecision,
+        sandboxDecision,
+        call,
+        context,
+        startTime,
         toolCallId,
-        taskNodeId: context.taskNodeId,
-        allowed: false,
-        requiresConfirmation: policyDecision.requiresConfirmation,
-        reason: sandboxDecision.reason ?? "Sandbox policy violation",
-        riskTags: mergeRiskTags(policyDecision.riskTags, sandboxDecision.riskTags),
-        sandboxed: sandboxDecision.sandboxed,
-        affectedPaths: sandboxDecision.affectedPaths,
-      });
-      this.emitDecision(decision, context);
-
-      const denied = this.createErrorResult(
-        "SANDBOX_VIOLATION",
-        sandboxDecision.reason ?? "Sandbox policy violation"
+        decisionId
       );
-      this.emitRecord(
-        this.createExecutionRecord({
-          toolCallId,
-          toolName: call.name,
-          taskNodeId: context.taskNodeId,
-          status: "failed",
-          durationMs: Date.now() - startTime,
-          affectedPaths: sandboxDecision.affectedPaths,
-          policyDecisionId: decisionId,
-          sandboxed: sandboxDecision.sandboxed,
-          error: denied.error?.message ?? "Sandbox policy violation",
-        }),
-        context
-      );
-      this.recordToolMetric(call.name, "error");
-      this.recordDuration(call.name, startTime);
-      this.emitSandboxTelemetry(call, context, denied, startTime);
-      this.auditResult(call, context, denied);
-      return { ok: false, result: denied };
     }
 
     const executionDecision = this.createExecutionDecision({
@@ -419,29 +425,15 @@ export class ToolExecutionPipeline
 
     const rateResult = this.checkRateLimit(call, context);
     if (!rateResult.allowed) {
-      const limited = this.createErrorResult(
-        "RATE_LIMITED",
-        `Rate limit exceeded. Retry after ${rateResult.resetInMs}ms.`
+      return this.handleRateLimitExceeded(
+        rateResult.resetInMs,
+        sandboxDecision,
+        call,
+        context,
+        startTime,
+        toolCallId,
+        decisionId
       );
-      this.emitRecord(
-        this.createExecutionRecord({
-          toolCallId,
-          toolName: call.name,
-          taskNodeId: context.taskNodeId,
-          status: "failed",
-          durationMs: Date.now() - startTime,
-          affectedPaths: sandboxDecision.affectedPaths,
-          policyDecisionId: decisionId,
-          sandboxed: sandboxDecision.sandboxed,
-          error: limited.error?.message ?? "Rate limited",
-        }),
-        context
-      );
-      this.recordToolMetric(call.name, "error");
-      this.recordDuration(call.name, startTime);
-      this.emitSandboxTelemetry(call, context, limited, startTime);
-      this.auditResult(call, context, limited);
-      return { ok: false, result: limited };
     }
 
     this.emitRecord(
@@ -459,6 +451,166 @@ export class ToolExecutionPipeline
     );
 
     return { ok: true, sandboxDecision };
+  }
+
+  private handleValidationFailure(
+    validationError: ToolError,
+    call: MCPToolCall,
+    context: ToolContext,
+    startTime: number,
+    toolCallId: string
+  ): ExecutionPreparationResult {
+    const invalidResult: MCPToolResult = {
+      success: false,
+      content: [{ type: "text", text: validationError.message }],
+      error: validationError,
+    };
+    this.emitRecord(
+      this.createExecutionRecord({
+        toolCallId,
+        toolName: call.name,
+        taskNodeId: context.taskNodeId,
+        status: "failed",
+        durationMs: Date.now() - startTime,
+        sandboxed: context.security.sandbox.type !== "none",
+        error: validationError.message,
+      }),
+      context
+    );
+    this.recordToolMetric(call.name, "error");
+    this.recordDuration(call.name, startTime);
+    this.auditResult(call, context, invalidResult);
+    return { ok: false, result: invalidResult };
+  }
+
+  private handlePolicyDenied(
+    policyDecision: ToolPolicyDecision,
+    call: MCPToolCall,
+    context: ToolContext,
+    startTime: number,
+    toolCallId: string,
+    decisionId: string
+  ): ExecutionPreparationResult {
+    const escalation = policyDecision.escalation;
+    const decision = this.createExecutionDecision({
+      decisionId,
+      toolName: call.name,
+      toolCallId,
+      taskNodeId: context.taskNodeId,
+      allowed: false,
+      requiresConfirmation: policyDecision.requiresConfirmation,
+      reason: policyDecision.reason ?? "Permission denied",
+      riskTags: policyDecision.riskTags,
+      escalation,
+      sandboxed: context.security.sandbox.type !== "none",
+    });
+    this.emitDecision(decision, context);
+
+    const denied = this.createErrorResult(
+      escalation ? "PERMISSION_ESCALATION_REQUIRED" : "PERMISSION_DENIED",
+      policyDecision.reason ?? "Permission denied",
+      escalation ? { escalation } : undefined
+    );
+    this.emitRecord(
+      this.createExecutionRecord({
+        toolCallId,
+        toolName: call.name,
+        taskNodeId: context.taskNodeId,
+        status: "failed",
+        durationMs: Date.now() - startTime,
+        policyDecisionId: decisionId,
+        sandboxed: decision.sandboxed,
+        error: denied.error?.message ?? "Permission denied",
+      }),
+      context
+    );
+    this.recordDenied(call, startTime, policyDecision.reason);
+    this.recordToolMetric(call.name, "error");
+    this.emitSandboxTelemetry(call, context, denied, startTime);
+    this.auditResult(call, context, denied);
+    return { ok: false, result: denied };
+  }
+
+  private handleSandboxDenied(
+    policyDecision: ToolPolicyDecision,
+    sandboxDecision: ExecutionSandboxDecision,
+    call: MCPToolCall,
+    context: ToolContext,
+    startTime: number,
+    toolCallId: string,
+    decisionId: string
+  ): ExecutionPreparationResult {
+    const decision = this.createExecutionDecision({
+      decisionId,
+      toolName: call.name,
+      toolCallId,
+      taskNodeId: context.taskNodeId,
+      allowed: false,
+      requiresConfirmation: policyDecision.requiresConfirmation,
+      reason: sandboxDecision.reason ?? "Sandbox policy violation",
+      riskTags: mergeRiskTags(policyDecision.riskTags, sandboxDecision.riskTags),
+      sandboxed: sandboxDecision.sandboxed,
+      affectedPaths: sandboxDecision.affectedPaths,
+    });
+    this.emitDecision(decision, context);
+
+    const denied = this.createErrorResult(
+      "SANDBOX_VIOLATION",
+      sandboxDecision.reason ?? "Sandbox policy violation"
+    );
+    this.emitRecord(
+      this.createExecutionRecord({
+        toolCallId,
+        toolName: call.name,
+        taskNodeId: context.taskNodeId,
+        status: "failed",
+        durationMs: Date.now() - startTime,
+        affectedPaths: sandboxDecision.affectedPaths,
+        policyDecisionId: decisionId,
+        sandboxed: sandboxDecision.sandboxed,
+        error: denied.error?.message ?? "Sandbox policy violation",
+      }),
+      context
+    );
+    this.recordToolMetric(call.name, "error");
+    this.recordDuration(call.name, startTime);
+    this.emitSandboxTelemetry(call, context, denied, startTime);
+    this.auditResult(call, context, denied);
+    return { ok: false, result: denied };
+  }
+
+  private handleRateLimitExceeded(
+    resetInMs: number,
+    sandboxDecision: ExecutionSandboxDecision,
+    call: MCPToolCall,
+    context: ToolContext,
+    startTime: number,
+    toolCallId: string,
+    decisionId: string
+  ): ExecutionPreparationResult {
+    const limited = this.createErrorResult(
+      "RATE_LIMITED",
+      `Rate limit exceeded. Retry after ${resetInMs}ms.`
+    );
+    this.emitRecord(
+      this.createExecutionRecord({
+        toolCallId,
+        toolName: call.name,
+        taskNodeId: context.taskNodeId,
+        status: "failed",
+        durationMs: Date.now() - startTime,
+        affectedPaths: sandboxDecision.affectedPaths,
+        policyDecisionId: decisionId,
+        sandboxed: sandboxDecision.sandboxed,
+        error: limited.error?.message ?? "Rate limited",
+      }),
+      context
+    );
+    this.recordToolMetric(call.name, "error");
+    this.recordDuration(call.name, startTime);
+    this.emitSandboxTelemetry(call, context, limited, startTime);
+    this.auditResult(call, context, limited);
+    return { ok: false, result: limited };
   }
 
   private checkRateLimit(call: MCPToolCall, context: ToolContext) {

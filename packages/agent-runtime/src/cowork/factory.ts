@@ -13,13 +13,20 @@ import { type CreateOrchestratorOptions, createOrchestrator } from "../orchestra
 import {
   createPermissionChecker,
   createSecurityPolicy,
+  createToolGovernancePolicyEngine,
   createToolPolicyEngine,
   type IPermissionChecker,
+  resolveToolExecutionContext,
   type ToolPolicyEngine,
 } from "../security";
 import type { TelemetryContext } from "../telemetry";
 import type { IToolRegistry } from "../tools/mcp/registry";
-import type { AuditLogger, CoworkToolContext, SecurityPolicy } from "../types";
+import type {
+  AuditLogger,
+  CoworkToolContext,
+  SecurityPolicy,
+  ToolExecutionContext,
+} from "../types";
 import { DEFAULT_COWORK_POLICY } from "./defaultPolicy";
 import { CoworkPermissionChecker } from "./permissionChecker";
 import {
@@ -40,6 +47,7 @@ export interface CoworkRuntimeConfig {
   audit?: AuditLogger;
   telemetry?: TelemetryContext;
   modeManager?: AgentModeManager;
+  toolExecutionContext?: Partial<ToolExecutionContext>;
 }
 
 export interface CreateCoworkOrchestratorOptions
@@ -82,7 +90,12 @@ export function createCoworkToolExecutor(
   const coworkPolicyEngine = resolveCoworkPolicyEngine(config);
   const policy = createCoworkPermissionChecker({ ...config, policyEngine: coworkPolicyEngine });
   const coworkContext = buildCoworkContext(config, coworkPolicyEngine);
-  const toolPolicyEngine = resolveToolPolicyEngine(policy, config.modeManager);
+  const toolPolicyEngine = resolveToolPolicyEngine(
+    policy,
+    config.modeManager,
+    undefined,
+    config.toolExecutionContext
+  );
 
   return createToolExecutor({
     registry,
@@ -114,7 +127,8 @@ export function createCoworkOrchestrator(
   const toolPolicyEngine = resolveToolPolicyEngine(
     policy,
     cowork.modeManager,
-    baseToolPolicyEngine
+    baseToolPolicyEngine,
+    cowork.toolExecutionContext
   );
   const coworkToolExecution: ToolExecutionOptions = {
     ...toolExecution,
@@ -147,10 +161,13 @@ function resolveCoworkPolicyEngine(config: CoworkRuntimeConfig): CoworkPolicyEng
 function resolveToolPolicyEngine(
   policy: IPermissionChecker,
   modeManager?: AgentModeManager,
-  basePolicyEngine?: ToolPolicyEngine
+  basePolicyEngine?: ToolPolicyEngine,
+  toolExecutionContext?: Partial<ToolExecutionContext>
 ): ToolPolicyEngine {
   const engine = basePolicyEngine ?? createToolPolicyEngine(policy);
-  return modeManager ? createModePolicyEngine(modeManager, engine) : engine;
+  const modeEngine = modeManager ? createModePolicyEngine(modeManager, engine) : engine;
+  const resolvedContext = resolveToolExecutionContext(toolExecutionContext, policy.getPolicy());
+  return createToolGovernancePolicyEngine(modeEngine, resolvedContext);
 }
 
 function buildCoworkContext(

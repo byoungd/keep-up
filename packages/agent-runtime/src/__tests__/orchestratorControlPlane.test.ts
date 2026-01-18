@@ -73,6 +73,32 @@ const waitForEvent = (orchestrator: ReturnType<typeof createOrchestrator>, type:
   });
 
 describe("AgentOrchestrator control plane", () => {
+  it("rejects multiple tool calls in interactive policy", async () => {
+    const registry = createToolRegistry();
+    await registry.register(noopServer);
+    const llm = new SequenceLLM([
+      {
+        content: "Use tools",
+        finishReason: "tool_use",
+        toolCalls: [
+          { name: "dummy:noop", arguments: {} },
+          { name: "dummy:noop", arguments: {} },
+        ],
+      },
+    ]);
+
+    const orchestrator = createOrchestrator(llm, registry, {
+      maxTurns: 1,
+      requireConfirmation: false,
+      toolExecutionContext: { policy: "interactive" },
+    });
+
+    await orchestrator.run("start");
+
+    expect(orchestrator.getState().status).toBe("error");
+    expect(orchestrator.getState().error).toContain("Single-Step Constraint Violation");
+  });
+
   it("steps exactly one cycle", async () => {
     const registry = createToolRegistry();
     await registry.register(noopServer);

@@ -40,9 +40,10 @@ describe("ErrorRecoveryEngine", () => {
     ];
     const engine = createErrorRecoveryEngine(strategies);
     const initialError: ToolError = { code: "EXECUTION_FAILED", message: "timeout" };
+    const retryError: ToolError = { code: "EXECUTION_FAILED", message: "flaky" };
     const executor = vi
       .fn<Promise<MCPToolResult>, [MCPToolCall]>()
-      .mockRejectedValueOnce(initialError)
+      .mockRejectedValueOnce(retryError)
       .mockResolvedValueOnce(successResult);
 
     const recoveryPromise = engine.recover(toolCall, initialError, executor);
@@ -56,6 +57,34 @@ describe("ErrorRecoveryEngine", () => {
     expect(recovery.recovered).toBe(true);
     expect(recovery.result).toEqual(successResult);
     expect(recovery.attempts).toBe(2);
+  });
+
+  it("stops retries when error signatures repeat", async () => {
+    const strategies: RecoveryStrategy[] = [
+      {
+        errorPattern: /timeout/i,
+        category: "transient",
+        maxRetries: 3,
+        baseBackoffMs: 10,
+        backoffMultiplier: 1,
+        maxBackoffMs: 10,
+        action: "retry",
+        contextMessage: () => "retry",
+      },
+    ];
+    const engine = createErrorRecoveryEngine(strategies);
+    const initialError: ToolError = { code: "EXECUTION_FAILED", message: "timeout" };
+    const executor = vi.fn<Promise<MCPToolResult>, [MCPToolCall]>().mockRejectedValue(initialError);
+
+    const recoveryPromise = engine.recover(toolCall, initialError, executor);
+
+    await vi.advanceTimersByTimeAsync(10);
+
+    const recovery = await recoveryPromise;
+
+    expect(executor).toHaveBeenCalledTimes(1);
+    expect(recovery.recovered).toBe(false);
+    expect(recovery.attempts).toBe(1);
   });
 
   it("aborts on permanent errors without retry", async () => {

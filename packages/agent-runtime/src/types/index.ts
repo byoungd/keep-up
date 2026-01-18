@@ -131,6 +131,8 @@ export interface ToolContext {
   taskNodeId?: string;
   /** Security policy in effect */
   security: SecurityPolicy;
+  /** Tool execution policy context */
+  toolExecution?: ToolExecutionContext;
   /** Abort signal for cancellation */
   signal?: AbortSignal;
   /** Audit logger */
@@ -371,6 +373,21 @@ export interface AuditFilter {
 // Agent Orchestrator Types
 // ============================================================================
 
+/** Tool execution policy mode */
+export type ExecutionPolicy = "interactive" | "batch";
+
+/** Tool execution policy context */
+export interface ToolExecutionContext {
+  /** Policy mode */
+  policy: ExecutionPolicy;
+  /** Tool allowlist patterns */
+  allowedTools: string[];
+  /** Tool patterns that require approval */
+  requiresApproval: string[];
+  /** Max parallel calls in batch mode */
+  maxParallel: number;
+}
+
 /** Configuration for parallel tool execution */
 export interface ParallelExecutionConfig {
   /** Enable parallel execution of independent tools (default: true) */
@@ -393,6 +410,8 @@ export interface AgentConfig {
   maxTurns?: number;
   /** Whether to require confirmation for dangerous operations */
   requireConfirmation?: boolean;
+  /** Tool execution policy context */
+  toolExecutionContext?: ToolExecutionContext;
   /** Parallel tool execution configuration */
   parallelExecution?: ParallelExecutionConfig;
   /** Planning configuration (plan-then-execute pattern) */

@@ -342,6 +342,7 @@ export class AgentManager implements IAgentManager {
       security,
       maxTurns: options.maxTurns ?? profile.maxTurns,
       requireConfirmation: profile.requireConfirmation,
+      toolExecutionContext: { allowedTools },
       telemetry: this.telemetry,
       eventBus,
       components: sessionState ? { sessionState } : undefined,

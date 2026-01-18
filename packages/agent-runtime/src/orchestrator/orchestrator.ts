@@ -33,7 +33,13 @@ import {
 } from "../executor";
 import type { KnowledgeRegistry } from "../knowledge";
 import { AGENTS_GUIDE_PROMPT } from "../prompts/agentGuidelines";
-import { createAuditLogger, createPermissionChecker, createToolPolicyEngine } from "../security";
+import {
+  createAuditLogger,
+  createPermissionChecker,
+  createToolGovernancePolicyEngine,
+  createToolPolicyEngine,
+  resolveToolExecutionContext,
+} from "../security";
 import type { SessionState } from "../session";
 import { createSkillPolicyGuard } from "../skills/skillPolicyGuard";
 import type { SkillPromptAdapter } from "../skills/skillPromptAdapter";
@@ -66,6 +72,7 @@ import type {
   TokenUsageStats,
   ToolContext,
   ToolError,
+  ToolExecutionContext,
 } from "../types";
 import { countTokens } from "../utils/tokenCounter";
 import {
@@ -87,6 +94,7 @@ import {
   type PlanningEngine,
 } from "./planning";
 import { createRequestCache, type RequestCache } from "./requestCache";
+import { createSingleStepEnforcer, type SingleStepEnforcer } from "./singleStepEnforcer";
 import { SmartToolScheduler } from "./smartToolScheduler";
 import { ToolResultCache } from "./toolResultCache";
 import { createTurnExecutor, type ITurnExecutor, type TurnOutcome } from "./turnExecutor";
@@ -257,6 +265,7 @@ export class AgentOrchestrator {
   private readonly streamBridge?: OrchestratorStreamBridge;
   private readonly artifactPipeline?: ArtifactPipeline;
   private readonly loopStateMachine: AgentLoopStateMachine;
+  private readonly singleStepEnforcer: SingleStepEnforcer;
   private lastObservation?: Observation;
   private currentRunId?: string;
   private currentPlanNodeId?: string;
@@ -313,6 +322,10 @@ export class AgentOrchestrator {
     this.tracer = telemetry?.tracer;
     this.sessionState = components.sessionState;
     this.state = this.resolveInitialState();
+    this.singleStepEnforcer = createSingleStepEnforcer({
+      enabled: config.toolExecutionContext?.policy === "interactive",
+      allowZeroToolCalls: true,
+    });
     this.toolExecutor = components.toolExecutor;
     this.eventBus = components.eventBus;
     this.errorRecoveryEngine =
@@ -932,6 +945,7 @@ export class AgentOrchestrator {
       }
 
       if (outcome.type === "tool_use" && outcome.toolCalls) {
+        this.enforceToolExecutionPolicy(outcome.toolCalls);
         const decision = this.buildDecisionForToolCalls(outcome.toolCalls);
         const shouldExecute = await this.maybeCreatePlan(outcome.toolCalls);
         if (!shouldExecute) {
@@ -975,6 +989,17 @@ export class AgentOrchestrator {
     }
   }
 
+  private enforceToolExecutionPolicy(toolCalls: MCPToolCall[]): void {
+    if (this.config.toolExecutionContext?.policy !== "interactive") {
+      return;
+    }
+
+    const result = this.singleStepEnforcer.validate(toolCalls);
+    if (!result.valid) {
+      throw new Error(result.error ?? "Interactive policy allows a single tool call per turn.");
+    }
+  }
+
   /**
    * Execute tool calls with intelligent parallelization.
    *
@@ -985,32 +1010,76 @@ export class AgentOrchestrator {
     toolCalls: MCPToolCall[],
     parentSpan?: SpanContext
   ): Promise<void> {
-    const parallelConfig = this.config.parallelExecution ?? {
-      enabled: true,
-      maxConcurrent: this.config.security?.limits?.maxConcurrentCalls ?? 5,
-    };
-
-    if (!parallelConfig.enabled || toolCalls.length <= 1) {
-      // Sequential execution
-      for (const call of toolCalls) {
-        await this.executeSingleToolCall(call, parentSpan);
-      }
+    if (this.config.toolExecutionContext?.policy === "interactive") {
+      await this.executeInteractiveToolCalls(toolCalls, parentSpan);
       return;
     }
 
-    // Analyze dependencies and group independent calls
+    const parallelConfig = this.resolveParallelExecutionSettings();
+
+    if (!parallelConfig.enabled || toolCalls.length <= 1) {
+      await this.executeSequentialToolCalls(toolCalls, parentSpan);
+      return;
+    }
+
+    const maxParallel = this.resolveMaxParallel(parallelConfig.maxConcurrent);
+    await this.executeScheduledToolGroups(
+      toolCalls,
+      parallelConfig.maxConcurrent,
+      maxParallel,
+      parentSpan
+    );
+  }
+
+  private async executeInteractiveToolCalls(
+    toolCalls: MCPToolCall[],
+    parentSpan?: SpanContext
+  ): Promise<void> {
+    if (toolCalls.length > 1) {
+      throw new Error("Interactive policy allows a single tool call per turn.");
+    }
+    await this.executeSequentialToolCalls(toolCalls, parentSpan);
+  }
+
+  private async executeSequentialToolCalls(
+    toolCalls: MCPToolCall[],
+    parentSpan?: SpanContext
+  ): Promise<void> {
+    for (const call of toolCalls) {
+      await this.executeSingleToolCall(call, parentSpan);
+    }
+  }
+
+  private resolveParallelExecutionSettings(): ParallelExecutionConfig {
+    return (
+      this.config.parallelExecution ?? {
+        enabled: true,
+        maxConcurrent: this.config.security?.limits?.maxConcurrentCalls ?? 5,
+      }
+    );
+  }
+
+  private resolveMaxParallel(maxConcurrent: number): number {
+    return this.config.toolExecutionContext?.maxParallel ?? maxConcurrent;
+  }
+
+  private async executeScheduledToolGroups(
+    toolCalls: MCPToolCall[],
+    maxConcurrent: number,
+    maxParallel: number,
+    parentSpan?: SpanContext
+  ): Promise<void> {
     const groups = this.analyzeToolDependencies(toolCalls, parentSpan);
     const scheduledGroups = this.toolScheduler.scheduleGroups(groups);
 
-    // Execute groups sequentially, but calls within each group in parallel
     for (const group of scheduledGroups) {
       if (group.length === 1) {
         await this.executeSingleToolCall(group[0], parentSpan);
-      } else {
-        // Execute group in parallel with concurrency limit
-        const maxConcurrent = Math.min(parallelConfig.maxConcurrent, group.length);
-        await this.executeParallelToolCalls(group, maxConcurrent, parentSpan);
+        continue;
       }
+
+      const groupConcurrency = Math.min(maxConcurrent, maxParallel, group.length);
+      await this.executeParallelToolCalls(group, groupConcurrency, parentSpan);
     }
   }
 
@@ -1471,6 +1540,7 @@ export class AgentOrchestrator {
       correlationId: this.currentRunId,
       taskNodeId: call ? this.taskGraphToolCalls.get(call) : undefined,
       security: this.config.security,
+      toolExecution: this.config.toolExecutionContext,
       signal: this.abortController?.signal,
       skills: this.skillSession
         ? {
@@ -1694,6 +1764,7 @@ export interface CreateOrchestratorOptions {
   maxTurns?: number;
   requireConfirmation?: boolean;
   telemetry?: TelemetryContext;
+  toolExecutionContext?: Partial<ToolExecutionContext>;
   /** Enable parallel execution of independent tool calls (default: true) */
   parallelExecution?: boolean | Partial<ParallelExecutionConfig>;
   planning?: {
@@ -1756,7 +1827,12 @@ export function createOrchestrator(
     eventBus ? createEventBusExecutionObserver(eventBus, config.name) : undefined
   );
   const toolExecution = { ...(options.toolExecution ?? {}), executionObserver };
-  const policyEngine = resolvePolicyEngine(options, permissionChecker, skillRegistry);
+  const policyEngine = resolvePolicyEngine(
+    options,
+    permissionChecker,
+    skillRegistry,
+    config.toolExecutionContext
+  );
   const toolExecutor = resolveToolExecutor(
     options,
     registry,
@@ -1788,13 +1864,16 @@ function buildAgentConfig(
   options: CreateOrchestratorOptions,
   parallelExecution: ParallelExecutionConfig
 ): AgentConfig {
+  const security = options.security ?? DEFAULT_SECURITY;
+
   return {
     name: options.name ?? "agent",
     systemPrompt: options.systemPrompt ?? DEFAULT_SYSTEM_PROMPT,
-    security: options.security ?? DEFAULT_SECURITY,
+    security,
     toolServers: [],
     maxTurns: options.maxTurns ?? 50,
     requireConfirmation: options.requireConfirmation ?? true,
+    toolExecutionContext: resolveToolExecutionContext(options.toolExecutionContext, security),
     parallelExecution,
     planning: buildPlanningConfig(options.planning),
     recovery: { enabled: options.recovery?.enabled ?? false },
@@ -1847,11 +1926,18 @@ function resolveSkillComponents(
 function resolvePolicyEngine(
   options: CreateOrchestratorOptions,
   permissionChecker: ReturnType<typeof createPermissionChecker>,
-  skillRegistry: SkillRegistry | undefined
+  skillRegistry: SkillRegistry | undefined,
+  toolExecutionContext: ToolExecutionContext | undefined
 ) {
   const basePolicyEngine =
     options.toolExecution?.policyEngine ?? createToolPolicyEngine(permissionChecker);
-  return skillRegistry ? createSkillPolicyGuard(basePolicyEngine, skillRegistry) : basePolicyEngine;
+  const skillPolicyEngine = skillRegistry
+    ? createSkillPolicyGuard(basePolicyEngine, skillRegistry)
+    : basePolicyEngine;
+  if (!toolExecutionContext) {
+    return skillPolicyEngine;
+  }
+  return createToolGovernancePolicyEngine(skillPolicyEngine, toolExecutionContext);
 }
 
 function resolveToolExecutor(

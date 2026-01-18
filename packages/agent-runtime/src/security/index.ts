@@ -9,6 +9,7 @@ import type {
   AuditEntry,
   AuditFilter,
   AuditLogger,
+  ExecutionPolicy,
   MCPTool,
   MCPToolCall,
   PermissionEscalation,
@@ -16,6 +17,7 @@ import type {
   SandboxConfig,
   SecurityPolicy,
   ToolContext,
+  ToolExecutionContext,
   ToolPermissions,
 } from "../types";
 import { SECURITY_PRESETS, type SecurityPreset } from "../types";
@@ -263,6 +265,141 @@ export class PermissionPolicyEngine implements ToolPolicyEngine {
 
 export function createToolPolicyEngine(checker: IPermissionChecker): ToolPolicyEngine {
   return new PermissionPolicyEngine(checker);
+}
+
+const DEFAULT_EXECUTION_POLICY: ExecutionPolicy = "interactive";
+const DEFAULT_ALLOWED_TOOLS = ["*"];
+const DEFAULT_INTERACTIVE_APPROVAL_TOOLS = ["bash:execute"];
+
+export function resolveToolExecutionContext(
+  overrides: Partial<ToolExecutionContext> | undefined,
+  security: SecurityPolicy
+): ToolExecutionContext {
+  const policy = overrides?.policy ?? DEFAULT_EXECUTION_POLICY;
+  const allowedTools = overrides?.allowedTools ?? DEFAULT_ALLOWED_TOOLS;
+  const requiresApproval = mergeToolPatterns(
+    policy === "interactive" ? DEFAULT_INTERACTIVE_APPROVAL_TOOLS : [],
+    overrides?.requiresApproval ?? []
+  );
+  const maxParallel = Math.max(
+    1,
+    overrides?.maxParallel ?? security.limits.maxConcurrentCalls ?? 5
+  );
+
+  return {
+    policy,
+    allowedTools,
+    requiresApproval,
+    maxParallel,
+  };
+}
+
+export class ToolGovernancePolicyEngine implements ToolPolicyEngine {
+  constructor(
+    private readonly base: ToolPolicyEngine,
+    private readonly defaults: ToolExecutionContext
+  ) {}
+
+  evaluate(context: ToolPolicyContext): ToolPolicyDecision {
+    const baseDecision = this.base.evaluate(context);
+    if (!baseDecision.allowed) {
+      return baseDecision;
+    }
+
+    const executionContext = context.context.toolExecution ?? this.defaults;
+    const requiresApproval = mergeToolPatterns(
+      executionContext.policy === "interactive" ? DEFAULT_INTERACTIVE_APPROVAL_TOOLS : [],
+      executionContext.requiresApproval
+    );
+    const toolName = context.call.name;
+
+    if (!isToolAllowed(toolName, executionContext.allowedTools)) {
+      return {
+        allowed: false,
+        requiresConfirmation: false,
+        reason: `Tool "${toolName}" not allowed by execution policy`,
+        riskTags: mergeRiskTags(baseDecision.riskTags, ["policy:allowlist"]),
+      };
+    }
+
+    const approvalRequired = isToolAllowed(toolName, requiresApproval);
+    const requiresConfirmation = baseDecision.requiresConfirmation || approvalRequired;
+    const reason =
+      baseDecision.reason ??
+      (approvalRequired ? "Tool requires approval by execution policy" : undefined);
+
+    return {
+      allowed: true,
+      requiresConfirmation,
+      reason,
+      riskTags: mergeRiskTags(
+        baseDecision.riskTags,
+        approvalRequired ? ["policy:approval"] : undefined
+      ),
+    };
+  }
+}
+
+export function createToolGovernancePolicyEngine(
+  base: ToolPolicyEngine,
+  defaults: ToolExecutionContext
+): ToolPolicyEngine {
+  return new ToolGovernancePolicyEngine(base, defaults);
+}
+
+function mergeToolPatterns(...lists: string[][]): string[] {
+  const set = new Set<string>();
+  for (const list of lists) {
+    for (const entry of list) {
+      const trimmed = entry.trim();
+      if (!trimmed) {
+        continue;
+      }
+      set.add(trimmed);
+    }
+  }
+  return Array.from(set);
+}
+
+function isToolAllowed(toolName: string, patterns: string[]): boolean {
+  if (patterns.length === 0) {
+    return false;
+  }
+  for (const pattern of patterns) {
+    if (matchesToolPattern(toolName, pattern)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function matchesToolPattern(toolName: string, pattern: string): boolean {
+  const normalizedTool = toolName.toLowerCase();
+  const normalizedPattern = pattern.trim().toLowerCase();
+  if (!normalizedPattern) {
+    return false;
+  }
+  if (normalizedPattern === "*") {
+    return true;
+  }
+  if (normalizedPattern.endsWith(":*")) {
+    const prefix = normalizedPattern.slice(0, -2);
+    return normalizedTool.startsWith(prefix);
+  }
+  return normalizedTool === normalizedPattern;
+}
+
+function mergeRiskTags(...tags: Array<string[] | undefined>): string[] | undefined {
+  const set = new Set<string>();
+  for (const group of tags) {
+    if (!group) {
+      continue;
+    }
+    for (const tag of group) {
+      set.add(tag);
+    }
+  }
+  return set.size > 0 ? Array.from(set) : undefined;
 }
 
 // ============================================================================
