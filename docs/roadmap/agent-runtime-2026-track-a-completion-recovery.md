@@ -1,7 +1,7 @@
 # Track A: Completion and Recovery Contracts
 
 Owner: Tech Lead + Runtime Developer
-Status: Planned
+Status: Completed
 
 ## Objective
 Implement the Completion and Recovery contracts as defined in docs/specs/agent-runtime-spec-2026.md Section 5.1 and 5.2.

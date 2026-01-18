@@ -60,6 +60,9 @@ export class PermissionChecker implements IPermissionChecker {
 
     // Check tool-specific permissions
     switch (tool) {
+      case "completion":
+      case "complete_task":
+        return { allowed: true, requiresConfirmation: false };
       case "bash":
         return this.checkBashPermission(operation);
       case "file":

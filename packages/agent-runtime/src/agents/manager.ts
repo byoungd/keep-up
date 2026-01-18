@@ -433,6 +433,9 @@ export class AgentManager implements IAgentManager {
   }
 
   private isToolAllowed(toolName: string, allowedTools: string[]): boolean {
+    if (this.isCompletionToolName(toolName)) {
+      return true;
+    }
     for (const pattern of allowedTools) {
       if (pattern === "*") {
         return true;
@@ -449,6 +452,10 @@ export class AgentManager implements IAgentManager {
       }
     }
     return false;
+  }
+
+  private isCompletionToolName(toolName: string): boolean {
+    return toolName === "complete_task" || toolName.endsWith(":complete_task");
   }
 
   private extractOutput(messages: { role: string; content?: string }[]): string {

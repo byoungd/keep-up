@@ -8,6 +8,7 @@ import type { AgentLLMRequest, AgentLLMResponse, IAgentLLM } from "../orchestrat
 import { createOrchestrator } from "../orchestrator/orchestrator";
 import { createSecurityPolicy } from "../security";
 import { collectStream, createStreamWriter } from "../streaming";
+import { createCompletionToolServer } from "../tools/core";
 import { createToolRegistry } from "../tools/mcp/registry";
 import type { MCPToolServer } from "../types";
 
@@ -16,7 +17,11 @@ class OneShotToolLLM implements IAgentLLM {
 
   async complete(_request: AgentLLMRequest): Promise<AgentLLMResponse> {
     if (this.called) {
-      return { content: "Done", finishReason: "stop" };
+      return {
+        content: "Done",
+        finishReason: "tool_use",
+        toolCalls: [{ name: "complete_task", arguments: { summary: "Done" } }],
+      };
     }
 
     this.called = true;
@@ -57,6 +62,7 @@ describe("AgentOrchestrator stream bridge", () => {
   it("emits progress and metadata chunks for execution events", async () => {
     resetGlobalEventBus();
     const registry = createToolRegistry({ enforceQualifiedNames: false });
+    await registry.register(createCompletionToolServer());
     await registry.register(createPingServer());
 
     const writer = createStreamWriter("stream-bridge");

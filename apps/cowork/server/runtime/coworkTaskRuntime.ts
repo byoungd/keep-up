@@ -7,6 +7,7 @@ import {
   createBashToolServer,
   createBrowserToolServer,
   createCodeToolServer,
+  createCompletionToolServer,
   createCoworkRuntime,
   createDockerBashExecutor,
   createFileToolServer,
@@ -368,6 +369,7 @@ export class CoworkTaskRuntime {
     dockerAvailable: boolean;
   }> {
     const toolRegistry = createToolRegistry();
+    await toolRegistry.register(createCompletionToolServer());
     await toolRegistry.register(createFileToolServer());
     const workspacePath = process.cwd();
     const assetManager = this.getRuntimeAssetManager();

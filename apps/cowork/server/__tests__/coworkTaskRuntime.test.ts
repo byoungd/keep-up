@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   type CoworkSession,
+  createCompletionToolServer,
   createCoworkRuntime,
   createFileToolServer,
   createMockLLM,
@@ -108,8 +109,13 @@ describe("CoworkTaskRuntime", () => {
         events: eventHub,
         runtimeFactory: async (seed) => {
           const llm = createMockLLM();
-          llm.setDefaultResponse({ content: "All done.", finishReason: "stop" });
+          llm.setDefaultResponse({
+            content: "All done.",
+            finishReason: "tool_use",
+            toolCalls: [{ name: "completion:complete_task", arguments: { summary: "All done." } }],
+          });
           const registry = createToolRegistry();
+          await registry.register(createCompletionToolServer());
           const runtimeInstance = createCoworkRuntime({
             llm,
             registry,
@@ -150,8 +156,13 @@ describe("CoworkTaskRuntime", () => {
         events: eventHub,
         runtimeFactory: async (seed) => {
           const llm = createMockLLM();
-          llm.setDefaultResponse({ content: "All done.", finishReason: "stop" });
+          llm.setDefaultResponse({
+            content: "All done.",
+            finishReason: "tool_use",
+            toolCalls: [{ name: "completion:complete_task", arguments: { summary: "All done." } }],
+          });
           const registry = createToolRegistry();
+          await registry.register(createCompletionToolServer());
           const runtimeInstance = createCoworkRuntime({
             llm,
             registry,
@@ -189,19 +200,27 @@ describe("CoworkTaskRuntime", () => {
       const session = createSession(rootPath);
       await storage.sessionStore.create(session);
 
+      let runtimeRef: ReturnType<typeof createCoworkRuntime> | undefined;
       const runtime = new CoworkTaskRuntime({
         storage,
         events: eventHub,
         runtimeFactory: async (seed) => {
           const llm = createMockLLM();
-          llm.setDefaultResponse({ content: "All done.", finishReason: "stop" });
+          llm.setDefaultResponse({
+            content: "All done.",
+            finishReason: "tool_use",
+            toolCalls: [{ name: "completion:complete_task", arguments: { summary: "All done." } }],
+          });
           const registry = createToolRegistry();
-          return createCoworkRuntime({
+          await registry.register(createCompletionToolServer());
+          const runtimeInstance = createCoworkRuntime({
             llm,
             registry,
             cowork: { session: seed },
             taskQueueConfig: { maxConcurrent: 1 },
           });
+          runtimeRef = runtimeInstance;
+          return runtimeInstance;
         },
       });
 
@@ -213,8 +232,12 @@ describe("CoworkTaskRuntime", () => {
       const stored = await storage.taskStore.getById(task.taskId);
 
       expect(stored?.metadata).toEqual(metadata);
+      if (!runtimeRef) {
+        throw new Error("Runtime not created");
+      }
+      await runtimeRef.waitForTask(task.taskId);
     } finally {
-      await rm(dir, { recursive: true, force: true });
+      await cleanupDir(dir);
     }
   });
 
@@ -232,8 +255,13 @@ describe("CoworkTaskRuntime", () => {
         events: eventHub,
         runtimeFactory: async (seed) => {
           const llm = createMockLLM();
-          llm.setDefaultResponse({ content: "All done.", finishReason: "stop" });
+          llm.setDefaultResponse({
+            content: "All done.",
+            finishReason: "tool_use",
+            toolCalls: [{ name: "completion:complete_task", arguments: { summary: "All done." } }],
+          });
           const registry = createToolRegistry();
+          await registry.register(createCompletionToolServer());
           const runtimeInstance = createCoworkRuntime({
             llm,
             registry,
@@ -297,9 +325,14 @@ describe("CoworkTaskRuntime", () => {
                 },
               ],
             },
-            { content: "Done.", finishReason: "stop" },
+            {
+              content: "Done.",
+              finishReason: "tool_use",
+              toolCalls: [{ name: "completion:complete_task", arguments: { summary: "Done." } }],
+            },
           ]);
           const registry = createToolRegistry();
+          await registry.register(createCompletionToolServer());
           await registry.register(createFileToolServer());
           const runtimeInstance = createCoworkRuntime({
             llm,
@@ -368,10 +401,15 @@ describe("CoworkTaskRuntime", () => {
             },
           ],
         },
-        { content: "Done.", finishReason: "stop" },
+        {
+          content: "Done.",
+          finishReason: "tool_use",
+          toolCalls: [{ name: "completion:complete_task", arguments: { summary: "Done." } }],
+        },
       ]);
 
       const registry = createToolRegistry();
+      await registry.register(createCompletionToolServer());
       await registry.register(createFileToolServer());
       const runtime = createCoworkRuntime({
         llm,

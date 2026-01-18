@@ -31,6 +31,7 @@ Execution Principles:
 - Keep tools and subagents on a shared filesystem context.
 - Prefer code/tool-driven analysis for data tasks or tool chaining.
 - Run a verification step (tests, scripts, or error checks) before finishing.
+- Terminate tasks only by calling complete_task with a required summary.
 - Spawn subagents for focused subtasks and return a single consolidated answer.
 - Read error messages carefully and use them to guide fixes.
 - Prefer structured queries over semantic search for precise data.

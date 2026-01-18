@@ -7,6 +7,7 @@ import {
   AGENT_PROFILES,
   type AgentType,
   createAgentManager,
+  createCompletionToolServer,
   createFileToolServer,
   createMockLLM,
   createToolRegistry,
@@ -82,6 +83,7 @@ describe("AgentManager", () => {
 
   beforeEach(async () => {
     registry = createToolRegistry();
+    await registry.register(createCompletionToolServer());
     await registry.register(createFileToolServer());
     llm = createMockLLM();
   });
@@ -113,7 +115,13 @@ describe("AgentManager", () => {
   it("should spawn an agent and get result", async () => {
     llm.setDefaultResponse({
       content: "I found 3 TypeScript files in the project.",
-      finishReason: "stop",
+      finishReason: "tool_use",
+      toolCalls: [
+        {
+          name: "completion:complete_task",
+          arguments: { summary: "Found TypeScript files." },
+        },
+      ],
     });
 
     const manager = createAgentManager({ llm, registry });
@@ -151,7 +159,13 @@ describe("AgentManager", () => {
       callCount++;
       return {
         content: `Agent ${callCount} completed`,
-        finishReason: "stop" as const,
+        finishReason: "tool_use" as const,
+        toolCalls: [
+          {
+            name: "completion:complete_task",
+            arguments: { summary: `Agent ${callCount} completed` },
+          },
+        ],
       };
     };
 
@@ -177,7 +191,11 @@ describe("AgentManager", () => {
       maxConcurrent = Math.max(maxConcurrent, concurrentCount);
       await new Promise((r) => setTimeout(r, 10));
       concurrentCount--;
-      return { content: "Done", finishReason: "stop" as const };
+      return {
+        content: "Done",
+        finishReason: "tool_use" as const,
+        toolCalls: [{ name: "completion:complete_task", arguments: { summary: "Done" } }],
+      };
     };
 
     const manager = createAgentManager({
@@ -254,7 +272,11 @@ describe("AgentManager", () => {
           finishReason: "tool_use" as const,
         };
       }
-      return { content: "Done", finishReason: "stop" as const };
+      return {
+        content: "Done",
+        finishReason: "tool_use" as const,
+        toolCalls: [{ name: "completion:complete_task", arguments: { summary: "Done" } }],
+      };
     };
 
     const manager = createAgentManager({ llm, registry });
@@ -272,7 +294,8 @@ describe("AgentManager", () => {
   it("should get agent status", async () => {
     llm.setDefaultResponse({
       content: "Done",
-      finishReason: "stop",
+      finishReason: "tool_use",
+      toolCalls: [{ name: "completion:complete_task", arguments: { summary: "Done" } }],
     });
 
     const manager = createAgentManager({ llm, registry });
