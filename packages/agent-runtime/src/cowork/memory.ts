@@ -11,7 +11,7 @@ import type {
   MemoryStats,
   RecallOptions,
   RememberOptions,
-} from "../memory/types";
+} from "@ku0/agent-runtime-memory";
 
 export class NoopMemoryManager implements IMemoryManager {
   async remember(_content: string, _options?: RememberOptions): Promise<string> {

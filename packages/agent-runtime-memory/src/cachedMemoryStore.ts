@@ -2,8 +2,6 @@
  * Cached memory store wrapper.
  */
 
-import type { CacheStats } from "../utils/cache";
-import { hashStableValue, LRUCache } from "../utils/cache";
 import { type MemoryCacheConfig, resolveMemoryCacheConfig } from "./cacheTypes";
 import {
   buildCacheKey,
@@ -20,6 +18,8 @@ import type {
   MemoryStats,
   MemoryType,
 } from "./types";
+import type { CacheStats } from "./utils/cache";
+import { hashStableValue, LRUCache } from "./utils/cache";
 
 type QueryCacheEntry = {
   kind: "query";

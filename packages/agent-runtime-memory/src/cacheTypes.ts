@@ -2,7 +2,7 @@
  * Memory cache configuration types.
  */
 
-import type { CacheOptions } from "../utils/cache";
+import type { CacheOptions } from "./utils/cache";
 
 export interface MemoryCacheConfig {
   enableQueryCache?: boolean;

@@ -3,9 +3,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import { CachedMemoryStore } from "../memory/cachedMemoryStore";
-import { createInMemoryStore } from "../memory/memoryStore";
-import type { Memory } from "../memory/types";
+import { CachedMemoryStore, createInMemoryStore, type Memory } from "../index";
 
 function createTestMemory(
   overrides?: Partial<Memory>

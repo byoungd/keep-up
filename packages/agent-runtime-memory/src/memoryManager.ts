@@ -5,7 +5,6 @@
  * automatic consolidation, and event emission.
  */
 
-import { countTokens } from "../utils/tokenCounter";
 import { CachedMemoryStore } from "./cachedMemoryStore";
 import { type MemoryCacheConfig, resolveMemoryCacheConfig } from "./cacheTypes";
 import { CachedEmbeddingProvider } from "./embeddingCache";
@@ -26,6 +25,7 @@ import type {
   RememberOptions,
 } from "./types";
 import { DEFAULT_MEMORY_CONFIG } from "./types";
+import { countTokens } from "./utils/tokenCounter";
 
 // ============================================================================
 // Conversation Context

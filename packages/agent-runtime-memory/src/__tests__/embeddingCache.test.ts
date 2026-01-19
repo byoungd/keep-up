@@ -3,8 +3,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { CachedEmbeddingProvider } from "../memory/embeddingCache";
-import type { IEmbeddingProvider } from "../memory/types";
+import { CachedEmbeddingProvider, type IEmbeddingProvider } from "../index";
 
 class CountingEmbeddingProvider implements IEmbeddingProvider {
   embedCalls = 0;

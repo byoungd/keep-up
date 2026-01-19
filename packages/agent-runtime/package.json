@@ -44,6 +44,7 @@
     "@ku0/ai-core": "workspace:*",
     "@ku0/agent-runtime-core": "workspace:*",
     "@ku0/agent-runtime-telemetry": "workspace:*",
+    "@ku0/agent-runtime-memory": "workspace:*",
     "@ku0/core": "workspace:*",
     "@ku0/db": "workspace:*",
     "@ku0/tool-lsp": "workspace:*",
@@ -53,7 +54,6 @@
     "chokidar": "^5.0.0",
     "dockerode": "^4.0.0",
     "gray-matter": "^4.0.3",
-    "mem0ai": "^2.2.1",
     "pino": "^10.2.0",
     "playwright": "^1.51.0",
     "zod": "^4.3.5"
