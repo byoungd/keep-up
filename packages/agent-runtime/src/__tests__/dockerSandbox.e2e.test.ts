@@ -10,10 +10,16 @@ import { DockerSandboxManager } from "../sandbox/sandboxManager";
 import { SandboxToolServer } from "../tools/sandbox/sandboxToolServer";
 import type { ToolContext } from "../types";
 
-const dockerSocketCandidates = ["/var/run/docker.sock", join(homedir(), ".docker/run/docker.sock")];
-const hasDockerSocket =
-  dockerSocketCandidates.some((candidate) => existsSync(candidate)) ||
-  Boolean(process.env.DOCKER_HOST);
+const dockerSocketCandidates = [
+  "/var/run/docker.sock",
+  join(homedir(), ".docker/run/docker.sock"),
+  join(homedir(), "Library/Containers/com.docker.docker/Data/docker-cli.sock"),
+];
+const resolvedDockerSocket = dockerSocketCandidates.find((candidate) => existsSync(candidate));
+if (!process.env.DOCKER_HOST && resolvedDockerSocket) {
+  process.env.DOCKER_HOST = `unix://${resolvedDockerSocket}`;
+}
+const hasDockerSocket = Boolean(resolvedDockerSocket) || Boolean(process.env.DOCKER_HOST);
 const describeIf = hasDockerSocket ? describe : describe.skip;
 
 function createContext(sessionId = "session-docker-e2e"): ToolContext {

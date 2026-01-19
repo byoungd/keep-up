@@ -39,6 +39,9 @@ jobs:
       - name: UI Contract
         run: pnpm ui:contract
 
+      - name: Circular Dependencies
+        run: pnpm check:circular
+
       - name: Typecheck
         run: pnpm typecheck
 
