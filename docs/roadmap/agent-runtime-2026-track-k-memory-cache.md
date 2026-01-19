@@ -1,7 +1,7 @@
 # Track K: Memory Store Cache Layer
 
 **Owner**: Runtime Dev
-**Status**: Proposed
+**Status**: Completed
 **Date**: 2026-01-19
 **Timeline**: Week 3
 
@@ -15,22 +15,22 @@ Accelerate memory retrieval operations (RAG) by implementing a multi-level cachi
 ## Tasks
 
 ### Phase 1: Layered Caching Design
-- [ ] Design `CachedMemoryStore` wrapper implementing `IMemoryStore`.
-- [ ] Define L1 Cache: Exact Query (Text/Filter -> Result IDs).
-- [ ] Define L2 Cache: Embedding Cache (Text Content -> Vector).
+- [x] Design `CachedMemoryStore` wrapper implementing `IMemoryStore`.
+- [x] Define L1 Cache: Exact Query (Text/Filter -> Result IDs).
+- [x] Define L2 Cache: Embedding Cache (Text Content -> Vector).
 
 ### Phase 2: Implementation
-- [ ] Implement `CachedMemoryStore`.
-- [ ] Integrate shared `LRUCache` (from Track I).
-- [ ] Implement "Cache-Aside" logic for embedding requests.
+- [x] Implement `CachedMemoryStore`.
+- [x] Integrate shared `LRUCache` (from Track I).
+- [x] Implement "Cache-Aside" logic for embedding requests.
 
 ### Phase 3: Invalidation
-- [ ] Implement invalidation hook: On `add/update/delete` in underlying store, clear relevant L1 keys.
-- [ ] Option: Use short TTL (e.g., 5s) for L1 if perfect invalidation is too complex.
+- [x] Implement invalidation hook: On `add/update/delete` in underlying store, clear relevant L1 keys.
+- [x] Option: Use short TTL (e.g., 5s) for L1 if perfect invalidation is too complex.
 
 ## Deliverables
-- [ ] `CachedMemoryStore` wrapper.
-- [ ] Unit tests for caching behavior (hits/misses/invalidation).
+- [x] `CachedMemoryStore` wrapper.
+- [x] Unit tests for caching behavior (hits/misses/invalidation).
 
 ## Technical Context
 

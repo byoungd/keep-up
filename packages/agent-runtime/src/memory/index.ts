@@ -9,6 +9,14 @@
  * 2. Mem0MemoryAdapter - Mem0 cloud/oss integration (recommended)
  */
 
+// Memory cache wrappers
+export { CachedMemoryStore, createCachedMemoryStore } from "./cachedMemoryStore";
+export {
+  type MemoryCacheConfig,
+  type ResolvedMemoryCacheConfig,
+  resolveMemoryCacheConfig,
+} from "./cacheTypes";
+export { CachedEmbeddingProvider, createCachedEmbeddingProvider } from "./embeddingCache";
 // Mem0 Adapter (recommended for production)
 export {
   createMem0MemoryAdapter,

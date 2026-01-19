@@ -5,14 +5,14 @@
  */
 
 import * as path from "node:path";
-import type { CoworkPolicyAction, CoworkPolicyDecision, CoworkPolicyEngine } from "./policy";
+import type { CoworkPolicyDecisionLike, CoworkPolicyEngineLike, CoworkSessionLike } from "../types";
+import type { CoworkPolicyAction } from "./policy";
 import { isPathWithinRoots } from "./policy";
-import type { CoworkSession } from "./types";
 
 export type CoworkFileIntent = "read" | "write" | "create" | "delete" | "rename" | "move";
 
 export interface CoworkFileActionRequest {
-  session: CoworkSession;
+  session: CoworkSessionLike;
   path: string;
   intent: CoworkFileIntent;
   fileSizeBytes?: number;
@@ -20,26 +20,26 @@ export interface CoworkFileActionRequest {
 }
 
 export interface CoworkNetworkActionRequest {
-  session: CoworkSession;
+  session: CoworkSessionLike;
   host: string;
   hostAllowlist?: string[];
 }
 
 export interface CoworkConnectorActionRequest {
-  session: CoworkSession;
+  session: CoworkSessionLike;
   connectorScopeAllowed: boolean;
 }
 
-export interface CoworkSandboxDecision extends CoworkPolicyDecision {
+export interface CoworkSandboxDecision extends CoworkPolicyDecisionLike {
   normalizedPath?: string;
   withinGrant?: boolean;
   withinOutputRoot?: boolean;
 }
 
 export class CoworkSandboxAdapter {
-  private readonly policyEngine: CoworkPolicyEngine;
+  private readonly policyEngine: CoworkPolicyEngineLike;
 
-  constructor(policyEngine: CoworkPolicyEngine) {
+  constructor(policyEngine: CoworkPolicyEngineLike) {
     this.policyEngine = policyEngine;
   }
 
@@ -92,11 +92,11 @@ function toFileAction(intent: CoworkFileIntent): CoworkPolicyAction {
   return `file.${intent}` as CoworkPolicyAction;
 }
 
-function collectGrantRoots(session: CoworkSession): string[] {
+function collectGrantRoots(session: CoworkSessionLike): string[] {
   return session.grants.map((grant) => grant.rootPath);
 }
 
-function collectOutputRoots(session: CoworkSession): string[] {
+function collectOutputRoots(session: CoworkSessionLike): string[] {
   const roots: string[] = [];
   for (const grant of session.grants) {
     if (grant.outputRoots) {

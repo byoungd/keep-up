@@ -6,7 +6,7 @@
  */
 
 import { type ContextManager, createContextManager } from "../context";
-import { createMemoryManager, type IMemoryManager } from "../memory";
+import { createMemoryManager, type IMemoryManager, type MemoryCacheConfig } from "../memory";
 import type { AgentMessage, AgentState } from "../types";
 import type { ToolResultCache } from "../utils/cache";
 
@@ -111,10 +111,16 @@ export interface SessionStateConfig {
   contextId?: string;
   contextManager?: ContextManager;
   memoryManager?: IMemoryManager;
+  memoryCache?: MemoryCacheConfig;
   toolCache?: ToolResultCache;
   initialState?: AgentState;
   initialSnapshot?: SessionSnapshot;
 }
+
+const DEFAULT_SESSION_MEMORY_CACHE: MemoryCacheConfig = {
+  enableQueryCache: true,
+  enableEmbeddingCache: true,
+};
 
 // ============================================================================
 // Default Snapshots
@@ -165,7 +171,9 @@ export class InMemorySessionState implements SessionState {
     this.createdAt = Date.now();
     this.id = config.id ?? this.generateSessionId();
     this.context = config.contextManager ?? createContextManager();
-    this.memory = config.memoryManager ?? createMemoryManager();
+    this.memory =
+      config.memoryManager ??
+      createMemoryManager(undefined, undefined, config.memoryCache ?? DEFAULT_SESSION_MEMORY_CACHE);
     this.toolCache = config.toolCache;
 
     if (config.contextId) {

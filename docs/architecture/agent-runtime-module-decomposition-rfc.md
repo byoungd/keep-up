@@ -141,6 +141,12 @@ The following plan addresses each cycle cluster without changing behavior. These
 | orchestrator <-> requestCache/turnExecutor | requestCache/turnExecutor import LLM types from orchestrator | Extract LLM request/response/tool definition types into `orchestrator/llmTypes.ts` (or core) and have orchestrator re-export them. | Phase 2 |
 | sandboxManager <-> containerFactory/pool/context | `SandboxPolicy` lives in sandboxManager and is imported by helpers | Extract sandbox types (policy/session config) into `sandbox/types.ts` and have sandboxManager and helpers depend on that file. | Phase 3 |
 
+### Follow-up Scan (After Cycle Fixes)
+Command:
+`pnpm dlx madge packages/agent-runtime/src --ts-config packages/agent-runtime/tsconfig.json --extensions ts,tsx --circular --exclude "dist"`
+
+Result: no circular dependencies detected.
+
 ## Migration Plan (Phased)
 
 ### Phase 1: Inventory and RFC Approval
