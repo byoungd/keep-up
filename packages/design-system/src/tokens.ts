@@ -194,6 +194,8 @@ export const semanticColors = {
   accentIndigo: "var(--color-accent-indigo)",
   accentCyan: "var(--color-accent-cyan)",
   accentRose: "var(--color-accent-rose)",
+  accentAi: "var(--color-accent-ai)",
+  accentAiSheen: "var(--accent-ai-sheen)",
 
   // Highlights
   highlightYellow: "var(--color-highlight-yellow)",

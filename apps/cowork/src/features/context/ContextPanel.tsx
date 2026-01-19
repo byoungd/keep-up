@@ -4,6 +4,7 @@ import { cn } from "@ku0/shared/utils";
 import type { ArtifactItem } from "@ku0/shell";
 import { ArtifactPreviewPane } from "@ku0/shell";
 import { useParams } from "@tanstack/react-router";
+import { AnimatePresence, motion } from "framer-motion";
 import * as React from "react";
 import { ArtifactsList } from "../artifacts/components/ArtifactsList";
 import { useTaskStream } from "../tasks/hooks/useTaskStream";
@@ -134,11 +135,26 @@ export function ContextPanel({
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-auto-hide">
         {resolvedTab === "preview" && (
           <div className="h-full">
-            {previewArtifact ? (
-              <ArtifactPreviewPane item={previewArtifact} onClose={onClosePreview} />
-            ) : (
-              <div className="p-4 text-sm text-muted-foreground">No preview selected.</div>
-            )}
+            <AnimatePresence mode="sync">
+              {previewArtifact ? (
+                <ArtifactPreviewPane
+                  key={previewArtifact.id}
+                  item={previewArtifact}
+                  onClose={onClosePreview}
+                />
+              ) : (
+                <motion.div
+                  key="empty"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
+                  className="p-4 text-sm text-muted-foreground"
+                >
+                  No preview selected.
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         )}
 

@@ -1,4 +1,5 @@
 import { cn } from "@ku0/shared/utils";
+import { motion } from "framer-motion";
 import { buildPreviewText, getArtifactIcon } from "./TaskStreamUtils";
 import type { ArtifactItem } from "./types";
 
@@ -17,8 +18,10 @@ export function DeliverableItem({
   const statusClass = resolveArtifactStatusClass(artifact.status);
 
   return (
-    <button
+    <motion.button
       type="button"
+      layoutId={`artifact-${artifact.id}`}
+      transition={{ duration: 0.2, ease: "easeOut" }}
       onClick={() => onPreview?.(artifact)}
       className={cn(
         "group flex flex-col items-start gap-2 p-3 rounded-lg border border-transparent bg-surface-2/30 hover:bg-surface-2 hover:border-border/50 hover:shadow-sm hover:scale-[1.01] active:scale-[0.99] text-left transition-all duration-normal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
@@ -56,7 +59,7 @@ export function DeliverableItem({
           {preview}
         </div>
       )}
-    </button>
+    </motion.button>
   );
 }
 

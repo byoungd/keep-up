@@ -216,6 +216,24 @@
     }
   }
 
+  .ai-sheen-line {
+    display: block;
+    width: 100%;
+    height: 1px;
+    background: var(--accent-ai-sheen);
+    background-size: 200% 100%;
+    animation: ai-sheen 2s linear infinite;
+  }
+
+  @keyframes ai-sheen {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: -200% 0;
+    }
+  }
+
   /* Smooth focus ring for AI inputs */
   .ai-focus-ring:focus-visible {
     outline: none;
@@ -245,6 +263,7 @@
     .ai-thinking-pulse,
     .ai-message-enter,
     .ai-gradient-shimmer,
+    .ai-sheen-line,
     .animate-pulse,
     .animate-ping,
     .animate-spin {

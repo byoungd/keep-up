@@ -10,31 +10,31 @@
 
 The **only** allowed loop in the UI.
 
-- [ ] **Sheen Animation**
-    - [ ] Define `@keyframes ai-sheen` (gradient translateX).
-    - [ ] Create `.ai-sheen-line` utility: `h-[1px]`, `background: var(--accent-ai-sheen)`, `animation: ai-sheen 2s linear infinite`.
-- [ ] **Application**
-    - [ ] **Chat Input**: Add sheen line to bottom edge when `state === 'processing'`.
-    - [ ] **Thinking Node**: Add sheen line to top edge of the thinking block.
+- [x] **Sheen Animation**
+    - [x] Define `@keyframes ai-sheen` (gradient translateX).
+    - [x] Create `.ai-sheen-line` utility: `h-[1px]`, `background: var(--accent-ai-sheen)`, `animation: ai-sheen 2s linear infinite`.
+- [x] **Application**
+    - [x] **Chat Input**: Add sheen line to bottom edge when `state === 'processing'`.
+    - [x] **Thinking Node**: Add sheen line to top edge of the thinking block.
 
 ## 2. Layout Projection (The "Expansive" Feel)
 *Target File: `apps/cowork/src/components/features/Artifact/*`*
 
 Opening an artifact should feel like it *grows* from the chat, not a new page load.
 
-- [ ] **Shared Layout IDs**
-    - [ ] Assign `layoutId={`artifact-${id}`}` to the Chat Link.
-    - [ ] Assign `layoutId={`artifact-${id}`}` to the Split View container.
-- [ ] **Transition Physics**
-    - [ ] Configure `transition={{ duration: 0.2, ease: "easeOut" }}`.
-    - [ ] Ensure `AnimatePresence` handles the cross-dissolve of content.
+- [x] **Shared Layout IDs**
+    - [x] Assign `layoutId={`artifact-${id}`}` to the Chat Link.
+    - [x] Assign `layoutId={`artifact-${id}`}` to the Split View container.
+- [x] **Transition Physics**
+    - [x] Configure `transition={{ duration: 0.2, ease: "easeOut" }}`.
+    - [x] Ensure `AnimatePresence` handles the cross-dissolve of content.
 
 ## 3. Sidebar Physics (Calm Firmness)
 *Target File: `apps/cowork/src/components/layout/Sidebar.tsx`*
 
-- [ ] **Spring Tuning**
-    - [ ] Set `stiffness: 400`, `damping: 30` (Fast but no bounce).
-    - [ ] Remove any `opacity` fade on the sidebar container itself; let the width drive the motion.
+- [x] **Spring Tuning**
+    - [x] Set `stiffness: 400`, `damping: 30` (Fast but no bounce).
+    - [x] Remove any `opacity` fade on the sidebar container itself; let the width drive the motion.
 
 ---
 

@@ -24,6 +24,7 @@
     "@tanstack/react-virtual": "^3.13.17",
     "better-sqlite3": "^12.6.0",
     "clsx": "^2.1.1",
+    "framer-motion": "^11.0.0",
     "hono": "^4.9.1",
     "lucide-react": "^0.562.0",
     "react": "^19.0.0",
