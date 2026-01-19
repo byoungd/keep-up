@@ -124,9 +124,9 @@ graph TD
 - [x] Move tool registry and servers into tooling package.
 
 ### Phase 4: Wiring and Compatibility
-- [ ] Update facade exports to preserve `@ku0/agent-runtime` API.
-- [ ] Add dependency checks (madge or dependency-cruiser).
-- [ ] Update documentation and migration notes.
+- [x] Update facade exports to preserve `@ku0/agent-runtime` API.
+- [x] Add dependency checks (madge or dependency-cruiser).
+- [x] Update documentation and migration notes.
 
 ## Acceptance Criteria
 - No cyclic dependencies across runtime packages.

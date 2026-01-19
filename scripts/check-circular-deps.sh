@@ -7,7 +7,13 @@ set -e
 
 PACKAGES=(
   "packages/core/src/index.ts"
+  "packages/agent-runtime-core/src/index.ts"
+  "packages/agent-runtime-control/src/index.ts"
+  "packages/agent-runtime-memory/src/index.ts"
   "packages/agent-runtime/src/index.ts"
+  "packages/agent-runtime-sandbox/src/index.ts"
+  "packages/agent-runtime-tools/src/index.ts"
+  "packages/agent-runtime-telemetry/src/index.ts"
   "packages/ai-core/src/index.ts"
   "packages/lfcc-bridge/src/index.ts"
 )
@@ -30,9 +36,9 @@ for pkg in "${PACKAGES[@]}"; do
   echo "📦 Checking $PKG_NAME..."
 
   # Run madge with circular detection
-  # --extensions ts: Only check TypeScript files
+  # --extensions ts,tsx: Only check TypeScript files
   # --exclude: Skip dist and node_modules to avoid type definition cycles
-  OUTPUT=$(pnpm madge --circular --extensions ts --exclude 'dist|node_modules' "$pkg" 2>&1)
+  OUTPUT=$(pnpm madge --circular --extensions ts,tsx --exclude 'dist|node_modules' "$pkg" 2>&1)
 
   if echo "$OUTPUT" | grep -q "Found .* circular"; then
     echo "❌ $PKG_NAME has circular dependencies:"
@@ -51,7 +57,7 @@ if [ $FAILED -gt 0 ]; then
   echo "❌ $FAILED package(s) have circular dependencies"
   echo ""
   echo "💡 To fix circular dependencies:"
-  echo "   1. Run: pnpm madge --circular --extensions ts <package>/src/index.ts"
+  echo "   1. Run: pnpm madge --circular --extensions ts,tsx <package>/src/index.ts"
   echo "   2. Identify the cycle and refactor to break it"
   echo "   3. Consider extracting shared types to a separate file"
   exit 1
