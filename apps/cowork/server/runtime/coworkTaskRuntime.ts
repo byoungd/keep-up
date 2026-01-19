@@ -7,6 +7,7 @@ import type {
   ConfirmationRequest,
   CoworkSession,
   CoworkTask,
+  SecurityPolicy,
 } from "@ku0/agent-runtime";
 import {
   AgentModeManager,
@@ -429,7 +430,7 @@ export class CoworkTaskRuntime {
     };
   }
 
-  private buildRuntimeSecurityPolicy(dockerAvailable: boolean) {
+  private buildRuntimeSecurityPolicy(dockerAvailable: boolean): SecurityPolicy | undefined {
     if (!this.isLfccGatewayConfigured()) {
       return dockerAvailable ? buildDockerSecurityPolicy() : undefined;
     }
@@ -438,9 +439,14 @@ export class CoworkTaskRuntime {
       ? buildDockerSecurityPolicy()
       : createSecurityPolicy("balanced");
 
+    const permissions: SecurityPolicy["permissions"] = {
+      ...basePolicy.permissions,
+      lfcc: "write",
+    };
+
     return {
       ...basePolicy,
-      permissions: { ...basePolicy.permissions, lfcc: "write" },
+      permissions,
     };
   }
 
@@ -972,7 +978,7 @@ function mapPendingToolCalls(state: AgentState, timestamp: number): Checkpoint["
   return calls;
 }
 
-function buildDockerSecurityPolicy() {
+function buildDockerSecurityPolicy(): SecurityPolicy {
   const policy = createSecurityPolicy("balanced");
   return {
     ...policy,

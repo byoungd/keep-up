@@ -4,19 +4,52 @@
  * MCP server providing code file operations: read, edit, list.
  */
 
+import * as path from "node:path";
 import type { MCPTool, MCPToolResult, ToolContext } from "../../types";
 import { BaseToolServer, errorResult, textResult } from "../mcp/baseServer";
 import * as editor from "./editor";
 import * as fileSystem from "./fileSystem";
+import {
+  createLSPClient,
+  type Diagnostic,
+  detectLanguageServerForPath,
+  isServerAvailable,
+  type Location,
+  type LSPClient,
+  lspLocationToPath,
+  type ServerConfig,
+} from "./lsp";
 import * as patch from "./patch";
 
 // ============================================================================
 // Tool Server
 // ============================================================================
 
+class LspUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "LspUnavailableError";
+  }
+}
+
+class LspProjectNotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "LspProjectNotFoundError";
+  }
+}
+
+interface LspSession {
+  client: LSPClient;
+  config: ServerConfig;
+  rootPath: string;
+}
+
 export class CodeToolServer extends BaseToolServer {
   readonly name = "code";
   readonly description = "Code file reading, editing, and navigation tools";
+
+  private readonly lspSessions = new Map<string, Promise<LspSession>>();
 
   constructor() {
     super();
@@ -24,6 +57,9 @@ export class CodeToolServer extends BaseToolServer {
     this.registerTool(this.createListFilesTool(), this.handleListFiles.bind(this));
     this.registerTool(this.createEditFileTool(), this.handleEditFile.bind(this));
     this.registerTool(this.createApplyPatchTool(), this.handleApplyPatch.bind(this));
+    this.registerTool(this.createGoToDefinitionTool(), this.handleGoToDefinition.bind(this));
+    this.registerTool(this.createFindReferencesTool(), this.handleFindReferences.bind(this));
+    this.registerTool(this.createDiagnosticsTool(), this.handleDiagnostics.bind(this));
   }
 
   // --------------------------------------------------------------------------
@@ -168,6 +204,85 @@ export class CodeToolServer extends BaseToolServer {
       annotations: {
         requiresConfirmation: true,
         readOnly: false,
+      },
+    };
+  }
+
+  private createGoToDefinitionTool(): MCPTool {
+    return {
+      name: "go_to_definition",
+      description: "Find the definition of a symbol at a given position in a file.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          path: {
+            type: "string",
+            description: "Path to the source file",
+          },
+          line: {
+            type: "number",
+            description: "1-indexed line number",
+          },
+          character: {
+            type: "number",
+            description: "1-indexed character position",
+          },
+        },
+        required: ["path", "line", "character"],
+      },
+      annotations: {
+        requiresConfirmation: false,
+        readOnly: true,
+      },
+    };
+  }
+
+  private createFindReferencesTool(): MCPTool {
+    return {
+      name: "find_references",
+      description: "Find all references to a symbol at a given position.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          path: {
+            type: "string",
+            description: "Path to the source file",
+          },
+          line: {
+            type: "number",
+            description: "1-indexed line number",
+          },
+          character: {
+            type: "number",
+            description: "1-indexed character position",
+          },
+        },
+        required: ["path", "line", "character"],
+      },
+      annotations: {
+        requiresConfirmation: false,
+        readOnly: true,
+      },
+    };
+  }
+
+  private createDiagnosticsTool(): MCPTool {
+    return {
+      name: "get_diagnostics",
+      description: "Get compiler errors and warnings for a file.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          path: {
+            type: "string",
+            description: "Path to the source file",
+          },
+        },
+        required: ["path"],
+      },
+      annotations: {
+        requiresConfirmation: false,
+        readOnly: true,
       },
     };
   }
@@ -342,11 +457,232 @@ export class CodeToolServer extends BaseToolServer {
       );
     }
   }
+
+  private async handleGoToDefinition(
+    args: Record<string, unknown>,
+    context: ToolContext
+  ): Promise<MCPToolResult> {
+    const filePath = args.path as string | undefined;
+    const position = parsePosition(args.line, args.character);
+    if (!filePath) {
+      return errorResult("INVALID_ARGUMENTS", "path is required");
+    }
+    if (!position) {
+      return errorResult("INVALID_ARGUMENTS", "line and character must be >= 1");
+    }
+
+    const filePermission = context.security?.permissions?.file;
+    if (filePermission === "none") {
+      return errorResult("PERMISSION_DENIED", "File system access is disabled");
+    }
+
+    try {
+      const absolutePath = path.resolve(filePath);
+      const session = await this.getLspSession(absolutePath);
+      const locations = await session.client.goToDefinition(absolutePath, {
+        line: position.line - 1,
+        character: position.character - 1,
+      });
+
+      if (locations.length === 0) {
+        return textResult("No definition found.");
+      }
+
+      return textResult(formatLocations("Definitions", locations));
+    } catch (err) {
+      return this.formatLspError(err);
+    }
+  }
+
+  private async handleFindReferences(
+    args: Record<string, unknown>,
+    context: ToolContext
+  ): Promise<MCPToolResult> {
+    const filePath = args.path as string | undefined;
+    const position = parsePosition(args.line, args.character);
+    if (!filePath) {
+      return errorResult("INVALID_ARGUMENTS", "path is required");
+    }
+    if (!position) {
+      return errorResult("INVALID_ARGUMENTS", "line and character must be >= 1");
+    }
+
+    const filePermission = context.security?.permissions?.file;
+    if (filePermission === "none") {
+      return errorResult("PERMISSION_DENIED", "File system access is disabled");
+    }
+
+    try {
+      const absolutePath = path.resolve(filePath);
+      const session = await this.getLspSession(absolutePath);
+      const locations = await session.client.findReferences(absolutePath, {
+        line: position.line - 1,
+        character: position.character - 1,
+      });
+
+      if (locations.length === 0) {
+        return textResult("No references found.");
+      }
+
+      return textResult(formatLocations("References", locations));
+    } catch (err) {
+      return this.formatLspError(err);
+    }
+  }
+
+  private async handleDiagnostics(
+    args: Record<string, unknown>,
+    context: ToolContext
+  ): Promise<MCPToolResult> {
+    const filePath = args.path as string | undefined;
+    if (!filePath) {
+      return errorResult("INVALID_ARGUMENTS", "path is required");
+    }
+
+    const filePermission = context.security?.permissions?.file;
+    if (filePermission === "none") {
+      return errorResult("PERMISSION_DENIED", "File system access is disabled");
+    }
+
+    try {
+      const absolutePath = path.resolve(filePath);
+      const session = await this.getLspSession(absolutePath);
+      const diagnostics = await session.client.getDiagnostics(absolutePath);
+
+      if (diagnostics.length === 0) {
+        return textResult("No diagnostics reported.");
+      }
+
+      return textResult(formatDiagnostics(absolutePath, diagnostics));
+    } catch (err) {
+      return this.formatLspError(err);
+    }
+  }
+
+  private async getLspSession(filePath: string): Promise<LspSession> {
+    const detection = detectLanguageServerForPath(filePath);
+    if (!detection) {
+      throw new LspProjectNotFoundError("No supported language server detected for this path.");
+    }
+
+    const { config, rootPath } = detection;
+    if (!(await isServerAvailable(config))) {
+      throw new LspUnavailableError(`Language server not available: ${config.command}`);
+    }
+
+    const key = `${config.id}:${rootPath}`;
+    const existing = this.lspSessions.get(key);
+    if (existing) {
+      return existing;
+    }
+
+    const sessionPromise = this.createLspSession(config, rootPath);
+    this.lspSessions.set(key, sessionPromise);
+
+    try {
+      return await sessionPromise;
+    } catch (error) {
+      this.lspSessions.delete(key);
+      throw error;
+    }
+  }
+
+  private async createLspSession(config: ServerConfig, rootPath: string): Promise<LspSession> {
+    const client = await createLSPClient({
+      command: config.command,
+      args: config.args,
+      cwd: rootPath,
+    });
+
+    await client.initialize(rootPath);
+    await client.waitForReady();
+
+    return { client, config, rootPath };
+  }
+
+  private formatLspError(error: unknown): MCPToolResult {
+    if (error instanceof LspProjectNotFoundError || error instanceof LspUnavailableError) {
+      return errorResult("RESOURCE_NOT_FOUND", error.message);
+    }
+    if (error instanceof Error) {
+      return errorResult("EXECUTION_FAILED", `LSP request failed: ${error.message}`);
+    }
+    return errorResult("EXECUTION_FAILED", "LSP request failed");
+  }
+
+  async dispose(): Promise<void> {
+    for (const sessionPromise of this.lspSessions.values()) {
+      try {
+        const session = await sessionPromise;
+        await session.client.shutdown();
+      } catch (_error) {
+        // Ignore shutdown errors to avoid blocking disposal.
+      }
+    }
+    this.lspSessions.clear();
+  }
 }
 
 // ============================================================================
 // Helper Functions
 // ============================================================================
+
+function parsePosition(
+  lineValue: unknown,
+  characterValue: unknown
+): {
+  line: number;
+  character: number;
+} | null {
+  if (typeof lineValue !== "number" || typeof characterValue !== "number") {
+    return null;
+  }
+  if (!Number.isFinite(lineValue) || !Number.isFinite(characterValue)) {
+    return null;
+  }
+  if (lineValue < 1 || characterValue < 1) {
+    return null;
+  }
+  return { line: lineValue, character: characterValue };
+}
+
+function formatLocations(label: string, locations: Location[]): string {
+  const lines = [`${label} (${locations.length}):`];
+  for (const location of locations) {
+    const filePath = lspLocationToPath(location);
+    const line = location.range.start.line + 1;
+    const character = location.range.start.character + 1;
+    lines.push(`- ${filePath}:${line}:${character}`);
+  }
+  return lines.join("\n");
+}
+
+function formatDiagnostics(filePath: string, diagnostics: Diagnostic[]): string {
+  const lines = [`Diagnostics (${diagnostics.length}):`];
+  for (const diagnostic of diagnostics) {
+    const line = diagnostic.range.start.line + 1;
+    const character = diagnostic.range.start.character + 1;
+    const severity = formatSeverity(diagnostic.severity);
+    const code = diagnostic.code ? ` [${diagnostic.code}]` : "";
+    lines.push(`- ${filePath}:${line}:${character} ${severity}${code}: ${diagnostic.message}`);
+  }
+  return lines.join("\n");
+}
+
+function formatSeverity(severity?: Diagnostic["severity"]): string {
+  switch (severity) {
+    case 1:
+      return "Error";
+    case 2:
+      return "Warning";
+    case 3:
+      return "Info";
+    case 4:
+      return "Hint";
+    default:
+      return "Info";
+  }
+}
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) {

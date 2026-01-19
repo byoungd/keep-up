@@ -80,6 +80,9 @@ importers:
       '@ku0/design-system':
         specifier: workspace:*
         version: link:../../packages/design-system
+      '@ku0/lfcc-bridge':
+        specifier: workspace:*
+        version: link:../../packages/lfcc-bridge
       '@ku0/project-context':
         specifier: workspace:*
         version: link:../../packages/project-context
