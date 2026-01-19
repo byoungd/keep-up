@@ -318,6 +318,51 @@ export interface A2AContext {
 }
 
 // ============================================================================
+// Runtime Message Bus Types
+// ============================================================================
+
+/** Message envelope for inter-agent communication */
+export interface MessageEnvelope {
+  /** Unique message ID */
+  id: string;
+  /** Sender agent ID */
+  from: string;
+  /** Recipient agent ID (null for broadcast) */
+  to: string | null;
+  /** Message type */
+  type: "request" | "response" | "event";
+  /** Topic for pub/sub (used with type: 'event') */
+  topic?: string;
+  /** Message payload */
+  payload: unknown;
+  /** Correlation ID for request/response matching */
+  correlationId?: string;
+  /** Timestamp */
+  timestamp: number;
+}
+
+/** Subscription handle */
+export interface MessageSubscription {
+  id: string;
+  topic: string;
+  unsubscribe: () => void;
+}
+
+/** Message handler function */
+export type MessageHandler = (envelope: MessageEnvelope) => void | Promise<void>;
+
+/** Runtime message bus interface */
+export interface RuntimeMessageBus {
+  send(from: string, to: string, payload: unknown): MessageEnvelope;
+  request(from: string, to: string, payload: unknown, timeoutMs?: number): Promise<MessageEnvelope>;
+  respond(from: string, correlationId: string, payload: unknown): MessageEnvelope;
+  publish(from: string, topic: string, payload: unknown): MessageEnvelope;
+  subscribe(topic: string, handler: MessageHandler): MessageSubscription;
+  registerAgent(agentId: string, handler: MessageHandler): () => void;
+  waitFor(correlationId: string, timeoutMs?: number): Promise<MessageEnvelope>;
+}
+
+// ============================================================================
 // Completion Contract Types
 // ============================================================================
 

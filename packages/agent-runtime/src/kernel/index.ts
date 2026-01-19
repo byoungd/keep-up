@@ -4,8 +4,13 @@
  * Defines the boundary between control-plane orchestration and data-plane services.
  */
 
-import type { RuntimeEvent, RuntimeEventBus } from "@ku0/agent-runtime-control";
-import { getGlobalEventBus } from "@ku0/agent-runtime-control";
+import {
+  A2AMessageBusAdapter,
+  createMessageBus,
+  getGlobalEventBus,
+  type RuntimeEvent,
+  type RuntimeEventBus,
+} from "@ku0/agent-runtime-control";
 import type { TelemetryContext } from "@ku0/agent-runtime-telemetry/telemetry";
 import {
   createSkillPolicyGuard,
@@ -45,11 +50,13 @@ import {
 import type { SessionState } from "../session";
 import { createSessionState } from "../session";
 import type {
+  A2AContext,
   AgentState,
   AuditLogger,
   ConfirmationHandler,
   MCPTool,
   MCPToolCall,
+  RuntimeMessageBus,
   ToolContext,
 } from "../types";
 
@@ -69,6 +76,7 @@ export interface RuntimeServices {
   executor?: ToolExecutor;
   policy: IPermissionChecker;
   events?: RuntimeEventBus;
+  messageBus?: RuntimeMessageBus;
   state?: SessionState;
   audit?: AuditLogger;
   telemetry?: TelemetryContext;
@@ -105,6 +113,8 @@ export class RuntimeKernel implements Kernel {
   private readonly executor: ToolExecutor;
   private readonly eventBus: RuntimeEventBus;
   private readonly sessionState: SessionState;
+  private readonly messageBus: RuntimeMessageBus;
+  private readonly a2aContext?: A2AContext;
   private readonly skillRegistry?: SkillRegistry;
   private readonly skillSession?: SkillSession;
   private readonly skillPromptAdapter?: SkillPromptAdapter;
@@ -116,6 +126,8 @@ export class RuntimeKernel implements Kernel {
     this.services = services;
     this.eventBus = services.events ?? getGlobalEventBus();
     this.sessionState = services.state ?? createSessionState();
+    this.messageBus = services.messageBus ?? createMessageBus(this.eventBus);
+    this.a2aContext = this.resolveA2AContext();
     const skillOptions = this.resolveSkillOptions();
     this.skillRegistry = skillOptions?.registry;
     this.skillSession =
@@ -186,6 +198,7 @@ export class RuntimeKernel implements Kernel {
       return {
         telemetry: this.services.telemetry,
         skills: skillOptions,
+        a2a: this.a2aContext,
         components: {
           toolExecutor: this.executor,
           eventBus: this.eventBus,
@@ -200,6 +213,7 @@ export class RuntimeKernel implements Kernel {
       ...this.config.orchestrator,
       telemetry: this.services.telemetry ?? this.config.orchestrator.telemetry,
       skills: this.config.orchestrator.skills ?? skillOptions,
+      a2a: this.config.orchestrator.a2a ?? this.a2aContext,
       components: {
         ...this.config.orchestrator.components,
         toolExecutor: this.executor,
@@ -221,6 +235,17 @@ export class RuntimeKernel implements Kernel {
     }
     // Convert kernel skills config to orchestrator skills config format
     return this.config.skills;
+  }
+
+  private resolveA2AContext(): A2AContext | undefined {
+    if (this.config.orchestrator?.a2a) {
+      return this.config.orchestrator.a2a;
+    }
+    const agentId = this.config.orchestrator?.name ?? "agent";
+    return {
+      adapter: new A2AMessageBusAdapter(this.messageBus),
+      agentId,
+    };
   }
 
   private wrapOrchestratorEvent(event: OrchestratorEvent): RuntimeEvent<OrchestratorEvent> {

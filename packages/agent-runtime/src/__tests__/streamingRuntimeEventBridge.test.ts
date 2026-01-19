@@ -5,7 +5,7 @@
 import { createEventBus } from "@ku0/agent-runtime-control";
 import { describe, expect, it } from "vitest";
 import { attachRuntimeEventStreamBridge, collectStream, createStreamWriter } from "../streaming";
-import type { ArtifactEnvelope } from "../types";
+import type { ArtifactEnvelope, MessageEnvelope } from "../types";
 
 function createArtifact(id: string, overrides: Partial<ArtifactEnvelope> = {}): ArtifactEnvelope {
   return {
@@ -28,6 +28,15 @@ describe("RuntimeEventStreamBridge", () => {
     const eventBus = createEventBus();
     const writer = createStreamWriter("stream-bridge");
     attachRuntimeEventStreamBridge({ eventBus, stream: writer, correlationId: "corr-1" });
+
+    const message: MessageEnvelope = {
+      id: "msg-1",
+      from: "agent-1",
+      to: "agent-2",
+      type: "request",
+      payload: { action: "ping" },
+      timestamp: Date.now(),
+    };
 
     eventBus.emit(
       "execution:record",
@@ -70,6 +79,7 @@ describe("RuntimeEventStreamBridge", () => {
       },
       { correlationId: "corr-1", source: "bridge-test" }
     );
+    eventBus.emit("message:delivered", message, { correlationId: "corr-1", source: "bridge-test" });
 
     writer.close();
 
@@ -82,6 +92,7 @@ describe("RuntimeEventStreamBridge", () => {
     expect(metadataChunks.some((chunk) => chunk.data.key === "execution:record")).toBe(true);
     expect(metadataChunks.some((chunk) => chunk.data.key === "artifact")).toBe(true);
     expect(metadataChunks.some((chunk) => chunk.data.key === "artifact:quarantined")).toBe(true);
+    expect(metadataChunks.some((chunk) => chunk.data.key === "message:delivered")).toBe(true);
     expect(errorChunks).toHaveLength(1);
   });
 

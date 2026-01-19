@@ -5,41 +5,19 @@
  * Reference: spec Control Plane - RuntimeMessageBus
  */
 
+import type {
+  MessageEnvelope,
+  MessageHandler,
+  MessageSubscription,
+  RuntimeMessageBus as RuntimeMessageBusContract,
+} from "@ku0/agent-runtime-core";
 import { createEventBus, type RuntimeEventBus } from "./eventBus";
 
 // ============================================================================
 // Types
 // ============================================================================
 
-/** Message envelope for inter-agent communication */
-export interface MessageEnvelope {
-  /** Unique message ID */
-  id: string;
-  /** Sender agent ID */
-  from: string;
-  /** Recipient agent ID (null for broadcast) */
-  to: string | null;
-  /** Message type */
-  type: "request" | "response" | "event";
-  /** Topic for pub/sub (used with type: 'event') */
-  topic?: string;
-  /** Message payload */
-  payload: unknown;
-  /** Correlation ID for request/response matching */
-  correlationId?: string;
-  /** Timestamp */
-  timestamp: number;
-}
-
-/** Subscription handle */
-export interface MessageSubscription {
-  id: string;
-  topic: string;
-  unsubscribe: () => void;
-}
-
-/** Message handler function */
-export type MessageHandler = (envelope: MessageEnvelope) => void | Promise<void>;
+export type { MessageEnvelope, MessageHandler, MessageSubscription };
 
 /** Pending request for response tracking */
 interface PendingRequest {
@@ -55,7 +33,7 @@ interface PendingRequest {
 /**
  * Inter-agent messaging system.
  */
-export class RuntimeMessageBus {
+export class RuntimeMessageBusImpl implements RuntimeMessageBusContract {
   private readonly eventBus: RuntimeEventBus;
   private readonly subscriptions = new Map<string, Set<MessageHandler>>();
   private readonly directHandlers = new Map<string, MessageHandler>();
@@ -102,7 +80,7 @@ export class RuntimeMessageBus {
       timestamp: Date.now(),
     };
 
-    this.eventBus.emitRaw("message:delivered", envelope);
+    this.eventBus.emit("message:delivered", envelope);
     return envelope;
   }
 
@@ -135,7 +113,7 @@ export class RuntimeMessageBus {
 
       this.pendingRequests.set(correlationId, { resolve, reject, timeout });
 
-      this.eventBus.emitRaw("message:delivered", envelope);
+      this.eventBus.emit("message:delivered", envelope);
     });
   }
 
@@ -153,7 +131,7 @@ export class RuntimeMessageBus {
       timestamp: Date.now(),
     };
 
-    this.eventBus.emitRaw("message:delivered", envelope);
+    this.eventBus.emit("message:delivered", envelope);
     return envelope;
   }
 
@@ -171,7 +149,7 @@ export class RuntimeMessageBus {
       timestamp: Date.now(),
     };
 
-    this.eventBus.emitRaw("message:delivered", envelope);
+    this.eventBus.emit("message:delivered", envelope);
     return envelope;
   }
 
@@ -310,6 +288,6 @@ export class RuntimeMessageBus {
 /**
  * Create a new RuntimeMessageBus.
  */
-export function createMessageBus(eventBus?: RuntimeEventBus): RuntimeMessageBus {
-  return new RuntimeMessageBus(eventBus);
+export function createMessageBus(eventBus?: RuntimeEventBus): RuntimeMessageBusContract {
+  return new RuntimeMessageBusImpl(eventBus);
 }

@@ -4,6 +4,7 @@
  * Provides event-driven communication for the agent runtime.
  */
 
+export type { RuntimeMessageBus } from "@ku0/agent-runtime-core";
 export {
   type A2AAdapterOptions,
   A2ACapabilityRegistry,
@@ -42,7 +43,7 @@ export {
   type MessageEnvelope,
   type MessageHandler,
   type MessageSubscription,
-  RuntimeMessageBus,
+  RuntimeMessageBusImpl,
 } from "./messageBus";
 export {
   createScopedEventBus,

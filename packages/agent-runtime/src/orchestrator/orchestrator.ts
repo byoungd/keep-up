@@ -67,6 +67,7 @@ import type { ISOPExecutor } from "../sop/types";
 import { attachRuntimeEventStreamBridge, type StreamWriter } from "../streaming";
 import { createTaskGraphStore, type TaskGraphStore, type TaskNodeStatus } from "../tasks/taskGraph";
 import type {
+  A2AContext,
   AgentConfig,
   AgentMessage,
   AgentState,
@@ -2401,6 +2402,8 @@ export interface CreateOrchestratorOptions {
   maxTurns?: number;
   requireConfirmation?: boolean;
   telemetry?: TelemetryContext;
+  /** Optional A2A routing context */
+  a2a?: A2AContext;
   /** Optional runtime configuration (cache defaults, etc) */
   runtime?: RuntimeConfig;
   toolExecutionContext?: Partial<ToolExecutionContext>;
@@ -2524,6 +2527,7 @@ function buildAgentConfig(
     maxTurns: options.maxTurns ?? DEFAULT_MAX_TURNS,
     requireConfirmation: options.requireConfirmation ?? true,
     parallelExecution,
+    a2a: options.a2a,
     planning: buildPlanningConfig(options.planning),
     recovery: buildRecoveryConfig(options.recovery),
     toolDiscovery: buildToolDiscoveryConfig(options.toolDiscovery),

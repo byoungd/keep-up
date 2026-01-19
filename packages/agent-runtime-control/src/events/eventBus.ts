@@ -8,6 +8,7 @@
 import type {
   ArtifactEnvelope,
   ExecutionDecision,
+  MessageEnvelope,
   ToolExecutionRecord,
 } from "@ku0/agent-runtime-core";
 import { getLogger, type Logger } from "@ku0/agent-runtime-telemetry/logging";
@@ -197,6 +198,11 @@ export interface SystemEvents {
   "system:checkpoint": { checkpointId: string };
 }
 
+/** Message bus events */
+export interface MessageBusEvents {
+  "message:delivered": MessageEnvelope;
+}
+
 /** Execution plane events */
 export interface ExecutionEvents {
   "execution:decision": ExecutionDecision;
@@ -236,6 +242,7 @@ export interface RuntimeEventMap
     ToolEvents,
     PluginEvents,
     SystemEvents,
+    MessageBusEvents,
     ExecutionEvents,
     SubagentEvents,
     ArtifactEvents {
