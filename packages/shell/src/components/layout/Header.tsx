@@ -103,7 +103,7 @@ export function Header({
             size="compact"
             onClick={onToggleRight}
             className={cn(
-              "h-8 w-8 p-0 transition-all rounded-md",
+              "h-8 w-8 p-0 transition-all duration-fast rounded-md",
               isRightPanelOpen
                 ? "bg-surface-2 text-foreground"
                 : "text-muted-foreground hover:text-foreground hover:bg-surface-2"

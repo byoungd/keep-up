@@ -76,7 +76,7 @@ export const SidebarHeader = React.memo(function SidebarHeader({
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05] shrink-0"
+            className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-surface-2 shrink-0"
             onClick={toggleCollapsed}
             aria-label={isCollapsed ? t("expand") : t("collapse")}
             title={isCollapsed ? t("expand") : t("collapse")}
@@ -93,7 +93,7 @@ export const SidebarHeader = React.memo(function SidebarHeader({
           size="sm"
           className={cn(
             "w-full justify-start gap-2.5 h-8 px-2.5",
-            "bg-surface-2/50 hover:bg-foreground/[0.05] text-muted-foreground hover:text-foreground transition-colors"
+            "bg-surface-2/50 hover:bg-surface-2 text-muted-foreground hover:text-foreground transition-colors duration-fast"
           )}
           onClick={handleSearch}
         >

@@ -188,8 +188,8 @@ function LibraryList({ items, activeId, onSelect }: LibraryListProps) {
                   <span
                     className={`text-micro uppercase tracking-wider px-2 py-0.5 rounded-full border ${
                       item.record.status === "applied"
-                        ? "border-emerald-500/30 text-emerald-600 bg-emerald-500/10"
-                        : "border-amber-500/30 text-amber-600 bg-amber-500/10"
+                        ? "border-success/30 text-success bg-success/10"
+                        : "border-warning/30 text-warning bg-warning/10"
                     }`}
                   >
                     {item.record.status}

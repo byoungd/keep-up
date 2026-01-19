@@ -21,7 +21,7 @@ export function ArtifactRail({
           <p className="text-sm font-semibold text-foreground">Artifact Rail</p>
           <p className="text-xs text-muted-foreground">Session {sessionId.slice(0, 8)}...</p>
         </div>
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto scrollbar-auto-hide">
           <ArtifactsList
             artifacts={graph.artifacts}
             onApply={onApplyArtifact}

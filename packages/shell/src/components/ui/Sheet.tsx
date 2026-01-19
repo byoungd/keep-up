@@ -157,7 +157,7 @@ export function Sheet({
                     <button
                       type="button"
                       onClick={() => onOpenChange(false)}
-                      className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors ml-auto"
+                      className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors duration-fast ml-auto"
                       aria-label="Close panel"
                     >
                       <X className="h-4 w-4" />
@@ -167,7 +167,7 @@ export function Sheet({
               )}
 
               {/* Content */}
-              <div className="flex-1 overflow-y-auto">{children}</div>
+              <div className="flex-1 overflow-y-auto scrollbar-auto-hide">{children}</div>
             </motion.div>
           </div>
         </Wrapper>

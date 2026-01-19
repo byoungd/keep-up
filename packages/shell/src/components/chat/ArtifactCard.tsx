@@ -134,7 +134,7 @@ function ArtifactReviewBadge({ label }: { label: string | null }) {
   }
 
   return (
-    <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-fine text-emerald-600">
+    <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-fine text-success">
       <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
       {label}
     </div>
@@ -241,7 +241,7 @@ function ChecklistDetails({
               <span
                 className={cn(
                   "inline-flex h-3 w-3 items-center justify-center rounded-sm border",
-                  item.checked ? "border-emerald-500/60 bg-emerald-500/20" : "border-border/60"
+                  item.checked ? "border-success/60 bg-success/20" : "border-border/60"
                 )}
               />
               <span className={cn(item.checked ? "text-foreground" : "text-muted-foreground")}>
@@ -304,14 +304,14 @@ function ArtifactActions({
       <button
         type="button"
         onClick={onApprove}
-        className="rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-500/20"
+        className="rounded-md border border-success/40 bg-success/10 px-3 py-1 text-xs font-medium text-success hover:bg-success/20 transition-colors duration-fast"
       >
         {t("artifactApprove")}
       </button>
       <button
         type="button"
         onClick={onReject}
-        className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-500/20"
+        className="rounded-md border border-error/40 bg-error/10 px-3 py-1 text-xs font-medium text-error hover:bg-error/20 transition-colors duration-fast"
       >
         {t("artifactReject")}
       </button>
@@ -319,7 +319,7 @@ function ArtifactActions({
         <button
           type="button"
           onClick={onApply}
-          className="rounded-md border border-border/50 bg-surface-2/60 px-3 py-1 text-xs font-medium text-foreground hover:bg-surface-2"
+          className="rounded-md border border-border/50 bg-surface-2/60 px-3 py-1 text-xs font-medium text-foreground hover:bg-surface-2 transition-colors duration-fast"
         >
           {t("artifactApply")}
         </button>

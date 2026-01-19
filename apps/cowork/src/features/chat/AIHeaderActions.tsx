@@ -8,34 +8,28 @@ import { useAIControl } from "./AIControlContext";
  */
 export function AIHeaderActions() {
   const { setContextPanel } = useAIControl();
+  const actionClassName =
+    "text-fine leading-[1.3] font-medium text-muted-foreground hover:text-foreground px-2 py-1 rounded-md hover:bg-surface-2 transition-colors duration-fast";
 
   return (
     <div className="flex items-center gap-1">
-      <button
-        type="button"
-        onClick={() => setContextPanel("project")}
-        className="text-xs font-medium text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-foreground/[0.05] transition-colors"
-      >
+      <button type="button" onClick={() => setContextPanel("project")} className={actionClassName}>
         Context
       </button>
-      <button
-        type="button"
-        onClick={() => setContextPanel("packs")}
-        className="text-xs font-medium text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-foreground/[0.05] transition-colors"
-      >
+      <button type="button" onClick={() => setContextPanel("packs")} className={actionClassName}>
         Packs
       </button>
       <button
         type="button"
         onClick={() => setContextPanel("workflows")}
-        className="text-xs font-medium text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-foreground/[0.05] transition-colors"
+        className={actionClassName}
       >
         Workflows
       </button>
       <button
         type="button"
         onClick={() => setContextPanel("preflight")}
-        className="text-xs font-medium text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-foreground/[0.05] transition-colors"
+        className={actionClassName}
       >
         Preflight
       </button>

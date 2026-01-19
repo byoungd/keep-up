@@ -61,6 +61,17 @@ export function Dialog({
   const dialogId = React.useId();
   const titleId = `${dialogId}-title`;
   const descId = `${dialogId}-desc`;
+  const motionDuration = React.useMemo(() => {
+    if (typeof window === "undefined") {
+      return 0.2;
+    }
+    const raw = window
+      .getComputedStyle(document.documentElement)
+      .getPropertyValue("--duration-normal")
+      .trim();
+    const parsed = Number.parseFloat(raw);
+    return Number.isNaN(parsed) ? 0.2 : parsed / 1000;
+  }, []);
 
   // Handle ESC key manually (FocusScope handles focus, but we need to control open state)
   React.useEffect(() => {
@@ -113,7 +124,7 @@ export function Dialog({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
+              transition={{ duration: motionDuration }}
               className="absolute inset-0 bg-background/60 backdrop-blur-sm pointer-events-auto"
               onClick={closeOnBackdropClick ? () => onOpenChange(false) : undefined}
               aria-hidden="true"
@@ -128,7 +139,7 @@ export function Dialog({
               initial={{ opacity: 0, scale: 0.95, y: -10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: -10 }}
-              transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}
+              transition={{ duration: motionDuration, ease: [0.4, 0, 0.2, 1] }}
               className={cn("relative w-full p-4 pointer-events-auto", SIZE_CLASSES[size])}
               tabIndex={-1}
             >
@@ -156,7 +167,7 @@ export function Dialog({
                     <button
                       type="button"
                       onClick={() => onOpenChange(false)}
-                      className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors"
+                      className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors duration-fast"
                       aria-label="Close dialog"
                     >
                       <X className="h-4 w-4" />

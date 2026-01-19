@@ -22,10 +22,10 @@ export function ArtifactPreviewPane({ item, onClose, className }: ArtifactPrevie
 
   const iconColor =
     item.type === "image"
-      ? "text-purple-500"
+      ? "text-accent-violet"
       : item.type === "link"
-        ? "text-orange-500"
-        : "text-blue-500";
+        ? "text-accent-amber"
+        : "text-accent-indigo";
 
   return (
     <motion.div
@@ -55,7 +55,7 @@ export function ArtifactPreviewPane({ item, onClose, className }: ArtifactPrevie
               href={item.url}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-1.5 text-xs text-blue-500 hover:text-blue-400 transition-colors px-2 py-1 rounded-md hover:bg-surface-2"
+              className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors duration-fast px-2 py-1 rounded-md hover:bg-surface-2"
             >
               Open
               <ExternalLink className="w-3 h-3" />
@@ -64,7 +64,7 @@ export function ArtifactPreviewPane({ item, onClose, className }: ArtifactPrevie
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors"
+            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors duration-fast"
             aria-label="Close preview"
           >
             <X className="w-4 h-4" />
@@ -73,7 +73,7 @@ export function ArtifactPreviewPane({ item, onClose, className }: ArtifactPrevie
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4 bg-surface-2/5">
+      <div className="flex-1 overflow-y-auto scrollbar-auto-hide p-4 bg-surface-2/5">
         {item.type === "image" ? (
           <div className="flex items-center justify-center min-h-full">
             <img
@@ -84,8 +84,8 @@ export function ArtifactPreviewPane({ item, onClose, className }: ArtifactPrevie
           </div>
         ) : item.type === "link" ? (
           <div className="flex flex-col items-center justify-center h-full text-center gap-4 text-muted-foreground">
-            <div className="w-16 h-16 rounded-2xl bg-orange-500/10 flex items-center justify-center">
-              <LinkIcon className="w-8 h-8 text-orange-500" />
+            <div className="w-16 h-16 rounded-2xl bg-accent-amber/10 flex items-center justify-center">
+              <LinkIcon className="w-8 h-8 text-accent-amber" />
             </div>
             <div className="max-w-md">
               <p className="text-sm">Link previews are disabled in this environment.</p>
@@ -93,7 +93,7 @@ export function ArtifactPreviewPane({ item, onClose, className }: ArtifactPrevie
                 href={item.url}
                 target="_blank"
                 rel="noreferrer"
-                className="text-xs text-blue-500 hover:underline break-all mt-2 block"
+                className="text-xs text-primary hover:underline break-all mt-2 block"
               >
                 {item.url}
               </a>

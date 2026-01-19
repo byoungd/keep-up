@@ -78,7 +78,7 @@ export function PreviewDialog({ open, onOpenChange, artifact }: PreviewDialogPro
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto bg-surface-2/30 relative">
+      <div className="flex-1 overflow-y-auto scrollbar-auto-hide bg-surface-2/30 relative">
         <div className="max-w-4xl mx-auto p-8 min-h-full">{renderContent(artifact)}</div>
       </div>
 
@@ -87,10 +87,10 @@ export function PreviewDialog({ open, onOpenChange, artifact }: PreviewDialogPro
           <Button
             variant="ghost"
             size="sm"
-            className="rounded-full h-9 px-4 gap-2 text-muted-foreground hover:text-foreground"
+            className="rounded-full h-9 px-4 gap-2 text-muted-foreground hover:text-foreground transition-colors duration-fast"
             onClick={handleCopy}
           >
-            {isCopied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+            {isCopied ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
             <span>{isCopied ? "Copied" : "Copy"}</span>
           </Button>
 
@@ -189,9 +189,9 @@ function renderContent(artifact: ArtifactItem) {
         <div className="rounded-xl overflow-hidden border border-border/20 bg-surface-1">
           <div className="flex items-center px-4 py-2 border-b border-border/10 bg-surface-2/30">
             <div className="flex gap-1.5">
-              <div className="w-3 h-3 rounded-full bg-red-500/20" />
-              <div className="w-3 h-3 rounded-full bg-yellow-500/20" />
-              <div className="w-3 h-3 rounded-full bg-green-500/20" />
+              <div className="w-3 h-3 rounded-full bg-error/20" />
+              <div className="w-3 h-3 rounded-full bg-warning/20" />
+              <div className="w-3 h-3 rounded-full bg-success/20" />
             </div>
           </div>
           <pre className="p-4 overflow-x-auto text-sm font-mono leading-relaxed bg-transparent">

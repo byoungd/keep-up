@@ -60,7 +60,7 @@ export function ProjectContextPanel({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="flex flex-col h-full bg-surface-0 border-l border-border shadow-xl w-[600px] animate-in slide-in-from-right duration-300">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-surface-50/50 backdrop-blur-sm">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-surface-1/50 backdrop-blur-sm">
         <div>
           <h2 className="text-lg font-semibold text-foreground">Project Context (AGENTS.md)</h2>
           <p className="text-xs text-muted-foreground">
@@ -73,7 +73,7 @@ export function ProjectContextPanel({ onClose }: { onClose: () => void }) {
           <button
             type="button"
             onClick={onClose}
-            className="p-2 hover:bg-surface-100 rounded-md text-muted-foreground hover:text-foreground transition-colors"
+            className="p-2 hover:bg-surface-2 rounded-md text-muted-foreground hover:text-foreground transition-colors duration-fast"
           >
             ✕
           </button>
@@ -99,13 +99,13 @@ export function ProjectContextPanel({ onClose }: { onClose: () => void }) {
         />
       </div>
 
-      <div className="px-6 py-4 border-t border-border bg-surface-50 flex items-center justify-between gap-4">
+      <div className="px-6 py-4 border-t border-border bg-surface-1 flex items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           {mode === "view" ? (
             <button
               type="button"
               onClick={() => setMode("edit")}
-              className="px-4 py-2 text-sm font-medium text-foreground bg-surface-100 border border-border rounded-md hover:bg-surface-200 transition-colors"
+              className="px-4 py-2 text-sm font-medium text-foreground bg-surface-1 border border-border rounded-md hover:bg-surface-2 transition-colors duration-fast"
             >
               Edit Manually
             </button>
@@ -115,7 +115,7 @@ export function ProjectContextPanel({ onClose }: { onClose: () => void }) {
                 type="button"
                 onClick={handleSave}
                 disabled={isLoading}
-                className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 transition-colors shadow-sm disabled:opacity-50"
+                className="px-4 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-md hover:bg-primary/90 transition-colors duration-fast shadow-sm disabled:opacity-50"
               >
                 Save Changes
               </button>
@@ -125,7 +125,7 @@ export function ProjectContextPanel({ onClose }: { onClose: () => void }) {
                   setMode("view");
                   loadContext(); // Revert
                 }}
-                className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors duration-fast"
               >
                 Cancel
               </button>
@@ -138,7 +138,7 @@ export function ProjectContextPanel({ onClose }: { onClose: () => void }) {
           onClick={handleGenerate}
           disabled={isGenerating || mode === "edit"}
           className={cn(
-            "px-4 py-2 text-sm font-medium text-primary-600 bg-primary-50 border border-primary-200 rounded-md hover:bg-primary-100 transition-colors shadow-sm flex items-center gap-2",
+            "px-4 py-2 text-sm font-medium text-primary bg-primary/10 border border-primary/20 rounded-md hover:bg-primary/15 transition-colors duration-fast shadow-sm flex items-center gap-2",
             isGenerating ? "opacity-70 cursor-wait" : ""
           )}
         >

@@ -15,20 +15,20 @@ export function MinimalTaskView({ task, content }: { task: AgentTask; content?: 
   const hasDetails = (task.thoughts?.length ?? 0) > 0 || task.steps.length > 0;
 
   return (
-    <div className="flex flex-col gap-3 w-full animate-in fade-in slide-in-from-bottom-2 duration-300">
+    <div className="flex flex-col gap-3 w-full animate-in fade-in slide-in-from-bottom-2 duration-slow">
       {/* 1. Ultra-Minimal Thinking Toggle */}
       {hasDetails && (
         <div className="flex flex-col items-start gap-1">
           <button
             type="button"
             onClick={() => setIsDetailsOpen(!isDetailsOpen)}
-            className="group flex items-center gap-2 text-fine font-mono text-muted-foreground/60 hover:text-muted-foreground transition-colors select-none"
+            className="group flex items-center gap-2 text-fine font-mono text-muted-foreground/60 hover:text-muted-foreground transition-colors duration-fast select-none"
           >
             <span className="flex items-center gap-1.5">
               {isRunning ? (
                 <span className="relative flex h-1.5 w-1.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-sky-500" />
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-info/70 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-info" />
                 </span>
               ) : (
                 <span className="text-micro opacity-70">Model Process</span>
@@ -38,7 +38,7 @@ export function MinimalTaskView({ task, content }: { task: AgentTask; content?: 
               </span>
             </span>
             <svg
-              className={`w-3 h-3 opacity-40 transition-transform duration-200 ${isDetailsOpen ? "rotate-180" : ""}`}
+              className={`w-3 h-3 opacity-40 transition-transform duration-normal ${isDetailsOpen ? "rotate-180" : ""}`}
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -85,7 +85,7 @@ export function MinimalTaskView({ task, content }: { task: AgentTask; content?: 
           {visibleArtifacts.map((artifact) => (
             <div
               key={artifact.id}
-              className="inline-flex items-center gap-1.5 text-xs text-primary/80 hover:text-primary transition-colors cursor-pointer hover:underline decoration-primary/30 underline-offset-4"
+              className="inline-flex items-center gap-1.5 text-xs text-primary/80 hover:text-primary transition-colors duration-fast cursor-pointer hover:underline decoration-primary/30 underline-offset-4"
             >
               {artifact.type === "diff" ? (
                 <svg
@@ -154,10 +154,10 @@ function ThinkingNodeDisplay({ node }: { node: TaskNode & { type: "thinking" } }
 
 function ToolCallNodeDisplay({ node }: { node: TaskNode & { type: "tool_call" } }) {
   return (
-    <div className={`${BASE_NODE_CLASSES} bg-accent-blue/5 border-accent-blue/20 text-accent-blue`}>
+    <div className={`${BASE_NODE_CLASSES} bg-info/5 border-info/20 text-info`}>
       <div className="flex items-center justify-between mb-1.5">
         <div className="flex items-center gap-2">
-          <div className="p-1 bg-accent-blue/10 rounded-lg">
+          <div className="p-1 bg-info/10 rounded-lg">
             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <title>Tool</title>
               <path
@@ -177,8 +177,8 @@ function ToolCallNodeDisplay({ node }: { node: TaskNode & { type: "tool_call" } 
             <span
               className={`text-nano px-2 py-0.5 rounded-full font-black uppercase tracking-tighter ${
                 node.riskLevel === "high"
-                  ? "bg-accent-red text-background"
-                  : "bg-accent-amber/20 text-accent-amber"
+                  ? "bg-error text-error-foreground"
+                  : "bg-warning/20 text-warning"
               }`}
             >
               {node.riskLevel} Risk
@@ -186,7 +186,7 @@ function ToolCallNodeDisplay({ node }: { node: TaskNode & { type: "tool_call" } 
           </div>
         )}
       </div>
-      <div className="font-mono text-micro bg-black/5 dark:bg-white/5 rounded-lg p-2 overflow-x-auto border border-black/5">
+      <div className="font-mono text-micro bg-surface-2/50 rounded-lg p-2 overflow-x-auto border border-border/40">
         <pre>{JSON.stringify(node.args, null, 2)}</pre>
       </div>
     </div>
@@ -198,14 +198,12 @@ function ToolOutputDisplay({ node }: { node: TaskNode & { type: "tool_output" } 
     <div
       className={`${BASE_NODE_CLASSES} ${
         node.isError
-          ? "bg-accent-red/5 border-accent-red/20 text-accent-red"
-          : "bg-accent-emerald/5 border-accent-emerald/20 text-accent-emerald"
+          ? "bg-error/5 border-error/20 text-error"
+          : "bg-success/5 border-success/20 text-success"
       }`}
     >
       <div className="flex items-center gap-2 mb-1.5">
-        <div
-          className={`p-1 rounded-lg ${node.isError ? "bg-accent-red/10" : "bg-accent-emerald/10"}`}
-        >
+        <div className={`p-1 rounded-lg ${node.isError ? "bg-error/10" : "bg-success/10"}`}>
           <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <title>Output</title>
             <path
@@ -225,7 +223,7 @@ function ToolOutputDisplay({ node }: { node: TaskNode & { type: "tool_output" } 
           {node.activityLabel && (node.isError ? " Failed" : " Complete")}
         </span>
       </div>
-      <div className="opacity-90 font-mono text-micro bg-black/5 dark:bg-white/5 p-2 rounded-lg border border-black/5 overflow-hidden">
+      <div className="opacity-90 font-mono text-micro bg-surface-2/50 p-2 rounded-lg border border-border/40 overflow-hidden">
         <div className="break-all line-clamp-6">
           {typeof node.output === "string" ? node.output : JSON.stringify(node.output)}
         </div>
@@ -242,19 +240,19 @@ function StatusNodeDisplay({
   duration?: string;
 }) {
   return (
-    <div className="flex items-center gap-4 py-3 px-2 animate-in fade-in slide-in-from-left-2 duration-700">
+    <div className="flex items-center gap-4 py-3 px-2 animate-in fade-in slide-in-from-left-2 duration-slow">
       <div className="relative">
         <div
           className={`w-3 h-3 rounded-full shrink-0 shadow-sm ${
             node.status === "completed"
-              ? "bg-accent-emerald"
+              ? "bg-success"
               : node.status === "failed"
-                ? "bg-accent-red"
-                : "bg-accent-blue animate-pulse"
+                ? "bg-error"
+                : "bg-info animate-pulse"
           }`}
         />
         {node.status === "running" && (
-          <div className="absolute inset-0 bg-accent-blue rounded-full animate-ping opacity-20" />
+          <div className="absolute inset-0 bg-info rounded-full animate-ping opacity-20" />
         )}
       </div>
       <div className="flex flex-col gap-0.5 flex-1 min-w-0">
@@ -289,7 +287,7 @@ function StatusNodeDisplay({
 function ErrorNodeDisplay({ node }: { node: TaskNode & { type: "error" } }) {
   return (
     <div
-      className={`${BASE_NODE_CLASSES} bg-accent-red border-accent-red/30 text-background font-bold shadow-accent-red/20`}
+      className={`${BASE_NODE_CLASSES} bg-error border-error/30 text-error-foreground font-bold shadow-error/20`}
     >
       <div className="flex items-center gap-2 mb-1.5 uppercase font-black tracking-tighter text-tiny">
         <div className="p-1 bg-white/20 rounded-lg">

@@ -20,6 +20,21 @@ body {
   line-height: var(--line-height-content);
 }
 
+.text-chrome {
+  font-size: var(--font-size-chrome);
+  line-height: var(--line-height-chrome);
+}
+
+.text-fine {
+  font-size: var(--font-size-fine);
+  line-height: var(--line-height-fine);
+}
+
+.text-content {
+  font-size: var(--font-size-content);
+  line-height: var(--line-height-content);
+}
+
 .card-panel {
   background: color-mix(in srgb, var(--color-surface-1) 82%, transparent);
   border-radius: var(--radius-2xl);

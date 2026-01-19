@@ -61,7 +61,7 @@ export const ListRow = React.forwardRef<HTMLButtonElement, ListRowProps>(
         data-disabled={disabled ? "" : undefined}
         data-value={value}
         className={cn(
-          "flex items-center gap-3 w-full rounded-md outline-none transition-colors",
+          "flex items-center gap-3 w-full rounded-md outline-none transition-colors duration-fast",
           "text-left text-foreground",
           "hover:bg-surface-2 focus-visible:bg-surface-2",
           "data-[selected=true]:bg-primary/10 data-[selected=true]:text-primary",

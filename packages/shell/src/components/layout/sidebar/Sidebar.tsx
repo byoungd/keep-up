@@ -165,10 +165,7 @@ export const Sidebar = React.memo(function Sidebar({
       <nav
         aria-label="Sidebar navigation"
         className={cn(
-          "flex-1 overflow-y-auto px-3 py-2 space-y-4 outline-none",
-          "[&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent",
-          "[&::-webkit-scrollbar-thumb]:bg-transparent hover:[&::-webkit-scrollbar-thumb]:bg-border/40",
-          "[&::-webkit-scrollbar-thumb]:rounded-full transition-colors"
+          "flex-1 overflow-y-auto scrollbar-auto-hide px-3 py-2 space-y-4 outline-none"
         )}
       >
         {state.groups
@@ -208,7 +205,7 @@ export const Sidebar = React.memo(function Sidebar({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05]"
+                  className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors duration-fast"
                   aria-label={t("moreItems")}
                   title={t("moreItems")}
                 >
@@ -241,7 +238,7 @@ export const Sidebar = React.memo(function Sidebar({
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05]"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors duration-fast"
               onClick={onOpenCustomize}
               aria-label={t("customize")}
             >
@@ -256,7 +253,7 @@ export const Sidebar = React.memo(function Sidebar({
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05]"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors duration-fast"
               onClick={() =>
                 window.open("https://github.com/Start-Rail/English-level-up-tips", "_blank")
               }

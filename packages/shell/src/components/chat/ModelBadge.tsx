@@ -47,7 +47,7 @@ export function ModelBadge({
     <span
       className={cn(
         "inline-flex items-center gap-1 rounded-full border bg-surface-1/70 text-muted-foreground",
-        fallbackNotice ? "border-amber-500/40 text-amber-600/90" : "border-border/50",
+        fallbackNotice ? "border-warning/40 text-warning/90" : "border-border/50",
         size === "sm" ? "px-2 py-0.5 text-micro" : "px-2.5 py-1 text-fine",
         className
       )}
@@ -56,7 +56,7 @@ export function ModelBadge({
       {showProviderLabel && <span className="font-medium">{providerLabel}</span>}
       {showProviderLabel && modelLabel && <span className="opacity-50">•</span>}
       {modelLabel && <span className="truncate max-w-[160px]">{modelLabel}</span>}
-      {fallbackNotice && <AlertTriangle className="h-3 w-3 text-amber-500" aria-hidden="true" />}
+      {fallbackNotice && <AlertTriangle className="h-3 w-3 text-warning" aria-hidden="true" />}
     </span>
   );
 }

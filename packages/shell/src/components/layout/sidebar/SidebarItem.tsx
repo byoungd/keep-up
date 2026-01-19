@@ -36,13 +36,13 @@ export const SidebarItem = React.memo(function SidebarItem({
       href={href}
       aria-current={isActive ? "page" : undefined}
       className={cn(
-        "sidebar-item group relative flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors cursor-pointer",
+        "sidebar-item group relative flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors duration-fast cursor-pointer",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         isActive
           ? "bg-foreground/[0.08] text-foreground font-medium"
           : isContextSelected
             ? "text-foreground/80"
-            : "text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground"
+            : "text-muted-foreground hover:bg-surface-2 hover:text-foreground"
       )}
       data-value={href}
     >
@@ -51,7 +51,7 @@ export const SidebarItem = React.memo(function SidebarItem({
       {Icon && (
         <Icon
           className={cn(
-            "h-4 w-4 shrink-0 transition-colors opacity-70 group-hover:opacity-100 group-hover:text-foreground",
+            "h-4 w-4 shrink-0 transition-colors duration-fast opacity-70 group-hover:opacity-100 group-hover:text-foreground",
             isActive
               ? "text-foreground opacity-100"
               : isContextSelected
@@ -74,7 +74,7 @@ export const SidebarItem = React.memo(function SidebarItem({
         <Badge
           variant="secondary"
           className={cn(
-            "ml-auto shrink-0 transition-all",
+            "ml-auto shrink-0 transition-all duration-fast",
             badgeStyle === "DOT"
               ? "h-1.5 w-1.5 min-w-0 p-0 rounded-full bg-primary"
               : "text-micro h-4 min-w-4 px-1 bg-surface-3 text-muted-foreground"
