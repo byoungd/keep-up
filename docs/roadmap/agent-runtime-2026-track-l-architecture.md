@@ -111,8 +111,8 @@ graph TD
 
 ### Phase 2: Core Interfaces and Composition Root
 - [x] Extract runtime interfaces and shared types into `agent-runtime-core`.
-- [ ] Define `RuntimeComponents` wiring contract.
-- [ ] Design `createRuntime` composition factory for explicit DI.
+- [x] Define `RuntimeComponents` wiring contract.
+- [x] Design `createRuntime` composition factory for explicit DI.
 - [x] Break circular dependencies per RFC Cycle Resolution Plan.
 
 ### Phase 3: Package Extraction
