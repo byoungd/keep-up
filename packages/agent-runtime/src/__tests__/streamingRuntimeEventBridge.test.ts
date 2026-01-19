@@ -2,8 +2,8 @@
  * Runtime Event Stream Bridge Tests
  */
 
+import { createEventBus } from "@ku0/agent-runtime-control";
 import { describe, expect, it } from "vitest";
-import { createEventBus } from "../events";
 import { attachRuntimeEventStreamBridge, collectStream, createStreamWriter } from "../streaming";
 import type { ArtifactEnvelope } from "../types";
 

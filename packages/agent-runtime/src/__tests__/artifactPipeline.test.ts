@@ -2,11 +2,11 @@
  * Artifact Pipeline Tests
  */
 
+import type { ArtifactEvents, RuntimeEvent } from "@ku0/agent-runtime-control";
+import { createEventBus } from "@ku0/agent-runtime-control";
 import { describe, expect, it } from "vitest";
 import type { ArtifactEnvelope } from "../artifacts";
 import { createArtifactPipeline, createArtifactRegistry } from "../artifacts";
-import type { ArtifactEvents, RuntimeEvent } from "../events";
-import { createEventBus } from "../events";
 import { createTaskGraphStore } from "../tasks/taskGraph";
 
 function createPlanArtifact(overrides: Partial<ArtifactEnvelope> = {}): ArtifactEnvelope {

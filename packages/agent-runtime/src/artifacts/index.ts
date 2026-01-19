@@ -4,8 +4,8 @@
  * Stores structured artifacts and validates payloads before emission.
  */
 
+import type { RuntimeEventBus } from "@ku0/agent-runtime-control";
 import { z } from "zod";
-import type { RuntimeEventBus } from "../events/eventBus";
 import type { TaskGraphStore } from "../tasks/taskGraph";
 import type { ArtifactEnvelope, ArtifactType } from "../types";
 

@@ -118,6 +118,7 @@ graph TD
 ### Phase 3: Package Extraction
 - [x] Extract telemetry/logging into `agent-runtime-telemetry`.
 - [x] Extract memory into `agent-runtime-memory`.
+- [x] Extract events into `agent-runtime-control`.
 - [ ] Create package scaffolding and move plane modules.
 - [ ] Move integrations into sandbox and memory packages.
 - [ ] Move tool registry and servers into tooling package.

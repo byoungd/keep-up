@@ -10,7 +10,7 @@ import type {
   RuntimeEventBus,
   SubagentEventPayload,
   Subscription,
-} from "../events/eventBus";
+} from "@ku0/agent-runtime-control";
 import type { ExecutionDecision, ToolExecutionRecord } from "../types";
 import {
   formatToolActivityLabel,

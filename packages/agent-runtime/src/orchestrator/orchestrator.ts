@@ -12,6 +12,7 @@
  * - Streaming support for real-time feedback
  */
 
+import { getGlobalEventBus, type RuntimeEventBus } from "@ku0/agent-runtime-control";
 import type {
   IMetricsCollector,
   ITracer,
@@ -29,7 +30,6 @@ import type {
 } from "../artifacts";
 import { createArtifactPipeline, createArtifactRegistry } from "../artifacts";
 import type { ContextFrameBuilder, ContextItem } from "../context";
-import { getGlobalEventBus, type RuntimeEventBus } from "../events/eventBus";
 import {
   createToolExecutor,
   type ToolConfirmationDetailsProvider,
