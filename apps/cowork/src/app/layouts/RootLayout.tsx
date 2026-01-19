@@ -7,6 +7,7 @@ import {
   TooltipProvider,
 } from "@ku0/shell";
 import { Link, Outlet, useLocation, useRouter } from "@tanstack/react-router";
+import { LayoutGroup } from "framer-motion";
 import { Sparkles } from "lucide-react";
 import React from "react";
 import { CoworkSidebarSections } from "../../components/sidebar/CoworkSidebarSections";
@@ -301,30 +302,32 @@ export function RootLayout() {
           }}
         >
           <ReaderPreferencesProvider>
-            <AppShell
-              rightPanel={aiPanelElement}
-              auxPanel={contextPanel}
-              appName="KeepUp"
-              sidebarProps={{
-                showSearch: false,
-                renderGroup: renderSidebarGroup,
-                newAction: {
-                  label: "New Session",
-                  ariaLabel: "New Session",
-                  icon: Sparkles,
-                  onClick: () => router.navigate({ to: "/new-session" }),
-                },
-              }}
-              layoutStyle="arc"
-              headerProps={{
-                leftSlot: (
-                  <span className="font-semibold text-sm text-foreground">Cowork Agent</span>
-                ),
-                rightSlot: <AIHeaderActions />,
-              }}
-            >
-              <Outlet />
-            </AppShell>
+            <LayoutGroup id="artifact-preview">
+              <AppShell
+                rightPanel={aiPanelElement}
+                auxPanel={contextPanel}
+                appName="KeepUp"
+                sidebarProps={{
+                  showSearch: false,
+                  renderGroup: renderSidebarGroup,
+                  newAction: {
+                    label: "New Session",
+                    ariaLabel: "New Session",
+                    icon: Sparkles,
+                    onClick: () => router.navigate({ to: "/new-session" }),
+                  },
+                }}
+                layoutStyle="arc"
+                headerProps={{
+                  leftSlot: (
+                    <span className="font-semibold text-sm text-foreground">Cowork Agent</span>
+                  ),
+                  rightSlot: <AIHeaderActions />,
+                }}
+              >
+                <Outlet />
+              </AppShell>
+            </LayoutGroup>
           </ReaderPreferencesProvider>
         </ReaderShellProvider>
       </TooltipProvider>

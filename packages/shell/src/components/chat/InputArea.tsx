@@ -87,6 +87,7 @@ export function InputArea({
   const charCount = input.length;
   const isOverLimit = charCount > MAX_CHARS;
   const hasContent = input.trim().length > 0;
+  const isProcessing = isLoading || isStreaming;
 
   const slashCommandProps = React.useMemo(
     () => ({
@@ -291,6 +292,13 @@ export function InputArea({
           models={models}
           onSelectModel={onSelectModel}
         />
+
+        {isProcessing && (
+          <div
+            className="ai-sheen-line pointer-events-none absolute inset-x-0 bottom-0"
+            aria-hidden="true"
+          />
+        )}
       </motion.div>
 
       {/* Hidden File Input */}

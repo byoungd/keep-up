@@ -1,4 +1,5 @@
 import { cn } from "@ku0/shared/utils";
+import { motion } from "framer-motion";
 import {
   AlertCircle,
   CheckCircle2,
@@ -148,9 +149,11 @@ export function StepItem({
             ))}
             {/* File artifacts attached to step */}
             {artifacts?.map((art) => (
-              <button
+              <motion.button
                 type="button"
                 key={art.id}
+                layoutId={`artifact-${art.id}`}
+                transition={{ duration: 0.2, ease: "easeOut" }}
                 onClick={(e) => {
                   e.stopPropagation();
                   onPreview?.(art);
@@ -159,7 +162,7 @@ export function StepItem({
               >
                 <FileText className="h-3 w-3 opacity-60" />
                 {art.title}
-              </button>
+              </motion.button>
             ))}
           </div>
         </div>

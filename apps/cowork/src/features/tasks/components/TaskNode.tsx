@@ -134,16 +134,20 @@ export function MinimalTaskView({ task, content }: { task: AgentTask; content?: 
 // --- Specialized Node Displays ---
 
 const BASE_NODE_CLASSES =
-  "animate-in fade-in slide-in-from-left-4 duration-500 fill-mode-both px-3 py-2 rounded-xl text-xs shadow-sm overflow-hidden border border-border/20";
+  "relative animate-in fade-in slide-in-from-left-4 duration-500 fill-mode-both px-3 py-2 rounded-xl text-xs shadow-sm overflow-hidden border border-border/20";
 
 function ThinkingNodeDisplay({ node }: { node: TaskNode & { type: "thinking" } }) {
   return (
     <div className={`${BASE_NODE_CLASSES} bg-surface-1 text-muted-foreground italic font-mono`}>
+      <div
+        className="ai-sheen-line pointer-events-none absolute inset-x-0 top-0"
+        aria-hidden="true"
+      />
       <div className="flex items-center gap-2 opacity-60 mb-1.5">
         <div className="flex space-x-0.5">
-          <div className="w-1 h-1 bg-muted-foreground rounded-full animate-bounce [animation-delay:-0.3s]" />
-          <div className="w-1 h-1 bg-muted-foreground rounded-full animate-bounce [animation-delay:-0.15s]" />
-          <div className="w-1 h-1 bg-muted-foreground rounded-full animate-bounce" />
+          <div className="w-1 h-1 bg-muted-foreground/60 rounded-full" />
+          <div className="w-1 h-1 bg-muted-foreground/60 rounded-full" />
+          <div className="w-1 h-1 bg-muted-foreground/60 rounded-full" />
         </div>
         <span className="text-micro uppercase font-bold tracking-widest">Internal Logic</span>
       </div>

@@ -130,7 +130,7 @@
   --color-accent-ai-sheen: linear-gradient(
     90deg,
     transparent,
-    rgba(124, 58, 237, 0.5),
+    rgba(139, 92, 246, 0.6),
     transparent
   );
   /* Softer highlights for comfortable reading (matches /app AnnotationSpan style) */

@@ -57,8 +57,10 @@ function AttachmentCard({ artifact, onClick }: { artifact: ArtifactItem; onClick
   const Icon = getArtifactIcon(artifact.type);
 
   return (
-    <button
+    <motion.button
       type="button"
+      layoutId={`artifact-${artifact.id}`}
+      transition={{ duration: 0.2, ease: "easeOut" }}
       onClick={onClick}
       className="flex items-center gap-3 p-3 bg-surface-1 border border-border/40 rounded-lg hover:border-primary/30 hover:bg-surface-1/80 hover:shadow-md transition-all duration-normal group cursor-pointer active:scale-[0.99]"
     >
@@ -91,7 +93,7 @@ function AttachmentCard({ artifact, onClick }: { artifact: ArtifactItem; onClick
       >
         <Download className="w-4 h-4" />
       </span>
-    </button>
+    </motion.button>
   );
 }
 
