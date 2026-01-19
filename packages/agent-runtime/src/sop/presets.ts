@@ -24,10 +24,13 @@ export const CODER_SOP: RoleDefinition = {
     { name: "plan", allowedTools: ["read_file", "search_code"] },
     { name: "implement", allowedTools: ["write_file", "read_file"] },
     { name: "verify", allowedTools: ["run_command", "read_file"] },
+    { name: "review", allowedTools: ["read_file", "search_code", "list_dir"] },
+    { name: "complete", allowedTools: [] },
   ],
   qualityGates: [
     { after: "implement", check: "tests_exist" },
     { after: "verify", check: "tests_pass" },
+    { after: "review", check: "risk_reported" },
   ],
   maxReactLoop: 15,
 };

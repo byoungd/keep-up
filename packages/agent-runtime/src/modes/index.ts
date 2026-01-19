@@ -1,7 +1,7 @@
 /**
  * Agent Modes
  *
- * Plan Mode and Build Mode for controlled agent operation.
+ * Plan, Review, and Build Modes for controlled agent operation.
  */
 
 export {
@@ -11,6 +11,7 @@ export {
   createAgentModeManager,
   type ModeConfig,
   PLAN_MODE,
+  REVIEW_MODE,
 } from "./AgentModeManager";
 export { createModePolicyEngine, ModeToolPolicyEngine } from "./modePolicy";
 

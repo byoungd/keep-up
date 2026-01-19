@@ -107,8 +107,8 @@ Artifacts are mandatory for traceability and review.
 |----------|---------|-----------------|
 | PlanCard | Task plan and file targets | summary, steps, files |
 | DiffCard | Structured change summary | files, hunks, rationale |
-| TestReport | Test commands + results | command, status, duration |
-| ReviewReport | Risk + regression notes | risks, recommendations |
+| TestReport | Test commands + results | command, status, durationMs |
+| ReviewReport | Risk + regression notes | summary, risks, recommendations |
 
 ---
 

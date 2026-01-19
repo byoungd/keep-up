@@ -582,7 +582,13 @@ export interface ToolExecutionRecord {
 // Artifact Types
 // ============================================================================
 
-export type ArtifactType = "PlanCard" | "DiffCard" | "ReportCard" | "ChecklistCard";
+export type ArtifactType =
+  | "PlanCard"
+  | "DiffCard"
+  | "ReportCard"
+  | "ChecklistCard"
+  | "TestReport"
+  | "ReviewReport";
 
 export interface ArtifactEnvelope {
   id: string;

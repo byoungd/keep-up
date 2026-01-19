@@ -162,6 +162,14 @@ describe("SOPExecutor", () => {
       await executor.advancePhase();
       expect(executor.getCurrentPhase()).toBe("verify");
       expect(executor.getAllowedTools()).toEqual(["run_command", "read_file"]);
+
+      await executor.advancePhase();
+      expect(executor.getCurrentPhase()).toBe("review");
+      expect(executor.getAllowedTools()).toEqual(["read_file", "search_code", "list_dir"]);
+
+      await executor.advancePhase();
+      expect(executor.getCurrentPhase()).toBe("complete");
+      expect(executor.getAllowedTools()).toEqual([]);
     });
 
     it("should reset to first phase", async () => {
@@ -272,7 +280,8 @@ describe("SOPExecutor", () => {
       await executor.advancePhase(); // understand -> plan
       await executor.advancePhase(); // plan -> implement
       await executor.advancePhase(); // implement -> verify (passes tests_exist)
-      await executor.advancePhase(); // verify -> complete (passes tests_pass)
+      await executor.advancePhase(); // verify -> review (passes tests_pass)
+      await executor.advancePhase(); // review -> complete (passes risk_reported)
 
       expect(executor.getCurrentPhase()).toBe("complete");
     });
@@ -291,10 +300,12 @@ describe("SOPExecutor", () => {
       await executor.advancePhase(); // understand -> plan (no gates)
       await executor.advancePhase(); // plan -> implement (no gates)
       await executor.advancePhase(); // implement -> verify (tests_exist gate)
-      await executor.advancePhase(); // verify -> complete (tests_pass gate)
+      await executor.advancePhase(); // verify -> review (tests_pass gate)
+      await executor.advancePhase(); // review -> complete (risk_reported gate)
 
       expect(checkedGates).toContain("tests_exist");
       expect(checkedGates).toContain("tests_pass");
+      expect(checkedGates).toContain("risk_reported");
     });
   });
 
@@ -308,10 +319,9 @@ describe("SOPExecutor", () => {
       const executor = createSOPExecutor(CODER_SOP);
 
       // Advance to completion
-      await executor.advancePhase();
-      await executor.advancePhase();
-      await executor.advancePhase();
-      await executor.advancePhase();
+      for (let i = 0; i < CODER_SOP.phases.length; i++) {
+        await executor.advancePhase();
+      }
 
       expect(executor.getCurrentPhase()).toBe("complete");
       expect(executor.isComplete()).toBe(true);
@@ -321,10 +331,9 @@ describe("SOPExecutor", () => {
       const executor = createSOPExecutor(CODER_SOP);
 
       // Advance to completion
-      await executor.advancePhase();
-      await executor.advancePhase();
-      await executor.advancePhase();
-      await executor.advancePhase();
+      for (let i = 0; i < CODER_SOP.phases.length; i++) {
+        await executor.advancePhase();
+      }
 
       await expect(executor.advancePhase()).rejects.toThrow(NoMorePhasesError);
     });
@@ -336,7 +345,7 @@ describe("SOPExecutor", () => {
 
       const role = executor.getRole();
       expect(role.name).toBe("Coder");
-      expect(role.phases).toHaveLength(4);
+      expect(role.phases).toHaveLength(6);
     });
   });
 });
@@ -349,14 +358,21 @@ describe("Preset SOPs", () => {
   describe("CODER_SOP", () => {
     it("should have correct structure", () => {
       expect(CODER_SOP.name).toBe("Coder");
-      expect(CODER_SOP.phases).toHaveLength(4);
-      expect(CODER_SOP.qualityGates).toHaveLength(2);
+      expect(CODER_SOP.phases).toHaveLength(6);
+      expect(CODER_SOP.qualityGates).toHaveLength(3);
       expect(CODER_SOP.maxReactLoop).toBe(15);
     });
 
     it("should have phases in correct order", () => {
       const phaseNames = CODER_SOP.phases.map((p) => p.name);
-      expect(phaseNames).toEqual(["understand", "plan", "implement", "verify"]);
+      expect(phaseNames).toEqual([
+        "understand",
+        "plan",
+        "implement",
+        "verify",
+        "review",
+        "complete",
+      ]);
     });
   });
 
@@ -445,11 +461,18 @@ describe("SOP Integration", () => {
     expect(executor.isToolAllowed("run_command")).toBe(true);
     expect(executor.isToolAllowed("write_file")).toBe(false);
 
-    // Phase 5: Complete (passes tests_pass gate)
+    // Phase 5: Review (passes tests_pass gate)
+    await executor.advancePhase();
+    events.push(`phase:${executor.getCurrentPhase()}`);
+    expect(executor.isToolAllowed("read_file")).toBe(true);
+    expect(executor.isToolAllowed("write_file")).toBe(false);
+
+    // Phase 6: Complete (passes risk_reported gate)
     await executor.advancePhase();
     events.push(`phase:${executor.getCurrentPhase()}`);
 
-    // Should be complete
+    // Mark completion after final phase
+    await executor.advancePhase();
     expect(executor.isComplete()).toBe(true);
 
     // Verify expected events
@@ -460,6 +483,8 @@ describe("SOP Integration", () => {
       "gate_check:tests_exist",
       "phase:verify",
       "gate_check:tests_pass",
+      "phase:review",
+      "gate_check:risk_reported",
       "phase:complete",
     ]);
   });
