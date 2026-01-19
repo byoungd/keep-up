@@ -20,6 +20,7 @@ export interface WebSearchResult {
   url: string;
   snippet: string;
   publishedDate?: string;
+  content?: string; // Full or partial content if available
 }
 
 /**
@@ -94,6 +95,297 @@ export class MockWebSearchProvider implements IWebSearchProvider {
       title: "Mock Page",
       content: `Mock content fetched from ${url}`,
       contentType: "text/plain",
+    };
+  }
+}
+
+// ============================================================================
+// Real Web Search Providers
+// ============================================================================
+
+interface TavilySearchResult {
+  title: string;
+  url: string;
+  content: string;
+  raw_content?: string;
+  published_date?: string;
+}
+
+interface TavilyResponse {
+  results: TavilySearchResult[];
+}
+
+interface TavilyRequestBody {
+  api_key: string;
+  query: string;
+  search_depth: "basic" | "advanced";
+  max_results: number;
+  include_answer: boolean;
+  include_images: boolean;
+  include_raw_content: boolean;
+  include_domains?: string[];
+  exclude_domains?: string[];
+  days?: number;
+}
+
+/**
+ * Tavily Search Provider
+ * API Docs: https://docs.tavily.com/docs/tavily-api/rest_api
+ */
+export class TavilyWebSearchProvider implements IWebSearchProvider {
+  readonly name = "tavily";
+  private readonly apiKey: string;
+
+  constructor(apiKey: string) {
+    this.apiKey = apiKey;
+  }
+
+  async search(query: string, options?: WebSearchOptions): Promise<WebSearchResult[]> {
+    const body: TavilyRequestBody = {
+      api_key: this.apiKey,
+      query,
+      search_depth: "basic",
+      max_results: options?.maxResults ?? 5,
+      include_answer: false,
+      include_images: false,
+      include_raw_content: false,
+    };
+
+    if (options?.allowedDomains && options.allowedDomains.length > 0) {
+      body.include_domains = options.allowedDomains;
+    }
+
+    if (options?.blockedDomains && options.blockedDomains.length > 0) {
+      body.exclude_domains = options.blockedDomains;
+    }
+
+    // Tavily 'days' parameter fits freshness roughly
+    if (options?.freshness) {
+      // Basic mapping: day -> 1, week -> 7, month -> 30, year -> 365
+      // The API takes 'days' as number of days back
+      switch (options.freshness) {
+        case "day":
+          body.days = 1;
+          break;
+        case "week":
+          body.days = 7;
+          break;
+        case "month":
+          body.days = 30;
+          break;
+        case "year":
+          body.days = 365;
+          break;
+      }
+    }
+
+    const response = await fetch("https://api.tavily.com/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Tavily API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = (await response.json()) as TavilyResponse;
+    const results = data.results || [];
+
+    return results.map((r) => ({
+      title: r.title,
+      url: r.url,
+      snippet: r.content, // Tavily 'content' is often a good snippet
+      content: r.raw_content,
+      publishedDate: r.published_date,
+    }));
+  }
+}
+
+interface SerperOrganicResult {
+  title: string;
+  link: string;
+  snippet: string;
+  date?: string;
+}
+
+interface SerperResponse {
+  organic: SerperOrganicResult[];
+}
+
+interface SerperRequestBody {
+  q: string;
+  num: number;
+  tbs?: string;
+}
+
+/**
+ * Serper (Google) Search Provider
+ * API Docs: https://serper.dev/playground
+ */
+export class SerperWebSearchProvider implements IWebSearchProvider {
+  readonly name = "serper";
+  private readonly apiKey: string;
+
+  constructor(apiKey: string) {
+    this.apiKey = apiKey;
+  }
+
+  async search(query: string, options?: WebSearchOptions): Promise<WebSearchResult[]> {
+    const body: SerperRequestBody = {
+      q: query,
+      num: options?.maxResults ?? 5,
+    };
+
+    if (options?.freshness) {
+      // Serper uses 'tbs' parameter for time range usually, but the documented JSON API
+      // supports a simplified 'date' or similar? Actually Serper API is simple.
+      // Checking docs: "tbs": "qdr:h" (hour), "qdr:d" (day), "qdr:w" (week), "qdr:m" (month), "qdr:y" (year)
+      switch (options.freshness) {
+        case "day":
+          body.tbs = "qdr:d";
+          break;
+        case "week":
+          body.tbs = "qdr:w";
+          break;
+        case "month":
+          body.tbs = "qdr:m";
+          break;
+        case "year":
+          body.tbs = "qdr:y";
+          break;
+      }
+    }
+
+    // Apply domain filtering via query modification
+    // Note: Serper doesn't strictly support domain filtering in the JSON body for all endpoints easily,
+    // usually handled via query "site:example.com".
+    let finalQuery = body.q;
+    if (options?.allowedDomains && options.allowedDomains.length > 0) {
+      finalQuery += ` site:${options.allowedDomains.join(" OR site:")}`;
+    }
+    if (options?.blockedDomains && options.blockedDomains.length > 0) {
+      finalQuery += ` -site:${options.blockedDomains.join(" -site:")}`;
+    }
+
+    const response = await fetch("https://google.serper.dev/search", {
+      method: "POST",
+      headers: {
+        "X-API-KEY": this.apiKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ ...body, q: finalQuery }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Serper API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = (await response.json()) as SerperResponse;
+    const organic = data.organic || [];
+
+    return organic.map((r) => ({
+      title: r.title,
+      url: r.link,
+      snippet: r.snippet,
+      publishedDate: r.date,
+    }));
+  }
+}
+
+// ============================================================================
+// Jina Web Search Provider (Free, No API Key Required)
+// ============================================================================
+
+interface JinaSearchResult {
+  title: string;
+  url: string;
+  description: string;
+  content?: string;
+}
+
+interface JinaSearchResponse {
+  code: number;
+  data: JinaSearchResult[];
+}
+
+interface JinaReaderResponse {
+  code: number;
+  data: {
+    title: string;
+    url: string;
+    content: string;
+  };
+}
+
+/**
+ * Jina Web Search Provider
+ *
+ * A free, keyless search provider using Jina AI's public APIs:
+ * - Search: https://s.jina.ai/{query}
+ * - Reader: https://r.jina.ai/{url}
+ *
+ * Docs: https://jina.ai/reader/
+ */
+export class JinaWebSearchProvider implements IWebSearchProvider {
+  readonly name = "jina";
+
+  async search(query: string, options?: WebSearchOptions): Promise<WebSearchResult[]> {
+    const maxResults = options?.maxResults ?? 5;
+    const encodedQuery = encodeURIComponent(query);
+
+    const response = await fetch(`https://s.jina.ai/${encodedQuery}`, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "X-Return-Format": "json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Jina Search API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = (await response.json()) as JinaSearchResponse;
+
+    if (data.code !== 200 || !data.data) {
+      throw new Error(`Jina Search returned error code: ${data.code}`);
+    }
+
+    return data.data.slice(0, maxResults).map((r) => ({
+      title: r.title,
+      url: r.url,
+      snippet: r.description,
+      content: r.content,
+    }));
+  }
+
+  async fetch(url: string): Promise<WebFetchResult> {
+    const encodedUrl = encodeURIComponent(url);
+
+    const response = await fetch(`https://r.jina.ai/${encodedUrl}`, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "X-Return-Format": "json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Jina Reader API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = (await response.json()) as JinaReaderResponse;
+
+    if (data.code !== 200 || !data.data) {
+      throw new Error(`Jina Reader returned error code: ${data.code}`);
+    }
+
+    return {
+      url: data.data.url,
+      title: data.data.title,
+      content: data.data.content,
+      contentType: "text/markdown",
     };
   }
 }
@@ -278,5 +570,19 @@ export class WebSearchToolServer extends BaseToolServer {
  * ```
  */
 export function createWebSearchToolServer(provider?: IWebSearchProvider): WebSearchToolServer {
-  return new WebSearchToolServer(provider);
+  if (provider) {
+    return new WebSearchToolServer(provider);
+  }
+
+  // Try to detect provider from environment variables (priority order)
+  if (process.env.TAVILY_API_KEY) {
+    return new WebSearchToolServer(new TavilyWebSearchProvider(process.env.TAVILY_API_KEY));
+  }
+
+  if (process.env.SERPER_API_KEY) {
+    return new WebSearchToolServer(new SerperWebSearchProvider(process.env.SERPER_API_KEY));
+  }
+
+  // Fallback to Jina (free, no API key required)
+  return new WebSearchToolServer(new JinaWebSearchProvider());
 }

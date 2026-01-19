@@ -7,7 +7,10 @@
 export {
   createWebSearchToolServer,
   type IWebSearchProvider,
+  JinaWebSearchProvider,
   MockWebSearchProvider,
+  SerperWebSearchProvider,
+  TavilyWebSearchProvider,
   type WebFetchResult,
   type WebSearchOptions,
   type WebSearchResult,
