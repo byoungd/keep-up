@@ -6,7 +6,10 @@
  */
 
 import { countTokens } from "../utils/tokenCounter";
-import { createInMemoryStore, InMemoryStore } from "./memoryStore";
+import { CachedMemoryStore } from "./cachedMemoryStore";
+import { type MemoryCacheConfig, resolveMemoryCacheConfig } from "./cacheTypes";
+import { CachedEmbeddingProvider } from "./embeddingCache";
+import { createInMemoryStore } from "./memoryStore";
 import type {
   ConsolidationResult,
   IEmbeddingProvider,
@@ -292,17 +295,19 @@ export class MemoryManager implements IMemoryManager {
    * Export memories for backup.
    */
   async export(): Promise<string> {
-    if (this.store instanceof InMemoryStore) {
-      const memories = this.store.getAll();
-      return JSON.stringify({
-        version: 1,
-        exportedAt: Date.now(),
-        sessionId: this.sessionId,
-        memories,
-        context: this.context,
-      });
+    const exportable = getExportableStore(this.store);
+    if (!exportable) {
+      throw new Error("Export not supported for this store type");
     }
-    throw new Error("Export not supported for this store type");
+
+    const memories = exportable.getAll();
+    return JSON.stringify({
+      version: 1,
+      exportedAt: Date.now(),
+      sessionId: this.sessionId,
+      memories,
+      context: this.context,
+    });
   }
 
   /**
@@ -315,19 +320,20 @@ export class MemoryManager implements IMemoryManager {
       throw new Error(`Unsupported export version: ${parsed.version}`);
     }
 
-    if (this.store instanceof InMemoryStore) {
-      const imported = await this.store.bulkImport(parsed.memories);
-
-      // Restore context if present
-      if (parsed.context) {
-        this.context = parsed.context;
-        this.contextTokens = this.context.reduce((sum, m) => sum + m.tokens, 0);
-      }
-
-      return imported;
+    const exportable = getExportableStore(this.store);
+    if (!exportable) {
+      throw new Error("Import not supported for this store type");
     }
 
-    throw new Error("Import not supported for this store type");
+    const imported = await exportable.bulkImport(parsed.memories);
+
+    // Restore context if present
+    if (parsed.context) {
+      this.context = parsed.context;
+      this.contextTokens = this.context.reduce((sum, m) => sum + m.tokens, 0);
+    }
+
+    return imported;
   }
 
   /**
@@ -411,6 +417,47 @@ export class MemoryManager implements IMemoryManager {
 // Utility Functions
 // ============================================================================
 
+type ExportableMemoryStore = IMemoryStore & {
+  getAll(): Memory[];
+  bulkImport(memories: Memory[]): Promise<number>;
+};
+
+function getExportableStore(store: IMemoryStore): ExportableMemoryStore | null {
+  if (store instanceof CachedMemoryStore) {
+    return store.hasExportableInner() ? (store as ExportableMemoryStore) : null;
+  }
+
+  const candidate = store as ExportableMemoryStore;
+  if (typeof candidate.getAll === "function" && typeof candidate.bulkImport === "function") {
+    return candidate;
+  }
+  return null;
+}
+
+function applyMemoryCache(
+  store: IMemoryStore,
+  embeddingProvider: IEmbeddingProvider | undefined,
+  cacheConfig?: MemoryCacheConfig
+): { store: IMemoryStore; embeddingProvider?: IEmbeddingProvider } {
+  const resolved = resolveMemoryCacheConfig(cacheConfig);
+  if (!resolved) {
+    return { store, embeddingProvider };
+  }
+
+  const cachedStore =
+    resolved.enableQueryCache && !(store instanceof CachedMemoryStore)
+      ? new CachedMemoryStore(store, resolved)
+      : store;
+  const cachedProvider =
+    embeddingProvider &&
+    resolved.enableEmbeddingCache &&
+    !(embeddingProvider instanceof CachedEmbeddingProvider)
+      ? new CachedEmbeddingProvider(embeddingProvider, resolved)
+      : embeddingProvider;
+
+  return { store: cachedStore, embeddingProvider: cachedProvider };
+}
+
 function generateSessionId(): string {
   return `session-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -428,9 +475,12 @@ function estimateTokens(text: string): number {
  */
 export function createMemoryManager(
   config?: Partial<MemoryConfig>,
-  embeddingProvider?: IEmbeddingProvider
+  embeddingProvider?: IEmbeddingProvider,
+  cacheConfig?: MemoryCacheConfig
 ): MemoryManager {
-  return new MemoryManager(config, undefined, embeddingProvider);
+  const store = createInMemoryStore();
+  const cached = applyMemoryCache(store, embeddingProvider, cacheConfig);
+  return new MemoryManager(config, cached.store, cached.embeddingProvider);
 }
 
 /**
@@ -439,7 +489,9 @@ export function createMemoryManager(
 export function createMemoryManagerWithStore(
   store: IMemoryStore,
   config?: Partial<MemoryConfig>,
-  embeddingProvider?: IEmbeddingProvider
+  embeddingProvider?: IEmbeddingProvider,
+  cacheConfig?: MemoryCacheConfig
 ): MemoryManager {
-  return new MemoryManager(config, store, embeddingProvider);
+  const cached = applyMemoryCache(store, embeddingProvider, cacheConfig);
+  return new MemoryManager(config, cached.store, cached.embeddingProvider);
 }
