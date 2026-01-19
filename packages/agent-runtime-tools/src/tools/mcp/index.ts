@@ -29,6 +29,11 @@ export {
   type ToolRegistryOptions,
 } from "./registry";
 export {
+  createToolRegistryView,
+  ToolRegistryView,
+  type ToolRegistryViewOptions,
+} from "./registryView";
+export {
   createMcpRemoteToolServer,
   type McpRemoteServerConfig,
   McpRemoteToolServer,

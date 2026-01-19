@@ -5,15 +5,32 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   AGENT_PROFILES,
+  type AgentLLMRequest,
+  type AgentLLMResponse,
   type AgentType,
   createAgentManager,
+  createBashToolServer,
   createCompletionToolServer,
   createFileToolServer,
   createMockLLM,
   createToolRegistry,
   getAgentProfile,
+  type IAgentLLM,
   listAgentTypes,
 } from "../index";
+
+class RecordingLLM implements IAgentLLM {
+  lastRequest?: AgentLLMRequest;
+
+  async complete(request: AgentLLMRequest): Promise<AgentLLMResponse> {
+    this.lastRequest = request;
+    return {
+      content: "Done",
+      finishReason: "stop",
+      usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+    };
+  }
+}
 
 // ============================================================================
 // Profile Tests
@@ -203,6 +220,27 @@ describe("AgentManager", () => {
     expect(results).toHaveLength(3);
     expect(results.every((r) => r.success)).toBe(true);
     expect(callCount).toBe(3);
+  });
+
+  it("honors explicit empty allowlists for scoped agents", async () => {
+    const scopedRegistry = createToolRegistry();
+    await scopedRegistry.register(createCompletionToolServer());
+    await scopedRegistry.register(createFileToolServer());
+    await scopedRegistry.register(createBashToolServer());
+
+    const recordingLLM = new RecordingLLM();
+    const manager = createAgentManager({ llm: recordingLLM, registry: scopedRegistry });
+
+    await manager.spawn({
+      type: "general",
+      task: "No tools",
+      allowedTools: [],
+    });
+
+    const toolNames = recordingLLM.lastRequest?.tools.map((tool) => tool.name) ?? [];
+    expect(toolNames).toContain("completion:complete_task");
+    expect(toolNames.some((name) => name.startsWith("file:"))).toBe(false);
+    expect(toolNames.some((name) => name.startsWith("bash:"))).toBe(false);
   });
 
   it("should respect maxConcurrent limit", async () => {

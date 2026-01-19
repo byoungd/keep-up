@@ -566,6 +566,12 @@ export interface AuditFilter {
 /** Tool execution policy mode */
 export type ExecutionPolicy = "interactive" | "batch";
 
+/** Tool registry scoping for isolated registry views. */
+export interface ToolRegistryScope {
+  /** Tool allowlist patterns for registry access. */
+  allowedTools: string[];
+}
+
 /** Tool execution policy context */
 export interface ToolExecutionContext {
   /** Policy mode */

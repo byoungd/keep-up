@@ -5,6 +5,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@ku0/ai-core": path.resolve(__dirname, "../ai-core/src/index.ts"),
+      "@ku0/agent-runtime-tools": path.resolve(__dirname, "../agent-runtime-tools/src"),
     },
   },
   test: {

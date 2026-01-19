@@ -290,6 +290,7 @@ export {
   createLFCCToolServer,
   createSubagentToolServer,
   createToolRegistry,
+  createToolRegistryView,
   createWebSearchToolServer,
   type LFCCToolServerOptions,
   type MultiDocumentGatewayRequest,
@@ -297,6 +298,8 @@ export {
   type MultiDocumentPolicy,
   type MultiDocumentRequestDocument,
   type MultiDocumentRole,
+  ToolRegistryView,
+  type ToolRegistryViewOptions,
   validateCompletionInput,
 } from "@ku0/agent-runtime-tools";
 // LSP Tools (Semantic Code Intelligence)
