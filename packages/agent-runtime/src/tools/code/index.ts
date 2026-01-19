@@ -28,6 +28,23 @@ export {
   type ReadFileResult,
   readFile,
 } from "./fileSystem";
+// LSP operations
+export {
+  createLSPClient,
+  type DetectedLanguageServer,
+  type Diagnostic,
+  type DocumentSymbol,
+  detectLanguageServer,
+  detectLanguageServerForPath,
+  isServerAvailable,
+  type Location,
+  type LSPClient,
+  type LSPClientOptions,
+  type Position,
+  type Range,
+  type ServerConfig,
+  type SymbolInformation,
+} from "./lsp";
 // Patch operations
 export { type ApplyPatchResult, applyPatch } from "./patch";
 // Code search

@@ -63,12 +63,13 @@ export class CoworkRuntimeBridge {
 
   async checkAction(session: CoworkSession, request: ToolCheckRequest): Promise<ToolCheckResult> {
     const decision = this.evaluate(session, request);
+    const riskTags = toCoworkRiskTags(decision.riskTags);
     void this.logDecision(session.sessionId, request, decision);
     if (decision.decision === "deny") {
       return { status: "denied", decision };
     }
     if (decision.decision === "allow_with_confirm") {
-      const approval = await this.createApproval(session.sessionId, request, decision.riskTags);
+      const approval = await this.createApproval(session.sessionId, request, riskTags);
       return { status: "approval_required", decision, approval };
     }
     return { status: "allowed", decision };
@@ -112,7 +113,7 @@ export class CoworkRuntimeBridge {
       input: buildDecisionInput(request),
       decision: decision.decision,
       ruleId: decision.ruleId,
-      riskTags: decision.riskTags,
+      riskTags: toCoworkRiskTags(decision.riskTags),
       reason: decision.reason,
       outcome: decision.decision === "deny" ? "denied" : "success",
     };
@@ -167,4 +168,11 @@ function buildDecisionInput(request: ToolCheckRequest): Record<string, unknown> 
     kind: request.kind,
     connectorScopeAllowed: request.connectorScopeAllowed,
   };
+}
+
+const COWORK_RISK_TAGS: CoworkRiskTag[] = ["delete", "overwrite", "network", "connector", "batch"];
+
+function toCoworkRiskTags(tags: string[]): CoworkRiskTag[] {
+  const allowed = new Set<CoworkRiskTag>(COWORK_RISK_TAGS);
+  return tags.filter((tag): tag is CoworkRiskTag => allowed.has(tag as CoworkRiskTag));
 }
