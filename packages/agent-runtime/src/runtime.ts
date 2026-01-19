@@ -4,7 +4,11 @@
  * Provides explicit wiring for the agent runtime using dependency injection.
  */
 
-import type { RuntimeEventBus } from "@ku0/agent-runtime-control";
+import {
+  createMessageBus,
+  getGlobalEventBus,
+  type RuntimeEventBus,
+} from "@ku0/agent-runtime-control";
 import type { TelemetryContext } from "@ku0/agent-runtime-telemetry/telemetry";
 import type {
   IToolRegistry,
@@ -19,7 +23,13 @@ import type { IAgentLLM } from "./orchestrator/llmTypes";
 import type { IPermissionChecker } from "./security";
 import { createPermissionChecker, createSecurityPolicy } from "./security";
 import type { SessionState } from "./session";
-import type { AuditLogger, MCPToolServer, SecurityPolicy, SecurityPreset } from "./types";
+import type {
+  AuditLogger,
+  MCPToolServer,
+  RuntimeMessageBus,
+  SecurityPolicy,
+  SecurityPreset,
+} from "./types";
 
 export interface RuntimeComponents {
   llm: IAgentLLM;
@@ -30,6 +40,7 @@ export interface RuntimeComponents {
   auditLogger?: AuditLogger;
   telemetry?: TelemetryContext;
   eventBus?: RuntimeEventBus;
+  messageBus?: RuntimeMessageBus;
   sessionState?: SessionState;
   toolExecutor?: ToolExecutor;
   skillRegistry?: SkillRegistry;
@@ -52,12 +63,15 @@ export interface RuntimeInstance {
   auditLogger?: AuditLogger;
   telemetry?: TelemetryContext;
   eventBus?: RuntimeEventBus;
+  messageBus?: RuntimeMessageBus;
   sessionState?: SessionState;
 }
 
 export async function createRuntime(options: CreateRuntimeOptions): Promise<RuntimeInstance> {
   const components = options.components;
   const registry = components.registry ?? createToolRegistry();
+  const eventBus = components.eventBus ?? getGlobalEventBus();
+  const messageBus = components.messageBus ?? createMessageBus(eventBus);
 
   if (components.toolServers?.length) {
     for (const server of components.toolServers) {
@@ -76,7 +90,8 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<Runt
     registry,
     executor: components.toolExecutor,
     policy: permissionChecker,
-    events: components.eventBus,
+    events: eventBus,
+    messageBus,
     state: components.sessionState,
     audit: components.auditLogger,
     telemetry: components.telemetry,
@@ -104,7 +119,8 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<Runt
     permissionChecker,
     auditLogger: components.auditLogger,
     telemetry: components.telemetry,
-    eventBus: components.eventBus,
+    eventBus,
+    messageBus,
     sessionState: components.sessionState,
   };
 }

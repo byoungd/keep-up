@@ -4,7 +4,7 @@
  * Maps A2A envelopes onto the runtime message bus for cross-agent collaboration.
  */
 
-import type { MessageEnvelope, RuntimeMessageBus } from "./messageBus";
+import type { MessageEnvelope, RuntimeMessageBus } from "@ku0/agent-runtime-core";
 
 export type A2AMessageType = "request" | "response" | "event";
 

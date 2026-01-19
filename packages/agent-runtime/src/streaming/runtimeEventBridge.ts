@@ -11,7 +11,7 @@ import type {
   SubagentEventPayload,
   Subscription,
 } from "@ku0/agent-runtime-control";
-import type { ExecutionDecision, ToolExecutionRecord } from "../types";
+import type { ExecutionDecision, MessageEnvelope, ToolExecutionRecord } from "../types";
 import {
   formatToolActivityLabel,
   formatToolActivityMessage,
@@ -152,6 +152,10 @@ export function attachRuntimeEventStreamBridge(config: RuntimeEventStreamBridgeC
     stream.writeError(message, "ARTIFACT_QUARANTINED", false);
   };
 
+  const handleMessageDelivered = (payload: MessageEnvelope) => {
+    stream.writeMetadata("message:delivered", payload);
+  };
+
   if (includeDecisions) {
     subscriptions.push(
       eventBus.subscribe("execution:decision", (event) => {
@@ -187,6 +191,15 @@ export function attachRuntimeEventStreamBridge(config: RuntimeEventStreamBridgeC
         return;
       }
       handleArtifactQuarantined(event.payload as ArtifactEvents["artifact:quarantined"]);
+    })
+  );
+
+  subscriptions.push(
+    eventBus.subscribe("message:delivered", (event) => {
+      if (!shouldHandle(event)) {
+        return;
+      }
+      handleMessageDelivered(event.payload as MessageEnvelope);
     })
   );
 
