@@ -95,7 +95,7 @@ const ReferenceChip = React.memo(function ReferenceChip({
     <button
       type="button"
       className={cn(
-        "flex items-center gap-2 rounded-full border px-2 py-1 text-micro transition-colors",
+        "flex items-center gap-2 rounded-full border px-2 py-1 text-micro transition-colors duration-fast",
         tone,
         resolveAvailable && "hover:border-primary/40 hover:bg-primary/5"
       )}

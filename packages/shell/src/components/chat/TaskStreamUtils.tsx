@@ -40,10 +40,10 @@ export const TASK_THEME = {
   // Status Colors (Backgrounds, Text, Badges)
   status: {
     running: {
-      text: "text-amber-500",
-      bg: "bg-amber-500/10",
-      badge: "bg-amber-500/5",
-      icon: "text-amber-500",
+      text: "text-warning",
+      bg: "bg-warning/10",
+      badge: "bg-warning/5",
+      icon: "text-warning",
     },
     queued: {
       text: "text-muted-foreground",
@@ -58,16 +58,16 @@ export const TASK_THEME = {
       icon: "text-primary",
     },
     failed: {
-      text: "text-red-500",
-      bg: "bg-red-500/10",
-      badge: "bg-red-500/5",
-      icon: "text-red-500",
+      text: "text-error",
+      bg: "bg-error/10",
+      badge: "bg-error/5",
+      icon: "text-error",
     },
     paused: {
-      text: "text-orange-500",
-      bg: "bg-orange-500/10",
-      badge: "bg-orange-500/5",
-      icon: "text-orange-500",
+      text: "text-warning",
+      bg: "bg-warning/10",
+      badge: "bg-warning/5",
+      icon: "text-warning",
     },
   },
   // Animation Curves (Snappy vs Bouncy)
@@ -120,7 +120,7 @@ export function getStatusMeta(status: AgentTask["status"]) {
     case "paused": // Review state
       return {
         label: "Review",
-        icon: <div className="h-2.5 w-2.5 rounded-full border-[2.5px] border-orange-500" />,
+        icon: <div className="h-2.5 w-2.5 rounded-full border-[2.5px] border-warning" />,
         textClass: TASK_THEME.status.paused.text,
         bgClass: TASK_THEME.status.paused.bg,
         badgeBg: TASK_THEME.status.paused.badge,

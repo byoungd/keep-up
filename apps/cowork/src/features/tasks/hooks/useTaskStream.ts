@@ -778,6 +778,7 @@ function handleApprovalRequired(
   }
   const action = typeof data.action === "string" ? data.action : "tool";
   const riskTags = extractRiskTags(data.riskTags);
+  const reason = typeof data.reason === "string" ? data.reason : undefined;
   const taskId = typeof data.taskId === "string" ? data.taskId : undefined;
 
   return {
@@ -788,7 +789,7 @@ function handleApprovalRequired(
       id: `approval-${approvalId}`,
       type: "tool_call",
       toolName: action,
-      args: { action, riskTags },
+      args: { action, riskTags, ...(reason ? { reason } : {}) },
       requiresApproval: true,
       approvalId,
       riskLevel: mapRiskLevel(riskTags),

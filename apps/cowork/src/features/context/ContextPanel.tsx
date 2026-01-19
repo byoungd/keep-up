@@ -120,7 +120,7 @@ export function ContextPanel({
             type="button"
             key={tab}
             onClick={() => onTabChange(tab)}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-full transition-colors ${
+            className={`px-3 py-1.5 text-xs font-semibold rounded-full transition-colors duration-fast ${
               resolvedTab === tab
                 ? "bg-foreground text-background"
                 : "text-muted-foreground hover:text-foreground hover:bg-surface-2/60"
@@ -131,7 +131,7 @@ export function ContextPanel({
         ))}
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto">
+      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-auto-hide">
         {resolvedTab === "preview" && (
           <div className="h-full">
             {previewArtifact ? (
@@ -150,7 +150,7 @@ export function ContextPanel({
 
         {resolvedTab === "notes" && (
           <div className="h-full flex flex-col">
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            <div className="flex-1 overflow-y-auto scrollbar-auto-hide p-4 space-y-3">
               {notes.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No notes yet.</p>
               ) : (

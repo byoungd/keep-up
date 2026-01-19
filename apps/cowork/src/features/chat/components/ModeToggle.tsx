@@ -13,17 +13,15 @@ export function ModeToggle({ mode, onToggle, className }: ModeToggleProps) {
       type="button"
       onClick={onToggle}
       className={cn(
-        "flex items-center gap-2 px-2 py-1 rounded-md text-xs font-medium transition-colors border",
+        "flex items-center gap-2 px-2 py-1 rounded-md text-xs font-medium transition-colors duration-fast border",
         mode === "plan"
-          ? "bg-blue-500/5 text-blue-600 hover:bg-blue-500/10 border-blue-500/20 dark:text-blue-400"
-          : "bg-orange-500/5 text-orange-600 hover:bg-orange-500/10 border-orange-500/20 dark:text-orange-400",
+          ? "bg-info/5 text-info hover:bg-info/10 border-info/20"
+          : "bg-warning/5 text-warning hover:bg-warning/10 border-warning/20",
         className
       )}
       title={`Current mode: ${mode.toUpperCase()}. Click to switch to ${mode === "plan" ? "Build" : "Plan"} Mode. Build mode allows file modifications.`}
     >
-      <span
-        className={cn("w-2 h-2 rounded-full", mode === "plan" ? "bg-blue-500" : "bg-orange-500")}
-      />
+      <span className={cn("w-2 h-2 rounded-full", mode === "plan" ? "bg-info" : "bg-warning")} />
       {mode === "plan" ? "PLAN" : "BUILD"}
     </button>
   );

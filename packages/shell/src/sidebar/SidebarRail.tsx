@@ -30,7 +30,7 @@ const DefaultAvatar: React.FC<{ name: string; url?: string }> = ({ name, url }) 
   }
 
   return (
-    <div className="h-6 w-6 rounded-md bg-gradient-to-br from-indigo-500 to-cyan-500 flex items-center justify-center text-micro font-medium text-white">
+    <div className="h-6 w-6 rounded-md bg-gradient-to-br from-accent-indigo to-accent-cyan flex items-center justify-center text-micro font-medium text-white">
       {initial}
     </div>
   );
@@ -108,7 +108,7 @@ export const SidebarRail = React.memo(function SidebarRail({
       <Tooltip content="Workspace">
         <button
           type="button"
-          className="h-9 w-9 flex items-center justify-center rounded-lg text-foreground/80 hover:text-foreground hover:bg-surface-2/70"
+          className="h-9 w-9 flex items-center justify-center rounded-lg text-foreground/80 hover:text-foreground hover:bg-surface-2/70 transition-colors duration-fast"
           aria-label="Workspace"
         >
           <Avatar name={workspaceName} url={workspaceAvatarUrl} />
@@ -119,7 +119,7 @@ export const SidebarRail = React.memo(function SidebarRail({
         <Tooltip content="Search">
           <button
             type="button"
-            className="h-9 w-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface-2/70"
+            className="h-9 w-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface-2/70 transition-colors duration-fast"
             onClick={onSearch}
             aria-label="Search"
           >
@@ -128,7 +128,7 @@ export const SidebarRail = React.memo(function SidebarRail({
         </Tooltip>
       )}
 
-      <div className="flex flex-1 flex-col items-center gap-2 overflow-y-auto">
+      <div className="flex flex-1 flex-col items-center gap-2 overflow-y-auto scrollbar-auto-hide">
         {groups.map((group, groupIndex) => {
           if (group.items.length === 0) {
             return null;
@@ -147,7 +147,7 @@ export const SidebarRail = React.memo(function SidebarRail({
                       aria-current={isActive ? "page" : undefined}
                       aria-label={item.label}
                       className={cn(
-                        "relative flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-200",
+                        "relative flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-normal",
                         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                         isActive
                           ? "bg-surface-2/90 text-foreground"

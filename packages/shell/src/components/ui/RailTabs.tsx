@@ -72,7 +72,7 @@ export function RailTabs({ tabs, activeTab, onTabChange, className }: RailTabsPr
             onClick={() => onTabChange(tab.id)}
             onKeyDown={(e) => handleKeyDown(e, index)}
             className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-fast",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
               isActive
                 ? "bg-surface-1 text-foreground shadow-sm"
@@ -108,7 +108,7 @@ export function RailTabPanel({ id, activeTab, children, className }: RailTabPane
       id={`tabpanel-${id}`}
       role="tabpanel"
       aria-labelledby={id}
-      className={cn("flex-1 overflow-y-auto", className)}
+      className={cn("flex-1 overflow-y-auto scrollbar-auto-hide", className)}
     >
       {children}
     </div>

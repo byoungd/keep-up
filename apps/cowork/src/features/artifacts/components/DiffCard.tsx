@@ -44,10 +44,10 @@ export function DiffCard({ file, diff, status, appliedAt, onApply, onRevert }: D
   };
 
   return (
-    <div className="bg-surface border border-border rounded-xl shadow-sm my-4 overflow-hidden group hover:border-border transition-colors">
+    <div className="bg-surface-1 border border-border rounded-xl shadow-sm my-4 overflow-hidden group hover:border-border transition-colors duration-fast">
       <div className="px-4 py-3 bg-muted border-b border-border flex justify-between items-center">
         <div className="flex items-center gap-3">
-          <div className="p-1.5 bg-surface border border-border rounded shadow-sm">
+          <div className="p-1.5 bg-surface-1 border border-border rounded shadow-sm">
             <svg
               className="w-4 h-4 text-muted-foreground"
               fill="none"
@@ -76,7 +76,7 @@ export function DiffCard({ file, diff, status, appliedAt, onApply, onRevert }: D
           <button
             type="button"
             onClick={handleCopy}
-            className="p-1.5 rounded-lg border border-border bg-surface text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-all flex items-center gap-1.5"
+            className="p-1.5 rounded-lg border border-border bg-surface-1 text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-all duration-fast flex items-center gap-1.5"
             title="Copy diff to clipboard"
           >
             {copied ? (
@@ -110,7 +110,7 @@ export function DiffCard({ file, diff, status, appliedAt, onApply, onRevert }: D
             <button
               type="button"
               onClick={handleApply}
-              className="text-xs font-black bg-foreground text-background px-3 py-1.5 rounded-lg shadow-sm hover:scale-105 active:scale-95 transition-all uppercase tracking-tighter disabled:opacity-50"
+              className="text-xs font-black bg-foreground text-background px-3 py-1.5 rounded-lg shadow-sm hover:scale-105 active:scale-95 transition-all duration-fast uppercase tracking-tighter disabled:opacity-50"
               disabled={busy !== null || !onApply}
               aria-busy={busy === "apply"}
             >
@@ -120,7 +120,7 @@ export function DiffCard({ file, diff, status, appliedAt, onApply, onRevert }: D
             <button
               type="button"
               onClick={handleRevert}
-              className="text-xs font-black bg-surface-2 text-foreground px-3 py-1.5 rounded-lg shadow-sm hover:scale-105 active:scale-95 transition-all uppercase tracking-tighter disabled:opacity-50"
+              className="text-xs font-black bg-surface-2 text-foreground px-3 py-1.5 rounded-lg shadow-sm hover:scale-105 active:scale-95 transition-all duration-fast uppercase tracking-tighter disabled:opacity-50"
               disabled={busy !== null || !onRevert}
               aria-busy={busy === "revert"}
             >
@@ -133,11 +133,11 @@ export function DiffCard({ file, diff, status, appliedAt, onApply, onRevert }: D
             Applied {new Date(appliedAt).toLocaleString()}
           </div>
         )}
-        {status === "reverted" && <div className="text-micro text-amber-600">Reverted</div>}
+        {status === "reverted" && <div className="text-micro text-warning">Reverted</div>}
       </div>
 
       {/* Mock Diff Viewer - in production use Shiki/Prism */}
-      <div className="overflow-x-auto p-0 text-fine font-mono bg-surface leading-relaxed">
+      <div className="overflow-x-auto p-0 text-fine font-mono bg-surface-1 leading-relaxed">
         <table className="w-full border-collapse">
           <tbody>
             {diff.split("\n").map((line, cur) => {

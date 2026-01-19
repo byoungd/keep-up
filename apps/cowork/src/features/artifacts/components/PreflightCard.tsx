@@ -18,7 +18,7 @@ function formatDuration(durationMs: number) {
 function statusTone(status: PreflightPayload["report"]["checks"][number]["status"]) {
   switch (status) {
     case "pass":
-      return "text-emerald-600 bg-emerald-500/10 border-emerald-500/20";
+      return "text-success bg-success/10 border-success/20";
     case "fail":
       return "text-destructive bg-destructive/10 border-destructive/20";
     default:
@@ -35,7 +35,7 @@ export function PreflightCard({ payload }: PreflightCardProps) {
       <div className="px-4 py-3 bg-muted border-b border-border flex flex-wrap gap-3 justify-between">
         <div className="flex items-center gap-2">
           <svg
-            className="w-4 h-4 text-accent-blue"
+            className="w-4 h-4 text-accent-indigo"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"

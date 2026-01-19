@@ -77,7 +77,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               max-width: 400px;
             }
             .error-boundary-icon {
-              color: var(--color-destructive, #ef4444);
+              color: var(--color-destructive, var(--color-error));
               margin-bottom: 1rem;
             }
             .error-boundary-title {
@@ -95,10 +95,10 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               background: var(--color-primary);
               color: var(--color-primary-foreground);
               border: none;
-              border-radius: 0.375rem;
+              border-radius: var(--radius-md);
               font-size: 0.875rem;
               cursor: pointer;
-              transition: opacity 0.15s;
+              transition: opacity var(--duration-fast) var(--ease-smooth);
             }
             .error-boundary-retry:hover {
               opacity: 0.9;

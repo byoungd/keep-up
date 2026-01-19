@@ -1,7 +1,7 @@
 import type * as React from "react";
 import { cn } from "../../lib/cn";
 
-export interface ThinkingBarProps extends React.ComponentPropsWithoutRef<"output"> {
+export interface ThinkingBarProps extends React.HTMLAttributes<HTMLOutputElement> {
   ariaLabel?: string;
 }
 

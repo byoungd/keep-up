@@ -15,7 +15,7 @@ export function ReportCard({ title = "Report", content }: ReportCardProps) {
   };
 
   return (
-    <div className="bg-surface border border-border rounded-xl shadow-sm my-4 overflow-hidden group hover:border-border transition-colors">
+    <div className="bg-surface-1 border border-border rounded-xl shadow-sm my-4 overflow-hidden group hover:border-border transition-colors duration-fast">
       <div className="px-4 py-3 bg-muted border-b border-border flex justify-between items-center">
         <div className="flex items-center gap-2">
           <svg
@@ -37,7 +37,7 @@ export function ReportCard({ title = "Report", content }: ReportCardProps) {
         <button
           type="button"
           onClick={handleCopy}
-          className="p-1.5 rounded-lg border border-border bg-surface text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-all"
+          className="p-1.5 rounded-lg border border-border bg-surface-1 text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-all duration-fast"
           title="Copy report to clipboard"
         >
           {copied ? (

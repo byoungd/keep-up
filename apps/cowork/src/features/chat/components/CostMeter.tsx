@@ -72,7 +72,7 @@ export function CostMeter({ usage, modelId }: CostMeterProps) {
       {(isWarning || isCritical) && (
         <div
           className={`flex items-center gap-1 font-medium ${
-            isCritical ? "text-destructive" : "text-amber-500"
+            isCritical ? "text-destructive" : "text-warning"
           }`}
           title={`Context Usage: ${utilization.toFixed(1)}%`}
         >

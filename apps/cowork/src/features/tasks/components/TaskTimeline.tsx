@@ -74,7 +74,7 @@ export function TaskTimeline({ graph, isConnected, approveTool, rejectTool }: Ta
       {/* List */}
       <div
         ref={containerRef}
-        className="flex-1 overflow-y-auto p-4 space-y-6 scroll-smooth scrollbar-hide"
+        className="flex-1 overflow-y-auto scrollbar-auto-hide p-4 space-y-6 scroll-smooth"
         onScroll={(e) => {
           const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
           setShowScrollButton(scrollHeight - scrollTop - clientHeight > 150);
@@ -129,7 +129,7 @@ export function TaskTimeline({ graph, isConnected, approveTool, rejectTool }: Ta
 
         {/* Render Pending Approval Card at the bottom if active */}
         {pendingNode && pendingNode.type === "tool_call" && (
-          <div className="sticky bottom-4 z-10 animate-in slide-in-from-bottom-6 fade-in duration-500 shadow-2xl rounded-2xl border border-accent-blue/20">
+          <div className="sticky bottom-4 z-10 animate-in slide-in-from-bottom-6 fade-in duration-slow shadow-2xl rounded-2xl border border-accent-indigo/20">
             <PendingApprovalCard
               toolName={pendingNode.toolName}
               args={pendingNode.args}
@@ -149,7 +149,7 @@ export function TaskTimeline({ graph, isConnected, approveTool, rejectTool }: Ta
           type="button"
           aria-label="Scroll to bottom"
           onClick={scrollToBottom}
-          className="absolute bottom-6 right-6 bg-foreground text-background rounded-full p-2 shadow-lg hover:scale-105 active:scale-95 z-20 transition-transform"
+          className="absolute bottom-6 right-6 bg-foreground text-background rounded-full p-2 shadow-lg hover:scale-105 active:scale-95 z-20 transition-transform duration-fast"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <title>Scroll to bottom icon</title>

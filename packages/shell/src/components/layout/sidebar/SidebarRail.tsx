@@ -106,7 +106,7 @@ export const SidebarRail = React.memo(function SidebarRail({
         </Button>
       </Tooltip>
 
-      <div className="flex flex-1 flex-col items-center gap-2 overflow-y-auto">
+      <div className="flex flex-1 flex-col items-center gap-2 overflow-y-auto scrollbar-auto-hide">
         {state.groups.map((group, groupIndex) => {
           if (group.mainItems.length === 0) {
             return null;
@@ -124,7 +124,7 @@ export const SidebarRail = React.memo(function SidebarRail({
                       aria-current={isActive ? "page" : undefined}
                       aria-label={item.label}
                       className={cn(
-                        "relative flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-200",
+                        "relative flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-normal",
                         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                         isActive
                           ? "bg-surface-2/90 text-foreground"

@@ -1,11 +1,14 @@
 // Components
 
+export { ApprovalCard } from "./components/ai/ApprovalCard";
 export { AIPanel } from "./components/chat/AIPanel";
+export { BackgroundTaskIndicator } from "./components/chat/BackgroundTaskIndicator";
 export type { PanelPosition } from "./components/chat/ModelSelector";
 export type {
   ActionItem,
   ActiveTask,
   AgentTask,
+  ApprovalRiskLevel,
   ArtifactItem,
   Message,
   MessageStatus,
