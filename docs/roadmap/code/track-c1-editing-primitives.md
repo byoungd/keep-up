@@ -132,7 +132,7 @@ export async function editFile(
 **Implementation Notes**:
 1. **Backup**: Before any edit, store original content in memory.
 2. **Apply**: Replace lines in-place. Sort edits by `startLine` descending to avoid index shifts.
-3. **Validate**: For `.ts`/`.tsx`/`.js`/`.jsx`, run `tsc --noEmit path`. For `.py`, run `python -m py_compile path`.
+3. **Validate**: Prefer repo-configured checks (e.g., `pnpm typecheck`, `pnpm lint`) and compare diagnostics before/after so pre-existing errors do not cause rollbacks. If no project config exists, fall back to language-specific checks: TypeScript `tsc --noEmit` on the target file(s), JavaScript `node --check`, Python `python -m py_compile path`.
 4. **Rollback**: If validation fails, restore original content and return error.
 5. **Diff**: Use `diff` library (e.g., `diff` npm package) to generate unified diff output.
 
@@ -147,7 +147,7 @@ Port the fuzzy matching logic from `opencode/internal/diff/patch.go`.
 
 export interface ApplyPatchResult {
   success: boolean;
-  /** Fuzz level used (0 = exact, 1 = trimmed whitespace, 100+ = substring match) */
+  /** Fuzz level used (0 = exact, 1 = trimEnd, 2 = trim) */
   fuzzLevel: number;
   /** Files modified */
   filesModified: string[];
@@ -166,9 +166,9 @@ export async function applyPatch(
 ```
 
 **Fuzzy Matching Algorithm** (from `opencode`):
-1. **Pass 1 (Exact)**: Match context lines exactly.
-2. **Pass 2 (Trim Right)**: Ignore trailing whitespace (`trimEnd()`).
-3. **Pass 3 (Trim All)**: Ignore all whitespace (`trim()`).
+1. **Pass 1 (Exact)**: Match context lines exactly (fuzzLevel = 0).
+2. **Pass 2 (Trim Right)**: Ignore trailing whitespace (`trimEnd()`, fuzzLevel = 1).
+3. **Pass 3 (Trim All)**: Ignore all whitespace (`trim()`, fuzzLevel = 2).
 4. If all passes fail, return error with context mismatch details.
 
 ---
