@@ -127,7 +127,6 @@ function buildRipgrepArgs(
     args.push("-i");
   }
 
-  args.push("--max-count", String(options.maxResults));
   appendIncludeExtensions(args, options.includeExtensions);
   appendExcludePatterns(args, options.excludePatterns);
   args.push(query);
@@ -172,7 +171,8 @@ function parseRipgrepOutput(
   const matches: SearchMatch[] = [];
   let totalMatches = 0;
 
-  for (const line of stdout.split("\n")) {
+  const lines = stdout.split("\n");
+  for (const line of lines) {
     if (!line.trim()) {
       continue;
     }
@@ -181,7 +181,6 @@ function parseRipgrepOutput(
       continue;
     }
 
-    totalMatches += 1;
     if (matches.length < maxResults) {
       matches.push({
         path: path.isAbsolute(record.path) ? record.path : path.resolve(rootDir, record.path),
@@ -189,6 +188,7 @@ function parseRipgrepOutput(
         content: record.content,
       });
     }
+    totalMatches += 1;
   }
 
   return { matches, totalMatches };
@@ -325,7 +325,14 @@ function createRegexMatcher(pattern: string, ignoreCase: boolean): (line: string
 }
 
 function shouldIgnoreCase(query: string, caseSensitive?: boolean): boolean {
-  return !caseSensitive && !/[A-Z]/.test(query);
+  if (caseSensitive === false) {
+    return true;
+  }
+  if (caseSensitive === true) {
+    return false;
+  }
+  // Smart case: ignore case if query is all lowercase
+  return !/[A-Z]/.test(query);
 }
 
 async function resolveSearchFiles(rootPath: string, options: SearchOptions): Promise<string[]> {

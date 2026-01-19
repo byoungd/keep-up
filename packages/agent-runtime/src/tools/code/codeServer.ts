@@ -48,9 +48,10 @@ interface LspSession {
   rootPath: string;
 }
 
-export class CodeToolServer extends BaseToolServer {
-  readonly name = "code";
+export class CodeInteractionServer extends BaseToolServer {
+  readonly name = "code_interaction";
   readonly description = "Code file reading, editing, and navigation tools";
+
   private readonly windowViewer = createWindowViewer();
   private readonly lspSessions = new Map<string, Promise<LspSession>>();
 
@@ -958,8 +959,8 @@ function formatSeverity(severity?: Diagnostic["severity"]): string {
 // ============================================================================
 
 /**
- * Create a code tool server.
+ * Create a code interaction tool server.
  */
-export function createCodeToolServer(): CodeToolServer {
-  return new CodeToolServer();
+export function createCodeInteractionServer(): CodeInteractionServer {
+  return new CodeInteractionServer();
 }

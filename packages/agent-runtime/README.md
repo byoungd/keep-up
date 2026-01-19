@@ -36,7 +36,7 @@ This package provides the core infrastructure for building AI agents with:
 │             ▼          ▼            ▼                       │
 │      [ Tool Servers ]  [ Skills ]   [ Capabilities ]        │
 │    Bash • File • Code  Procedural   Browser • Worktree      │
-│                                     Pipelines               │
+│    Interaction Tool                 Pipelines               │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -118,12 +118,23 @@ const file = createFileToolServer();
 // Tools: read, write, list, info, delete
 ```
 
-### Code Tool Server
+### Code Interaction Tool Server
+
+Advanced code navigation, editing, and intelligence (IDE capabilities):
+
+```typescript
+const codeInteraction = createCodeInteractionServer();
+// Tools: read_file, list_files, edit_file, apply_patch, 
+//        view_outline, search_code, scroll_file,
+//        go_to_definition, find_references, get_diagnostics
+```
+
+### Code Execution Tool Server
 
 Multi-language code execution:
 
 ```typescript
-const code = createCodeToolServer();
+const codeExecution = createCodeToolServer();
 // Tools: run, languages
 // Supports: python, javascript, typescript, ruby, go, rust, bash
 ```

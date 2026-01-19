@@ -292,7 +292,9 @@ export async function editFile(
   // Apply edits
   const newLines = [...originalLines];
   for (const edit of sortedEdits) {
-    const replacementLines = edit.replacement.split("\n");
+    // If replacement is empty string, we want to delete (empty array).
+    // Otherwise split by newline.
+    const replacementLines = edit.replacement === "" ? [] : edit.replacement.split("\n");
     // Convert to 0-indexed
     const startIdx = edit.startLine - 1;
     const endIdx = edit.endLine; // splice uses exclusive end, so no -1 needed

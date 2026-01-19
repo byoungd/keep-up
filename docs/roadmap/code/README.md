@@ -19,9 +19,9 @@
 
 | Track | Name | Priority | Status | Branch |
 |-------|------|----------|--------|--------|
-| **C1** | [Editing Primitives](./track-c1-editing-primitives.md) | High | Ready | `feat/code-editing-primitives` |
-| **C2** | [Context Management](./track-c2-context-management.md) | High | Ready | `feat/code-context-management` |
-| **C3** | [LSP Integration](./track-c3-lsp-integration.md) | Medium | Ready | `feat/code-lsp-integration` |
+| **C1** | [Editing Primitives](./track-c1-editing-primitives.md) | High | ✅ Completed | `main` |
+| **C2** | [Context Management](./track-c2-context-management.md) | High | ✅ Completed | `main` |
+| **C3** | [LSP Integration](./track-c3-lsp-integration.md) | Medium | ✅ Completed | `main` |
 
 ---
 

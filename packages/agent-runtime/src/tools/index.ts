@@ -6,6 +6,28 @@
 
 // Browser Tools
 export * from "./browser";
+// Code Interaction Tools (Explicit to avoid SearchOptions/SearchResult conflict)
+// Re-export clashing types with prefix
+export {
+  applyPatch,
+  CodeInteractionServer,
+  createCodeInteractionServer,
+  createLSPClient,
+  createWindowViewer,
+  deleteLines,
+  editFile,
+  fileExists,
+  getFileStats,
+  getOutline,
+  insertAfterLine,
+  listFiles,
+  readFile,
+  replaceLines,
+  type SearchMatch as CodeSearchMatch,
+  type SearchOptions as CodeSearchOptions,
+  type SearchResult as CodeSearchResult,
+  searchCode,
+} from "./code";
 // Core Tools
 export * from "./core";
 // Digest Tools

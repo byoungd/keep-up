@@ -17,6 +17,7 @@
  *   createToolRegistry,
  *   createBashToolServer,
  *   createFileToolServer,
+ *   createCodeInteractionServer,
  *   createLFCCToolServer,
  *   createOrchestrator,
  *   createMockLLM,
@@ -29,6 +30,7 @@
  * // Register tools
  * await registry.register(createBashToolServer());
  * await registry.register(createFileToolServer());
+ * await registry.register(createCodeInteractionServer());
  * await registry.register(createLFCCToolServer());
  *
  * // Create LLM adapter (use createAICoreAdapter for production)
@@ -275,6 +277,7 @@ export {
 export { createAICoreAdapter, createMockLLM } from "./orchestrator/aiCoreAdapter";
 export { createCodeAgentOrchestrator } from "./orchestrator/codeAgentFactory";
 export { createOrchestrator } from "./orchestrator/orchestrator";
+export { createCodeInteractionServer } from "./tools/code/codeServer";
 export { createBashToolServer } from "./tools/core/bash";
 export { createCodeToolServer } from "./tools/core/code";
 export {

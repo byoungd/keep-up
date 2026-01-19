@@ -5,7 +5,7 @@
  */
 
 // Tool server
-export { CodeToolServer, createCodeToolServer } from "./codeServer";
+export { CodeInteractionServer, createCodeInteractionServer } from "./codeServer";
 
 // Editor operations
 export {
