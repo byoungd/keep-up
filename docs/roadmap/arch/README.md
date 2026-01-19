@@ -4,6 +4,8 @@ This folder contains parallelizable tracks for the Track L module decomposition.
 scoped to a single plane or wiring task so separate agents can implement in parallel and deliver
 independent PRs. All tracks must comply with:
 
+See also: [docs/roadmap/README.md](/docs/roadmap/README.md)
+
 - docs/roadmap/agent-runtime-2026-track-l-architecture.md
 - docs/architecture/agent-runtime-module-decomposition-rfc.md
 - packages/agent-runtime/ARCHITECTURE.md

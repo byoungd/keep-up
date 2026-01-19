@@ -1,7 +1,7 @@
 # Track 3: Motion & Signature Implementation Plan
 
 > **Goal**: Implement the "feel" of intelligence and the "expansive" nature of Arc.
-> **Reference Standards**: [`docs/specs/cowork/cowork-arc-dia-standards.md`](file:///Users/han/Documents/Code/Parallel/keep-up/docs/specs/cowork/cowork-arc-dia-standards.md) (Sections 3 & 4)
+> **Reference Standards**: [`docs/specs/cowork/cowork-arc-dia-standards.md`](/docs/specs/cowork/cowork-arc-dia-standards.md) (Sections 3 & 4)
 
 ---
 

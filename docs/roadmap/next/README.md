@@ -4,6 +4,8 @@
 > **Status**: Proposed  
 > **References**: `.tmp/analysis/` (10 projects), `docs/roadmap/arch/` (completed)
 
+See also: [docs/roadmap/README.md](/docs/roadmap/README.md)
+
 ---
 
 ## Executive Summary

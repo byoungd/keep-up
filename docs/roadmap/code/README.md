@@ -2,6 +2,8 @@
 
 **Overview**: This roadmap defines the parallel development tracks for building a top-tier AI Code Agent. All designs are derived from deep analysis of production-grade implementations in `.tmp/analysis/`.
 
+See also: [docs/roadmap/README.md](/docs/roadmap/README.md)
+
 ---
 
 ## Source Analysis Summary

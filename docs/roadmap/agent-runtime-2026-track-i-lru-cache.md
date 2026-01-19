@@ -1,9 +1,9 @@
 # Track I: LRU Cache Optimization
 
-**Owner**: Runtime Dev
-**Status**: Completed
-**Date**: 2026-01-19
-**Timeline**: Week 1
+Owner: Runtime Dev
+Status: Completed
+Date: 2026-01-19
+Timeline: Week 1
 
 ## Objective
 Maximize hitting ratio and minimize overhead by unifying and tuning cache strategies across the Agent Runtime. Current implementation suffers from fragmentation between `RequestCache` and `ToolResultCache`, and uses a custom LRU implementation that lacks advanced features.

@@ -3,6 +3,7 @@
 Date: 2026-01-18
 Owner: Keep-Up Engineering
 Status: Proposed
+See also: [docs/roadmap/README.md](/docs/roadmap/README.md)
 
 ## Goal
 Deliver the Agent Runtime v2026.1 spec implementation to top-tier product quality with deterministic execution, graceful recovery, strict tool governance, checkpointed persistence, and LFCC-aligned AI mutation flows.
