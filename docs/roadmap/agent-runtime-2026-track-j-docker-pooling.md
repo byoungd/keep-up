@@ -1,9 +1,9 @@
 # Track J: Docker Container Pooling
 
-**Owner**: Runtime Dev
-**Status**: Completed
-**Date**: 2026-01-19
-**Timeline**: Week 2
+Owner: Runtime Dev
+Status: Completed
+Date: 2026-01-19
+Timeline: Week 2
 
 ## Objective
 Reduce tool execution latency by eliminating container startup time from the critical path using a "warm pool" of Docker containers.
@@ -81,4 +81,3 @@ export class ContainerPool {
 ## Verification
 - **Test**: `packages/agent-runtime/src/sandbox/__tests__/containerPool.test.ts`
 - **Metric**: Measure `acquire()` latency. Should be <10ms for warm pool vs >500ms for cold.
-

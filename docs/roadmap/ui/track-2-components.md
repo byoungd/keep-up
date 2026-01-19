@@ -1,7 +1,7 @@
 # Track 2: Component Material Refactor Plan
 
 > **Goal**: Upgrade "Shadcn defaults" to "Cowork Signature" materials.
-> **Reference Standards**: [`docs/specs/cowork/cowork-arc-dia-standards.md`](file:///Users/han/Documents/Code/Parallel/keep-up/docs/specs/cowork/cowork-arc-dia-standards.md) (Sections 2.2 & 5)
+> **Reference Standards**: [`docs/specs/cowork/cowork-arc-dia-standards.md`](/docs/specs/cowork/cowork-arc-dia-standards.md) (Sections 2.2 & 5)
 
 ---
 

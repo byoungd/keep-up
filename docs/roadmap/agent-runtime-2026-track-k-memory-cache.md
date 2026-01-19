@@ -1,9 +1,9 @@
 # Track K: Memory Store Cache Layer
 
-**Owner**: Runtime Dev
-**Status**: Completed
-**Date**: 2026-01-19
-**Timeline**: Week 3
+Owner: Runtime Dev
+Status: Completed
+Date: 2026-01-19
+Timeline: Week 3
 
 ## Objective
 Accelerate memory retrieval operations (RAG) by implementing a multi-level caching layer for semantic and text queries.
@@ -77,4 +77,3 @@ export class CachedMemoryStore implements IMemoryStore {
     2. Run `search("test")` again -> Measure time (Expect <1ms).
     3. `add(newMemory)`.
     4. Run `search("test")` -> Measure time (Expect >100ms, cache invalidated).
-

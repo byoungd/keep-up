@@ -1,7 +1,7 @@
 # Track 1: Foundation & Physics Implementation Plan
 
 > **Goal**: Establish the "Arc/Dia" physical universe (Tokens, Layers, Layout) so components inherit quality by default.
-> **Reference Standards**: [`docs/specs/cowork/cowork-arc-dia-standards.md`](file:///Users/han/Documents/Code/Parallel/keep-up/docs/specs/cowork/cowork-arc-dia-standards.md) (Sections 1 & 2.1)
+> **Reference Standards**: [`docs/specs/cowork/cowork-arc-dia-standards.md`](/docs/specs/cowork/cowork-arc-dia-standards.md) (Sections 1 & 2.1)
 
 ---
 
