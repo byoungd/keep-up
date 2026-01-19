@@ -15,6 +15,10 @@ export interface SmartToolSchedulerConfig {
   maxNetworkConcurrent?: number;
   maxDefaultConcurrent?: number;
   profiles?: ToolExecutionProfile[];
+  adaptiveConcurrency?: boolean;
+  targetLatencyMs?: number;
+  minConcurrencyScale?: number;
+  maxConcurrencyScale?: number;
 }
 
 type ConcurrencyBudget = {
@@ -96,6 +100,10 @@ const DEFAULT_PROFILE: ToolExecutionProfile = {
   canParallelize: true,
 };
 
+const DEFAULT_TARGET_LATENCY_MS = 2000;
+const DEFAULT_MIN_CONCURRENCY_SCALE = 0.5;
+const DEFAULT_MAX_CONCURRENCY_SCALE = 1.5;
+
 type BatchState = {
   calls: MCPToolCall[];
   cpuCount: number;
@@ -107,6 +115,10 @@ export class SmartToolScheduler {
   private readonly dependencyAnalyzer: DependencyAnalyzer;
   private readonly profiles = new Map<string, ToolExecutionProfile>();
   private readonly budget: ConcurrencyBudget;
+  private readonly adaptiveConcurrency: boolean;
+  private readonly targetLatencyMs: number;
+  private readonly minConcurrencyScale: number;
+  private readonly maxConcurrencyScale: number;
 
   constructor(
     options: { config?: SmartToolSchedulerConfig; dependencyAnalyzer?: DependencyAnalyzer } = {}
@@ -118,6 +130,10 @@ export class SmartToolScheduler {
       network: config.maxNetworkConcurrent ?? DEFAULT_BUDGET.network,
       default: config.maxDefaultConcurrent ?? DEFAULT_BUDGET.default,
     };
+    this.adaptiveConcurrency = config.adaptiveConcurrency ?? true;
+    this.targetLatencyMs = config.targetLatencyMs ?? DEFAULT_TARGET_LATENCY_MS;
+    this.minConcurrencyScale = config.minConcurrencyScale ?? DEFAULT_MIN_CONCURRENCY_SCALE;
+    this.maxConcurrencyScale = config.maxConcurrencyScale ?? DEFAULT_MAX_CONCURRENCY_SCALE;
 
     const mergedProfiles = [...PROFILE_PRESETS, ...(config.profiles ?? [])];
     for (const profile of mergedProfiles) {
@@ -161,6 +177,31 @@ export class SmartToolScheduler {
     const profile = this.getProfile(toolName);
     const next = durationMs * 0.2 + profile.avgDurationMs * 0.8;
     this.profiles.set(toolName, { ...profile, avgDurationMs: Math.max(10, next) });
+  }
+
+  recommendConcurrency(calls: MCPToolCall[], baseConcurrency: number): number {
+    if (!this.adaptiveConcurrency || calls.length === 0) {
+      return baseConcurrency;
+    }
+
+    const profiles = calls.map((call) => this.getProfile(call.name));
+    const avgDuration =
+      profiles.reduce((sum, profile) => sum + profile.avgDurationMs, 0) / profiles.length;
+
+    let scale = 1;
+    if (avgDuration > this.targetLatencyMs) {
+      scale = Math.max(this.minConcurrencyScale, this.targetLatencyMs / avgDuration);
+    } else if (avgDuration < this.targetLatencyMs * 0.5) {
+      scale = Math.min(this.maxConcurrencyScale, this.targetLatencyMs / avgDuration);
+    }
+
+    const cpuHeavyRatio =
+      profiles.filter((profile) => profile.cpuIntensive).length / profiles.length;
+    if (cpuHeavyRatio > 0.5) {
+      scale *= 0.8;
+    }
+
+    return Math.max(1, Math.min(baseConcurrency, Math.round(baseConcurrency * scale)));
   }
 
   private buildBatches(calls: MCPToolCall[]): MCPToolCall[][] {

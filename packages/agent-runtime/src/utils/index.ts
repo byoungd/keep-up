@@ -27,6 +27,12 @@ export {
   createToolResultCache,
   LRUCache,
   ToolResultCache,
+  type ToolResultCacheOptions,
+  type ToolResultCachePersistence,
+  type ToolResultCacheSnapshot,
+  type ToolResultCacheStore,
+  type ToolResultTtlContext,
+  type ToolResultTtlStrategy,
 } from "./cache";
 // YAML frontmatter parsing
 export {
@@ -117,3 +123,7 @@ export {
   resolveToolActivity,
   type ToolActivity,
 } from "./toolActivity";
+export {
+  FileToolResultCacheStore,
+  type FileToolResultCacheStoreConfig,
+} from "./toolResultCacheStore";

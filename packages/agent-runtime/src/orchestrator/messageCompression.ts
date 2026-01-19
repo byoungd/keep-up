@@ -50,6 +50,10 @@ export interface CompressionConfig {
   preserveCount: number;
   /** Enable summarization (requires LLM) */
   enableSummarization: boolean;
+  /** Enable incremental compression when messages append */
+  incremental?: boolean;
+  /** Maximum token cache entries */
+  maxTokenCacheEntries?: number;
   /** Token estimator function */
   estimateTokens: (text: string) => number;
   /** Optional summarizer for LLM-based compression */
@@ -103,6 +107,8 @@ const DEFAULT_CONFIG: CompressionConfig = {
   minMessages: 5,
   preserveCount: 3,
   enableSummarization: false,
+  incremental: true,
+  maxTokenCacheEntries: 2000,
   estimateTokens: (text) => countTokens(text),
 };
 
@@ -118,10 +124,18 @@ const DEFAULT_CONFIG: CompressionConfig = {
 export class MessageCompressor {
   protected readonly config: CompressionConfig;
   protected readonly tokenCache = new Map<string, number>();
+  private messageTokenCache = new WeakMap<AgentMessage, number>();
+  private readonly maxTokenCacheEntries: number;
+  private lastSnapshot?: {
+    input: AgentMessage[];
+    totalTokens: number;
+    compressionRatio: number;
+  };
   protected summarizer?: ISummarizer;
 
   constructor(config: Partial<CompressionConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
+    this.maxTokenCacheEntries = this.config.maxTokenCacheEntries ?? 2000;
     this.summarizer = config.summarizer;
   }
 
@@ -138,6 +152,7 @@ export class MessageCompressor {
    */
   compress(messages: AgentMessage[]): CompressionResult {
     if (messages.length === 0) {
+      this.lastSnapshot = undefined;
       return {
         messages: [],
         totalTokens: 0,
@@ -147,13 +162,19 @@ export class MessageCompressor {
       };
     }
 
+    const incrementalResult = this.tryIncrementalCompression(messages);
+    if (incrementalResult) {
+      this.updateSnapshot(messages, incrementalResult);
+      return incrementalResult;
+    }
+
     // Calculate current token count
     const totalTokens = this.calculateTotalTokens(messages);
     const originalCount = messages.length;
 
     // If within limits, return as-is
     if (totalTokens <= this.config.maxTokens) {
-      return {
+      const result: CompressionResult = {
         messages: [...messages],
         totalTokens,
         removedCount: 0,
@@ -161,6 +182,8 @@ export class MessageCompressor {
         compressionRatio: 0,
         utilization: (totalTokens / this.config.maxTokens) * 100,
       };
+      this.updateSnapshot(messages, result);
+      return result;
     }
 
     // Apply compression strategy (sync strategies only)
@@ -189,7 +212,7 @@ export class MessageCompressor {
       .map((msg) => messages.indexOf(msg))
       .filter((idx) => idx !== -1);
 
-    return {
+    const finalResult: CompressionResult = {
       ...result,
       removedCount: originalCount - result.messages.length,
       utilization,
@@ -200,6 +223,62 @@ export class MessageCompressor {
         summary: `Compressed ${originalCount - result.messages.length} messages using ${this.config.strategy} strategy`,
       },
     };
+    this.updateSnapshot(messages, finalResult);
+    return finalResult;
+  }
+
+  private tryIncrementalCompression(messages: AgentMessage[]): CompressionResult | null {
+    if (!this.config.incremental || !this.lastSnapshot) {
+      return null;
+    }
+
+    if (this.lastSnapshot.compressionRatio > 0) {
+      return null;
+    }
+
+    const previousMessages = this.lastSnapshot.input;
+    if (messages.length < previousMessages.length) {
+      return null;
+    }
+
+    if (!this.isPrefixMatch(previousMessages, messages)) {
+      return null;
+    }
+
+    let totalTokens = this.lastSnapshot.totalTokens;
+    for (let i = previousMessages.length; i < messages.length; i++) {
+      totalTokens += this.estimateMessageTokens(messages[i]);
+    }
+
+    if (totalTokens > this.config.maxTokens) {
+      return null;
+    }
+
+    return {
+      messages: [...messages],
+      totalTokens,
+      removedCount: 0,
+      summarizedCount: 0,
+      compressionRatio: 0,
+      utilization: (totalTokens / this.config.maxTokens) * 100,
+    };
+  }
+
+  private updateSnapshot(messages: AgentMessage[], result: CompressionResult): void {
+    this.lastSnapshot = {
+      input: messages.slice(),
+      totalTokens: result.totalTokens,
+      compressionRatio: result.compressionRatio,
+    };
+  }
+
+  private isPrefixMatch(prefix: AgentMessage[], full: AgentMessage[]): boolean {
+    for (let i = 0; i < prefix.length; i++) {
+      if (prefix[i] !== full[i]) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /**
@@ -217,14 +296,7 @@ export class MessageCompressor {
    * Estimate tokens for a message.
    */
   estimateMessageTokens(message: AgentMessage): number {
-    // Create cache key based on role and partial content
-    let contentPreview = "";
-    if ("content" in message && message.content) {
-      contentPreview = message.content.substring(0, 50);
-    }
-    const cacheKey = `${message.role}:${contentPreview}`;
-
-    const cached = this.tokenCache.get(cacheKey);
+    const cached = this.messageTokenCache.get(message);
     if (cached !== undefined) {
       return cached;
     }
@@ -233,7 +305,7 @@ export class MessageCompressor {
 
     // Content tokens (for messages that have content)
     if ("content" in message && message.content) {
-      tokens += this.config.estimateTokens(message.content);
+      tokens += this.estimateTextTokens(message.content);
     }
 
     // Tool calls tokens (rough estimate) - only for assistant messages
@@ -243,16 +315,57 @@ export class MessageCompressor {
 
     // Tool result tokens - only for tool messages
     if (message.role === "tool" && message.result) {
-      const resultText = JSON.stringify(message.result);
-      tokens += this.config.estimateTokens(resultText);
+      tokens += this.estimateStructuredTokens(message.result);
     }
 
-    // Cache result
-    if (this.tokenCache.size < 1000) {
-      this.tokenCache.set(cacheKey, tokens);
-    }
+    this.messageTokenCache.set(message, tokens);
 
     return tokens;
+  }
+
+  private estimateStructuredTokens(value: unknown): number {
+    try {
+      const text = JSON.stringify(value);
+      return this.estimateTextTokens(text);
+    } catch {
+      return this.estimateTextTokens(String(value));
+    }
+  }
+
+  private estimateTextTokens(text: string): number {
+    const key = this.buildTextCacheKey(text);
+    const cached = this.tokenCache.get(key);
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    const tokens = this.config.estimateTokens(text);
+    this.writeTokenCache(key, tokens);
+    return tokens;
+  }
+
+  private buildTextCacheKey(text: string): string {
+    return `${text.length}:${this.hashText(text)}`;
+  }
+
+  private writeTokenCache(key: string, tokens: number): void {
+    if (this.tokenCache.size >= this.maxTokenCacheEntries) {
+      const oldestKey = this.tokenCache.keys().next().value;
+      if (oldestKey) {
+        this.tokenCache.delete(oldestKey);
+      }
+    }
+    this.tokenCache.set(key, tokens);
+  }
+
+  private hashText(text: string): string {
+    let hash = 0;
+    for (let i = 0; i < text.length; i++) {
+      const char = text.charCodeAt(i);
+      hash = (hash << 5) - hash + char;
+      hash |= 0;
+    }
+    return Math.abs(hash).toString(36);
   }
 
   /**
@@ -348,6 +461,7 @@ export class MessageCompressor {
    */
   async compressAsync(messages: AgentMessage[]): Promise<CompressionResult> {
     if (messages.length === 0) {
+      this.lastSnapshot = undefined;
       return {
         messages: [],
         totalTokens: 0,
@@ -357,11 +471,17 @@ export class MessageCompressor {
       };
     }
 
+    const incrementalResult = this.tryIncrementalCompression(messages);
+    if (incrementalResult) {
+      this.updateSnapshot(messages, incrementalResult);
+      return incrementalResult;
+    }
+
     const totalTokens = this.calculateTotalTokens(messages);
     const _originalCount = messages.length;
 
     if (totalTokens <= this.config.maxTokens) {
-      return {
+      const result: CompressionResult = {
         messages: [...messages],
         totalTokens,
         removedCount: 0,
@@ -369,6 +489,8 @@ export class MessageCompressor {
         compressionRatio: 0,
         utilization: (totalTokens / this.config.maxTokens) * 100,
       };
+      this.updateSnapshot(messages, result);
+      return result;
     }
 
     // Use async summarization if available and strategy requests it
@@ -377,7 +499,9 @@ export class MessageCompressor {
       this.summarizer &&
       this.config.enableSummarization
     ) {
-      return this.compressWithSummarization(messages);
+      const result = await this.compressWithSummarization(messages);
+      this.updateSnapshot(messages, result);
+      return result;
     }
 
     // Fall back to sync compression
@@ -569,6 +693,8 @@ export class MessageCompressor {
    */
   clearCache(): void {
     this.tokenCache.clear();
+    this.messageTokenCache = new WeakMap();
+    this.lastSnapshot = undefined;
   }
 }
 
