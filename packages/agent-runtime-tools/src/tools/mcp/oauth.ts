@@ -4,6 +4,10 @@
  * Minimal OAuth client provider and token store integration for MCP SDK transports.
  */
 
+import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
+
 import {
   type AddClientAuthentication,
   auth,
@@ -37,6 +41,61 @@ export class InMemoryMcpOAuthTokenStore implements McpOAuthTokenStore {
 
   async clear(): Promise<void> {
     this.tokens = undefined;
+  }
+}
+
+interface EncryptedTokenPayload {
+  version: 1;
+  algorithm: "aes-256-gcm";
+  iv: string;
+  tag: string;
+  ciphertext: string;
+}
+
+export interface FileMcpOAuthTokenStoreConfig {
+  filePath: string;
+  encryptionKey: string | Uint8Array;
+  keyEncoding?: "hex" | "base64";
+}
+
+export class FileMcpOAuthTokenStore implements McpOAuthTokenStore {
+  private readonly filePath: string;
+  private readonly key: Buffer;
+
+  constructor(config: FileMcpOAuthTokenStoreConfig) {
+    this.filePath = config.filePath;
+    this.key = resolveEncryptionKey(config.encryptionKey, config.keyEncoding);
+  }
+
+  async getTokens(): Promise<OAuthTokens | undefined> {
+    try {
+      const payload = await readFile(this.filePath, "utf-8");
+      const decrypted = decryptPayload(payload, this.key);
+      return decrypted;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === "ENOENT") {
+        return undefined;
+      }
+      throw error;
+    }
+  }
+
+  async saveTokens(tokens: OAuthTokens): Promise<void> {
+    await mkdir(dirname(this.filePath), { recursive: true });
+    const payload = encryptPayload(tokens, this.key);
+    await writeFile(this.filePath, payload, { mode: 0o600 });
+  }
+
+  async clear(): Promise<void> {
+    try {
+      await unlink(this.filePath);
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== "ENOENT") {
+        throw error;
+      }
+    }
   }
 }
 
@@ -202,4 +261,58 @@ export class McpOAuthSession {
       throw new UnauthorizedError("OAuth redirect required to authorize MCP server.");
     }
   }
+}
+
+function resolveEncryptionKey(key: string | Uint8Array, encoding?: "hex" | "base64"): Buffer {
+  const buffer = typeof key === "string" ? decodeKeyString(key, encoding) : Buffer.from(key);
+  if (buffer.length !== 32) {
+    throw new Error("MCP OAuth token store requires a 32-byte encryption key.");
+  }
+  return buffer;
+}
+
+function decodeKeyString(value: string, encoding?: "hex" | "base64"): Buffer {
+  const trimmed = value.trim();
+  if (encoding) {
+    return Buffer.from(trimmed, encoding);
+  }
+
+  const isHex = /^[0-9a-f]+$/i.test(trimmed) && trimmed.length % 2 === 0;
+  return Buffer.from(trimmed, isHex ? "hex" : "base64");
+}
+
+function encryptPayload(tokens: OAuthTokens, key: Buffer): string {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  const plaintext = Buffer.from(JSON.stringify(tokens), "utf-8");
+  const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+  const tag = cipher.getAuthTag();
+
+  const payload: EncryptedTokenPayload = {
+    version: 1,
+    algorithm: "aes-256-gcm",
+    iv: iv.toString("base64"),
+    tag: tag.toString("base64"),
+    ciphertext: ciphertext.toString("base64"),
+  };
+
+  return JSON.stringify(payload);
+}
+
+function decryptPayload(payload: string, key: Buffer): OAuthTokens {
+  const parsed = JSON.parse(payload) as EncryptedTokenPayload;
+  if (parsed.version !== 1 || parsed.algorithm !== "aes-256-gcm") {
+    throw new Error("Unsupported MCP OAuth token payload.");
+  }
+
+  const iv = Buffer.from(parsed.iv, "base64");
+  const tag = Buffer.from(parsed.tag, "base64");
+  const ciphertext = Buffer.from(parsed.ciphertext, "base64");
+  const decipher = createDecipheriv("aes-256-gcm", key, iv);
+  decipher.setAuthTag(tag);
+  const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString(
+    "utf-8"
+  );
+
+  return JSON.parse(plaintext) as OAuthTokens;
 }

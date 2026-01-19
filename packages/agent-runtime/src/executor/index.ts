@@ -21,6 +21,7 @@ import {
   type PromptInjectionAssessment,
   type PromptInjectionGuard,
   type PromptInjectionPolicy,
+  resolvePromptInjectionPolicy,
   shouldBlockPromptInjection,
   type ToolPolicyDecision,
   type ToolPolicyEngine,
@@ -919,19 +920,15 @@ export class ToolExecutionPipeline
     tool: MCPTool | undefined,
     context: ToolContext
   ): PromptInjectionAssessment | null {
-    if (!this.promptInjectionPolicy.enabled) {
+    const policy = this.resolvePromptPolicy(call, tool);
+    if (!policy.enabled) {
       return null;
     }
-    const result = this.promptInjectionGuard.assessInput(
-      call,
-      tool,
-      context,
-      this.promptInjectionPolicy
-    );
+    const result = this.promptInjectionGuard.assessInput(call, tool, context, policy);
     if (!result) {
       return null;
     }
-    if (!shouldBlockPromptInjection(result.assessment, this.promptInjectionPolicy)) {
+    if (!shouldBlockPromptInjection(result.assessment, policy)) {
       return null;
     }
     return result.assessment;
@@ -943,21 +940,16 @@ export class ToolExecutionPipeline
     context: ToolContext,
     result: MCPToolResult
   ): MCPToolResult {
-    if (!this.promptInjectionPolicy.enabled || !result.success) {
+    const policy = this.resolvePromptPolicy(call, tool);
+    if (!policy.enabled || !result.success) {
       return result;
     }
 
-    const assessment = this.promptInjectionGuard.assessOutput(
-      call,
-      tool,
-      result,
-      context,
-      this.promptInjectionPolicy
-    );
+    const assessment = this.promptInjectionGuard.assessOutput(call, tool, result, context, policy);
     if (!assessment) {
       return result;
     }
-    if (!shouldBlockPromptInjection(assessment.assessment, this.promptInjectionPolicy)) {
+    if (!shouldBlockPromptInjection(assessment.assessment, policy)) {
       return result;
     }
 
@@ -970,6 +962,11 @@ export class ToolExecutionPipeline
       source: assessment.assessment.source,
       truncated: assessment.assessment.truncated,
     });
+  }
+
+  private resolvePromptPolicy(call: MCPToolCall, tool: MCPTool | undefined): PromptInjectionPolicy {
+    const toolName = tool?.name ?? call.name;
+    return resolvePromptInjectionPolicy(this.promptInjectionPolicy, toolName);
   }
 
   private async applyOutputSpooling(
