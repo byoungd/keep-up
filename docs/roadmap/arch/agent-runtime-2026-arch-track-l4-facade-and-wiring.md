@@ -1,7 +1,7 @@
 # Track L4: Facade Wiring and Dependency Enforcement
 
 Owner: Runtime Architect + Runtime Developer
-Status: Ready
+Status: Done
 Date: 2026-01-19
 Timeline: Week 4+
 
@@ -45,6 +45,14 @@ add dependency enforcement tooling to prevent regressions.
 4. Add dependency graph check script (madge or dependency-cruiser) and document invocation.
 5. Update migration notes and Track L roadmap docs with final package layout.
 6. Run build and smoke tests.
+
+## Dependency Checks
+- `pnpm check:circular` (runs `scripts/check-circular-deps.sh` across runtime packages)
+- Optional ad-hoc: `pnpm madge --circular --extensions ts,tsx packages/agent-runtime/src/index.ts`
+
+## Migration Notes
+- `@ku0/agent-runtime-tools` now owns tools, browser automation, plugins, skills, and tool registry.
+- `@ku0/agent-runtime` re-exports tool factories and subpaths (`/tools`, `/browser`, `/plugins`, `/skills`).
 
 ## Acceptance Criteria
 - Facade API remains compatible with previous exports.
