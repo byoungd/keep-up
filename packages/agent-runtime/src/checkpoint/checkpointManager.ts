@@ -5,196 +5,25 @@
  * Enables resuming interrupted operations and crash recovery.
  */
 
-// ============================================================================
-// Types
-// ============================================================================
+import type {
+  Checkpoint,
+  CheckpointCreateParams,
+  CheckpointFilter,
+  CheckpointManagerConfig,
+  CheckpointMessage,
+  CheckpointStatus,
+  CheckpointStatusUpdate,
+  CheckpointSummary,
+  CheckpointToolCall,
+  CheckpointToolResult,
+  ICheckpointManager,
+  ICheckpointStorage,
+  RecoveryOptions,
+  RecoveryResult,
+} from "@ku0/agent-runtime-core";
 
 /** Checkpoint state version for migration */
 export const CHECKPOINT_VERSION = 1;
-
-/** Checkpoint status */
-export type CheckpointStatus = "pending" | "completed" | "failed" | "cancelled";
-
-/** Serializable checkpoint data */
-export interface Checkpoint {
-  /** Unique checkpoint ID */
-  id: string;
-
-  /** Version for migration support */
-  version: number;
-
-  /** Timestamp when checkpoint was created */
-  createdAt: number;
-
-  /** Original task/goal */
-  task: string;
-
-  /** Agent type */
-  agentType: string;
-
-  /** Agent instance ID */
-  agentId: string;
-
-  /** Current status */
-  status: CheckpointStatus;
-
-  /** Conversation history (messages) */
-  messages: CheckpointMessage[];
-
-  /** Pending tool calls */
-  pendingToolCalls: CheckpointToolCall[];
-
-  /** Completed tool calls with results */
-  completedToolCalls: CheckpointToolResult[];
-
-  /** Current step/turn number */
-  currentStep: number;
-
-  /** Maximum allowed steps */
-  maxSteps: number;
-
-  /** Custom metadata */
-  metadata: Record<string, unknown>;
-
-  /** Error information if failed */
-  error?: {
-    message: string;
-    code?: string;
-    recoverable: boolean;
-  };
-
-  /** Parent checkpoint ID (for nested agents) */
-  parentCheckpointId?: string;
-
-  /** Child checkpoint IDs */
-  childCheckpointIds: string[];
-}
-
-/** Serializable message */
-export interface CheckpointMessage {
-  role: "user" | "assistant" | "system";
-  content: string;
-  timestamp: number;
-}
-
-/** Pending tool call */
-export interface CheckpointToolCall {
-  id: string;
-  name: string;
-  arguments: Record<string, unknown>;
-  timestamp: number;
-}
-
-/** Completed tool result */
-export interface CheckpointToolResult {
-  callId: string;
-  name: string;
-  arguments: Record<string, unknown>;
-  result: unknown;
-  success: boolean;
-  durationMs: number;
-  timestamp: number;
-}
-
-/** Checkpoint storage interface */
-export interface ICheckpointStorage {
-  /** Save a checkpoint */
-  save(checkpoint: Checkpoint): Promise<void>;
-
-  /** Load a checkpoint by ID */
-  load(id: string): Promise<Checkpoint | null>;
-
-  /** List checkpoints with optional filters */
-  list(filter?: CheckpointFilter): Promise<CheckpointSummary[]>;
-
-  /** Delete a checkpoint */
-  delete(id: string): Promise<boolean>;
-
-  /** Delete old checkpoints */
-  prune(olderThanMs: number): Promise<number>;
-}
-
-/** Checkpoint filter options */
-export interface CheckpointFilter {
-  /** Filter by status */
-  status?: CheckpointStatus | CheckpointStatus[];
-
-  /** Filter by agent type */
-  agentType?: string;
-
-  /** Filter by creation time (after) */
-  createdAfter?: number;
-
-  /** Filter by creation time (before) */
-  createdBefore?: number;
-
-  /** Maximum results */
-  limit?: number;
-
-  /** Sort order */
-  sortBy?: "createdAt" | "status";
-  sortOrder?: "asc" | "desc";
-}
-
-/** Checkpoint summary (for listing) */
-export interface CheckpointSummary {
-  id: string;
-  task: string;
-  agentType: string;
-  status: CheckpointStatus;
-  createdAt: number;
-  currentStep: number;
-  maxSteps: number;
-  hasError: boolean;
-}
-
-/** Checkpoint manager configuration */
-export interface CheckpointManagerConfig {
-  /** Checkpoint storage implementation */
-  storage: ICheckpointStorage;
-
-  /** Auto-checkpoint interval (steps) */
-  autoCheckpointInterval?: number;
-
-  /** Maximum checkpoints to keep per agent */
-  maxCheckpointsPerAgent?: number;
-
-  /** Auto-prune checkpoints older than (ms) */
-  autoPruneOlderThanMs?: number;
-}
-
-/** Recovery options */
-export interface RecoveryOptions {
-  /** Skip completed tool calls */
-  skipCompletedTools?: boolean;
-
-  /** Retry failed tool calls */
-  retryFailedTools?: boolean;
-
-  /** Maximum retry attempts */
-  maxRetries?: number;
-
-  /** Resume from specific step */
-  fromStep?: number;
-}
-
-/** Recovery result */
-export interface RecoveryResult {
-  /** Whether recovery succeeded */
-  success: boolean;
-
-  /** Recovered checkpoint */
-  checkpoint: Checkpoint;
-
-  /** Steps skipped */
-  skippedSteps: number;
-
-  /** Steps to replay */
-  stepsToReplay: number;
-
-  /** Error if recovery failed */
-  error?: string;
-}
 
 // ============================================================================
 // In-Memory Storage Implementation
@@ -302,7 +131,7 @@ export class InMemoryCheckpointStorage implements ICheckpointStorage {
 /**
  * Manages checkpoints for agent workflows.
  */
-export class CheckpointManager {
+export class CheckpointManager implements ICheckpointManager {
   private readonly storage: ICheckpointStorage;
   private readonly autoCheckpointInterval: number;
   private readonly maxCheckpointsPerAgent: number;
@@ -325,14 +154,7 @@ export class CheckpointManager {
   /**
    * Create a new checkpoint.
    */
-  async create(params: {
-    task: string;
-    agentType: string;
-    agentId: string;
-    maxSteps?: number;
-    metadata?: Record<string, unknown>;
-    parentCheckpointId?: string;
-  }): Promise<Checkpoint> {
+  async create(params: CheckpointCreateParams): Promise<Checkpoint> {
     const checkpoint: Checkpoint = {
       id: this.generateId(),
       version: CHECKPOINT_VERSION,
@@ -460,7 +282,7 @@ export class CheckpointManager {
   async updateStatus(
     checkpointId: string,
     status: CheckpointStatus,
-    error?: { message: string; code?: string; recoverable?: boolean }
+    error?: CheckpointStatusUpdate
   ): Promise<void> {
     const checkpoint = await this.getActiveCheckpoint(checkpointId);
     if (!checkpoint) {

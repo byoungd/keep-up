@@ -742,6 +742,227 @@ export interface ToolExecutionRecord {
 }
 
 // ============================================================================
+// Checkpoint Types
+// ============================================================================
+
+/** Checkpoint status */
+export type CheckpointStatus = "pending" | "completed" | "failed" | "cancelled";
+
+/** Checkpoint error information */
+export interface CheckpointError {
+  message: string;
+  code?: string;
+  recoverable: boolean;
+}
+
+/** Serializable message */
+export interface CheckpointMessage {
+  role: "user" | "assistant" | "system";
+  content: string;
+  timestamp: number;
+}
+
+/** Pending tool call */
+export interface CheckpointToolCall {
+  id: string;
+  name: string;
+  arguments: Record<string, unknown>;
+  timestamp: number;
+}
+
+/** Completed tool result */
+export interface CheckpointToolResult {
+  callId: string;
+  name: string;
+  arguments: Record<string, unknown>;
+  result: unknown;
+  success: boolean;
+  durationMs: number;
+  timestamp: number;
+}
+
+/** Serializable checkpoint data */
+export interface Checkpoint {
+  /** Unique checkpoint ID */
+  id: string;
+  /** Version for migration support */
+  version: number;
+  /** Timestamp when checkpoint was created */
+  createdAt: number;
+  /** Original task/goal */
+  task: string;
+  /** Agent type */
+  agentType: string;
+  /** Agent instance ID */
+  agentId: string;
+  /** Current status */
+  status: CheckpointStatus;
+  /** Conversation history (messages) */
+  messages: CheckpointMessage[];
+  /** Pending tool calls */
+  pendingToolCalls: CheckpointToolCall[];
+  /** Completed tool calls with results */
+  completedToolCalls: CheckpointToolResult[];
+  /** Current step/turn number */
+  currentStep: number;
+  /** Maximum allowed steps */
+  maxSteps: number;
+  /** Custom metadata */
+  metadata: Record<string, unknown>;
+  /** Error information if failed */
+  error?: CheckpointError;
+  /** Parent checkpoint ID (for nested agents) */
+  parentCheckpointId?: string;
+  /** Child checkpoint IDs */
+  childCheckpointIds: string[];
+}
+
+/** Checkpoint filter options */
+export interface CheckpointFilter {
+  /** Filter by status */
+  status?: CheckpointStatus | CheckpointStatus[];
+  /** Filter by agent type */
+  agentType?: string;
+  /** Filter by creation time (after) */
+  createdAfter?: number;
+  /** Filter by creation time (before) */
+  createdBefore?: number;
+  /** Maximum results */
+  limit?: number;
+  /** Sort order */
+  sortBy?: "createdAt" | "status";
+  sortOrder?: "asc" | "desc";
+}
+
+/** Checkpoint summary (for listing) */
+export interface CheckpointSummary {
+  id: string;
+  task: string;
+  agentType: string;
+  status: CheckpointStatus;
+  createdAt: number;
+  currentStep: number;
+  maxSteps: number;
+  hasError: boolean;
+}
+
+/** Checkpoint storage interface */
+export interface ICheckpointStorage {
+  /** Save a checkpoint */
+  save(checkpoint: Checkpoint): Promise<void>;
+  /** Load a checkpoint by ID */
+  load(id: string): Promise<Checkpoint | null>;
+  /** List checkpoints with optional filters */
+  list(filter?: CheckpointFilter): Promise<CheckpointSummary[]>;
+  /** Delete a checkpoint */
+  delete(id: string): Promise<boolean>;
+  /** Delete old checkpoints */
+  prune(olderThanMs: number): Promise<number>;
+}
+
+/** Checkpoint manager configuration */
+export interface CheckpointManagerConfig {
+  /** Checkpoint storage implementation */
+  storage: ICheckpointStorage;
+  /** Auto-checkpoint interval (steps) */
+  autoCheckpointInterval?: number;
+  /** Maximum checkpoints to keep per agent */
+  maxCheckpointsPerAgent?: number;
+  /** Auto-prune checkpoints older than (ms) */
+  autoPruneOlderThanMs?: number;
+}
+
+/** Checkpoint create params */
+export interface CheckpointCreateParams {
+  task: string;
+  agentType: string;
+  agentId: string;
+  maxSteps?: number;
+  metadata?: Record<string, unknown>;
+  parentCheckpointId?: string;
+}
+
+/** Checkpoint status update payload */
+export interface CheckpointStatusUpdate {
+  message: string;
+  code?: string;
+  recoverable?: boolean;
+}
+
+/** Recovery options */
+export interface RecoveryOptions {
+  /** Skip completed tool calls */
+  skipCompletedTools?: boolean;
+  /** Retry failed tool calls */
+  retryFailedTools?: boolean;
+  /** Maximum retry attempts */
+  maxRetries?: number;
+  /** Resume from specific step */
+  fromStep?: number;
+}
+
+/** Recovery result */
+export interface RecoveryResult {
+  /** Whether recovery succeeded */
+  success: boolean;
+  /** Recovered checkpoint */
+  checkpoint: Checkpoint;
+  /** Steps skipped */
+  skippedSteps: number;
+  /** Steps to replay */
+  stepsToReplay: number;
+  /** Error if recovery failed */
+  error?: string;
+}
+
+/** Checkpoint manager interface */
+export interface ICheckpointManager {
+  create(params: CheckpointCreateParams): Promise<Checkpoint>;
+  addMessage(checkpointId: string, message: Omit<CheckpointMessage, "timestamp">): Promise<void>;
+  addPendingToolCall(
+    checkpointId: string,
+    toolCall: Omit<CheckpointToolCall, "timestamp">
+  ): Promise<void>;
+  completeToolCall(
+    checkpointId: string,
+    result: Omit<CheckpointToolResult, "timestamp">
+  ): Promise<void>;
+  advanceStep(checkpointId: string): Promise<number>;
+  updateStatus(
+    checkpointId: string,
+    status: CheckpointStatus,
+    error?: CheckpointStatusUpdate
+  ): Promise<void>;
+  updateMetadata(checkpointId: string, metadata: Record<string, unknown>): Promise<void>;
+  save(checkpointId: string): Promise<void>;
+  saveAll(): Promise<void>;
+  load(checkpointId: string): Promise<Checkpoint | null>;
+  prepareRecovery(checkpointId: string, options?: RecoveryOptions): Promise<RecoveryResult>;
+  getRecoverableCheckpoints(): Promise<CheckpointSummary[]>;
+  list(filter?: CheckpointFilter): Promise<CheckpointSummary[]>;
+  getPendingCheckpoints(): Promise<CheckpointSummary[]>;
+  delete(checkpointId: string): Promise<boolean>;
+  prune(): Promise<number>;
+  dispose(): Promise<void>;
+}
+
+/** Checkpoint event payload */
+export interface CheckpointEvent {
+  checkpointId: string;
+  runId?: string;
+  agentId: string;
+  agentType: string;
+  status: CheckpointStatus;
+  step: number;
+  update: "created" | "message" | "tool_call" | "tool_result" | "turn_end" | "status";
+  messageRole?: CheckpointMessage["role"];
+  toolCallId?: string;
+  toolName?: string;
+  success?: boolean;
+  error?: string;
+}
+
+// ============================================================================
 // Artifact Types
 // ============================================================================
 

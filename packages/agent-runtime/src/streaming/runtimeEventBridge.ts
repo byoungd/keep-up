@@ -11,7 +11,12 @@ import type {
   SubagentEventPayload,
   Subscription,
 } from "@ku0/agent-runtime-control";
-import type { ExecutionDecision, MessageEnvelope, ToolExecutionRecord } from "../types";
+import type {
+  CheckpointEvent,
+  ExecutionDecision,
+  MessageEnvelope,
+  ToolExecutionRecord,
+} from "../types";
 import {
   formatToolActivityLabel,
   formatToolActivityMessage,
@@ -156,6 +161,21 @@ export function attachRuntimeEventStreamBridge(config: RuntimeEventStreamBridgeC
     stream.writeMetadata("message:delivered", payload);
   };
 
+  const handleCheckpointEvent = (
+    payload: CheckpointEvent,
+    context?: { agentId?: string; parentId?: string }
+  ) => {
+    if (context?.agentId) {
+      stream.writeMetadata("checkpoint", {
+        ...payload,
+        agentId: context.agentId,
+        parentId: context.parentId,
+      });
+      return;
+    }
+    stream.writeMetadata("checkpoint", payload);
+  };
+
   if (includeDecisions) {
     subscriptions.push(
       eventBus.subscribe("execution:decision", (event) => {
@@ -204,6 +224,24 @@ export function attachRuntimeEventStreamBridge(config: RuntimeEventStreamBridgeC
   );
 
   subscriptions.push(
+    eventBus.subscribe("checkpoint:created", (event) => {
+      if (!shouldHandle(event)) {
+        return;
+      }
+      handleCheckpointEvent(event.payload as CheckpointEvent);
+    })
+  );
+
+  subscriptions.push(
+    eventBus.subscribe("checkpoint:updated", (event) => {
+      if (!shouldHandle(event)) {
+        return;
+      }
+      handleCheckpointEvent(event.payload as CheckpointEvent);
+    })
+  );
+
+  subscriptions.push(
     eventBus.subscribe("subagent:event", (event) => {
       if (!shouldHandle(event)) {
         return;
@@ -231,6 +269,10 @@ export function attachRuntimeEventStreamBridge(config: RuntimeEventStreamBridgeC
           innerEvent.payload as ArtifactEvents["artifact:quarantined"],
           context
         );
+      }
+
+      if (innerEvent.type === "checkpoint:created" || innerEvent.type === "checkpoint:updated") {
+        handleCheckpointEvent(innerEvent.payload as CheckpointEvent, context);
       }
     })
   );

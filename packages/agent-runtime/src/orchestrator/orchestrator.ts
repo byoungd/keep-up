@@ -72,8 +72,11 @@ import type {
   AgentMessage,
   AgentState,
   ArtifactEnvelope,
+  CheckpointEvent,
+  CheckpointStatus,
   ConfirmationHandler,
   ConfirmationRequest,
+  ICheckpointManager,
   MCPTool,
   MCPToolCall,
   MCPToolResult,
@@ -181,6 +184,7 @@ export interface OrchestratorComponents {
   toolExecutor?: ToolExecutor;
   eventBus?: RuntimeEventBus;
   sessionState?: SessionState;
+  checkpointManager?: ICheckpointManager;
   errorRecoveryEngine?: ErrorRecoveryEngine;
   toolDiscovery?: ToolDiscoveryEngine;
   /** Intent registry for tracking AI edit intents */
@@ -267,6 +271,7 @@ export class AgentOrchestrator {
   private readonly approvalManager?: ApprovalManager;
   private readonly eventBus?: RuntimeEventBus;
   private readonly sessionState?: SessionState;
+  private readonly checkpointManager?: ICheckpointManager;
   private readonly errorRecoveryEngine?: ErrorRecoveryEngine;
   private readonly toolDiscovery?: ToolDiscoveryEngine;
   private readonly intentRegistry?: IntentRegistry;
@@ -284,6 +289,10 @@ export class AgentOrchestrator {
   private readonly statusController: OrchestratorStatusController;
   private lastObservation?: Observation;
   private currentRunId?: string;
+  private currentCheckpointId?: string;
+  private currentCheckpointStatus?: CheckpointStatus;
+  private currentCheckpointAgentId?: string;
+  private currentTask?: string;
   private currentPlanNodeId?: string;
   private planArtifactEmitted = false;
   private readonly taskGraphToolCalls = new WeakMap<MCPToolCall, string>();
@@ -340,6 +349,7 @@ export class AgentOrchestrator {
     this.metrics = telemetry?.metrics;
     this.tracer = telemetry?.tracer;
     this.sessionState = components.sessionState;
+    this.checkpointManager = components.checkpointManager;
     this.state = this.resolveInitialState();
     this.statusController = new OrchestratorStatusController(this.state.status);
     this.singleStepEnforcer = createSingleStepEnforcer({
@@ -567,12 +577,19 @@ export class AgentOrchestrator {
   private async runWithId(userMessage: string, runId: string): Promise<AgentState> {
     this.abortController = new AbortController();
     this.currentRunId = runId;
+    this.currentTask = userMessage;
+    this.currentCheckpointId = undefined;
+    this.currentCheckpointStatus = undefined;
+    this.currentCheckpointAgentId = undefined;
+    this.state.checkpointId = undefined;
     this.recoveryState = { active: false, warned: false };
     this.forceCompletionToolsOnly = false;
     this.planArtifactEmitted = false;
     this.taskGraph?.setEventContext({ correlationId: runId, source: this.config.name });
     this.currentPlanNodeId = this.createPlanNode(userMessage);
     const detachStreamBridge = this.attachStreamBridge(runId);
+
+    await this.initializeCheckpoint(userMessage);
 
     // Add user message
     const userMsg: AgentMessage = { role: "user", content: userMessage };
@@ -587,6 +604,7 @@ export class AgentOrchestrator {
         this.state.error = "Completion tool not registered.";
         this.emit("error", { error: this.state.error });
         this.metrics?.increment(AGENT_METRICS.turnsTotal.name, { status: "error" });
+        await this.finalizeCheckpointStatus();
         return this.state;
       }
 
@@ -615,6 +633,7 @@ export class AgentOrchestrator {
       this.emit("error", { error: this.state.error });
     }
 
+    await this.finalizeCheckpointStatus();
     return this.state;
   }
 
@@ -782,9 +801,236 @@ export class AgentOrchestrator {
     return existing;
   }
 
+  private async ensureCheckpointReady(): Promise<void> {
+    if (!this.checkpointManager || this.currentCheckpointId) {
+      return;
+    }
+
+    await this.initializeCheckpoint(this.resolveCheckpointTask());
+  }
+
+  private async initializeCheckpoint(task: string): Promise<void> {
+    if (!this.checkpointManager || this.currentCheckpointId) {
+      return;
+    }
+
+    try {
+      const agentId = this.currentRunId ?? this.sessionState?.id ?? this.config.name;
+      const checkpoint = await this.checkpointManager.create({
+        task,
+        agentType: this.config.name,
+        agentId,
+        maxSteps: this.config.maxTurns ?? DEFAULT_MAX_TURNS,
+        metadata: {
+          runId: this.currentRunId,
+          sessionId: this.sessionState?.id,
+        },
+      });
+
+      this.currentCheckpointId = checkpoint.id;
+      this.currentCheckpointStatus = checkpoint.status;
+      this.currentCheckpointAgentId = agentId;
+      this.state.checkpointId = checkpoint.id;
+      this.sessionState?.setState(this.state);
+
+      await this.seedCheckpointMessages(checkpoint.id);
+      this.emitCheckpointEvent("created");
+    } catch {
+      // Avoid breaking orchestration on checkpoint initialization failures.
+    }
+  }
+
+  private async seedCheckpointMessages(checkpointId: string): Promise<void> {
+    if (!this.checkpointManager) {
+      return;
+    }
+
+    for (const message of this.state.messages) {
+      if (message.role === "tool") {
+        continue;
+      }
+      await this.checkpointManager.addMessage(checkpointId, {
+        role: message.role,
+        content: message.content,
+      });
+    }
+  }
+
+  private recordCheckpointMessage(message: AgentMessage): void {
+    if (message.role === "tool") {
+      return;
+    }
+
+    const checkpointId = this.currentCheckpointId;
+    if (!this.checkpointManager || !checkpointId) {
+      return;
+    }
+
+    void this.checkpointManager
+      .addMessage(checkpointId, { role: message.role, content: message.content })
+      .then(() => {
+        this.emitCheckpointEvent("message", { messageRole: message.role });
+      })
+      .catch(() => {
+        // Avoid breaking orchestration on checkpoint write errors.
+      });
+  }
+
+  private async recordCheckpointToolCall(call: MCPToolCall): Promise<string | undefined> {
+    const checkpointId = this.currentCheckpointId;
+    if (!this.checkpointManager || !checkpointId) {
+      return call.id;
+    }
+
+    const toolCallId = this.ensureToolCallId(call);
+
+    try {
+      await this.checkpointManager.addPendingToolCall(checkpointId, {
+        id: toolCallId,
+        name: call.name,
+        arguments: call.arguments,
+      });
+      this.emitCheckpointEvent("tool_call", { toolCallId, toolName: call.name });
+    } catch {
+      // Avoid breaking orchestration on checkpoint write errors.
+    }
+
+    return toolCallId;
+  }
+
+  private async recordCheckpointToolResult(
+    call: MCPToolCall,
+    result: MCPToolResult,
+    durationMs: number
+  ): Promise<void> {
+    const checkpointId = this.currentCheckpointId;
+    if (!this.checkpointManager || !checkpointId) {
+      return;
+    }
+
+    const toolCallId = this.ensureToolCallId(call);
+
+    try {
+      await this.checkpointManager.completeToolCall(checkpointId, {
+        callId: toolCallId,
+        name: call.name,
+        arguments: call.arguments,
+        result,
+        success: result.success,
+        durationMs,
+      });
+      this.emitCheckpointEvent("tool_result", {
+        toolCallId,
+        toolName: call.name,
+        success: result.success,
+        error: result.success ? undefined : result.error?.message,
+      });
+    } catch {
+      // Avoid breaking orchestration on checkpoint write errors.
+    }
+  }
+
+  private async recordCheckpointTurnEnd(): Promise<void> {
+    const checkpointId = this.currentCheckpointId;
+    if (!this.checkpointManager || !checkpointId) {
+      return;
+    }
+
+    try {
+      const step = await this.checkpointManager.advanceStep(checkpointId);
+      this.emitCheckpointEvent("turn_end", { step });
+    } catch {
+      // Avoid breaking orchestration on checkpoint write errors.
+    }
+  }
+
+  private async finalizeCheckpointStatus(): Promise<void> {
+    const checkpointId = this.currentCheckpointId;
+    if (!this.checkpointManager || !checkpointId) {
+      return;
+    }
+
+    const status = this.state.status;
+    if (status === "complete" && this.currentCheckpointStatus !== "completed") {
+      this.currentCheckpointStatus = "completed";
+      try {
+        await this.checkpointManager.updateStatus(checkpointId, "completed");
+        this.emitCheckpointEvent("status");
+      } catch {
+        // Avoid breaking orchestration on checkpoint write errors.
+      }
+      return;
+    }
+
+    if (status === "error" && this.currentCheckpointStatus !== "failed") {
+      const message = this.state.error ?? "Execution failed.";
+      this.currentCheckpointStatus = "failed";
+      try {
+        await this.checkpointManager.updateStatus(checkpointId, "failed", {
+          message,
+          recoverable: Boolean(this.errorRecoveryEngine),
+        });
+        this.emitCheckpointEvent("status", { error: message });
+      } catch {
+        // Avoid breaking orchestration on checkpoint write errors.
+      }
+    }
+  }
+
+  private emitCheckpointEvent(
+    update: CheckpointEvent["update"],
+    data: Partial<CheckpointEvent> = {}
+  ): void {
+    if (!this.eventBus || !this.currentCheckpointId) {
+      return;
+    }
+
+    const payload: CheckpointEvent = {
+      checkpointId: this.currentCheckpointId,
+      runId: this.currentRunId,
+      agentId: this.currentCheckpointAgentId ?? this.currentRunId ?? this.config.name,
+      agentType: this.config.name,
+      status: this.currentCheckpointStatus ?? "pending",
+      step: this.state.turn,
+      update,
+      ...data,
+    };
+
+    const eventType = update === "created" ? "checkpoint:created" : "checkpoint:updated";
+    this.eventBus.emit(eventType, payload, {
+      source: this.config.name,
+      correlationId: this.currentRunId,
+      priority: "normal",
+    });
+  }
+
+  private ensureToolCallId(call: MCPToolCall): string {
+    if (call.id) {
+      return call.id;
+    }
+    const generated = `call_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+    call.id = generated;
+    return generated;
+  }
+
+  private resolveCheckpointTask(): string {
+    return this.currentTask ?? this.findLatestUserMessage() ?? "task";
+  }
+
+  private findLatestUserMessage(): string | undefined {
+    for (let i = this.state.messages.length - 1; i >= 0; i--) {
+      const message = this.state.messages[i];
+      if (message.role === "user") {
+        return message.content;
+      }
+    }
+    return undefined;
+  }
+
   private recordMessage(message: AgentMessage): void {
     this.sessionState?.recordMessage(message);
     this.sessionState?.setState(this.state);
+    this.recordCheckpointMessage(message);
   }
 
   private async awaitControlGate(): Promise<void> {
@@ -1130,6 +1376,7 @@ export class AgentOrchestrator {
     this.state.turn++;
     this.statusController.setStatus(this.state, "thinking");
     this.emit("turn:start", { turn: this.state.turn });
+    await this.ensureCheckpointReady();
 
     const turnStart = Date.now();
     const isRecoveryTurn = this.shouldEnterRecoveryTurn();
@@ -1149,6 +1396,7 @@ export class AgentOrchestrator {
       this.handleTurnError(err, turnSpan);
     } finally {
       this.resetRecoveryState();
+      await this.recordCheckpointTurnEnd();
       this.metrics?.observe(AGENT_METRICS.turnDuration.name, Date.now() - turnStart, {});
       turnSpan?.end();
     }
@@ -1819,11 +2067,15 @@ export class AgentOrchestrator {
     });
 
     try {
+      this.ensureToolCallId(call);
+      await this.recordCheckpointToolCall(call);
+
       // Check if confirmation is required
       if (this.config.requireConfirmation && this.requiresConfirmation(call)) {
         const confirmed = await this.requestConfirmation(call);
         if (!confirmed) {
-          this.handleDeniedToolCall(call, toolSpan);
+          const deniedResult = this.handleDeniedToolCall(call, toolSpan);
+          await this.recordCheckpointToolResult(call, deniedResult, Date.now() - toolStart);
           return;
         }
       }
@@ -1848,19 +2100,21 @@ export class AgentOrchestrator {
     });
   }
 
-  private handleDeniedToolCall(call: MCPToolCall, toolSpan?: SpanContext): void {
+  private handleDeniedToolCall(call: MCPToolCall, toolSpan?: SpanContext): MCPToolResult {
     const taskNodeId = this.taskGraphToolCalls.get(call);
     this.updateTaskGraphStatus(taskNodeId, "failed");
-    this.addToolResult(call.name, {
+    const result: MCPToolResult = {
       success: false,
       content: [{ type: "text", text: "User denied the operation" }],
       error: { code: "PERMISSION_DENIED", message: "User denied the operation" },
-    });
+    };
+    this.addToolResult(call.name, result);
     this.metrics?.increment(AGENT_METRICS.permissionDenied.name, {
       tool_name: call.name,
       permission: "user_confirmation",
     });
     toolSpan?.setStatus("error", "User denied");
+    return result;
   }
 
   private async invokeToolAndRecordResult(
@@ -1883,6 +2137,7 @@ export class AgentOrchestrator {
 
     this.emit("tool:result", { toolName: call.name, result });
     this.addToolResult(call.name, result);
+    await this.recordCheckpointToolResult(call, result, Date.now() - toolStart);
     this.updateTaskGraphStatus(taskNodeId, result.success ? "completed" : "failed");
 
     this.recordToolMetrics(call, result, toolStart);
