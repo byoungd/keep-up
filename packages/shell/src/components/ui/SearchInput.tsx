@@ -68,13 +68,13 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
               <button
                 type="button"
                 onClick={handleClear}
-                className="p-0.5 rounded hover:bg-muted transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="p-0.5 rounded hover:bg-muted transition-colors duration-fast focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 aria-label="Clear search"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
             ) : shortcutHint ? (
-              <kbd className="px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground bg-surface-2 rounded border border-border/30">
+              <kbd className="px-1.5 py-0.5 text-micro font-medium text-muted-foreground bg-surface-2 rounded border border-border/30">
                 {shortcutHint}
               </kbd>
             ) : undefined

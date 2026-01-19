@@ -69,7 +69,8 @@ export interface CrossDocReference {
   source: {
     doc_id: DocumentId;
     block_id: string;
-    anchor: StableAnchor;
+    start: StableAnchor;
+    end: StableAnchor;
     excerpt?: string;
     /** Context hash for precondition validation (LFCC v0.9.2 §11.1) */
     if_match_context_hash?: string;

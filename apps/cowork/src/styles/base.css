@@ -10,6 +10,29 @@ body,
 
 body {
   margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-chrome);
+  line-height: var(--line-height-chrome);
+}
+
+.shell-canvas {
+  font-size: var(--font-size-content);
+  line-height: var(--line-height-content);
+}
+
+.text-chrome {
+  font-size: var(--font-size-chrome);
+  line-height: var(--line-height-chrome);
+}
+
+.text-fine {
+  font-size: var(--font-size-fine);
+  line-height: var(--line-height-fine);
+}
+
+.text-content {
+  font-size: var(--font-size-content);
+  line-height: var(--line-height-content);
 }
 
 .card-panel {

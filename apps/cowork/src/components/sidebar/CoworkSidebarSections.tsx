@@ -14,21 +14,28 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
   Input,
+  SearchInput,
   Tooltip,
   useReaderShell,
 } from "@ku0/shell";
 import {
   Brain,
+  CalendarClock,
   Check,
   ChevronDown,
   ExternalLink,
   Folder,
   FolderPlus,
   ListFilter,
+  ListTodo,
+  Loader2,
   MoreHorizontal,
   PencilLine,
+  Pin,
+  PinOff,
   Plus,
   Share2,
+  Sparkles,
   Star,
   Trash2,
 } from "lucide-react";
@@ -38,27 +45,29 @@ import { useWorkspace } from "../../app/providers/WorkspaceProvider";
 type TaskFilter = "all" | "favorites" | "scheduled";
 
 const FAVORITES_STORAGE_KEY = "cowork-task-favorites-v1";
+const PINNED_PROJECTS_STORAGE_KEY = "cowork-pinned-projects-v1";
 
-function readFavorites(): string[] {
+function readStorageSet(key: string): Set<string> {
   if (typeof window === "undefined") {
-    return [];
+    return new Set();
   }
   try {
-    const stored = window.localStorage.getItem(FAVORITES_STORAGE_KEY);
+    const stored = window.localStorage.getItem(key);
     const parsed = stored ? (JSON.parse(stored) as string[]) : [];
-    return Array.isArray(parsed) ? parsed : [];
+    return new Set(Array.isArray(parsed) ? parsed : []);
   } catch {
-    return [];
+    return new Set();
   }
 }
 
-function writeFavorites(favorites: Set<string>): void {
+function writeStorageSet(key: string, ids: Set<string>): void {
   if (typeof window === "undefined") {
     return;
   }
-  window.localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(Array.from(favorites)));
+  window.localStorage.setItem(key, JSON.stringify(Array.from(ids)));
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Refactoring out of scope for current task
 export function CoworkSidebarSections() {
   const { router, components } = useReaderShell();
   const {
@@ -70,6 +79,7 @@ export function CoworkSidebarSections() {
     moveSessionToProject,
     renameSession,
     deleteSession,
+    getSessionsForProject,
   } = useWorkspace();
   const { Link } = components;
 
@@ -80,19 +90,59 @@ export function CoworkSidebarSections() {
   const [isTasksExpanded, setIsTasksExpanded] = React.useState(true);
   const [taskFilter, setTaskFilter] = React.useState<TaskFilter>("all");
   const [favoriteIds, setFavoriteIds] = React.useState<Set<string>>(new Set());
+  const [pinnedProjectIds, setPinnedProjectIds] = React.useState<Set<string>>(new Set());
+  const [expandedProjectIds, setExpandedProjectIds] = React.useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [pendingRenameSessionId, setPendingRenameSessionId] = React.useState<string | null>(null);
+  const [renameValue, setRenameValue] = React.useState("");
+  const [pendingDeleteSessionId, setPendingDeleteSessionId] = React.useState<string | null>(null);
+  const renameInputRef = React.useRef<HTMLInputElement | null>(null);
 
   React.useEffect(() => {
-    setFavoriteIds(new Set(readFavorites()));
+    setFavoriteIds(readStorageSet(FAVORITES_STORAGE_KEY));
+    setPinnedProjectIds(readStorageSet(PINNED_PROJECTS_STORAGE_KEY));
   }, []);
 
-  const sortedProjects = React.useMemo(
-    () => [...projects].sort((a, b) => b.createdAt - a.createdAt),
-    [projects]
-  );
+  React.useEffect(() => {
+    if (!pendingRenameSessionId) {
+      return;
+    }
+    const rafId = requestAnimationFrame(() => {
+      renameInputRef.current?.focus();
+    });
+    return () => cancelAnimationFrame(rafId);
+  }, [pendingRenameSessionId]);
 
-  const activeProject = React.useMemo(() => {
+  const sortedProjects = React.useMemo(() => {
+    return [...projects].sort((a, b) => {
+      const aPinned = pinnedProjectIds.has(a.id);
+      const bPinned = pinnedProjectIds.has(b.id);
+      if (aPinned && !bPinned) {
+        return -1;
+      }
+      if (!aPinned && bPinned) {
+        return 1;
+      }
+      return b.createdAt - a.createdAt;
+    });
+  }, [projects, pinnedProjectIds]);
+
+  /* activeProject unused after header cleanup */
+  /* const activeProject = React.useMemo(() => {
     return projects.find((p) => p.id === activeProjectId) ?? null;
-  }, [projects, activeProjectId]);
+  }, [projects, activeProjectId]); */
+
+  const normalizedSearch = searchQuery.trim().toLowerCase();
+  const hasSearch = normalizedSearch.length > 0;
+  const matchesSearch = React.useCallback(
+    (session: { title?: string }) => {
+      if (!normalizedSearch) {
+        return true;
+      }
+      return (session.title ?? "").toLowerCase().includes(normalizedSearch);
+    },
+    [normalizedSearch]
+  );
 
   const sortedSessions = React.useMemo(
     () => [...sessions].sort((a, b) => b.createdAt - a.createdAt),
@@ -124,8 +174,23 @@ export function CoworkSidebarSections() {
       return [];
     }
 
+    if (normalizedSearch) {
+      filtered = filtered.filter(matchesSearch);
+    }
+
     return filtered;
-  }, [favoriteIds, sortedSessions, taskFilter, activeProjectId]);
+  }, [favoriteIds, sortedSessions, taskFilter, activeProjectId, normalizedSearch, matchesSearch]);
+
+  const handleSelectProject = React.useCallback(
+    (projectId: string) => {
+      if (activeProjectId === projectId) {
+        setActiveProject(null);
+      } else {
+        setActiveProject(projectId);
+      }
+    },
+    [activeProjectId, setActiveProject]
+  );
 
   const handleCreateProject = React.useCallback(async () => {
     const trimmedName = projectName.trim();
@@ -143,18 +208,6 @@ export function CoworkSidebarSections() {
     }
   }, [projectInstructions, projectName, createProject]);
 
-  const handleSelectProject = React.useCallback(
-    (projectId: string) => {
-      // Toggle if clicking same project? Or just select?
-      if (activeProjectId === projectId) {
-        setActiveProject(null); // Deselect
-      } else {
-        setActiveProject(projectId);
-      }
-    },
-    [activeProjectId, setActiveProject]
-  );
-
   const toggleFavorite = React.useCallback((sessionId: string) => {
     setFavoriteIds((prev) => {
       const next = new Set(prev);
@@ -163,7 +216,32 @@ export function CoworkSidebarSections() {
       } else {
         next.add(sessionId);
       }
-      writeFavorites(next);
+      writeStorageSet(FAVORITES_STORAGE_KEY, next);
+      return next;
+    });
+  }, []);
+
+  const togglePinProject = React.useCallback((projectId: string) => {
+    setPinnedProjectIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(projectId)) {
+        next.delete(projectId);
+      } else {
+        next.add(projectId);
+      }
+      writeStorageSet(PINNED_PROJECTS_STORAGE_KEY, next);
+      return next;
+    });
+  }, []);
+
+  const toggleExpandProject = React.useCallback((projectId: string) => {
+    setExpandedProjectIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(projectId)) {
+        next.delete(projectId);
+      } else {
+        next.add(projectId);
+      }
       return next;
     });
   }, []);
@@ -186,29 +264,71 @@ export function CoworkSidebarSections() {
     [moveSessionToProject]
   );
 
-  const handleDeleteSession = React.useCallback(
-    async (sessionId: string) => {
-      if (window.confirm("Are you sure you want to delete this session?")) {
-        try {
-          await deleteSession(sessionId);
-        } catch (_e) {
-          void _e;
-        }
-      }
+  const openRenameDialog = React.useCallback(
+    (sessionId: string) => {
+      const target = sessions.find((session) => session.id === sessionId);
+      setPendingRenameSessionId(sessionId);
+      setRenameValue(target?.title ?? "");
     },
-    [deleteSession]
+    [sessions]
   );
 
-  const handleRenamePrompt = React.useCallback(
-    (sessionId: string) => {
-      const s = sessions.find((x) => x.id === sessionId);
-      const newName = window.prompt("Enter new session name", s?.title);
-      if (newName) {
-        renameSession(sessionId, newName);
-      }
-    },
-    [sessions, renameSession]
-  );
+  const closeRenameDialog = React.useCallback(() => {
+    setPendingRenameSessionId(null);
+    setRenameValue("");
+  }, []);
+
+  const confirmRenameSession = React.useCallback(async () => {
+    if (!pendingRenameSessionId) {
+      return;
+    }
+    const trimmed = renameValue.trim();
+    if (!trimmed) {
+      return;
+    }
+    try {
+      await renameSession(pendingRenameSessionId, trimmed);
+    } catch (_err) {
+      void _err;
+    } finally {
+      closeRenameDialog();
+    }
+  }, [pendingRenameSessionId, renameValue, renameSession, closeRenameDialog]);
+
+  const openDeleteDialog = React.useCallback((sessionId: string) => {
+    setPendingDeleteSessionId(sessionId);
+  }, []);
+
+  const closeDeleteDialog = React.useCallback(() => {
+    setPendingDeleteSessionId(null);
+  }, []);
+
+  const confirmDeleteSession = React.useCallback(async () => {
+    if (!pendingDeleteSessionId) {
+      return;
+    }
+    try {
+      await deleteSession(pendingDeleteSessionId);
+    } catch (_e) {
+      void _e;
+    } finally {
+      closeDeleteDialog();
+    }
+  }, [pendingDeleteSessionId, deleteSession, closeDeleteDialog]);
+
+  const pendingRenameSession = React.useMemo(() => {
+    if (!pendingRenameSessionId) {
+      return null;
+    }
+    return sessions.find((session) => session.id === pendingRenameSessionId) ?? null;
+  }, [pendingRenameSessionId, sessions]);
+
+  const pendingDeleteSession = React.useMemo(() => {
+    if (!pendingDeleteSessionId) {
+      return null;
+    }
+    return sessions.find((session) => session.id === pendingDeleteSessionId) ?? null;
+  }, [pendingDeleteSessionId, sessions]);
 
   const handlePlaceholderAction = React.useCallback(() => {
     /* TODO */
@@ -222,10 +342,10 @@ export function CoworkSidebarSections() {
   return (
     <div className="space-y-2">
       <section className="space-y-1">
-        <div className="flex items-center justify-between rounded-lg px-3 py-2 group hover:bg-surface-2/85 transition-colors">
+        <div className="flex items-center justify-between rounded-md px-3 py-1.5 group hover:bg-surface-2 transition-colors duration-fast">
           <button
             type="button"
-            className="flex flex-1 items-center gap-2 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            className="flex flex-1 items-center gap-2 text-left text-fine font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors duration-fast cursor-pointer"
             aria-label="Projects section"
             aria-expanded={isProjectsExpanded}
             onClick={() => setIsProjectsExpanded((prev) => !prev)}
@@ -233,7 +353,7 @@ export function CoworkSidebarSections() {
             <span>Projects</span>
             <ChevronDown
               className={cn(
-                "h-3 w-3 opacity-0 group-hover:opacity-100 transition-all",
+                "h-3 w-3 opacity-0 group-hover:opacity-100 transition-all duration-fast",
                 !isProjectsExpanded && "-rotate-90"
               )}
             />
@@ -242,7 +362,7 @@ export function CoworkSidebarSections() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-surface-1/80 hover:ring-1 hover:ring-border/50"
+              className="h-6 w-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-surface-2"
               aria-label="Create project"
               onClick={() => setIsDialogOpen(true)}
             >
@@ -260,50 +380,173 @@ export function CoworkSidebarSections() {
           )}
           aria-hidden={!isProjectsExpanded}
         >
-          <button
-            type="button"
-            className="flex items-center gap-3 w-full rounded-lg px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-surface-2/90 transition-colors cursor-pointer"
-            onClick={() => setIsDialogOpen(true)}
-          >
-            <FolderPlus className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-            <span>New project</span>
-          </button>
-
-          {sortedProjects.map((project) => (
+          {projects.length === 0 && (
             <button
-              key={project.id}
               type="button"
-              onClick={() => handleSelectProject(project.id)}
-              className={cn(
-                "flex items-center gap-3 w-full rounded-lg px-3 py-2 text-sm transition-colors cursor-pointer",
-                activeProjectId === project.id
-                  ? "bg-surface-2 text-foreground font-medium"
-                  : "text-muted-foreground hover:bg-surface-2/90 hover:text-foreground"
-              )}
+              className="flex items-center gap-2.5 w-full rounded-md px-3 py-1.5 text-[13px] text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors duration-fast cursor-pointer group"
+              onClick={() => setIsDialogOpen(true)}
             >
-              <Folder className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-              <span className="truncate">{project.name}</span>
+              <FolderPlus
+                className="h-4 w-4 text-muted-foreground opacity-70 group-hover:opacity-100 group-hover:text-foreground transition-all duration-fast"
+                aria-hidden="true"
+              />
+              <span>New project</span>
             </button>
-          ))}
+          )}
+
+          {sortedProjects.map((project) => {
+            const isExpanded = expandedProjectIds.has(project.id);
+            const isPinned = pinnedProjectIds.has(project.id);
+            const projectTasks = getSessionsForProject(project.id).filter(matchesSearch);
+            const hasTasks = projectTasks.length > 0;
+
+            return (
+              <div key={project.id} className="space-y-0.5">
+                <div
+                  className={cn(
+                    "group relative flex items-center rounded-md px-3 py-1.5 transition-colors duration-fast",
+                    activeProjectId === project.id
+                      ? "bg-foreground/[0.08] text-foreground font-medium"
+                      : "text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+                  )}
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleSelectProject(project.id)}
+                    className="flex flex-1 items-center gap-2.5 min-w-0 text-[13px] text-left cursor-pointer outline-none pl-0.5"
+                  >
+                    <Folder
+                      className={cn(
+                        "h-4 w-4 shrink-0 transition-all duration-fast",
+                        activeProjectId === project.id
+                          ? "text-foreground"
+                          : "text-muted-foreground opacity-70 group-hover:opacity-100 group-hover:text-foreground"
+                      )}
+                      aria-hidden="true"
+                    />
+                    <span className="truncate flex-1">{project.name}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleExpandProject(project.id)}
+                    className={cn(
+                      "flex items-center justify-center h-5 w-5 rounded hover:bg-surface-2 transition-colors duration-fast cursor-pointer text-muted-foreground hover:text-foreground mr-7",
+                      hasTasks
+                        ? "opacity-0 group-hover:opacity-100"
+                        : "opacity-0 pointer-events-none"
+                    )}
+                    aria-label={isExpanded ? "Collapse project" : "Expand project"}
+                  >
+                    <ChevronDown
+                      className={cn("h-3 w-3 transition-transform", !isExpanded && "-rotate-90")}
+                    />
+                  </button>
+
+                  <DropdownMenu modal={false}>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={cn(
+                          "absolute right-1 top-1/2 h-6 w-6 -translate-y-1/2 rounded-md",
+                          "text-muted-foreground hover:text-foreground",
+                          "bg-surface-2 shadow-sm border border-border/20",
+                          "transition-opacity opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto",
+                          "focus-visible:opacity-100 focus-visible:pointer-events-auto",
+                          "data-[state=open]:opacity-100 data-[state=open]:pointer-events-auto data-[state=open]:bg-surface-3"
+                        )}
+                        aria-label="Project actions"
+                      >
+                        <MoreHorizontal className="h-3.5 w-3.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="start"
+                      side="right"
+                      sideOffset={6}
+                      className="w-48 rounded-lg p-1"
+                    >
+                      <DropdownMenuItem
+                        onSelect={() => togglePinProject(project.id)}
+                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-2 focus:text-foreground cursor-pointer outline-none"
+                      >
+                        {isPinned ? (
+                          <>
+                            <PinOff className="h-3.5 w-3.5" />
+                            <span>Unpin</span>
+                          </>
+                        ) : (
+                          <>
+                            <Pin className="h-3.5 w-3.5" />
+                            <span>Pin</span>
+                          </>
+                        )}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-2 focus:text-foreground cursor-pointer outline-none">
+                        <PencilLine className="h-3.5 w-3.5" />
+                        <span>Edit</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator className="mx-1" />
+                      <DropdownMenuItem className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] text-destructive focus:text-destructive focus:bg-surface-2 cursor-pointer outline-none">
+                        <Trash2 className="h-3.5 w-3.5" />
+                        <span>Delete</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+
+                {/* Nested Project Tasks */}
+                {isExpanded && hasTasks && (
+                  <div className="ml-2 pl-2 border-l border-border/20 space-y-0.5 mb-1">
+                    {projectTasks.map((session) => {
+                      const isActive = activeSessionId === session.id;
+                      const isRunning = session.status === "running";
+                      return (
+                        <div
+                          key={session.id}
+                          className={cn(
+                            "relative flex items-center rounded-md px-3 py-1.5 transition-colors duration-fast group",
+                            isActive
+                              ? "bg-foreground/[0.08] text-foreground font-medium"
+                              : "text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+                          )}
+                        >
+                          <Link
+                            href={`/sessions/${session.id}`}
+                            className="flex items-center gap-2.5 flex-1 min-w-0 text-[13px] cursor-pointer"
+                            title={session.title}
+                          >
+                            {isRunning ? (
+                              <Loader2 className="h-4 w-4 shrink-0 text-primary animate-spin" />
+                            ) : (
+                              <Brain
+                                className="h-4 w-4 shrink-0 opacity-70 group-hover:opacity-100 group-hover:text-foreground transition-all duration-fast"
+                                aria-hidden="true"
+                              />
+                            )}
+                            <span className="truncate">{session.title}</span>
+                          </Link>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </section>
 
       <section className="space-y-1">
-        <div className="flex items-center justify-between rounded-lg px-3 py-2 group hover:bg-surface-2/85 transition-colors">
+        <div className="flex items-center justify-between rounded-md px-3 py-1.5 group hover:bg-surface-2 transition-colors duration-fast">
           <button
             type="button"
-            className="flex flex-1 items-center gap-2 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            className="flex flex-1 items-center gap-2 text-left text-fine font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors duration-fast cursor-pointer"
             aria-label="All tasks section"
             aria-expanded={isTasksExpanded}
             onClick={() => setIsTasksExpanded((prev) => !prev)}
           >
             <span>
-              {activeProjectId ? (
-                <span className="flex items-center gap-1">
-                  {activeProject?.name ?? "Project"}
-                  <span className="text-muted-foreground/50 mx-1">/</span>
-                </span>
-              ) : null}
               {taskFilter === "favorites"
                 ? "Favorites"
                 : taskFilter === "scheduled"
@@ -312,42 +555,63 @@ export function CoworkSidebarSections() {
             </span>
             <ChevronDown
               className={cn(
-                "h-3 w-3 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all",
+                "h-3 w-3 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all duration-fast",
                 !isTasksExpanded && "-rotate-90"
               )}
             />
           </button>
 
-          <DropdownMenu>
+          <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-surface-1/80 hover:ring-1 hover:ring-border/50 data-[state=open]:bg-surface-1/90 data-[state=open]:text-foreground data-[state=open]:ring-1 data-[state=open]:ring-border/60"
+                className="h-6 w-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-surface-2 data-[state=open]:bg-surface-2 data-[state=open]:text-foreground"
                 aria-label="Task filters"
               >
                 <ListFilter className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-44 rounded-xl p-2">
+            <DropdownMenuContent align="start" className="w-44 rounded-lg p-1">
               <DropdownMenuItem
-                onSelect={() => setTaskFilter("all")}
-                className="gap-3 rounded-lg px-3 py-2 text-sm"
+                onSelect={() => {
+                  setTaskFilter("all");
+                  setActiveProject(null);
+                }}
+                className={cn(
+                  "gap-2.5 rounded-md px-2 py-1.5 text-[13px] focus:bg-surface-2 focus:text-foreground cursor-pointer outline-none",
+                  taskFilter === "all"
+                    ? "bg-foreground/[0.08] text-foreground font-medium"
+                    : "text-muted-foreground"
+                )}
               >
+                <ListTodo className="h-4 w-4" />
                 Tasks
                 {taskFilter === "all" ? <Check className="ml-auto h-3 w-3" /> : null}
               </DropdownMenuItem>
               <DropdownMenuItem
                 onSelect={() => setTaskFilter("favorites")}
-                className="gap-3 rounded-lg px-3 py-2 text-sm"
+                className={cn(
+                  "gap-2.5 rounded-md px-2 py-1.5 text-[13px] focus:bg-surface-2 focus:text-foreground cursor-pointer outline-none",
+                  taskFilter === "favorites"
+                    ? "bg-foreground/[0.08] text-foreground font-medium"
+                    : "text-muted-foreground"
+                )}
               >
+                <Star className="h-4 w-4" />
                 Favorites
                 {taskFilter === "favorites" ? <Check className="ml-auto h-3 w-3" /> : null}
               </DropdownMenuItem>
               <DropdownMenuItem
                 onSelect={() => setTaskFilter("scheduled")}
-                className="gap-3 rounded-lg px-3 py-2 text-sm"
+                className={cn(
+                  "gap-2.5 rounded-md px-2 py-1.5 text-[13px] focus:bg-surface-2 focus:text-foreground cursor-pointer outline-none",
+                  taskFilter === "scheduled"
+                    ? "bg-foreground/[0.08] text-foreground font-medium"
+                    : "text-muted-foreground"
+                )}
               >
+                <CalendarClock className="h-4 w-4" />
                 Scheduled
                 {taskFilter === "scheduled" ? <Check className="ml-auto h-3 w-3" /> : null}
               </DropdownMenuItem>
@@ -364,10 +628,33 @@ export function CoworkSidebarSections() {
           )}
           aria-hidden={!isTasksExpanded}
         >
+          <div className="px-3 pb-1">
+            <SearchInput
+              placeholder="Search sessions..."
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              onClear={() => setSearchQuery("")}
+              aria-label="Search sessions"
+            />
+          </div>
           {filteredSessions.length === 0 ? (
-            <div className="px-3 py-2 text-[11px] text-muted-foreground/70">
-              {activeProjectId ? "No tasks in this project." : "No tasks."}
-            </div>
+            hasSearch ? (
+              <div className="px-3 py-2 text-[13px] text-muted-foreground">
+                No sessions match your search.
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="flex items-center gap-2.5 w-full rounded-md px-3 py-1.5 text-[13px] text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors duration-fast cursor-pointer group"
+                onClick={() => router.push("/new-session")}
+              >
+                <Sparkles
+                  className="h-4 w-4 text-muted-foreground opacity-70 group-hover:opacity-100 group-hover:text-foreground transition-all duration-fast"
+                  aria-hidden="true"
+                />
+                <span>{activeProjectId ? "New task in project" : "New task"}</span>
+              </button>
+            )
           ) : (
             filteredSessions.map((session) => {
               const isActive = activeSessionId === session.id;
@@ -377,21 +664,24 @@ export function CoworkSidebarSections() {
                 <div
                   key={session.id}
                   className={cn(
-                    "relative flex items-center rounded-lg px-3 py-1.5 transition-colors group",
+                    "relative flex items-center rounded-md px-3 py-1.5 transition-colors duration-fast group",
                     isActive
-                      ? "bg-surface-2 text-foreground font-medium"
-                      : "text-muted-foreground hover:bg-surface-2/90 hover:text-foreground"
+                      ? "bg-foreground/[0.08] text-foreground font-medium"
+                      : "text-muted-foreground hover:bg-surface-2 hover:text-foreground"
                   )}
                 >
                   <Link
                     href={`/sessions/${session.id}`}
-                    className="flex items-center gap-2 flex-1 min-w-0 pr-2 text-sm cursor-pointer"
+                    className="flex items-center gap-2.5 flex-1 min-w-0 pr-2 text-[13px] cursor-pointer"
                     title={session.title}
                   >
-                    <Brain className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    <Brain
+                      className="h-4 w-4 shrink-0 opacity-70 group-hover:opacity-100 group-hover:text-foreground transition-all duration-fast"
+                      aria-hidden="true"
+                    />
                     <span className="overflow-hidden whitespace-nowrap block">{session.title}</span>
                   </Link>
-                  <DropdownMenu>
+                  <DropdownMenu modal={false}>
                     <DropdownMenuTrigger asChild>
                       <Button
                         variant="ghost"
@@ -413,25 +703,25 @@ export function CoworkSidebarSections() {
                       align="start"
                       side="right"
                       sideOffset={6}
-                      className="w-56 rounded-xl p-2"
+                      className="w-56 rounded-lg p-1"
                     >
                       <DropdownMenuItem
                         onSelect={handlePlaceholderAction}
-                        className="gap-3 rounded-lg px-3 py-2 text-sm"
+                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-2 focus:text-foreground cursor-pointer outline-none"
                       >
                         <Share2 className="h-4 w-4" aria-hidden="true" />
                         <span>Share</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onSelect={() => handleRenamePrompt(session.id)}
-                        className="gap-3 rounded-lg px-3 py-2 text-sm"
+                        onSelect={() => openRenameDialog(session.id)}
+                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-2 focus:text-foreground cursor-pointer outline-none"
                       >
                         <PencilLine className="h-4 w-4" aria-hidden="true" />
                         <span>Rename</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onSelect={() => toggleFavorite(session.id)}
-                        className="gap-3 rounded-lg px-3 py-2 text-sm"
+                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-2 focus:text-foreground cursor-pointer outline-none"
                       >
                         <Star
                           className={cn("h-4 w-4", isFavorite ? "fill-current" : undefined)}
@@ -441,18 +731,18 @@ export function CoworkSidebarSections() {
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onSelect={() => handleOpenInNewTab(session.id)}
-                        className="gap-3 rounded-lg px-3 py-2 text-sm"
+                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-2 focus:text-foreground cursor-pointer outline-none"
                       >
                         <ExternalLink className="h-4 w-4" aria-hidden="true" />
                         <span>Open in new tab</span>
                       </DropdownMenuItem>
 
                       <DropdownMenuSub>
-                        <DropdownMenuSubTrigger className="gap-3 rounded-lg px-3 py-2 text-sm">
+                        <DropdownMenuSubTrigger className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-2 focus:text-foreground cursor-pointer outline-none data-[state=open]:bg-surface-2 data-[state=open]:text-foreground">
                           <Folder className="h-4 w-4" />
                           <span>Move to project</span>
                         </DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent className="w-56 rounded-xl p-2">
+                        <DropdownMenuSubContent className="w-56 rounded-lg p-1">
                           {sortedProjects.length === 0 ? (
                             <DropdownMenuItem disabled>
                               <span className="text-muted-foreground">No projects</span>
@@ -463,7 +753,7 @@ export function CoworkSidebarSections() {
                                 <DropdownMenuItem
                                   key={project.id}
                                   onSelect={() => handleMoveToProject(session.id, project.id)}
-                                  className="gap-3 rounded-lg px-3 py-2 text-sm"
+                                  className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-2 focus:text-foreground cursor-pointer outline-none"
                                 >
                                   <span>{project.name}</span>
                                   {session.projectId === project.id && (
@@ -476,7 +766,7 @@ export function CoworkSidebarSections() {
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem
                                     onSelect={() => handleMoveToProject(session.id, null)}
-                                    className="gap-3 rounded-lg px-3 py-2 text-sm"
+                                    className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-2 focus:text-foreground cursor-pointer outline-none"
                                   >
                                     <span>Remove from project</span>
                                   </DropdownMenuItem>
@@ -489,8 +779,8 @@ export function CoworkSidebarSections() {
 
                       <DropdownMenuSeparator className="mx-2" />
                       <DropdownMenuItem
-                        onSelect={() => handleDeleteSession(session.id)}
-                        className="gap-3 rounded-lg px-3 py-2 text-sm text-destructive focus:text-destructive"
+                        onSelect={() => openDeleteDialog(session.id)}
+                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] text-destructive focus:text-destructive focus:bg-surface-2 cursor-pointer outline-none"
                       >
                         <Trash2 className="h-4 w-4" aria-hidden="true" />
                         <span>Delete</span>
@@ -503,6 +793,85 @@ export function CoworkSidebarSections() {
           )}
         </div>
       </section>
+
+      <Dialog
+        open={pendingRenameSessionId !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeRenameDialog();
+          }
+        }}
+        title="Rename session"
+        description={
+          pendingRenameSession?.title
+            ? `Update the name for "${pendingRenameSession.title}".`
+            : "Update the session name."
+        }
+        className="rounded-2xl bg-surface-1/95 border-border/30"
+      >
+        <div className="space-y-3">
+          <label className="text-sm font-medium text-foreground" htmlFor="session-rename">
+            Session name
+          </label>
+          <Input
+            id="session-rename"
+            ref={renameInputRef}
+            value={renameValue}
+            onChange={(event) => setRenameValue(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                void confirmRenameSession();
+              }
+            }}
+            aria-label="Session name"
+          />
+        </div>
+
+        <DialogFooter className="bg-transparent border-none px-0 -mx-0 mt-6">
+          <Button variant="secondary" type="button" onClick={closeRenameDialog}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            onClick={() => void confirmRenameSession()}
+            disabled={!renameValue.trim()}
+          >
+            Rename
+          </Button>
+        </DialogFooter>
+      </Dialog>
+
+      <Dialog
+        open={pendingDeleteSessionId !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeDeleteDialog();
+          }
+        }}
+        title="Delete session"
+        description="This action cannot be undone."
+        className="rounded-2xl bg-surface-1/95 border-border/30"
+      >
+        <div className="space-y-3 text-sm text-muted-foreground">
+          <p>
+            Are you sure you want to delete{" "}
+            <span className="font-medium text-foreground">
+              {pendingDeleteSession?.title ?? "this session"}
+            </span>
+            ?
+          </p>
+        </div>
+
+        <DialogFooter className="bg-transparent border-none px-0 -mx-0 mt-6">
+          <Button variant="secondary" type="button" onClick={closeDeleteDialog}>
+            Cancel
+          </Button>
+          <Button variant="destructive" type="button" onClick={() => void confirmDeleteSession()}>
+            Delete
+          </Button>
+        </DialogFooter>
+      </Dialog>
 
       <Dialog
         open={isDialogOpen}

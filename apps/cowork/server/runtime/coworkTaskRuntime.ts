@@ -1,8 +1,16 @@
 import { join, resolve } from "node:path";
-import type { ConfirmationRequest, CoworkSession, CoworkTask } from "@ku0/agent-runtime";
+import type {
+  AgentState,
+  Checkpoint,
+  CheckpointStatus,
+  ConfirmationRequest,
+  CoworkSession,
+  CoworkTask,
+} from "@ku0/agent-runtime";
 import {
   AgentModeManager,
   BrowserManager,
+  CHECKPOINT_VERSION,
   createAICoreAdapter,
   createBashToolServer,
   createBrowserToolServer,
@@ -18,10 +26,13 @@ import {
   createToolRegistry,
   createWebSearchToolServer,
   DockerSandboxManager,
+  FileToolResultCacheStore,
   type GhostAgent,
   type Mem0MemoryAdapter,
+  MessagePackCheckpointStorage,
   ProcessCodeExecutor,
   RuntimeAssetManager,
+  ToolResultCache,
 } from "@ku0/agent-runtime";
 import { normalizeModelId } from "@ku0/ai-core";
 import { DEFAULT_PROJECT_CONTEXT_TOKEN_BUDGET } from "@ku0/shared";
@@ -50,6 +61,12 @@ import { createWebSearchProvider } from "./webSearchProvider";
 
 type Logger = Pick<Console, "info" | "warn" | "error" | "debug">;
 
+export type RuntimePersistenceConfig = {
+  toolCachePath?: string;
+  toolCacheFlushIntervalMs?: number;
+  checkpointDir?: string;
+};
+
 type SessionRuntime = {
   sessionId: string;
   runtime: ReturnType<typeof createCoworkRuntime>;
@@ -62,6 +79,7 @@ type SessionRuntime = {
   eventQueue: Promise<void>;
   unsubscribeQueue: () => void;
   unsubscribeOrchestrator: () => void;
+  checkpointStorage?: MessagePackCheckpointStorage;
   ghostAgent?: GhostAgent;
 };
 
@@ -76,6 +94,7 @@ type RuntimeBuildResult = {
   providerId: string | null;
   fallbackNotice: string | null;
   contextPackKey: string | null;
+  checkpointStorage?: MessagePackCheckpointStorage;
 };
 
 const noop = () => undefined;
@@ -83,6 +102,8 @@ export class CoworkTaskRuntime {
   private readonly runtimes = new Map<string, SessionRuntime>();
   private readonly runtimeFactory?: RuntimeFactory;
   private readonly logger: Logger; // Store logger for use in methods
+  private readonly runtimePersistence?: RuntimePersistenceConfig;
+  private readonly toolResultCache?: ToolResultCache;
   private runtimeAssetManager?: RuntimeAssetManager;
 
   // Services
@@ -106,13 +127,27 @@ export class CoworkTaskRuntime {
     approvalService?: ApprovalService;
     providerKeys?: ProviderKeyService;
     contextIndexManager?: ContextIndexManager;
+    runtimePersistence?: RuntimePersistenceConfig;
   }) {
     this.logger = deps.logger ?? console; // Assign to property
     const logger = this.logger;
     this.runtimeFactory = deps.runtimeFactory;
     this.configStore = deps.storage.configStore;
+    this.runtimePersistence = deps.runtimePersistence;
     this.providerKeys =
       deps.providerKeys ?? new ProviderKeyService(deps.storage.configStore, logger);
+
+    if (this.runtimePersistence?.toolCachePath) {
+      const store = new FileToolResultCacheStore({
+        filePath: this.runtimePersistence.toolCachePath,
+      });
+      this.toolResultCache = new ToolResultCache({
+        persistence: {
+          store,
+          autoFlushIntervalMs: this.runtimePersistence.toolCacheFlushIntervalMs ?? 60_000,
+        },
+      });
+    }
 
     // Initialize Services
     this.sessionManager = new SessionLifecycleManager(deps.storage.sessionStore);
@@ -313,12 +348,14 @@ export class CoworkTaskRuntime {
     if (this.runtimeFactory) {
       const runtime = await this.runtimeFactory(session, settings);
       const contextPackKey = await this.projectContextManager.getContextPackKey(session);
+      const checkpointStorage = this.createCheckpointStorage(session.sessionId);
       return {
         runtime,
         modelId: requestedModel,
         providerId: null,
         fallbackNotice: null,
         contextPackKey,
+        checkpointStorage,
       };
     }
 
@@ -335,6 +372,7 @@ export class CoworkTaskRuntime {
     const securityPolicy = toolRegistryResult.dockerAvailable
       ? buildDockerSecurityPolicy()
       : undefined;
+    const components = this.toolResultCache ? { toolResultCache: this.toolResultCache } : undefined;
     const runtime = createCoworkRuntime({
       llm: adapter,
       registry: toolRegistry,
@@ -351,9 +389,11 @@ export class CoworkTaskRuntime {
           enabled: modeManager.isPlanMode(),
           autoExecuteLowRisk: false,
         },
+        components,
       },
       systemPromptAddition: prompt.addition,
     });
+    const checkpointStorage = this.createCheckpointStorage(session.sessionId);
 
     return {
       runtime,
@@ -361,6 +401,7 @@ export class CoworkTaskRuntime {
       providerId: resolved.providerId,
       fallbackNotice: resolved.fallbackNotice ?? null,
       contextPackKey: prompt.contextPackKey,
+      checkpointStorage,
     };
   }
 
@@ -436,6 +477,7 @@ export class CoworkTaskRuntime {
       eventQueue: Promise.resolve(),
       unsubscribeQueue: noop,
       unsubscribeOrchestrator: noop,
+      checkpointStorage: runtimeResult.checkpointStorage,
       ghostAgent: undefined,
     };
   }
@@ -447,6 +489,11 @@ export class CoworkTaskRuntime {
     runtime.waitForTask = async (taskId: string) => {
       const result = await originalWaitForTask(taskId);
       await runtimeState.eventQueue.catch(() => undefined);
+      if (runtimeState.checkpointStorage && result?.state) {
+        await this.persistTaskCheckpoint(runtimeState, taskId, result.state).catch((err) => {
+          this.logger.warn("Failed to persist task checkpoint", err);
+        });
+      }
       return result;
     };
 
@@ -513,6 +560,24 @@ export class CoworkTaskRuntime {
         )
         .catch((err) => this.logger.error("Orchestrator event error", err));
     });
+  }
+
+  private async persistTaskCheckpoint(
+    runtimeState: SessionRuntime,
+    taskId: string,
+    state: AgentState
+  ): Promise<void> {
+    const storage = runtimeState.checkpointStorage;
+    if (!storage) {
+      return;
+    }
+
+    const checkpoint = buildCheckpointFromState(state, {
+      sessionId: runtimeState.sessionId,
+      taskId,
+    });
+
+    await storage.save(checkpoint);
   }
 
   private async ensureRuntimeForTask(
@@ -663,6 +728,15 @@ export class CoworkTaskRuntime {
     );
   }
 
+  private createCheckpointStorage(sessionId: string): MessagePackCheckpointStorage | undefined {
+    if (!this.runtimePersistence?.checkpointDir) {
+      return undefined;
+    }
+    return new MessagePackCheckpointStorage({
+      rootDir: join(this.runtimePersistence.checkpointDir, sessionId),
+    });
+  }
+
   private getRuntimeAssetManager(): RuntimeAssetManager {
     if (!this.runtimeAssetManager) {
       const cacheDir = resolveRuntimeAssetDir();
@@ -714,6 +788,81 @@ export class CoworkTaskRuntime {
   async resolveApproval(approvalId: string, decision: "approved" | "rejected") {
     return this.approvalCoordinator.resolveApproval(approvalId, decision);
   }
+}
+
+function buildCheckpointFromState(
+  state: AgentState,
+  context: { sessionId: string; taskId: string }
+): Checkpoint {
+  const now = Date.now();
+  const checkpointId = state.checkpointId ?? crypto.randomUUID();
+  const taskLabel = resolveTaskLabel(state) ?? context.taskId;
+
+  return {
+    id: checkpointId,
+    version: CHECKPOINT_VERSION,
+    createdAt: now,
+    task: taskLabel,
+    agentType: "cowork",
+    agentId: context.sessionId,
+    status: mapCheckpointStatus(state.status),
+    messages: mapCheckpointMessages(state, now),
+    pendingToolCalls: mapPendingToolCalls(state, now),
+    completedToolCalls: [],
+    currentStep: state.turn,
+    maxSteps: Math.max(state.turn, 1),
+    metadata: { sessionId: context.sessionId, taskId: context.taskId },
+    error: state.error ? { message: state.error, recoverable: false } : undefined,
+    parentCheckpointId: undefined,
+    childCheckpointIds: [],
+  };
+}
+
+function mapCheckpointStatus(status: AgentState["status"]): CheckpointStatus {
+  if (status === "complete") {
+    return "completed";
+  }
+  if (status === "error") {
+    return "failed";
+  }
+  return "pending";
+}
+
+function resolveTaskLabel(state: AgentState): string | null {
+  for (const message of state.messages) {
+    if (message.role === "user") {
+      return message.content;
+    }
+  }
+  return null;
+}
+
+function mapCheckpointMessages(state: AgentState, timestamp: number): Checkpoint["messages"] {
+  const messages: Checkpoint["messages"] = [];
+  for (const message of state.messages) {
+    if (message.role === "tool") {
+      continue;
+    }
+    messages.push({
+      role: message.role,
+      content: message.content,
+      timestamp,
+    });
+  }
+  return messages;
+}
+
+function mapPendingToolCalls(state: AgentState, timestamp: number): Checkpoint["pendingToolCalls"] {
+  const calls: Checkpoint["pendingToolCalls"] = [];
+  for (const call of state.pendingToolCalls) {
+    calls.push({
+      id: call.id ?? crypto.randomUUID(),
+      name: call.name,
+      arguments: call.arguments,
+      timestamp,
+    });
+  }
+  return calls;
 }
 
 function buildDockerSecurityPolicy() {

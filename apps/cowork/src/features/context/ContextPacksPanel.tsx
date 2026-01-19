@@ -84,7 +84,7 @@ function ContextPacksSearchSection({
           onClick={onSearch}
           disabled={isSearching}
           className={cn(
-            "px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 transition-colors shadow-sm",
+            "px-4 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-md hover:bg-primary/90 transition-colors duration-fast shadow-sm",
             isSearching ? "opacity-70 cursor-wait" : ""
           )}
         >
@@ -111,7 +111,7 @@ function ContextPacksSearchSection({
             <div
               key={result.chunk.id}
               className={cn(
-                "rounded-lg border border-border/40 bg-surface-50/70 p-3 space-y-2",
+                "rounded-lg border border-border/40 bg-surface-1/70 p-3 space-y-2",
                 isSelected ? "ring-1 ring-primary/40" : ""
               )}
             >
@@ -128,7 +128,7 @@ function ContextPacksSearchSection({
                     <p className="text-xs font-semibold text-foreground">
                       {result.chunk.sourcePath}
                     </p>
-                    <p className="text-[10px] text-muted-foreground">
+                    <p className="text-micro text-muted-foreground">
                       Score {result.score.toFixed(2)} | {result.chunk.tokenCount} tokens
                     </p>
                   </div>
@@ -169,7 +169,7 @@ function ContextPacksSearchSection({
             onClick={onCreatePack}
             disabled={isSavingPack || !canCreate}
             className={cn(
-              "px-4 py-2 text-sm font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded-md hover:bg-primary-100 transition-colors",
+              "px-4 py-2 text-sm font-medium text-primary bg-primary/10 border border-primary/20 rounded-md hover:bg-primary/15 transition-colors duration-fast",
               isSavingPack || !canCreate ? "opacity-60 cursor-not-allowed" : ""
             )}
           >
@@ -231,13 +231,13 @@ function ContextPacksSavedSection({
       </div>
 
       {!resolvedSessionId ? (
-        <div className="text-xs text-muted-foreground border border-border/40 rounded-md p-3 bg-surface-50">
+        <div className="text-xs text-muted-foreground border border-border/40 rounded-md p-3 bg-surface-1/70">
           Start a session to pin context packs.
         </div>
       ) : null}
 
       {sortedPacks.length === 0 && !isLoadingPacks ? (
-        <div className="text-xs text-muted-foreground border border-border/40 rounded-md p-3 bg-surface-50">
+        <div className="text-xs text-muted-foreground border border-border/40 rounded-md p-3 bg-surface-1/70">
           No packs yet. Search and create one to get started.
         </div>
       ) : null}
@@ -248,7 +248,7 @@ function ContextPacksSavedSection({
         return (
           <div
             key={pack.id}
-            className="rounded-lg border border-border/40 bg-surface-50/70 p-3 space-y-3"
+            className="rounded-lg border border-border/40 bg-surface-1/70 p-3 space-y-3"
           >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="space-y-1">
@@ -265,7 +265,7 @@ function ContextPacksSavedSection({
                       type="button"
                       onClick={onSaveRename}
                       disabled={isSavingPack || !editingPackName.trim()}
-                      className="text-xs font-medium text-primary-700 hover:text-primary-900"
+                      className="text-xs font-medium text-primary hover:text-primary/80 transition-colors duration-fast"
                     >
                       Save
                     </button>
@@ -280,7 +280,7 @@ function ContextPacksSavedSection({
                 ) : (
                   <p className="text-sm font-semibold text-foreground">{pack.name}</p>
                 )}
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-fine text-muted-foreground">
                   {pack.chunkIds.length} chunks | Updated {formatTimestamp(pack.updatedAt)}
                 </p>
               </div>
@@ -290,10 +290,10 @@ function ContextPacksSavedSection({
                   onClick={() => onTogglePin(pack.id)}
                   disabled={isUpdatingPins || !resolvedSessionId}
                   className={cn(
-                    "px-3 py-1 text-xs font-semibold rounded-full border transition-colors",
+                    "px-3 py-1 text-xs font-semibold rounded-full border transition-colors duration-fast",
                     isPinned
                       ? "bg-foreground text-background border-foreground"
-                      : "text-foreground border-border hover:bg-surface-100"
+                      : "text-foreground border-border hover:bg-surface-2"
                   )}
                 >
                   {isPinned ? "Pinned" : "Pin"}
@@ -533,7 +533,7 @@ export function ContextPacksPanel({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="flex flex-col h-full bg-surface-0 border-l border-border shadow-xl w-[640px] animate-in slide-in-from-right duration-300">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-surface-50/50 backdrop-blur-sm">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-surface-1/50 backdrop-blur-sm">
         <div>
           <h2 className="text-lg font-semibold text-foreground">Context Packs</h2>
           <p className="text-xs text-muted-foreground">
@@ -543,14 +543,14 @@ export function ContextPacksPanel({ onClose }: { onClose: () => void }) {
         <button
           type="button"
           onClick={onClose}
-          className="p-2 hover:bg-surface-100 rounded-md text-muted-foreground hover:text-foreground transition-colors"
+          className="p-2 hover:bg-surface-2 rounded-md text-muted-foreground hover:text-foreground transition-colors duration-fast"
           aria-label="Close context packs"
         >
           X
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+      <div className="flex-1 overflow-y-auto scrollbar-auto-hide p-6 space-y-6">
         {errorMessage ? (
           <div className="text-xs text-destructive bg-destructive/5 border border-destructive/10 px-3 py-2 rounded-md">
             {errorMessage}

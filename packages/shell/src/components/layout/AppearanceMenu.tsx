@@ -56,7 +56,7 @@ export function AppearanceMenu({ onClose }: AppearanceMenuProps) {
   return (
     <div
       ref={menuRef}
-      className="absolute top-12 right-0 w-[280px] bg-surface-1 border border-border/20 rounded-xl shadow-xl z-50 flex flex-col overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150"
+      className="absolute top-12 right-0 w-[280px] bg-surface-1 border border-border/20 rounded-xl shadow-xl z-50 flex flex-col overflow-hidden animate-in fade-in slide-in-from-top-1 duration-normal"
     >
       {/* Header - minimal */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border/10">
@@ -64,7 +64,7 @@ export function AppearanceMenu({ onClose }: AppearanceMenuProps) {
         <button
           type="button"
           onClick={onClose}
-          className="h-5 w-5 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground hover:bg-surface-2 transition-colors"
+          className="h-5 w-5 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground hover:bg-surface-2 transition-colors duration-fast"
         >
           <X className="h-3 w-3" />
         </button>
@@ -123,7 +123,7 @@ export function AppearanceMenu({ onClose }: AppearanceMenuProps) {
                 title={bg.label}
                 aria-pressed={canvas === bg.value}
                 className={cn(
-                  "h-6 w-6 rounded-full transition-all",
+                  "h-6 w-6 rounded-full transition-all duration-fast",
                   bg.color,
                   canvas === bg.value
                     ? "ring-2 ring-primary ring-offset-2 ring-offset-surface-1"
@@ -150,7 +150,7 @@ function Section({ label, value, children }: SectionProps) {
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium text-muted-foreground">{label}</span>
-        {value && <span className="text-[10px] font-mono text-muted-foreground/70">{value}</span>}
+        {value && <span className="text-micro font-mono text-muted-foreground/70">{value}</span>}
       </div>
       {children}
     </div>
@@ -171,7 +171,7 @@ function TypefaceButton({ label, active, onClick, fontClass }: TypefaceButtonPro
       type="button"
       onClick={onClick}
       className={cn(
-        "flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all",
+        "flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all duration-fast",
         fontClass,
         active
           ? "bg-primary/10 text-primary border border-primary/20"

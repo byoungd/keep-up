@@ -16,7 +16,7 @@ const DefaultAvatar: React.FC<{ name: string; url?: string }> = ({ name, url }) 
   }
 
   return (
-    <div className="h-6 w-6 rounded-md bg-gradient-to-br from-indigo-500 to-cyan-500 flex items-center justify-center text-[11px] font-medium text-white">
+    <div className="h-6 w-6 rounded-md bg-gradient-to-br from-accent-indigo to-accent-cyan flex items-center justify-center text-fine font-medium text-white">
       {initial}
     </div>
   );
@@ -58,7 +58,7 @@ export const SidebarHeader = React.memo(function SidebarHeader({
         {onToggleCollapse && (
           <button
             type="button"
-            className="h-6 w-6 flex items-center justify-center text-muted-foreground hover:text-foreground shrink-0 rounded-md hover:bg-surface-2"
+            className="h-6 w-6 flex items-center justify-center text-muted-foreground hover:text-foreground shrink-0 rounded-md hover:bg-surface-2 transition-colors duration-fast"
             onClick={onToggleCollapse}
             aria-label="Collapse sidebar"
           >
@@ -73,14 +73,14 @@ export const SidebarHeader = React.memo(function SidebarHeader({
           type="button"
           className={cn(
             "w-full flex items-center justify-start gap-2 h-8 px-2.5 rounded-md",
-            "bg-canvas hover:bg-surface-2 text-muted-foreground hover:text-foreground",
-            "border border-border/50 shadow-xs transition-colors"
+            "bg-surface-2/70 hover:bg-surface-2 text-muted-foreground hover:text-foreground",
+            "transition-colors duration-fast"
           )}
           onClick={onSearch}
         >
           <Search className="h-4 w-4" />
           <span className="text-xs font-medium flex-1 text-left">Search...</span>
-          <kbd className="text-[10px] text-foreground/80 bg-surface-2 px-1.5 py-0.5 rounded border border-border/50">
+          <kbd className="text-micro text-foreground/80 bg-surface-3/60 px-1.5 py-0.5 rounded">
             ⌘K
           </kbd>
         </button>

@@ -34,7 +34,7 @@ const renderRailBadge = (
   }
 
   return (
-    <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-primary px-1 text-[10px] leading-4 text-primary-foreground">
+    <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-primary px-1 text-micro leading-4 text-primary-foreground">
       {item.badgeCount}
     </span>
   );
@@ -82,14 +82,14 @@ export const SidebarRail = React.memo(function SidebarRail({
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9 rounded-lg text-foreground/80"
+          className="h-9 w-9 rounded-lg text-foreground/80 hover:text-foreground hover:bg-surface-2/70"
           aria-label={t("workspace")}
         >
           <Avatar
             size="sm"
             src={workspaceAvatarUrl}
             fallback={workspaceInitial}
-            className="h-6 w-6 rounded-md bg-linear-to-br from-accent-indigo to-accent-cyan text-[10px]"
+            className="h-6 w-6 rounded-md bg-linear-to-br from-accent-indigo to-accent-cyan text-micro"
           />
         </Button>
       </Tooltip>
@@ -98,7 +98,7 @@ export const SidebarRail = React.memo(function SidebarRail({
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9 rounded-lg text-muted-foreground hover:text-foreground"
+          className="h-9 w-9 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface-2/70"
           onClick={handleSearch}
           aria-label={t("searchLabel")}
         >
@@ -106,7 +106,7 @@ export const SidebarRail = React.memo(function SidebarRail({
         </Button>
       </Tooltip>
 
-      <div className="flex flex-1 flex-col items-center gap-2 overflow-y-auto">
+      <div className="flex flex-1 flex-col items-center gap-2 overflow-y-auto scrollbar-auto-hide">
         {state.groups.map((group, groupIndex) => {
           if (group.mainItems.length === 0) {
             return null;
@@ -124,11 +124,11 @@ export const SidebarRail = React.memo(function SidebarRail({
                       aria-current={isActive ? "page" : undefined}
                       aria-label={item.label}
                       className={cn(
-                        "relative flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-200",
+                        "relative flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-normal",
                         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                         isActive
-                          ? "bg-surface-2 text-foreground shadow-sm"
-                          : "text-muted-foreground hover:bg-surface-2/50 hover:text-foreground"
+                          ? "bg-surface-2/90 text-foreground"
+                          : "text-muted-foreground hover:bg-surface-2/70 hover:text-foreground"
                       )}
                     >
                       <item.icon className="h-4 w-4" strokeWidth={isActive ? 2 : 1.5} />
@@ -146,7 +146,7 @@ export const SidebarRail = React.memo(function SidebarRail({
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9 rounded-lg text-muted-foreground hover:text-foreground"
+          className="h-9 w-9 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface-2/70"
           onClick={onOpenCustomize}
           aria-label={t("customize")}
         >

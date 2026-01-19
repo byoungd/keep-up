@@ -305,7 +305,7 @@ export function SidebarConfigSection({
   // --- Previews ---
 
   const badgeCountPreview = (
-    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-surface-3 px-1.5 text-[10px] font-semibold text-foreground">
+    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-surface-3 px-1.5 text-micro font-semibold text-foreground">
       12
     </span>
   );
@@ -319,7 +319,7 @@ export function SidebarConfigSection({
       className="flex h-6 w-8 gap-0.5 rounded border border-border bg-surface-1 p-px"
       aria-hidden="true"
     >
-      <div className="h-full w-[2px] rounded-full bg-primary/40 group-hover:bg-primary transition-colors" />
+      <div className="h-full w-[2px] rounded-full bg-primary/40 group-hover:bg-primary transition-colors duration-fast" />
       <div className="flex-1 opacity-20 bg-muted-foreground/10 rounded-[1px]" />
     </div>
   );

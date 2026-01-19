@@ -45,13 +45,13 @@ export function ThinkingProcess({
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="group flex w-full items-center gap-2 px-2.5 py-2 text-xs font-medium text-muted-foreground/70 hover:text-foreground transition-all duration-300 rounded-lg hover:bg-surface-2/40"
+        className="group flex w-full items-center gap-2 px-2.5 py-2 text-xs font-medium text-muted-foreground/70 hover:text-foreground transition-all duration-slow rounded-lg hover:bg-surface-2/40"
         aria-expanded={expanded}
       >
-        <div className="flex items-center gap-2 transition-transform duration-300">
+        <div className="flex items-center gap-2 transition-transform duration-slow">
           <ChevronRight
             className={cn(
-              "h-3.5 w-3.5 opacity-60 group-hover:opacity-100 transition-all duration-300",
+              "h-3.5 w-3.5 opacity-60 group-hover:opacity-100 transition-all duration-slow",
               expanded && "rotate-90"
             )}
             aria-hidden="true"
@@ -60,7 +60,7 @@ export function ThinkingProcess({
           <span className="font-medium">Thinking Process</span>
         </div>
         {!expanded && (
-          <span className="text-[10px] text-muted-foreground/40 bg-surface-2/60 px-2 py-0.5 rounded-full border border-border/20 font-mono">
+          <span className="text-micro text-muted-foreground/40 bg-surface-2/60 px-2 py-0.5 rounded-full border border-border/20 font-mono">
             {completedThinking.length} step{completedThinking.length !== 1 ? "s" : ""}
           </span>
         )}
@@ -68,7 +68,7 @@ export function ThinkingProcess({
 
       {/* Thinking Content */}
       {expanded && (
-        <div className="pl-5 ml-2 border-l-2 border-border/30 space-y-4 py-3 animate-in fade-in slide-in-from-top-2 duration-300 ease-out">
+        <div className="pl-5 ml-2 border-l-2 border-border/30 space-y-4 py-3 animate-in fade-in slide-in-from-top-2 duration-slow ease-out">
           {completedThinking.map((block, idx) => (
             <ThinkingBlockItem key={`thinking-${idx}-${block.timestamp}`} block={block} />
           ))}
@@ -84,15 +84,15 @@ export function ThinkingProcess({
 function ThinkingBlockItem({ block }: { block: ThinkingBlock }) {
   const TypeBadge = () => {
     const colors = {
-      reasoning: "bg-blue-500/20 text-blue-500",
-      planning: "bg-green-500/20 text-green-500",
-      reflection: "bg-purple-500/20 text-purple-500",
+      reasoning: "bg-info/20 text-info",
+      planning: "bg-success/20 text-success",
+      reflection: "bg-accent-violet/20 text-accent-violet",
     } as const;
 
     return (
       <span
         className={cn(
-          "inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-medium",
+          "inline-flex items-center rounded px-1.5 py-0.5 text-tiny font-medium",
           colors[block.type]
         )}
       >
@@ -105,7 +105,7 @@ function ThinkingBlockItem({ block }: { block: ThinkingBlock }) {
     <div className="space-y-2">
       <div className="flex items-center gap-2">
         <TypeBadge />
-        <span className="text-[10px] text-muted-foreground">
+        <span className="text-micro text-muted-foreground">
           {new Date(block.timestamp).toLocaleTimeString()}
         </span>
       </div>
@@ -123,7 +123,7 @@ export function ThinkingIndicatorInline({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-md bg-purple-500/10 px-2 py-1 text-xs text-purple-500",
+        "inline-flex items-center gap-1.5 rounded-md bg-accent-violet/10 px-2 py-1 text-xs text-accent-violet",
         className
       )}
     >

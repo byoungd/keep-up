@@ -138,16 +138,13 @@ export function MessageList({
   );
 
   const containerClass = cn(
-    "flex-1 overflow-y-auto overflow-x-hidden px-6 py-6 space-y-6",
-    isMain && "px-0", // Remove global padding in main mode to allow full-width scrollbar area (though padding usually inside scrollbar?)
+    "flex-1 overflow-y-auto overflow-x-hidden px-6 py-6 space-y-6 scrollbar-auto-hide",
+    isMain && "px-0" // Remove global padding in main mode to allow full-width scrollbar area (though padding usually inside scrollbar?)
     // Actually, distinct padding logic for items?
     // If I keep px-6, the scrollbar is at the edge of the container (which has padding).
     // So keeping px-6 is fine for scrollbar position.
     // BUT I want content to be max-w-3xl.
     // So I need a wrapper around items.
-    "[&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent",
-    "[&::-webkit-scrollbar-thumb]:bg-transparent hover:[&::-webkit-scrollbar-thumb]:bg-border/40",
-    "[&::-webkit-scrollbar-thumb]:rounded-full transition-colors"
   );
 
   const handleScroll = React.useCallback(() => {

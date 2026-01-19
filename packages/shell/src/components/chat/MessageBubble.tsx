@@ -55,12 +55,12 @@ export const MessageBubble = React.memo(function MessageBubble({
             <h2 className="mt-2 mb-1 text-xs font-semibold tracking-tight">{children}</h2>
           ),
           h3: ({ children }: { children: React.ReactNode }) => (
-            <h3 className="mt-2 mb-1 text-[11px] font-semibold uppercase text-muted-foreground">
+            <h3 className="mt-2 mb-1 text-fine font-semibold uppercase text-muted-foreground">
               {children}
             </h3>
           ),
           pre: ({ children }: { children: React.ReactNode }) => (
-            <pre className="rounded-lg bg-surface-2/70 p-3 text-[11px] text-foreground/90 overflow-x-auto border border-border/40">
+            <pre className="rounded-lg bg-surface-2/70 p-3 text-fine text-foreground/90 overflow-x-auto border border-border/40">
               {children}
             </pre>
           ),
@@ -69,7 +69,7 @@ export const MessageBubble = React.memo(function MessageBubble({
             inline ? (
               <code
                 className={cn(
-                  "rounded bg-surface-2/80 px-1.5 py-0.5 text-[11px] text-foreground/90",
+                  "rounded bg-surface-2/80 px-1.5 py-0.5 text-fine text-foreground/90",
                   className
                 )}
                 {...props}
@@ -116,12 +116,12 @@ export const MessageBubble = React.memo(function MessageBubble({
             </div>
           ),
           th: ({ children }: { children: React.ReactNode }) => (
-            <th className="border-b border-border/50 px-2 py-1 text-left text-[11px] font-semibold">
+            <th className="border-b border-border/50 px-2 py-1 text-left text-fine font-semibold">
               {children}
             </th>
           ),
           td: ({ children }: { children: React.ReactNode }) => (
-            <td className="border-b border-border/30 px-2 py-1 text-[11px]">{children}</td>
+            <td className="border-b border-border/30 px-2 py-1 text-fine">{children}</td>
           ),
         }
       : {
@@ -147,7 +147,7 @@ export const MessageBubble = React.memo(function MessageBubble({
             inline ? (
               <code
                 className={cn(
-                  "rounded bg-surface-2/80 px-1.5 py-0.5 text-[12px] text-foreground/90",
+                  "rounded bg-surface-2/80 px-1.5 py-0.5 text-xs text-foreground/90",
                   className
                 )}
                 {...props}
@@ -204,7 +204,13 @@ export const MessageBubble = React.memo(function MessageBubble({
         };
 
   return (
-    <div className={cn(containerClass, "max-w-[70ch] text-[14.5px] leading-[1.65]", className)}>
+    <div
+      className={cn(
+        containerClass,
+        "max-w-[70ch] text-content leading-[1.65] ai-message-enter",
+        className
+      )}
+    >
       {/* biome-ignore lint/suspicious/noExplicitAny: Components type mismatch in ReactMarkdown */}
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={components as any}>
         {content}

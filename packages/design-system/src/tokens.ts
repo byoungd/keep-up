@@ -37,6 +37,12 @@ export const spacing = {
 // Typography Scale
 // =============================================================================
 export const fontSize = {
+  nano: ["var(--font-size-nano)", { lineHeight: "var(--line-height-nano)" }],
+  tiny: ["var(--font-size-tiny)", { lineHeight: "var(--line-height-tiny)" }],
+  micro: ["var(--font-size-micro)", { lineHeight: "var(--line-height-micro)" }],
+  fine: ["var(--font-size-fine)", { lineHeight: "var(--line-height-fine)" }],
+  chrome: ["var(--font-size-chrome)", { lineHeight: "var(--line-height-chrome)" }],
+  content: ["var(--font-size-content)", { lineHeight: "var(--line-height-content)" }],
   xs: ["0.75rem", { lineHeight: "1rem" }], // 12px
   sm: ["0.875rem", { lineHeight: "1.25rem" }], // 14px
   base: ["1rem", { lineHeight: "1.5rem" }], // 16px

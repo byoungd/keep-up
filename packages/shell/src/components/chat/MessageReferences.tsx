@@ -41,7 +41,7 @@ export const MessageReferences = React.memo(function MessageReferences({
 
   return (
     <div className="mt-3 flex flex-col gap-2">
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground/70">
+      <div className="text-micro uppercase tracking-wider text-muted-foreground/70">
         {labels.label}
       </div>
       <div className="flex flex-wrap items-center gap-2">
@@ -56,7 +56,7 @@ export const MessageReferences = React.memo(function MessageReferences({
         ))}
       </div>
       {!resolveReference && (
-        <div className="text-[10px] text-muted-foreground">{labels.unavailable}</div>
+        <div className="text-micro text-muted-foreground">{labels.unavailable}</div>
       )}
     </div>
   );
@@ -95,7 +95,7 @@ const ReferenceChip = React.memo(function ReferenceChip({
     <button
       type="button"
       className={cn(
-        "flex items-center gap-2 rounded-full border px-2 py-1 text-[10px] transition-colors",
+        "flex items-center gap-2 rounded-full border px-2 py-1 text-micro transition-colors duration-fast",
         tone,
         resolveAvailable && "hover:border-primary/40 hover:bg-primary/5"
       )}
@@ -105,7 +105,7 @@ const ReferenceChip = React.memo(function ReferenceChip({
       <span className="truncate max-w-[120px]">{snippet || entry.anchor.blockId}</span>
       <span className="opacity-80">{label}</span>
       {resolveAvailable && (
-        <span className="rounded-full border border-transparent bg-background/70 px-1.5 py-0.5 text-[9px] uppercase">
+        <span className="rounded-full border border-transparent bg-background/70 px-1.5 py-0.5 text-tiny uppercase">
           {labels.find}
         </span>
       )}

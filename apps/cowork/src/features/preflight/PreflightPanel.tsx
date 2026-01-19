@@ -113,7 +113,7 @@ export function PreflightPanel({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="flex flex-col h-full bg-surface-0 border-l border-border shadow-xl w-[520px] animate-in slide-in-from-right duration-300">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-surface-50/50 backdrop-blur-sm">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-surface-1/50 backdrop-blur-sm">
         <div>
           <h2 className="text-lg font-semibold text-foreground">Preflight QA</h2>
           <p className="text-xs text-muted-foreground">
@@ -123,14 +123,14 @@ export function PreflightPanel({ onClose }: { onClose: () => void }) {
         <button
           type="button"
           onClick={onClose}
-          className="p-2 hover:bg-surface-100 rounded-md text-muted-foreground hover:text-foreground transition-colors"
+          className="p-2 hover:bg-surface-2 rounded-md text-muted-foreground hover:text-foreground transition-colors duration-fast"
           aria-label="Close preflight panel"
         >
           X
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+      <div className="flex-1 overflow-y-auto scrollbar-auto-hide p-6 space-y-6">
         {errorMessage ? (
           <div className="text-xs text-destructive bg-destructive/5 border border-destructive/10 px-3 py-2 rounded-md">
             {errorMessage}
@@ -148,7 +148,7 @@ export function PreflightPanel({ onClose }: { onClose: () => void }) {
               onClick={handleRun}
               disabled={isRunning}
               className={cn(
-                "px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 transition-colors shadow-sm",
+                "px-4 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-md hover:bg-primary/90 transition-colors duration-fast shadow-sm",
                 isRunning ? "opacity-70 cursor-wait" : ""
               )}
             >
@@ -157,7 +157,7 @@ export function PreflightPanel({ onClose }: { onClose: () => void }) {
           </div>
 
           {allowlist.length > 0 ? (
-            <div className="rounded-lg border border-border/40 bg-surface-50/70 p-3 space-y-2">
+            <div className="rounded-lg border border-border/40 bg-surface-1/70 p-3 space-y-2">
               {allowlist.map((check) => (
                 <div key={check.id} className="text-xs text-muted-foreground">
                   <span className="font-semibold text-foreground">{check.name}</span>
@@ -173,7 +173,7 @@ export function PreflightPanel({ onClose }: { onClose: () => void }) {
           {isLoading ? (
             <div className="text-xs text-muted-foreground">Loading preflight report...</div>
           ) : latest ? (
-            <div className="rounded-lg border border-border/40 bg-surface-50/70 p-4 space-y-2">
+            <div className="rounded-lg border border-border/40 bg-surface-1/70 p-4 space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-sm font-semibold text-foreground">Preflight Report</p>
                 <span className="text-xs text-muted-foreground">
@@ -188,9 +188,9 @@ export function PreflightPanel({ onClose }: { onClose: () => void }) {
                       <span className="text-foreground">{check.name}</span>
                       <span
                         className={cn(
-                          "px-2 py-0.5 rounded-full border text-[10px] uppercase tracking-wider",
+                          "px-2 py-0.5 rounded-full border text-micro uppercase tracking-wider",
                           check.status === "pass"
-                            ? "border-emerald-500/30 text-emerald-600 bg-emerald-500/10"
+                            ? "border-success/30 text-success bg-success/10"
                             : check.status === "fail"
                               ? "border-destructive/30 text-destructive bg-destructive/10"
                               : "border-border/60 text-muted-foreground bg-muted"

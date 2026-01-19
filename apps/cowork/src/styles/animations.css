@@ -38,3 +38,29 @@
 .animate-pulse-subtle {
   animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+@keyframes thinking-shimmer {
+  0% {
+    transform: translateX(-45%);
+  }
+  100% {
+    transform: translateX(45%);
+  }
+}
+
+.thinking-bar__fill {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-accent-ai) 25%, transparent),
+    color-mix(in srgb, var(--color-accent-ai) 65%, transparent),
+    color-mix(in srgb, var(--color-accent-indigo) 55%, transparent)
+  );
+  background-size: 200% 100%;
+  animation: thinking-shimmer 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .thinking-bar__fill {
+    animation: none;
+  }
+}

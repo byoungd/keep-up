@@ -435,6 +435,7 @@ function isAnyToolAllowed(toolNames: string[], patterns: string[]): boolean {
   }
   return false;
 }
+
 function mergeRiskTags(...tags: Array<string[] | undefined>): string[] | undefined {
   const set = new Set<string>();
   for (const group of tags) {

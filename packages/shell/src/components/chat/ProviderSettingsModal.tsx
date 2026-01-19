@@ -84,9 +84,9 @@ export const PROVIDER_META: ProviderMeta[] = [
     apiKeyUrl: "https://platform.openai.com/api-keys",
     supportsCustomUrl: true,
     tone: {
-      bg: "bg-emerald-500/10",
-      text: "text-emerald-600 dark:text-emerald-400",
-      border: "border-emerald-500/20",
+      bg: "bg-accent-emerald/10",
+      text: "text-accent-emerald",
+      border: "border-accent-emerald/20",
     },
   },
   {
@@ -97,9 +97,9 @@ export const PROVIDER_META: ProviderMeta[] = [
     apiKeyUrl: "https://console.anthropic.com/settings/keys",
     supportsCustomUrl: true,
     tone: {
-      bg: "bg-orange-500/10",
-      text: "text-orange-600 dark:text-orange-400",
-      border: "border-orange-500/20",
+      bg: "bg-accent-amber/10",
+      text: "text-accent-amber",
+      border: "border-accent-amber/20",
     },
   },
   {
@@ -110,9 +110,9 @@ export const PROVIDER_META: ProviderMeta[] = [
     apiKeyUrl: "https://aistudio.google.com/apikey",
     supportsCustomUrl: false,
     tone: {
-      bg: "bg-blue-500/10",
-      text: "text-blue-600 dark:text-blue-400",
-      border: "border-blue-500/20",
+      bg: "bg-accent-cyan/10",
+      text: "text-accent-cyan",
+      border: "border-accent-cyan/20",
     },
   },
   {
@@ -123,9 +123,9 @@ export const PROVIDER_META: ProviderMeta[] = [
     apiKeyUrl: "https://platform.deepseek.com/api_keys",
     supportsCustomUrl: true,
     tone: {
-      bg: "bg-indigo-500/10",
-      text: "text-indigo-600 dark:text-indigo-400",
-      border: "border-indigo-500/20",
+      bg: "bg-accent-indigo/10",
+      text: "text-accent-indigo",
+      border: "border-accent-indigo/20",
     },
   },
   {
@@ -136,9 +136,9 @@ export const PROVIDER_META: ProviderMeta[] = [
     apiKeyUrl: "https://platform.moonshot.cn/console/api-keys",
     supportsCustomUrl: true,
     tone: {
-      bg: "bg-purple-500/10",
-      text: "text-purple-600 dark:text-purple-400",
-      border: "border-purple-500/20",
+      bg: "bg-accent-violet/10",
+      text: "text-accent-violet",
+      border: "border-accent-violet/20",
     },
   },
 ];
@@ -197,7 +197,7 @@ export function ProviderListView({ onSelectProvider }: ProviderListViewProps) {
       </div>
 
       {/* Provider list */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto scrollbar-auto-hide">
         <div className="p-2 space-y-1">
           {PROVIDER_META.map((provider) => {
             const Icon = provider.icon;
@@ -211,7 +211,7 @@ export function ProviderListView({ onSelectProvider }: ProviderListViewProps) {
                 onClick={() => onSelectProvider(provider.id)}
                 className={cn(
                   "group w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left",
-                  "transition-all duration-200 ease-out",
+                  "transition-all duration-normal ease-out",
                   "border border-transparent",
                   "hover:bg-surface-2/60 hover:border-border/30",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
@@ -221,7 +221,7 @@ export function ProviderListView({ onSelectProvider }: ProviderListViewProps) {
                 <span
                   className={cn(
                     "h-10 w-10 rounded-xl flex items-center justify-center shrink-0",
-                    "transition-transform duration-200 group-hover:scale-105",
+                    "transition-transform duration-normal group-hover:scale-105",
                     provider.tone.bg,
                     provider.tone.border,
                     "border"
@@ -237,7 +237,7 @@ export function ProviderListView({ onSelectProvider }: ProviderListViewProps) {
                       {config.displayName || DEFAULT_PROVIDER_NAMES[provider.id]}
                     </span>
                     {isConfigured && (
-                      <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-success/10 text-success text-[10px] font-medium">
+                      <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-success/10 text-success text-micro font-medium">
                         <Check className="h-2.5 w-2.5" />
                         {t("providerConfigured")}
                       </span>
@@ -252,7 +252,7 @@ export function ProviderListView({ onSelectProvider }: ProviderListViewProps) {
                 <ChevronRight
                   className={cn(
                     "h-4 w-4 text-muted-foreground/40 shrink-0",
-                    "transition-transform duration-200",
+                    "transition-transform duration-normal",
                     "group-hover:translate-x-0.5 group-hover:text-muted-foreground"
                   )}
                 />
@@ -264,7 +264,7 @@ export function ProviderListView({ onSelectProvider }: ProviderListViewProps) {
 
       {/* Footer tip */}
       <div className="px-4 py-3 border-t border-border/30">
-        <div className="flex items-start gap-2 text-[11px] text-muted-foreground/70">
+        <div className="flex items-start gap-2 text-fine text-muted-foreground/70">
           <Sparkles className="h-3.5 w-3.5 shrink-0 mt-0.5 text-accent-amber" />
           <span>{t("providerSettingsTip")}</span>
         </div>
@@ -332,7 +332,7 @@ export function ProviderDetailView({ providerId, onBack, onClose }: ProviderDeta
         <button
           type="button"
           onClick={onBack}
-          className="p-1.5 -ml-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors"
+          className="p-1.5 -ml-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors duration-fast"
           aria-label={t("providerBack")}
         >
           <ChevronRight className="h-4 w-4 rotate-180" />
@@ -353,12 +353,12 @@ export function ProviderDetailView({ providerId, onBack, onClose }: ProviderDeta
           <h3 className="text-sm font-semibold text-foreground">
             {config.displayName || DEFAULT_PROVIDER_NAMES[providerId]}
           </h3>
-          <p className="text-[11px] text-muted-foreground/70">{meta.description}</p>
+          <p className="text-fine text-muted-foreground/70">{meta.description}</p>
         </div>
       </div>
 
       {/* Form content */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-5">
+      <div className="flex-1 overflow-y-auto scrollbar-auto-hide p-4 space-y-5">
         {/* API Key field */}
         <div className="space-y-2">
           <label
@@ -381,13 +381,13 @@ export function ProviderDetailView({ providerId, onBack, onClose }: ProviderDeta
                 "bg-surface-2/50 border border-border/40",
                 "placeholder:text-muted-foreground/40",
                 "focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10",
-                "transition-all duration-200"
+                "transition-all duration-normal"
               )}
             />
             <button
               type="button"
               onClick={() => setShowApiKey(!showApiKey)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-muted-foreground/60 hover:text-foreground hover:bg-surface-2 transition-colors"
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-muted-foreground/60 hover:text-foreground hover:bg-surface-2 transition-colors duration-fast"
               aria-label={showApiKey ? t("providerHideKey") : t("providerShowKey")}
             >
               {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -397,7 +397,7 @@ export function ProviderDetailView({ providerId, onBack, onClose }: ProviderDeta
             href={meta.apiKeyUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-[11px] text-primary hover:text-primary/80 transition-colors"
+            className="inline-flex items-center gap-1 text-fine text-primary hover:text-primary/80 transition-colors duration-fast"
           >
             {t("providerGetApiKey")}
             <ExternalLink className="h-3 w-3" />
@@ -428,18 +428,18 @@ export function ProviderDetailView({ providerId, onBack, onClose }: ProviderDeta
                 "bg-surface-2/50 border border-border/40",
                 "placeholder:text-muted-foreground/40",
                 "focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10",
-                "transition-all duration-200"
+                "transition-all duration-normal"
               )}
               aria-label={t("providerBaseUrl")}
             />
-            <p className="text-[11px] text-muted-foreground/60">{t("providerBaseUrlHint")}</p>
+            <p className="text-fine text-muted-foreground/60">{t("providerBaseUrlHint")}</p>
           </div>
         )}
 
         {/* OpenAI-compatible notice */}
         <div className="flex items-start gap-2.5 p-3 rounded-xl bg-surface-2/50 border border-border/30">
           <Settings2 className="h-4 w-4 text-muted-foreground/70 shrink-0 mt-0.5" />
-          <div className="text-[11px] text-muted-foreground/80 leading-relaxed">
+          <div className="text-fine text-muted-foreground/80 leading-relaxed">
             <span className="font-medium text-foreground/80">{t("providerCompatibleTitle")}</span>
             <br />
             {t("providerCompatibleDescription")}
@@ -464,7 +464,7 @@ export function ProviderDetailView({ providerId, onBack, onClose }: ProviderDeta
             className={cn(
               "p-2 rounded-lg text-muted-foreground/60",
               "hover:text-destructive hover:bg-destructive/10",
-              "transition-colors duration-200"
+              "transition-colors duration-fast"
             )}
             aria-label={t("providerReset")}
           >

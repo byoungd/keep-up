@@ -181,15 +181,15 @@ function LibraryList({ items, activeId, onSelect }: LibraryListProps) {
                 </p>
               </div>
               <div className="flex flex-col items-end gap-1">
-                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                <span className="text-micro uppercase tracking-wider text-muted-foreground">
                   {item.payload.type}
                 </span>
                 {item.record.status !== "pending" && (
                   <span
-                    className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                    className={`text-micro uppercase tracking-wider px-2 py-0.5 rounded-full border ${
                       item.record.status === "applied"
-                        ? "border-emerald-500/30 text-emerald-600 bg-emerald-500/10"
-                        : "border-amber-500/30 text-amber-600 bg-amber-500/10"
+                        ? "border-success/30 text-success bg-success/10"
+                        : "border-warning/30 text-warning bg-warning/10"
                     }`}
                   >
                     {item.record.status}
@@ -198,7 +198,7 @@ function LibraryList({ items, activeId, onSelect }: LibraryListProps) {
               </div>
             </div>
             <p className="mt-2 text-xs text-muted-foreground line-clamp-2">{item.snippet}</p>
-            <p className="mt-2 text-[10px] text-muted-foreground">
+            <p className="mt-2 text-micro text-muted-foreground">
               {new Date(item.record.createdAt).toLocaleString()}
             </p>
           </button>

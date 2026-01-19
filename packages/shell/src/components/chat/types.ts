@@ -1,3 +1,6 @@
+/** Risk level used for approval gating. */
+export type ApprovalRiskLevel = "low" | "medium" | "high" | "critical";
+
 /**
  * Represents a single action/tool call within a step.
  */
@@ -91,7 +94,7 @@ export interface AgentTask {
     approvalId: string;
     toolName: string;
     args: Record<string, unknown>;
-    riskLevel?: "low" | "medium" | "high";
+    riskLevel?: ApprovalRiskLevel;
     reason?: string;
   };
 

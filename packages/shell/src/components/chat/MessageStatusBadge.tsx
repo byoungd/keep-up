@@ -44,7 +44,7 @@ export function MessageStatusBadge({
   const showLabel = true; // For error/canceled, always show label for clarity
 
   return (
-    <span className={cn("inline-flex items-center gap-1.5 text-[10px]", meta.className)}>
+    <span className={cn("inline-flex items-center gap-1.5 text-micro", meta.className)}>
       {meta.icon}
       {showLabel && (
         <span className="opacity-80 font-medium uppercase tracking-wider">{labels[status]}</span>

@@ -18,7 +18,7 @@ function formatDuration(durationMs: number) {
 function statusTone(status: PreflightPayload["report"]["checks"][number]["status"]) {
   switch (status) {
     case "pass":
-      return "text-emerald-600 bg-emerald-500/10 border-emerald-500/20";
+      return "text-success bg-success/10 border-success/20";
     case "fail":
       return "text-destructive bg-destructive/10 border-destructive/20";
     default:
@@ -35,7 +35,7 @@ export function PreflightCard({ payload }: PreflightCardProps) {
       <div className="px-4 py-3 bg-muted border-b border-border flex flex-wrap gap-3 justify-between">
         <div className="flex items-center gap-2">
           <svg
-            className="w-4 h-4 text-accent-blue"
+            className="w-4 h-4 text-accent-indigo"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -89,19 +89,19 @@ export function PreflightCard({ payload }: PreflightCardProps) {
                 <summary className="flex items-center justify-between gap-3 px-3 py-2 cursor-pointer">
                   <div className="flex flex-col">
                     <span className="text-sm font-semibold text-foreground">{check.name}</span>
-                    <span className="text-[11px] text-muted-foreground">
+                    <span className="text-fine text-muted-foreground">
                       {check.command} {check.args.join(" ")}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span
-                      className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border ${statusTone(
+                      className={`text-micro uppercase tracking-wider px-2 py-0.5 rounded-full border ${statusTone(
                         check.status
                       )}`}
                     >
                       {check.status}
                     </span>
-                    <span className="text-[11px] text-muted-foreground">
+                    <span className="text-fine text-muted-foreground">
                       {formatDuration(check.durationMs)}
                     </span>
                   </div>

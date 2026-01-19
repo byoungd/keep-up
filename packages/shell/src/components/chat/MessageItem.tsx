@@ -5,6 +5,7 @@ import { Bot, User } from "lucide-react";
 import * as React from "react";
 import { parseArtifactsFromContent } from "../../lib/ai/artifacts";
 import type { ReferenceAnchor, ReferenceRange } from "../../lib/ai/referenceAnchors";
+import { ApprovalCard } from "../ai/ApprovalCard";
 import { ConfidenceBadge } from "../ai/ConfidenceBadge";
 import { ArtifactList } from "./ArtifactCard";
 import { AskMessage } from "./AskMessage";
@@ -20,7 +21,13 @@ import { ResultMessage } from "./ResultMessage";
 import { TaskStreamMessage } from "./TaskStreamMessage";
 import { ThinkingProcess } from "./ThinkingProcess";
 import { TokenUsageDisplay } from "./TokenUsageDisplay";
-import type { AgentTask, ArtifactItem, Message, MessageItemTranslations } from "./types";
+import type {
+  AgentTask,
+  ApprovalRiskLevel,
+  ArtifactItem,
+  Message,
+  MessageItemTranslations,
+} from "./types";
 
 export interface MessageItemProps {
   message: Message;
@@ -92,6 +99,39 @@ const useMessageArtifacts = (message: Message) => {
   return { displayContent, artifacts, assistantArtifacts };
 };
 
+type ApprovalMetadata = {
+  approvalId: string;
+  toolName: string;
+  args: Record<string, unknown>;
+  riskLevel?: ApprovalRiskLevel;
+  reason?: string;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function extractApprovalMetadata(message: Message): ApprovalMetadata | null {
+  if (!message.metadata || !isRecord(message.metadata)) {
+    return null;
+  }
+  const approvalId =
+    typeof message.metadata.approvalId === "string" ? message.metadata.approvalId : undefined;
+  const toolName =
+    typeof message.metadata.toolName === "string" ? message.metadata.toolName : undefined;
+  const args = isRecord(message.metadata.args) ? message.metadata.args : undefined;
+  if (!approvalId || !toolName || !args) {
+    return null;
+  }
+  const riskLevel =
+    typeof message.metadata.riskLevel === "string" &&
+    ["low", "medium", "high", "critical"].includes(message.metadata.riskLevel)
+      ? (message.metadata.riskLevel as ApprovalRiskLevel)
+      : undefined;
+  const reason = typeof message.metadata.reason === "string" ? message.metadata.reason : undefined;
+  return { approvalId, toolName, args, riskLevel, reason };
+}
+
 const MessageContent = ({
   message,
   displayContent,
@@ -114,10 +154,45 @@ const MessageContent = ({
     metadata: { approvalId: string; toolName: string; args: Record<string, unknown> }
   ) => Promise<void>;
 }) => {
+  const [pendingApproval, setPendingApproval] = React.useState<"approve" | "reject" | null>(null);
+
   if (message.type === "info") {
     return <InfoMessage content={message.content} />;
   }
   if (message.type === "ask") {
+    const approvalMetadata = extractApprovalMetadata(message);
+    if (approvalMetadata) {
+      const toolDescription =
+        approvalMetadata.reason ?? `Approval required to run ${approvalMetadata.toolName}.`;
+      const isPending = message.status === "pending";
+      const handleApprovalAction = async (action: "approve" | "reject") => {
+        if (!onTaskAction) {
+          return;
+        }
+        setPendingApproval(action);
+        try {
+          await onTaskAction(action, {
+            approvalId: approvalMetadata.approvalId,
+            toolName: approvalMetadata.toolName,
+            args: approvalMetadata.args,
+          });
+        } finally {
+          setPendingApproval(null);
+        }
+      };
+      return (
+        <ApprovalCard
+          toolName={approvalMetadata.toolName}
+          toolDescription={toolDescription}
+          parameters={approvalMetadata.args}
+          riskLevel={approvalMetadata.riskLevel ?? "medium"}
+          onApprove={() => handleApprovalAction("approve")}
+          onReject={() => handleApprovalAction("reject")}
+          pendingAction={pendingApproval}
+          isDisabled={!onTaskAction || !isPending}
+        />
+      );
+    }
     return (
       <AskMessage
         content={message.content}
@@ -214,7 +289,7 @@ export const MessageItem = React.memo(function MessageItem({
           onTaskAction={onTaskAction}
         />
         {!isUser && message.fallbackNotice && message.type !== "task_stream" && (
-          <div className="mt-2 text-[11px] text-amber-600/90">{message.fallbackNotice}</div>
+          <div className="mt-2 text-fine text-warning/90">{message.fallbackNotice}</div>
         )}
 
         {/* Artifacts (from inline artifact blocks only) */}

@@ -53,7 +53,7 @@ export function StepItem({
       {/* biome-ignore lint/a11y/useAriaPropsSupportedByRole: Valid usage */}
       <div
         className={cn(
-          "flex items-center gap-3 select-none px-2 py-1 rounded-md transition-all duration-200",
+          "flex items-center gap-3 select-none px-2 py-1 rounded-md transition-all duration-normal",
           hasDetails
             ? "cursor-pointer hover:bg-surface-2/40 focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none"
             : "",
@@ -94,7 +94,7 @@ export function StepItem({
                   isActive ? "text-foreground" : "text-muted-foreground",
                   isCompleted &&
                     "text-muted-foreground/60 line-through decoration-muted-foreground/20",
-                  isFailed && "text-red-500"
+                  isFailed && "text-error"
                 )}
               >
                 {step.label}
@@ -106,7 +106,7 @@ export function StepItem({
                 <span
                   className={cn(
                     TASK_THEME.type.meta,
-                    "font-mono opacity-0 group-hover/step:opacity-100 transition-opacity"
+                    "font-mono opacity-0 group-hover/step:opacity-100 transition-opacity duration-fast"
                   )}
                 >
                   {step.duration}
@@ -116,7 +116,7 @@ export function StepItem({
               {hasDetails && (
                 <ChevronDown
                   className={cn(
-                    "h-3 w-3 text-muted-foreground/30 transition-transform duration-200",
+                    "h-3 w-3 text-muted-foreground/30 transition-transform duration-normal",
                     !isCollapsed && "rotate-180",
                     "opacity-0 group-hover/step:opacity-100"
                   )}
@@ -134,7 +134,7 @@ export function StepItem({
             {actions.map((action) => (
               <div
                 key={action.id}
-                className="flex items-start gap-2.5 text-[11px] text-muted-foreground/80 font-mono leading-relaxed"
+                className="flex items-start gap-2.5 text-fine text-muted-foreground/80 font-mono leading-relaxed"
               >
                 <span className="mt-[3px] opacity-40 shrink-0">
                   {action.status === "running" ? (
@@ -155,7 +155,7 @@ export function StepItem({
                   e.stopPropagation();
                   onPreview?.(art);
                 }}
-                className="flex items-center gap-2 text-[11px] text-foreground/80 hover:text-primary hover:underline transition-colors w-full text-left font-sans py-0.5"
+                className="flex items-center gap-2 text-fine text-foreground/80 hover:text-primary hover:underline transition-colors duration-fast w-full text-left font-sans py-0.5"
               >
                 <FileText className="h-3 w-3 opacity-60" />
                 {art.title}
@@ -171,10 +171,10 @@ export function StepItem({
 // Local StepIcon to reduce import complexity
 function StepIcon({ status }: { status: TaskStep["status"] }) {
   if (status === "running") {
-    return <Loader2 className="h-3.5 w-3.5 text-amber-500 animate-spin" />;
+    return <Loader2 className="h-3.5 w-3.5 text-warning animate-spin" />;
   }
   if (status === "failed") {
-    return <AlertCircle className="h-3.5 w-3.5 text-red-500" />;
+    return <AlertCircle className="h-3.5 w-3.5 text-error" />;
   }
   if (status === "completed") {
     return <CheckCircle2 className="h-3.5 w-3.5 text-primary/60" />;

@@ -34,7 +34,7 @@ export function CostMeter({ usage, modelId }: CostMeterProps) {
   const isCritical = utilization > 95;
 
   return (
-    <div className="flex items-center gap-3 text-[10px] text-muted-foreground mr-2">
+    <div className="flex items-center gap-3 text-micro text-muted-foreground mr-2">
       <div className="flex items-center gap-1" title="Input Tokens">
         <svg
           className="w-3 h-3 text-muted-foreground/70"
@@ -72,7 +72,7 @@ export function CostMeter({ usage, modelId }: CostMeterProps) {
       {(isWarning || isCritical) && (
         <div
           className={`flex items-center gap-1 font-medium ${
-            isCritical ? "text-destructive" : "text-amber-500"
+            isCritical ? "text-destructive" : "text-warning"
           }`}
           title={`Context Usage: ${utilization.toFixed(1)}%`}
         >

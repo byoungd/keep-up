@@ -45,25 +45,12 @@ function PhaseItem({
   return (
     <div className="flex items-center shrink-0">
       <motion.div
-        initial={false}
-        animate={{
-          backgroundColor: isActive
-            ? "var(--primary-10)"
-            : isCompleted
-              ? "var(--green-10)"
-              : "transparent",
-          borderColor: isActive
-            ? "var(--primary-20)"
-            : isCompleted
-              ? "var(--green-20)"
-              : "var(--border-10)",
-        }}
         className={cn(
-          "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors relative overflow-hidden",
+          "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors duration-fast relative overflow-hidden",
           isActive
-            ? "text-primary shadow-[0_0_10px_-3px_var(--primary)]"
+            ? "bg-primary/10 border-primary/20 text-primary shadow-[0_0_10px_-3px_var(--color-primary)]"
             : isCompleted
-              ? "text-green-600 dark:text-green-400"
+              ? "bg-success/10 border-success/20 text-success"
               : "bg-surface-2/50 border-border/10 text-muted-foreground"
         )}
       >
@@ -105,7 +92,7 @@ function TaskDetails({
               <Target className="w-3.5 h-3.5" />
             </div>
             <div className="space-y-1">
-              <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+              <div className="text-micro font-bold text-muted-foreground uppercase tracking-widest">
                 Current Objective
               </div>
               <div className="text-sm text-foreground font-medium leading-relaxed">{goal}</div>
@@ -142,18 +129,18 @@ function TaskDetails({
             <div
               key={step.id}
               className={cn(
-                "flex items-start gap-3 text-sm transition-colors",
+                "flex items-start gap-3 text-sm transition-colors duration-fast",
                 isCompleted ? "opacity-50" : "opacity-100"
               )}
             >
               {/* Status Icon */}
               <div className="mt-0.5 shrink-0 flex items-center justify-center w-4 h-4">
                 {isCompleted ? (
-                  <CheckCircle2 className="w-4 h-4 text-green-500" />
+                  <CheckCircle2 className="w-4 h-4 text-success" />
                 ) : isRunning ? (
                   <div className="flex items-center justify-center w-4 h-4">
-                    <div className="w-3.5 h-3.5 rounded-full border border-blue-500/30 flex items-center justify-center">
-                      <div className="w-1.5 h-1.5 bg-gradient-to-tr from-blue-500 to-cyan-400 rounded-full animate-pulse-spring" />
+                    <div className="w-3.5 h-3.5 rounded-full border border-info/30 flex items-center justify-center">
+                      <div className="w-1.5 h-1.5 bg-gradient-to-tr from-accent-indigo to-info rounded-full animate-pulse-spring" />
                     </div>
                   </div>
                 ) : (
@@ -194,14 +181,14 @@ function TaskDetails({
             e.stopPropagation();
             onReviewClick?.(task);
           }}
-          className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors group"
+          className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors duration-fast group"
         >
           <span className="font-medium">{filesChanged} files</span>
           <span className="text-muted-foreground/50">•</span>
-          <span className="text-green-500">+{linesAdded}</span>
-          <span className="text-red-500/80">-{linesRemoved}</span>
+          <span className="text-success">+{linesAdded}</span>
+          <span className="text-error/80">-{linesRemoved}</span>
 
-          <ArrowUpRight className="w-3 h-3 opacity-0 -translate-y-0.5 group-hover:opacity-100 transition-all" />
+          <ArrowUpRight className="w-3 h-3 opacity-0 -translate-y-0.5 group-hover:opacity-100 transition-all duration-fast" />
         </button>
       </div>
     </div>
@@ -227,7 +214,7 @@ function TaskAccordionItem({
   return (
     <div
       className={cn(
-        "group flex flex-col transition-colors",
+        "group flex flex-col transition-colors duration-fast",
         isExpanded ? "bg-surface-1 relative z-10" : "bg-surface-1/50 hover:bg-surface-1/80"
       )}
     >
@@ -240,7 +227,7 @@ function TaskAccordionItem({
         {/* Background Progress Fill (Extremely Light) */}
         {isLoading && (
           <motion.div
-            className="absolute inset-y-0 left-0 bg-blue-500/5 z-0"
+            className="absolute inset-y-0 left-0 bg-info/5 z-0"
             initial={{ width: 0 }}
             animate={{ width: `${task.progress}%` }}
             transition={{ duration: 0.5, ease: "easeInOut" }}
@@ -250,15 +237,15 @@ function TaskAccordionItem({
         {/* Left Side: Status Icon */}
         <div className="relative z-10 shrink-0">
           {task.status === "completed" ? (
-            <div className="bg-green-500/10 text-green-500 p-1 rounded-full">
+            <div className="bg-success/10 text-success p-1 rounded-full">
               <CheckCircle2 className="w-4 h-4" />
             </div>
           ) : task.status === "running" ? (
-            <div className="bg-blue-500/10 text-blue-500 p-1 rounded-full animate-pulse-subtle">
+            <div className="bg-info/10 text-info p-1 rounded-full animate-pulse-subtle">
               <Loader2 className="w-4 h-4 animate-spin" />
             </div>
           ) : task.status === "failed" ? (
-            <div className="bg-red-500/10 text-red-500 p-1 rounded-full">
+            <div className="bg-error/10 text-error p-1 rounded-full">
               <Circle className="w-4 h-4" />
             </div>
           ) : (
@@ -273,7 +260,7 @@ function TaskAccordionItem({
           <div className="flex items-center justify-between">
             <span
               className={cn(
-                "text-sm font-medium truncate transition-colors",
+                "text-sm font-medium truncate transition-colors duration-fast",
                 isExpanded ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
               )}
             >
@@ -297,11 +284,11 @@ function TaskAccordionItem({
                       onArtifactClick?.(doc, task);
                     }
                   }}
-                  className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/10 hover:bg-blue-500/20 transition-colors"
+                  className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-accent-indigo/10 text-accent-indigo border border-accent-indigo/20 hover:bg-accent-indigo/20 transition-colors duration-fast"
                   title={`${grouped.docs.length} Documents`}
                 >
                   <FileText className="w-3 h-3" />
-                  <span className="text-[10px] font-mono font-medium">{grouped.docs.length}</span>
+                  <span className="text-micro font-mono font-medium">{grouped.docs.length}</span>
                 </button>
               )}
               {grouped.images.length > 0 && (
@@ -314,11 +301,11 @@ function TaskAccordionItem({
                       onArtifactClick?.(image, task);
                     }
                   }}
-                  className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/10 hover:bg-purple-500/20 transition-colors"
+                  className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-accent-violet/10 text-accent-violet border border-accent-violet/20 hover:bg-accent-violet/20 transition-colors duration-fast"
                   title={`${grouped.images.length} Images`}
                 >
                   <ImageIcon className="w-3 h-3" />
-                  <span className="text-[10px] font-mono font-medium">{grouped.images.length}</span>
+                  <span className="text-micro font-mono font-medium">{grouped.images.length}</span>
                 </button>
               )}
               {grouped.links.length > 0 && (
@@ -331,11 +318,11 @@ function TaskAccordionItem({
                       onArtifactClick?.(link, task);
                     }
                   }}
-                  className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/10 hover:bg-orange-500/20 transition-colors"
+                  className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-accent-amber/10 text-accent-amber border border-accent-amber/20 hover:bg-accent-amber/20 transition-colors duration-fast"
                   title={`${grouped.links.length} Links`}
                 >
                   <LinkIcon className="w-3 h-3" />
-                  <span className="text-[10px] font-mono font-medium">{grouped.links.length}</span>
+                  <span className="text-micro font-mono font-medium">{grouped.links.length}</span>
                 </button>
               )}
             </div>
@@ -344,7 +331,7 @@ function TaskAccordionItem({
           {/* Chevron */}
           <div
             className={cn(
-              "text-muted-foreground/50 transition-transform duration-200",
+              "text-muted-foreground/50 transition-transform duration-normal",
               isExpanded && "rotate-90 text-foreground"
             )}
           >

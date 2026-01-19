@@ -72,7 +72,7 @@ function ProviderGroup({
         type="button"
         className="model-selector__group-header"
         onClick={toggleExpand}
-        style={{ borderLeftColor: provider.accentColor ?? "#666" }}
+        style={{ borderLeftColor: provider.accentColor ?? "var(--color-muted-foreground)" }}
       >
         <span className="model-selector__provider-name">{provider.shortName}</span>
         {provider.hasKey ? (

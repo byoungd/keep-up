@@ -84,14 +84,14 @@ export function ConfidenceBadge({
     <span
       className={cn(
         "inline-flex items-center gap-1 rounded-full font-medium relative overflow-hidden",
-        "transition-colors duration-150",
+        "transition-colors duration-fast",
         // Size variants
-        size === "sm" && "px-1.5 py-0.5 text-[10px]",
+        size === "sm" && "px-1.5 py-0.5 text-micro",
         size === "md" && "px-2 py-1 text-xs",
         // Level-based colors
-        level === "high" && "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-        level === "medium" && "bg-amber-500/15 text-amber-600 dark:text-amber-400",
-        level === "low" && "bg-rose-500/15 text-rose-600 dark:text-rose-400",
+        level === "high" && "bg-success/15 text-success",
+        level === "medium" && "bg-warning/15 text-warning",
+        level === "low" && "bg-error/15 text-error",
         // Shimmer animation class
         "group",
         className
@@ -104,7 +104,7 @@ export function ConfidenceBadge({
         className={cn(
           "absolute inset-0 -translate-x-full",
           "bg-gradient-to-r from-transparent via-white/20 to-transparent",
-          "group-hover:translate-x-full transition-transform duration-700 ease-out"
+          "group-hover:translate-x-full transition-transform duration-slow ease-out"
         )}
         aria-hidden="true"
       />
@@ -112,9 +112,9 @@ export function ConfidenceBadge({
       <span
         className={cn(
           "size-1.5 rounded-full relative",
-          level === "high" && "bg-emerald-500",
-          level === "medium" && "bg-amber-500",
-          level === "low" && "bg-rose-500"
+          level === "high" && "bg-success",
+          level === "medium" && "bg-warning",
+          level === "low" && "bg-error"
         )}
         aria-hidden="true"
       />
@@ -174,15 +174,15 @@ export function ConfidenceBar({ score, className }: ConfidenceBarProps): React.R
       <div className="h-1 flex-1 rounded-full bg-muted overflow-hidden">
         <div
           className={cn(
-            "h-full rounded-full transition-all duration-300",
-            level === "high" && "bg-emerald-500",
-            level === "medium" && "bg-amber-500",
-            level === "low" && "bg-rose-500"
+            "h-full rounded-full transition-all duration-normal",
+            level === "high" && "bg-success",
+            level === "medium" && "bg-warning",
+            level === "low" && "bg-error"
           )}
           style={{ width: `${percentage}%` }}
         />
       </div>
-      <span className="text-[10px] text-muted-foreground tabular-nums">{percentage}%</span>
+      <span className="text-micro text-muted-foreground tabular-nums">{percentage}%</span>
     </div>
   );
 }

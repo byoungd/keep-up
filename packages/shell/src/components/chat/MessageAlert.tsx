@@ -58,7 +58,7 @@ export const MessageAlert = React.memo(function MessageAlert({
             <div className="font-medium">{title}</div>
             <div className="opacity-80">{body}</div>
             {requestId && (
-              <div className="text-[10px] opacity-60">
+              <div className="text-micro opacity-60">
                 {requestIdLabel}: {requestId.slice(0, 12)}...
               </div>
             )}

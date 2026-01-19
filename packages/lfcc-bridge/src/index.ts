@@ -25,6 +25,7 @@ export * from "./policy/degradationStateMachine";
 export * from "./policy/policyDegradation";
 export * from "./policy/policyManager";
 export * from "./projection/projection";
+export * from "./referenceStore/loroReferenceStore";
 export * from "./runtime/loroRuntime";
 export * from "./security/aiGatewayWrite";
 export * from "./security/relocation";

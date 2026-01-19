@@ -41,20 +41,20 @@ export const SidebarItem = React.memo(function SidebarItem({
       href={href}
       aria-current={isActive ? "page" : undefined}
       className={cn(
-        "sidebar-item group relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
+        "sidebar-item group relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-normal",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         isActive
-          ? "bg-surface-2 text-foreground font-semibold"
+          ? "bg-surface-2/90 text-foreground font-semibold"
           : isContextSelected
             ? "text-foreground/80"
-            : "text-muted-foreground hover:bg-surface-2/50 hover:text-foreground"
+            : "text-muted-foreground hover:bg-surface-2/70 hover:text-foreground"
       )}
     >
       <Icon
         className={cn(
-          "h-4 w-4 shrink-0 transition-colors",
+          "h-4 w-4 shrink-0 transition-colors duration-fast",
           isActive
-            ? "text-primary"
+            ? "text-foreground"
             : isContextSelected
               ? "text-foreground/60"
               : "text-muted-foreground group-hover:text-foreground/80"
@@ -67,10 +67,10 @@ export const SidebarItem = React.memo(function SidebarItem({
       {badgeCount > 0 && (
         <span
           className={cn(
-            "ml-auto shrink-0 transition-all",
+            "ml-auto shrink-0 transition-all duration-fast",
             badgeStyle === "DOT"
               ? "h-2 w-2 min-w-0 p-0 rounded-full bg-primary"
-              : "text-[10px] h-5 min-w-5 px-1.5 bg-surface-3 text-muted-foreground rounded-full flex items-center justify-center"
+              : "text-micro h-5 min-w-5 px-1.5 bg-surface-3 text-muted-foreground rounded-full flex items-center justify-center"
           )}
         >
           {badgeStyle === "COUNT" ? badgeCount : null}

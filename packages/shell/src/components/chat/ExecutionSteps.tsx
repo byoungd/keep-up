@@ -43,13 +43,13 @@ export function ExecutionSteps({ steps, className, defaultExpanded = false }: Ex
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="group flex w-full items-center justify-between px-2 py-1.5 text-xs font-medium text-muted-foreground/80 hover:text-foreground transition-colors rounded-md hover:bg-surface-2/50"
+        className="group flex w-full items-center justify-between px-2 py-1.5 text-xs font-medium text-muted-foreground/80 hover:text-foreground transition-colors duration-fast rounded-md hover:bg-surface-2/50"
         aria-expanded={expanded}
       >
         <div className="flex items-center gap-1.5">
           <ChevronRight
             className={cn(
-              "h-3.5 w-3.5 opacity-70 group-hover:opacity-100 transition-all",
+              "h-3.5 w-3.5 opacity-70 group-hover:opacity-100 transition-all duration-fast",
               expanded && "rotate-90"
             )}
             aria-hidden="true"
@@ -61,7 +61,7 @@ export function ExecutionSteps({ steps, className, defaultExpanded = false }: Ex
 
       {/* Steps List */}
       {expanded && (
-        <div className="pl-4 ml-2.5 border-l border-border/40 space-y-1.5 py-2 animate-in fade-in slide-in-from-top-1 duration-200">
+        <div className="pl-4 ml-2.5 border-l border-border/40 space-y-1.5 py-2 animate-in fade-in slide-in-from-top-1 duration-normal">
           {steps.map((step) => (
             <StepItem key={step.id} step={step} />
           ))}
@@ -84,7 +84,7 @@ function StepsSummary({ steps }: { steps: ExecutionStep[] }) {
   );
 
   return (
-    <div className="flex items-center gap-2 text-[10px]">
+    <div className="flex items-center gap-2 text-micro">
       {statusCounts.success > 0 && (
         <span className="flex items-center gap-1 text-success">
           <CheckCircle2 className="h-2.5 w-2.5" />
@@ -135,7 +135,7 @@ function StepItem({ step }: { step: ExecutionStep }) {
   return (
     <div
       className={cn(
-        "rounded-md px-2 py-1.5 text-xs transition-colors hover:bg-surface-2/40 border border-transparent hover:border-border/30",
+        "rounded-md px-2 py-1.5 text-xs transition-colors duration-fast hover:bg-surface-2/40 border border-transparent hover:border-border/30",
         status === "executing" && "bg-primary/5 border-primary/10"
       )}
     >
@@ -156,19 +156,19 @@ function StepItem({ step }: { step: ExecutionStep }) {
           />
           <span className="font-medium">{step.toolName}</span>
           {step.parallel && (
-            <span className="rounded bg-primary/20 px-1 py-0.5 text-[9px] text-primary">
+            <span className="rounded bg-primary/20 px-1 py-0.5 text-tiny text-primary">
               parallel
             </span>
           )}
         </div>
         {step.durationMs !== undefined && (
-          <span className="text-muted-foreground text-[10px]">{step.durationMs}ms</span>
+          <span className="text-muted-foreground text-micro">{step.durationMs}ms</span>
         )}
       </button>
 
       {/* Step Details */}
       {showDetails && (
-        <div className="mt-2 space-y-2 text-[11px]">
+        <div className="mt-2 space-y-2 text-fine">
           {/* Arguments */}
           {Object.keys(step.arguments).length > 0 && (
             <div>

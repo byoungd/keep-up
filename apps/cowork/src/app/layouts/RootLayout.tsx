@@ -11,6 +11,8 @@ import { Sparkles } from "lucide-react";
 import React from "react";
 import { CoworkSidebarSections } from "../../components/sidebar/CoworkSidebarSections";
 import { COWORK_SIDEBAR_CONFIG_KEY, COWORK_SIDEBAR_GROUPS } from "../../config/sidebar";
+import { AIControlProvider } from "../../features/chat/AIControlContext";
+import { AIHeaderActions } from "../../features/chat/AIHeaderActions";
 import { CoworkAIPanel } from "../../features/chat/CoworkAIPanel";
 import { ContextPanel, type ContextPanelTab } from "../../features/context/ContextPanel";
 
@@ -45,7 +47,13 @@ export function RootLayout() {
   const location = useLocation();
 
   // Sidebar State (Physical Layout)
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("cowork-sidebar-collapsed");
+      return stored === "true";
+    }
+    return false;
+  });
   const [sidebarWidth, setSidebarWidth] = React.useState(240);
 
   // Auxiliary Panel State
@@ -109,6 +117,11 @@ export function RootLayout() {
       localStorage.setItem("cowork-aux-panel-position", auxPanelPosition);
     }
   }, [auxPanelPosition, isHydrated]);
+
+  // Persist sidebar collapsed state
+  React.useEffect(() => {
+    localStorage.setItem("cowork-sidebar-collapsed", String(isSidebarCollapsed));
+  }, [isSidebarCollapsed]);
 
   const shellContextValue = React.useMemo(
     () => ({
@@ -278,34 +291,43 @@ export function RootLayout() {
   );
 
   return (
-    <TooltipProvider>
-      <ReaderShellProvider
-        value={shellContextValue}
-        sidebarConfig={{
-          initialGroups: COWORK_SIDEBAR_GROUPS,
-          configKey: COWORK_SIDEBAR_CONFIG_KEY,
-        }}
-      >
-        <ReaderPreferencesProvider>
-          <AppShell
-            rightPanel={aiPanelElement}
-            auxPanel={contextPanel}
-            appName="KeepUp"
-            sidebarProps={{
-              showSearch: false,
-              renderGroup: renderSidebarGroup,
-              newAction: {
-                label: "New Session",
-                ariaLabel: "New Session",
-                icon: Sparkles,
-                onClick: () => router.navigate({ to: "/new-session" }),
-              },
-            }}
-          >
-            <Outlet />
-          </AppShell>
-        </ReaderPreferencesProvider>
-      </ReaderShellProvider>
-    </TooltipProvider>
+    <AIControlProvider>
+      <TooltipProvider>
+        <ReaderShellProvider
+          value={shellContextValue}
+          sidebarConfig={{
+            initialGroups: COWORK_SIDEBAR_GROUPS,
+            configKey: COWORK_SIDEBAR_CONFIG_KEY,
+          }}
+        >
+          <ReaderPreferencesProvider>
+            <AppShell
+              rightPanel={aiPanelElement}
+              auxPanel={contextPanel}
+              appName="KeepUp"
+              sidebarProps={{
+                showSearch: false,
+                renderGroup: renderSidebarGroup,
+                newAction: {
+                  label: "New Session",
+                  ariaLabel: "New Session",
+                  icon: Sparkles,
+                  onClick: () => router.navigate({ to: "/new-session" }),
+                },
+              }}
+              layoutStyle="arc"
+              headerProps={{
+                leftSlot: (
+                  <span className="font-semibold text-sm text-foreground">Cowork Agent</span>
+                ),
+                rightSlot: <AIHeaderActions />,
+              }}
+            >
+              <Outlet />
+            </AppShell>
+          </ReaderPreferencesProvider>
+        </ReaderShellProvider>
+      </TooltipProvider>
+    </AIControlProvider>
   );
 }

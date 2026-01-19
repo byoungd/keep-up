@@ -53,7 +53,7 @@ export function InputToolbar({
           type="button"
           variant="ghost"
           size="icon"
-          className="h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors"
+          className="h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors duration-fast"
           onClick={onAddAttachment}
           disabled={isAttachmentBusy || isLoading || isStreaming}
           aria-label={translations.addImage}
@@ -79,7 +79,7 @@ export function InputToolbar({
         {hasContent && (
           <span
             className={cn(
-              "text-[10px] tabular-nums animate-in fade-in duration-200",
+              "text-micro tabular-nums animate-in fade-in duration-normal",
               isOverLimit ? "text-destructive font-medium" : "text-muted-foreground/50"
             )}
             aria-hidden="true"
@@ -92,7 +92,7 @@ export function InputToolbar({
         <Button
           size="icon"
           className={cn(
-            "h-7 w-7 rounded-md shadow-none transition-all duration-200",
+            "h-7 w-7 rounded-md shadow-none transition-all duration-normal",
             isStreaming
               ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
               : hasContent
