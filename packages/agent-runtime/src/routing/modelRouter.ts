@@ -6,12 +6,21 @@
  * Enhanced with capability caching and cost/latency scoring (Track H.1).
  */
 
+import type { TelemetryContext } from "@ku0/agent-runtime-telemetry/telemetry";
+import { METRIC_NAMES } from "@ku0/agent-runtime-telemetry/telemetry";
 import {
   getModelCapabilityCache,
   type ModelCapability,
   type ModelCapabilityCache,
   type ModelScore,
 } from "./modelCapabilityCache";
+import {
+  type ModelHealthConfig,
+  type ModelHealthObservation,
+  type ModelHealthSnapshot,
+  type ModelHealthStatus,
+  ModelHealthTracker,
+} from "./modelHealthTracker";
 
 export type ModelRiskLevel = "low" | "medium" | "high";
 
@@ -50,6 +59,14 @@ export interface ModelRoutingDecision {
   metrics?: RoutingMetrics;
 }
 
+export interface RoutingFallbackInfo {
+  used: boolean;
+  from: string;
+  to: string;
+  reason: string;
+  healthStatus?: ModelHealthStatus;
+}
+
 /**
  * Routing metrics for observability.
  */
@@ -62,6 +79,10 @@ export interface RoutingMetrics {
   scores?: ModelScore[];
   /** Capability of selected model */
   capability?: ModelCapability;
+  /** Health metrics for selected model */
+  health?: ModelHealthSnapshot;
+  /** Fallback details when a health downgrade occurs */
+  fallback?: RoutingFallbackInfo;
 }
 
 /**
@@ -101,10 +122,18 @@ export interface ModelRouterConfig {
   rules?: ModelRouteRule[];
   /** Optional callback to emit routing decisions for observability */
   onRoutingDecision?: RoutingDecisionEmitter;
+  /** Optional telemetry context for routing metrics */
+  telemetry?: TelemetryContext;
   /** Enable capability-based scoring (Track H.1) */
   enableCapabilityScoring?: boolean;
   /** Optional custom capability cache */
   capabilityCache?: ModelCapabilityCache;
+  /** Optional model health tracker for fallback routing (Track M5) */
+  healthTracker?: ModelHealthTracker;
+  /** Optional health tracker configuration */
+  healthConfig?: ModelHealthConfig;
+  /** Enable health-aware fallback routing */
+  enableHealthFallback?: boolean;
 }
 
 export class ModelRouter {
@@ -112,12 +141,20 @@ export class ModelRouter {
   private readonly defaultPolicy: ModelRoutingPolicy;
   private readonly capabilityCache: ModelCapabilityCache;
   private readonly enableScoring: boolean;
+  private readonly healthTracker?: ModelHealthTracker;
+  private readonly enableHealthFallback: boolean;
+  private readonly telemetry?: TelemetryContext;
 
   constructor(config: ModelRouterConfig) {
     this.config = config;
     this.defaultPolicy = config.defaultPolicy ?? "quality";
     this.enableScoring = config.enableCapabilityScoring ?? true;
     this.capabilityCache = config.capabilityCache ?? getModelCapabilityCache();
+    this.enableHealthFallback = config.enableHealthFallback ?? true;
+    this.healthTracker =
+      config.healthTracker ??
+      (this.enableHealthFallback ? new ModelHealthTracker(config.healthConfig) : undefined);
+    this.telemetry = config.telemetry;
   }
 
   /**
@@ -147,11 +184,14 @@ export class ModelRouter {
           cacheHit: decision.metrics?.cacheHit ?? false,
           scores: decision.metrics?.scores,
           capability: decision.metrics?.capability,
+          health: decision.metrics?.health,
+          fallback: decision.metrics?.fallback,
         },
       };
 
       // Emit for observability
       this.config.onRoutingDecision?.(routingDecision);
+      this.recordTelemetry(routingDecision);
 
       return routingDecision;
     } catch {
@@ -169,10 +209,17 @@ export class ModelRouter {
         metrics: {
           routingLatencyMs,
           cacheHit: false,
+          fallback: {
+            used: true,
+            from: requestedModel,
+            to: resolvedModel,
+            reason: "routing failure",
+          },
         },
       };
 
       this.config.onRoutingDecision?.(fallbackDecision);
+      this.recordTelemetry(fallbackDecision);
 
       return fallbackDecision;
     }
@@ -183,9 +230,10 @@ export class ModelRouter {
     const policy = request.policy ?? this.defaultPolicy;
     const matchedRule = this.config.rules?.find((rule) => rule.match(request));
 
+    let decision: ModelRouteDecision;
     if (matchedRule) {
       const capability = this.capabilityCache.get(matchedRule.modelId);
-      return {
+      decision = {
         modelId: matchedRule.modelId,
         reason: matchedRule.reason,
         fallbackModels: matchedRule.fallbackModels ?? [],
@@ -196,56 +244,77 @@ export class ModelRouter {
         },
         policy: matchedRule.policy ?? policy,
         metrics: {
-          routingLatencyMs: performance.now() - startTime,
+          routingLatencyMs: 0,
           cacheHit: !!capability,
           capability,
         },
       };
-    }
-
-    // Use capability-based scoring if enabled and preferred models specified
-    if (this.enableScoring && request.preferredModels && request.preferredModels.length > 1) {
+    } else if (
+      this.enableScoring &&
+      request.preferredModels &&
+      request.preferredModels.length > 1
+    ) {
       const scores = this.capabilityCache.rank(request.preferredModels, policy);
 
       if (scores.length > 0) {
         const best = scores[0];
         const capability = this.capabilityCache.get(best.modelId);
-
-        return {
+        decision = {
           modelId: best.modelId,
           reason: `selected by ${policy} scoring (score: ${best.score.toFixed(3)})`,
           fallbackModels: scores.slice(1).map((s) => s.modelId),
           budget: { ...this.config.defaultBudget, ...request.budget },
           policy,
           metrics: {
-            routingLatencyMs: performance.now() - startTime,
+            routingLatencyMs: 0,
             cacheHit: best.fromCache,
             scores,
             capability,
           },
         };
+      } else {
+        const capability = this.capabilityCache.get(this.config.defaultModel);
+        decision = {
+          modelId: this.config.defaultModel,
+          reason: "default model",
+          fallbackModels:
+            request.preferredModels?.filter((id) => id !== this.config.defaultModel) ?? [],
+          budget: { ...this.config.defaultBudget, ...request.budget },
+          policy,
+          metrics: {
+            routingLatencyMs: 0,
+            cacheHit: !!capability,
+            capability,
+          },
+        };
       }
+    } else {
+      const capability = this.capabilityCache.get(this.config.defaultModel);
+      decision = {
+        modelId: this.config.defaultModel,
+        reason: "default model",
+        fallbackModels:
+          request.preferredModels?.filter((id) => id !== this.config.defaultModel) ?? [],
+        budget: { ...this.config.defaultBudget, ...request.budget },
+        policy,
+        metrics: {
+          routingLatencyMs: 0,
+          cacheHit: !!capability,
+          capability,
+        },
+      };
     }
 
-    const capability = this.capabilityCache.get(this.config.defaultModel);
-    return {
-      modelId: this.config.defaultModel,
-      reason: "default model",
-      fallbackModels:
-        request.preferredModels?.filter((id) => id !== this.config.defaultModel) ?? [],
-      budget: { ...this.config.defaultBudget, ...request.budget },
-      policy,
-      metrics: {
-        routingLatencyMs: performance.now() - startTime,
-        cacheHit: !!capability,
-        capability,
-      },
-    };
+    const healthAdjusted = this.applyHealthFallback(decision);
+    if (healthAdjusted.metrics) {
+      healthAdjusted.metrics.routingLatencyMs = performance.now() - startTime;
+    }
+    return healthAdjusted;
   }
 
   /**
    * Record a latency observation for a model.
-   * This updates the capability cache for future routing decisions.
+   * This updates the capability cache and health tracker for future routing decisions.
    */
   recordLatency(modelId: string, latencyMs: number): void {
     this.capabilityCache.recordLatency({
@@ -253,6 +322,150 @@ export class ModelRouter {
       latencyMs,
       timestamp: Date.now(),
     });
+    this.healthTracker?.recordObservation({ modelId, outcome: "success", latencyMs });
+  }
+
+  recordSuccess(modelId: string, latencyMs?: number): void {
+    this.healthTracker?.recordObservation({ modelId, outcome: "success", latencyMs });
+  }
+
+  recordError(modelId: string, latencyMs?: number): void {
+    this.healthTracker?.recordObservation({ modelId, outcome: "error", latencyMs });
+  }
+
+  recordTimeout(modelId: string, latencyMs?: number): void {
+    this.healthTracker?.recordObservation({ modelId, outcome: "timeout", latencyMs });
+  }
+
+  recordHealthObservation(observation: ModelHealthObservation): void {
+    this.healthTracker?.recordObservation(observation);
+  }
+
+  getModelHealth(modelId: string): ModelHealthSnapshot | undefined {
+    return this.healthTracker?.getHealth(modelId);
+  }
+
+  private applyHealthFallback(decision: ModelRouteDecision): ModelRouteDecision {
+    if (!this.enableHealthFallback || !this.healthTracker) {
+      return decision;
+    }
+
+    const candidates = this.buildCandidateList(decision.modelId, decision.fallbackModels);
+    if (candidates.length === 0) {
+      return decision;
+    }
+
+    const healthByModel = new Map<string, ModelHealthSnapshot | undefined>();
+    const candidatesWithStatus = candidates.map((modelId) => {
+      const health = this.healthTracker?.getHealth(modelId);
+      healthByModel.set(modelId, health);
+      return { modelId, status: health?.status ?? "healthy" };
+    });
+
+    const primary = candidatesWithStatus[0];
+    let selected = primary;
+    let fallbackReason: string | undefined;
+
+    if (primary.status === "unhealthy") {
+      const fallbackCandidate = candidatesWithStatus.find(
+        (candidate) => candidate.status !== "unhealthy"
+      );
+      if (fallbackCandidate) {
+        selected = fallbackCandidate;
+        fallbackReason = "primary unhealthy";
+      }
+    } else if (primary.status === "degraded") {
+      const fallbackCandidate = candidatesWithStatus.find(
+        (candidate) => candidate.status === "healthy"
+      );
+      if (fallbackCandidate) {
+        selected = fallbackCandidate;
+        fallbackReason = "primary degraded";
+      }
+    }
+
+    const fallbackUsed = selected.modelId !== primary.modelId;
+    const fallbackModels = candidatesWithStatus
+      .filter((candidate) => candidate.modelId !== selected.modelId)
+      .filter((candidate) => candidate.status !== "unhealthy")
+      .map((candidate) => candidate.modelId);
+
+    const selectedHealth = healthByModel.get(selected.modelId);
+    const baseMetrics: RoutingMetrics = decision.metrics ?? {
+      routingLatencyMs: 0,
+      cacheHit: false,
+    };
+    let metrics: RoutingMetrics = { ...baseMetrics, health: selectedHealth };
+
+    if (fallbackUsed) {
+      const capability = this.capabilityCache.get(selected.modelId);
+      metrics = {
+        ...metrics,
+        cacheHit: !!capability,
+        capability,
+        health: selectedHealth,
+        fallback: {
+          used: true,
+          from: primary.modelId,
+          to: selected.modelId,
+          reason: fallbackReason ?? "health fallback",
+          healthStatus: primary.status,
+        },
+      };
+    }
+
+    return {
+      ...decision,
+      modelId: selected.modelId,
+      reason: fallbackUsed
+        ? `${decision.reason}; health fallback from ${primary.modelId} (${primary.status})`
+        : decision.reason,
+      fallbackModels,
+      metrics,
+    };
+  }
+
+  private buildCandidateList(primary: string, fallbacks: string[]): string[] {
+    const seen = new Set<string>();
+    const candidates: string[] = [];
+
+    for (const modelId of [primary, ...fallbacks]) {
+      if (seen.has(modelId)) {
+        continue;
+      }
+      seen.add(modelId);
+      candidates.push(modelId);
+    }
+
+    return candidates;
+  }
+
+  private recordTelemetry(decision: ModelRoutingDecision): void {
+    if (!this.telemetry || !decision.metrics) {
+      return;
+    }
+
+    const fallbackUsed = decision.metrics.fallback?.used ?? false;
+    const labels: Record<string, string> = {
+      policy: decision.policy,
+      fallback: fallbackUsed ? "true" : "false",
+    };
+
+    if (decision.metrics.health?.status) {
+      labels.health = decision.metrics.health.status;
+    }
+
+    this.telemetry.metrics.observe(
+      METRIC_NAMES.ROUTING_LATENCY_MS,
+      decision.metrics.routingLatencyMs,
+      labels
+    );
+
+    if (decision.metrics.cacheHit) {
+      this.telemetry.metrics.increment(METRIC_NAMES.ROUTING_CACHE_HITS, labels);
+    } else {
+      this.telemetry.metrics.increment(METRIC_NAMES.ROUTING_CACHE_MISSES, labels);
+    }
   }
 
   /**

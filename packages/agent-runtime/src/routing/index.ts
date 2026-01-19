@@ -15,6 +15,15 @@ export {
   type ScoringWeights,
 } from "./modelCapabilityCache";
 export {
+  createModelHealthTracker,
+  type ModelHealthConfig,
+  type ModelHealthObservation,
+  type ModelHealthSnapshot,
+  type ModelHealthStatus,
+  type ModelHealthThresholds,
+  ModelHealthTracker,
+} from "./modelHealthTracker";
+export {
   createModelRouter,
   type ModelBudget,
   type ModelRiskLevel,
@@ -26,5 +35,6 @@ export {
   type ModelRoutingPolicy,
   type ModelRoutingRequest,
   type RoutingDecisionEmitter,
+  type RoutingFallbackInfo,
   type RoutingMetrics,
 } from "./modelRouter";
