@@ -106,6 +106,12 @@ export type { SelectProps } from "./components/ui/Select";
 export { Select, SelectOption } from "./components/ui/Select";
 export type { SheetProps } from "./components/ui/Sheet";
 export { Sheet } from "./components/ui/Sheet";
+export {
+  SidebarLeftFilledIcon,
+  SidebarLeftIcon,
+  SidebarRightFilledIcon,
+  SidebarRightIcon,
+} from "./components/ui/SidebarIcons";
 export { Skeleton, SkeletonCard, SkeletonText } from "./components/ui/Skeleton";
 export { Slider } from "./components/ui/Slider";
 export { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/Tabs";

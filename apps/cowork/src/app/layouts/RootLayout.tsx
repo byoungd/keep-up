@@ -7,13 +7,13 @@ import {
   TooltipProvider,
 } from "@ku0/shell";
 import { Link, Outlet, useLocation, useRouter } from "@tanstack/react-router";
-import { LayoutGroup } from "framer-motion";
+import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
 import React from "react";
+import { SessionHeaderActions } from "../../components/session/SessionHeaderActions";
 import { CoworkSidebarSections } from "../../components/sidebar/CoworkSidebarSections";
 import { COWORK_SIDEBAR_CONFIG_KEY, COWORK_SIDEBAR_GROUPS } from "../../config/sidebar";
 import { AIControlProvider } from "../../features/chat/AIControlContext";
-import { AIHeaderActions } from "../../features/chat/AIHeaderActions";
 import { CoworkAIPanel } from "../../features/chat/CoworkAIPanel";
 import { ContextPanel, type ContextPanelTab } from "../../features/context/ContextPanel";
 
@@ -47,6 +47,10 @@ export function RootLayout() {
   const router = useRouter();
   const location = useLocation();
 
+  // Use ref for router to avoid useMemo dependency changes
+  const routerRef = React.useRef(router);
+  routerRef.current = router;
+
   // Sidebar State (Physical Layout)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(() => {
     if (typeof window !== "undefined") {
@@ -60,6 +64,8 @@ export function RootLayout() {
   // Auxiliary Panel State
   const [isHydrated, setIsHydrated] = React.useState(false);
   const [isAuxPanelVisible, setIsAuxPanelVisible] = React.useState(false);
+  const [isExiting, setIsExiting] = React.useState(false);
+
   const [auxPanelWidth, setAuxPanelWidth] = React.useState(420);
   const [auxPanelPosition, setAuxPanelPosition] = React.useState<"left" | "right">("right");
   const [contextTab, setContextTab] = React.useState<ContextPanelTab>("artifacts");
@@ -124,6 +130,114 @@ export function RootLayout() {
     localStorage.setItem("cowork-sidebar-collapsed", String(isSidebarCollapsed));
   }, [isSidebarCollapsed]);
 
+  // Stable router functions using refs
+  const stableRouterFns = React.useMemo(
+    () => ({
+      push: (url: string) => routerRef.current.navigate({ to: url }),
+      replace: (url: string) => routerRef.current.navigate({ to: url, replace: true }),
+      back: () => window.history.back(),
+      forward: () => window.history.forward(),
+    }),
+    []
+  );
+
+  // Stable Link component
+  const ShellLink = React.useMemo(() => {
+    return function ShellLinkComponent({
+      href,
+      children,
+      ...props
+    }: {
+      href: string;
+      children: React.ReactNode;
+      [key: string]: unknown;
+    }) {
+      return (
+        <Link to={href} {...props}>
+          {children}
+        </Link>
+      );
+    };
+  }, []);
+
+  // Stable sidebar callbacks
+  const toggleSidebar = React.useCallback(() => {
+    setIsSidebarCollapsed((prev) => !prev);
+  }, []);
+
+  // Stable aux panel callbacks
+  const toggleAuxPanel = React.useCallback(() => {
+    if (isAuxPanelVisible) {
+      setIsExiting(true);
+      setIsAuxPanelVisible(false);
+    } else {
+      setIsAuxPanelVisible(true);
+    }
+  }, [isAuxPanelVisible]);
+
+  // Stable i18n translate function - dictionary is static, no deps needed
+  const translateFn = React.useCallback(
+    (
+      key: string,
+      defaultValueOrValues?: string | Record<string, string | number>,
+      valuesOrDefault?: Record<string, string | number> | string
+    ) => {
+      const { defaultValue, values } = resolveI18nArgs(defaultValueOrValues, valuesOrDefault);
+      const dictionary: Record<string, string> = {
+        "Sidebar.searchPlaceholder": "Search...",
+        "Sidebar.workspace": "Workspace",
+        "Sidebar.collapse": "Collapse",
+        "Sidebar.create": "New",
+        "Sidebar.moreItems": "More",
+        "Sidebar.customize": "Customize",
+
+        // Settings Modal
+        "Settings.title": "Settings",
+        "Settings.close": "Close",
+        "Settings.tabNavigation": "Navigation",
+        "Settings.tabAppearance": "Appearance",
+        "Settings.badgeStyle": "Badge",
+        "Settings.badgeStyleCount": "Count",
+        "Settings.badgeStyleCountDesc": "Show number of unread items",
+        "Settings.badgeStyleDot": "Dot",
+        "Settings.badgeStyleDotDesc": "Show a dot for unread items",
+        "Settings.collapseBehavior": "Nav",
+        "Settings.collapsePeek": "Peek",
+        "Settings.collapsePeekDesc": "Sidebar peeks on hover",
+        "Settings.collapseRail": "Rail",
+        "Settings.collapseRailDesc": "Sidebar shrinks to a rail",
+        "Settings.required": "Required",
+        "Settings.visibilityAlways": "Always Show",
+        "Settings.visibilityWhenBadged": "When Unread",
+        "Settings.visibilityHideInMore": "Hide in More",
+        "Settings.themeMode": "Theme",
+        "Settings.themeLight": "Light",
+        "Settings.themeLightDesc": "Classic light",
+        "Settings.themeDark": "Dark",
+        "Settings.themeDarkDesc": "Classic dark",
+        "Settings.themeSystem": "Auto",
+        "Settings.themeSystemDesc": "Follow OS",
+        "Settings.readerFontSize": "Reader Font Size",
+        "Settings.canvasTone": "Canvas Tone",
+        "Settings.canvasDefault": "Default",
+        "Settings.canvasWarm": "Warm",
+        "Settings.canvasSepia": "Sepia",
+        "Settings.canvasDark": "Dark",
+        "Settings.aiPanelPosition": "Context Panel",
+        "Settings.aiPanelLeftRail": "Left",
+        "Settings.aiPanelLeftRailDesc": "Dock on the left side",
+        "Settings.aiPanelRightRail": "Right",
+        "Settings.aiPanelRightRailDesc": "Dock on the right side",
+
+        // Header
+        "Header.toggleContext": "Toggle Context Panel (⌘+2)",
+      };
+      const resolved = dictionary[key] ?? defaultValue ?? key.split(".").pop() ?? key;
+      return interpolate(resolved, values);
+    },
+    []
+  );
+
   const shellContextValue = React.useMemo(
     () => ({
       user: {
@@ -132,10 +246,7 @@ export function RootLayout() {
         avatarUrl: undefined,
       },
       router: {
-        push: (url: string) => router.navigate({ to: url }),
-        replace: (url: string) => router.navigate({ to: url, replace: true }),
-        back: () => window.history.back(),
-        forward: () => window.history.forward(),
+        ...stableRouterFns,
         pathname: location.pathname,
       },
       locale: "en",
@@ -159,8 +270,8 @@ export function RootLayout() {
         isHydrated: true,
       },
       auxPanel: {
-        isVisible: isAuxPanelVisible,
-        toggle: () => setIsAuxPanelVisible((prev) => !prev),
+        isVisible: isAuxPanelVisible || isExiting,
+        toggle: toggleAuxPanel,
         setVisible: setIsAuxPanelVisible,
         width: auxPanelWidth,
         setWidth: setAuxPanelWidth,
@@ -170,107 +281,61 @@ export function RootLayout() {
       },
       sidebar: {
         isCollapsed: isSidebarCollapsed,
-        toggle: () => setIsSidebarCollapsed((prev) => !prev),
+        toggle: toggleSidebar,
         setCollapsed: setIsSidebarCollapsed,
         width: sidebarWidth,
         setWidth: setSidebarWidth,
       },
       components: {
-        Link: ({
-          href,
-          children,
-          ...props
-        }: {
-          href: string;
-          children: React.ReactNode;
-          [key: string]: unknown;
-        }) => (
-          <Link to={href} {...props}>
-            {children}
-          </Link>
-        ),
+        Link: ShellLink,
       },
       i18n: {
-        t: (
-          key: string,
-          defaultValueOrValues?: string | Record<string, string | number>,
-          valuesOrDefault?: Record<string, string | number> | string
-        ) => {
-          const { defaultValue, values } = resolveI18nArgs(defaultValueOrValues, valuesOrDefault);
-          const dictionary: Record<string, string> = {
-            "Sidebar.searchPlaceholder": "Search...",
-            "Sidebar.workspace": "Workspace",
-            "Sidebar.collapse": "Collapse",
-            "Sidebar.create": "New",
-            "Sidebar.moreItems": "More",
-            "Sidebar.customize": "Customize",
-
-            // Settings Modal
-            "Settings.title": "Settings",
-            "Settings.close": "Close",
-            "Settings.tabNavigation": "Navigation",
-            "Settings.tabAppearance": "Appearance",
-            "Settings.badgeStyle": "Badge",
-            "Settings.badgeStyleCount": "Count",
-            "Settings.badgeStyleCountDesc": "Show number of unread items",
-            "Settings.badgeStyleDot": "Dot",
-            "Settings.badgeStyleDotDesc": "Show a dot for unread items",
-            "Settings.collapseBehavior": "Nav",
-            "Settings.collapsePeek": "Peek",
-            "Settings.collapsePeekDesc": "Sidebar peeks on hover",
-            "Settings.collapseRail": "Rail",
-            "Settings.collapseRailDesc": "Sidebar shrinks to a rail",
-            "Settings.required": "Required",
-            "Settings.visibilityAlways": "Always Show",
-            "Settings.visibilityWhenBadged": "When Unread",
-            "Settings.visibilityHideInMore": "Hide in More",
-            "Settings.themeMode": "Theme",
-            "Settings.themeLight": "Light",
-            "Settings.themeLightDesc": "Classic light",
-            "Settings.themeDark": "Dark",
-            "Settings.themeDarkDesc": "Classic dark",
-            "Settings.themeSystem": "Auto",
-            "Settings.themeSystemDesc": "Follow OS",
-            "Settings.readerFontSize": "Reader Font Size",
-            "Settings.canvasTone": "Canvas Tone",
-            "Settings.canvasDefault": "Default",
-            "Settings.canvasWarm": "Warm",
-            "Settings.canvasSepia": "Sepia",
-            "Settings.canvasDark": "Dark",
-            "Settings.aiPanelPosition": "Context Panel",
-            "Settings.aiPanelLeftRail": "Left",
-            "Settings.aiPanelLeftRailDesc": "Dock on the left side",
-            "Settings.aiPanelRightRail": "Right",
-            "Settings.aiPanelRightRailDesc": "Dock on the right side",
-
-            // Header
-            "Header.toggleContext": "Toggle Context Panel (⌘+2)",
-          };
-          const resolved = dictionary[key] ?? defaultValue ?? key.split(".").pop() ?? key;
-          return interpolate(resolved, values);
-        },
+        t: translateFn,
       },
     }),
     [
       isSidebarCollapsed,
       sidebarWidth,
       isAuxPanelVisible,
+      isExiting,
       auxPanelWidth,
       auxPanelPosition,
-      router,
-      location.pathname,
       isHydrated,
+      location.pathname,
+      // Stable refs - included for correctness but won't cause rebuilds
+      stableRouterFns,
+      ShellLink,
+      toggleSidebar,
+      toggleAuxPanel,
+      translateFn,
     ]
   );
 
   const contextPanel = (
-    <ContextPanel
-      activeTab={contextTab}
-      onTabChange={setContextTab}
-      previewArtifact={previewArtifact}
-      onClosePreview={handleClosePreview}
-      position={auxPanelPosition}
-    />
+    <AnimatePresence mode="wait" onExitComplete={() => setIsExiting(false)}>
+      {isAuxPanelVisible && !isExiting && (
+        <motion.div
+          key="context-panel"
+          className="h-full"
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: 20 }}
+          transition={{ duration: 0.2, ease: "easeInOut" }}
+        >
+          <ContextPanel
+            activeTab={contextTab}
+            onTabChange={setContextTab}
+            previewArtifact={previewArtifact}
+            onClosePreview={handleClosePreview}
+            position={auxPanelPosition}
+            onToggle={() => {
+              setIsExiting(true);
+              setIsAuxPanelVisible(false);
+            }}
+          />
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 
   // AI Panel with preview callback
@@ -322,7 +387,7 @@ export function RootLayout() {
                   leftSlot: (
                     <span className="font-semibold text-sm text-foreground">Cowork Agent</span>
                   ),
-                  rightSlot: <AIHeaderActions />,
+                  rightSlot: <SessionHeaderActions />,
                 }}
               >
                 <Outlet />

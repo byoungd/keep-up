@@ -8,7 +8,7 @@ import { SidebarLocalProvider } from "./SidebarLocalContext";
 
 const MIN_WIDTH = 200; // Minimum visible width when expanded
 const DEFAULT_WIDTH = 240; // Default comfortable width
-const MAX_WIDTH = 400;
+const MAX_WIDTH = 800;
 const COLLAPSE_THRESHOLD = 120; // Below this during drag = collapse
 const COLLAPSED_WIDTH = 72;
 const EDGE_HOVER_WIDTH = 8;
@@ -22,7 +22,7 @@ interface ResizableSidebarProps {
   collapseMode?: "peek" | "rail";
 }
 
-export function ResizableSidebar({
+function ResizableSidebarInner({
   children,
   collapsedContent,
   className,
@@ -255,3 +255,5 @@ export function ResizableSidebar({
 
   return sidebar;
 }
+
+export const ResizableSidebar = React.memo(ResizableSidebarInner);
