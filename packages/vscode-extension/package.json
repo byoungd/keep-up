@@ -1,0 +1,49 @@
+{
+  "name": "keepup-vscode-extension",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "displayName": "Keep-Up",
+  "description": "Keep-Up agent tooling for VS Code",
+  "main": "./dist/extension.js",
+  "engines": {
+    "vscode": "^1.86.0"
+  },
+  "activationEvents": [
+    "onCommand:keepup.newTask",
+    "onCommand:keepup.continueTask",
+    "onCommand:keepup.showDiff",
+    "onCommand:keepup.applyChanges"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "keepup.newTask",
+        "title": "Keep-Up: New Task"
+      },
+      {
+        "command": "keepup.continueTask",
+        "title": "Keep-Up: Continue Task"
+      },
+      {
+        "command": "keepup.showDiff",
+        "title": "Keep-Up: Show Diff"
+      },
+      {
+        "command": "keepup.applyChanges",
+        "title": "Keep-Up: Apply Changes"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write ."
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/vscode": "^1.86.0",
+    "typescript": "^5.7.3"
+  }
+}
