@@ -78,6 +78,7 @@ export const sharedThemeExtend: ThemeExtend = {
       2: "var(--color-surface-2)",
       3: "var(--color-surface-3)",
       elevated: "var(--color-surface-elevated)",
+      hover: "var(--color-surface-hover)",
     },
   },
   borderRadius: {

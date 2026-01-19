@@ -10,17 +10,17 @@
 
 We must first expand the vocabulary of the design system to support Arc/Dia concepts.
 
-- [ ] **Semantic Typography**
-    - [ ] Add `.text-ui`: `13px` / `18px line-height` (for Sidebar, Headers, Buttons).
-    - [ ] Add `.text-chat`: `15px` / `24px line-height` (for Chat Content).
-    - [ ] Add `.text-meta`: `12px` / `16px line-height` (for Timestamps, Captions).
-- [ ] **AI Accent Tokens**
-    - [ ] `accent-ai-strong`: `violet-600` (Active states).
-    - [ ] `accent-ai-sheen`: `linear-gradient(...)` (Thinking states).
-- [ ] **Layer Z-Index Constants**
-    - [ ] `layer-base`: `0`
-    - [ ] `layer-canvas`: `10`
-    - [ ] `layer-overlay`: `50`
+- [x] **Semantic Typography**
+    - [x] Add `.text-ui`: `13px` / `18px line-height` (for Sidebar, Headers, Buttons).
+    - [x] Add `.text-chat`: `15px` / `24px line-height` (for Chat Content).
+    - [x] Add `.text-meta`: `12px` / `16px line-height` (for Timestamps, Captions).
+- [x] **AI Accent Tokens**
+    - [x] `accent-ai-strong`: `violet-600` (Active states).
+    - [x] `accent-ai-sheen`: `linear-gradient(...)` (Thinking states).
+- [x] **Layer Z-Index Constants**
+    - [x] `layer-base`: `0`
+    - [x] `layer-canvas`: `10`
+    - [x] `layer-overlay`: `50`
 
 ---
 
@@ -29,13 +29,13 @@ We must first expand the vocabulary of the design system to support Arc/Dia conc
 
 The "Application Frame" feel comes from the precise gap between the window and the work surface.
 
-- [ ] **Implement Responsive Inset**
-    - [ ] **Mobile (<1024px)**: `0px` inset (Full bleed).
-    - [ ] **Desktop (>=1024px)**: `6px` padding on the root container.
-- [ ] **Canvas Elevation**
-    - [ ] Apply `rounded-lg` (12px) to the main content area.
-    - [ ] Apply `shadow-soft` to lift Canvas off the Frame.
-    - [ ] Ensure `clip-path` handles corner radius correctly for scrollbars.
+- [x] **Implement Responsive Inset**
+    - [x] **Mobile (<1024px)**: `0px` inset (Full bleed).
+    - [x] **Desktop (>=1024px)**: `6px` padding on the root container.
+- [x] **Canvas Elevation**
+    - [x] Apply `rounded-lg` (12px) to the main content area.
+    - [x] Apply `shadow-soft` to lift Canvas off the Frame.
+    - [x] Ensure `clip-path` handles corner radius correctly for scrollbars.
 
 ---
 
@@ -44,11 +44,27 @@ The "Application Frame" feel comes from the precise gap between the window and t
 
 Remove "noisy" defaults to achieve curated minimalism.
 
-- [ ] **Border Purge**
-    - [ ] Remove default `border-r` from Sidebar components.
-    - [ ] Visually separate Sidebar from Canvas using purely `bg-surface-1` (Sidebar) vs `bg-canvas` (Canvas) contrast.
-- [ ] **Background Tinting**
-    - [ ] Enable `var(--color-theme-base)` on the `<body>` or root `div` to support user tinting.
+- [x] **Border Purge**
+    - [x] Remove default `border-r` from Sidebar components.
+    - [x] Visually separate Sidebar from Canvas using purely `bg-surface-1` (Sidebar) vs `bg-canvas` (Canvas) contrast.
+- [x] **Background Tinting**
+    - [x] Enable `var(--color-theme-base)` on the `<body>` or root `div` to support user tinting.
+
+---
+
+## 4. Visual Standardization (Sidebar)
+*Target: Global Design System & Sidebar Components*
+
+Ensure "Premium" feel by unifying interaction models.
+
+- [x] **Global Hover Token**
+    - [x] Create `--color-surface-hover` (Transparent Black) in `theme.css`.
+    - [x] Ensure Light/Dark mode compatibility.
+- [x] **Scorched Earth Audit**
+    - [x] Remove all `surface-2` (Zinc) or manual opacity styles from Sidebar.
+    - [x] Standardize all Dropdowns, Items, and Rails to use `bg-surface-hover`.
+- [x] **Logic Verification**
+    - [x] Verify "Rail" mode (72px) behavior via E2E tests.
 
 ---
 

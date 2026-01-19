@@ -43,6 +43,8 @@ interface SidebarProps {
   renderItemChildren?: SidebarItemRenderer;
   renderGroup?: SidebarGroupRenderer;
   showSearch?: boolean;
+  isPeeking?: boolean;
+  onPin?: () => void;
 }
 
 export const Sidebar = React.memo(function Sidebar({
@@ -205,7 +207,7 @@ export const Sidebar = React.memo(function Sidebar({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors duration-fast"
+                  className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-surface-hover transition-colors duration-fast"
                   aria-label={t("moreItems")}
                   title={t("moreItems")}
                 >
@@ -238,7 +240,7 @@ export const Sidebar = React.memo(function Sidebar({
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors duration-fast"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-surface-hover transition-colors duration-fast"
               onClick={onOpenCustomize}
               aria-label={t("customize")}
             >
@@ -253,7 +255,7 @@ export const Sidebar = React.memo(function Sidebar({
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors duration-fast"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-surface-hover transition-colors duration-fast"
               onClick={() =>
                 window.open("https://github.com/Start-Rail/English-level-up-tips", "_blank")
               }

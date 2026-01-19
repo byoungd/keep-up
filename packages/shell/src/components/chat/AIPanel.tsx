@@ -197,7 +197,7 @@ export function AIPanel({
 
   React.useEffect(() => {
     setApprovalAction(null);
-  }, [pendingApproval?.approvalId]);
+  }, []);
 
   // Always notify parent about artifact clicks
   // Parent (RootLayout) manages the preview in the resizable right panel

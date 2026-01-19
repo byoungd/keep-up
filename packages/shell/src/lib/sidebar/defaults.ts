@@ -83,4 +83,4 @@ export const DEFAULT_SIDEBAR_GROUPS: SidebarGroupDefinition[] = [
 
 export const DEFAULT_BADGE_STYLE = "COUNT" as const;
 export const SIDEBAR_CONFIG_STORAGE_KEY = "sidebar-config-v1";
-export const DEFAULT_COLLAPSE_MODE = "peek" as const;
+export const DEFAULT_COLLAPSE_MODE = "rail" as const;

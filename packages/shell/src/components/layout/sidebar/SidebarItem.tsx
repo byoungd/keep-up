@@ -41,8 +41,8 @@ export const SidebarItem = React.memo(function SidebarItem({
         isActive
           ? "bg-foreground/[0.08] text-foreground font-medium"
           : isContextSelected
-            ? "text-foreground/80"
-            : "text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+            ? "text-foreground/80 bg-foreground/[0.03]"
+            : "text-muted-foreground hover:bg-surface-hover hover:text-foreground"
       )}
       data-value={href}
     >

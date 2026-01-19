@@ -14,7 +14,6 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
   Input,
-  SearchInput,
   Tooltip,
   useReaderShell,
 } from "@ku0/shell";
@@ -92,7 +91,6 @@ export function CoworkSidebarSections() {
   const [favoriteIds, setFavoriteIds] = React.useState<Set<string>>(new Set());
   const [pinnedProjectIds, setPinnedProjectIds] = React.useState<Set<string>>(new Set());
   const [expandedProjectIds, setExpandedProjectIds] = React.useState<Set<string>>(new Set());
-  const [searchQuery, setSearchQuery] = React.useState("");
   const [pendingRenameSessionId, setPendingRenameSessionId] = React.useState<string | null>(null);
   const [renameValue, setRenameValue] = React.useState("");
   const [pendingDeleteSessionId, setPendingDeleteSessionId] = React.useState<string | null>(null);
@@ -132,18 +130,6 @@ export function CoworkSidebarSections() {
     return projects.find((p) => p.id === activeProjectId) ?? null;
   }, [projects, activeProjectId]); */
 
-  const normalizedSearch = searchQuery.trim().toLowerCase();
-  const hasSearch = normalizedSearch.length > 0;
-  const matchesSearch = React.useCallback(
-    (session: { title?: string }) => {
-      if (!normalizedSearch) {
-        return true;
-      }
-      return (session.title ?? "").toLowerCase().includes(normalizedSearch);
-    },
-    [normalizedSearch]
-  );
-
   const sortedSessions = React.useMemo(
     () => [...sessions].sort((a, b) => b.createdAt - a.createdAt),
     [sessions]
@@ -174,12 +160,8 @@ export function CoworkSidebarSections() {
       return [];
     }
 
-    if (normalizedSearch) {
-      filtered = filtered.filter(matchesSearch);
-    }
-
     return filtered;
-  }, [favoriteIds, sortedSessions, taskFilter, activeProjectId, normalizedSearch, matchesSearch]);
+  }, [favoriteIds, sortedSessions, taskFilter, activeProjectId]);
 
   const handleSelectProject = React.useCallback(
     (projectId: string) => {
@@ -342,7 +324,7 @@ export function CoworkSidebarSections() {
   return (
     <div className="space-y-2">
       <section className="space-y-1">
-        <div className="flex items-center justify-between rounded-md px-3 py-1.5 group hover:bg-surface-2 transition-colors duration-fast">
+        <div className="flex items-center justify-between rounded-md px-3 py-1.5 group hover:bg-surface-hover transition-colors duration-fast">
           <button
             type="button"
             className="flex flex-1 items-center gap-2 text-left text-fine font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors duration-fast cursor-pointer"
@@ -362,7 +344,7 @@ export function CoworkSidebarSections() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-surface-2"
+              className="h-6 w-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-surface-hover"
               aria-label="Create project"
               onClick={() => setIsDialogOpen(true)}
             >
@@ -383,7 +365,7 @@ export function CoworkSidebarSections() {
           {projects.length === 0 && (
             <button
               type="button"
-              className="flex items-center gap-2.5 w-full rounded-md px-3 py-1.5 text-[13px] text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors duration-fast cursor-pointer group"
+              className="flex items-center gap-2.5 w-full rounded-md px-3 py-1.5 text-[13px] text-muted-foreground hover:text-foreground hover:bg-surface-hover transition-colors duration-fast cursor-pointer group"
               onClick={() => setIsDialogOpen(true)}
             >
               <FolderPlus
@@ -397,7 +379,7 @@ export function CoworkSidebarSections() {
           {sortedProjects.map((project) => {
             const isExpanded = expandedProjectIds.has(project.id);
             const isPinned = pinnedProjectIds.has(project.id);
-            const projectTasks = getSessionsForProject(project.id).filter(matchesSearch);
+            const projectTasks = getSessionsForProject(project.id);
             const hasTasks = projectTasks.length > 0;
 
             return (
@@ -407,7 +389,7 @@ export function CoworkSidebarSections() {
                     "group relative flex items-center rounded-md px-3 py-1.5 transition-colors duration-fast",
                     activeProjectId === project.id
                       ? "bg-foreground/[0.08] text-foreground font-medium"
-                      : "text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+                      : "text-muted-foreground hover:bg-surface-hover hover:text-foreground"
                   )}
                 >
                   <button
@@ -430,7 +412,7 @@ export function CoworkSidebarSections() {
                     type="button"
                     onClick={() => toggleExpandProject(project.id)}
                     className={cn(
-                      "flex items-center justify-center h-5 w-5 rounded hover:bg-surface-2 transition-colors duration-fast cursor-pointer text-muted-foreground hover:text-foreground mr-7",
+                      "flex items-center justify-center h-5 w-5 rounded hover:bg-surface-hover transition-colors duration-fast cursor-pointer text-muted-foreground hover:text-foreground mr-7",
                       hasTasks
                         ? "opacity-0 group-hover:opacity-100"
                         : "opacity-0 pointer-events-none"
@@ -468,7 +450,7 @@ export function CoworkSidebarSections() {
                     >
                       <DropdownMenuItem
                         onSelect={() => togglePinProject(project.id)}
-                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-2 focus:text-foreground cursor-pointer outline-none"
+                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none"
                       >
                         {isPinned ? (
                           <>
@@ -482,12 +464,12 @@ export function CoworkSidebarSections() {
                           </>
                         )}
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-2 focus:text-foreground cursor-pointer outline-none">
+                      <DropdownMenuItem className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none">
                         <PencilLine className="h-3.5 w-3.5" />
                         <span>Edit</span>
                       </DropdownMenuItem>
                       <DropdownMenuSeparator className="mx-1" />
-                      <DropdownMenuItem className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] text-destructive focus:text-destructive focus:bg-surface-2 cursor-pointer outline-none">
+                      <DropdownMenuItem className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] text-destructive focus:text-destructive focus:bg-surface-hover cursor-pointer outline-none">
                         <Trash2 className="h-3.5 w-3.5" />
                         <span>Delete</span>
                       </DropdownMenuItem>
@@ -508,7 +490,7 @@ export function CoworkSidebarSections() {
                             "relative flex items-center rounded-md px-3 py-1.5 transition-colors duration-fast group",
                             isActive
                               ? "bg-foreground/[0.08] text-foreground font-medium"
-                              : "text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+                              : "text-muted-foreground hover:bg-surface-hover hover:text-foreground"
                           )}
                         >
                           <Link
@@ -538,7 +520,7 @@ export function CoworkSidebarSections() {
       </section>
 
       <section className="space-y-1">
-        <div className="flex items-center justify-between rounded-md px-3 py-1.5 group hover:bg-surface-2 transition-colors duration-fast">
+        <div className="flex items-center justify-between rounded-md px-3 py-1.5 group hover:bg-surface-hover transition-colors duration-fast">
           <button
             type="button"
             className="flex flex-1 items-center gap-2 text-left text-fine font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors duration-fast cursor-pointer"
@@ -566,7 +548,7 @@ export function CoworkSidebarSections() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-surface-2 data-[state=open]:bg-surface-2 data-[state=open]:text-foreground"
+                className="h-6 w-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-surface-hover data-[state=open]:bg-foreground/[0.08] data-[state=open]:text-foreground"
                 aria-label="Task filters"
               >
                 <ListFilter className="h-4 w-4" />
@@ -579,7 +561,7 @@ export function CoworkSidebarSections() {
                   setActiveProject(null);
                 }}
                 className={cn(
-                  "gap-2.5 rounded-md px-2 py-1.5 text-[13px] focus:bg-surface-2 focus:text-foreground cursor-pointer outline-none",
+                  "gap-2.5 rounded-md px-2 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none",
                   taskFilter === "all"
                     ? "bg-foreground/[0.08] text-foreground font-medium"
                     : "text-muted-foreground"
@@ -592,7 +574,7 @@ export function CoworkSidebarSections() {
               <DropdownMenuItem
                 onSelect={() => setTaskFilter("favorites")}
                 className={cn(
-                  "gap-2.5 rounded-md px-2 py-1.5 text-[13px] focus:bg-surface-2 focus:text-foreground cursor-pointer outline-none",
+                  "gap-2.5 rounded-md px-2 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none",
                   taskFilter === "favorites"
                     ? "bg-foreground/[0.08] text-foreground font-medium"
                     : "text-muted-foreground"
@@ -605,7 +587,7 @@ export function CoworkSidebarSections() {
               <DropdownMenuItem
                 onSelect={() => setTaskFilter("scheduled")}
                 className={cn(
-                  "gap-2.5 rounded-md px-2 py-1.5 text-[13px] focus:bg-surface-2 focus:text-foreground cursor-pointer outline-none",
+                  "gap-2.5 rounded-md px-2 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none",
                   taskFilter === "scheduled"
                     ? "bg-foreground/[0.08] text-foreground font-medium"
                     : "text-muted-foreground"
@@ -628,33 +610,18 @@ export function CoworkSidebarSections() {
           )}
           aria-hidden={!isTasksExpanded}
         >
-          <div className="px-3 pb-1">
-            <SearchInput
-              placeholder="Search sessions..."
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              onClear={() => setSearchQuery("")}
-              aria-label="Search sessions"
-            />
-          </div>
           {filteredSessions.length === 0 ? (
-            hasSearch ? (
-              <div className="px-3 py-2 text-[13px] text-muted-foreground">
-                No sessions match your search.
-              </div>
-            ) : (
-              <button
-                type="button"
-                className="flex items-center gap-2.5 w-full rounded-md px-3 py-1.5 text-[13px] text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors duration-fast cursor-pointer group"
-                onClick={() => router.push("/new-session")}
-              >
-                <Sparkles
-                  className="h-4 w-4 text-muted-foreground opacity-70 group-hover:opacity-100 group-hover:text-foreground transition-all duration-fast"
-                  aria-hidden="true"
-                />
-                <span>{activeProjectId ? "New task in project" : "New task"}</span>
-              </button>
-            )
+            <button
+              type="button"
+              className="flex items-center gap-2.5 w-full rounded-md px-3 py-1.5 text-[13px] text-muted-foreground hover:text-foreground hover:bg-surface-hover transition-colors duration-fast cursor-pointer group"
+              onClick={() => router.push("/new-session")}
+            >
+              <Sparkles
+                className="h-4 w-4 text-muted-foreground opacity-70 group-hover:opacity-100 group-hover:text-foreground transition-all duration-fast"
+                aria-hidden="true"
+              />
+              <span>{activeProjectId ? "New task in project" : "New task"}</span>
+            </button>
           ) : (
             filteredSessions.map((session) => {
               const isActive = activeSessionId === session.id;
@@ -667,7 +634,7 @@ export function CoworkSidebarSections() {
                     "relative flex items-center rounded-md px-3 py-1.5 transition-colors duration-fast group",
                     isActive
                       ? "bg-foreground/[0.08] text-foreground font-medium"
-                      : "text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+                      : "text-muted-foreground hover:bg-surface-hover hover:text-foreground"
                   )}
                 >
                   <Link
@@ -707,21 +674,21 @@ export function CoworkSidebarSections() {
                     >
                       <DropdownMenuItem
                         onSelect={handlePlaceholderAction}
-                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-2 focus:text-foreground cursor-pointer outline-none"
+                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none"
                       >
                         <Share2 className="h-4 w-4" aria-hidden="true" />
                         <span>Share</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onSelect={() => openRenameDialog(session.id)}
-                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-2 focus:text-foreground cursor-pointer outline-none"
+                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none"
                       >
                         <PencilLine className="h-4 w-4" aria-hidden="true" />
                         <span>Rename</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onSelect={() => toggleFavorite(session.id)}
-                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-2 focus:text-foreground cursor-pointer outline-none"
+                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none"
                       >
                         <Star
                           className={cn("h-4 w-4", isFavorite ? "fill-current" : undefined)}
@@ -731,14 +698,14 @@ export function CoworkSidebarSections() {
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onSelect={() => handleOpenInNewTab(session.id)}
-                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-2 focus:text-foreground cursor-pointer outline-none"
+                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none"
                       >
                         <ExternalLink className="h-4 w-4" aria-hidden="true" />
                         <span>Open in new tab</span>
                       </DropdownMenuItem>
 
                       <DropdownMenuSub>
-                        <DropdownMenuSubTrigger className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-2 focus:text-foreground cursor-pointer outline-none data-[state=open]:bg-surface-2 data-[state=open]:text-foreground">
+                        <DropdownMenuSubTrigger className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none data-[state=open]:bg-foreground/5 data-[state=open]:text-foreground">
                           <Folder className="h-4 w-4" />
                           <span>Move to project</span>
                         </DropdownMenuSubTrigger>
@@ -753,7 +720,7 @@ export function CoworkSidebarSections() {
                                 <DropdownMenuItem
                                   key={project.id}
                                   onSelect={() => handleMoveToProject(session.id, project.id)}
-                                  className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-2 focus:text-foreground cursor-pointer outline-none"
+                                  className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none"
                                 >
                                   <span>{project.name}</span>
                                   {session.projectId === project.id && (
@@ -766,7 +733,7 @@ export function CoworkSidebarSections() {
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem
                                     onSelect={() => handleMoveToProject(session.id, null)}
-                                    className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-2 focus:text-foreground cursor-pointer outline-none"
+                                    className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none"
                                   >
                                     <span>Remove from project</span>
                                   </DropdownMenuItem>
@@ -780,7 +747,7 @@ export function CoworkSidebarSections() {
                       <DropdownMenuSeparator className="mx-2" />
                       <DropdownMenuItem
                         onSelect={() => openDeleteDialog(session.id)}
-                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] text-destructive focus:text-destructive focus:bg-surface-2 cursor-pointer outline-none"
+                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] text-destructive focus:text-destructive focus:bg-surface-hover cursor-pointer outline-none"
                       >
                         <Trash2 className="h-4 w-4" aria-hidden="true" />
                         <span>Delete</span>
@@ -881,7 +848,7 @@ export function CoworkSidebarSections() {
       >
         <div className="space-y-5">
           <div className="flex justify-center">
-            <div className="h-12 w-12 rounded-2xl bg-surface-2/70 border border-border/40 flex items-center justify-center text-muted-foreground">
+            <div className="h-12 w-12 rounded-2xl bg-foreground/[0.05] border border-border/40 flex items-center justify-center text-muted-foreground">
               <Folder className="h-6 w-6" aria-hidden="true" />
             </div>
           </div>

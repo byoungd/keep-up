@@ -1,10 +1,16 @@
 "use client";
 
 import { cn } from "@ku0/shared/utils";
-import { PanelLeft, PanelRight, Square } from "lucide-react";
+import { PanelLeft, Square } from "lucide-react";
 
 import { useReaderShell } from "../../context/ReaderShellContext";
 import { Button } from "../ui/Button";
+import {
+  SidebarLeftFilledIcon,
+  SidebarLeftIcon,
+  SidebarRightFilledIcon,
+  SidebarRightIcon,
+} from "../ui/SidebarIcons";
 import { Tooltip } from "../ui/Tooltip";
 
 export interface HeaderProps {
@@ -26,6 +32,7 @@ export interface HeaderProps {
   rightSlot?: React.ReactNode;
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: legacy code
 export function Header({
   onToggleLeft,
   onToggleRight,
@@ -48,12 +55,15 @@ export function Header({
 
   const resolvedPanelPosition =
     rightPanelPosition ?? (aiPanelPosition === "left" ? "left" : "right");
-  const GlobalAiIcon =
-    aiPanelPosition === "main" && !rightPanelPosition
-      ? Square
-      : resolvedPanelPosition === "left"
-        ? PanelLeft
-        : PanelRight;
+
+  let GlobalAiIcon: React.ElementType | undefined;
+  if (aiPanelPosition === "main" && !rightPanelPosition) {
+    GlobalAiIcon = Square;
+  } else if (resolvedPanelPosition === "left") {
+    GlobalAiIcon = isRightPanelOpen ? SidebarLeftFilledIcon : SidebarLeftIcon;
+  } else {
+    GlobalAiIcon = isRightPanelOpen ? SidebarRightFilledIcon : SidebarRightIcon;
+  }
 
   const expandLabel = t("expand", undefined, "Expand sidebar");
   const collapseLabel = t("collapse", undefined, "Collapse sidebar");
@@ -76,7 +86,7 @@ export function Header({
             )}
             aria-label={isCollapsed ? expandLabel : collapseLabel}
           >
-            <PanelLeft className="h-4 w-4" />
+            <SidebarLeftIcon className="h-4 w-4" />
           </Button>
         </Tooltip>
 

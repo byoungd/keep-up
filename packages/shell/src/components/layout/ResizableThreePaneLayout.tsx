@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@ku0/shared/utils";
+
 import * as React from "react";
 import { useThreePaneResize } from "../../hooks/useThreePaneResize";
 
@@ -15,6 +16,7 @@ interface ResizableThreePaneLayoutProps {
   onLayoutChange?: (layout: [number, number, number]) => void;
   layoutUnit?: "percent" | "pixel";
   centerPanelClassName?: string;
+  layoutStyle?: "default" | "arc";
 }
 
 export interface ResizableThreePaneLayoutHandle {
@@ -25,6 +27,24 @@ export interface ResizableThreePaneLayoutHandle {
   expandRight: (targetSize?: number) => void;
   collapseRight: () => void;
 }
+
+interface ResizeHandleProps {
+  side: "left" | "right";
+  dragHandle: string | null;
+  onMouseDown: (e: React.MouseEvent) => void;
+}
+
+const ResizeHandle = React.memo(({ side, dragHandle, onMouseDown }: ResizeHandleProps) => (
+  // biome-ignore lint/a11y/noStaticElementInteractions: Resize handle requires mouse
+  <div
+    className={cn(
+      "w-1 -mx-0.5 z-50 cursor-col-resize touch-none relative shrink-0 transition-colors duration-200",
+      dragHandle === side ? "bg-primary/50" : "hover:bg-border/40",
+      dragHandle === side && "z-60"
+    )}
+    onMouseDown={onMouseDown}
+  />
+));
 
 export const ResizableThreePaneLayout = React.forwardRef<
   ResizableThreePaneLayoutHandle,
@@ -42,6 +62,7 @@ export const ResizableThreePaneLayout = React.forwardRef<
       onLayoutChange,
       layoutUnit = "percent",
       centerPanelClassName,
+      layoutStyle = "default",
     },
     ref
   ) => {
@@ -80,7 +101,10 @@ export const ResizableThreePaneLayout = React.forwardRef<
 
     return (
       <div
-        className="flex flex-col h-full w-full bg-canvas overflow-hidden"
+        className={cn(
+          "flex flex-col h-full w-full overflow-hidden",
+          layoutStyle === "arc" ? "bg-theme-base" : "bg-canvas"
+        )}
         suppressHydrationWarning
       >
         {nav && <div className="flex-none z-20">{nav}</div>}
@@ -95,7 +119,7 @@ export const ResizableThreePaneLayout = React.forwardRef<
             className={cn(
               "h-full shrink-0 overflow-hidden",
               "bg-sidebar",
-              leftWidth > 0 && "border-r border-border/40",
+              layoutStyle !== "arc" && leftWidth > 0 && "border-r border-border/40",
               !isDragging && "transition-[width] duration-200 ease-out"
             )}
             style={{ width: `${leftWidth}${unitSuffix}` }}
@@ -113,19 +137,22 @@ export const ResizableThreePaneLayout = React.forwardRef<
 
           {/* Left Resize Handle - only show if leftPanel exists */}
           {leftPanel && (
-            // biome-ignore lint/a11y/noStaticElementInteractions: Resize handle requires mouse
-            <div
-              className={cn(
-                "w-1 -mx-0.5 z-50 cursor-col-resize touch-none relative shrink-0 transition-colors duration-200",
-                dragHandle === "left" ? "bg-primary/50" : "hover:bg-border/40",
-                dragHandle === "left" && "z-60"
-              )}
+            <ResizeHandle
+              side="left"
+              dragHandle={dragHandle}
               onMouseDown={handleMouseDown("left")}
             />
           )}
 
           {/* CENTER PANEL */}
-          <div className="h-full flex-1 min-w-0 bg-canvas z-10 relative overflow-hidden">
+          <div
+            className={cn(
+              "h-full flex-1 min-w-0 z-10 relative overflow-hidden",
+              layoutStyle === "arc"
+                ? "bg-canvas rounded-lg shadow-soft my-1.5 mr-1.5 ml-0"
+                : "bg-canvas"
+            )}
+          >
             <div className={cn("h-full w-full overflow-auto scroll-smooth", centerPanelClassName)}>
               {centerPanel}
             </div>
@@ -133,14 +160,9 @@ export const ResizableThreePaneLayout = React.forwardRef<
 
           {rightPanel && (
             <>
-              {/* Right Resize Handle */}
-              {/* biome-ignore lint/a11y/noStaticElementInteractions: Resize handle requires mouse */}
-              <div
-                className={cn(
-                  "w-1 -mx-0.5 z-50 cursor-col-resize touch-none relative shrink-0 transition-colors duration-200",
-                  dragHandle === "right" ? "bg-primary/50" : "hover:bg-border/40",
-                  dragHandle === "right" && "z-60"
-                )}
+              <ResizeHandle
+                side="right"
+                dragHandle={dragHandle}
                 onMouseDown={handleMouseDown("right")}
               />
 
@@ -148,7 +170,8 @@ export const ResizableThreePaneLayout = React.forwardRef<
               <div
                 className={cn(
                   "h-full shrink-0 overflow-hidden",
-                  "bg-sidebar border-l border-border/40",
+                  "bg-sidebar",
+                  layoutStyle !== "arc" && "border-l border-border/40",
                   !isDragging && "transition-[width] duration-200 ease-out"
                 )}
                 style={{ width: `${rightWidth}${unitSuffix}` }}

@@ -4,6 +4,7 @@ import { cn } from "@ku0/shared/utils";
 import { motion } from "framer-motion";
 import * as React from "react";
 import { useReaderShell } from "../../../context/ReaderShellContext";
+import { SidebarLocalProvider } from "./SidebarLocalContext";
 
 const MIN_WIDTH = 200; // Minimum visible width when expanded
 const DEFAULT_WIDTH = 240; // Default comfortable width
@@ -172,9 +173,9 @@ export function ResizableSidebar({
       animate={{ width: targetWidth }}
       transition={transition}
       className={cn(
-        "relative shrink-0 z-[51] bg-surface-2",
+        "relative shrink-0 bg-sidebar",
+        isFloating ? "fixed left-0 top-0 bottom-0 shadow-2xl z-[51]" : "z-0",
         isDragging && "select-none",
-        isFloating && "fixed left-0 top-0 bottom-0 shadow-2xl z-[51]",
         className
       )}
       style={{ width: targetWidth }}
@@ -201,7 +202,19 @@ export function ResizableSidebar({
         />
       )}
       {collapseMode === "rail" && isCollapsed && collapsedContent}
-      {!isCollapsed && children}
+      {!isCollapsed && (
+        <SidebarLocalProvider
+          value={{
+            isPeeking: isFloating,
+            onPin: () => {
+              setAutoExpanded(false);
+              setIsCollapsed(false);
+            },
+          }}
+        >
+          {children}
+        </SidebarLocalProvider>
+      )}
 
       {collapseMode === "rail" && isCollapsed && (
         // biome-ignore lint/a11y/noStaticElementInteractions: Resize handle requires mouse
@@ -217,13 +230,16 @@ export function ResizableSidebar({
       {!isCollapsed && (
         // biome-ignore lint/a11y/noStaticElementInteractions: Resize handle requires mouse
         <div
-          className={cn(
-            "absolute -right-0.5 top-0 bottom-0 w-1 cursor-col-resize z-drag",
-            "transition-colors duration-fast",
-            isDragging ? "bg-primary/50" : "hover:bg-border/40"
-          )}
+          className="absolute -right-[15px] top-0 bottom-0 w-6 cursor-col-resize z-[20] flex items-center justify-center group/resize select-none"
           onMouseDown={handleDragStart}
-        />
+        >
+          <div
+            className={cn(
+              "w-1 h-full transition-colors duration-fast",
+              isDragging ? "bg-primary/50" : "group-hover/resize:bg-border/50"
+            )}
+          />
+        </div>
       )}
     </motion.div>
   );

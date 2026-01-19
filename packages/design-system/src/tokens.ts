@@ -41,7 +41,10 @@ export const fontSize = {
   tiny: ["var(--font-size-tiny)", { lineHeight: "var(--line-height-tiny)" }],
   micro: ["var(--font-size-micro)", { lineHeight: "var(--line-height-micro)" }],
   fine: ["var(--font-size-fine)", { lineHeight: "var(--line-height-fine)" }],
+  meta: ["var(--font-size-meta)", { lineHeight: "var(--line-height-meta)" }],
+  ui: ["var(--font-size-ui)", { lineHeight: "var(--line-height-ui)" }], // 13px
   chrome: ["var(--font-size-chrome)", { lineHeight: "var(--line-height-chrome)" }],
+  chat: ["var(--font-size-chat)", { lineHeight: "var(--line-height-chat)" }], // 15px
   content: ["var(--font-size-content)", { lineHeight: "var(--line-height-content)" }],
   xs: ["0.75rem", { lineHeight: "1rem" }], // 12px
   sm: ["0.875rem", { lineHeight: "1.25rem" }], // 14px
@@ -109,6 +112,9 @@ export const zIndex = {
   40: "40",
   50: "50",
   60: "60",
+  "layer-base": "0",
+  "layer-canvas": "10",
+  "layer-overlay": "50",
   overlay: "100",
   modal: "200",
   popover: "300",
@@ -194,6 +200,8 @@ export const semanticColors = {
   accentIndigo: "var(--color-accent-indigo)",
   accentCyan: "var(--color-accent-cyan)",
   accentRose: "var(--color-accent-rose)",
+  accentAiStrong: "var(--color-accent-ai-strong)",
+  accentAiSheen: "var(--color-accent-ai-sheen)",
 
   // Highlights
   highlightYellow: "var(--color-highlight-yellow)",

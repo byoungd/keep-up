@@ -98,6 +98,7 @@ Add these qualitative checks to the review process to ensure Arc/Dia feel.
 ### 4.3 The "Material Integrity" Check
 *   [ ] **Pass**: Are there exactly 3 layers of depth?
 *   [ ] **Pass**: Is the Canvas clearly separated from the Frame (6px inset)?
+*   [ ] **Pass**: **Binding Interaction Physics**: Do Hover and Active states share the same material physics? (e.g., both Alpha-bases or both Solid)? NO mixing `bg-surface-2` (Solid) with `bg-foreground/10` (Alpha).
 
 ---
 

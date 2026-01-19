@@ -883,7 +883,7 @@ export function AppShell(props: AppShellProps) {
       {commandPalette}
       {createDocumentDialog}
       {importModals}
-      <div className="fixed inset-0 w-full overflow-hidden font-sans text-foreground bg-theme">
+      <div className="fixed inset-0 w-full overflow-hidden font-sans text-foreground bg-theme-base">
         <div className="flex h-full w-full">
           {sidebarElement}
 
@@ -891,9 +891,9 @@ export function AppShell(props: AppShellProps) {
           <div
             className={cn(
               "flex-1 flex flex-col min-w-0 relative overflow-hidden transition-all duration-200 ease-in-out",
-              layoutStyle === "arc"
-                ? "bg-canvas rounded-lg shadow-lg border border-border/10 my-2 mr-2"
-                : "bg-canvas rounded-lg shadow-sm"
+              layoutStyle === "arc" && isDesktop
+                ? "bg-canvas rounded-lg shadow-soft m-1.5 z-10"
+                : "bg-canvas rounded-lg shadow-sm z-0"
             )}
           >
             <Header

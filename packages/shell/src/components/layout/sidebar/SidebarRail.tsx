@@ -66,7 +66,7 @@ export const SidebarRail = React.memo(function SidebarRail({
     return (
       <aside
         className="flex h-full w-full flex-col items-center justify-center gap-2 py-3"
-        aria-label="Sidebar rail"
+        aria-label="Primary sidebar"
       >
         <div className="h-5 w-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
       </aside>
@@ -76,13 +76,13 @@ export const SidebarRail = React.memo(function SidebarRail({
   return (
     <aside
       className="flex h-full w-full flex-col items-center gap-3 py-3"
-      aria-label="Sidebar rail"
+      aria-label="Primary sidebar"
     >
       <Tooltip content={t("workspace")} side="right" sideOffset={10}>
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9 rounded-lg text-foreground/80 hover:text-foreground hover:bg-surface-2/70"
+          className="h-9 w-9 rounded-lg text-foreground/80 hover:text-foreground hover:bg-surface-hover"
           aria-label={t("workspace")}
         >
           <Avatar
@@ -98,7 +98,7 @@ export const SidebarRail = React.memo(function SidebarRail({
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface-2/70"
+          className="h-9 w-9 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface-hover"
           onClick={handleSearch}
           aria-label={t("searchLabel")}
         >
@@ -127,8 +127,8 @@ export const SidebarRail = React.memo(function SidebarRail({
                         "relative flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-normal",
                         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                         isActive
-                          ? "bg-surface-2/90 text-foreground"
-                          : "text-muted-foreground hover:bg-surface-2/70 hover:text-foreground"
+                          ? "bg-foreground/[0.08] text-foreground"
+                          : "text-muted-foreground hover:bg-surface-hover hover:text-foreground"
                       )}
                     >
                       <item.icon className="h-4 w-4" strokeWidth={isActive ? 2 : 1.5} />
@@ -146,7 +146,7 @@ export const SidebarRail = React.memo(function SidebarRail({
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface-2/70"
+          className="h-9 w-9 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface-hover"
           onClick={onOpenCustomize}
           aria-label={t("customize")}
         >

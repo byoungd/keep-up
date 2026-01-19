@@ -1,13 +1,15 @@
 "use client";
 
 import { cn } from "@ku0/shared/utils";
-import { PanelLeft, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import * as React from "react";
 // import { useImportContextOptional } from "@/context/ImportContext";
 import { useReaderShell } from "../../../context/ReaderShellContext";
 import { Avatar } from "../../ui/Avatar";
 import { Button } from "../../ui/Button";
+import { SidebarLeftFilledIcon, SidebarLeftIcon } from "../../ui/SidebarIcons";
 import { Tooltip } from "../../ui/Tooltip";
+import { useSidebarLocal } from "./SidebarLocalContext";
 import type { SidebarNewAction } from "./types";
 
 interface SidebarHeaderProps {
@@ -28,6 +30,7 @@ export const SidebarHeader = React.memo(function SidebarHeader({
   showSearch = true,
 }: SidebarHeaderProps) {
   const { sidebar, i18n } = useReaderShell();
+  const { isPeeking, onPin } = useSidebarLocal();
   const t = (key: string) => i18n.t(`Sidebar.${key}`, key);
   const { toggle: toggleCollapsed, isCollapsed } = sidebar;
   // const importContext = useImportContextOptional(); // Removed
@@ -45,12 +48,19 @@ export const SidebarHeader = React.memo(function SidebarHeader({
     // open(workspaceName ? `${workspaceName} ` : "");
   }, [onOpenSearch]);
 
+  // Content (Avatar/Title) is visible if Pinned OR Peeking
+  const isContentVisible = !isCollapsed || !!isPeeking;
+
+  // Icon is Active (Filled) ONLY if Pinned (Not Collapsed AND Not Peeking)
+  // If Peeking, it is visually open but functionally "collapsed/previewing", so Icon is Outline.
+  const isIconFilled = !isCollapsed && !isPeeking;
+
   return (
     <div className={cn("sidebar-header px-3 py-3 space-y-2", className)}>
       {/* Row 1: Workspace & Actions */}
       <div className="flex items-center gap-2">
         {/* Toggle / Avatar Zone - Show Avatar when expanded, Hide when collapsed */}
-        {!isCollapsed && (
+        {isContentVisible && (
           <div className="relative group/toggle shrink-0 h-6 w-6">
             <Avatar
               size="sm"
@@ -63,7 +73,7 @@ export const SidebarHeader = React.memo(function SidebarHeader({
 
         {/* Workspace Switcher */}
         {/* Workspace Name */}
-        {!isCollapsed && (
+        {isContentVisible && (
           <div className="flex items-center gap-2 flex-1 py-1.5 -ml-1 px-1 min-w-0">
             <span className="text-sm font-semibold text-foreground truncate flex-1 text-left">
               {workspaceName || t("workspace")}
@@ -72,16 +82,40 @@ export const SidebarHeader = React.memo(function SidebarHeader({
         )}
 
         {/* Toggle Sidebar - Always visible so user can collapse/expand */}
-        <Tooltip content={isCollapsed ? t("expand") : t("collapse")} side="bottom">
+        <Tooltip
+          content={
+            isPeeking
+              ? i18n.t("Sidebar.pin", "Pin sidebar")
+              : isCollapsed
+                ? t("expand")
+                : t("collapse")
+          }
+          side="bottom"
+        >
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-surface-2 shrink-0"
-            onClick={toggleCollapsed}
-            aria-label={isCollapsed ? t("expand") : t("collapse")}
-            title={isCollapsed ? t("expand") : t("collapse")}
+            className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-surface-hover shrink-0"
+            onClick={() => {
+              if (isPeeking && onPin) {
+                onPin();
+              } else {
+                toggleCollapsed();
+              }
+            }}
+            aria-label={
+              isPeeking
+                ? i18n.t("Sidebar.pin", "Pin sidebar")
+                : isCollapsed
+                  ? t("expand")
+                  : t("collapse")
+            }
           >
-            <PanelLeft className="h-4 w-4" />
+            {isIconFilled ? (
+              <SidebarLeftFilledIcon className="h-4 w-4" />
+            ) : (
+              <SidebarLeftIcon className="h-4 w-4" />
+            )}
           </Button>
         </Tooltip>
       </div>
@@ -93,7 +127,7 @@ export const SidebarHeader = React.memo(function SidebarHeader({
           size="sm"
           className={cn(
             "w-full justify-start gap-2.5 h-8 px-2.5",
-            "bg-surface-2/50 hover:bg-surface-2 text-muted-foreground hover:text-foreground transition-colors duration-fast"
+            "bg-foreground/[0.03] hover:bg-surface-hover hover:text-foreground text-muted-foreground transition-colors duration-fast"
           )}
           onClick={handleSearch}
         >
