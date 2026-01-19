@@ -18,6 +18,7 @@ High-level system design and historical context.
 *   **`docs/architecture/`**
     *   [Agent System v2](architecture/agent-system-v2.md) - The broader product vision (Thinking, Memory, Multi-modal).
     *   [Runtime Reference](architecture/agent-runtime-reference.md) - Bridge document pointing to the Spec.
+    *   [Runtime Module Decomposition RFC](architecture/agent-runtime-module-decomposition-rfc.md) - Proposed module boundaries and migration plan.
     *   [Safety & Stability](architecture/AGENT_RUNTIME_STABILITY.md) - Historical stability assessment (Jan 2026).
     *   [UI Integration](architecture/04_AI_Native_UI_Integration.md) - AI-Native UI patterns.
 
