@@ -7,6 +7,7 @@ import * as React from "react";
 import { useReaderShell } from "../../../context/ReaderShellContext";
 import { Avatar } from "../../ui/Avatar";
 import { Button } from "../../ui/Button";
+import { Icon as IconWrapper } from "../../ui/Icon";
 import { Tooltip } from "../../ui/Tooltip";
 import type { SidebarNewAction } from "./types";
 
@@ -81,7 +82,9 @@ export const SidebarHeader = React.memo(function SidebarHeader({
             aria-label={isCollapsed ? t("expand") : t("collapse")}
             title={isCollapsed ? t("expand") : t("collapse")}
           >
-            <PanelLeft className="h-4 w-4" />
+            <IconWrapper size="lg" aria-hidden="true">
+              <PanelLeft />
+            </IconWrapper>
           </Button>
         </Tooltip>
       </div>
@@ -97,7 +100,9 @@ export const SidebarHeader = React.memo(function SidebarHeader({
           )}
           onClick={handleSearch}
         >
-          <Search className="h-4 w-4 shrink-0" />
+          <IconWrapper size="lg" aria-hidden="true" className="shrink-0">
+            <Search />
+          </IconWrapper>
           <span className="text-xs font-medium flex-1 text-left">{t("searchPlaceholder")}</span>
           <kbd className="text-micro text-foreground/80 bg-surface-3/60 px-1.5 py-0.5 rounded">
             ⌘K

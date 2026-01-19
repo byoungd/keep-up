@@ -3,7 +3,7 @@ import * as React from "react";
 
 export type IconSize = "sm" | "md" | "lg";
 
-interface IconProps extends React.HTMLAttributes<HTMLDivElement> {
+interface IconProps extends React.HTMLAttributes<HTMLSpanElement> {
   size?: IconSize; // sm=16, md=18, lg=20
   children?: React.ReactNode;
 }
@@ -24,7 +24,7 @@ export function Icon({ size = "md", className, children, ...props }: IconProps) 
   };
 
   return (
-    <div
+    <span
       className={cn(
         "inline-flex items-center justify-center shrink-0 align-text-bottom text-current leading-none",
         sizeClasses[size],
@@ -45,6 +45,6 @@ export function Icon({ size = "md", className, children, ...props }: IconProps) 
         }
         return child;
       })}
-    </div>
+    </span>
   );
 }

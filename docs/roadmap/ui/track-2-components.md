@@ -6,35 +6,35 @@
 ---
 
 ## 1. Input Physics & Aesthetics
-*Target File: `apps/cowork/src/components/ui/input.tsx` & `ChatInput.tsx`*
+*Target File: `packages/shell/src/components/ui/Input.tsx` & `packages/shell/src/components/chat/InputArea.tsx`*
 
-- [ ] **Soft Input Field**
-    - [ ] Remove default border (`border-input`).
-    - [ ] Set background to `bg-surface-2`.
-    - [ ] Implement `ring-1` + `ring-primary/20` on **focus-visible only**.
-- [ ] **Input Morph (Chat)**
-    - [ ] Animate height changes using Spring physics (matches Motion Spec).
+- [x] **Soft Input Field**
+    - [x] Remove default border (`border-input`).
+    - [x] Set background to `bg-surface-2`.
+    - [x] Implement `ring-1` + `ring-primary/20` on **focus-visible only**.
+- [x] **Input Morph (Chat)**
+    - [x] Animate height changes using Spring physics (matches Motion Spec).
 
 ## 2. Surface Flattening (Cards)
-*Target File: `apps/cowork/src/components/ui/card.tsx` & `ArtifactCard.tsx`*
+*Target File: `packages/shell/src/components/ui/Card.tsx`, `apps/cowork/src/components/ui/Card.tsx`, `packages/shell/src/components/chat/ArtifactCard.tsx`*
 
-- [ ] **Borderless Cards**
-    - [ ] Remove `border` class from default Card.
-    - [ ] Set background to `bg-surface-1`.
-- [ ] **Artifact Card Interactions**
-    - [ ] **Idle**: Flat, no shadow.
-    - [ ] **Hover**: `shadow-sm`, subtle color shift (`bg-surface-2`). **NO SCALE**.
+- [x] **Borderless Cards**
+    - [x] Remove `border` class from default Card.
+    - [x] Set background to `bg-surface-1`.
+- [x] **Artifact Card Interactions**
+    - [x] **Idle**: Flat, no shadow.
+    - [x] **Hover**: `shadow-sm`, subtle color shift (`bg-surface-2`). **NO SCALE**.
 
 ## 3. Visual Grammar Enforcement
-*Target File: `apps/cowork/src/components/ui/*`*
+*Target File: `packages/shell/src/components/ui/Icon.tsx`, `packages/shell/src/components/layout/sidebar/*`, `packages/shell/src/components/ui/SearchInput.tsx`, `packages/shell/src/components/ui/Button.tsx`*
 
-- [ ] **Iconography**
-    - [ ] Create `Icon` wrapper or Config Provider to enforce `strokeWidth={2}`.
-    - [ ] Audit usages:
-        - [ ] Navigation/Chrome: `size-5` (20px).
-        - [ ] Inline UI: `size-4` (16px).
-- [ ] **Buttons**
-    - [ ] Ensure `Button` component uses `text-ui` (13px) for Small/Medium variants.
+- [x] **Iconography**
+    - [x] Create `Icon` wrapper or Config Provider to enforce `strokeWidth={2}`.
+    - [x] Audit usages:
+        - [x] Navigation/Chrome: `size-5` (20px).
+        - [x] Inline UI: `size-4` (16px).
+- [x] **Buttons**
+    - [x] Ensure `Button` component uses `text-chrome` (13px) for Small/Medium variants.
 
 ---
 

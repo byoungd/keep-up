@@ -20,6 +20,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../../ui/DropdownMenu";
+import { Icon as IconWrapper } from "../../ui/Icon";
 import { Tooltip } from "../../ui/Tooltip";
 import { SidebarGroup } from "./SidebarGroup";
 import { SidebarHeader } from "./SidebarHeader";
@@ -209,7 +210,9 @@ export const Sidebar = React.memo(function Sidebar({
                   aria-label={t("moreItems")}
                   title={t("moreItems")}
                 >
-                  <MoreHorizontal className="h-4 w-4" />
+                  <IconWrapper size="lg" aria-hidden="true">
+                    <MoreHorizontal />
+                  </IconWrapper>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent side="top" align="start" className="w-56">
@@ -221,7 +224,13 @@ export const Sidebar = React.memo(function Sidebar({
                     {group.moreItems.map((item) => (
                       <DropdownMenuItem key={item.id} asChild className="cursor-pointer">
                         <Link href={item.route} className="flex items-center gap-2">
-                          <item.icon className="h-4 w-4 text-muted-foreground" />
+                          <IconWrapper
+                            size="sm"
+                            aria-hidden="true"
+                            className="text-muted-foreground"
+                          >
+                            <item.icon />
+                          </IconWrapper>
                           <span className="text-sm">{item.label}</span>
                           {renderMoreBadge(item, state.badgeStyle)}
                         </Link>
@@ -242,7 +251,9 @@ export const Sidebar = React.memo(function Sidebar({
               onClick={onOpenCustomize}
               aria-label={t("customize")}
             >
-              <Settings2 className="h-4 w-4" />
+              <IconWrapper size="lg" aria-hidden="true">
+                <Settings2 />
+              </IconWrapper>
             </Button>
           </Tooltip>
         </div>
@@ -259,7 +270,9 @@ export const Sidebar = React.memo(function Sidebar({
               }
               aria-label="Help"
             >
-              <CircleHelp className="h-4 w-4" />
+              <IconWrapper size="lg" aria-hidden="true">
+                <CircleHelp />
+              </IconWrapper>
             </Button>
           </Tooltip>
         </div>

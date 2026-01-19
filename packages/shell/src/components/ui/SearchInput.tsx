@@ -3,6 +3,7 @@
 import { cn } from "@ku0/shared/utils";
 import { Search, X } from "lucide-react";
 import * as React from "react";
+import { Icon as IconWrapper } from "./Icon";
 import { Input, type InputProps } from "./Input";
 
 export interface SearchInputProps extends Omit<InputProps, "leftIcon" | "type"> {
@@ -62,7 +63,11 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
           ref={internalRef}
           type="search"
           value={value}
-          leftIcon={<Search className="h-4 w-4" />}
+          leftIcon={
+            <IconWrapper size="sm" aria-hidden="true">
+              <Search />
+            </IconWrapper>
+          }
           rightIcon={
             hasValue ? (
               <button
@@ -71,7 +76,9 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
                 className="p-0.5 rounded hover:bg-muted transition-colors duration-fast focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 aria-label="Clear search"
               >
-                <X className="h-3.5 w-3.5" />
+                <IconWrapper size="sm" aria-hidden="true">
+                  <X />
+                </IconWrapper>
               </button>
             ) : shortcutHint ? (
               <kbd className="px-1.5 py-0.5 text-micro font-medium text-muted-foreground bg-surface-2 rounded border border-border/30">

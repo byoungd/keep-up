@@ -5,6 +5,7 @@ import { PanelLeft, PanelRight, Square } from "lucide-react";
 
 import { useReaderShell } from "../../context/ReaderShellContext";
 import { Button } from "../ui/Button";
+import { Icon as IconWrapper } from "../ui/Icon";
 import { Tooltip } from "../ui/Tooltip";
 
 export interface HeaderProps {
@@ -71,12 +72,14 @@ export function Header({
             size="icon"
             onClick={handleToggle}
             className={cn(
-              "h-6 w-6 text-muted-foreground hover:text-foreground",
+              "h-7 w-7 text-muted-foreground hover:text-foreground",
               !isCollapsed && "hidden"
             )}
             aria-label={isCollapsed ? expandLabel : collapseLabel}
           >
-            <PanelLeft className="h-4 w-4" />
+            <IconWrapper size="lg" aria-hidden="true">
+              <PanelLeft />
+            </IconWrapper>
           </Button>
         </Tooltip>
 
@@ -88,7 +91,9 @@ export function Header({
           className="md:hidden lg:hidden text-muted-foreground hover:text-foreground"
           aria-label="Toggle sidebar"
         >
-          <PanelLeft className="h-4 w-4" />
+          <IconWrapper size="lg" aria-hidden="true">
+            <PanelLeft />
+          </IconWrapper>
         </Button>
 
         {leftSlot}
@@ -110,7 +115,9 @@ export function Header({
             )}
             aria-label={toggleLabel}
           >
-            <GlobalAiIcon className="h-4 w-4" />
+            <IconWrapper size="lg" aria-hidden="true">
+              <GlobalAiIcon />
+            </IconWrapper>
           </Button>
         </Tooltip>
       </div>

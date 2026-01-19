@@ -1,6 +1,8 @@
 "use client";
 import type { ModelCapability } from "@ku0/ai-core";
+import { SPRINGS } from "@ku0/shared/ui/motion";
 import { cn } from "@ku0/shared/utils";
+import { motion, useReducedMotion } from "framer-motion";
 import { AlertTriangle, Loader2, X } from "lucide-react";
 import * as React from "react";
 import { useSlashCommand } from "../../hooks/useSlashCommand";
@@ -80,6 +82,7 @@ export function InputArea({
   onSelectModel,
 }: InputAreaProps) {
   const [isFocused, setIsFocused] = React.useState(false);
+  const prefersReducedMotion = useReducedMotion();
   // Memoize derived values to simplify render logic
   const charCount = input.length;
   const isOverLimit = charCount > MAX_CHARS;
@@ -224,7 +227,9 @@ export function InputArea({
       )}
 
       {/* Main Omnibox Container */}
-      <div
+      <motion.div
+        layout
+        transition={prefersReducedMotion ? { duration: 0 } : SPRINGS.layout}
         className={cn(
           "relative flex flex-col rounded-xl border transition-all duration-200 ease-out",
           // Idle state
@@ -286,7 +291,7 @@ export function InputArea({
           models={models}
           onSelectModel={onSelectModel}
         />
-      </div>
+      </motion.div>
 
       {/* Hidden File Input */}
       <input

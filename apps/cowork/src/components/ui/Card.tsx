@@ -8,8 +8,8 @@ export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 const toneClasses: Record<CardTone, string> = {
-  default: "bg-surface-2 text-foreground",
-  subtle: "bg-surface-1 text-foreground",
+  default: "bg-surface-1 text-foreground",
+  subtle: "bg-surface-0 text-foreground",
 };
 
 export const Card = React.forwardRef<HTMLDivElement, CardProps>(
