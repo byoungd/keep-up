@@ -3,7 +3,15 @@
  *
  * Selects models based on task class, risk, budget constraints, and policy.
  * Implements spec 5.7: Model Routing Contract.
+ * Enhanced with capability caching and cost/latency scoring (Track H.1).
  */
+
+import {
+  getModelCapabilityCache,
+  type ModelCapability,
+  type ModelCapabilityCache,
+  type ModelScore,
+} from "./modelCapabilityCache";
 
 export type ModelRiskLevel = "low" | "medium" | "high";
 
@@ -38,6 +46,22 @@ export interface ModelRoutingDecision {
   resolved: string;
   reason: string;
   policy: ModelRoutingPolicy;
+  /** Routing metrics for observability (Track H.1) */
+  metrics?: RoutingMetrics;
+}
+
+/**
+ * Routing metrics for observability.
+ */
+export interface RoutingMetrics {
+  /** Time taken to make routing decision in ms */
+  routingLatencyMs: number;
+  /** Whether capability cache was hit */
+  cacheHit: boolean;
+  /** Model scores considered */
+  scores?: ModelScore[];
+  /** Capability of selected model */
+  capability?: ModelCapability;
 }
 
 /**
@@ -50,6 +74,8 @@ export interface ModelRouteDecision {
   budget: ModelBudget;
   /** Policy used for this decision */
   policy: ModelRoutingPolicy;
+  /** Routing metrics (Track H.1) */
+  metrics?: RoutingMetrics;
 }
 
 export interface ModelRouteRule {
@@ -75,15 +101,23 @@ export interface ModelRouterConfig {
   rules?: ModelRouteRule[];
   /** Optional callback to emit routing decisions for observability */
   onRoutingDecision?: RoutingDecisionEmitter;
+  /** Enable capability-based scoring (Track H.1) */
+  enableCapabilityScoring?: boolean;
+  /** Optional custom capability cache */
+  capabilityCache?: ModelCapabilityCache;
 }
 
 export class ModelRouter {
   private readonly config: ModelRouterConfig;
   private readonly defaultPolicy: ModelRoutingPolicy;
+  private readonly capabilityCache: ModelCapabilityCache;
+  private readonly enableScoring: boolean;
 
   constructor(config: ModelRouterConfig) {
     this.config = config;
     this.defaultPolicy = config.defaultPolicy ?? "quality";
+    this.enableScoring = config.enableCapabilityScoring ?? true;
+    this.capabilityCache = config.capabilityCache ?? getModelCapabilityCache();
   }
 
   /**
@@ -93,6 +127,7 @@ export class ModelRouter {
    * - Fallback to safe default on failure
    */
   resolveForTurn(request: ModelRoutingRequest): ModelRoutingDecision {
+    const startTime = performance.now();
     const requestedModel = request.preferredModels?.[0] ?? this.config.defaultModel;
     const policy = request.policy ?? this.defaultPolicy;
     const defaultWithinBudget =
@@ -100,11 +135,19 @@ export class ModelRouter {
 
     try {
       const decision = this.route(request);
+      const routingLatencyMs = performance.now() - startTime;
+
       const routingDecision: ModelRoutingDecision = {
         requested: requestedModel,
         resolved: decision.modelId,
         reason: decision.reason,
         policy: decision.policy,
+        metrics: {
+          routingLatencyMs,
+          cacheHit: decision.metrics?.cacheHit ?? false,
+          scores: decision.metrics?.scores,
+          capability: decision.metrics?.capability,
+        },
       };
 
       // Emit for observability
@@ -112,6 +155,8 @@ export class ModelRouter {
 
       return routingDecision;
     } catch {
+      const routingLatencyMs = performance.now() - startTime;
+
       // Fallback on routing failure per spec 5.7
       const resolvedModel = defaultWithinBudget ? this.config.defaultModel : requestedModel;
       const fallbackDecision: ModelRoutingDecision = {
@@ -121,6 +166,10 @@ export class ModelRouter {
           ? "fallback to default model after routing failure"
           : "fallback to requested model; default exceeded budget",
         policy,
+        metrics: {
+          routingLatencyMs,
+          cacheHit: false,
+        },
       };
 
       this.config.onRoutingDecision?.(fallbackDecision);
@@ -130,10 +179,12 @@ export class ModelRouter {
   }
 
   route(request: ModelRoutingRequest): ModelRouteDecision {
+    const startTime = performance.now();
     const policy = request.policy ?? this.defaultPolicy;
     const matchedRule = this.config.rules?.find((rule) => rule.match(request));
 
     if (matchedRule) {
+      const capability = this.capabilityCache.get(matchedRule.modelId);
       return {
         modelId: matchedRule.modelId,
         reason: matchedRule.reason,
@@ -144,9 +195,39 @@ export class ModelRouter {
           ...matchedRule.budgetOverride,
         },
         policy: matchedRule.policy ?? policy,
+        metrics: {
+          routingLatencyMs: performance.now() - startTime,
+          cacheHit: !!capability,
+          capability,
+        },
       };
     }
 
+    // Use capability-based scoring if enabled and preferred models specified
+    if (this.enableScoring && request.preferredModels && request.preferredModels.length > 1) {
+      const scores = this.capabilityCache.rank(request.preferredModels, policy);
+
+      if (scores.length > 0) {
+        const best = scores[0];
+        const capability = this.capabilityCache.get(best.modelId);
+
+        return {
+          modelId: best.modelId,
+          reason: `selected by ${policy} scoring (score: ${best.score.toFixed(3)})`,
+          fallbackModels: scores.slice(1).map((s) => s.modelId),
+          budget: { ...this.config.defaultBudget, ...request.budget },
+          policy,
+          metrics: {
+            routingLatencyMs: performance.now() - startTime,
+            cacheHit: best.fromCache,
+            scores,
+            capability,
+          },
+        };
+      }
+    }
+
+    const capability = this.capabilityCache.get(this.config.defaultModel);
     return {
       modelId: this.config.defaultModel,
       reason: "default model",
@@ -154,7 +235,24 @@ export class ModelRouter {
         request.preferredModels?.filter((id) => id !== this.config.defaultModel) ?? [],
       budget: { ...this.config.defaultBudget, ...request.budget },
       policy,
+      metrics: {
+        routingLatencyMs: performance.now() - startTime,
+        cacheHit: !!capability,
+        capability,
+      },
     };
+  }
+
+  /**
+   * Record a latency observation for a model.
+   * This updates the capability cache for future routing decisions.
+   */
+  recordLatency(modelId: string, latencyMs: number): void {
+    this.capabilityCache.recordLatency({
+      modelId,
+      latencyMs,
+      timestamp: Date.now(),
+    });
   }
 
   /**
@@ -162,6 +260,13 @@ export class ModelRouter {
    */
   getDefaultModel(): string {
     return this.config.defaultModel;
+  }
+
+  /**
+   * Get routing cache statistics.
+   */
+  getCacheStats(): { hits: number; misses: number; hitRate: number; entries: number } {
+    return this.capabilityCache.getStats();
   }
 }
 

@@ -5,6 +5,15 @@
  */
 
 export {
+  createModelCapabilityCache,
+  getModelCapabilityCache,
+  type ModelCapability,
+  ModelCapabilityCache,
+  type ModelCapabilityCacheOptions,
+  type ModelScore,
+  type ScoringWeights,
+} from "./modelCapabilityCache";
+export {
   createModelRouter,
   type ModelBudget,
   type ModelRiskLevel,
@@ -16,4 +25,5 @@ export {
   type ModelRoutingPolicy,
   type ModelRoutingRequest,
   type RoutingDecisionEmitter,
+  type RoutingMetrics,
 } from "./modelRouter";
