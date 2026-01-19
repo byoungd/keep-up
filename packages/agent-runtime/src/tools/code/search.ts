@@ -28,7 +28,7 @@ export interface SearchOptions {
   maxResults?: number;
   /** File extensions to include (e.g., [".ts", ".tsx"]) */
   includeExtensions?: string[];
-  /** Glob patterns to exclude (e.g., ["**/ node_modules /**"]) */;
+  /** Glob patterns to exclude, e.g. `["**\/node_modules\/**"]` */
   excludePatterns?: string[];
 }
 
