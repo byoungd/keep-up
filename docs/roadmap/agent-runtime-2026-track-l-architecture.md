@@ -120,7 +120,7 @@ graph TD
 - [x] Extract memory into `agent-runtime-memory`.
 - [x] Extract events into `agent-runtime-control`.
 - [ ] Create package scaffolding and move plane modules.
-- [ ] Move integrations into sandbox and memory packages.
+- [x] Extract sandbox/runtime assets into `agent-runtime-sandbox`.
 - [ ] Move tool registry and servers into tooling package.
 
 ### Phase 4: Wiring and Compatibility
