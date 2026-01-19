@@ -30,3 +30,13 @@ export {
 } from "./fileSystem";
 // Patch operations
 export { type ApplyPatchResult, applyPatch } from "./patch";
+// Code search
+export { type SearchMatch, type SearchOptions, type SearchResult, searchCode } from "./search";
+// Outline extraction
+export { getOutline, type OutlineItem, type OutlineResult } from "./skeleton";
+// Windowed viewer
+export {
+  createWindowViewer,
+  type WindowState,
+  type WindowViewResult,
+} from "./window";

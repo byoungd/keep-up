@@ -9,6 +9,9 @@ import { BaseToolServer, errorResult, textResult } from "../mcp/baseServer";
 import * as editor from "./editor";
 import * as fileSystem from "./fileSystem";
 import * as patch from "./patch";
+import { type SearchResult, searchCode } from "./search";
+import { getOutline, type OutlineItem, type OutlineResult } from "./skeleton";
+import { createWindowViewer, type WindowViewResult } from "./window";
 
 // ============================================================================
 // Tool Server
@@ -17,6 +20,7 @@ import * as patch from "./patch";
 export class CodeToolServer extends BaseToolServer {
   readonly name = "code";
   readonly description = "Code file reading, editing, and navigation tools";
+  private readonly windowViewer = createWindowViewer();
 
   constructor() {
     super();
@@ -24,6 +28,9 @@ export class CodeToolServer extends BaseToolServer {
     this.registerTool(this.createListFilesTool(), this.handleListFiles.bind(this));
     this.registerTool(this.createEditFileTool(), this.handleEditFile.bind(this));
     this.registerTool(this.createApplyPatchTool(), this.handleApplyPatch.bind(this));
+    this.registerTool(this.createViewOutlineTool(), this.handleViewOutline.bind(this));
+    this.registerTool(this.createSearchCodeTool(), this.handleSearchCode.bind(this));
+    this.registerTool(this.createScrollFileTool(), this.handleScrollFile.bind(this));
   }
 
   // --------------------------------------------------------------------------
@@ -168,6 +175,84 @@ export class CodeToolServer extends BaseToolServer {
       annotations: {
         requiresConfirmation: true,
         readOnly: false,
+      },
+    };
+  }
+
+  private createViewOutlineTool(): MCPTool {
+    return {
+      name: "view_outline",
+      description:
+        "Get the structure/skeleton of a source file (classes, functions, etc.) without implementation details.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          path: { type: "string", description: "Path to the source file" },
+        },
+        required: ["path"],
+      },
+      annotations: {
+        requiresConfirmation: false,
+        readOnly: true,
+      },
+    };
+  }
+
+  private createSearchCodeTool(): MCPTool {
+    return {
+      name: "search_code",
+      description: "Search for text or patterns across the codebase using ripgrep.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          query: { type: "string", description: "Search term or regex pattern" },
+          path: { type: "string", description: "Limit search to this file or directory" },
+          is_regex: { type: "boolean", description: "Treat query as regex (default: false)" },
+          case_sensitive: {
+            type: "boolean",
+            description: "Case-sensitive search (default: false)",
+          },
+          max_results: { type: "number", description: "Maximum results to return (default: 50)" },
+          include_extensions: {
+            type: "array",
+            description: "File extensions to include (e.g., ['.ts', '.tsx'])",
+            items: { type: "string" },
+          },
+          exclude_patterns: {
+            type: "array",
+            description: "Glob patterns to exclude (e.g., ['**/node_modules/**'])",
+            items: { type: "string" },
+          },
+        },
+        required: ["query"],
+      },
+      annotations: {
+        requiresConfirmation: false,
+        readOnly: true,
+      },
+    };
+  }
+
+  private createScrollFileTool(): MCPTool {
+    return {
+      name: "scroll_file",
+      description: "Navigate through the currently open file (scroll up, down, or go to a line).",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          action: {
+            type: "string",
+            enum: ["open", "scroll_up", "scroll_down", "goto"],
+            description: "Navigation action",
+          },
+          path: { type: "string", description: "File to open (required for 'open')" },
+          line: { type: "number", description: "Line number (required for 'goto')" },
+        },
+        required: ["action"],
+      },
+      annotations: {
+        requiresConfirmation: false,
+        readOnly: true,
       },
     };
   }
@@ -342,6 +427,120 @@ export class CodeToolServer extends BaseToolServer {
       );
     }
   }
+
+  private async handleViewOutline(
+    args: Record<string, unknown>,
+    context: ToolContext
+  ): Promise<MCPToolResult> {
+    const filePath = args.path as string | undefined;
+    if (!filePath) {
+      return errorResult("INVALID_ARGUMENTS", "path is required");
+    }
+
+    const filePermission = context.security?.permissions?.file;
+    if (filePermission === "none") {
+      return errorResult("PERMISSION_DENIED", "File system access is disabled");
+    }
+
+    try {
+      const outline = await getOutline(filePath);
+      const formatted = formatOutline(outline);
+      return textResult(formatted);
+    } catch (err) {
+      return errorResult(
+        "EXECUTION_FAILED",
+        `Failed to get outline: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
+
+  private async handleSearchCode(
+    args: Record<string, unknown>,
+    context: ToolContext
+  ): Promise<MCPToolResult> {
+    const query = args.query as string | undefined;
+    if (!query) {
+      return errorResult("INVALID_ARGUMENTS", "query is required");
+    }
+
+    const filePermission = context.security?.permissions?.file;
+    if (filePermission === "none") {
+      return errorResult("PERMISSION_DENIED", "File system access is disabled");
+    }
+
+    try {
+      const result = await searchCode(query, {
+        path: args.path as string | undefined,
+        isRegex: (args.is_regex as boolean | undefined) ?? false,
+        caseSensitive: (args.case_sensitive as boolean | undefined) ?? false,
+        maxResults: args.max_results as number | undefined,
+        includeExtensions: args.include_extensions as string[] | undefined,
+        excludePatterns: args.exclude_patterns as string[] | undefined,
+      });
+
+      const formatted = formatSearchResult(result);
+      return textResult(formatted);
+    } catch (err) {
+      return errorResult(
+        "EXECUTION_FAILED",
+        `Search failed: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
+
+  private async handleScrollFile(
+    args: Record<string, unknown>,
+    context: ToolContext
+  ): Promise<MCPToolResult> {
+    const action = args.action as string | undefined;
+    if (!action) {
+      return errorResult("INVALID_ARGUMENTS", "action is required");
+    }
+
+    const filePermission = context.security?.permissions?.file;
+    if (filePermission === "none") {
+      return errorResult("PERMISSION_DENIED", "File system access is disabled");
+    }
+
+    try {
+      let result: WindowViewResult;
+      switch (action) {
+        case "open": {
+          const filePath = args.path as string | undefined;
+          if (!filePath) {
+            return errorResult("INVALID_ARGUMENTS", "path is required for action 'open'");
+          }
+          result = await this.windowViewer.open(filePath, args.line as number | undefined);
+          break;
+        }
+        case "scroll_up":
+          result = await this.windowViewer.scrollUp();
+          break;
+        case "scroll_down":
+          result = await this.windowViewer.scrollDown();
+          break;
+        case "goto": {
+          const line = args.line as number | undefined;
+          if (!line) {
+            return errorResult("INVALID_ARGUMENTS", "line is required for action 'goto'");
+          }
+          result = await this.windowViewer.goto(line);
+          break;
+        }
+        default:
+          return errorResult("INVALID_ARGUMENTS", `Unknown action: ${action}`);
+      }
+
+      const header = `[File: ${result.path}] (${result.totalLines} lines total, showing ${result.viewportStart}-${result.viewportEnd})`;
+      const stats = `Lines above: ${result.linesAbove}, lines below: ${result.linesBelow}`;
+      return textResult(`${header}\n${stats}\n\n${result.content}`);
+    } catch (err) {
+      return errorResult(
+        "EXECUTION_FAILED",
+        `Failed to scroll file: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
 }
 
 // ============================================================================
@@ -356,6 +555,55 @@ function formatBytes(bytes: number): string {
     return `${(bytes / 1024).toFixed(1)} KB`;
   }
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatOutline(outline: OutlineResult): string {
+  const lines: string[] = [];
+  lines.push(`[Outline: ${outline.path}] (${outline.totalLines} lines total)`);
+  lines.push("");
+  if (outline.items.length === 0) {
+    lines.push("No outline items found.");
+    return lines.join("\n");
+  }
+
+  for (const item of outline.items) {
+    appendOutlineItem(lines, item, 0);
+  }
+
+  return lines.join("\n");
+}
+
+function appendOutlineItem(lines: string[], item: OutlineItem, depth: number): void {
+  const indent = "  ".repeat(depth);
+  const label =
+    item.signature && (item.kind === "function" || item.kind === "method")
+      ? item.signature
+      : `${item.kind} ${item.name}`;
+  lines.push(`${indent}${label} (lines ${item.range[0]}-${item.range[1]})`);
+  if (item.children) {
+    for (const child of item.children) {
+      appendOutlineItem(lines, child, depth + 1);
+    }
+  }
+}
+
+function formatSearchResult(result: SearchResult): string {
+  const lines: string[] = [];
+  const truncatedNote = result.truncated ? " (truncated)" : "";
+  lines.push(`Query: "${result.query}"`);
+  lines.push(`Matches: ${result.matchCount}${truncatedNote}`);
+  lines.push("");
+
+  if (result.matches.length === 0) {
+    lines.push("No matches found.");
+    return lines.join("\n");
+  }
+
+  for (const match of result.matches) {
+    lines.push(`${match.path}:${match.lineNumber}: ${match.content}`);
+  }
+
+  return lines.join("\n");
 }
 
 // ============================================================================

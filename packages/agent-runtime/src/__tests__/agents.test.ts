@@ -380,10 +380,11 @@ describe("WebSearchToolServer", () => {
   });
 
   it("should fetch with mock provider", async () => {
-    const { createWebSearchToolServer } = await import("../tools/web");
+    const { createWebSearchToolServer, MockWebSearchProvider } = await import("../tools/web");
     const { createSecurityPolicy } = await import("../security");
 
-    const server = createWebSearchToolServer();
+    const mockProvider = new MockWebSearchProvider();
+    const server = createWebSearchToolServer(mockProvider);
     const result = await server.callTool(
       { name: "fetch", arguments: { url: "https://example.com/page" } },
       { security: createSecurityPolicy("balanced") }
