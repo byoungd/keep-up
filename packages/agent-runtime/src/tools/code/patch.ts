@@ -48,7 +48,7 @@ export async function applyPatch(
       success: false,
       fuzzLevel: 0,
       filesModified: [],
-      error: parsed.error,
+      error: (parsed as { error: string }).error,
     };
   }
 
@@ -58,7 +58,7 @@ export async function applyPatch(
       success: false,
       fuzzLevel: planResult.fuzzLevel,
       filesModified: planResult.filesModified,
-      error: planResult.error,
+      error: (planResult as { error: string }).error,
     };
   }
 
@@ -68,7 +68,7 @@ export async function applyPatch(
       success: false,
       fuzzLevel: planResult.fuzzLevel,
       filesModified: planResult.filesModified,
-      error: writeResult.error,
+      error: (writeResult as { error: string }).error,
     };
   }
 
@@ -122,7 +122,7 @@ async function buildPatchPlans(
         success: false,
         filesModified,
         fuzzLevel: maxFuzz,
-        error: result.error,
+        error: (result as { error: string }).error,
       };
     }
 
@@ -147,14 +147,14 @@ async function buildPlanForPatch(
 
   const contentResult = await loadOriginalContent(target);
   if (!contentResult.success) {
-    return { success: false, error: contentResult.error };
+    return { success: false, error: (contentResult as { error: string }).error };
   }
 
   const { lines, endsWithNewline } = splitLines(contentResult.content);
   const hunkResult = applyHunks(lines, patch.hunks, target.filePath);
 
   if (!hunkResult.success) {
-    return { success: false, error: hunkResult.error };
+    return { success: false, error: (hunkResult as { error: string }).error };
   }
 
   return {
@@ -194,11 +194,12 @@ function applyHunks(
   let workingLines = [...lines];
   let maxFuzz: FuzzLevel = 0;
 
-  for (const [index, hunk] of hunks.entries()) {
+  for (let i = 0; i < hunks.length; i++) {
+    const hunk = hunks[i];
     const expectedIndex = Math.max(0, Math.min(workingLines.length, hunk.oldStart - 1));
     const result = applyHunkWithFuzz(workingLines, hunk, expectedIndex);
     if (!result) {
-      return { success: false, error: `Failed to apply hunk ${index + 1} for ${filePath}` };
+      return { success: false, error: `Failed to apply hunk ${i + 1} for ${filePath}` };
     }
 
     workingLines = result.lines;
