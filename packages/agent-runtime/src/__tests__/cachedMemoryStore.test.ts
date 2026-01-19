@@ -2,10 +2,8 @@
  * CachedMemoryStore tests.
  */
 
+import { CachedMemoryStore, createInMemoryStore, type Memory } from "@ku0/agent-runtime-memory";
 import { describe, expect, it, vi } from "vitest";
-import { CachedMemoryStore } from "../memory/cachedMemoryStore";
-import { createInMemoryStore } from "../memory/memoryStore";
-import type { Memory } from "../memory/types";
 
 function createTestMemory(
   overrides?: Partial<Memory>

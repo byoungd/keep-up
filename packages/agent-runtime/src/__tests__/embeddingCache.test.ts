@@ -2,9 +2,8 @@
  * CachedEmbeddingProvider tests.
  */
 
+import { CachedEmbeddingProvider, type IEmbeddingProvider } from "@ku0/agent-runtime-memory";
 import { describe, expect, it } from "vitest";
-import { CachedEmbeddingProvider } from "../memory/embeddingCache";
-import type { IEmbeddingProvider } from "../memory/types";
 
 class CountingEmbeddingProvider implements IEmbeddingProvider {
   embedCalls = 0;

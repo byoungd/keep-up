@@ -5,8 +5,12 @@
  * Includes planning, error recovery, and discovery integration for persistence.
  */
 
+import {
+  createMemoryManager,
+  type IMemoryManager,
+  type MemoryCacheConfig,
+} from "@ku0/agent-runtime-memory";
 import { type ContextManager, createContextManager } from "../context";
-import { createMemoryManager, type IMemoryManager, type MemoryCacheConfig } from "../memory";
 import type { AgentMessage, AgentState } from "../types";
 import type { ToolResultCache } from "../utils/cache";
 

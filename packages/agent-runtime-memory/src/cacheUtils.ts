@@ -2,8 +2,8 @@
  * Shared cache key helpers for memory caching.
  */
 
-import { hashStableValue } from "../utils/cache";
 import type { MemoryType } from "./types";
+import { hashStableValue } from "./utils/cache";
 
 export function normalizeCacheText(text: string): string {
   return text.trim().replace(/\s+/g, " ");

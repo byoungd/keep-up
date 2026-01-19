@@ -1,0 +1,33 @@
+{
+  "name": "@ku0/agent-runtime-memory",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Agent Runtime memory adapters and caches",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write ."
+  },
+  "dependencies": {
+    "@ku0/ai-core": "workspace:*",
+    "mem0ai": "^2.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.3"
+  }
+}

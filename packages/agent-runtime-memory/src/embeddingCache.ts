@@ -2,11 +2,11 @@
  * Cached embedding provider wrapper.
  */
 
-import type { CacheStats } from "../utils/cache";
-import { LRUCache } from "../utils/cache";
 import { type MemoryCacheConfig, resolveMemoryCacheConfig } from "./cacheTypes";
 import { buildCacheKey, normalizeCacheText } from "./cacheUtils";
 import type { IEmbeddingProvider } from "./types";
+import type { CacheStats } from "./utils/cache";
+import { LRUCache } from "./utils/cache";
 
 export class CachedEmbeddingProvider implements IEmbeddingProvider {
   private readonly inner: IEmbeddingProvider;

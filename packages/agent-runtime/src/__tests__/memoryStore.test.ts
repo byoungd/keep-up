@@ -11,10 +11,13 @@
  * - Bulk operations
  */
 
+import {
+  cosineSimilarity,
+  createInMemoryStore,
+  InMemoryStore,
+  type Memory,
+} from "@ku0/agent-runtime-memory";
 import { beforeEach, describe, expect, it } from "vitest";
-import { createInMemoryStore, InMemoryStore } from "../memory/memoryStore";
-import type { Memory } from "../memory/types";
-import { cosineSimilarity } from "../memory/types";
 
 // ============================================================================
 // Test Fixtures
