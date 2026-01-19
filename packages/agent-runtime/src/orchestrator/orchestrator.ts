@@ -12,6 +12,13 @@
  * - Streaming support for real-time feedback
  */
 
+import type {
+  IMetricsCollector,
+  ITracer,
+  SpanContext,
+  TelemetryContext,
+} from "@ku0/agent-runtime-telemetry/telemetry";
+import { AGENT_METRICS } from "@ku0/agent-runtime-telemetry/telemetry";
 import { MODEL_CATALOG, type ModelCapability } from "@ku0/ai-core";
 import type { IntentRegistry } from "@ku0/core";
 import { createIntentRegistry } from "@ku0/core";
@@ -52,8 +59,6 @@ import { createSkillSession } from "../skills/skillSession";
 import type { ISOPExecutor } from "../sop/types";
 import { attachRuntimeEventStreamBridge, type StreamWriter } from "../streaming";
 import { createTaskGraphStore, type TaskGraphStore, type TaskNodeStatus } from "../tasks/taskGraph";
-import type { IMetricsCollector, ITracer, SpanContext, TelemetryContext } from "../telemetry";
-import { AGENT_METRICS } from "../telemetry";
 import { COMPLETION_TOOL_NAME, validateCompletionInput } from "../tools/core/completion";
 import {
   createToolDiscoveryEngine,

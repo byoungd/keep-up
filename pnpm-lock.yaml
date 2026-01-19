@@ -180,6 +180,9 @@ importers:
       '@ku0/agent-runtime-core':
         specifier: workspace:*
         version: link:../agent-runtime-core
+      '@ku0/agent-runtime-telemetry':
+        specifier: workspace:*
+        version: link:../agent-runtime-telemetry
       '@ku0/ai-core':
         specifier: workspace:*
         version: link:../ai-core
@@ -248,6 +251,15 @@ importers:
         specifier: workspace:*
         version: link:../core
     devDependencies:
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
+  packages/agent-runtime-telemetry:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.19.3
       typescript:
         specifier: ^5.7.3
         version: 5.9.3

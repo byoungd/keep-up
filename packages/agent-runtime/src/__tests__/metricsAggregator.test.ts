@@ -1,9 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createMetricsAggregator,
   METRIC_NAMES,
   type MetricsAggregator,
-} from "../telemetry/metricsAggregator";
+} from "@ku0/agent-runtime-telemetry/telemetry";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 describe("MetricsAggregator", () => {
   let aggregator: MetricsAggregator;

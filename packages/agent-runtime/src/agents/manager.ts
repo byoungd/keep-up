@@ -5,11 +5,11 @@
  * Supports spawning, parallel execution, and status tracking.
  */
 
+import type { TelemetryContext } from "@ku0/agent-runtime-telemetry/telemetry";
 import { type AgentEvents, createScopedEventBus, type RuntimeEventBus } from "../events";
 import { type AgentOrchestrator, createOrchestrator } from "../orchestrator/orchestrator";
 import { createSecurityPolicy } from "../security";
 import { createSessionState, type SessionState } from "../session";
-import type { TelemetryContext } from "../telemetry";
 import type { IToolRegistry } from "../tools/mcp/registry";
 import type { AgentMessage, MCPToolCall, SecurityPolicy } from "../types";
 import { AGENT_PROFILES, getAgentProfile, listAgentTypes } from "./profiles";

@@ -4,7 +4,7 @@
  * Loads and manages plugin lifecycle with security boundaries.
  */
 
-import { getLogger } from "../logging/logger.js";
+import { getLogger } from "@ku0/agent-runtime-telemetry/logging";
 import type {
   AgentContribution,
   AgentFactory,

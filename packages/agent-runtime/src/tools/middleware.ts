@@ -5,7 +5,7 @@
  * Enables logging, caching, rate limiting, metrics, and custom transformations.
  */
 
-import { getLogger } from "../logging/logger.js";
+import { getLogger } from "@ku0/agent-runtime-telemetry/logging";
 import type { MCPToolCall, MCPToolResult, ToolContext } from "../types";
 
 // ============================================================================

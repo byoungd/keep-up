@@ -3,8 +3,12 @@
  * @description Tests for the StructuredLogger
  */
 
+import {
+  createNoopLogger,
+  createStructuredLogger,
+  LogBuffer,
+} from "@ku0/agent-runtime-telemetry/telemetry";
 import { describe, expect, it } from "vitest";
-import { createNoopLogger, createStructuredLogger, LogBuffer } from "../telemetry/structuredLogger";
 
 describe("StructuredLogger", () => {
   describe("log levels", () => {

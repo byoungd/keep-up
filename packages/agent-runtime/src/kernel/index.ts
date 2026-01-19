@@ -4,6 +4,7 @@
  * Defines the boundary between control-plane orchestration and data-plane services.
  */
 
+import type { TelemetryContext } from "@ku0/agent-runtime-telemetry/telemetry";
 import type {
   ArtifactEmissionContext,
   ArtifactEmissionResult,
@@ -35,7 +36,6 @@ import type { SessionState } from "../session";
 import { createSessionState } from "../session";
 import type { SkillPromptAdapter, SkillRegistry, SkillSession } from "../skills";
 import { createSkillPolicyGuard, createSkillPromptAdapter, createSkillSession } from "../skills";
-import type { TelemetryContext } from "../telemetry";
 import { errorResult } from "../tools/mcp/baseServer";
 import type { IToolRegistry } from "../tools/mcp/registry";
 import type {

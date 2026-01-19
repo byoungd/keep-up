@@ -22,13 +22,13 @@
  * @module orchestrator/turnExecutor
  */
 
+import type { IMetricsCollector, SpanContext } from "@ku0/agent-runtime-telemetry/telemetry";
+import { AGENT_METRICS } from "@ku0/agent-runtime-telemetry/telemetry";
 import type { ContextFrameBuilder, ContextFrameOutput, ContextItem } from "../context";
 import type { KnowledgeMatchResult, KnowledgeRegistry } from "../knowledge";
 import { AGENTS_GUIDE_PROMPT } from "../prompts/agentGuidelines";
 import { SkillPromptAdapter, type SkillPromptOptions } from "../skills/skillPromptAdapter";
 import type { SkillRegistry } from "../skills/skillRegistry";
-import type { IMetricsCollector, SpanContext } from "../telemetry";
-import { AGENT_METRICS } from "../telemetry";
 import type { AgentMessage, AgentState, MCPToolCall, TokenUsageStats } from "../types";
 import type { AgentLLMRequest, AgentLLMResponse, AgentToolDefinition, IAgentLLM } from "./llmTypes";
 import type { MessageCompressor } from "./messageCompression";

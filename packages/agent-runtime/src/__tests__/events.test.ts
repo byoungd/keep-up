@@ -2,6 +2,11 @@
  * Event Bus Tests
  */
 
+import {
+  createLogger,
+  createMemoryTransport,
+  type MemoryTransport,
+} from "@ku0/agent-runtime-telemetry/logging";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createEventBus,
@@ -10,7 +15,6 @@ import {
   getGlobalEventBus,
   resetGlobalEventBus,
 } from "../events";
-import { createLogger, createMemoryTransport, type MemoryTransport } from "../logging/logger";
 
 describe("EventBus", () => {
   let eventBus: EventBus;

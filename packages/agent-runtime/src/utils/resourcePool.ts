@@ -11,7 +11,7 @@
  * - Backpressure handling
  */
 
-import { getLogger } from "../logging/logger.js";
+import { getLogger } from "@ku0/agent-runtime-telemetry/logging";
 
 const logger = getLogger("resource-pool");
 

@@ -12,10 +12,13 @@
  * - Event log write latency: <5ms (P99)
  */
 
+import {
+  createMetricsAggregator,
+  type MetricsAggregator,
+} from "@ku0/agent-runtime-telemetry/telemetry";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ContextCompactor, type Message } from "../context/ContextCompactor";
 import { createModelRouter, type ModelRoutingDecision } from "../routing/modelRouter";
-import { createMetricsAggregator, type MetricsAggregator } from "../telemetry/metricsAggregator";
 import { ToolResultCache } from "../utils/cache";
 
 // ============================================================================

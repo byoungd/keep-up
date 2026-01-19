@@ -2,7 +2,6 @@
  * Telemetry Module Tests
  */
 
-import { beforeEach, describe, expect, it } from "vitest";
 import {
   AGENT_METRICS,
   createTelemetryContext,
@@ -10,7 +9,8 @@ import {
   InMemoryTracer,
   measureAsync,
   traced,
-} from "../telemetry";
+} from "@ku0/agent-runtime-telemetry/telemetry";
+import { beforeEach, describe, expect, it } from "vitest";
 
 // ============================================================================
 // Metrics Collector Tests
