@@ -2,8 +2,8 @@
  * Lineage Tracking Tests
  */
 
+import { type AgentLineageManager, createLineageManager } from "@ku0/agent-runtime-tools";
 import { beforeEach, describe, expect, it } from "vitest";
-import { type AgentLineageManager, createLineageManager } from "../agents/lineage";
 
 describe("AgentLineageManager", () => {
   let manager: AgentLineageManager;

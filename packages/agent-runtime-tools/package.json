@@ -1,0 +1,61 @@
+{
+  "name": "@ku0/agent-runtime-tools",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Agent Runtime tool registry, tool servers, and integrations",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./tools": {
+      "types": "./dist/tools/index.d.ts",
+      "default": "./dist/tools/index.js"
+    },
+    "./browser": {
+      "types": "./dist/browser/index.d.ts",
+      "default": "./dist/browser/index.js"
+    },
+    "./plugins": {
+      "types": "./dist/plugins/index.d.ts",
+      "default": "./dist/plugins/index.js"
+    },
+    "./skills": {
+      "types": "./dist/skills/index.d.ts",
+      "default": "./dist/skills/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write ."
+  },
+  "dependencies": {
+    "@ku0/agent-runtime-control": "workspace:*",
+    "@ku0/agent-runtime-core": "workspace:*",
+    "@ku0/agent-runtime-sandbox": "workspace:*",
+    "@ku0/agent-runtime-telemetry": "workspace:*",
+    "@ku0/core": "workspace:*",
+    "@ku0/db": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.25.2",
+    "diff": "^8.0.3",
+    "gray-matter": "^4.0.3",
+    "playwright": "^1.51.0"
+  },
+  "devDependencies": {
+    "@types/diff": "^8.0.0",
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.3",
+    "vitest": "^4.0.0"
+  }
+}

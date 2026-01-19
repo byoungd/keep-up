@@ -14,7 +14,7 @@ export {
   type DelegationRole,
   type LineageAgentStatus,
   type LineageChain,
-} from "./lineage";
+} from "@ku0/agent-runtime-tools";
 // Manager
 export { AgentManager, createAgentManager } from "./manager";
 

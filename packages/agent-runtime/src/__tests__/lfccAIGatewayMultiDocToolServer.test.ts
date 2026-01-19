@@ -1,12 +1,12 @@
-import type { AIEnvelopeResponse, ReferenceStore } from "@ku0/core";
-import { documentId, gateway } from "@ku0/core";
-import { describe, expect, it } from "vitest";
-import { createSecurityPolicy } from "../security";
 import {
   type AIEnvelopeGateway,
   createLFCCToolServer,
   type MultiDocumentPolicy,
-} from "../tools/lfcc/lfccServer";
+} from "@ku0/agent-runtime-tools";
+import type { AIEnvelopeResponse, ReferenceStore } from "@ku0/core";
+import { documentId, gateway } from "@ku0/core";
+import { describe, expect, it } from "vitest";
+import { createSecurityPolicy } from "../security";
 import type { ToolContext } from "../types";
 
 const baseContext: ToolContext = {

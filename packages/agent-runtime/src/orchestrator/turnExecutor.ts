@@ -24,11 +24,11 @@
 
 import type { IMetricsCollector, SpanContext } from "@ku0/agent-runtime-telemetry/telemetry";
 import { AGENT_METRICS } from "@ku0/agent-runtime-telemetry/telemetry";
+import type { SkillRegistry } from "@ku0/agent-runtime-tools";
+import { SkillPromptAdapter, type SkillPromptOptions } from "@ku0/agent-runtime-tools";
 import type { ContextFrameBuilder, ContextFrameOutput, ContextItem } from "../context";
 import type { KnowledgeMatchResult, KnowledgeRegistry } from "../knowledge";
 import { AGENTS_GUIDE_PROMPT } from "../prompts/agentGuidelines";
-import { SkillPromptAdapter, type SkillPromptOptions } from "../skills/skillPromptAdapter";
-import type { SkillRegistry } from "../skills/skillRegistry";
 import type { AgentMessage, AgentState, MCPToolCall, TokenUsageStats } from "../types";
 import type { AgentLLMRequest, AgentLLMResponse, AgentToolDefinition, IAgentLLM } from "./llmTypes";
 import type { MessageCompressor } from "./messageCompression";

@@ -5,6 +5,7 @@
  */
 
 import type { TelemetryContext } from "@ku0/agent-runtime-telemetry/telemetry";
+import type { IToolRegistry } from "@ku0/agent-runtime-tools";
 import type { ToolExecutionOptions } from "../executor";
 import { createToolExecutor } from "../executor";
 import type { AgentModeManager } from "../modes";
@@ -20,7 +21,6 @@ import {
   resolveToolExecutionContext,
   type ToolPolicyEngine,
 } from "../security";
-import type { IToolRegistry } from "../tools/mcp/registry";
 import type {
   AuditLogger,
   CoworkToolContext,

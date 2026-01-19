@@ -6,6 +6,7 @@
 
 import type { TelemetryContext } from "@ku0/agent-runtime-telemetry/telemetry";
 import { AGENT_METRICS } from "@ku0/agent-runtime-telemetry/telemetry";
+import type { IToolRegistry } from "@ku0/agent-runtime-tools";
 import {
   createExecutionSandboxAdapter,
   type ExecutionSandboxAdapter,
@@ -24,7 +25,6 @@ import {
   type ToolPolicyDecision,
   type ToolPolicyEngine,
 } from "../security";
-import type { IToolRegistry } from "../tools/mcp/registry";
 import type {
   AuditLogger,
   ExecutionDecision,
@@ -35,14 +35,13 @@ import type {
   ToolContext,
   ToolError,
   ToolExecutionRecord,
+  ToolExecutor,
 } from "../types";
 import type { ToolResultCache } from "../utils/cache";
 import type { ToolRateLimiter } from "../utils/rateLimit";
 import { type RetryOptions, retry } from "../utils/retry";
 
-export interface ToolExecutor {
-  execute(call: MCPToolCall, context: ToolContext): Promise<MCPToolResult>;
-}
+export type { ToolExecutor } from "../types";
 
 export interface ToolExecutionObserver {
   onDecision?: (decision: ExecutionDecision, context: ToolContext) => void;

@@ -6,14 +6,19 @@
 
 import type { RuntimeEventBus } from "@ku0/agent-runtime-control";
 import type { TelemetryContext } from "@ku0/agent-runtime-telemetry/telemetry";
+import type {
+  IToolRegistry,
+  SkillPromptAdapter,
+  SkillRegistry,
+  SkillSession,
+} from "@ku0/agent-runtime-tools";
+import { createToolRegistry } from "@ku0/agent-runtime-tools";
 import type { ToolExecutor } from "./executor";
 import { createKernel, type Kernel, type KernelConfig, type RuntimeServices } from "./kernel";
 import type { IAgentLLM } from "./orchestrator/llmTypes";
 import type { IPermissionChecker } from "./security";
 import { createPermissionChecker, createSecurityPolicy } from "./security";
 import type { SessionState } from "./session";
-import type { SkillPromptAdapter, SkillRegistry, SkillSession } from "./skills";
-import { createToolRegistry, type IToolRegistry } from "./tools/mcp/registry";
 import type { AuditLogger, MCPToolServer, SecurityPolicy, SecurityPreset } from "./types";
 
 export interface RuntimeComponents {

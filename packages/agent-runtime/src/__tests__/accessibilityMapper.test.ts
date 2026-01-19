@@ -1,9 +1,9 @@
-import { describe, expect, it } from "vitest";
 import {
   buildAccessibilitySnapshot,
   parseAccessibilitySnapshotText,
   type RawAccessibilityNode,
-} from "../browser";
+} from "@ku0/agent-runtime-tools";
+import { describe, expect, it } from "vitest";
 
 describe("buildAccessibilitySnapshot", () => {
   it("assigns refs and tracks occurrences by role/name", () => {

@@ -9,13 +9,6 @@
  * - Error handling
  */
 
-import { beforeEach, describe, expect, it } from "vitest";
-import {
-  createGitToolServer,
-  GitToolServer,
-  type IGitExecutor,
-  MockGitExecutor,
-} from "../tools/git/gitServer";
 import type {
   CommitOptions,
   ConflictInfo,
@@ -27,7 +20,14 @@ import type {
   GitStash,
   GitStatus,
   SemanticDiffAnalysis,
-} from "../tools/git/types";
+} from "@ku0/agent-runtime-tools";
+import {
+  createGitToolServer,
+  GitToolServer,
+  type IGitExecutor,
+  MockGitExecutor,
+} from "@ku0/agent-runtime-tools";
+import { beforeEach, describe, expect, it } from "vitest";
 import type { ToolContext } from "../types";
 
 // ============================================================================

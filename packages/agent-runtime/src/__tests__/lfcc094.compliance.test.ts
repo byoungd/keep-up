@@ -10,11 +10,11 @@
  * This file focuses on Track H.5 specific compliance and metrics validation.
  */
 
+import { createLFCCToolServer, type MultiDocumentPolicy } from "@ku0/agent-runtime-tools";
 import type { ReferenceStore } from "@ku0/core";
 import { documentId, gateway } from "@ku0/core";
 import { describe, expect, it } from "vitest";
 import { createSecurityPolicy } from "../security";
-import { createLFCCToolServer, type MultiDocumentPolicy } from "../tools/lfcc/lfccServer";
 import type { ToolContext } from "../types";
 
 // ============================================================================

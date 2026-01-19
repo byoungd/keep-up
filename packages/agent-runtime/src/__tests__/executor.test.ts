@@ -18,6 +18,7 @@ import {
   type MetricValue,
   type TelemetryContext,
 } from "@ku0/agent-runtime-telemetry/telemetry";
+import type { IToolRegistry } from "@ku0/agent-runtime-tools";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   type CachePredicate,
@@ -31,7 +32,6 @@ import {
   createToolPolicyEngine,
   type IPermissionChecker,
 } from "../security";
-import type { IToolRegistry } from "../tools/mcp/registry";
 import type {
   AuditEntry,
   AuditLogger,

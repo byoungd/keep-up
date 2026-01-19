@@ -15,10 +15,10 @@
 
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import type { TodoItem } from "@ku0/agent-runtime-tools";
+import { createPlanPersistence, type PlanPersistence } from "@ku0/agent-runtime-tools";
 import { DEFAULT_AGENT_RUNTIME_DIR } from "../runtimePaths";
-import type { TodoItem } from "../tools/core/todo";
 import type { ExecutionPlan, PlanStep } from "./planning";
-import { createPlanPersistence, type PlanPersistence } from "./planPersistence";
 
 // ============================================================================
 // Types

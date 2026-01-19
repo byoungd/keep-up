@@ -2,11 +2,11 @@
  * Cowork File Tool Enforcement Tests
  */
 
+import { FileToolServer, type IFileSystem } from "@ku0/agent-runtime-tools";
 import { describe, expect, it } from "vitest";
 import { DEFAULT_COWORK_POLICY } from "../cowork/defaultPolicy";
 import { CoworkPolicyEngine } from "../cowork/policy";
 import type { CoworkSession } from "../cowork/types";
-import { FileToolServer, type IFileSystem } from "../tools/core/file";
 import { SECURITY_PRESETS } from "../types";
 
 class StubFileSystem implements IFileSystem {

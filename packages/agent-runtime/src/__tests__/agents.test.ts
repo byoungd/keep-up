@@ -344,14 +344,16 @@ describe("AgentManager", () => {
 
 describe("WebSearchToolServer", () => {
   it("should be importable", async () => {
-    const { createWebSearchToolServer, MockWebSearchProvider } = await import("../tools/web");
+    const { createWebSearchToolServer, MockWebSearchProvider } = await import(
+      "@ku0/agent-runtime-tools"
+    );
 
     expect(createWebSearchToolServer).toBeDefined();
     expect(MockWebSearchProvider).toBeDefined();
   });
 
   it("should create server with mock provider", async () => {
-    const { createWebSearchToolServer } = await import("../tools/web");
+    const { createWebSearchToolServer } = await import("@ku0/agent-runtime-tools");
     const server = createWebSearchToolServer();
 
     const tools = server.listTools();
@@ -360,7 +362,9 @@ describe("WebSearchToolServer", () => {
   });
 
   it("should search with mock provider", async () => {
-    const { createWebSearchToolServer, MockWebSearchProvider } = await import("../tools/web");
+    const { createWebSearchToolServer, MockWebSearchProvider } = await import(
+      "@ku0/agent-runtime-tools"
+    );
     const { createSecurityPolicy } = await import("../security");
 
     const mockProvider = new MockWebSearchProvider();
@@ -380,7 +384,9 @@ describe("WebSearchToolServer", () => {
   });
 
   it("should fetch with mock provider", async () => {
-    const { createWebSearchToolServer, MockWebSearchProvider } = await import("../tools/web");
+    const { createWebSearchToolServer, MockWebSearchProvider } = await import(
+      "@ku0/agent-runtime-tools"
+    );
     const { createSecurityPolicy } = await import("../security");
 
     const mockProvider = new MockWebSearchProvider();
@@ -395,7 +401,7 @@ describe("WebSearchToolServer", () => {
   });
 
   it("should reject invalid URLs", async () => {
-    const { createWebSearchToolServer } = await import("../tools/web");
+    const { createWebSearchToolServer } = await import("@ku0/agent-runtime-tools");
     const { createSecurityPolicy } = await import("../security");
 
     const server = createWebSearchToolServer();
@@ -409,7 +415,7 @@ describe("WebSearchToolServer", () => {
   });
 
   it("should respect network permission", async () => {
-    const { createWebSearchToolServer } = await import("../tools/web");
+    const { createWebSearchToolServer } = await import("@ku0/agent-runtime-tools");
     const { securityPolicy } = await import("../security");
 
     const server = createWebSearchToolServer();

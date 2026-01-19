@@ -1,3 +1,4 @@
+import { SandboxToolServer } from "@ku0/agent-runtime-tools";
 import { describe, expect, it } from "vitest";
 import type {
   SandboxContext,
@@ -7,7 +8,6 @@ import type {
   SandboxManager,
   SandboxPolicy,
 } from "../sandbox";
-import { SandboxToolServer } from "../tools/sandbox/sandboxToolServer";
 import type { ToolContext } from "../types";
 
 class MockSandboxContext implements SandboxContext {
