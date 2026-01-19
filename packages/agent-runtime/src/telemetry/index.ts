@@ -554,6 +554,19 @@ export function attachTelemetryToEventBus(
   };
 }
 
+// Metrics Aggregator (Track H.3)
+export {
+  type AggregatedMetric,
+  createMetricsAggregator,
+  getMetricsAggregator,
+  type HistogramBucket,
+  type HistogramData,
+  METRIC_NAMES,
+  type MetricDataPoint,
+  MetricsAggregator,
+  type MetricsAggregatorConfig,
+  type SummaryData,
+} from "./metricsAggregator";
 // Profiler
 export {
   createNoopProfiler,
@@ -567,7 +580,6 @@ export {
   profileMethod,
   setGlobalProfiler,
 } from "./profiler";
-
 // Structured Logger
 export {
   type AgentLogContext,
