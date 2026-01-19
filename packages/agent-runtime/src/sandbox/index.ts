@@ -125,6 +125,7 @@ export type {
 } from "./sandboxContext";
 export type {
   DockerSandboxManagerOptions,
+  DockerSandboxPoolOptions,
   SandboxManager,
   SandboxPolicy,
   SandboxSessionConfig,

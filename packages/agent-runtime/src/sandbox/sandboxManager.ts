@@ -5,8 +5,10 @@
  */
 
 import { PassThrough } from "node:stream";
-import Dockerode, { type Container, type HostConfig } from "dockerode";
+import Dockerode, { type Container } from "dockerode";
 import type { RuntimeAssetManager } from "../assets";
+import { createSandboxContainer } from "./containerFactory";
+import { ContainerPool } from "./containerPool";
 import type {
   SandboxContext,
   SandboxExecOptions,
@@ -47,6 +49,17 @@ export interface DockerSandboxManagerOptions {
   containerWorkspacePath?: string;
   defaultPolicy?: SandboxPolicy;
   assetManager?: RuntimeAssetManager;
+  pool?: DockerSandboxPoolOptions;
+}
+
+export interface DockerSandboxPoolOptions {
+  enabled?: boolean;
+  minSize?: number;
+  maxSize?: number;
+  idleTimeoutMs?: number;
+  healthCheckIntervalMs?: number;
+  resetCommand?: string;
+  resetTimeoutMs?: number;
 }
 
 const DEFAULT_POLICY: SandboxPolicy = {
@@ -59,6 +72,13 @@ const DEFAULT_POLICY: SandboxPolicy = {
 
 const DEFAULT_IMAGE = "node:20-alpine";
 const DEFAULT_CONTAINER_WORKSPACE = "/workspace";
+const DEFAULT_POOL_OPTIONS: Required<
+  Pick<DockerSandboxPoolOptions, "enabled" | "minSize" | "maxSize">
+> = {
+  enabled: true,
+  minSize: 2,
+  maxSize: 10,
+};
 
 export class DockerSandboxManager implements SandboxManager {
   private readonly docker: Dockerode;
@@ -68,6 +88,8 @@ export class DockerSandboxManager implements SandboxManager {
   private readonly containerWorkspacePath: string;
   private readonly defaultPolicy: SandboxPolicy;
   private readonly assetManager?: RuntimeAssetManager;
+  private readonly poolOptions: DockerSandboxPoolOptions;
+  private pool?: ContainerPool;
 
   constructor(options: DockerSandboxManagerOptions = {}) {
     this.assetManager = options.assetManager;
@@ -76,6 +98,7 @@ export class DockerSandboxManager implements SandboxManager {
     this.workspacePath = options.workspacePath ?? process.cwd();
     this.containerWorkspacePath = options.containerWorkspacePath ?? DEFAULT_CONTAINER_WORKSPACE;
     this.defaultPolicy = options.defaultPolicy ?? DEFAULT_POLICY;
+    this.poolOptions = { ...DEFAULT_POOL_OPTIONS, ...options.pool };
   }
 
   async isAvailable(timeoutMs = 1500): Promise<boolean> {
@@ -109,11 +132,14 @@ export class DockerSandboxManager implements SandboxManager {
     const workspacePath = config.workspacePath ?? this.workspacePath;
     const image = config.image ?? this.image;
     await this.ensureImageAvailable(image);
-    const container = await this.createContainer({
-      image,
-      workspacePath,
-      policy,
-    });
+    const usePool = this.shouldUsePool(config, image, workspacePath);
+    const container = usePool
+      ? await this.getOrCreatePool().acquire()
+      : await this.createContainer({
+          image,
+          workspacePath,
+          policy,
+        });
 
     const context = new DockerSandboxContext({
       id,
@@ -123,6 +149,11 @@ export class DockerSandboxManager implements SandboxManager {
       containerWorkspacePath: this.containerWorkspacePath,
       policy,
       docker: this.docker,
+      releaseContainer: usePool
+        ? async (leased, clean) => {
+            await this.getOrCreatePool().release(leased, clean);
+          }
+        : undefined,
     });
     this.contexts.set(id, context);
     return context;
@@ -151,6 +182,10 @@ export class DockerSandboxManager implements SandboxManager {
     for (const id of ids) {
       await this.closeSandbox(id);
     }
+    if (this.pool) {
+      await this.pool.dispose();
+      this.pool = undefined;
+    }
   }
 
   private async createContainer(input: {
@@ -158,20 +193,13 @@ export class DockerSandboxManager implements SandboxManager {
     workspacePath: string;
     policy: SandboxPolicy;
   }): Promise<Container> {
-    const hostConfig = buildHostConfig(
-      input.workspacePath,
-      this.containerWorkspacePath,
-      input.policy
-    );
-    const container = await this.docker.createContainer({
-      Image: input.image,
-      Cmd: ["sh", "-c", "tail -f /dev/null"],
-      Tty: false,
-      WorkingDir: this.containerWorkspacePath,
-      HostConfig: hostConfig,
+    return createSandboxContainer({
+      docker: this.docker,
+      image: input.image,
+      workspacePath: input.workspacePath,
+      containerWorkspacePath: this.containerWorkspacePath,
+      policy: input.policy,
     });
-    await container.start();
-    return container;
   }
 
   private async ensureImageAvailable(image: string): Promise<void> {
@@ -185,6 +213,48 @@ export class DockerSandboxManager implements SandboxManager {
     if (!status.imagePresent) {
       throw new Error(status.reason ?? `Docker image ${image} unavailable`);
     }
+  }
+
+  private shouldUsePool(
+    config: SandboxSessionConfig,
+    image: string,
+    workspacePath: string
+  ): boolean {
+    if (!this.poolOptions.enabled) {
+      return false;
+    }
+    if (this.poolOptions.maxSize !== undefined && this.poolOptions.maxSize < 1) {
+      return false;
+    }
+    if (config.policy) {
+      return false;
+    }
+    if (image !== this.image) {
+      return false;
+    }
+    if (workspacePath !== this.workspacePath) {
+      return false;
+    }
+    return true;
+  }
+
+  private getOrCreatePool(): ContainerPool {
+    if (!this.pool) {
+      this.pool = new ContainerPool(this.docker, {
+        minSize: this.poolOptions.minSize ?? DEFAULT_POOL_OPTIONS.minSize,
+        maxSize: this.poolOptions.maxSize ?? DEFAULT_POOL_OPTIONS.maxSize,
+        idleTimeoutMs: this.poolOptions.idleTimeoutMs,
+        healthCheckIntervalMs: this.poolOptions.healthCheckIntervalMs,
+        resetCommand: this.poolOptions.resetCommand,
+        resetTimeoutMs: this.poolOptions.resetTimeoutMs,
+        image: this.image,
+        workspacePath: this.workspacePath,
+        containerWorkspacePath: this.containerWorkspacePath,
+        policy: this.defaultPolicy,
+      });
+      this.pool.start();
+    }
+    return this.pool;
   }
 }
 
@@ -200,6 +270,8 @@ class DockerSandboxContext implements SandboxContext {
 
   private readonly container: Container;
   private readonly docker: Dockerode;
+  private readonly releaseContainer?: (container: Container, clean: boolean) => Promise<void>;
+  private dirty = false;
 
   constructor(input: {
     id: string;
@@ -209,6 +281,7 @@ class DockerSandboxContext implements SandboxContext {
     containerWorkspacePath: string;
     policy: SandboxPolicy;
     docker: Dockerode;
+    releaseContainer?: (container: Container, clean: boolean) => Promise<void>;
   }) {
     this.id = input.id;
     this.container = input.container;
@@ -218,6 +291,7 @@ class DockerSandboxContext implements SandboxContext {
     this.containerWorkspacePath = input.containerWorkspacePath;
     this.policy = input.policy;
     this.docker = input.docker;
+    this.releaseContainer = input.releaseContainer;
     this.createdAt = Date.now();
     this.lastUsedAt = this.createdAt;
   }
@@ -234,6 +308,7 @@ class DockerSandboxContext implements SandboxContext {
   }
 
   async exec(command: string, options: SandboxExecOptions = {}): Promise<SandboxExecResult> {
+    this.dirty = true;
     await this.ensureRunning();
     const startTime = Date.now();
     const maxOutputBytes = options.maxOutputBytes ?? 1024 * 1024;
@@ -326,6 +401,14 @@ class DockerSandboxContext implements SandboxContext {
   }
 
   async dispose(): Promise<void> {
+    if (this.releaseContainer) {
+      try {
+        await this.releaseContainer(this.container, !this.dirty);
+        return;
+      } catch {
+        // Fall through to container removal.
+      }
+    }
     try {
       await this.container.stop({ t: 2 });
     } catch {
@@ -337,25 +420,4 @@ class DockerSandboxContext implements SandboxContext {
       // Ignore removal errors
     }
   }
-}
-
-function buildHostConfig(
-  workspacePath: string,
-  containerWorkspacePath: string,
-  policy: SandboxPolicy
-): HostConfig {
-  const bindMode = policy.filesystem === "read-only" ? "ro" : "rw";
-  const binds = [`${workspacePath}:${containerWorkspacePath}:${bindMode}`];
-  const readonlyRoot = policy.filesystem !== "full";
-
-  return {
-    AutoRemove: false,
-    // Docker does not enforce domain allowlists; keep network isolated when requested.
-    NetworkMode: policy.network === "none" ? "none" : "bridge",
-    Binds: binds,
-    ReadonlyRootfs: readonlyRoot,
-    Tmpfs: readonlyRoot ? { "/tmp": "rw", "/var/tmp": "rw" } : undefined,
-    Memory: policy.maxMemoryMB * 1024 * 1024,
-    NanoCpus: Math.round((policy.maxCpuPercent / 100) * 1e9),
-  };
 }
