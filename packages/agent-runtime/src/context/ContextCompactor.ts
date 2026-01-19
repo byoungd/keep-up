@@ -88,6 +88,32 @@ export interface CompactionResult {
   tokensSaved?: number;
   /** Original messages preserved for checkpoint */
   originalMessages?: Message[];
+  /** Compression metrics (Track H.2) */
+  metrics?: CompressionMetrics;
+}
+
+/**
+ * Compression metrics for observability (Track H.2).
+ */
+export interface CompressionMetrics {
+  /** Original token count before compression */
+  originalTokens: number;
+  /** Token count after compression */
+  compressedTokens: number;
+  /** Tokens saved (absolute) */
+  tokensSaved: number;
+  /** Compression ratio (0.0 to 1.0, higher = more compression) */
+  compressionRatio: number;
+  /** Time taken to perform compression in ms */
+  compressionTimeMs: number;
+  /** Strategy used */
+  strategy: "summarize" | "truncate" | "hybrid" | "prune";
+  /** Quality score estimate (0.0 to 1.0, based on preserved context) */
+  qualityScore: number;
+  /** Number of messages summarized */
+  messagesSummarized: number;
+  /** Number of tool results pruned */
+  toolResultsPruned: number;
 }
 
 /**
@@ -288,13 +314,16 @@ Do NOT include redundant tool outputs or verbose explanations.`;
 
   /**
    * Apply a summary to the context and prepare for continuation.
+   * Enhanced with compression metrics (Track H.2).
    */
   applyCompaction(
     contextManager: ContextManager,
     contextId: string,
     summary: string,
-    recentMessages: Message[]
+    recentMessages: Message[],
+    originalMessages?: Message[]
   ): CompactionResult {
+    const startTime = performance.now();
     const context = contextManager.get(contextId);
     if (!context) {
       return {
@@ -304,16 +333,46 @@ Do NOT include redundant tool outputs or verbose explanations.`;
       };
     }
 
+    // Calculate token metrics
+    const originalTokens = originalMessages ? this.estimateTokens(originalMessages) : 0;
+    const summaryTokens = countTokens(summary);
+    const recentTokens = this.estimateTokens(recentMessages);
+    const compressedTokens = summaryTokens + recentTokens;
+    const tokensSaved = Math.max(0, originalTokens - compressedTokens);
+    const compressionRatio = originalTokens > 0 ? tokensSaved / originalTokens : 0;
+
+    // Calculate quality score (heuristic based on preservation ratio)
+    // Higher preservation of recent messages = higher quality
+    const messagesSummarized = originalMessages ? originalMessages.length : 0;
+    const preservationRatio =
+      messagesSummarized > 0 ? recentMessages.length / messagesSummarized : 1;
+    const qualityScore = Math.min(1, 0.5 + preservationRatio * 0.5);
+
     // Update scratchpad with summary
     const timestamp = new Date().toISOString();
     const compactionNote = `[Compaction @ ${timestamp}]\n${summary}`;
     contextManager.updateScratchpad(contextId, compactionNote, "append");
 
+    const compressionTimeMs = performance.now() - startTime;
+
     return {
       compacted: true,
       summary,
-      messagesBefore: recentMessages.length + 1, // +1 for the summarized portion
+      messagesBefore: (originalMessages?.length ?? 0) + recentMessages.length,
       messagesAfter: recentMessages.length,
+      tokensSaved,
+      originalMessages,
+      metrics: {
+        originalTokens,
+        compressedTokens,
+        tokensSaved,
+        compressionRatio,
+        compressionTimeMs,
+        strategy: this.contextConfig.compressionStrategy,
+        qualityScore,
+        messagesSummarized,
+        toolResultsPruned: 0, // Will be set by pruneToolResults if called
+      },
     };
   }
 
