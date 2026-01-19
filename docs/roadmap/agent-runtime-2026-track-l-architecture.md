@@ -110,7 +110,7 @@ graph TD
 - [x] Resolve open placements for bridge/browser/cowork/events (see [Resolved Placements](../architecture/agent-runtime-module-decomposition-rfc.md#resolved-placements)).
 
 ### Phase 2: Core Interfaces and Composition Root
-- [ ] Extract runtime interfaces and shared types into `agent-runtime-core`.
+- [x] Extract runtime interfaces and shared types into `agent-runtime-core`.
 - [ ] Define `RuntimeComponents` wiring contract.
 - [ ] Design `createRuntime` composition factory for explicit DI.
 - [x] Break circular dependencies per RFC Cycle Resolution Plan.
