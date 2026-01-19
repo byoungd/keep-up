@@ -28,3 +28,5 @@ export {
   type ReadFileResult,
   readFile,
 } from "./fileSystem";
+// Patch operations
+export { type ApplyPatchResult, applyPatch } from "./patch";

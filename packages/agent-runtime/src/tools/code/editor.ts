@@ -73,47 +73,163 @@ function detectLanguage(filePath: string): Language {
 // Syntax Validation
 // ============================================================================
 
-interface ValidationResult {
-  valid: boolean;
-  error?: string;
+interface ValidationSnapshot {
+  ok: boolean;
+  output: string;
+  signatures: string[];
 }
 
-async function validateSyntax(filePath: string, language: Language): Promise<ValidationResult> {
+interface ValidationCommand {
+  command: string;
+  args: string[];
+  timeout: number;
+}
+
+function getValidationCommand(filePath: string, language: Language): ValidationCommand | null {
+  switch (language) {
+    case "typescript":
+      return {
+        command: "npx",
+        args: ["tsc", "--noEmit", "--skipLibCheck", "--pretty", "false", filePath],
+        timeout: 30_000,
+      };
+    case "javascript":
+      return {
+        command: "node",
+        args: ["--check", filePath],
+        timeout: 10_000,
+      };
+    case "python":
+      return {
+        command: "python3",
+        args: ["-m", "py_compile", filePath],
+        timeout: 10_000,
+      };
+    default:
+      return null;
+  }
+}
+
+async function runValidation(filePath: string, language: Language): Promise<ValidationSnapshot> {
+  const command = getValidationCommand(filePath, language);
+  if (!command) {
+    return { ok: true, output: "", signatures: [] };
+  }
+
   try {
-    switch (language) {
-      case "typescript":
-      case "javascript": {
-        // Use tsc --noEmit for TypeScript/JavaScript
-        const { stderr } = await execFileAsync(
-          "npx",
-          ["tsc", "--noEmit", "--skipLibCheck", filePath],
-          {
-            timeout: 30000,
-          }
-        );
-        if (stderr?.includes("error")) {
-          return { valid: false, error: stderr };
-        }
-        return { valid: true };
-      }
-      case "python": {
-        // Use python -m py_compile for Python
-        await execFileAsync("python3", ["-m", "py_compile", filePath], {
-          timeout: 10000,
-        });
-        return { valid: true };
-      }
-      default:
-        // Skip validation for unknown languages
-        return { valid: true };
-    }
-  } catch (err) {
-    const error = err as { stderr?: string; message?: string };
+    const { stdout, stderr } = await execFileAsync(command.command, command.args, {
+      timeout: command.timeout,
+    });
+    const output = [stdout, stderr].filter(Boolean).join("\n").trim();
     return {
-      valid: false,
-      error: error.stderr || error.message || "Unknown validation error",
+      ok: true,
+      output,
+      signatures: extractDiagnosticSignatures(output, language),
+    };
+  } catch (err) {
+    const error = err as { stdout?: string; stderr?: string; message?: string };
+    const output = [error.stdout, error.stderr, error.message].filter(Boolean).join("\n").trim();
+    return {
+      ok: false,
+      output,
+      signatures: extractDiagnosticSignatures(output, language),
     };
   }
+}
+
+function extractDiagnosticSignatures(output: string, language: Language): string[] {
+  if (!output) {
+    return [];
+  }
+
+  const lines = output
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const signatures: string[] = [];
+  for (const line of lines) {
+    const signature = extractSignatureFromLine(line, language);
+    if (signature) {
+      signatures.push(signature);
+      continue;
+    }
+
+    if (line.includes("error")) {
+      signatures.push(normalizeDiagnosticLine(line));
+    }
+  }
+
+  return signatures;
+}
+
+function extractSignatureFromLine(line: string, language: Language): string | null {
+  switch (language) {
+    case "typescript":
+      return extractTypeScriptSignature(line);
+    case "javascript":
+      return extractJavaScriptSignature(line);
+    case "python":
+      return extractPythonSignature(line);
+    default:
+      return null;
+  }
+}
+
+function extractTypeScriptSignature(line: string): string | null {
+  const match = line.match(/error TS(\d+):\s*(.*)$/);
+  if (!match) {
+    return null;
+  }
+  return `TS${match[1]}:${match[2]}`;
+}
+
+function extractJavaScriptSignature(line: string): string | null {
+  const match = line.match(
+    /^(SyntaxError|ReferenceError|TypeError|RangeError|EvalError|URIError):\s*(.*)$/
+  );
+  if (!match) {
+    return null;
+  }
+  return `${match[1]}:${match[2]}`;
+}
+
+function extractPythonSignature(line: string): string | null {
+  const match = line.match(
+    /^(SyntaxError|IndentationError|TabError|NameError|TypeError|ValueError):\s*(.*)$/
+  );
+  if (!match) {
+    return null;
+  }
+  return `${match[1]}:${match[2]}`;
+}
+
+function normalizeDiagnosticLine(line: string): string {
+  return line
+    .replace(/:\d+:\d+/g, ":<line>:<col>")
+    .replace(/:\d+/g, ":<line>")
+    .replace(/\\/g, "/");
+}
+
+function getValidationError(
+  baseline: ValidationSnapshot,
+  current: ValidationSnapshot
+): string | undefined {
+  if (current.ok) {
+    return undefined;
+  }
+
+  const baselineSet = new Set(baseline.signatures);
+  const newDiagnostics = current.signatures.filter((sig) => !baselineSet.has(sig));
+
+  if (newDiagnostics.length === 0) {
+    if (baseline.ok) {
+      return current.output || "Syntax validation failed.";
+    }
+    return undefined;
+  }
+
+  return `New diagnostics detected:\n${newDiagnostics.join("\n")}`;
 }
 
 // ============================================================================
@@ -206,25 +322,27 @@ export async function editFile(
     };
   }
 
+  const language = detectLanguage(absolutePath);
+  const baseline =
+    shouldValidate && language !== "unknown" ? await runValidation(absolutePath, language) : null;
+
   // Write new content
   await fs.writeFile(absolutePath, newContent, "utf-8");
 
   // Validate syntax if requested
-  if (shouldValidate) {
-    const language = detectLanguage(absolutePath);
-    if (language !== "unknown") {
-      const validation = await validateSyntax(absolutePath, language);
+  if (shouldValidate && language !== "unknown" && baseline) {
+    const validation = await runValidation(absolutePath, language);
+    const validationError = getValidationError(baseline, validation);
 
-      if (!validation.valid) {
-        // Rollback
-        await fs.writeFile(absolutePath, originalContent, "utf-8");
-        return {
-          success: false,
-          diff,
-          syntaxError: validation.error,
-          rolledBack: true,
-        };
-      }
+    if (validationError) {
+      // Rollback
+      await fs.writeFile(absolutePath, originalContent, "utf-8");
+      return {
+        success: false,
+        diff,
+        syntaxError: validationError,
+        rolledBack: true,
+      };
     }
   }
 
