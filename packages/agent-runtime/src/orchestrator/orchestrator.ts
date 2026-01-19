@@ -76,6 +76,7 @@ import type {
   ToolError,
   ToolExecutionContext,
 } from "../types";
+import { ToolResultCache } from "../utils/cache";
 import { countTokens } from "../utils/tokenCounter";
 import {
   type AgentLoopStateMachine,
@@ -98,7 +99,7 @@ import {
 import { createRequestCache, type RequestCache } from "./requestCache";
 import { createSingleStepEnforcer, type SingleStepEnforcer } from "./singleStepEnforcer";
 import { SmartToolScheduler } from "./smartToolScheduler";
-import { ToolResultCache } from "./toolResultCache";
+import { OrchestratorStatusController } from "./statusController";
 import { createTurnExecutor, type ITurnExecutor, type TurnOutcome } from "./turnExecutor";
 
 // ============================================================================
@@ -294,6 +295,7 @@ export class AgentOrchestrator {
   private readonly modelRouter?: ModelRouter;
   private readonly loopStateMachine: AgentLoopStateMachine;
   private readonly singleStepEnforcer: SingleStepEnforcer;
+  private readonly statusController: OrchestratorStatusController;
   private lastObservation?: Observation;
   private currentRunId?: string;
   private currentPlanNodeId?: string;
@@ -352,6 +354,7 @@ export class AgentOrchestrator {
     this.tracer = telemetry?.tracer;
     this.sessionState = components.sessionState;
     this.state = this.resolveInitialState();
+    this.statusController = new OrchestratorStatusController(this.state.status);
     this.singleStepEnforcer = createSingleStepEnforcer({
       enabled: config.toolExecutionContext?.policy === "interactive",
       allowZeroToolCalls: true,
@@ -379,7 +382,8 @@ export class AgentOrchestrator {
         maxToolResultTokens: 500,
       });
 
-    this.toolResultCache = components.toolResultCache ?? new ToolResultCache();
+    this.toolResultCache =
+      components.toolResultCache ?? this.sessionState?.toolCache ?? new ToolResultCache();
 
     this.requestCache =
       components.requestCache ??
@@ -479,7 +483,7 @@ export class AgentOrchestrator {
 
     try {
       if (!this.hasCompletionTool()) {
-        this.state.status = "error";
+        this.statusController.setStatus(this.state, "error");
         this.state.error = "Completion tool not registered.";
         this.emit("error", { error: this.state.error });
         this.metrics?.increment(AGENT_METRICS.turnsTotal.name, { status: "error" });
@@ -506,7 +510,7 @@ export class AgentOrchestrator {
       this.state.status !== "waiting_confirmation" &&
       this.state.status !== "error"
     ) {
-      this.state.status = "error";
+      this.statusController.setStatus(this.state, "error");
       this.state.error = this.state.error ?? "Task terminated without calling complete_task.";
       this.emit("error", { error: this.state.error });
     }
@@ -563,7 +567,7 @@ export class AgentOrchestrator {
       throw new Error("Cannot resume: agent is not waiting for confirmation");
     }
 
-    this.state.status = "executing";
+    this.statusController.setStatus(this.state, "executing");
     this.loopStateMachine.resume();
     while (this.shouldContinue()) {
       await this.awaitControlGate();
@@ -583,7 +587,7 @@ export class AgentOrchestrator {
   stop(): void {
     this.abortController?.abort();
     if (this.state.status !== "error") {
-      this.state.status = "error";
+      this.statusController.setStatus(this.state, "error");
       this.state.error = this.state.error ?? "Execution aborted before completion.";
       this.emit("error", { error: this.state.error });
     }
@@ -1024,7 +1028,7 @@ export class AgentOrchestrator {
 
   private async executeTurn(): Promise<void> {
     this.state.turn++;
-    this.state.status = "thinking";
+    this.statusController.setStatus(this.state, "thinking");
     this.emit("turn:start", { turn: this.state.turn });
 
     const turnStart = Date.now();
@@ -1225,7 +1229,7 @@ export class AgentOrchestrator {
       throw new Error("Plan approval denied.");
     }
 
-    this.state.status = "executing";
+    this.statusController.setStatus(this.state, "executing");
     this.loopStateMachine.transitionToAction(decision);
     await this.executeToolCalls(toolCalls, turnSpan);
     const observation = this.buildToolObservation(toolCalls, turnStart);
@@ -1253,7 +1257,7 @@ export class AgentOrchestrator {
   }
 
   private handleTurnError(err: unknown, turnSpan?: SpanContext): void {
-    this.state.status = "error";
+    this.statusController.setStatus(this.state, "error");
     this.state.error = err instanceof Error ? err.message : String(err);
     this.emit("error", { error: this.state.error });
     this.metrics?.increment(AGENT_METRICS.turnsTotal.name, { status: "error" });
@@ -1292,7 +1296,7 @@ export class AgentOrchestrator {
     isRecovery: boolean
   ): Promise<boolean> {
     const decision = this.buildDecisionForToolCalls(toolCalls);
-    this.state.status = "executing";
+    this.statusController.setStatus(this.state, "executing");
     this.loopStateMachine.transitionToAction(decision);
     await this.executeToolCalls(toolCalls, turnSpan);
     const observation = this.buildToolObservation(toolCalls, turnStart);
@@ -1313,7 +1317,7 @@ export class AgentOrchestrator {
       throw new Error(parsedPayload.error ?? "Completion payload missing required fields.");
     }
 
-    this.state.status = "complete";
+    this.statusController.setStatus(this.state, "complete");
     this.emitCompletion(parsedPayload.payload);
     this.metrics?.increment(AGENT_METRICS.turnsTotal.name, { status: "complete" });
     turnSpan?.setStatus("ok");
@@ -1444,7 +1448,8 @@ export class AgentOrchestrator {
         continue;
       }
 
-      const groupConcurrency = Math.min(maxConcurrent, maxParallel, group.length);
+      const recommendedConcurrency = this.toolScheduler.recommendConcurrency(group, maxConcurrent);
+      const groupConcurrency = Math.min(recommendedConcurrency, maxParallel, group.length);
       await this.executeParallelToolCalls(group, groupConcurrency, parentSpan);
     }
   }
@@ -1670,7 +1675,7 @@ export class AgentOrchestrator {
     context: ToolContext
   ): Promise<MCPToolResult> {
     // Try cache first
-    let result = this.toolResultCache.get(call);
+    let result = this.toolResultCache.get(call.name, call.arguments) as MCPToolResult | undefined;
     if (result) {
       this.emit("tool:result", { toolName: call.name, result, cached: true });
       return result;
@@ -1691,7 +1696,7 @@ export class AgentOrchestrator {
     }
 
     // Cache the result
-    this.toolResultCache.set(call, result);
+    this.toolResultCache.set(call.name, call.arguments, result);
     return result;
   }
 
@@ -1786,14 +1791,14 @@ export class AgentOrchestrator {
       return false;
     }
 
-    this.state.status = "waiting_confirmation";
+    this.statusController.setStatus(this.state, "waiting_confirmation");
     this.emit("confirmation:required", request);
     this.loopStateMachine.pause();
 
     const confirmed = await this.confirmationHandler(request);
 
     this.emit("confirmation:received", { confirmed });
-    this.state.status = "executing";
+    this.statusController.setStatus(this.state, "executing");
     this.loopStateMachine.resume();
 
     return confirmed;

@@ -22,6 +22,7 @@ const taskRuntime = new CoworkTaskRuntime({
   events: eventHub,
   logger: serverLogger,
   contextIndexManager,
+  runtimePersistence: serverConfig.runtimePersistence,
 });
 const app = createCoworkApp({
   storage,

@@ -22,3 +22,8 @@ export {
   type RecoveryOptions,
   type RecoveryResult,
 } from "./checkpointManager";
+export {
+  type CheckpointDelta,
+  MessagePackCheckpointStorage,
+  type MessagePackCheckpointStorageConfig,
+} from "./messagePackCheckpointStorage";
