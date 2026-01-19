@@ -8,7 +8,7 @@ import type {
   CallToolResult as SdkCallToolResult,
   Tool as SdkTool,
   ToolAnnotations as SdkToolAnnotations,
-} from "@modelcontextprotocol/sdk/types";
+} from "@modelcontextprotocol/sdk/types.js";
 import type { JSONSchema, MCPTool, MCPToolResult, ToolContent } from "../../types";
 
 export interface ToolScopeConfig {
