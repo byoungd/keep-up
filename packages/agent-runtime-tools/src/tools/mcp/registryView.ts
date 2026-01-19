@@ -49,12 +49,12 @@ class ToolServerView implements MCPToolServer {
     return this.server.callTool(call, context);
   }
 
-  initialize?(): Promise<void> {
-    return this.server.initialize?.();
+  async initialize(): Promise<void> {
+    await this.server.initialize?.();
   }
 
-  dispose?(): Promise<void> {
-    return this.server.dispose?.();
+  async dispose(): Promise<void> {
+    await this.server.dispose?.();
   }
 }
 
