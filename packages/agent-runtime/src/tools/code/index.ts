@@ -1,0 +1,30 @@
+/**
+ * Code Tools Module
+ *
+ * Provides code file operations for agents: reading, editing, and navigation.
+ */
+
+// Tool server
+export { CodeToolServer, createCodeToolServer } from "./codeServer";
+
+// Editor operations
+export {
+  deleteLines,
+  type EditChunk,
+  type EditOptions,
+  type EditResult,
+  editFile,
+  insertAfterLine,
+  replaceLines,
+} from "./editor";
+// File system operations
+export {
+  type FileEntry,
+  fileExists,
+  getFileStats,
+  type ListFilesOptions,
+  listFiles,
+  type ReadFileOptions,
+  type ReadFileResult,
+  readFile,
+} from "./fileSystem";
