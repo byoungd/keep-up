@@ -69,6 +69,7 @@ import type {
   AgentConfig,
   AgentMessage,
   AgentState,
+  ArtifactEnvelope,
   ConfirmationHandler,
   ConfirmationRequest,
   MCPTool,
@@ -282,6 +283,7 @@ export class AgentOrchestrator {
   private lastObservation?: Observation;
   private currentRunId?: string;
   private currentPlanNodeId?: string;
+  private planArtifactEmitted = false;
   private readonly taskGraphToolCalls = new WeakMap<MCPToolCall, string>();
   private totalUsage: TokenUsageStats = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
   private readonly controlState: ControlStateSnapshot = { paused: false, stepMode: false };
@@ -511,6 +513,8 @@ export class AgentOrchestrator {
       maxRefinements: config.planning?.maxRefinements,
       planningTimeoutMs: config.planning?.planningTimeoutMs,
       autoExecuteLowRisk: config.planning?.autoExecuteLowRisk,
+      persistToFile: config.planning?.persistToFile,
+      workingDirectory: config.planning?.workingDirectory,
     });
   }
 
@@ -543,11 +547,19 @@ export class AgentOrchestrator {
       return { stored: false, valid: false, errors: ["Artifact pipeline not configured"] };
     }
 
-    return this.artifactPipeline.emit(artifact, {
+    const result = this.artifactPipeline.emit(artifact, {
       correlationId: context.correlationId ?? this.currentRunId,
       source: context.source ?? this.config.name,
       idempotencyKey: context.idempotencyKey ?? artifact.id,
     });
+
+    if (result.stored) {
+      void this.advanceSopForArtifact(artifact).catch(() => {
+        // Avoid breaking artifact emission on SOP updates.
+      });
+    }
+
+    return result;
   }
 
   private async runWithId(userMessage: string, runId: string): Promise<AgentState> {
@@ -555,6 +567,7 @@ export class AgentOrchestrator {
     this.currentRunId = runId;
     this.recoveryState = { active: false, warned: false };
     this.forceCompletionToolsOnly = false;
+    this.planArtifactEmitted = false;
     this.taskGraph?.setEventContext({ correlationId: runId, source: this.config.name });
     this.currentPlanNodeId = this.createPlanNode(userMessage);
     const detachStreamBridge = this.attachStreamBridge(runId);
@@ -1306,13 +1319,14 @@ export class AgentOrchestrator {
     turnStart: number,
     turnSpan?: SpanContext
   ): Promise<void> {
-    this.enforceToolExecutionPolicy(toolCalls);
+    this.enforceSingleStepPolicy(toolCalls);
     const decision = this.buildDecisionForToolCalls(toolCalls);
     const shouldExecute = await this.maybeCreatePlan(toolCalls);
     if (!shouldExecute) {
       this.recordPlanRejection(decision, toolCalls, turnStart);
       throw new Error("Plan approval denied.");
     }
+    this.enforceSOPToolFiltering(toolCalls);
 
     this.statusController.setStatus(this.state, "executing");
     this.loopStateMachine.transitionToAction(decision);
@@ -1419,7 +1433,7 @@ export class AgentOrchestrator {
     });
   }
 
-  private enforceToolExecutionPolicy(toolCalls: MCPToolCall[]): void {
+  private enforceSingleStepPolicy(toolCalls: MCPToolCall[]): void {
     if (this.config.toolExecutionContext?.policy !== "interactive") {
       return;
     }
@@ -1428,9 +1442,6 @@ export class AgentOrchestrator {
     if (!result.valid) {
       throw new Error(result.error ?? "Interactive policy allows a single tool call per turn.");
     }
-
-    // SOP phase-gated tool filtering (Track E)
-    this.enforceSOPToolFiltering(toolCalls);
   }
 
   private enforceSOPToolFiltering(toolCalls: MCPToolCall[]): void {
@@ -1544,8 +1555,11 @@ export class AgentOrchestrator {
       return true;
     }
 
+    await this.advanceSopToPhase("plan");
+
     const plan = this.buildPlan(toolCalls);
     this.emit("plan:created", plan);
+    this.maybeEmitPlanArtifact(plan, toolCalls);
 
     if (plan.requiresApproval) {
       this.loopStateMachine.pause();
@@ -1559,7 +1573,128 @@ export class AgentOrchestrator {
     }
 
     this.emit("plan:executing", plan);
+    await this.advanceSopToPhase("implement");
     return true;
+  }
+
+  private maybeEmitPlanArtifact(plan: ExecutionPlan, toolCalls: MCPToolCall[]): void {
+    if (this.planArtifactEmitted || !this.artifactPipeline) {
+      return;
+    }
+
+    const artifact = this.buildPlanArtifact(plan, toolCalls);
+    const result = this.emitArtifact(artifact);
+    if (result.stored) {
+      this.planArtifactEmitted = true;
+    }
+  }
+
+  private buildPlanArtifact(plan: ExecutionPlan, toolCalls: MCPToolCall[]): ArtifactEnvelope {
+    const steps = plan.steps.map((step) => {
+      const status = this.mapPlanStepStatus(step.status);
+      return status ? { title: step.description, status } : { title: step.description };
+    });
+
+    return {
+      id: plan.id,
+      type: "PlanCard",
+      schemaVersion: "1.0.0",
+      title: "Plan",
+      payload: {
+        goal: plan.goal,
+        summary: plan.goal,
+        steps,
+        files: this.extractPlanFiles(toolCalls),
+      },
+      taskNodeId: this.currentPlanNodeId ?? this.currentRunId ?? "plan",
+      createdAt: new Date().toISOString(),
+    };
+  }
+
+  private extractPlanFiles(toolCalls: MCPToolCall[]): string[] {
+    const files = new Set<string>();
+
+    for (const call of toolCalls) {
+      const args = call.arguments;
+      if (!args || typeof args !== "object") {
+        continue;
+      }
+      const path = (args as { path?: unknown }).path;
+      if (typeof path === "string" && path.length > 0) {
+        files.add(path);
+      }
+    }
+
+    return Array.from(files);
+  }
+
+  private mapPlanStepStatus(
+    status: ExecutionPlan["steps"][number]["status"]
+  ): "pending" | "running" | "blocked" | "completed" | "failed" | undefined {
+    switch (status) {
+      case "pending":
+        return "pending";
+      case "executing":
+        return "running";
+      case "complete":
+        return "completed";
+      case "failed":
+        return "failed";
+      case "skipped":
+        return "blocked";
+      default:
+        return undefined;
+    }
+  }
+
+  private async advanceSopToPhase(targetPhase: string): Promise<void> {
+    if (!this.sopExecutor) {
+      return;
+    }
+
+    const phases = this.sopExecutor.getRole().phases;
+    const targetIndex = phases.findIndex((phase) => phase.name === targetPhase);
+    if (targetIndex < 0) {
+      return;
+    }
+
+    while (this.sopExecutor.getPhaseIndex() < targetIndex) {
+      const canAdvance = await this.sopExecutor.canAdvance();
+      if (!canAdvance.passed) {
+        return;
+      }
+      try {
+        await this.sopExecutor.advancePhase();
+      } catch {
+        return;
+      }
+    }
+  }
+
+  private async advanceSopForArtifact(artifact: ArtifactEnvelope): Promise<void> {
+    if (!this.sopExecutor) {
+      return;
+    }
+
+    const currentPhase = this.sopExecutor.getCurrentPhase();
+
+    if (artifact.type === "TestReport") {
+      if (currentPhase === "implement") {
+        await this.advanceSopToPhase("verify");
+        return;
+      }
+      if (currentPhase === "verify") {
+        const status = artifact.payload.status;
+        if (typeof status === "string" && status === "passed") {
+          await this.advanceSopToPhase("review");
+        }
+      }
+      return;
+    }
+
+    if (artifact.type === "ReviewReport" && currentPhase === "review") {
+      await this.advanceSopToPhase("complete");
+    }
   }
 
   private buildPlan(toolCalls: MCPToolCall[]): ExecutionPlan {
@@ -2276,6 +2411,8 @@ export interface CreateOrchestratorOptions {
     maxRefinements?: number;
     planningTimeoutMs?: number;
     autoExecuteLowRisk?: boolean;
+    persistToFile?: boolean;
+    workingDirectory?: string;
   };
   components?: OrchestratorComponents;
   toolExecution?: ToolExecutionOptions;
@@ -2409,6 +2546,8 @@ function buildPlanningConfig(
     maxRefinements: planning?.maxRefinements,
     planningTimeoutMs: planning?.planningTimeoutMs,
     autoExecuteLowRisk: planning?.autoExecuteLowRisk,
+    persistToFile: planning?.persistToFile,
+    workingDirectory: planning?.workingDirectory,
   };
 }
 

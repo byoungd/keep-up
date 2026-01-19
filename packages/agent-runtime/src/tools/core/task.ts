@@ -4,11 +4,12 @@
  * Agent task management following top-tier patterns (Cursor, Claude).
  * Provides structured task breakdown with subtasks, dependencies, and progress tracking.
  *
- * Tasks are stored in .agent/TASKS.json for machine-readable format.
+ * Tasks are stored in .agent-runtime/TASKS.json for machine-readable format.
  */
 
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import { DEFAULT_AGENT_RUNTIME_DIR } from "../../runtimePaths";
 import type { MCPToolResult, ToolContext } from "../../types";
 import { BaseToolServer, errorResult, textResult } from "../mcp/baseServer";
 
@@ -49,7 +50,7 @@ export class TaskToolServer extends BaseToolServer {
   readonly description = "Manage structured tasks with subtasks and dependencies";
 
   private readonly taskFileName = "TASKS.json";
-  private readonly agentDir = ".agent";
+  private readonly agentDir = DEFAULT_AGENT_RUNTIME_DIR;
 
   constructor() {
     super();

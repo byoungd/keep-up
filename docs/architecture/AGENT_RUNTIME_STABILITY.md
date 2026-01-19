@@ -55,7 +55,7 @@ These modules have comprehensive implementations, good test coverage, and are fu
 - 10 specialized agent types with custom system prompts
 - Tool restrictions per profile
 - Security preset configuration
-- Edit restrictions (e.g., plan agent limited to .agent/plans/)
+- Edit restrictions (e.g., plan agent limited to .agent-runtime/plans/)
 
 ### 4. Security System
 - Permission checker with tool-specific validation

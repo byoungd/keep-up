@@ -4,7 +4,7 @@
  * Provides tools for saving and retrieving intermediate results during agent execution.
  * Inspired by Manus's pattern of proactively persisting intermediate data to files.
  *
- * Directory: .agent/scratch/
+ * Directory: .agent-runtime/scratch/
  *
  * Benefits:
  * - Preserves context window space by offloading large data
@@ -21,6 +21,7 @@
 
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import { DEFAULT_AGENT_RUNTIME_DIR, DEFAULT_AGENT_SCRATCH_DIR } from "../../runtimePaths";
 import type { MCPToolResult, ToolContext } from "../../types";
 import { BaseToolServer, errorResult, textResult } from "../mcp/baseServer";
 
@@ -45,7 +46,7 @@ export class ScratchToolServer extends BaseToolServer {
   readonly name = "scratch";
   readonly description = "Save and retrieve intermediate results";
 
-  private readonly baseDir = ".agent";
+  private readonly baseDir = DEFAULT_AGENT_RUNTIME_DIR;
   private readonly scratchDir = "scratch";
 
   constructor() {
@@ -59,7 +60,7 @@ export class ScratchToolServer extends BaseToolServer {
       {
         name: "save",
         description:
-          "Save an intermediate result to .agent/scratch/ for later reference. " +
+          `Save an intermediate result to ${DEFAULT_AGENT_SCRATCH_DIR}/ for later reference. ` +
           "Use this to preserve large data, research findings, or computation results " +
           "instead of keeping them in the context window.",
         inputSchema: {
@@ -100,7 +101,7 @@ export class ScratchToolServer extends BaseToolServer {
     this.registerTool(
       {
         name: "load",
-        description: "Load a previously saved intermediate result from .agent/scratch/",
+        description: `Load a previously saved intermediate result from ${DEFAULT_AGENT_SCRATCH_DIR}/`,
         inputSchema: {
           type: "object",
           properties: {
@@ -276,7 +277,7 @@ export class ScratchToolServer extends BaseToolServer {
 
       const sizeKb = (metadata.size / 1024).toFixed(1);
       return textResult(
-        `Saved intermediate result to .agent/scratch/${path.basename(filePath)}\n` +
+        `Saved intermediate result to ${DEFAULT_AGENT_SCRATCH_DIR}/${path.basename(filePath)}\n` +
           `Size: ${sizeKb} KB\n` +
           `Reference with: scratch:load name="${name}"`
       );

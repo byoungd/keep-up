@@ -44,4 +44,42 @@ describe("ArtifactRegistry", () => {
     expect(result.stored).toBe(false);
     expect(registry.listQuarantined()).toHaveLength(1);
   });
+
+  it("stores test and review reports", () => {
+    const registry = createArtifactRegistry();
+
+    const testReport: ArtifactEnvelope = {
+      id: "artifact-test-report",
+      type: "TestReport",
+      schemaVersion: "1.0.0",
+      title: "Unit Tests",
+      payload: {
+        command: "pnpm vitest packages/agent-runtime",
+        status: "passed",
+        durationMs: 1200,
+      },
+      taskNodeId: "node-test",
+      createdAt: "2026-01-19T00:00:00.000Z",
+    };
+
+    const reviewReport: ArtifactEnvelope = {
+      id: "artifact-review-report",
+      type: "ReviewReport",
+      schemaVersion: "1.0.0",
+      title: "Review Report",
+      payload: {
+        summary: "Reviewed changes, no blocking issues.",
+        risks: [],
+        recommendations: ["Add coverage for edge case X."],
+      },
+      taskNodeId: "node-review",
+      createdAt: "2026-01-19T00:00:00.000Z",
+    };
+
+    const testResult = registry.store(testReport);
+    const reviewResult = registry.store(reviewReport);
+
+    expect(testResult.stored).toBe(true);
+    expect(reviewResult.stored).toBe(true);
+  });
 });

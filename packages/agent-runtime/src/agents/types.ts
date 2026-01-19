@@ -77,7 +77,7 @@ export interface EditRestrictions {
   /**
    * Glob patterns for allowed write paths.
    * If specified, ONLY these paths can be written to.
-   * Example: [".agent/plans/\*.md", ".agent/TODO.md"]
+   * Example: [".agent-runtime/plans/*.md", ".agent-runtime/TODO.md"]
    */
   allow?: string[];
 

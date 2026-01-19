@@ -5,7 +5,7 @@
  * Inspired by OpenCode's `.opencode/plan/` pattern and Manus's file-based state management.
  *
  * Directory structure:
- * .agent/
+ * .agent-runtime/
  * ├── plans/
  * │   ├── current.md          <- Active plan
  * │   └── history/
@@ -14,6 +14,7 @@
 
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import { DEFAULT_AGENT_RUNTIME_DIR } from "../runtimePaths";
 import type { ExecutionPlan, PlanStep } from "./planTypes";
 
 // ============================================================================
@@ -21,7 +22,7 @@ import type { ExecutionPlan, PlanStep } from "./planTypes";
 // ============================================================================
 
 export interface PlanPersistenceConfig {
-  /** Base directory for agent files (default: .agent) */
+  /** Base directory for agent files (default: .agent-runtime) */
   baseDir: string;
   /** Maximum history files to keep (default: 50) */
   maxHistoryFiles: number;
@@ -48,7 +49,7 @@ export class PlanPersistence {
 
   constructor(config: Partial<PlanPersistenceConfig> = {}) {
     this.config = {
-      baseDir: config.baseDir ?? ".agent",
+      baseDir: config.baseDir ?? DEFAULT_AGENT_RUNTIME_DIR,
       maxHistoryFiles: config.maxHistoryFiles ?? 50,
       workingDirectory: config.workingDirectory,
     };

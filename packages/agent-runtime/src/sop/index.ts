@@ -5,6 +5,7 @@
  * Provides role definitions, registry, and execution logic.
  */
 
+export { type ArtifactLookup, createCodeAgentGateChecker } from "./gates";
 // Presets
 export {
   ARCHITECT_SOP,

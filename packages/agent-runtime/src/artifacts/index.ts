@@ -265,6 +265,19 @@ const checklistCardSchema = z.object({
   items: z.array(checklistItemSchema).min(1),
 });
 
+const testReportSchema = z.object({
+  command: z.string().min(1),
+  status: z.enum(["passed", "failed", "skipped"]),
+  durationMs: z.number().int().nonnegative(),
+  summary: z.string().optional(),
+});
+
+const reviewReportSchema = z.object({
+  summary: z.string().min(1),
+  risks: z.array(z.string().min(1)),
+  recommendations: z.array(z.string().min(1)).optional(),
+});
+
 function createSchemaValidator<T extends z.ZodTypeAny>(
   schema: T
 ): (payload: Record<string, unknown>) => ArtifactValidationResult {
@@ -303,5 +316,17 @@ function registerDefaultSchemas(registry: ArtifactRegistry): void {
     type: "ChecklistCard",
     version: "1.0.0",
     validate: createSchemaValidator(checklistCardSchema),
+  });
+
+  registry.registerSchema({
+    type: "TestReport",
+    version: "1.0.0",
+    validate: createSchemaValidator(testReportSchema),
+  });
+
+  registry.registerSchema({
+    type: "ReviewReport",
+    version: "1.0.0",
+    validate: createSchemaValidator(reviewReportSchema),
   });
 }

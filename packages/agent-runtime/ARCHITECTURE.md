@@ -18,6 +18,16 @@ We have standardized on the following libraries. **Do not create custom implemen
 
 ---
 
+## Code Agent Architecture
+
+The final Code Agent architecture, contracts, and evaluation metrics are defined in:
+
+- `docs/specs/agent-runtime/code-agent-architecture-spec.md`
+
+Any changes to code-agent workflows must align with that spec in addition to the runtime contracts.
+
+---
+
 ## 1. Multi-Agent Orchestration
 
 **Standard**: Use the official OpenAI Agents SDK.

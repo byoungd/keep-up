@@ -15,6 +15,7 @@
 
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import { DEFAULT_AGENT_RUNTIME_DIR } from "../runtimePaths";
 import type { TodoItem } from "../tools/core/todo";
 import type { ExecutionPlan, PlanStep } from "./planning";
 import { createPlanPersistence, type PlanPersistence } from "./planPersistence";
@@ -51,13 +52,14 @@ export class IntegratedPlanningService {
 
   constructor(config: Partial<IntegratedPlanningConfig> = {}) {
     this.config = {
-      baseDir: config.baseDir ?? ".agent",
+      baseDir: config.baseDir ?? DEFAULT_AGENT_RUNTIME_DIR,
       workingDirectory: config.workingDirectory,
       autoGenerateTodos: config.autoGenerateTodos ?? true,
       autoSyncStatus: config.autoSyncStatus ?? true,
     };
 
     this.persistence = createPlanPersistence({
+      baseDir: this.config.baseDir,
       workingDirectory: this.config.workingDirectory,
     });
   }

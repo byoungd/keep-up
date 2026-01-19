@@ -273,6 +273,7 @@ export {
   type LspProvider,
 } from "@ku0/tool-lsp";
 export { createAICoreAdapter, createMockLLM } from "./orchestrator/aiCoreAdapter";
+export { createCodeAgentOrchestrator } from "./orchestrator/codeAgentFactory";
 export { createOrchestrator } from "./orchestrator/orchestrator";
 export { createBashToolServer } from "./tools/core/bash";
 export { createCodeToolServer } from "./tools/core/code";

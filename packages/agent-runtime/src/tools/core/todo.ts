@@ -4,11 +4,12 @@
  * Agent-readable TODO list following top-tier patterns (Cursor, Claude).
  * Provides todoRead and todoWrite operations for persistent task tracking.
  *
- * The TODO list is stored as a markdown file (.agent/TODO.md) in the workspace.
+ * The TODO list is stored as a markdown file (.agent-runtime/TODO.md) in the workspace.
  */
 
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import { DEFAULT_AGENT_RUNTIME_DIR } from "../../runtimePaths";
 import type { MCPToolResult, ToolContext } from "../../types";
 import { BaseToolServer, errorResult, textResult } from "../mcp/baseServer";
 
@@ -34,7 +35,7 @@ export class TodoToolServer extends BaseToolServer {
   readonly description = "Read and write TODO items for task tracking";
 
   private readonly todoFileName = "TODO.md";
-  private readonly agentDir = ".agent";
+  private readonly agentDir = DEFAULT_AGENT_RUNTIME_DIR;
 
   constructor() {
     super();

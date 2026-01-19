@@ -4,7 +4,7 @@
  * Provides scoped, conditional knowledge injection for agents.
  * Inspired by Manus's pattern where knowledge items are only adopted when conditions are met.
  *
- * Directory: .agent/knowledge/
+ * Directory: .agent-runtime/knowledge/
  *
  * Features:
  * - Scoped knowledge items with conditions
@@ -19,6 +19,7 @@
 
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import { DEFAULT_AGENT_KNOWLEDGE_DIR } from "../runtimePaths";
 
 // ============================================================================
 // Types
@@ -167,7 +168,7 @@ export class KnowledgeRegistry {
       return 0;
     }
 
-    const knowledgeDir = path.join(this.projectDir, ".agent", "knowledge");
+    const knowledgeDir = path.join(this.projectDir, DEFAULT_AGENT_KNOWLEDGE_DIR);
 
     try {
       const files = await fs.readdir(knowledgeDir);

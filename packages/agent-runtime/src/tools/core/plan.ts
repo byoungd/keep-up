@@ -21,6 +21,7 @@
 
 import type { ExecutionPlan, PlanStep } from "../../orchestrator/planning";
 import { createPlanPersistence, type PlanPersistence } from "../../orchestrator/planPersistence";
+import { DEFAULT_AGENT_PLANS_DIR } from "../../runtimePaths";
 import type { MCPToolResult, ToolContext } from "../../types";
 import { BaseToolServer, errorResult, textResult } from "../mcp/baseServer";
 
@@ -49,6 +50,7 @@ export class PlanToolServer extends BaseToolServer {
   readonly description = "Create and manage execution plans";
 
   private persistence: PlanPersistence;
+  private readonly currentPlanPath = `${DEFAULT_AGENT_PLANS_DIR}/current.md`;
 
   constructor() {
     super();
@@ -61,8 +63,7 @@ export class PlanToolServer extends BaseToolServer {
     this.registerTool(
       {
         name: "save",
-        description:
-          "Save or update the current execution plan. Use this to persist your plan to .agent/plans/current.md",
+        description: `Save or update the current execution plan. Use this to persist your plan to ${this.currentPlanPath}`,
         inputSchema: {
           type: "object",
           properties: {
@@ -120,7 +121,7 @@ export class PlanToolServer extends BaseToolServer {
     this.registerTool(
       {
         name: "load",
-        description: "Load the current execution plan from .agent/plans/current.md",
+        description: `Load the current execution plan from ${this.currentPlanPath}`,
         inputSchema: {
           type: "object",
           properties: {},
@@ -348,7 +349,7 @@ export class PlanToolServer extends BaseToolServer {
       await this.persistence.saveCurrent(plan);
 
       return textResult(
-        `Plan saved successfully!\n\nGoal: ${goal}\nSteps: ${steps.length}\nRisk: ${riskAssessment}\nLocation: .agent/plans/current.md`
+        `Plan saved successfully!\n\nGoal: ${goal}\nSteps: ${steps.length}\nRisk: ${riskAssessment}\nLocation: ${this.currentPlanPath}`
       );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

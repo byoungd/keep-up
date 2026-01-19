@@ -15,8 +15,12 @@ export class ModeToolPolicyEngine implements ToolPolicyEngine {
     }
 
     if (
-      this.modeManager.isPlanMode() &&
-      !isPlanModeToolAllowed(context.call.name, context.toolDefinition)
+      this.modeManager.isReadOnlyMode() &&
+      !isReadOnlyModeToolAllowed(
+        context.call.name,
+        context.toolDefinition,
+        this.modeManager.isPlanMode()
+      )
     ) {
       return {
         allowed: false,
@@ -37,8 +41,12 @@ export function createModePolicyEngine(
   return new ModeToolPolicyEngine(modeManager, basePolicy);
 }
 
-function isPlanModeToolAllowed(toolName: string, toolDefinition?: MCPTool): boolean {
-  if (toolName.startsWith("plan:")) {
+function isReadOnlyModeToolAllowed(
+  toolName: string,
+  toolDefinition: MCPTool | undefined,
+  allowPlanTools: boolean
+): boolean {
+  if (allowPlanTools && toolName.startsWith("plan:")) {
     return true;
   }
   return toolDefinition?.annotations?.readOnly === true;
