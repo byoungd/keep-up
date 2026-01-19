@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { A2AMessageBusAdapter } from "../events/a2a";
-import { createMessageBus } from "../events/messageBus";
+import { A2AMessageBusAdapter, createMessageBus } from "../index";
 
 describe("A2AMessageBusAdapter", () => {
   it("routes request/response envelopes", async () => {

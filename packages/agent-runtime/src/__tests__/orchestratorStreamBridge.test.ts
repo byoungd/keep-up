@@ -2,8 +2,8 @@
  * Orchestrator Stream Bridge Integration Tests
  */
 
+import { resetGlobalEventBus } from "@ku0/agent-runtime-control";
 import { describe, expect, it } from "vitest";
-import { resetGlobalEventBus } from "../events";
 import type { AgentLLMRequest, AgentLLMResponse, IAgentLLM } from "../orchestrator/orchestrator";
 import { createOrchestrator } from "../orchestrator/orchestrator";
 import { createSecurityPolicy } from "../security";

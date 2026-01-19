@@ -14,7 +14,7 @@ import {
   type EventBus,
   getGlobalEventBus,
   resetGlobalEventBus,
-} from "../events";
+} from "../index";
 
 describe("EventBus", () => {
   let eventBus: EventBus;

@@ -2,9 +2,9 @@
  * Orchestrator Execution Event Bus Tests
  */
 
+import type { RuntimeEvent } from "@ku0/agent-runtime-control";
+import { createEventBus } from "@ku0/agent-runtime-control";
 import { describe, expect, it } from "vitest";
-import type { RuntimeEvent } from "../events";
-import { createEventBus } from "../events";
 import type { AgentLLMRequest, AgentLLMResponse, IAgentLLM } from "../orchestrator/orchestrator";
 import { createOrchestrator } from "../orchestrator/orchestrator";
 import { createSecurityPolicy } from "../security";

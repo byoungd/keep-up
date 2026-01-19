@@ -5,8 +5,12 @@
  * Supports spawning, parallel execution, and status tracking.
  */
 
+import {
+  type AgentEvents,
+  createScopedEventBus,
+  type RuntimeEventBus,
+} from "@ku0/agent-runtime-control";
 import type { TelemetryContext } from "@ku0/agent-runtime-telemetry/telemetry";
-import { type AgentEvents, createScopedEventBus, type RuntimeEventBus } from "../events";
 import { type AgentOrchestrator, createOrchestrator } from "../orchestrator/orchestrator";
 import { createSecurityPolicy } from "../security";
 import { createSessionState, type SessionState } from "../session";

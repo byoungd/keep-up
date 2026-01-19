@@ -5,8 +5,8 @@
  * Inspired by Claude Code's agent architecture.
  */
 
+import type { RuntimeEventBus } from "@ku0/agent-runtime-control";
 import type { ContextManager } from "../context";
-import type { RuntimeEventBus } from "../events/eventBus";
 import type { IAgentLLM } from "../orchestrator/orchestrator";
 import type { IToolRegistry } from "../tools/mcp/registry";
 import type { SecurityPolicy } from "../types";

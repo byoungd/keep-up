@@ -4,8 +4,8 @@
  * Provides explicit wiring for the agent runtime using dependency injection.
  */
 
+import type { RuntimeEventBus } from "@ku0/agent-runtime-control";
 import type { TelemetryContext } from "@ku0/agent-runtime-telemetry/telemetry";
-import type { RuntimeEventBus } from "./events/eventBus";
 import type { ToolExecutor } from "./executor";
 import { createKernel, type Kernel, type KernelConfig, type RuntimeServices } from "./kernel";
 import type { IAgentLLM } from "./orchestrator/llmTypes";

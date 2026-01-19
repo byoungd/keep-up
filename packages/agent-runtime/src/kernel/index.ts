@@ -4,14 +4,14 @@
  * Defines the boundary between control-plane orchestration and data-plane services.
  */
 
+import type { RuntimeEvent, RuntimeEventBus } from "@ku0/agent-runtime-control";
+import { getGlobalEventBus } from "@ku0/agent-runtime-control";
 import type { TelemetryContext } from "@ku0/agent-runtime-telemetry/telemetry";
 import type {
   ArtifactEmissionContext,
   ArtifactEmissionResult,
   ArtifactPipeline,
 } from "../artifacts";
-import type { RuntimeEvent, RuntimeEventBus } from "../events/eventBus";
-import { getGlobalEventBus } from "../events/eventBus";
 import type {
   ToolConfirmationDetailsProvider,
   ToolConfirmationResolver,

@@ -5,7 +5,7 @@
  * and event-driven architecture for maximum decoupling.
  */
 
-import type { RuntimeEventBus } from "../../events/eventBus";
+import type { RuntimeEventBus } from "@ku0/agent-runtime-control";
 import type {
   MCPTool,
   MCPToolCall,

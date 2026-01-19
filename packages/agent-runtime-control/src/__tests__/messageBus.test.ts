@@ -3,7 +3,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createMessageBus, type RuntimeMessageBus } from "../events/messageBus";
+import { createMessageBus, type RuntimeMessageBus } from "../index";
 
 describe("RuntimeMessageBus", () => {
   let bus: RuntimeMessageBus;
