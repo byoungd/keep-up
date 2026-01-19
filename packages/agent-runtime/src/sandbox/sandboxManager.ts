@@ -15,22 +15,7 @@ import type {
   SandboxExecResult,
   SandboxInfo,
 } from "./sandboxContext";
-
-export interface SandboxPolicy {
-  network: "none" | "allowlist" | "full";
-  allowedHosts?: string[];
-  filesystem: "read-only" | "workspace-only" | "full";
-  maxMemoryMB: number;
-  maxCpuPercent: number;
-  timeoutMs: number;
-}
-
-export interface SandboxSessionConfig {
-  newContainer?: boolean;
-  policy?: SandboxPolicy;
-  workspacePath?: string;
-  image?: string;
-}
+import type { DockerSandboxPoolOptions, SandboxPolicy, SandboxSessionConfig } from "./types";
 
 export interface SandboxManager {
   isAvailable(timeoutMs?: number): Promise<boolean>;
@@ -50,16 +35,6 @@ export interface DockerSandboxManagerOptions {
   defaultPolicy?: SandboxPolicy;
   assetManager?: RuntimeAssetManager;
   pool?: DockerSandboxPoolOptions;
-}
-
-export interface DockerSandboxPoolOptions {
-  enabled?: boolean;
-  minSize?: number;
-  maxSize?: number;
-  idleTimeoutMs?: number;
-  healthCheckIntervalMs?: number;
-  resetCommand?: string;
-  resetTimeoutMs?: number;
 }
 
 const DEFAULT_POLICY: SandboxPolicy = {

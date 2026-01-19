@@ -93,6 +93,7 @@ import {
 import { createDependencyAnalyzer, type DependencyAnalyzer } from "./dependencyAnalyzer";
 import { createErrorRecoveryEngine, type ErrorRecoveryEngine } from "./errorRecovery";
 import { BackpressureEventStream } from "./eventStream";
+import type { AgentToolDefinition, IAgentLLM } from "./llmTypes";
 import { type MessageCompressor, SmartMessageCompressor } from "./messageCompression";
 import { NodeResultCache } from "./nodeResultCache";
 import {
@@ -107,49 +108,13 @@ import { SmartToolScheduler } from "./smartToolScheduler";
 import { OrchestratorStatusController } from "./statusController";
 import { createTurnExecutor, type ITurnExecutor, type TurnOutcome } from "./turnExecutor";
 
-// ============================================================================
-// LLM Interface (for dependency injection)
-// ============================================================================
-
-/**
- * Interface for LLM completion.
- * Implement this to connect to your LLM provider.
- */
-export interface IAgentLLM {
-  /** Generate a completion with tool use support */
-  complete(request: AgentLLMRequest): Promise<AgentLLMResponse>;
-
-  /** Stream a completion (optional) */
-  stream?(request: AgentLLMRequest): AsyncIterable<AgentLLMChunk>;
-}
-
-export interface AgentLLMRequest {
-  messages: AgentMessage[];
-  tools: AgentToolDefinition[];
-  systemPrompt?: string;
-  temperature?: number;
-  maxTokens?: number;
-}
-
-export interface AgentToolDefinition {
-  name: string;
-  description: string;
-  inputSchema: Record<string, unknown>;
-}
-
-export interface AgentLLMResponse {
-  content: string;
-  toolCalls?: MCPToolCall[];
-  finishReason: "stop" | "tool_use" | "max_tokens" | "error";
-  usage?: TokenUsageStats;
-}
-
-export interface AgentLLMChunk {
-  type: "content" | "tool_call" | "done" | "usage";
-  content?: string;
-  toolCall?: MCPToolCall;
-  usage?: TokenUsageStats;
-}
+export type {
+  AgentLLMChunk,
+  AgentLLMRequest,
+  AgentLLMResponse,
+  AgentToolDefinition,
+  IAgentLLM,
+} from "./llmTypes";
 
 // ============================================================================
 // Orchestrator Events

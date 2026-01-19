@@ -14,7 +14,7 @@
 
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import type { ExecutionPlan, PlanStep } from "./planning";
+import type { ExecutionPlan, PlanStep } from "./planTypes";
 
 // ============================================================================
 // Types

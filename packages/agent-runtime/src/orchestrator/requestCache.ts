@@ -21,7 +21,7 @@ import {
   type ICacheStrategy,
   LRUCache,
 } from "../utils/cache";
-import type { AgentLLMRequest, AgentLLMResponse } from "./orchestrator";
+import type { AgentLLMRequest, AgentLLMResponse } from "./llmTypes";
 
 // ============================================================================
 // Types

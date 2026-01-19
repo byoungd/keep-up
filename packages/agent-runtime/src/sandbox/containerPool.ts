@@ -7,7 +7,7 @@
 import type Dockerode from "dockerode";
 import type { Container } from "dockerode";
 import { createSandboxContainer } from "./containerFactory";
-import type { SandboxPolicy } from "./sandboxManager";
+import type { SandboxPolicy } from "./types";
 
 export interface ContainerPoolOptions {
   minSize: number;

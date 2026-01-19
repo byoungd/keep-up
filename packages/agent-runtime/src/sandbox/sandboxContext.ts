@@ -4,7 +4,7 @@
  * Defines the contract for sandbox execution contexts.
  */
 
-import type { SandboxPolicy } from "./sandboxManager";
+import type { SandboxPolicy } from "./types";
 
 export interface SandboxExecOptions {
   cwd?: string;
