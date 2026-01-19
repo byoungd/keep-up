@@ -143,7 +143,7 @@ describe("SOPExecutor", () => {
       const executor = createSOPExecutor(CODER_SOP);
 
       const tools = executor.getAllowedTools();
-      expect(tools).toEqual(["read_file", "search_code", "list_dir"]);
+      expect(tools).toEqual(["file:read", "file:list", "file:info"]);
     });
 
     it("should advance through phases", async () => {
@@ -153,19 +153,30 @@ describe("SOPExecutor", () => {
 
       await executor.advancePhase();
       expect(executor.getCurrentPhase()).toBe("plan");
-      expect(executor.getAllowedTools()).toEqual(["read_file", "search_code"]);
+      expect(executor.getAllowedTools()).toEqual(["file:read", "file:list", "file:info", "plan:*"]);
 
       await executor.advancePhase();
       expect(executor.getCurrentPhase()).toBe("implement");
-      expect(executor.getAllowedTools()).toEqual(["write_file", "read_file"]);
+      expect(executor.getAllowedTools()).toEqual([
+        "file:write",
+        "file:read",
+        "file:list",
+        "file:info",
+      ]);
 
       await executor.advancePhase();
       expect(executor.getCurrentPhase()).toBe("verify");
-      expect(executor.getAllowedTools()).toEqual(["run_command", "read_file"]);
+      expect(executor.getAllowedTools()).toEqual([
+        "bash:execute",
+        "code:run",
+        "file:read",
+        "file:list",
+        "file:info",
+      ]);
 
       await executor.advancePhase();
       expect(executor.getCurrentPhase()).toBe("review");
-      expect(executor.getAllowedTools()).toEqual(["read_file", "search_code", "list_dir"]);
+      expect(executor.getAllowedTools()).toEqual(["file:read", "file:list", "file:info"]);
 
       await executor.advancePhase();
       expect(executor.getCurrentPhase()).toBe("complete");
@@ -189,16 +200,16 @@ describe("SOPExecutor", () => {
     it("should allow tools in the current phase", () => {
       const executor = createSOPExecutor(CODER_SOP);
 
-      expect(executor.isToolAllowed("read_file")).toBe(true);
-      expect(executor.isToolAllowed("search_code")).toBe(true);
-      expect(executor.isToolAllowed("list_dir")).toBe(true);
+      expect(executor.isToolAllowed("file:read")).toBe(true);
+      expect(executor.isToolAllowed("file:list")).toBe(true);
+      expect(executor.isToolAllowed("file:info")).toBe(true);
     });
 
     it("should deny tools not in the current phase", () => {
       const executor = createSOPExecutor(CODER_SOP);
 
-      expect(executor.isToolAllowed("write_file")).toBe(false);
-      expect(executor.isToolAllowed("run_command")).toBe(false);
+      expect(executor.isToolAllowed("file:write")).toBe(false);
+      expect(executor.isToolAllowed("bash:execute")).toBe(false);
     });
 
     it("should support wildcard matching", () => {
@@ -440,32 +451,32 @@ describe("SOP Integration", () => {
 
     // Phase 1: Understand
     events.push(`phase:${executor.getCurrentPhase()}`);
-    expect(executor.isToolAllowed("read_file")).toBe(true);
-    expect(executor.isToolAllowed("write_file")).toBe(false);
+    expect(executor.isToolAllowed("file:read")).toBe(true);
+    expect(executor.isToolAllowed("file:write")).toBe(false);
 
     // Phase 2: Plan
     await executor.advancePhase();
     events.push(`phase:${executor.getCurrentPhase()}`);
-    expect(executor.isToolAllowed("read_file")).toBe(true);
-    expect(executor.isToolAllowed("write_file")).toBe(false);
+    expect(executor.isToolAllowed("file:read")).toBe(true);
+    expect(executor.isToolAllowed("file:write")).toBe(false);
 
     // Phase 3: Implement
     await executor.advancePhase();
     events.push(`phase:${executor.getCurrentPhase()}`);
-    expect(executor.isToolAllowed("write_file")).toBe(true);
-    expect(executor.isToolAllowed("run_command")).toBe(false);
+    expect(executor.isToolAllowed("file:write")).toBe(true);
+    expect(executor.isToolAllowed("bash:execute")).toBe(false);
 
     // Phase 4: Verify (passes tests_exist gate)
     await executor.advancePhase();
     events.push(`phase:${executor.getCurrentPhase()}`);
-    expect(executor.isToolAllowed("run_command")).toBe(true);
-    expect(executor.isToolAllowed("write_file")).toBe(false);
+    expect(executor.isToolAllowed("bash:execute")).toBe(true);
+    expect(executor.isToolAllowed("file:write")).toBe(false);
 
     // Phase 5: Review (passes tests_pass gate)
     await executor.advancePhase();
     events.push(`phase:${executor.getCurrentPhase()}`);
-    expect(executor.isToolAllowed("read_file")).toBe(true);
-    expect(executor.isToolAllowed("write_file")).toBe(false);
+    expect(executor.isToolAllowed("file:read")).toBe(true);
+    expect(executor.isToolAllowed("file:write")).toBe(false);
 
     // Phase 6: Complete (passes risk_reported gate)
     await executor.advancePhase();

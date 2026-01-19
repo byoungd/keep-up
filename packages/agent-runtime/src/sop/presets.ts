@@ -20,11 +20,14 @@ export const CODER_SOP: RoleDefinition = {
   profile: "Senior Software Engineer",
   goal: "Write clean, tested, maintainable code",
   phases: [
-    { name: "understand", allowedTools: ["read_file", "search_code", "list_dir"] },
-    { name: "plan", allowedTools: ["read_file", "search_code"] },
-    { name: "implement", allowedTools: ["write_file", "read_file"] },
-    { name: "verify", allowedTools: ["run_command", "read_file"] },
-    { name: "review", allowedTools: ["read_file", "search_code", "list_dir"] },
+    { name: "understand", allowedTools: ["file:read", "file:list", "file:info"] },
+    { name: "plan", allowedTools: ["file:read", "file:list", "file:info", "plan:*"] },
+    { name: "implement", allowedTools: ["file:write", "file:read", "file:list", "file:info"] },
+    {
+      name: "verify",
+      allowedTools: ["bash:execute", "code:run", "file:read", "file:list", "file:info"],
+    },
+    { name: "review", allowedTools: ["file:read", "file:list", "file:info"] },
     { name: "complete", allowedTools: [] },
   ],
   qualityGates: [

@@ -30,6 +30,8 @@ export {
   createMockLLM,
   MockAgentLLM,
 } from "./aiCoreAdapter";
+export type { CreateCodeAgentOrchestratorOptions } from "./codeAgentFactory";
+export { createCodeAgentOrchestrator } from "./codeAgentFactory";
 // Consensus Orchestration
 export {
   type ConsensusConfig,
