@@ -36,14 +36,16 @@ function toSdkAnnotations(annotations?: MCPTool["annotations"]): SdkToolAnnotati
   };
 }
 
-function parseCategory(value: unknown): MCPTool["annotations"]["category"] | undefined {
+function parseCategory(
+  value: unknown
+): NonNullable<MCPTool["annotations"]>["category"] | undefined {
   if (typeof value !== "string") {
     return undefined;
   }
   if (!CATEGORY_VALUES.has(value)) {
     return undefined;
   }
-  return value as MCPTool["annotations"]["category"];
+  return value as NonNullable<MCPTool["annotations"]>["category"];
 }
 
 function fromSdkAnnotations(
