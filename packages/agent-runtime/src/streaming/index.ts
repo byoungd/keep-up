@@ -53,13 +53,13 @@ export {
 } from "./tokenStreamer";
 // New enhanced types
 export type {
-  CheckpointEvent,
   CreateStreamOptions,
   DoneEvent,
   HeartbeatEvent,
   IStreamReader,
   IStreamWriter,
   StreamCheckpoint,
+  StreamCheckpointEvent,
   StreamConfig,
   StreamErrorEvent,
   StreamEvent,

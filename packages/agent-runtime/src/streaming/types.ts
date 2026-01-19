@@ -156,7 +156,7 @@ export interface HeartbeatEvent {
 /**
  * Checkpoint event for recovery.
  */
-export interface CheckpointEvent {
+export interface StreamCheckpointEvent {
   type: "checkpoint";
   checkpointId: string;
   tokenIndex: number;
@@ -198,7 +198,7 @@ export type StreamEvent =
   | StreamErrorEvent
   | DoneEvent
   | HeartbeatEvent
-  | CheckpointEvent
+  | StreamCheckpointEvent
   | DocumentEditEvent;
 
 /**
