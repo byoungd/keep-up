@@ -42,8 +42,9 @@
   },
   "dependencies": {
     "@ku0/agent-runtime-core": "workspace:*",
-    "@ku0/agent-runtime-telemetry": "workspace:*",
     "@ku0/agent-runtime-memory": "workspace:*",
+    "@ku0/agent-runtime-telemetry": "workspace:*",
+    "@ku0/ai-core": "workspace:*",
     "@ku0/core": "workspace:*",
     "@ku0/db": "workspace:*",
     "@ku0/tool-lsp": "workspace:*",

@@ -186,6 +186,9 @@ importers:
       '@ku0/agent-runtime-telemetry':
         specifier: workspace:*
         version: link:../agent-runtime-telemetry
+      '@ku0/ai-core':
+        specifier: workspace:*
+        version: link:../ai-core
       '@ku0/core':
         specifier: workspace:*
         version: link:../core
