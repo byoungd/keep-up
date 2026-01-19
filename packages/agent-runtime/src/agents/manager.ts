@@ -11,7 +11,7 @@ import {
   type RuntimeEventBus,
 } from "@ku0/agent-runtime-control";
 import type { TelemetryContext } from "@ku0/agent-runtime-telemetry/telemetry";
-import type { IToolRegistry } from "@ku0/agent-runtime-tools";
+import { createToolRegistryView, type IToolRegistry } from "@ku0/agent-runtime-tools";
 import { type AgentOrchestrator, createOrchestrator } from "../orchestrator/orchestrator";
 import { createSecurityPolicy } from "../security";
 import { createSessionState, type SessionState } from "../session";
@@ -340,7 +340,7 @@ export class AgentManager implements IAgentManager {
       this.config.defaultSecurity ??
       createSecurityPolicy(profile.securityPreset);
 
-    // Create filtered registry based on allowed tools
+    // Create isolated registry view based on allowed tools
     const filteredRegistry = this.createFilteredRegistry(allowedTools);
 
     return createOrchestrator(this.config.llm, filteredRegistry, {
@@ -394,43 +394,15 @@ export class AgentManager implements IAgentManager {
   }
 
   private createFilteredRegistry(allowedTools: string[]): IToolRegistry {
-    // If all tools allowed, return original registry
-    if (allowedTools.includes("*")) {
-      return this.config.registry;
-    }
-
-    // Create a wrapper that filters tools
-    const originalRegistry = this.config.registry;
-
-    return {
-      listTools: () => {
-        const tools = originalRegistry.listTools();
-        return tools.filter((tool) => this.isToolAllowed(tool.name, allowedTools));
-      },
-      hasTool: (name: string) => {
-        return originalRegistry.hasTool(name) && this.isToolAllowed(name, allowedTools);
-      },
-      resolveToolServer: (name: string) => originalRegistry.resolveToolServer?.(name),
-      getServer: (name: string) => originalRegistry.getServer(name),
-      callTool: async (call, context) => {
-        if (!this.isToolAllowed(call.name, allowedTools)) {
-          return {
-            success: false,
-            content: [{ type: "text" as const, text: "Tool not allowed for this agent" }],
-            error: { code: "PERMISSION_DENIED", message: "Tool not allowed for this agent type" },
-          };
-        }
-        return originalRegistry.callTool(call, context);
-      },
-      register: (server) => originalRegistry.register(server),
-      unregister: (name) => originalRegistry.unregister(name),
-      on: (event, handler) => originalRegistry.on(event, handler),
-    };
+    return createToolRegistryView(this.config.registry, { allowedTools });
   }
 
   private resolveAllowedTools(profileAllowed: string[], scopedAllowed?: string[]): string[] {
-    if (!scopedAllowed || scopedAllowed.length === 0) {
+    if (!scopedAllowed) {
       return profileAllowed;
+    }
+    if (scopedAllowed.length === 0) {
+      return [];
     }
 
     if (profileAllowed.includes("*")) {
@@ -439,28 +411,6 @@ export class AgentManager implements IAgentManager {
 
     const scopedSet = new Set(scopedAllowed);
     return profileAllowed.filter((tool) => scopedSet.has(tool) || scopedSet.has("*"));
-  }
-
-  private isToolAllowed(toolName: string, allowedTools: string[]): boolean {
-    if (this.isCompletionToolName(toolName)) {
-      return true;
-    }
-    for (const pattern of allowedTools) {
-      if (pattern === "*") {
-        return true;
-      }
-      if (pattern === toolName) {
-        return true;
-      }
-      // Handle wildcard patterns like "bash:*"
-      if (pattern.endsWith(":*")) {
-        const prefix = pattern.slice(0, -2);
-        if (toolName.startsWith(prefix)) {
-          return true;
-        }
-      }
-    }
-    return false;
   }
 
   private isCompletionToolName(toolName: string): boolean {
