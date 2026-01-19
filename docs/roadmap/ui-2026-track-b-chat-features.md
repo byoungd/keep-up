@@ -1,7 +1,7 @@
 # Track UI-B: Chat Features (Cherry Parity)
 
 Owner: Agent Developer
-Status: Proposed
+Status: Complete
 Branch: `feature/ui-2026-track-b-chat`
 Dependencies: None (can start immediately)
 
@@ -218,14 +218,14 @@ Add export button to header or message context menu.
 
 ## Acceptance Criteria
 
-- [ ] Edit: clicking edit populates composer with message content
-- [ ] Retry: clicking retry resends the user message
-- [ ] Branch: shows branch indicator, new message has parentId set
-- [ ] Copy: copies message content to clipboard
-- [ ] Search: session list filters as user types
-- [ ] Rename: double-click or context menu allows rename
-- [ ] Delete: confirmation dialog, session removed from list
-- [ ] Export: downloads .md or .json file
+- [x] Edit: clicking edit populates composer with message content
+- [x] Retry: clicking retry resends the user message
+- [x] Branch: shows branch indicator, new message has parentId set
+- [x] Copy: copies message content to clipboard
+- [x] Search: session list filters as user types
+- [x] Rename: double-click or context menu allows rename
+- [x] Delete: confirmation dialog, session removed from list
+- [x] Export: downloads .md or .json file
 
 ## Testing Strategy
 
