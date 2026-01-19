@@ -16,6 +16,11 @@ import { type LoroFrontiers, LoroList, LoroMap, type LoroRuntime } from "../runt
 
 const REF_STORE_VERSION = "1.0";
 const REF_STORE_ORIGIN_PREFIX = "ref_store";
+const REF_STORE_DOC_ID_PREFIX = "lfcc_ref_store::";
+
+export function referenceStoreDocId(policyDomainId: string): string {
+  return `${REF_STORE_DOC_ID_PREFIX}${policyDomainId}`;
+}
 
 export type ReferenceVerificationResult =
   | { ok: true }
@@ -86,6 +91,7 @@ export class LoroReferenceStore implements ReferenceStore {
     this.runtime = options.runtime;
     this.policyDomainId = options.policyDomainId;
     this.verifier = options.verifier;
+    this.ensureRuntimeIdentity();
     this.ensureRoot();
   }
 
@@ -283,6 +289,16 @@ export class LoroReferenceStore implements ReferenceStore {
       throw new ReferenceStoreError(
         "REF_STORE_NOT_CONFIGURED",
         `Reference store policy domain mismatch: ${existingDomain}`
+      );
+    }
+  }
+
+  private ensureRuntimeIdentity(): void {
+    const expectedDocId = referenceStoreDocId(this.policyDomainId);
+    if (this.runtime.docId !== expectedDocId) {
+      throw new ReferenceStoreError(
+        "REF_STORE_NOT_CONFIGURED",
+        `Reference store doc_id mismatch: ${this.runtime.docId} (expected ${expectedDocId})`
       );
     }
   }

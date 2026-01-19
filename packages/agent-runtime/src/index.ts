@@ -286,6 +286,7 @@ export { createFileToolServer } from "./tools/core/file";
 export { createSubagentToolServer } from "./tools/core/subagent";
 export { createGitToolServer } from "./tools/git/gitServer";
 export {
+  type AIEnvelopeGateway,
   createLFCCToolServer,
   type LFCCToolServerOptions,
   type MultiDocumentGatewayRequest,

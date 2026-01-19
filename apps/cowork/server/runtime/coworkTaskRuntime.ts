@@ -1,6 +1,7 @@
 import { join, resolve } from "node:path";
 import type {
   AgentState,
+  AIEnvelopeGateway,
   Checkpoint,
   CheckpointStatus,
   ConfirmationRequest,
@@ -20,6 +21,7 @@ import {
   createDockerBashExecutor,
   createFileToolServer,
   createGhostAgent,
+  createLFCCToolServer,
   createMem0MemoryAdapter,
   createSandboxToolServer,
   createSecurityPolicy,
@@ -35,6 +37,12 @@ import {
   ToolResultCache,
 } from "@ku0/agent-runtime";
 import { normalizeModelId } from "@ku0/ai-core";
+import {
+  LoroReferenceStore,
+  LoroRuntime,
+  type ReferenceVerificationProvider,
+  referenceStoreDocId,
+} from "@ku0/lfcc-bridge";
 import { DEFAULT_PROJECT_CONTEXT_TOKEN_BUDGET } from "@ku0/shared";
 import { ApprovalService } from "../services/approvalService";
 import type { ContextIndexManager } from "../services/contextIndexManager";
@@ -65,6 +73,15 @@ export type RuntimePersistenceConfig = {
   toolCachePath?: string;
   toolCacheFlushIntervalMs?: number;
   checkpointDir?: string;
+};
+
+type LfccRuntimeConfig = {
+  aiEnvelopeGateway?: AIEnvelopeGateway;
+  aiEnvelopeGatewayResolver?: (docId: string) => AIEnvelopeGateway | undefined;
+  policyDomainId?: string;
+  policyDomainResolver?: (docId: string) => string | null;
+  referenceStoreResolver?: (policyDomainId: string) => LoroReferenceStore | undefined;
+  referenceVerifier?: ReferenceVerificationProvider;
 };
 
 type SessionRuntime = {
@@ -98,12 +115,18 @@ type RuntimeBuildResult = {
 };
 
 const noop = () => undefined;
+const DEFAULT_REFERENCE_VERIFIER: ReferenceVerificationProvider = {
+  verifyReference: () => ({ ok: true }),
+};
 export class CoworkTaskRuntime {
   private readonly runtimes = new Map<string, SessionRuntime>();
   private readonly runtimeFactory?: RuntimeFactory;
   private readonly logger: Logger; // Store logger for use in methods
   private readonly runtimePersistence?: RuntimePersistenceConfig;
   private readonly toolResultCache?: ToolResultCache;
+  private readonly lfccConfig?: LfccRuntimeConfig;
+  private readonly referenceStores = new Map<string, LoroReferenceStore>();
+  private readonly referenceVerifier: ReferenceVerificationProvider;
   private runtimeAssetManager?: RuntimeAssetManager;
 
   // Services
@@ -128,12 +151,15 @@ export class CoworkTaskRuntime {
     providerKeys?: ProviderKeyService;
     contextIndexManager?: ContextIndexManager;
     runtimePersistence?: RuntimePersistenceConfig;
+    lfcc?: LfccRuntimeConfig;
   }) {
     this.logger = deps.logger ?? console; // Assign to property
     const logger = this.logger;
     this.runtimeFactory = deps.runtimeFactory;
     this.configStore = deps.storage.configStore;
     this.runtimePersistence = deps.runtimePersistence;
+    this.lfccConfig = deps.lfcc;
+    this.referenceVerifier = deps.lfcc?.referenceVerifier ?? DEFAULT_REFERENCE_VERIFIER;
     this.providerKeys =
       deps.providerKeys ?? new ProviderKeyService(deps.storage.configStore, logger);
 
@@ -369,9 +395,7 @@ export class CoworkTaskRuntime {
       model: modelId || undefined,
     });
     const prompt = await this.buildSystemPromptAddition(session, modeManager);
-    const securityPolicy = toolRegistryResult.dockerAvailable
-      ? buildDockerSecurityPolicy()
-      : undefined;
+    const securityPolicy = this.buildRuntimeSecurityPolicy(toolRegistryResult.dockerAvailable);
     const components = this.toolResultCache ? { toolResultCache: this.toolResultCache } : undefined;
     const runtime = createCoworkRuntime({
       llm: adapter,
@@ -405,6 +429,27 @@ export class CoworkTaskRuntime {
     };
   }
 
+  private buildRuntimeSecurityPolicy(dockerAvailable: boolean) {
+    if (!this.isLfccGatewayConfigured()) {
+      return dockerAvailable ? buildDockerSecurityPolicy() : undefined;
+    }
+
+    const basePolicy = dockerAvailable
+      ? buildDockerSecurityPolicy()
+      : createSecurityPolicy("balanced");
+
+    return {
+      ...basePolicy,
+      permissions: { ...basePolicy.permissions, lfcc: "write" },
+    };
+  }
+
+  private isLfccGatewayConfigured(): boolean {
+    return Boolean(
+      this.lfccConfig?.aiEnvelopeGateway || this.lfccConfig?.aiEnvelopeGatewayResolver
+    );
+  }
+
   private async buildToolRegistry(session: CoworkSession): Promise<{
     registry: ReturnType<typeof createToolRegistry>;
     dockerAvailable: boolean;
@@ -412,6 +457,7 @@ export class CoworkTaskRuntime {
     const toolRegistry = createToolRegistry();
     await toolRegistry.register(createCompletionToolServer());
     await toolRegistry.register(createFileToolServer());
+    await this.registerLfccTools(toolRegistry, session);
     const workspacePath = process.cwd();
     const assetManager = this.getRuntimeAssetManager();
     const dockerAvailable = await this.registerExecutionTools({
@@ -423,6 +469,67 @@ export class CoworkTaskRuntime {
     await toolRegistry.register(createWebSearchToolServer(createWebSearchProvider(this.logger)));
     await this.registerBrowserTools(toolRegistry, assetManager);
     return { registry: toolRegistry, dockerAvailable };
+  }
+
+  private async registerLfccTools(
+    registry: ReturnType<typeof createToolRegistry>,
+    session: CoworkSession
+  ): Promise<void> {
+    if (!this.isLfccGatewayConfigured()) {
+      return;
+    }
+
+    const policyDomainResolver = this.resolvePolicyDomainResolver(session);
+    const referenceStoreResolver = this.resolveReferenceStoreResolver();
+
+    await registry.register(
+      createLFCCToolServer({
+        aiEnvelopeGateway: this.lfccConfig?.aiEnvelopeGateway,
+        aiEnvelopeGatewayResolver: this.lfccConfig?.aiEnvelopeGatewayResolver,
+        policyDomainResolver,
+        referenceStoreResolver,
+      })
+    );
+  }
+
+  private resolvePolicyDomainResolver(
+    session: CoworkSession
+  ): ((docId: string) => string | null) | undefined {
+    if (this.lfccConfig?.policyDomainResolver) {
+      return this.lfccConfig.policyDomainResolver;
+    }
+    const policyDomainId =
+      this.lfccConfig?.policyDomainId ?? session.projectId ?? session.sessionId;
+    if (!policyDomainId) {
+      return undefined;
+    }
+    return () => policyDomainId;
+  }
+
+  private resolveReferenceStoreResolver(): (
+    policyDomainId: string
+  ) => LoroReferenceStore | undefined {
+    if (this.lfccConfig?.referenceStoreResolver) {
+      return this.lfccConfig.referenceStoreResolver;
+    }
+    return (policyDomainId: string) => this.resolveReferenceStore(policyDomainId);
+  }
+
+  private resolveReferenceStore(policyDomainId: string): LoroReferenceStore {
+    const existing = this.referenceStores.get(policyDomainId);
+    if (existing) {
+      return existing;
+    }
+
+    const runtime = new LoroRuntime({ docId: referenceStoreDocId(policyDomainId) });
+    const store = new LoroReferenceStore({
+      policyDomainId,
+      runtime,
+      verifier: this.referenceVerifier,
+    });
+
+    this.referenceStores.set(policyDomainId, store);
+    return store;
   }
 
   private async buildSystemPromptAddition(

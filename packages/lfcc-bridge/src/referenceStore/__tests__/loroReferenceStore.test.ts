@@ -1,7 +1,11 @@
 import { documentId } from "@ku0/core";
 import { describe, expect, it } from "vitest";
 import { LoroRuntime } from "../../runtime/loroRuntime";
-import { LoroReferenceStore, type ReferenceVerificationProvider } from "../loroReferenceStore";
+import {
+  LoroReferenceStore,
+  type ReferenceVerificationProvider,
+  referenceStoreDocId,
+} from "../loroReferenceStore";
 
 function createRecord(refId: string, requestId: string) {
   return {
@@ -26,7 +30,7 @@ function createRecord(refId: string, requestId: string) {
 }
 
 function createStore(policyDomainId = "policy-1") {
-  const runtime = new LoroRuntime({ docId: `lfcc_ref_store::${policyDomainId}` });
+  const runtime = new LoroRuntime({ docId: referenceStoreDocId(policyDomainId) });
   let shouldVerify = true;
   const verifier: ReferenceVerificationProvider = {
     verifyReference() {
@@ -104,5 +108,49 @@ describe("LoroReferenceStore", () => {
     } catch (error) {
       expect(error).toMatchObject({ code: "REF_ALREADY_EXISTS" });
     }
+  });
+
+  it("rejects non-deterministic reference store doc_id", () => {
+    const runtime = new LoroRuntime({ docId: "random-doc" });
+    const verifier: ReferenceVerificationProvider = {
+      verifyReference() {
+        return { ok: true };
+      },
+    };
+
+    expect(() => new LoroReferenceStore({ policyDomainId: "policy-3", runtime, verifier })).toThrow(
+      /doc_id mismatch/
+    );
+  });
+
+  it("converges after conflicting status updates", async () => {
+    const policyDomainId = "policy-4";
+    const verifier: ReferenceVerificationProvider = {
+      verifyReference() {
+        return { ok: true };
+      },
+    };
+
+    const runtimeA = new LoroRuntime({ docId: referenceStoreDocId(policyDomainId), peerId: "1" });
+    const runtimeB = new LoroRuntime({ docId: referenceStoreDocId(policyDomainId), peerId: "2" });
+    const storeA = new LoroReferenceStore({ policyDomainId, runtime: runtimeA, verifier });
+    const storeB = new LoroReferenceStore({ policyDomainId, runtime: runtimeB, verifier });
+    const record = createRecord("ref-4", "req-4");
+
+    await storeA.createReference(record);
+    storeB.importUpdates(storeA.exportUpdates());
+
+    await storeA.updateReferenceStatus("ref-4", "orphan", "verification_failed");
+    await storeB.updateReferenceStatus("ref-4", "deleted", "user_deleted");
+
+    const updatesA = storeA.exportUpdates();
+    const updatesB = storeB.exportUpdates();
+    storeA.importUpdates(updatesB);
+    storeB.importUpdates(updatesA);
+
+    const statusA = storeA.getReference("ref-4")?.status;
+    const statusB = storeB.getReference("ref-4")?.status;
+    expect(statusA).toBe(statusB);
+    expect(statusA === "orphan" || statusA === "deleted").toBe(true);
   });
 });

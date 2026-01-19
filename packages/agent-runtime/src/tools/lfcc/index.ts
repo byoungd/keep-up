@@ -3,6 +3,7 @@
  */
 
 export {
+  type AIEnvelopeGateway,
   type BlockType,
   createLFCCToolServer,
   type ILFCCBridge,
