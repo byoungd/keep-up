@@ -204,6 +204,7 @@ export default defineConfig({
             "packages/ingest-youtube/src/**/*.test.ts",
             "packages/ai-core/src/**/*.test.ts",
             "packages/cli/src/**/*.test.ts",
+            "packages/agent-runtime-tools/src/**/*.test.ts",
             "packages/agent-runtime/src/**/*.test.ts",
             "packages/agent-runtime-memory/src/**/*.test.ts",
             "packages/agent-runtime-telemetry/src/**/*.test.ts",

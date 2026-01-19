@@ -5,7 +5,10 @@
  */
 
 export * from "./agents/lineage";
+export * from "./approval";
 export * from "./browser";
+export * from "./coordinator";
+export * from "./hooks";
 export * from "./orchestrator/planPersistence";
 export * from "./orchestrator/subagentOrchestrator";
 export * from "./plugins";
