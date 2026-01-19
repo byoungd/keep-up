@@ -8,18 +8,9 @@ import { SidebarLeftIcon, SidebarRightFilledIcon, SidebarRightIcon } from "../ui
 import { Tooltip } from "../ui/Tooltip";
 
 export interface HeaderProps {
-  docId?: string; // Kept for API consistency if needed
-  title?: string;
-  sourceType?: "local" | "github" | "rss" | "url";
-  onToggleLeft: () => void;
   onToggleRight: () => void;
   isRightPanelOpen?: boolean;
-  rightPanelPosition?: "left" | "right";
   rightPanelLabel?: string;
-  syncIndicator?: React.ReactNode;
-  presenceAvatars?: React.ReactNode;
-  globalActions?: React.ReactNode;
-  appName?: string;
   /** Custom content to render after the Toggle on the left side */
   leftSlot?: React.ReactNode;
   /** Custom content to render before the Panel Toggle on the right side */
@@ -27,10 +18,8 @@ export interface HeaderProps {
 }
 
 export function Header({
-  onToggleLeft: _onToggleLeft,
   onToggleRight,
   isRightPanelOpen,
-  rightPanelPosition: _rightPanelPosition,
   rightPanelLabel,
   leftSlot,
   rightSlot,

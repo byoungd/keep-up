@@ -44,7 +44,7 @@ export interface AppShellProps {
   createDocumentDialog?: React.ReactNode;
   commandPalette?: React.ReactNode;
   importModals?: React.ReactNode;
-  headerProps?: Omit<HeaderProps, "onToggleLeft" | "onToggleRight" | "isRightPanelOpen">;
+  headerProps?: Omit<HeaderProps, "onToggleRight" | "isRightPanelOpen">;
   sidebarProps?: {
     onOpenSearch?: () => void;
     onOpenImport?: () => void;
@@ -217,7 +217,7 @@ function resolveHeaderConfig({
   panelState,
   hasAuxPanel,
   isAuxPanelVisible,
-  auxPanelPosition,
+  auxPanelPosition: _auxPanelPosition,
   isAIPanelVisible,
   i18n,
 }: {
@@ -227,11 +227,10 @@ function resolveHeaderConfig({
   auxPanelPosition: "left" | "right";
   isAIPanelVisible: boolean;
   i18n: ReturnType<typeof useReaderShell>["i18n"];
-}): Pick<HeaderProps, "isRightPanelOpen" | "rightPanelPosition" | "rightPanelLabel"> {
+}): Pick<HeaderProps, "isRightPanelOpen" | "rightPanelLabel"> {
   if (panelState.isMain && hasAuxPanel) {
     return {
       isRightPanelOpen: isAuxPanelVisible,
-      rightPanelPosition: auxPanelPosition,
       rightPanelLabel: i18n.t("Header.toggleContext", "Toggle Context Panel (⌘+2)"),
     };
   }
@@ -646,8 +645,6 @@ export function AppShell(props: AppShellProps) {
     importModals,
     headerProps,
     sidebarProps,
-    appName,
-    headerActions,
     sidebar,
     layoutStyle = "default",
   } = props;
@@ -735,15 +732,6 @@ export function AppShell(props: AppShellProps) {
 
   // Reset mobile panel when switching to desktop
   useResetMobilePanel({ isDesktop, setMobilePanel });
-
-  const handleToggleLeft = React.useCallback(() => {
-    togglePanel({
-      isDesktop,
-      setMobilePanel,
-      target: "left",
-      onDesktopToggle: () => layoutRef.current?.toggleLeft(),
-    });
-  }, [isDesktop]);
 
   const handleToggleRight = React.useCallback(() => {
     const onDesktopToggle = resolveDesktopToggle({
@@ -897,13 +885,9 @@ export function AppShell(props: AppShellProps) {
             )}
           >
             <Header
-              onToggleLeft={handleToggleLeft}
               onToggleRight={handleToggleRight}
               isRightPanelOpen={headerConfig.isRightPanelOpen}
-              rightPanelPosition={headerConfig.rightPanelPosition}
               rightPanelLabel={headerConfig.rightPanelLabel}
-              globalActions={headerActions}
-              appName={appName}
               {...headerProps}
             />
 
