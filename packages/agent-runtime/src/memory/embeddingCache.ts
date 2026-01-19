@@ -14,6 +14,7 @@ export class CachedEmbeddingProvider implements IEmbeddingProvider {
   private readonly inFlight = new Map<string, Promise<number[]>>();
   private readonly providerId: string;
   private readonly modelId: string;
+  private readonly normalizeEmbeddingText: boolean;
 
   constructor(inner: IEmbeddingProvider, config?: MemoryCacheConfig) {
     this.inner = inner;
@@ -23,6 +24,7 @@ export class CachedEmbeddingProvider implements IEmbeddingProvider {
     }
     this.providerId = resolved?.embeddingProviderId ?? "default";
     this.modelId = resolved?.embeddingModelId ?? "default";
+    this.normalizeEmbeddingText = resolved?.normalizeEmbeddingText ?? false;
   }
 
   async embed(text: string): Promise<number[]> {
@@ -88,7 +90,7 @@ export class CachedEmbeddingProvider implements IEmbeddingProvider {
     return buildCacheKey("embedding", {
       providerId: this.providerId,
       modelId: this.modelId,
-      text: normalizeCacheText(text),
+      text: this.normalizeEmbeddingText ? normalizeCacheText(text) : text,
     });
   }
 

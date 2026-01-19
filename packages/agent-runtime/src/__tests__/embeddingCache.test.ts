@@ -65,6 +65,29 @@ describe("CachedEmbeddingProvider", () => {
     expect(first).toEqual(second);
   });
 
+  it("does not normalize embedding text by default", async () => {
+    const provider = new CountingEmbeddingProvider();
+    const cached = new CachedEmbeddingProvider(provider, { enableEmbeddingCache: true });
+
+    await cached.embed("hello world");
+    await cached.embed("hello   world");
+
+    expect(provider.embedCalls).toBe(2);
+  });
+
+  it("normalizes embedding text when configured", async () => {
+    const provider = new CountingEmbeddingProvider();
+    const cached = new CachedEmbeddingProvider(provider, {
+      enableEmbeddingCache: true,
+      normalizeEmbeddingText: true,
+    });
+
+    await cached.embed("hello world");
+    await cached.embed("hello   world");
+
+    expect(provider.embedCalls).toBe(1);
+  });
+
   it("deduplicates embedBatch requests", async () => {
     const provider = new CountingEmbeddingProvider();
     const cached = new CachedEmbeddingProvider(provider, { enableEmbeddingCache: true });

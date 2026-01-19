@@ -11,6 +11,7 @@ export interface MemoryCacheConfig {
   embeddingCache?: CacheOptions;
   embeddingProviderId?: string;
   embeddingModelId?: string;
+  normalizeEmbeddingText?: boolean;
 }
 
 export interface ResolvedMemoryCacheConfig {
@@ -20,6 +21,7 @@ export interface ResolvedMemoryCacheConfig {
   embeddingCache: CacheOptions;
   embeddingProviderId: string;
   embeddingModelId: string;
+  normalizeEmbeddingText: boolean;
 }
 
 const DEFAULT_QUERY_CACHE: CacheOptions = {
@@ -46,5 +48,6 @@ export function resolveMemoryCacheConfig(
     embeddingCache: { ...DEFAULT_EMBEDDING_CACHE, ...config.embeddingCache },
     embeddingProviderId: config.embeddingProviderId ?? "default",
     embeddingModelId: config.embeddingModelId ?? "default",
+    normalizeEmbeddingText: config.normalizeEmbeddingText ?? false,
   };
 }
