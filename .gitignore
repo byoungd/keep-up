@@ -191,3 +191,7 @@ docs/tasks/
 apps/reader/public/db-worker.js
 apps/reader/public/sqlite3.wasm
 apps/reader/public/assets/
+
+# Cowork E2E
+apps/cowork-e2e/test-results/
+apps/cowork-e2e/playwright-report/
