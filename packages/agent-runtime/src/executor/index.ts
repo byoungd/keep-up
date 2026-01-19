@@ -4,6 +4,8 @@
  * Centralizes policy checks, auditing, rate limiting, caching, retry, and telemetry.
  */
 
+import type { TelemetryContext } from "@ku0/agent-runtime-telemetry/telemetry";
+import { AGENT_METRICS } from "@ku0/agent-runtime-telemetry/telemetry";
 import {
   createExecutionSandboxAdapter,
   type ExecutionSandboxAdapter,
@@ -22,8 +24,6 @@ import {
   type ToolPolicyDecision,
   type ToolPolicyEngine,
 } from "../security";
-import type { TelemetryContext } from "../telemetry";
-import { AGENT_METRICS } from "../telemetry";
 import type { IToolRegistry } from "../tools/mcp/registry";
 import type {
   AuditLogger,

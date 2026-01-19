@@ -5,8 +5,6 @@
  * Includes metrics collection, tracing, and structured logging.
  */
 
-import type { RuntimeEventBus } from "../events/eventBus";
-
 // ============================================================================
 // Metric Types
 // ============================================================================
@@ -497,24 +495,31 @@ export function traced<T extends (...args: unknown[]) => unknown>(
 // Event Bus Telemetry Bridge
 // ============================================================================
 
+export interface TelemetryEventBus {
+  subscribe<Payload>(
+    pattern: string,
+    handler: (event: { payload: Payload }) => void
+  ): { unsubscribe(): void };
+}
+
 /**
  * Attach telemetry updates to event bus signals.
  * Avoid double counting if metrics are emitted elsewhere.
  */
 export function attachTelemetryToEventBus(
   telemetry: TelemetryContext,
-  eventBus: RuntimeEventBus
+  eventBus: TelemetryEventBus
 ): () => void {
   let activeAgents = 0;
 
   const subscriptions = [
-    eventBus.subscribe("tool:called", (event) => {
+    eventBus.subscribe<{ toolName: string }>("tool:called", (event) => {
       telemetry.metrics.increment(AGENT_METRICS.toolCallsTotal.name, {
         tool_name: event.payload.toolName,
         status: "started",
       });
     }),
-    eventBus.subscribe("tool:completed", (event) => {
+    eventBus.subscribe<{ toolName: string; durationMs: number }>("tool:completed", (event) => {
       telemetry.metrics.increment(AGENT_METRICS.toolCallsTotal.name, {
         tool_name: event.payload.toolName,
         status: "success",
@@ -523,25 +528,25 @@ export function attachTelemetryToEventBus(
         tool_name: event.payload.toolName,
       });
     }),
-    eventBus.subscribe("tool:failed", (event) => {
+    eventBus.subscribe<{ toolName: string }>("tool:failed", (event) => {
       telemetry.metrics.increment(AGENT_METRICS.toolCallsTotal.name, {
         tool_name: event.payload.toolName,
         status: "error",
       });
     }),
-    eventBus.subscribe("agent:started", () => {
+    eventBus.subscribe<Record<string, never>>("agent:started", () => {
       activeAgents += 1;
       telemetry.metrics.gauge(AGENT_METRICS.activeAgents.name, activeAgents);
     }),
-    eventBus.subscribe("agent:completed", () => {
+    eventBus.subscribe<Record<string, never>>("agent:completed", () => {
       activeAgents = Math.max(0, activeAgents - 1);
       telemetry.metrics.gauge(AGENT_METRICS.activeAgents.name, activeAgents);
     }),
-    eventBus.subscribe("agent:failed", () => {
+    eventBus.subscribe<Record<string, never>>("agent:failed", () => {
       activeAgents = Math.max(0, activeAgents - 1);
       telemetry.metrics.gauge(AGENT_METRICS.activeAgents.name, activeAgents);
     }),
-    eventBus.subscribe("agent:cancelled", () => {
+    eventBus.subscribe<Record<string, never>>("agent:cancelled", () => {
       activeAgents = Math.max(0, activeAgents - 1);
       telemetry.metrics.gauge(AGENT_METRICS.activeAgents.name, activeAgents);
     }),

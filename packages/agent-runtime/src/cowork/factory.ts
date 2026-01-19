@@ -4,6 +4,7 @@
  * Helpers for wiring Cowork policy, permission checking, and orchestrator setup.
  */
 
+import type { TelemetryContext } from "@ku0/agent-runtime-telemetry/telemetry";
 import type { ToolExecutionOptions } from "../executor";
 import { createToolExecutor } from "../executor";
 import type { AgentModeManager } from "../modes";
@@ -19,7 +20,6 @@ import {
   resolveToolExecutionContext,
   type ToolPolicyEngine,
 } from "../security";
-import type { TelemetryContext } from "../telemetry";
 import type { IToolRegistry } from "../tools/mcp/registry";
 import type {
   AuditLogger,

@@ -7,6 +7,7 @@
  * Design: Uses dependency injection for the LFCC bridge to maintain loose coupling.
  */
 
+import { getLogger } from "@ku0/agent-runtime-telemetry/logging";
 import type {
   AIEnvelopeDiagnostic,
   AIEnvelopeResponse,
@@ -27,7 +28,6 @@ import {
   normalizeAIRequestEnvelope,
   stableStringify,
 } from "@ku0/core";
-import { getLogger } from "../../logging/logger.js";
 import type { MCPToolResult, ToolContext } from "../../types";
 import { BaseToolServer, errorResult, textResult } from "../mcp/baseServer";
 import type {

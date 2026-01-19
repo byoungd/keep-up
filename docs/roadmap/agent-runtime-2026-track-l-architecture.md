@@ -116,6 +116,7 @@ graph TD
 - [x] Break circular dependencies per RFC Cycle Resolution Plan.
 
 ### Phase 3: Package Extraction
+- [x] Extract telemetry/logging into `agent-runtime-telemetry`.
 - [ ] Create package scaffolding and move plane modules.
 - [ ] Move integrations into sandbox and memory packages.
 - [ ] Move tool registry and servers into tooling package.

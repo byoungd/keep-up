@@ -4,6 +4,7 @@
  * Provides explicit wiring for the agent runtime using dependency injection.
  */
 
+import type { TelemetryContext } from "@ku0/agent-runtime-telemetry/telemetry";
 import type { RuntimeEventBus } from "./events/eventBus";
 import type { ToolExecutor } from "./executor";
 import { createKernel, type Kernel, type KernelConfig, type RuntimeServices } from "./kernel";
@@ -12,7 +13,6 @@ import type { IPermissionChecker } from "./security";
 import { createPermissionChecker, createSecurityPolicy } from "./security";
 import type { SessionState } from "./session";
 import type { SkillPromptAdapter, SkillRegistry, SkillSession } from "./skills";
-import type { TelemetryContext } from "./telemetry";
 import { createToolRegistry, type IToolRegistry } from "./tools/mcp/registry";
 import type { AuditLogger, MCPToolServer, SecurityPolicy, SecurityPreset } from "./types";
 

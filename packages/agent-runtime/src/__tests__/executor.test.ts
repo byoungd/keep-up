@@ -12,6 +12,12 @@
  * - Error handling
  */
 
+import {
+  type IMetricsCollector,
+  InMemoryTracer,
+  type MetricValue,
+  type TelemetryContext,
+} from "@ku0/agent-runtime-telemetry/telemetry";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   type CachePredicate,
@@ -25,12 +31,6 @@ import {
   createToolPolicyEngine,
   type IPermissionChecker,
 } from "../security";
-import {
-  type IMetricsCollector,
-  InMemoryTracer,
-  type MetricValue,
-  type TelemetryContext,
-} from "../telemetry";
 import type { IToolRegistry } from "../tools/mcp/registry";
 import type {
   AuditEntry,

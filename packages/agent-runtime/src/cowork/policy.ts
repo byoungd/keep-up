@@ -5,8 +5,8 @@
  */
 
 import * as path from "node:path";
-import type { TelemetryContext } from "../telemetry";
-import { AGENT_METRICS } from "../telemetry";
+import type { TelemetryContext } from "@ku0/agent-runtime-telemetry/telemetry";
+import { AGENT_METRICS } from "@ku0/agent-runtime-telemetry/telemetry";
 import { LRUCache } from "../utils/cache";
 import type { CoworkRiskTag } from "./types";
 

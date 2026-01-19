@@ -5,7 +5,7 @@
  * Supports wildcard subscriptions, async handlers, and event replay.
  */
 
-import { getLogger, type Logger } from "../logging/logger.js";
+import { getLogger, type Logger } from "@ku0/agent-runtime-telemetry/logging";
 import type { ArtifactEnvelope, ExecutionDecision, ToolExecutionRecord } from "../types";
 
 // ============================================================================

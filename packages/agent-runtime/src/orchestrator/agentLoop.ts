@@ -14,7 +14,7 @@
  * Parallel function calling is strictly forbidden.
  */
 
-import { getLogger } from "../logging/logger.js";
+import { getLogger } from "@ku0/agent-runtime-telemetry/logging";
 import type { AgentMessage, MCPToolCall, MCPToolResult } from "../types";
 
 const logger = getLogger("agent-loop");

@@ -2,9 +2,9 @@
  * Cowork Policy Tests
  */
 
+import { InMemoryMetricsCollector } from "@ku0/agent-runtime-telemetry/telemetry";
 import { describe, expect, it } from "vitest";
 import { type CoworkPolicyConfig, CoworkPolicyEngine } from "../cowork/policy";
-import { InMemoryMetricsCollector } from "../telemetry";
 
 const policyConfig: CoworkPolicyConfig = {
   version: "1.0",

@@ -2,7 +2,6 @@
  * Logging Tests
  */
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   configureLogger,
   createLogger,
@@ -11,7 +10,8 @@ import {
   type Logger,
   type MemoryTransport,
   resetLogger,
-} from "../logging";
+} from "@ku0/agent-runtime-telemetry/logging";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 describe("Logger", () => {
   let transport: MemoryTransport;
