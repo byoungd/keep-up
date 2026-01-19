@@ -29,6 +29,7 @@ Deliver the Agent Runtime v2026.1 spec implementation to top-tier product qualit
 | Track E | SOP Roles and Phase Gates | Dev + QA | Track B |
 | Track F | Model Routing, Context Management, Observability | Dev + QA | Track A |
 | Track G | AI Envelope and LFCC Alignment | TL + Dev + QA | Track B, Track C |
+| Track H | Optimization (M4) | Dev + QA | Track A-G |
 
 ## Milestones
 
@@ -75,3 +76,4 @@ M4: Optimization and Quality (Weeks 7-8)
 - docs/roadmap/agent-runtime-2026-track-e-sop-roles.md
 - docs/roadmap/agent-runtime-2026-track-f-model-routing-observability.md
 - docs/roadmap/agent-runtime-2026-track-g-ai-envelope-lfcc.md
+- docs/roadmap/agent-runtime-2026-track-h-optimization.md
