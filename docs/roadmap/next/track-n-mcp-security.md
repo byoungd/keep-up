@@ -11,7 +11,29 @@
 
 ## Objective
 
-Fully adopt MCP 2.0 SDK with production-grade security including OAuth 2.0 authorization and prompt injection defense.
+Upgrade the MCP integration to MCP 2.0 with full transport parity (stdio/SSE/streamable HTTP),
+persistent OAuth 2.0 authorization, and hardened prompt injection defenses. Build on the existing
+SDK adapter, remote server, and security guardrails already present in the runtime.
+
+---
+
+## Current Baseline (Already Implemented)
+
+- `packages/agent-runtime-tools/src/tools/mcp/sdkAdapter.ts` maps MCP SDK tool/result types.
+- `packages/agent-runtime-tools/src/tools/mcp/remoteServer.ts` connects to MCP servers via streamable HTTP.
+- `packages/agent-runtime-tools/src/tools/mcp/oauth.ts` provides OAuth client provider + in-memory token store.
+- `packages/agent-runtime/src/security/promptInjection.ts` and `packages/agent-runtime/src/executor/index.ts`
+  enforce prompt-injection checks.
+
+---
+
+## Gaps to Close
+
+- Transport support is streamable HTTP only; stdio and SSE are missing.
+- OAuth tokens are not persisted across sessions and lack secure storage.
+- Scope enforcement is localized to remote server calls without policy/audit visibility.
+- Server connection status, health, and auth state are not surfaced as events.
+- Prompt injection guardrails need connector-specific policy tuning and audit coverage.
 
 ---
 
@@ -72,259 +94,125 @@ const connection: McpConnection = {
 
 ## Tasks
 
-### N1: MCP SDK Full Adoption (Week 1)
+### N1: Transport Parity + MCP 2.0 Upgrade (Week 1)
 
-**Goal**: Replace custom MCP registry with official `@modelcontextprotocol/sdk`.
+**Goal**: Support stdio, SSE, and streamable HTTP transports through the official MCP SDK and align
+config with MCP 2.0 expectations.
 
 **Implementation**:
 
 ```typescript
-// packages/agent-runtime-tools/src/mcp/sdkAdapter.ts
+// packages/agent-runtime-tools/src/tools/mcp/remoteServer.ts
 
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { ListToolsResultSchema, CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
+export type McpTransportConfig =
+  | { type: "stdio"; command: string; args?: string[]; env?: Record<string, string> }
+  | { type: "sse"; url: string; eventSourceInit?: EventSourceInit }
+  | { type: "streamableHttp"; url: string; requestInit?: RequestInit };
 
-export interface McpServerConfig {
-  type: "stdio" | "sse" | "streamableHttp";
+export interface McpRemoteServerConfig {
   name: string;
-  command?: string;
-  args?: string[];
-  url?: string;
-  headers?: Record<string, string>;
-  timeout?: number;
-  autoApprove?: string[];
-}
-
-export class McpSdkAdapter {
-  private clients = new Map<string, Client>();
-  private transports = new Map<string, Transport>();
-
-  async connect(config: McpServerConfig): Promise<void> {
-    const transport = this.createTransport(config);
-    const client = new Client({ name: "keep-up", version: "1.0.0" }, { capabilities: {} });
-    
-    await client.connect(transport);
-    
-    this.clients.set(config.name, client);
-    this.transports.set(config.name, transport);
-  }
-
-  private createTransport(config: McpServerConfig): Transport {
-    switch (config.type) {
-      case "stdio":
-        return new StdioClientTransport({
-          command: config.command!,
-          args: config.args,
-          stderr: "pipe",
-        });
-      case "sse":
-        return new SSEClientTransport(new URL(config.url!));
-      case "streamableHttp":
-        return new StreamableHTTPClientTransport(new URL(config.url!));
-    }
-  }
-
-  async listTools(serverName: string): Promise<McpTool[]> {
-    const client = this.clients.get(serverName);
-    if (!client) throw new Error(`Server ${serverName} not connected`);
-    
-    const response = await client.request(
-      { method: "tools/list" },
-      ListToolsResultSchema
-    );
-    return response?.tools || [];
-  }
-
-  async callTool(serverName: string, toolName: string, args: unknown): Promise<unknown> {
-    const client = this.clients.get(serverName);
-    if (!client) throw new Error(`Server ${serverName} not connected`);
-    
-    const response = await client.request(
-      { method: "tools/call", params: { name: toolName, arguments: args } },
-      CallToolResultSchema
-    );
-    return response?.content;
-  }
+  description: string;
+  transport: McpTransportConfig;
+  auth?: {
+    provider: OAuthClientProvider;
+    scopes?: string[];
+    authorizationCode?: string;
+  };
+  toolScopes?: ToolScopeConfig;
 }
 ```
 
 **Deliverables**:
-- [ ] `packages/agent-runtime-tools/src/mcp/sdkAdapter.ts`
-- [ ] `packages/agent-runtime-tools/src/mcp/schemaValidator.ts`
-- [ ] Migration guide for existing MCP tools
-- [ ] Unit tests for all transport types
+- [ ] Add stdio + SSE support to `packages/agent-runtime-tools/src/tools/mcp/remoteServer.ts`
+- [ ] Transport factory with shared retry/health wiring (`packages/agent-runtime-tools/src/tools/mcp/transport.ts`)
+- [ ] Capability + schema validation for tool metadata (`packages/agent-runtime-tools/src/tools/mcp/sdkAdapter.ts`)
+- [ ] Unit tests for all transport types in `packages/agent-runtime-tools/src/__tests__/`
 
 ---
 
-### N2: OAuth 2.0 Integration (Week 2)
+### N2: OAuth 2.0 Persistence + Scope Policy (Week 2)
 
-**Goal**: Secure tool access with OAuth 2.0 scopes per Cline's `McpOAuthManager.ts`.
+**Goal**: Persist OAuth tokens securely and surface scope enforcement in the runtime policy/audit layer.
 
 **Implementation**:
 
 ```typescript
-// packages/agent-runtime-core/src/auth/oauth.ts
+// packages/agent-runtime-tools/src/tools/mcp/oauth.ts
 
-export interface OAuthTokens {
-  access_token: string;
-  refresh_token?: string;
-  expires_at?: number;
-  scope?: string;
-}
-
-export interface OAuthProvider {
-  tokens(): Promise<OAuthTokens | undefined>;
-  redirectUrl(): URL;
+export interface McpOAuthTokenStore {
+  getTokens(): Promise<OAuthTokens | undefined>;
   saveTokens(tokens: OAuthTokens): Promise<void>;
-  clearTokens(): Promise<void>;
+  clear(): Promise<void>;
 }
 
-export class McpOAuthManager {
-  private providers = new Map<string, OAuthProvider>();
-  private tokenStore: TokenStore;
-
-  constructor(tokenStore: TokenStore) {
-    this.tokenStore = tokenStore;
-  }
-
-  async getOrCreateProvider(serverName: string, url: string): Promise<OAuthProvider> {
-    const key = this.getServerAuthHash(serverName, url);
-    
-    if (!this.providers.has(key)) {
-      const provider = await this.createProvider(serverName, url);
-      this.providers.set(key, provider);
-    }
-    
-    return this.providers.get(key)!;
-  }
-
-  private getServerAuthHash(serverName: string, url: string): string {
-    return `${serverName}:${new URL(url).origin}`;
+export class SecureTokenStore implements McpOAuthTokenStore {
+  async getTokens(): Promise<OAuthTokens | undefined> {
+    return loadTokensFromSecureStore();
   }
   async saveTokens(tokens: OAuthTokens): Promise<void> {
-    // Securely store tokens with encryption
-    await this.tokenStore.setSecure(this.getServerAuthHash(), tokens);
+    await writeTokensToSecureStore(tokens);
   }
-
-  // Generate random state for CSRF protection
-  generateState(): string {
-    return crypto.randomBytes(32).toString("hex");
-  }
-
-  // PKCE Code Verifier generation
-  generateCodeVerifier(): string {
-    return crypto.randomBytes(32).toString("base64url");
+  async clear(): Promise<void> {
+    await deleteTokensFromSecureStore();
   }
 }
 ```
 
 **Deliverables**:
-- [ ] `packages/agent-runtime-core/src/auth/oauth.ts` (with PKCE/CSRF)
-- [ ] `packages/agent-runtime-core/src/auth/tokenStore.ts` (Keychain/Encrypted)
-- [ ] `packages/agent-runtime-tools/src/mcp/authMiddleware.ts`
-- [ ] Token persistence layer
-- [ ] Scope-to-tool binding in policy engine
+- [ ] Persistent token store implementation (keychain or encrypted DB)
+- [ ] OAuth refresh + re-auth flows wired to `McpOAuthSession`
+- [ ] Scope enforcement surfaced to `packages/agent-runtime/src/security/index.ts`
+- [ ] Audit events for auth decisions + scope mismatches
 
 ---
 
-### N3: Prompt Injection Defense (Week 3)
+### N3: Prompt Injection Defense + Audit (Week 3)
 
-**Goal**: Add defense layer against prompt injection attacks.
+**Goal**: Harden injection defenses with connector-specific policy and auditable block/redaction decisions.
 
 **Implementation**:
 
 ```typescript
-// packages/agent-runtime-core/src/security/injectionGuard.ts
+// packages/agent-runtime/src/security/promptInjection.ts
 
-export interface InjectionGuardConfig {
+export interface PromptInjectionPolicy {
   enabled: boolean;
-  blockPatterns: RegExp[];
-  sanitizePatterns: Array<{ pattern: RegExp; replacement: string }>;
-  maxInputLength: number;
-  allowedSchemas: Set<string>;
+  blockOnRisk: "low" | "medium" | "high";
+  maxContentChars: number;
+  maxDepth: number;
+  connectorOverrides?: Record<string, Partial<PromptInjectionPolicy>>;
 }
-
-export class InjectionGuard {
-  constructor(private config: InjectionGuardConfig) {}
-
-  validateInput(input: unknown, schema?: JSONSchema): ValidationResult {
-    if (typeof input === "string") {
-      return this.validateString(input);
-    }
-    if (typeof input === "object" && schema) {
-      return this.validateObject(input, schema);
-    }
-    return { valid: true };
-  }
-
-  private validateString(input: string): ValidationResult {
-    // Check maximum length
-    if (input.length > this.config.maxInputLength) {
-      return { valid: false, reason: "Input exceeds maximum length" };
-    }
-
-    // Check block patterns
-    for (const pattern of this.config.blockPatterns) {
-      if (pattern.test(input)) {
-        return { valid: false, reason: "Input contains blocked pattern" };
-      }
-    }
-
-    return { valid: true };
-  }
-
-  sanitize(input: string): string {
-    let result = input;
-    for (const { pattern, replacement } of this.config.sanitizePatterns) {
-      result = result.replace(pattern, replacement);
-    }
-    return result;
-  }
-}
-
-// Default block patterns
-export const DEFAULT_BLOCK_PATTERNS = [
-  /ignore\s+(?:all\s+)?(?:previous|prior)\s+instructions/i,
-  /system\s*:\s*/i,
-  /\[INST\]/i,
-  /<\|system\|>/i,
-];
 ```
 
 **Deliverables**:
-- [ ] `packages/agent-runtime-core/src/security/injectionGuard.ts`
-- [ ] `packages/agent-runtime-execution/src/sanitizer.ts`
-- [ ] Configurable block/sanitize patterns
-- [ ] Policy hooks for blocking/redaction
+- [ ] Connector-specific policies and redaction rules
+- [ ] Audit logs for blocked or redacted tool calls
+- [ ] Integration tests covering high-risk tool outputs
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] MCP tools registered and executed via official SDK
-- [ ] All three transport types (stdio/SSE/HTTP) working
-- [ ] OAuth 2.0 tokens managed with refresh flow
-- [ ] Scope enforcement at tool execution time
-- [ ] Injection guard blocks known attack patterns
-- [ ] Audit logging for all security decisions
-- [ ] Zero regression on existing MCP functionality
+- [ ] All three transports (stdio/SSE/streamable HTTP) work with the MCP SDK client.
+- [ ] MCP 2.0 capability negotiation and tool schema validation are enforced.
+- [ ] OAuth tokens persist securely and refresh without manual re-auth.
+- [ ] Tool scopes are enforced with audit visibility.
+- [ ] Prompt injection guardrails block or redact high-risk content with logged reasons.
+- [ ] No regression in existing MCP tools or prompt injection tests.
 
 ---
 
 ## Testing Requirements
 
 ```bash
-# Unit tests
+# MCP SDK + transport tests
 pnpm --filter @ku0/agent-runtime-tools test -- --grep "mcp"
 
-# Integration tests
-pnpm test:integration -- --grep "oauth"
+# OAuth flow tests
+pnpm --filter @ku0/agent-runtime-tools test -- --grep "oauth"
 
-# Security tests
-pnpm --filter @ku0/agent-runtime-core test -- --grep "injection"
+# Prompt injection/security tests
+pnpm --filter @ku0/agent-runtime test -- --grep "promptInjection"
 ```
 
 ---
@@ -333,6 +221,7 @@ pnpm --filter @ku0/agent-runtime-core test -- --grep "injection"
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| SDK breaking changes | High | Pin SDK version, abstraction layer |
-| OAuth token leakage | Critical | Secure token storage, no logging |
-| False positive blocks | Medium | Configurable patterns, override |
+| SDK breaking changes | High | Pin SDK version, adapter isolation |
+| OAuth token leakage | Critical | Secure storage + no logging |
+| Transport regressions | Medium | Per-transport tests and retry policies |
+| False positives in injection guard | Medium | Policy overrides + audit review |
