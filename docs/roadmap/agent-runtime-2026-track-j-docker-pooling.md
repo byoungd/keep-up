@@ -1,7 +1,7 @@
 # Track J: Docker Container Pooling
 
 **Owner**: Runtime Dev
-**Status**: Proposed
+**Status**: Completed
 **Date**: 2026-01-19
 **Timeline**: Week 2
 
@@ -15,24 +15,24 @@ Reduce tool execution latency by eliminating container startup time from the cri
 ## Tasks
 
 ### Phase 1: Container Pool Implementation
-- [ ] Create `ContainerPool` class in `packages/agent-runtime/src/sandbox/containerPool.ts`.
-- [ ] Implement `acquire()`: Returns an immediately available container or waits.
-- [ ] Implement `release(container)`: Returns container to pool or marks for destruction.
-- [ ] Implement background replenishment loop to maintain `N` warm containers.
+- [x] Create `ContainerPool` class in `packages/agent-runtime/src/sandbox/containerPool.ts`.
+- [x] Implement `acquire()`: Returns an immediately available container or waits.
+- [x] Implement `release(container)`: Returns container to pool or marks for destruction.
+- [x] Implement background replenishment loop to maintain `N` warm containers.
 
 ### Phase 2: Sandbox Manager Integration
-- [ ] Update `DockerSandboxManager` to use `ContainerPool`.
-- [ ] Implement "Reset/Clean" strategy for reused containers (e.g., `git clean -fdx`, `rm -rf /workspace/*`).
-- [ ] Add configuration for Pool Size (default: 2, max: 10).
+- [x] Update `DockerSandboxManager` to use `ContainerPool`.
+- [x] Implement "Reset/Clean" strategy for reused containers (e.g., `git clean -fdx`, `rm -rf /workspace/*`).
+- [x] Add configuration for Pool Size (default: 2, max: 10).
 
 ### Phase 3: Lifecycle Management
-- [ ] Implement idle timeout (destroy warm containers if unused for X min).
-- [ ] Add health checks for pooled containers.
+- [x] Implement idle timeout (destroy warm containers if unused for X min).
+- [x] Add health checks for pooled containers.
 
 ## Deliverables
-- [ ] `ContainerPool` class with unit tests.
-- [ ] Updated `DockerSandboxManager`.
-- [ ] Integration tests verifying pool behavior (reuse, replenishment).
+- [x] `ContainerPool` class with unit tests.
+- [x] Updated `DockerSandboxManager`.
+- [x] Integration tests verifying pool behavior (reuse, replenishment).
 
 ## Technical Context
 
