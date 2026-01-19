@@ -4,383 +4,232 @@
 **Status**: Proposed  
 **Priority**: 🟡 High  
 **Timeline**: Week 2-4  
-**Dependencies**: Track N1  
-**Reference**: CrewAI roles, LangGraph multi-agent, OpenCode agent tool
+**Dependencies**: Track L, Track M1, Track M4  
+**Reference**: RuntimeMessageBus (Track M1), A2A adapter (`packages/agent-runtime-control/src/events/a2a.ts`), MetaGPT routing, CrewAI roles
 
 ---
 
 ## Objective
 
-Enable cross-framework agent collaboration via standard A2A protocol with capability discovery and message routing.
+Deliver deterministic, auditable agent collaboration on top of `RuntimeMessageBus` with a canonical
+A2A envelope, capability discovery, and optional remote transport bridges.
+
+---
+
+## Current Baseline
+
+- `RuntimeMessageBus` in `@ku0/agent-runtime-core` provides send/request/respond/publish semantics.
+- `A2AMessageBusAdapter` in `@ku0/agent-runtime-control` normalizes A2A envelopes to the bus.
+- `A2AContext` is injected into orchestrator and tool execution contexts.
 
 ---
 
 ## Source Analysis
 
-### From OpenCode (agent tool pattern)
+### From OpenCode (event-driven pub/sub)
 
 ```go
-// From internal/llm/tools.go - agent delegation
-type AgentTool struct {
-    Name        string `json:"name"`
-    Description string `json:"description"`
+type Broker[T any] struct {
+  subscribers []chan T
 }
 
-// Agent spawns sub-agents for specialized tasks
-func (a *Agent) delegateToAgent(prompt string) (*AgentResult, error) {
-    subAgent := NewAgent(a.config)
-    subAgent.SetRole("sub-agent")
-    return subAgent.Run(prompt)
+func (b *Broker[T]) Publish(event T) {
+  for _, ch := range b.subscribers {
+    ch <- event
+  }
 }
 ```
 
-### From CrewAI (role-based collaboration)
+### From MetaGPT (send_to routing)
 
 ```python
-# Role-based agent creation with skill matching
-class Agent:
-    role: str
-    goal: str
-    backstory: str
-    tools: List[Tool]
-    
-    def delegate_work(self, task: Task, context: str) -> TaskOutput:
-        # Match task to agent with best matching skills
-        best_agent = self.crew.find_best_agent(task)
-        return best_agent.execute(task, context)
+msg = Message(send_to="coder", content="Implement the feature")
+role.publish(msg)
+```
+
+### From CrewAI (role-based delegation)
+
+```python
+best_agent = crew.find_best_agent(task)
+return best_agent.execute(task, context)
 ```
 
 ---
 
 ## Tasks
 
-### O1: A2A Protocol Implementation (Week 2)
+### O1: A2A Envelope + Core Contract (Week 2)
 
-**Goal**: Define and implement A2A envelope schema for cross-agent communication.
+**Goal**: Standardize the A2A envelope shape across core/control packages and publish schema docs.
 
 **Implementation**:
 
 ```typescript
-// packages/agent-runtime-control/src/a2a/envelope.ts
+// packages/agent-runtime-control/src/events/a2a.ts
+
+export type A2AMessageType = "request" | "response" | "event";
 
 export interface A2AEnvelope {
-  /** Unique identifier for this message */
-  messageId: string;
-  
-  /** ID of the originating agent */
-  sourceAgentId: string;
-  
-  /** ID of the target agent(s) */
-  targetAgentId: string | string[];
-  
-  /** Conversation thread identifier */
-  conversationId: string;
-  
-  /** Parent message ID for reply threading */
-  inReplyTo?: string;
-  
-  /** Message type */
-  type: "request" | "response" | "notification" | "error";
-  
-  /** Capabilities required to handle this message */
-  requiredCapabilities?: string[];
-  
-  /** Message payload */
-  payload: A2APayload;
-  
-  /** Metadata for tracing and routing */
-  metadata: A2AMetadata;
-}
-
-export interface A2APayload {
-  /** The action or query being requested */
-  action: string;
-  
-  /** Parameters for the action */
-  parameters?: Record<string, unknown>;
-  
-  /** Result data (for responses) */
-  result?: unknown;
-  
-  /** Error information (for error type) */
-  error?: A2AError;
-}
-
-export interface A2AMetadata {
-  /** Timestamp of message creation */
+  id: string;
+  requestId?: string;
+  from: string;
+  to?: string | null;
+  type: A2AMessageType;
+  conversationId?: string;
+  capabilities?: string[];
+  payload: unknown;
   timestamp: number;
-  
-  /** Correlation ID for distributed tracing */
-  correlationId: string;
-  
-  /** Hop count for routing loops detection */
-  hopCount: number;
-  
-  /** Maximum hops allowed */
-  maxHops: number;
-  
-  /** Priority level */
-  priority: "low" | "normal" | "high" | "critical";
-  
-  /** TTL in milliseconds */
-  ttlMs?: number;
-}
-
-export function createA2AEnvelope(
-  sourceAgentId: string,
-  targetAgentId: string,
-  action: string,
-  parameters?: Record<string, unknown>
-): A2AEnvelope {
-  return {
-    messageId: generateId(),
-    sourceAgentId,
-    targetAgentId,
-    conversationId: generateId(),
-    type: "request",
-    payload: { action, parameters },
-    metadata: {
-      timestamp: Date.now(),
-      correlationId: generateId(),
-      hopCount: 0,
-      maxHops: 10,
-      priority: "normal",
-    },
+  trace?: {
+    correlationId?: string;
+    parentId?: string;
   };
 }
 ```
 
+```typescript
+// packages/agent-runtime-core/src/index.ts
+
+export interface A2AEnvelopeLike {
+  payload: unknown;
+  id?: string;
+  from?: string;
+  to?: string | null;
+  type?: string;
+  requestId?: string;
+  conversationId?: string;
+  capabilities?: string[];
+  timestamp?: number;
+}
+```
+
 **Deliverables**:
-- [ ] `packages/agent-runtime-control/src/a2a/envelope.ts`
-- [ ] `packages/agent-runtime-control/src/a2a/serializer.ts`
-- [ ] JSON Schema for validation
-- [ ] Protocol documentation
+- [ ] `packages/agent-runtime-core/src/index.ts` A2A envelope/context contract.
+- [ ] `packages/agent-runtime-control/src/events/a2a.ts` canonical envelope + adapter helpers.
+- [ ] JSON schema for validation and interop guidance.
+- [ ] Protocol documentation (field semantics, correlation IDs, TTL guidance).
 
 ---
 
-### O2: Cross-Agent Messaging (Week 3)
+### O2: Message Bus Routing + Remote Bridge (Week 3)
 
-**Goal**: Extend RuntimeMessageBus with A2A transport adapter.
+**Goal**: Route A2A envelopes through `RuntimeMessageBus` and add an optional remote bridge layer.
 
 **Implementation**:
 
 ```typescript
-// packages/agent-runtime-control/src/messageBus/a2aAdapter.ts
-
-import { RuntimeMessageBus } from "./messageBus";
-import { A2AEnvelope } from "../a2a/envelope";
-
-export interface A2ATransport {
-  send(envelope: A2AEnvelope): Promise<void>;
-  receive(): AsyncGenerator<A2AEnvelope>;
-  close(): Promise<void>;
-}
+// packages/agent-runtime-control/src/events/a2a.ts
 
 export class A2AMessageBusAdapter {
-  private messageBus: RuntimeMessageBus;
-  private transports = new Map<string, A2ATransport>();
-  private pendingResponses = new Map<string, {
-    resolve: (response: A2AEnvelope) => void;
-    reject: (error: Error) => void;
-    timeout: NodeJS.Timeout;
-  }>();
+  constructor(private readonly bus: RuntimeMessageBus) {}
 
-  constructor(messageBus: RuntimeMessageBus) {
-    this.messageBus = messageBus;
-    this.setupInternalRouting();
+  async request(
+    from: string,
+    to: string,
+    payload: unknown,
+    timeoutMs?: number
+  ): Promise<A2AEnvelope> {
+    const envelope = this.createEnvelope({ from, to, type: "request", payload });
+    const response = await this.bus.request(from, to, envelope, timeoutMs);
+    return this.extractEnvelope(response) ?? envelope;
   }
 
-  async registerTransport(agentId: string, transport: A2ATransport): Promise<void> {
-    this.transports.set(agentId, transport);
-    this.startReceiving(agentId, transport);
-  }
-
-  async sendMessage(envelope: A2AEnvelope): Promise<A2AEnvelope | void> {
-    // Increment hop count
-    envelope.metadata.hopCount++;
-    
-    // Check for routing loops
-    if (envelope.metadata.hopCount > envelope.metadata.maxHops) {
-      throw new Error("Max hop count exceeded - possible routing loop");
-    }
-
-    // Local agent?
-    if (this.isLocalAgent(envelope.targetAgentId as string)) {
-      return this.routeLocally(envelope);
-    }
-
-    // Remote agent
-    const transport = this.transports.get(envelope.targetAgentId as string);
-    if (!transport) {
-      throw new Error(`No transport for agent ${envelope.targetAgentId}`);
-    }
-
-    await transport.send(envelope);
-
-    // For requests, wait for response
-    if (envelope.type === "request") {
-      return this.waitForResponse(envelope.messageId, envelope.metadata.ttlMs);
-    }
-  }
-
-  private async waitForResponse(messageId: string, ttlMs = 30000): Promise<A2AEnvelope> {
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        this.pendingResponses.delete(messageId);
-        reject(new Error("A2A response timeout"));
-      }, ttlMs);
-
-      this.pendingResponses.set(messageId, { resolve, reject, timeout });
+  respond(from: string, correlationId: string, payload: unknown, request?: A2AEnvelope): void {
+    const envelope = this.createEnvelope({
+      from,
+      to: request?.from ?? null,
+      type: "response",
+      payload,
+      requestId: request?.requestId ?? request?.id,
+      conversationId: request?.conversationId,
     });
+    this.bus.respond(from, correlationId, envelope);
   }
 
-  private async routeLocally(envelope: A2AEnvelope): Promise<A2AEnvelope | void> {
-    // Emit on internal message bus
-    this.messageBus.emit("a2a:message", {
-      envelope,
-      timestamp: Date.now(),
-    });
+  publish(from: string, topic: string, payload: unknown, capabilities?: string[]): void {
+    const envelope = this.createEnvelope({ from, to: null, type: "event", payload, capabilities });
+    this.bus.publish(from, topic, envelope);
   }
 }
 ```
 
 **Deliverables**:
-- [ ] `packages/agent-runtime-control/src/messageBus/a2aAdapter.ts`
-- [ ] Local and remote transport implementations
-- [ ] Correlation ID propagation
-- [ ] Timeout and retry handling
+- [ ] Adapter routing docs (request/respond/publish mapping to A2A envelopes).
+- [ ] Remote transport interface for cross-runtime bridging.
+- [ ] Correlation ID propagation between message bus and A2A traces.
+- [ ] Timeout and retry policy for remote requests.
+- [ ] Audit log entries for outbound and inbound A2A traffic.
 
 ---
 
-### O3: Capability Discovery (Week 4)
+### O3: Capability Discovery + Delegation (Week 4)
 
-**Goal**: Dynamic discovery of agent capabilities for intelligent delegation.
+**Goal**: Expand capability discovery with TTL, heartbeat, and routing policies for delegation.
 
 **Implementation**:
 
 ```typescript
-// packages/agent-runtime-control/src/discovery/capabilities.ts
+// packages/agent-runtime-control/src/events/a2a.ts
 
-export interface AgentCapability {
-  /** Unique capability identifier */
-  id: string;
-  
-  /** Human-readable name */
-  name: string;
-  
-  /** Detailed description */
-  description: string;
-  
-  /** Capability category */
-  category: "code" | "analysis" | "search" | "browser" | "shell" | "custom";
-  
-  /** Required tools */
-  requiredTools: string[];
-  
-  /** Skill level (0-1) */
-  proficiency: number;
-  
-  /** Resource requirements */
-  resources?: {
-    memory?: string;
-    gpu?: boolean;
-    network?: boolean;
-  };
-}
-
-export interface AgentProfile {
+export interface A2ACapabilityEntry {
   agentId: string;
-  name: string;
-  version: string;
-  capabilities: AgentCapability[];
-  status: "available" | "busy" | "offline";
+  capabilities: string[];
   lastSeen: number;
-  metadata?: Record<string, unknown>;
 }
 
-export class CapabilityRegistry {
-  private agents = new Map<string, AgentProfile>();
-  private capabilityIndex = new Map<string, Set<string>>(); // capability -> agentIds
+export class A2ACapabilityRegistry {
+  private readonly entries = new Map<string, A2ACapabilityEntry>();
 
-  register(profile: AgentProfile): void {
-    this.agents.set(profile.agentId, profile);
-    
-    for (const capability of profile.capabilities) {
-      if (!this.capabilityIndex.has(capability.id)) {
-        this.capabilityIndex.set(capability.id, new Set());
-      }
-      this.capabilityIndex.get(capability.id)!.add(profile.agentId);
-    }
+  register(agentId: string, capabilities: string[]): A2ACapabilityEntry {
+    const entry = { agentId, capabilities, lastSeen: Date.now() };
+    this.entries.set(agentId, entry);
+    return entry;
   }
 
-  findAgentsWithCapability(capabilityId: string): AgentProfile[] {
-    const agentIds = this.capabilityIndex.get(capabilityId) || new Set();
-    return Array.from(agentIds)
-      .map(id => this.agents.get(id)!)
-      .filter(agent => agent.status === "available");
-  }
-
-  findBestAgent(requiredCapabilities: string[]): AgentProfile | undefined {
-    const candidates = this.agents.values();
-    
-    let bestAgent: AgentProfile | undefined;
-    let bestScore = 0;
-
-    for (const agent of candidates) {
-      if (agent.status !== "available") continue;
-      
-      const score = this.calculateMatchScore(agent, requiredCapabilities);
-      if (score > bestScore) {
-        bestScore = score;
-        bestAgent = agent;
+  findByCapability(capability: string): A2ACapabilityEntry | undefined {
+    for (const entry of this.entries.values()) {
+      if (entry.capabilities.includes(capability)) {
+        return entry;
       }
     }
-
-    return bestAgent;
-  }
-
-  private calculateMatchScore(agent: AgentProfile, required: string[]): number {
-    let score = 0;
-    const agentCapIds = new Set(agent.capabilities.map(c => c.id));
-    
-    for (const req of required) {
-      if (agentCapIds.has(req)) {
-        const cap = agent.capabilities.find(c => c.id === req)!;
-        score += cap.proficiency;
-      }
-    }
-    
-    return score / required.length;
+    return undefined;
   }
 }
 ```
 
+```typescript
+// packages/agent-runtime-core/src/index.ts
+
+export interface A2ARoutingConfig {
+  roleToAgentId?: Record<string, string>;
+  capabilityPrefix?: string;
+}
+```
+
 **Deliverables**:
-- [ ] `packages/agent-runtime-control/src/discovery/capabilities.ts`
-- [ ] `packages/agent-runtime-control/src/discovery/skillMatcher.ts`
-- [ ] Agent heartbeat and status tracking
-- [ ] Trust scoring for external agents
+- [ ] TTL/heartbeat support for capability entries.
+- [ ] `A2AAdapterLike.resolveAgentForCapability` aligned with registry.
+- [ ] Role-to-agent routing using `A2ARoutingConfig`.
+- [ ] Delegation hooks to prefer capability-based routing.
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] A2A envelopes serialize/deserialize correctly
-- [ ] Local and remote message routing works
-- [ ] Correlation IDs propagate through hops
-- [ ] Capability discovery finds matching agents
-- [ ] Timeout and error handling is robust
-- [ ] Audit log records all A2A exchanges
+- [ ] A2A envelopes match core/control interfaces and validate against schema.
+- [ ] RuntimeMessageBus routing preserves correlation and conversation IDs.
+- [ ] Remote bridge enforces timeouts and does not bypass tool allowlists.
+- [ ] Capability discovery returns live agents and prunes stale entries.
+- [ ] Audit log captures A2A request/response and publish events.
 
 ---
 
 ## Testing Requirements
 
 ```bash
-# Unit tests
+# Unit tests for adapter and registry
 pnpm --filter @ku0/agent-runtime-control test -- --grep "a2a"
 
-# Integration tests with two local agents
+# Integration test with two local agents
 pnpm test:integration -- --grep "multi-agent"
 ```
 
@@ -390,6 +239,7 @@ pnpm test:integration -- --grep "multi-agent"
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| Routing loops | High | Hop count limit, visited set |
-| Capability mismatch | Medium | Strict schema validation |
-| Timeout cascades | Medium | Per-hop timeout budgets |
+| Envelope drift | High | Publish JSON schema and validate on ingress/egress |
+| Capability staleness | Medium | TTL + heartbeat pruning |
+| Remote trust boundary | High | Enforce allowlists and audit every hop |
+| Response timeouts | Medium | Timeout budgets and retry/backoff |
