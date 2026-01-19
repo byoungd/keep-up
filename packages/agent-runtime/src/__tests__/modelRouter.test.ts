@@ -2,7 +2,9 @@
  * Model Router Tests
  */
 
+import { createTelemetryContext, METRIC_NAMES } from "@ku0/agent-runtime-telemetry/telemetry";
 import { describe, expect, it } from "vitest";
+import { createModelHealthTracker } from "../routing/modelHealthTracker";
 import { createModelRouter, type ModelRoutingDecision } from "../routing/modelRouter";
 
 describe("ModelRouter", () => {
@@ -200,6 +202,76 @@ describe("ModelRouter", () => {
       expect(decision.reason).toBe("fallback to requested model; default exceeded budget");
       expect(emittedDecisions).toHaveLength(1);
       expect(emittedDecisions[0]).toEqual(decision);
+    });
+  });
+
+  describe("health-aware routing", () => {
+    it("falls back when primary is unhealthy", () => {
+      const healthTracker = createModelHealthTracker({
+        errorRate: { degraded: 0.2, unhealthy: 0.5 },
+        timeoutRate: { degraded: 0.2, unhealthy: 0.5 },
+        latencyMs: { degraded: 2000, unhealthy: 4000 },
+        sampleAlpha: 1,
+        minSampleCount: 1,
+      });
+
+      healthTracker.recordObservation({
+        modelId: "primary",
+        outcome: "error",
+        latencyMs: 300,
+      });
+
+      const router = createModelRouter({
+        defaultModel: "primary",
+        defaultBudget: { maxTokens: 500 },
+        enableCapabilityScoring: false,
+        healthTracker,
+        rules: [
+          {
+            id: "force-primary",
+            match: () => true,
+            modelId: "primary",
+            fallbackModels: ["fallback"],
+            reason: "rule primary",
+          },
+        ],
+      });
+
+      const decision = router.route({
+        taskType: "test",
+        risk: "low",
+        budget: { maxTokens: 200 },
+      });
+
+      expect(decision.modelId).toBe("fallback");
+      expect(decision.metrics?.fallback?.used).toBe(true);
+      expect(decision.reason).toContain("health fallback");
+    });
+
+    it("emits routing telemetry metrics", () => {
+      const telemetry = createTelemetryContext();
+      const router = createModelRouter({
+        defaultModel: "gpt-4",
+        defaultBudget: { maxTokens: 4000 },
+        telemetry,
+      });
+
+      router.resolveForTurn({
+        taskType: "test",
+        risk: "low",
+        budget: { maxTokens: 1000 },
+      });
+
+      const metrics = telemetry.metrics.getMetrics();
+      const hasRoutingLatency = metrics.some((metric) =>
+        metric.name.startsWith(METRIC_NAMES.ROUTING_LATENCY_MS)
+      );
+      const hasRoutingCache =
+        metrics.some((metric) => metric.name.startsWith(METRIC_NAMES.ROUTING_CACHE_HITS)) ||
+        metrics.some((metric) => metric.name.startsWith(METRIC_NAMES.ROUTING_CACHE_MISSES));
+
+      expect(hasRoutingLatency).toBe(true);
+      expect(hasRoutingCache).toBe(true);
     });
   });
 
