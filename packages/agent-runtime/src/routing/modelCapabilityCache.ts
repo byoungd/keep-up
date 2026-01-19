@@ -387,3 +387,12 @@ export function createModelCapabilityCache(
 ): ModelCapabilityCache {
   return new ModelCapabilityCache(options);
 }
+
+/**
+ * Reset the global model capability cache instance.
+ * Useful for test isolation.
+ */
+export function resetGlobalCapabilityCache(): void {
+  globalCache?.dispose();
+  globalCache = undefined;
+}

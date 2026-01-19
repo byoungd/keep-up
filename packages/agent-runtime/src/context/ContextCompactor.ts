@@ -117,6 +117,16 @@ export interface CompressionMetrics {
 }
 
 /**
+ * Result from pruneToolResults operation.
+ */
+export interface PruneResult {
+  /** Pruned messages */
+  messages: Message[];
+  /** Number of tool results that were pruned */
+  prunedCount: number;
+}
+
+/**
  * Threshold check result.
  */
 export interface ThresholdCheckResult {
@@ -256,10 +266,12 @@ export class ContextCompactor {
    * This is a lightweight form of compaction that preserves tool inputs
    * but removes verbose outputs from older messages.
    */
-  pruneToolResults(messages: Message[], currentTurn: number): Message[] {
-    return messages.map((msg, idx) => {
+  pruneToolResults(messages: Message[], currentTurn: number): PruneResult {
+    let prunedCount = 0;
+    const prunedMessages = messages.map((msg, idx) => {
       const messageAge = currentTurn - idx;
       if (messageAge > this.options.maxToolResultAge && msg.toolResults) {
+        prunedCount += msg.toolResults.length;
         return {
           ...msg,
           toolResults: msg.toolResults.map((result) => ({
@@ -270,6 +282,7 @@ export class ContextCompactor {
       }
       return msg;
     });
+    return { messages: prunedMessages, prunedCount };
   }
 
   /**
@@ -315,13 +328,16 @@ Do NOT include redundant tool outputs or verbose explanations.`;
   /**
    * Apply a summary to the context and prepare for continuation.
    * Enhanced with compression metrics (Track H.2).
+   *
+   * @param toolResultsPruned - Optional count of tool results pruned (from pruneToolResults)
    */
   applyCompaction(
     contextManager: ContextManager,
     contextId: string,
     summary: string,
     recentMessages: Message[],
-    originalMessages?: Message[]
+    originalMessages?: Message[],
+    toolResultsPruned = 0
   ): CompactionResult {
     const startTime = performance.now();
     const context = contextManager.get(contextId);
@@ -371,7 +387,7 @@ Do NOT include redundant tool outputs or verbose explanations.`;
         strategy: this.contextConfig.compressionStrategy,
         qualityScore,
         messagesSummarized,
-        toolResultsPruned: 0, // Will be set by pruneToolResults if called
+        toolResultsPruned,
       },
     };
   }

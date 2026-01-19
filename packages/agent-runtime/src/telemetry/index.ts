@@ -565,6 +565,7 @@ export {
   type MetricDataPoint,
   MetricsAggregator,
   type MetricsAggregatorConfig,
+  resetGlobalMetricsAggregator,
   type SummaryData,
 } from "./metricsAggregator";
 // Profiler

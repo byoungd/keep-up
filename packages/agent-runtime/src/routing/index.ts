@@ -11,6 +11,7 @@ export {
   ModelCapabilityCache,
   type ModelCapabilityCacheOptions,
   type ModelScore,
+  resetGlobalCapabilityCache,
   type ScoringWeights,
 } from "./modelCapabilityCache";
 export {

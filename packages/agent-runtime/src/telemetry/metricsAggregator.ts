@@ -134,6 +134,7 @@ export class MetricsAggregator {
         value: delta,
         lastUpdated: Date.now(),
       });
+      this.enforceMaxMetrics();
     }
   }
 
@@ -142,6 +143,7 @@ export class MetricsAggregator {
    */
   setGauge(name: string, value: number, labels: Record<string, string> = {}): void {
     const key = this.makeKey(name, labels);
+    const isNew = !this.metrics.has(key);
     this.metrics.set(key, {
       name,
       type: "gauge",
@@ -149,6 +151,9 @@ export class MetricsAggregator {
       value,
       lastUpdated: Date.now(),
     });
+    if (isNew) {
+      this.enforceMaxMetrics();
+    }
   }
 
   /**
@@ -298,7 +303,9 @@ export class MetricsAggregator {
 
   private formatLabels(labels: Record<string, string>): string {
     const entries = Object.entries(labels);
-    if (entries.length === 0) return "";
+    if (entries.length === 0) {
+      return "";
+    }
     return `{${entries.map(([k, v]) => `${k}="${v}"`).join(",")}}`;
   }
 
@@ -316,6 +323,7 @@ export class MetricsAggregator {
     // Add +Inf bucket
     buckets.push({ le: Number.POSITIVE_INFINITY, count: values.length });
 
+    const isNew = !this.metrics.has(key);
     this.metrics.set(key, {
       name,
       type: "histogram",
@@ -327,6 +335,9 @@ export class MetricsAggregator {
       },
       lastUpdated: Date.now(),
     });
+    if (isNew) {
+      this.enforceMaxMetrics();
+    }
   }
 
   private updateSummary(
@@ -339,11 +350,14 @@ export class MetricsAggregator {
     const count = sorted.length;
 
     const percentile = (p: number): number => {
-      if (count === 0) return 0;
+      if (count === 0) {
+        return 0;
+      }
       const idx = Math.ceil((p / 100) * count) - 1;
       return sorted[Math.max(0, Math.min(idx, count - 1))];
     };
 
+    const isNew = !this.metrics.has(key);
     this.metrics.set(key, {
       name,
       type: "summary",
@@ -358,6 +372,9 @@ export class MetricsAggregator {
       },
       lastUpdated: Date.now(),
     });
+    if (isNew) {
+      this.enforceMaxMetrics();
+    }
   }
 
   private startAutoFlush(): void {
@@ -366,6 +383,33 @@ export class MetricsAggregator {
         this.config.onFlush(this.getMetrics());
       }
     }, this.config.flushIntervalMs);
+  }
+
+  /**
+   * Enforce the maxMetrics limit by evicting oldest metrics.
+   */
+  private enforceMaxMetrics(): void {
+    while (this.metrics.size > this.config.maxMetrics) {
+      // Find oldest metric by lastUpdated
+      let oldestKey: string | undefined;
+      let oldestTime = Number.POSITIVE_INFINITY;
+
+      for (const [key, metric] of this.metrics) {
+        if (metric.lastUpdated < oldestTime) {
+          oldestTime = metric.lastUpdated;
+          oldestKey = key;
+        }
+      }
+
+      if (oldestKey) {
+        this.metrics.delete(oldestKey);
+        // Also clean up associated raw values
+        this.histogramValues.delete(oldestKey);
+        this.summaryValues.delete(oldestKey);
+      } else {
+        break;
+      }
+    }
   }
 }
 
@@ -390,6 +434,15 @@ export function getMetricsAggregator(config?: MetricsAggregatorConfig): MetricsA
  */
 export function createMetricsAggregator(config?: MetricsAggregatorConfig): MetricsAggregator {
   return new MetricsAggregator(config);
+}
+
+/**
+ * Reset the global metrics aggregator instance.
+ * Useful for test isolation.
+ */
+export function resetGlobalMetricsAggregator(): void {
+  globalAggregator?.dispose();
+  globalAggregator = undefined;
 }
 
 // ============================================================================
