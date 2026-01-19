@@ -1,7 +1,7 @@
 # Track I: LRU Cache Optimization
 
 **Owner**: Runtime Dev
-**Status**: Proposed
+**Status**: Completed
 **Date**: 2026-01-19
 **Timeline**: Week 1
 
@@ -16,29 +16,29 @@ Maximize hitting ratio and minimize overhead by unifying and tuning cache strate
 ## Tasks
 
 ### Phase 1: Benchmarking & Selection
-- [ ] Create benchmark suite `packages/agent-runtime/bench/cache.bench.ts`.
-- [ ] Compare `utils/cache.ts` (Current), `lru-cache` (npm), and `naive Map` implementation.
-- [ ] Profile memory usage and GC pressure for high-throughput scenarios.
+- [x] Create benchmark suite `packages/agent-runtime/bench/cache.bench.ts`.
+- [x] Compare `utils/cache.ts` (Current), `lru-cache` (npm), and `naive Map` implementation.
+- [x] Profile memory usage and GC pressure for high-throughput scenarios.
 
 ### Phase 2: Unification & Refactoring
-- [ ] Refactor `RequestCache` (`orchestrator/requestCache.ts`) to use `utils/cache.ts` primitives (or the selected library).
-- [ ] Deprecate standalone cache logic in `RequestCache`.
-- [ ] Ensure `ToolResultCache` aligns with the unified strategy.
+- [x] Refactor `RequestCache` (`orchestrator/requestCache.ts`) to use `utils/cache.ts` primitives (or the selected library).
+- [x] Deprecate standalone cache logic in `RequestCache`.
+- [x] Ensure `ToolResultCache` aligns with the unified strategy.
 
 ### Phase 3: Advanced Optimization
-- [ ] Implement "entry promotion" to reduce object allocation on cache hits.
-- [ ] Add adaptive sizing based on memory pressure if feasible.
-- [ ] Optimize hash generation for cache keys (`hashArgs` / `generateKey`).
+- [x] Implement "entry promotion" to reduce object allocation on cache hits.
+- [x] Add adaptive sizing based on memory pressure if feasible.
+- [x] Optimize hash generation for cache keys (`hashArgs` / `generateKey`).
 
 ### Phase 4: Configuration
-- [ ] Expose global cache configuration (TTL, MaxSize) via `RuntimeConfig`.
-- [ ] Allow environment variable overrides (e.g., `RUNTIME_CACHE_TTL`).
+- [x] Expose global cache configuration (TTL, MaxSize) via `RuntimeConfig`.
+- [x] Allow environment variable overrides (e.g., `RUNTIME_CACHE_TTL`).
 
 ## Deliverables
-- [ ] Benchmark report.
-- [ ] Unified Cache implementation.
-- [ ] Refactored `RequestCache` and `ToolResultCache`.
-- [ ] Performance regression tests.
+- [x] Benchmark report.
+- [x] Unified Cache implementation.
+- [x] Refactored `RequestCache` and `ToolResultCache`.
+- [x] Performance regression tests.
 
 ## Technical Context
 
@@ -74,4 +74,3 @@ export interface ICacheStrategy<K, V> {
 ## Verification
 - Run benchmarks: `pnpm bench:cache` (new script).
 - Run existing tests: `pnpm test packages/agent-runtime/src/orchestrator/__tests__/requestCache.test.ts`.
-
