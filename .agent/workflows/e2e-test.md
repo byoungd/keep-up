@@ -24,7 +24,13 @@ Before running tests, determine which area of the code was changed:
 
 // turbo
 ```bash
-pnpm test:e2e:<category>
+pnpm --filter cowork-e2e test:e2e
+```
+
+Or run from the directory:
+```bash
+cd apps/cowork-e2e
+pnpm test:e2e
 ```
 
 Example: If you changed editor formatting code:

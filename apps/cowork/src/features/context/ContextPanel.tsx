@@ -6,10 +6,22 @@ import { ArtifactPreviewPane } from "@ku0/shell";
 import { useParams } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import * as React from "react";
+import type { AgentMode } from "../../api/coworkApi";
 import { ArtifactsList } from "../artifacts/components/ArtifactsList";
+import { PreflightPanelContent } from "../preflight/PreflightPanelContent";
 import { useTaskStream } from "../tasks/hooks/useTaskStream";
+import { WorkflowTemplatesPanelContent } from "../workflows/WorkflowTemplatesPanelContent";
+import { ContextPacksPanelContent } from "./ContextPacksPanelContent";
+import { ProjectContextPanelContent } from "./ProjectContextPanelContent";
 
-export type ContextPanelTab = "preview" | "artifacts" | "notes";
+export type ContextPanelTab =
+  | "context"
+  | "packs"
+  | "workflows"
+  | "preflight"
+  | "artifacts"
+  | "notes"
+  | "preview";
 
 type ContextNote = {
   id: string;
@@ -23,13 +35,24 @@ interface ContextPanelProps {
   previewArtifact: ArtifactItem | null;
   onClosePreview: () => void;
   position: "left" | "right";
+  /** Optional callback to toggle (hide) the panel */
+  onToggle?: () => void;
+  /** Callback to run a workflow template */
+  onRunTemplate?: (
+    prompt: string,
+    mode: AgentMode,
+    metadata?: Record<string, unknown>
+  ) => Promise<void>;
 }
 
-const TAB_LABELS: Record<ContextPanelTab, string> = {
-  preview: "Preview",
-  artifacts: "Artifacts",
-  notes: "Notes",
-};
+const TAB_CONFIG: { id: ContextPanelTab; label: string }[] = [
+  { id: "context", label: "Context" },
+  { id: "packs", label: "Packs" },
+  { id: "workflows", label: "Workflows" },
+  { id: "preflight", label: "Preflight" },
+  { id: "artifacts", label: "Artifacts" },
+  { id: "notes", label: "Notes" },
+];
 
 function getNotesKey(sessionId: string | undefined) {
   return `cowork-context-notes:${sessionId ?? "no-session"}`;
@@ -64,6 +87,8 @@ export function ContextPanel({
   previewArtifact,
   onClosePreview,
   position,
+  onToggle: _onToggle,
+  onRunTemplate,
 }: ContextPanelProps) {
   const { sessionId } = useParams({ strict: false }) as { sessionId?: string };
   const { graph } = useTaskStream(sessionId ?? "");
@@ -92,9 +117,9 @@ export function ContextPanel({
   }, [draft, notes, storageKey]);
 
   const availableTabs = React.useMemo(() => {
-    const tabs: ContextPanelTab[] = ["artifacts", "notes"];
+    const tabs = [...TAB_CONFIG];
     if (previewArtifact) {
-      tabs.unshift("preview");
+      tabs.push({ id: "preview", label: "Preview" });
     }
     return tabs;
   }, [previewArtifact]);
@@ -108,55 +133,47 @@ export function ContextPanel({
         position === "left" ? "border-r border-border/30" : "border-l border-border/30"
       )}
     >
-      <div className="px-4 py-3 border-b border-border/40 bg-surface-0/90">
-        <p className="text-sm font-semibold text-foreground">Context Panel</p>
-        <p className="text-xs text-muted-foreground">
-          {sessionId ? `Session ${sessionId.slice(0, 8)}...` : "No active session"}
-        </p>
+      {/* Header with toggle button */}
+      <div className="shrink-0 px-4 py-3 border-b border-border/40 bg-surface-0/90 flex items-center justify-between">
+        <div>
+          <p className="text-sm font-semibold text-foreground">Context Panel</p>
+          <p className="text-xs text-muted-foreground">
+            {sessionId ? `Session ${sessionId.slice(0, 8)}...` : "No active session"}
+          </p>
+        </div>
+        {/* Toggle handled by Global Header */}
       </div>
 
-      <div className="px-3 py-2 border-b border-border/20 flex items-center gap-2">
+      {/* Unified Tab Bar */}
+      <div className="shrink-0 px-3 py-2 border-b border-border/20 flex items-center gap-1 overflow-x-auto scrollbar-auto-hide">
         {availableTabs.map((tab) => (
           <button
             type="button"
-            key={tab}
-            onClick={() => onTabChange(tab)}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-full transition-colors duration-fast ${
-              resolvedTab === tab
+            key={tab.id}
+            onClick={() => onTabChange(tab.id)}
+            className={cn(
+              "px-3 py-1.5 text-xs font-semibold rounded-full transition-colors duration-fast whitespace-nowrap",
+              resolvedTab === tab.id
                 ? "bg-foreground text-background"
                 : "text-muted-foreground hover:text-foreground hover:bg-surface-2/60"
-            }`}
+            )}
           >
-            {TAB_LABELS[tab]}
+            {tab.label}
           </button>
         ))}
       </div>
 
+      {/* Tab Content */}
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-auto-hide">
-        {resolvedTab === "preview" && (
-          <div className="h-full">
-            <AnimatePresence mode="sync">
-              {previewArtifact ? (
-                <ArtifactPreviewPane
-                  key={previewArtifact.id}
-                  item={previewArtifact}
-                  onClose={onClosePreview}
-                />
-              ) : (
-                <motion.div
-                  key="empty"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.2, ease: "easeOut" }}
-                  className="p-4 text-sm text-muted-foreground"
-                >
-                  No preview selected.
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+        {resolvedTab === "context" && <ProjectContextPanelContent />}
+
+        {resolvedTab === "packs" && <ContextPacksPanelContent />}
+
+        {resolvedTab === "workflows" && (
+          <WorkflowTemplatesPanelContent onRunTemplate={onRunTemplate} />
         )}
+
+        {resolvedTab === "preflight" && <PreflightPanelContent />}
 
         {resolvedTab === "artifacts" && (
           <div className="h-full">
@@ -202,6 +219,31 @@ export function ContextPanel({
                 Save Note
               </button>
             </div>
+          </div>
+        )}
+
+        {resolvedTab === "preview" && (
+          <div className="h-full">
+            <AnimatePresence mode="sync">
+              {previewArtifact ? (
+                <ArtifactPreviewPane
+                  key={previewArtifact.id}
+                  item={previewArtifact}
+                  onClose={onClosePreview}
+                />
+              ) : (
+                <motion.div
+                  key="empty"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
+                  className="p-4 text-sm text-muted-foreground"
+                >
+                  No preview selected.
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         )}
       </div>

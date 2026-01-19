@@ -2,11 +2,6 @@
 
 import { type ArtifactItem, AIPanel as ShellAIPanel, useReaderShell } from "@ku0/shell";
 import { useEffect, useMemo } from "react";
-import { ContextPacksPanel } from "../context/ContextPacksPanel";
-import { ProjectContextPanel } from "../context/ProjectContextPanel";
-import { PreflightPanel } from "../preflight/PreflightPanel";
-import { WorkflowTemplatesPanel } from "../workflows/WorkflowTemplatesPanel";
-import { useAIControl } from "./AIControlContext";
 import { CostMeter } from "./components/CostMeter";
 import { useCoworkAIPanelController } from "./useCoworkAIPanelController";
 
@@ -18,7 +13,6 @@ export interface CoworkAIPanelProps {
 export function CoworkAIPanel({ onClose, onPreviewArtifact }: CoworkAIPanelProps) {
   const { aiPanel } = useReaderShell();
   const ctrl = useCoworkAIPanelController();
-  const { contextPanel, setContextPanel } = useAIControl();
 
   const {
     messages,
@@ -50,7 +44,6 @@ export function CoworkAIPanel({ onClose, onPreviewArtifact }: CoworkAIPanelProps
     onQuote,
     onRetry,
     usage,
-    runTemplate,
   } = ctrl;
 
   useEffect(() => {
@@ -164,36 +157,6 @@ export function CoworkAIPanel({ onClose, onPreviewArtifact }: CoworkAIPanelProps
     <div className="relative h-full">
       <ShellAIPanel
         showHeader={false}
-        overlayContent={
-          contextPanel ? (
-            <div className="absolute inset-0 z-50 flex justify-end">
-              <button
-                type="button"
-                className="absolute inset-0 bg-black/20 w-full h-full border-none cursor-default"
-                onClick={() => setContextPanel(null)}
-                onKeyDown={(e) => {
-                  if (e.key === "Escape") {
-                    setContextPanel(null);
-                  }
-                }}
-                tabIndex={-1}
-                aria-label="Close context panel"
-              />
-              {contextPanel === "project" ? (
-                <ProjectContextPanel onClose={() => setContextPanel(null)} />
-              ) : contextPanel === "packs" ? (
-                <ContextPacksPanel onClose={() => setContextPanel(null)} />
-              ) : contextPanel === "preflight" ? (
-                <PreflightPanel onClose={() => setContextPanel(null)} />
-              ) : (
-                <WorkflowTemplatesPanel
-                  onClose={() => setContextPanel(null)}
-                  onRunTemplate={runTemplate}
-                />
-              )}
-            </div>
-          ) : null
-        }
         title={translations.title}
         model={model}
         setModel={setModel}

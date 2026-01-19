@@ -1,17 +1,10 @@
 "use client";
 
 import { cn } from "@ku0/shared/utils";
-import { PanelLeft, Square } from "lucide-react";
 
 import { useReaderShell } from "../../context/ReaderShellContext";
 import { Button } from "../ui/Button";
-import { Icon as IconWrapper } from "../ui/Icon";
-import {
-  SidebarLeftFilledIcon,
-  SidebarLeftIcon,
-  SidebarRightFilledIcon,
-  SidebarRightIcon,
-} from "../ui/SidebarIcons";
+import { SidebarLeftIcon, SidebarRightFilledIcon, SidebarRightIcon } from "../ui/SidebarIcons";
 import { Tooltip } from "../ui/Tooltip";
 
 export interface HeaderProps {
@@ -33,38 +26,24 @@ export interface HeaderProps {
   rightSlot?: React.ReactNode;
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: legacy code
 export function Header({
-  onToggleLeft,
+  onToggleLeft: _onToggleLeft,
   onToggleRight,
   isRightPanelOpen,
-  rightPanelPosition,
+  rightPanelPosition: _rightPanelPosition,
   rightPanelLabel,
   leftSlot,
   rightSlot,
 }: HeaderProps) {
-  const { sidebar, aiPanel, i18n } = useReaderShell();
+  const { sidebar, i18n } = useReaderShell();
   const t = (key: string, values?: Record<string, string | number>, defaultValue?: string) =>
     i18n.t(`Header.${key}`, values ?? defaultValue ?? key, defaultValue);
   const { isCollapsed, setCollapsed } = sidebar;
-  const { position: aiPanelPosition } = aiPanel;
 
   // When in peek mode (sidebar collapsed but hovering), clicking toggle should fully expand
   const handleToggle = () => {
     setCollapsed(!isCollapsed);
   };
-
-  const resolvedPanelPosition =
-    rightPanelPosition ?? (aiPanelPosition === "left" ? "left" : "right");
-
-  let GlobalAiIcon: React.ElementType | undefined;
-  if (aiPanelPosition === "main" && !rightPanelPosition) {
-    GlobalAiIcon = Square;
-  } else if (resolvedPanelPosition === "left") {
-    GlobalAiIcon = isRightPanelOpen ? SidebarLeftFilledIcon : SidebarLeftIcon;
-  } else {
-    GlobalAiIcon = isRightPanelOpen ? SidebarRightFilledIcon : SidebarRightIcon;
-  }
 
   const expandLabel = t("expand", undefined, "Expand sidebar");
   const collapseLabel = t("collapse", undefined, "Collapse sidebar");
@@ -91,13 +70,6 @@ export function Header({
           </Button>
         </Tooltip>
 
-        {/* Mobile toggle */}
-        <Button variant="ghost" size="icon" onClick={onToggleLeft} aria-label="Toggle sidebar">
-          <IconWrapper size="lg" aria-hidden="true">
-            <PanelLeft />
-          </IconWrapper>
-        </Button>
-
         {leftSlot}
       </div>
 
@@ -106,20 +78,17 @@ export function Header({
         {rightSlot}
         <Tooltip content={toggleLabel} side="bottom" align="end" sideOffset={8}>
           <Button
-            variant={isRightPanelOpen ? "subtle" : "ghost"}
-            size="compact"
+            variant="ghost"
+            size="icon"
             onClick={onToggleRight}
-            className={cn(
-              "h-8 w-8 p-0 transition-all duration-fast rounded-md",
-              isRightPanelOpen
-                ? "bg-surface-2 text-foreground"
-                : "text-muted-foreground hover:text-foreground hover:bg-surface-2"
-            )}
+            className="h-7 w-7 text-muted-foreground hover:text-foreground"
             aria-label={toggleLabel}
           >
-            <IconWrapper size="lg" aria-hidden="true">
-              <GlobalAiIcon />
-            </IconWrapper>
+            {isRightPanelOpen ? (
+              <SidebarRightFilledIcon className="h-4 w-4" />
+            ) : (
+              <SidebarRightIcon className="h-4 w-4" />
+            )}
           </Button>
         </Tooltip>
       </div>
