@@ -8,6 +8,7 @@ import type { MCPTool, MCPToolResult, ToolContext } from "../../types";
 import { BaseToolServer, errorResult, textResult } from "../mcp/baseServer";
 import * as editor from "./editor";
 import * as fileSystem from "./fileSystem";
+import * as patch from "./patch";
 
 // ============================================================================
 // Tool Server
@@ -22,6 +23,7 @@ export class CodeToolServer extends BaseToolServer {
     this.registerTool(this.createReadFileTool(), this.handleReadFile.bind(this));
     this.registerTool(this.createListFilesTool(), this.handleListFiles.bind(this));
     this.registerTool(this.createEditFileTool(), this.handleEditFile.bind(this));
+    this.registerTool(this.createApplyPatchTool(), this.handleApplyPatch.bind(this));
   }
 
   // --------------------------------------------------------------------------
@@ -144,6 +146,32 @@ export class CodeToolServer extends BaseToolServer {
     };
   }
 
+  private createApplyPatchTool(): MCPTool {
+    return {
+      name: "apply_patch",
+      description:
+        "Apply a unified diff patch to one or more files. Uses fuzzy matching to tolerate minor whitespace mismatches.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          patch: {
+            type: "string",
+            description: "Unified diff patch content",
+          },
+          base_path: {
+            type: "string",
+            description: "Base path for relative patch file paths (default: cwd)",
+          },
+        },
+        required: ["patch"],
+      },
+      annotations: {
+        requiresConfirmation: true,
+        readOnly: false,
+      },
+    };
+  }
+
   // --------------------------------------------------------------------------
   // Handlers
   // --------------------------------------------------------------------------
@@ -243,7 +271,7 @@ export class CodeToolServer extends BaseToolServer {
     }
 
     const filePermission = context.security?.permissions?.file;
-    if (filePermission === "read") {
+    if (filePermission === "read" || filePermission === "none") {
       return errorResult("PERMISSION_DENIED", "File system write access is disabled");
     }
 
@@ -277,6 +305,40 @@ export class CodeToolServer extends BaseToolServer {
       return errorResult(
         "EXECUTION_FAILED",
         `Failed to edit file: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
+
+  private async handleApplyPatch(
+    args: Record<string, unknown>,
+    context: ToolContext
+  ): Promise<MCPToolResult> {
+    const patchContent = args.patch as string | undefined;
+    if (!patchContent) {
+      return errorResult("INVALID_ARGUMENTS", "patch is required");
+    }
+
+    const filePermission = context.security?.permissions?.file;
+    if (filePermission === "read" || filePermission === "none") {
+      return errorResult("PERMISSION_DENIED", "File system write access is disabled");
+    }
+
+    try {
+      const result = await patch.applyPatch(patchContent, args.base_path as string | undefined);
+      if (!result.success) {
+        return errorResult("EXECUTION_FAILED", result.error ?? "Failed to apply patch");
+      }
+
+      const fuzzNote = result.fuzzLevel === 0 ? "exact match" : `fuzz level ${result.fuzzLevel}`;
+      const filesList =
+        result.filesModified.length > 0 ? `\n\n${result.filesModified.join("\n")}` : "";
+      return textResult(
+        `Patch applied (${fuzzNote}) to ${result.filesModified.length} file(s).${filesList}`
+      );
+    } catch (err) {
+      return errorResult(
+        "EXECUTION_FAILED",
+        `Failed to apply patch: ${err instanceof Error ? err.message : String(err)}`
       );
     }
   }
