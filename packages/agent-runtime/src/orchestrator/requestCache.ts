@@ -12,6 +12,15 @@
  */
 
 import type { AgentMessage } from "../types";
+import {
+  type CacheAdaptiveOptions,
+  type CacheEntry,
+  createCacheKeyHasher,
+  hashStableValue,
+  hashString,
+  type ICacheStrategy,
+  LRUCache,
+} from "../utils/cache";
 import type { AgentLLMRequest, AgentLLMResponse } from "./orchestrator";
 
 // ============================================================================
@@ -26,20 +35,14 @@ export interface CacheConfig {
   ttlMs: number;
   /** Maximum cache size (default: 1000) */
   maxSize: number;
+  /** Maximum cache size in bytes (default: unlimited) */
+  maxSizeBytes?: number;
+  /** Adaptive sizing configuration */
+  adaptive?: CacheAdaptiveOptions;
   /** Cache key generator */
   keyGenerator?: (request: AgentLLMRequest) => string;
-}
-
-/** Cache entry */
-interface CacheEntry {
-  /** Cached response */
-  response: AgentLLMResponse;
-  /** Cached timestamp */
-  timestamp: number;
-  /** Hit count */
-  hitCount: number;
-  /** Last accessed timestamp */
-  lastAccessed: number;
+  /** Custom cache strategy override */
+  strategy?: ICacheStrategy<string, AgentLLMResponse>;
 }
 
 /** Cache statistics */
@@ -66,6 +69,7 @@ const DEFAULT_CONFIG: CacheConfig = {
   enabled: true,
   ttlMs: 300000, // 5 minutes
   maxSize: 1000,
+  maxSizeBytes: Number.POSITIVE_INFINITY,
 };
 
 // ============================================================================
@@ -79,7 +83,7 @@ const DEFAULT_CONFIG: CacheConfig = {
  */
 export class RequestCache {
   private readonly config: CacheConfig;
-  private readonly cache = new Map<string, CacheEntry>();
+  private readonly cache: ICacheStrategy<string, AgentLLMResponse>;
   private stats: RequestCacheStats = {
     totalRequests: 0,
     hits: 0,
@@ -91,6 +95,14 @@ export class RequestCache {
 
   constructor(config: Partial<CacheConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
+    this.cache =
+      this.config.strategy ??
+      new LRUCache<AgentLLMResponse>({
+        maxEntries: this.config.maxSize,
+        defaultTtlMs: this.config.ttlMs,
+        maxSizeBytes: this.config.maxSizeBytes ?? Number.POSITIVE_INFINITY,
+        adaptive: this.config.adaptive,
+      });
   }
 
   /**
@@ -104,32 +116,27 @@ export class RequestCache {
     this.stats.totalRequests++;
 
     const key = this.generateKey(request);
-    const entry = this.cache.get(key);
+    const entry = this.peekEntry(key);
 
-    if (!entry) {
-      this.stats.misses++;
-      this.updateHitRate();
-      return null;
-    }
-
-    // Check expiration
-    const age = Date.now() - entry.timestamp;
-    if (age > this.config.ttlMs) {
+    if (entry && this.isExpired(entry)) {
       this.cache.delete(key);
       this.stats.misses++;
       this.stats.evictions++;
+      this.stats.size = this.cache.getStats().entries;
       this.updateHitRate();
       return null;
     }
 
-    // Cache hit - promote to end of Map for O(1) LRU
-    entry.hitCount++;
-    entry.lastAccessed = Date.now();
-    this.promoteEntry(key, entry);
+    const cached = this.cache.get(key);
+    if (cached === undefined) {
+      this.stats.misses++;
+      this.updateHitRate();
+      return null;
+    }
+
     this.stats.hits++;
     this.updateHitRate();
-
-    return entry.response;
+    return cached;
   }
 
   /**
@@ -141,21 +148,16 @@ export class RequestCache {
     }
 
     const key = this.generateKey(request);
-    const now = Date.now();
+    const hadKey = this.cache.has(key);
+    const sizeBefore = this.cache.getStats().entries;
 
-    // Evict if at capacity
-    if (this.cache.size >= this.config.maxSize && !this.cache.has(key)) {
-      this.evictLRU();
+    this.cache.set(key, response, this.config.ttlMs);
+
+    const sizeAfter = this.cache.getStats().entries;
+    if (!hadKey && sizeBefore >= this.config.maxSize && sizeAfter <= sizeBefore) {
+      this.stats.evictions++;
     }
-
-    this.cache.set(key, {
-      response,
-      timestamp: now,
-      hitCount: 0,
-      lastAccessed: now,
-    });
-
-    this.stats.size = this.cache.size;
+    this.stats.size = sizeAfter;
   }
 
   /**
@@ -167,15 +169,7 @@ export class RequestCache {
     }
 
     const key = this.generateKey(request);
-    const entry = this.cache.get(key);
-
-    if (!entry) {
-      return false;
-    }
-
-    // Check expiration
-    const age = Date.now() - entry.timestamp;
-    return age <= this.config.ttlMs;
+    return this.cache.has(key);
   }
 
   /**
@@ -183,7 +177,11 @@ export class RequestCache {
    */
   invalidate(request: AgentLLMRequest): boolean {
     const key = this.generateKey(request);
-    return this.cache.delete(key);
+    const deleted = this.cache.delete(key);
+    if (deleted) {
+      this.stats.size = this.cache.getStats().entries;
+    }
+    return deleted;
   }
 
   /**
@@ -205,19 +203,15 @@ export class RequestCache {
    * Clean expired entries.
    */
   cleanup(): number {
-    const now = Date.now();
-    let cleaned = 0;
-
-    for (const [key, entry] of this.cache) {
-      const age = now - entry.timestamp;
-      if (age > this.config.ttlMs) {
-        this.cache.delete(key);
-        cleaned++;
-      }
+    if (!(this.cache instanceof LRUCache)) {
+      return 0;
     }
 
-    this.stats.evictions += cleaned;
-    this.stats.size = this.cache.size;
+    const cleaned = this.cache.prune();
+    if (cleaned > 0) {
+      this.stats.evictions += cleaned;
+      this.stats.size = this.cache.getStats().entries;
+    }
 
     return cleaned;
   }
@@ -225,6 +219,17 @@ export class RequestCache {
   // ============================================================================
   // Private Methods
   // ============================================================================
+
+  private peekEntry(key: string): CacheEntry<AgentLLMResponse> | undefined {
+    if (this.cache instanceof LRUCache) {
+      return this.cache.peekEntry(key);
+    }
+    return undefined;
+  }
+
+  private isExpired(entry: CacheEntry<AgentLLMResponse>): boolean {
+    return entry.expiresAt > 0 && Date.now() > entry.expiresAt;
+  }
 
   private generateKey(request: AgentLLMRequest): string {
     if (this.config.keyGenerator) {
@@ -234,32 +239,39 @@ export class RequestCache {
     // Default: hash messages and tools
     const messagesKey = this.hashMessages(request.messages);
     const toolsKey = this.hashTools(request.tools);
-    const systemKey = request.systemPrompt ? this.hashString(request.systemPrompt) : "";
+    const systemKey = request.systemPrompt ? hashString(request.systemPrompt) : "";
     const tempKey = request.temperature?.toString() ?? "";
 
-    return `${messagesKey}:${toolsKey}:${systemKey}:${tempKey}`;
+    return hashString(`${messagesKey}:${toolsKey}:${systemKey}:${tempKey}`);
   }
 
   private hashMessages(messages: AgentMessage[]): string {
-    // Create a stable hash from message content
-    const parts: string[] = [];
-
+    const hasher = createCacheKeyHasher();
     for (const msg of messages) {
-      parts.push(msg.role);
+      hasher.update("role:");
+      hasher.update(msg.role);
+      hasher.update("|");
       if (msg.role === "user" || msg.role === "assistant" || msg.role === "system") {
-        parts.push(msg.content); // Full content for accurate dedup
+        hasher.update("content:");
+        hasher.update(msg.content);
+        hasher.update("|");
       }
       if (msg.role === "tool") {
-        parts.push(msg.toolName);
-        parts.push(this.serializeToolResult(msg.result));
+        hasher.update("tool:");
+        hasher.update(msg.toolName);
+        hasher.update("|result:");
+        hasher.update(hashStableValue(msg.result));
+        hasher.update("|");
       }
       // Only assistant has toolCalls
       if (msg.role === "assistant" && msg.toolCalls) {
-        parts.push(`tools:${msg.toolCalls.length}`);
+        hasher.update("toolCalls:");
+        hasher.update(msg.toolCalls.length.toString());
+        hasher.update("|");
       }
     }
 
-    return this.hashString(parts.join("|"));
+    return hasher.digest();
   }
 
   private hashTools(
@@ -269,60 +281,22 @@ export class RequestCache {
       return "no-tools";
     }
 
-    // Include tool input schemas for stronger dedup
-    const toolSpecs = tools
-      .map((t) => `${t.name}:${JSON.stringify(t.inputSchema ?? {})}`)
-      .sort()
-      .join(",");
-    return this.hashString(toolSpecs);
-  }
+    const toolHashes = tools
+      .map((tool) => {
+        const toolHasher = createCacheKeyHasher();
+        toolHasher.update(tool.name);
+        toolHasher.update("|");
+        toolHasher.update(hashStableValue(tool.inputSchema ?? {}));
+        return toolHasher.digest();
+      })
+      .sort();
 
-  private hashString(str: string): string {
-    // Simple hash function (FNV-1a)
-    let hash = 2166136261;
-    for (let i = 0; i < str.length; i++) {
-      hash ^= str.charCodeAt(i);
-      hash = (hash * 16777619) >>> 0;
+    const hasher = createCacheKeyHasher();
+    for (const toolHash of toolHashes) {
+      hasher.update(toolHash);
+      hasher.update("|");
     }
-    return hash.toString(36);
-  }
-
-  private serializeToolResult(result: unknown): string {
-    try {
-      return JSON.stringify(result);
-    } catch {
-      return "[unserializable]";
-    }
-  }
-
-  /**
-   * Promote entry to end of Map for LRU ordering.
-   *
-   * JavaScript Map maintains insertion order. By deleting and re-inserting,
-   * we move the entry to the "newest" position in iteration order.
-   * This makes eviction O(1) - we just grab the first key.
-   */
-  private promoteEntry(key: string, entry: CacheEntry): void {
-    this.cache.delete(key);
-    this.cache.set(key, entry);
-  }
-
-  /**
-   * Evict the least recently used entry.
-   *
-   * O(1) complexity: Map.keys().next() returns the first (oldest) key
-   * because we always promote accessed entries to the end via promoteEntry().
-   */
-  private evictLRU(): void {
-    if (this.cache.size === 0) {
-      return;
-    }
-
-    const lruKey = this.cache.keys().next().value;
-    if (lruKey !== undefined) {
-      this.cache.delete(lruKey);
-      this.stats.evictions++;
-    }
+    return hasher.digest();
   }
 
   private updateHitRate(): void {

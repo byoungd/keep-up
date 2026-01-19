@@ -443,6 +443,27 @@ export interface ParallelExecutionConfig {
   maxConcurrent: number;
 }
 
+export interface RuntimeCacheConfig {
+  /** Default TTL for caches in milliseconds */
+  ttlMs?: number;
+  /** Default max entries for caches */
+  maxEntries?: number;
+  request?: {
+    enabled?: boolean;
+    ttlMs?: number;
+    maxEntries?: number;
+  };
+  toolResult?: {
+    ttlMs?: number;
+    maxEntries?: number;
+    maxSizeBytes?: number;
+  };
+}
+
+export interface RuntimeConfig {
+  cache?: RuntimeCacheConfig;
+}
+
 /** Agent configuration */
 export interface AgentConfig {
   /** Agent name */
