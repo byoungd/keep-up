@@ -228,7 +228,7 @@ export function toSdkResult(result: MCPToolResult): SdkCallToolResult {
 }
 
 export function fromSdkResult(result: SdkCallToolResult): MCPToolResult {
-  const content = (result.content ?? []).map((entry) => fromSdkContent(entry));
+  const content = (result.content ?? []).map((entry: SdkContent) => fromSdkContent(entry));
   const isError = result.isError ?? false;
 
   if (!isError) {

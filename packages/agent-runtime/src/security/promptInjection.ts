@@ -2,6 +2,25 @@
  * Prompt Injection Guard
  *
  * Heuristic prompt injection detection for tool inputs and outputs.
+ *
+ * ## Defense-in-Depth Notice
+ * This guard provides pattern-based and entropy-based detection as one layer
+ * of a multi-layer security strategy. It should NOT be relied upon as the sole
+ * protection against prompt injection attacks.
+ *
+ * ### Known Limitations
+ * - Pattern-based detection can be bypassed via:
+ *   - Unicode homoglyphs (e.g., Cyrillic 'а' vs Latin 'a')
+ *   - Novel phrasings not covered by patterns
+ *   - Encoding tricks (base64, HTML entities, etc.)
+ * - Entropy analysis may produce false positives on legitimate code/data
+ * - Truncation for performance may miss injections in later content
+ *
+ * ### Recommendations
+ * 1. Use in combination with output sandboxing and privilege separation
+ * 2. Monitor and log high-risk assessments for review
+ * 3. Apply tool-level allowlists for sensitive operations
+ * 4. Consider human-in-the-loop for external connector outputs
  */
 
 import {

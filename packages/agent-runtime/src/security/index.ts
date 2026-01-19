@@ -684,10 +684,12 @@ export function securityPolicy(): SecurityPolicyBuilder {
 }
 
 export {
+  type ApprovalAuditLogger,
   type ApprovalDecision,
   type ApprovalHandler,
   type ApprovalKind,
   ApprovalManager,
+  type ApprovalManagerConfig,
   type ApprovalRecord,
   type ApprovalRequestOptions,
   type ApprovalStatus,

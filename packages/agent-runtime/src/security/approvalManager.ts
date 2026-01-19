@@ -30,9 +30,27 @@ export interface ApprovalRequestOptions {
 
 export type ApprovalHandler<RequestT> = (request: RequestT) => Promise<boolean | ApprovalDecision>;
 
+/**
+ * Audit logger for approval events.
+ * Implement this interface to integrate with external compliance/audit systems.
+ */
+export interface ApprovalAuditLogger {
+  logRequest?(record: ApprovalRecord): void | Promise<void>;
+  logResolution?(record: ApprovalRecord, decision: ApprovalDecision): void | Promise<void>;
+}
+
+export interface ApprovalManagerConfig {
+  auditLogger?: ApprovalAuditLogger;
+}
+
 export class ApprovalManager {
   private readonly records = new Map<string, ApprovalRecord>();
+  private readonly auditLogger?: ApprovalAuditLogger;
   private counter = 0;
+
+  constructor(config: ApprovalManagerConfig = {}) {
+    this.auditLogger = config.auditLogger;
+  }
 
   async request<RequestT>(
     kind: ApprovalKind,
@@ -91,6 +109,7 @@ export class ApprovalManager {
       expiresAt: timeoutMs ? now + timeoutMs : undefined,
     };
     this.records.set(id, record);
+    void Promise.resolve(this.auditLogger?.logRequest?.(record)).catch(() => undefined);
     return record;
   }
 
@@ -104,6 +123,9 @@ export class ApprovalManager {
     record.resolvedAt = Date.now();
     record.reason = decision.reason;
     this.records.set(id, record);
+    void Promise.resolve(this.auditLogger?.logResolution?.(record, decision)).catch(
+      () => undefined
+    );
     return decision;
   }
 
