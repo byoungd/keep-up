@@ -7,6 +7,7 @@
 
 import type {
   ArtifactEnvelope,
+  CheckpointEvent,
   ExecutionDecision,
   MessageEnvelope,
   ToolExecutionRecord,
@@ -209,6 +210,12 @@ export interface ExecutionEvents {
   "execution:record": ToolExecutionRecord;
 }
 
+/** Checkpoint lifecycle events */
+export interface CheckpointEvents {
+  "checkpoint:created": CheckpointEvent;
+  "checkpoint:updated": CheckpointEvent;
+}
+
 /** Subagent event forwarding */
 export interface SubagentEventPayload {
   agentId: string;
@@ -244,6 +251,7 @@ export interface RuntimeEventMap
     SystemEvents,
     MessageBusEvents,
     ExecutionEvents,
+    CheckpointEvents,
     SubagentEvents,
     ArtifactEvents {
   // Allow custom events with string index

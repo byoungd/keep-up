@@ -4,23 +4,30 @@
  * Provides state persistence and recovery for agent workflows.
  */
 
+export type {
+  Checkpoint,
+  CheckpointCreateParams,
+  CheckpointError,
+  CheckpointEvent,
+  CheckpointFilter,
+  CheckpointManagerConfig,
+  CheckpointMessage,
+  CheckpointStatus,
+  CheckpointStatusUpdate,
+  CheckpointSummary,
+  CheckpointToolCall,
+  CheckpointToolResult,
+  ICheckpointManager,
+  ICheckpointStorage,
+  RecoveryOptions,
+  RecoveryResult,
+} from "@ku0/agent-runtime-core";
 export {
   CHECKPOINT_VERSION,
-  type Checkpoint,
-  type CheckpointFilter,
   CheckpointManager,
-  type CheckpointManagerConfig,
-  type CheckpointMessage,
-  type CheckpointStatus,
-  type CheckpointSummary,
-  type CheckpointToolCall,
-  type CheckpointToolResult,
   createCheckpointManager,
   createInMemoryCheckpointStorage,
-  type ICheckpointStorage,
   InMemoryCheckpointStorage,
-  type RecoveryOptions,
-  type RecoveryResult,
 } from "./checkpointManager";
 export {
   type CheckpointDelta,

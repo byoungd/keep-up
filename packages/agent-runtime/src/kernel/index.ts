@@ -27,6 +27,7 @@ import type {
   ArtifactEmissionResult,
   ArtifactPipeline,
 } from "../artifacts";
+import { createCheckpointManager } from "../checkpoint";
 import type {
   ToolConfirmationDetailsProvider,
   ToolConfirmationResolver,
@@ -54,6 +55,7 @@ import type {
   AgentState,
   AuditLogger,
   ConfirmationHandler,
+  ICheckpointManager,
   MCPTool,
   MCPToolCall,
   RuntimeMessageBus,
@@ -78,6 +80,7 @@ export interface RuntimeServices {
   events?: RuntimeEventBus;
   messageBus?: RuntimeMessageBus;
   state?: SessionState;
+  checkpointManager?: ICheckpointManager;
   audit?: AuditLogger;
   telemetry?: TelemetryContext;
   clock?: Clock;
@@ -115,6 +118,7 @@ export class RuntimeKernel implements Kernel {
   private readonly sessionState: SessionState;
   private readonly messageBus: RuntimeMessageBus;
   private readonly a2aContext?: A2AContext;
+  private readonly checkpointManager: ICheckpointManager;
   private readonly skillRegistry?: SkillRegistry;
   private readonly skillSession?: SkillSession;
   private readonly skillPromptAdapter?: SkillPromptAdapter;
@@ -128,6 +132,7 @@ export class RuntimeKernel implements Kernel {
     this.sessionState = services.state ?? createSessionState();
     this.messageBus = services.messageBus ?? createMessageBus(this.eventBus);
     this.a2aContext = this.resolveA2AContext();
+    this.checkpointManager = services.checkpointManager ?? createCheckpointManager();
     const skillOptions = this.resolveSkillOptions();
     this.skillRegistry = skillOptions?.registry;
     this.skillSession =
@@ -203,6 +208,7 @@ export class RuntimeKernel implements Kernel {
           toolExecutor: this.executor,
           eventBus: this.eventBus,
           sessionState: this.sessionState,
+          checkpointManager: this.checkpointManager,
           skillRegistry: this.skillRegistry,
           skillSession: this.skillSession,
           skillPromptAdapter: this.skillPromptAdapter,
@@ -219,6 +225,8 @@ export class RuntimeKernel implements Kernel {
         toolExecutor: this.executor,
         eventBus: this.eventBus,
         sessionState: this.sessionState,
+        checkpointManager:
+          this.config.orchestrator.components?.checkpointManager ?? this.checkpointManager,
         skillRegistry: this.config.orchestrator.components?.skillRegistry ?? this.skillRegistry,
         skillSession: this.config.orchestrator.components?.skillSession ?? this.skillSession,
         skillPromptAdapter:

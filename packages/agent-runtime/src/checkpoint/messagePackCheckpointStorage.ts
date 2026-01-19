@@ -6,9 +6,6 @@
 
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { stableStringify } from "@ku0/core";
-import { decode, encode } from "@msgpack/msgpack";
-
 import type {
   Checkpoint,
   CheckpointFilter,
@@ -18,7 +15,9 @@ import type {
   CheckpointToolCall,
   CheckpointToolResult,
   ICheckpointStorage,
-} from "./checkpointManager";
+} from "@ku0/agent-runtime-core";
+import { stableStringify } from "@ku0/core";
+import { decode, encode } from "@msgpack/msgpack";
 
 type DeltaList<T> = { mode: "append"; items: T[] } | { mode: "replace"; items: T[] };
 

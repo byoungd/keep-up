@@ -25,6 +25,7 @@ import { createPermissionChecker, createSecurityPolicy } from "./security";
 import type { SessionState } from "./session";
 import type {
   AuditLogger,
+  ICheckpointManager,
   MCPToolServer,
   RuntimeMessageBus,
   SecurityPolicy,
@@ -42,6 +43,7 @@ export interface RuntimeComponents {
   eventBus?: RuntimeEventBus;
   messageBus?: RuntimeMessageBus;
   sessionState?: SessionState;
+  checkpointManager?: ICheckpointManager;
   toolExecutor?: ToolExecutor;
   skillRegistry?: SkillRegistry;
   skillSession?: SkillSession;
@@ -65,6 +67,7 @@ export interface RuntimeInstance {
   eventBus?: RuntimeEventBus;
   messageBus?: RuntimeMessageBus;
   sessionState?: SessionState;
+  checkpointManager?: ICheckpointManager;
 }
 
 export async function createRuntime(options: CreateRuntimeOptions): Promise<RuntimeInstance> {
@@ -93,6 +96,7 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<Runt
     events: eventBus,
     messageBus,
     state: components.sessionState,
+    checkpointManager: components.checkpointManager,
     audit: components.auditLogger,
     telemetry: components.telemetry,
     clock: components.clock,
@@ -122,6 +126,7 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<Runt
     eventBus,
     messageBus,
     sessionState: components.sessionState,
+    checkpointManager: components.checkpointManager,
   };
 }
 
