@@ -1,7 +1,7 @@
 # Track C: Checkpointing, Event Log, and Replay
 
 Owner: Runtime Developer + QA
-Status: Planned
+Status: Completed
 
 ## Objective
 Implement checkpoint persistence, event logging, and replay capabilities per docs/specs/agent-runtime-spec-2026.md Sections 5.5, 5.9, and 8.

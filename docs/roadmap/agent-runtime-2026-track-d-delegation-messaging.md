@@ -1,7 +1,7 @@
 # Track D: Delegation and Runtime Messaging
 
 Owner: Runtime Developer
-Status: Planned
+Status: Completed
 
 ## Objective
 Implement recursive delegation and runtime messaging as defined in docs/specs/agent-runtime-spec-2026.md Section 5.4 and Control Plane.
