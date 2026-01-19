@@ -7,6 +7,12 @@
  * - Optimized dependency analysis
  */
 
+export {
+  createPlanPersistence,
+  type PersistedPlanMetadata,
+  PlanPersistence,
+  type PlanPersistenceConfig,
+} from "@ku0/agent-runtime-tools";
 // Agent Loop (Manus Spec)
 export {
   type AgentLoopConfig,
@@ -21,7 +27,6 @@ export {
   type ThinkingResult,
   type ToolDecision,
 } from "./agentLoop";
-
 export {
   type AICoreAdapterOptions,
   type AICoreProvider,
@@ -111,12 +116,6 @@ export {
   type PlanRefinement,
   type PlanStep,
 } from "./planning";
-export {
-  createPlanPersistence,
-  type PersistedPlanMetadata,
-  PlanPersistence,
-  type PlanPersistenceConfig,
-} from "./planPersistence";
 export {
   type CacheConfig,
   createRequestCache,

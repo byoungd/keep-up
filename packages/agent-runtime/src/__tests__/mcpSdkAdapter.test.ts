@@ -1,5 +1,5 @@
+import { fromSdkResult, fromSdkTool, toSdkResult, toSdkTool } from "@ku0/agent-runtime-tools";
 import { describe, expect, it } from "vitest";
-import { fromSdkResult, fromSdkTool, toSdkResult, toSdkTool } from "../tools/mcp/sdkAdapter";
 import type { MCPTool, MCPToolResult } from "../types";
 
 describe("mcpSdkAdapter", () => {

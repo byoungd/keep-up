@@ -20,6 +20,19 @@ import type {
   TelemetryContext,
 } from "@ku0/agent-runtime-telemetry/telemetry";
 import { AGENT_METRICS } from "@ku0/agent-runtime-telemetry/telemetry";
+import {
+  COMPLETION_TOOL_NAME,
+  createSkillPolicyGuard,
+  createSkillPromptAdapter,
+  createSkillSession,
+  createToolDiscoveryEngine,
+  type IToolRegistry,
+  type SkillPromptAdapter,
+  type SkillRegistry,
+  type SkillSession,
+  type ToolDiscoveryEngine,
+  validateCompletionInput,
+} from "@ku0/agent-runtime-tools";
 import { MODEL_CATALOG, type ModelCapability } from "@ku0/ai-core";
 import type { IntentRegistry } from "@ku0/core";
 import { createIntentRegistry } from "@ku0/core";
@@ -50,21 +63,9 @@ import {
   createToolPolicyEngine,
 } from "../security";
 import type { SessionState } from "../session";
-import { createSkillPolicyGuard } from "../skills/skillPolicyGuard";
-import type { SkillPromptAdapter } from "../skills/skillPromptAdapter";
-import { createSkillPromptAdapter } from "../skills/skillPromptAdapter";
-import type { SkillRegistry } from "../skills/skillRegistry";
-import type { SkillSession } from "../skills/skillSession";
-import { createSkillSession } from "../skills/skillSession";
 import type { ISOPExecutor } from "../sop/types";
 import { attachRuntimeEventStreamBridge, type StreamWriter } from "../streaming";
 import { createTaskGraphStore, type TaskGraphStore, type TaskNodeStatus } from "../tasks/taskGraph";
-import { COMPLETION_TOOL_NAME, validateCompletionInput } from "../tools/core/completion";
-import {
-  createToolDiscoveryEngine,
-  type ToolDiscoveryEngine,
-} from "../tools/discovery/toolDiscovery";
-import type { IToolRegistry } from "../tools/mcp/registry";
 import type {
   AgentConfig,
   AgentMessage,

@@ -4,11 +4,11 @@
  * Bundles TaskQueue, CoworkTaskRunner, and Cowork orchestration helpers.
  */
 
+import type { IToolRegistry } from "@ku0/agent-runtime-tools";
 import type { AgentOrchestrator, IAgentLLM } from "../orchestrator/orchestrator";
 import { createAuditLogger } from "../security";
 import { createTaskQueue } from "../tasks";
 import type { ITaskQueue, TaskQueueConfig } from "../tasks/types";
-import type { IToolRegistry } from "../tools/mcp/registry";
 import type { AuditLogger } from "../types";
 import type { CoworkTaskEventHandler } from "./events";
 import {

@@ -4,6 +4,7 @@
  * Wires SOP enforcement, artifact-backed quality gates, and planning defaults.
  */
 
+import type { IToolRegistry } from "@ku0/agent-runtime-tools";
 import {
   type ArtifactRegistry,
   createArtifactPipeline,
@@ -18,7 +19,6 @@ import {
   type RoleDefinition,
 } from "../sop";
 import { createTaskGraphStore } from "../tasks/taskGraph";
-import type { IToolRegistry } from "../tools/mcp/registry";
 import {
   type CreateOrchestratorOptions,
   createOrchestrator,

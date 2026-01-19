@@ -4,12 +4,12 @@
 
 import type { ArtifactEvents, RuntimeEvent } from "@ku0/agent-runtime-control";
 import { createEventBus } from "@ku0/agent-runtime-control";
+import { createToolRegistry } from "@ku0/agent-runtime-tools";
 import { describe, expect, it } from "vitest";
 import type { AgentLLMRequest, AgentLLMResponse, IAgentLLM } from "../orchestrator/orchestrator";
 import { createOrchestrator } from "../orchestrator/orchestrator";
 import { createSecurityPolicy } from "../security";
 import { createTaskGraphStore } from "../tasks/taskGraph";
-import { createToolRegistry } from "../tools/mcp/registry";
 import type { ArtifactEnvelope } from "../types";
 
 class NoopLLM implements IAgentLLM {

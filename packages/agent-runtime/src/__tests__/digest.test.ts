@@ -1,9 +1,9 @@
+import { DbDigestProvider, DigestToolServer } from "@ku0/agent-runtime-tools";
 import type { DbDriver, FeedItemRow } from "@ku0/db/types";
 /**
  * Digest Tool Tests
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { DbDigestProvider, DigestToolServer } from "../tools/digest/digestToolServer";
 import type { ToolContext } from "../types";
 
 // Mock DbDriver

@@ -11,10 +11,10 @@ import {
   type RuntimeEventBus,
 } from "@ku0/agent-runtime-control";
 import type { TelemetryContext } from "@ku0/agent-runtime-telemetry/telemetry";
+import type { IToolRegistry } from "@ku0/agent-runtime-tools";
 import { type AgentOrchestrator, createOrchestrator } from "../orchestrator/orchestrator";
 import { createSecurityPolicy } from "../security";
 import { createSessionState, type SessionState } from "../session";
-import type { IToolRegistry } from "../tools/mcp/registry";
 import type { AgentMessage, MCPToolCall, SecurityPolicy } from "../types";
 import { AGENT_PROFILES, getAgentProfile, listAgentTypes } from "./profiles";
 import type {

@@ -2,9 +2,14 @@
  * Plugin System Tests
  */
 
+import type { BeforeToolCallHookData, PluginManifest } from "@ku0/agent-runtime-tools";
+import {
+  BasePlugin,
+  createPluginLoader,
+  createPluginRegistry,
+  satisfiesVersion,
+} from "@ku0/agent-runtime-tools";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { BeforeToolCallHookData, PluginManifest } from "../plugins";
-import { BasePlugin, createPluginLoader, createPluginRegistry, satisfiesVersion } from "../plugins";
 
 // ============================================================================
 // Test Plugin Implementations

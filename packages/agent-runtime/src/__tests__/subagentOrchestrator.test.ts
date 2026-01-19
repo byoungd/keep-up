@@ -2,6 +2,7 @@
  * Subagent Orchestrator Tests
  */
 
+import { SubagentOrchestrator, type SubagentTask } from "@ku0/agent-runtime-tools";
 import { describe, expect, it } from "vitest";
 import type {
   AgentProfile,
@@ -10,7 +11,6 @@ import type {
   IAgentManager,
   SpawnAgentOptions,
 } from "../agents/types";
-import { SubagentOrchestrator, type SubagentTask } from "../orchestrator/subagentOrchestrator";
 
 type SpawnRecord = SubagentTask & { parentContextId?: string };
 

@@ -10,15 +10,15 @@ import type {
   AuditFilter,
   AuditLogger,
   ExecutionPolicy,
-  MCPTool,
-  MCPToolCall,
   PermissionEscalation,
   ResourceLimits,
   SandboxConfig,
   SecurityPolicy,
-  ToolContext,
   ToolExecutionContext,
   ToolPermissions,
+  ToolPolicyContext,
+  ToolPolicyDecision,
+  ToolPolicyEngine,
 } from "../types";
 import { SECURITY_PRESETS, type SecurityPreset } from "../types";
 
@@ -214,33 +214,6 @@ export class PermissionChecker implements IPermissionChecker {
       resource,
     };
   }
-}
-
-// ============================================================================
-// Tool Policy Engine
-// ============================================================================
-
-export interface ToolPolicyContext {
-  call: MCPToolCall;
-  tool: string;
-  operation: string;
-  resource?: string;
-  toolDefinition?: MCPTool;
-  toolServer?: string;
-  context: ToolContext;
-  taskNodeId?: string;
-}
-
-export interface ToolPolicyDecision {
-  allowed: boolean;
-  requiresConfirmation: boolean;
-  reason?: string;
-  riskTags?: string[];
-  escalation?: PermissionEscalation;
-}
-
-export interface ToolPolicyEngine {
-  evaluate(context: ToolPolicyContext): ToolPolicyDecision;
 }
 
 export class PermissionPolicyEngine implements ToolPolicyEngine {
@@ -683,6 +656,8 @@ export function createSecurityPolicy(preset: SecurityPreset): SecurityPolicy {
 export function securityPolicy(): SecurityPolicyBuilder {
   return new SecurityPolicyBuilder();
 }
+
+export type { ToolPolicyContext, ToolPolicyDecision, ToolPolicyEngine } from "../types";
 
 export {
   type ApprovalAuditLogger,

@@ -2,12 +2,10 @@ import { existsSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
-
+import { SandboxToolServer } from "@ku0/agent-runtime-tools";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
 import { RuntimeAssetManager } from "../assets";
 import { DockerSandboxManager } from "../sandbox";
-import { SandboxToolServer } from "../tools/sandbox/sandboxToolServer";
 import type { ToolContext } from "../types";
 
 const dockerSocketCandidates = [

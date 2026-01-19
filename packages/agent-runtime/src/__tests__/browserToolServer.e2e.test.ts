@@ -1,12 +1,10 @@
 import { existsSync } from "node:fs";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
+import type { AccessibilityNodeRef, AccessibilitySnapshot } from "@ku0/agent-runtime-tools";
+import { BrowserManager, BrowserToolServer } from "@ku0/agent-runtime-tools";
 import { chromium } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import type { AccessibilityNodeRef, AccessibilitySnapshot } from "../browser";
-import { BrowserManager } from "../browser/browserManager";
-import { BrowserToolServer } from "../tools/browser/browserToolServer";
 import type { ToolContext } from "../types";
 
 const executablePath = chromium.executablePath();

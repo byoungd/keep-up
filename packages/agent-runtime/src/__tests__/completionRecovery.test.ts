@@ -2,11 +2,10 @@
  * Completion + Recovery Contract Tests
  */
 
+import { createCompletionToolServer, createToolRegistry } from "@ku0/agent-runtime-tools";
 import { describe, expect, it } from "vitest";
 import type { AgentLLMRequest, AgentLLMResponse, IAgentLLM } from "../orchestrator/orchestrator";
 import { createOrchestrator } from "../orchestrator/orchestrator";
-import { createCompletionToolServer } from "../tools/core";
-import { createToolRegistry } from "../tools/mcp/registry";
 import type { MCPToolServer } from "../types";
 
 class StopLLM implements IAgentLLM {

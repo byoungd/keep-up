@@ -1,21 +1,5 @@
 /**
- * Browser Module
- *
- * Playwright-backed browser automation helpers for agent tools.
+ * Browser Module (Facade)
  */
 
-export {
-  type AccessibilityNodeRef,
-  type AccessibilityNodeSnapshot,
-  type AccessibilitySnapshot,
-  buildAccessibilitySnapshot,
-  parseAccessibilitySnapshotText,
-  type RawAccessibilityNode,
-} from "./accessibilityMapper";
-export {
-  type BrowserCloseResult,
-  BrowserManager,
-  type BrowserManagerOptions,
-  type BrowserSession,
-  type BrowserSessionConfig,
-} from "./browserManager";
+export * from "@ku0/agent-runtime-tools/browser";

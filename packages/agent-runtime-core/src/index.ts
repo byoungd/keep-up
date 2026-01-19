@@ -800,3 +800,245 @@ export interface CompressionEvent {
   /** Summary of what was compressed */
   summary?: string;
 }
+
+// ============================================================================
+// Tool Execution Interfaces
+// ============================================================================
+
+export interface ToolExecutor {
+  execute(call: MCPToolCall, context: ToolContext): Promise<MCPToolResult>;
+}
+
+// ============================================================================
+// Tool Policy Interfaces
+// ============================================================================
+
+export interface ToolPolicyContext {
+  call: MCPToolCall;
+  tool: string;
+  operation: string;
+  resource?: string;
+  toolDefinition?: MCPTool;
+  toolServer?: string;
+  context: ToolContext;
+  taskNodeId?: string;
+}
+
+export interface ToolPolicyDecision {
+  allowed: boolean;
+  requiresConfirmation: boolean;
+  reason?: string;
+  riskTags?: string[];
+  escalation?: PermissionEscalation;
+}
+
+export interface ToolPolicyEngine {
+  evaluate(context: ToolPolicyContext): ToolPolicyDecision;
+}
+
+// ============================================================================
+// Agent Types
+// ============================================================================
+
+/**
+ * Available agent types.
+ * Each type has specialized tools and behaviors.
+ */
+export type AgentType =
+  | "general"
+  | "bash"
+  | "explore"
+  | "plan"
+  | "code"
+  | "research"
+  | "test-writer"
+  | "code-reviewer"
+  | "implementer"
+  | "debugger"
+  | "digest"
+  | "verifier";
+
+/**
+ * Agent profile containing configuration for a specific agent type.
+ */
+export interface AgentProfile {
+  /** Agent type identifier */
+  type: AgentType;
+
+  /** Human-readable name */
+  name: string;
+
+  /** Description of agent capabilities */
+  description: string;
+
+  /** Tools this agent has access to */
+  allowedTools: string[];
+
+  /** System prompt for the agent */
+  systemPrompt: string;
+
+  /** Security preset to use */
+  securityPreset: "safe" | "balanced" | "power" | "developer";
+
+  /** Maximum turns before auto-stop */
+  maxTurns: number;
+
+  /** Whether confirmation is required for dangerous operations */
+  requireConfirmation: boolean;
+
+  /**
+   * Edit restrictions for file operations.
+   * Used to constrain agents like "plan" to only write to specific paths.
+   * Pattern matching uses glob syntax.
+   */
+  editRestrictions?: EditRestrictions;
+}
+
+/**
+ * Edit restrictions for constraining file write operations.
+ */
+export interface EditRestrictions {
+  /** Glob patterns for allowed write paths. */
+  allow?: string[];
+  /** Glob patterns for denied write paths. */
+  deny?: string[];
+}
+
+/**
+ * Options for spawning a specialized agent.
+ */
+export interface SpawnAgentOptions {
+  /** Agent type to spawn */
+  type: AgentType;
+  /** Optional agent ID override (internal use). */
+  agentId?: string;
+  /** Task description for the agent */
+  task: string;
+  /** Override default max turns */
+  maxTurns?: number;
+  /** Run in background (non-blocking) */
+  runInBackground?: boolean;
+  /** Parent context for tracing */
+  parentTraceId?: string;
+  /** Explicit context ID for this agent */
+  contextId?: string;
+  /** Parent context ID for live context views */
+  parentContextId?: string;
+  /** Custom security policy override */
+  security?: SecurityPolicy;
+  /** Optional tool allowlist override for scoped execution */
+  allowedTools?: string[];
+  /** Current recursion depth (internal use). */
+  _depth?: number;
+  /** Abort signal for cancellation support. */
+  signal?: AbortSignal;
+}
+
+/**
+ * Result from a spawned agent.
+ */
+export interface AgentResult {
+  /** Agent ID for reference */
+  agentId: string;
+  /** Agent type that was spawned */
+  type: AgentType;
+  /** Whether the agent completed successfully */
+  success: boolean;
+  /** Final output/response from the agent */
+  output: string;
+  /** Error message if failed */
+  error?: string;
+  /** Number of turns executed */
+  turns: number;
+  /** Execution time in milliseconds */
+  durationMs: number;
+}
+
+export type AgentLifecycleStatus = "idle" | "running" | "completed" | "failed" | "stopped";
+
+/**
+ * Interface for agent spawning and management.
+ */
+export interface IAgentManager {
+  /** Spawn a specialized agent */
+  spawn(options: SpawnAgentOptions): Promise<AgentResult>;
+  /** Spawn multiple agents in parallel */
+  spawnParallel(options: SpawnAgentOptions[]): Promise<AgentResult[]>;
+  /** Get available agent types */
+  getAvailableTypes(): AgentType[];
+  /** Get profile for an agent type */
+  getProfile(type: AgentType): AgentProfile;
+  /** Stop a running agent by ID */
+  stop(agentId: string): Promise<void>;
+  /** Get status of a running agent */
+  getStatus(agentId: string): AgentLifecycleStatus | undefined;
+}
+
+// ============================================================================
+// Planning Types
+// ============================================================================
+
+/**
+ * Execution plan created by agent before taking action.
+ */
+export interface ExecutionPlan {
+  /** Plan identifier */
+  id: string;
+  /** High-level goal */
+  goal: string;
+  /** Ordered execution steps */
+  steps: PlanStep[];
+  /** Estimated duration in milliseconds */
+  estimatedDuration: number;
+  /** Risk assessment */
+  riskAssessment: "low" | "medium" | "high";
+  /** Tools required for execution */
+  toolsNeeded: string[];
+  /** Context/files needed */
+  contextRequired: string[];
+  /** Success criteria */
+  successCriteria: string[];
+  /** Created timestamp */
+  createdAt: number;
+  /** Status */
+  status: "draft" | "approved" | "rejected" | "executed";
+  /** Approval required */
+  requiresApproval: boolean;
+}
+
+/**
+ * Individual step in execution plan.
+ */
+export interface PlanStep {
+  /** Step identifier */
+  id: string;
+  /** Step number in sequence */
+  order: number;
+  /** Human-readable description */
+  description: string;
+  /** Tools to be used */
+  tools: string[];
+  /** Expected outcome */
+  expectedOutcome: string;
+  /** Dependencies on other steps (by ID) */
+  dependencies: string[];
+  /** Estimated duration in ms */
+  estimatedDuration?: number;
+  /** Whether this step can run in parallel */
+  parallelizable: boolean;
+  /** Execution status */
+  status?: "pending" | "executing" | "complete" | "failed" | "skipped";
+  /** Actual tool calls made (populated during execution) */
+  toolCalls?: MCPToolCall[];
+}
+
+// ============================================================================
+// Runtime Paths
+// ============================================================================
+
+export const DEFAULT_AGENT_RUNTIME_DIR = ".agent-runtime";
+export const DEFAULT_AGENT_PLANS_DIR = `${DEFAULT_AGENT_RUNTIME_DIR}/plans`;
+export const DEFAULT_AGENT_TODO_PATH = `${DEFAULT_AGENT_RUNTIME_DIR}/TODO.md`;
+export const DEFAULT_AGENT_TASK_PATH = `${DEFAULT_AGENT_RUNTIME_DIR}/TASKS.json`;
+export const DEFAULT_AGENT_SCRATCH_DIR = `${DEFAULT_AGENT_RUNTIME_DIR}/scratch`;
+export const DEFAULT_AGENT_KNOWLEDGE_DIR = `${DEFAULT_AGENT_RUNTIME_DIR}/knowledge`;

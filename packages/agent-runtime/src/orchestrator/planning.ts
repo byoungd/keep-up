@@ -5,7 +5,7 @@
  * Agents create structured plans before execution, enabling review and refinement.
  */
 
-import { createPlanPersistence, type PlanPersistence } from "./planPersistence";
+import { createPlanPersistence, type PlanPersistence } from "@ku0/agent-runtime-tools";
 import type { ExecutionPlan, PlanStep } from "./planTypes";
 
 export type { ExecutionPlan, PlanStep } from "./planTypes";

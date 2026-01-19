@@ -4,7 +4,7 @@
  * Provides utilities for parallel tool execution with concurrency control.
  */
 
-import type { IToolRegistry } from "../tools/mcp/registry";
+import type { IToolRegistry } from "@ku0/agent-runtime-tools";
 import type { MCPToolCall, MCPToolResult, ToolContext } from "../types";
 
 // ============================================================================

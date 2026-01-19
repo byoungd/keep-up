@@ -2,14 +2,13 @@
  * Code Agent Orchestrator Factory Tests
  */
 
+import { createCompletionToolServer, createToolRegistry } from "@ku0/agent-runtime-tools";
 import { describe, expect, it } from "vitest";
 import { createArtifactRegistry } from "../artifacts";
 import { createCodeAgentOrchestrator } from "../orchestrator/codeAgentFactory";
 import type { AgentLLMRequest, AgentLLMResponse, IAgentLLM } from "../orchestrator/orchestrator";
 import { createSecurityPolicy } from "../security";
 import { CODER_SOP, createCodeAgentGateChecker, createSOPExecutor } from "../sop";
-import { createCompletionToolServer } from "../tools/core";
-import { createToolRegistry } from "../tools/mcp/registry";
 import type { ArtifactEnvelope, MCPToolServer } from "../types";
 
 function createReadToolServer(): MCPToolServer {

@@ -2,11 +2,15 @@
  * Delegation Tool Tests
  */
 
+import {
+  type AgentLineageManager,
+  createDelegationToolServer,
+  createLineageManager,
+  type DelegationToolServer,
+} from "@ku0/agent-runtime-tools";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { type AgentLineageManager, createLineageManager } from "../agents/lineage";
 import type { AgentProfile, AgentResult, AgentType, IAgentManager } from "../agents/types";
 import { createSecurityPolicy } from "../security";
-import { createDelegationToolServer, type DelegationToolServer } from "../tools/core/delegation";
 
 // ============================================================================
 // Mock Agent Manager

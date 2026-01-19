@@ -119,9 +119,9 @@ graph TD
 - [x] Extract telemetry/logging into `agent-runtime-telemetry`.
 - [x] Extract memory into `agent-runtime-memory`.
 - [x] Extract events into `agent-runtime-control`.
-- [ ] Create package scaffolding and move plane modules.
+- [x] Create package scaffolding and move plane modules.
 - [x] Extract sandbox/runtime assets into `agent-runtime-sandbox`.
-- [ ] Move tool registry and servers into tooling package.
+- [x] Move tool registry and servers into tooling package.
 
 ### Phase 4: Wiring and Compatibility
 - [ ] Update facade exports to preserve `@ku0/agent-runtime` API.

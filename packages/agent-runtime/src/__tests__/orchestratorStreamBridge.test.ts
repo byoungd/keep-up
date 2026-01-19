@@ -3,13 +3,12 @@
  */
 
 import { resetGlobalEventBus } from "@ku0/agent-runtime-control";
+import { createCompletionToolServer, createToolRegistry } from "@ku0/agent-runtime-tools";
 import { describe, expect, it } from "vitest";
 import type { AgentLLMRequest, AgentLLMResponse, IAgentLLM } from "../orchestrator/orchestrator";
 import { createOrchestrator } from "../orchestrator/orchestrator";
 import { createSecurityPolicy } from "../security";
 import { collectStream, createStreamWriter } from "../streaming";
-import { createCompletionToolServer } from "../tools/core";
-import { createToolRegistry } from "../tools/mcp/registry";
 import type { MCPToolServer } from "../types";
 
 class OneShotToolLLM implements IAgentLLM {

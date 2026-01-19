@@ -1,7 +1,7 @@
+import { createLFCCToolServer } from "@ku0/agent-runtime-tools";
 import { gateway } from "@ku0/core";
 import { describe, expect, it } from "vitest";
 import { createSecurityPolicy } from "../security";
-import { createLFCCToolServer } from "../tools/lfcc/lfccServer";
 import type { ToolContext } from "../types";
 
 const baseContext: ToolContext = {

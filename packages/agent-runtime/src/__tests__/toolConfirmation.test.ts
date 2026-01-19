@@ -2,10 +2,10 @@
  * Tool Confirmation Resolution Tests
  */
 
+import { createToolRegistry } from "@ku0/agent-runtime-tools";
 import { describe, expect, it } from "vitest";
 import { ToolExecutionPipeline } from "../executor";
 import { createPermissionChecker, type ToolPolicyEngine } from "../security";
-import { createToolRegistry } from "../tools/mcp/registry";
 import type { MCPToolServer, ToolContext } from "../types";
 import { SECURITY_PRESETS } from "../types";
 

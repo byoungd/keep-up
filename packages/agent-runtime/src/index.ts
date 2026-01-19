@@ -71,6 +71,24 @@ export {
 // Telemetry
 // ============================================================================
 export * from "@ku0/agent-runtime-telemetry/telemetry";
+export type {
+  AggregatedResults,
+  ScriptContext,
+  ScriptExecutorConfig,
+  ScriptResult,
+  SubagentTask,
+  ToolSearchCriteria,
+  ToolSearchResult,
+} from "@ku0/agent-runtime-tools";
+// Subagent Orchestration
+// Script Executor
+// Tool Discovery
+export {
+  createScriptExecutor,
+  createSubagentOrchestrator,
+  createToolDiscoveryEngine,
+  SCRIPT_TEMPLATES,
+} from "@ku0/agent-runtime-tools";
 // ============================================================================
 // Agents
 // ============================================================================
@@ -147,9 +165,6 @@ export { createErrorRecoveryEngine } from "./orchestrator/errorRecovery";
 export type { ExecutionPlan, PlanningConfig, PlanStep } from "./orchestrator/planning";
 // Planning System
 export { createPlanningEngine } from "./orchestrator/planning";
-export type { AggregatedResults, SubagentTask } from "./orchestrator/subagentOrchestrator";
-// Subagent Orchestration
-export { createSubagentOrchestrator } from "./orchestrator/subagentOrchestrator";
 // ============================================================================
 // Pipeline
 // ============================================================================
@@ -238,16 +253,6 @@ export * from "./tasks";
 // Tools
 // ============================================================================
 export * from "./tools";
-export type {
-  ScriptContext,
-  ScriptExecutorConfig,
-  ScriptResult,
-} from "./tools/core/scriptExecutor";
-// Script Executor
-export { createScriptExecutor, SCRIPT_TEMPLATES } from "./tools/core/scriptExecutor";
-export type { ToolSearchCriteria, ToolSearchResult } from "./tools/discovery/toolDiscovery";
-// Tool Discovery
-export { createToolDiscoveryEngine } from "./tools/discovery/toolDiscovery";
 // ============================================================================
 // Types
 // ============================================================================
@@ -266,6 +271,34 @@ export { BUILT_IN_WORKFLOWS, createWorkflowTemplateManager } from "./workflows";
 // Convenience Re-exports
 // ============================================================================
 
+// Quick access to commonly used factories
+export {
+  type AIEnvelopeGateway,
+  COMPLETION_TOOL_DEFINITION,
+  COMPLETION_TOOL_NAME,
+  COMPLETION_TOOL_SCHEMA,
+  type CompleteTaskInput,
+  type CompletionEvent,
+  CompletionToolServer,
+  type CompletionValidationResult,
+  createBashToolServer,
+  createCodeInteractionServer,
+  createCodeToolServer,
+  createCompletionToolServer,
+  createFileToolServer,
+  createGitToolServer,
+  createLFCCToolServer,
+  createSubagentToolServer,
+  createToolRegistry,
+  createWebSearchToolServer,
+  type LFCCToolServerOptions,
+  type MultiDocumentGatewayRequest,
+  type MultiDocumentGatewayResponse,
+  type MultiDocumentPolicy,
+  type MultiDocumentRequestDocument,
+  type MultiDocumentRole,
+  validateCompletionInput,
+} from "@ku0/agent-runtime-tools";
 // LSP Tools (Semantic Code Intelligence)
 export {
   createLspToolServer,
@@ -277,33 +310,3 @@ export {
 export { createAICoreAdapter, createMockLLM } from "./orchestrator/aiCoreAdapter";
 export { createCodeAgentOrchestrator } from "./orchestrator/codeAgentFactory";
 export { createOrchestrator } from "./orchestrator/orchestrator";
-export { createCodeInteractionServer } from "./tools/code/codeServer";
-export { createBashToolServer } from "./tools/core/bash";
-export { createCodeToolServer } from "./tools/core/code";
-export {
-  COMPLETION_TOOL_DEFINITION,
-  COMPLETION_TOOL_NAME,
-  COMPLETION_TOOL_SCHEMA,
-  type CompleteTaskInput,
-  type CompletionEvent,
-  CompletionToolServer,
-  type CompletionValidationResult,
-  createCompletionToolServer,
-  validateCompletionInput,
-} from "./tools/core/completion";
-export { createFileToolServer } from "./tools/core/file";
-export { createSubagentToolServer } from "./tools/core/subagent";
-export { createGitToolServer } from "./tools/git/gitServer";
-export {
-  type AIEnvelopeGateway,
-  createLFCCToolServer,
-  type LFCCToolServerOptions,
-  type MultiDocumentGatewayRequest,
-  type MultiDocumentGatewayResponse,
-  type MultiDocumentPolicy,
-  type MultiDocumentRequestDocument,
-  type MultiDocumentRole,
-} from "./tools/lfcc/lfccServer";
-// Quick access to commonly used factories
-export { createToolRegistry } from "./tools/mcp/registry";
-export { createWebSearchToolServer } from "./tools/web/webSearchServer";

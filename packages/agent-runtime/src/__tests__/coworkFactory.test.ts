@@ -2,11 +2,11 @@
  * Cowork Factory Tests
  */
 
+import { createToolRegistry } from "@ku0/agent-runtime-tools";
 import { describe, expect, it } from "vitest";
 import { createCoworkToolExecutor } from "../cowork/factory";
 import type { CoworkSession } from "../cowork/types";
 import { createSecurityPolicy } from "../security";
-import { createToolRegistry } from "../tools/mcp/registry";
 import type { MCPToolServer, ToolContext } from "../types";
 
 function createFileServer(): MCPToolServer {
