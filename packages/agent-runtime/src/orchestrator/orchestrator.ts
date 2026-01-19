@@ -35,6 +35,7 @@ import type { KnowledgeRegistry } from "../knowledge";
 import { AGENTS_GUIDE_PROMPT } from "../prompts/agentGuidelines";
 import type { ModelRouter, ModelRoutingDecision } from "../routing/modelRouter";
 import {
+  ApprovalManager,
   createAuditLogger,
   createPermissionChecker,
   createToolGovernancePolicyEngine,
@@ -90,6 +91,7 @@ import { createDependencyAnalyzer, type DependencyAnalyzer } from "./dependencyA
 import { createErrorRecoveryEngine, type ErrorRecoveryEngine } from "./errorRecovery";
 import { BackpressureEventStream } from "./eventStream";
 import { type MessageCompressor, SmartMessageCompressor } from "./messageCompression";
+import { NodeResultCache } from "./nodeResultCache";
 import {
   createPlanningEngine,
   type ExecutionPlan,
@@ -223,6 +225,10 @@ export interface OrchestratorComponents {
   taskGraph?: TaskGraphStore;
   /** Optional tool result cache */
   toolResultCache?: ToolResultCache;
+  /** Optional node-level result cache */
+  nodeResultCache?: NodeResultCache;
+  /** Optional approval manager */
+  approvalManager?: ApprovalManager;
   /** Optional runtime event stream bridge */
   streamBridge?: OrchestratorStreamBridge;
   /** Optional artifact pipeline */
@@ -274,11 +280,13 @@ export class AgentOrchestrator {
   private readonly messageCompressor: MessageCompressor;
   private readonly requestCache: RequestCache;
   private readonly toolResultCache: ToolResultCache;
+  private readonly nodeResultCache?: NodeResultCache;
   private readonly dependencyAnalyzer: DependencyAnalyzer;
   private readonly toolScheduler: SmartToolScheduler;
   private readonly planningEngine: PlanningEngine;
   private readonly turnExecutor: ITurnExecutor;
   private readonly toolExecutor?: ToolExecutor;
+  private readonly approvalManager?: ApprovalManager;
   private readonly eventBus?: RuntimeEventBus;
   private readonly sessionState?: SessionState;
   private readonly errorRecoveryEngine?: ErrorRecoveryEngine;
@@ -360,56 +368,22 @@ export class AgentOrchestrator {
       allowZeroToolCalls: true,
     });
     this.toolExecutor = components.toolExecutor;
+    this.approvalManager = this.resolveApprovalManager(components);
     this.eventBus = components.eventBus;
-    this.errorRecoveryEngine =
-      components.errorRecoveryEngine ??
-      (config.recovery?.enabled ? createErrorRecoveryEngine() : undefined);
-    this.toolDiscovery =
-      components.toolDiscovery ??
-      (config.toolDiscovery?.enabled ? createToolDiscoveryEngine() : undefined);
-    if (this.toolDiscovery) {
-      this.toolDiscovery.registerServer(new RegistryToolServerAdapter(this.registry));
-    }
+    this.errorRecoveryEngine = this.resolveErrorRecoveryEngine(config, components);
+    this.toolDiscovery = this.resolveToolDiscovery(config, components);
 
     // Initialize performance optimizations
-    this.messageCompressor =
-      components.messageCompressor ??
-      new SmartMessageCompressor({
-        maxTokens: 8000,
-        strategy: "hybrid",
-        preserveCount: 3,
-        estimateTokens: (text: string) => countTokens(text),
-        maxToolResultTokens: 500,
-      });
-
-    this.toolResultCache =
-      components.toolResultCache ?? this.sessionState?.toolCache ?? new ToolResultCache();
-
-    this.requestCache =
-      components.requestCache ??
-      createRequestCache({
-        enabled: true,
-        ttlMs: 300000, // 5 minutes
-        maxSize: 1000,
-      });
-
-    this.dependencyAnalyzer = components.dependencyAnalyzer ?? createDependencyAnalyzer();
-    this.toolScheduler =
-      components.toolScheduler ??
-      new SmartToolScheduler({ dependencyAnalyzer: this.dependencyAnalyzer });
-
-    this.planningEngine =
-      components.planningEngine ??
-      createPlanningEngine({
-        enabled: config.planning?.enabled ?? false,
-        requireApproval: config.planning?.requireApproval ?? false,
-        maxRefinements: config.planning?.maxRefinements,
-        planningTimeoutMs: config.planning?.planningTimeoutMs,
-        autoExecuteLowRisk: config.planning?.autoExecuteLowRisk,
-      });
+    this.messageCompressor = this.resolveMessageCompressor(components);
+    this.toolResultCache = this.resolveToolResultCache(components);
+    this.nodeResultCache = this.resolveNodeResultCache(config, components);
+    this.requestCache = this.resolveRequestCache(components);
+    this.dependencyAnalyzer = this.resolveDependencyAnalyzer(components);
+    this.toolScheduler = this.resolveToolScheduler(components, this.dependencyAnalyzer);
+    this.planningEngine = this.resolvePlanningEngine(config, components);
 
     // Initialize knowledge registry for scoped knowledge injection
-    this.intentRegistry = components.intentRegistry ?? createIntentRegistry();
+    this.intentRegistry = this.resolveIntentRegistry(components);
     this.knowledgeRegistry = components.knowledgeRegistry;
     this.skillRegistry = components.skillRegistry;
     this.skillSession = components.skillSession;
@@ -434,6 +408,130 @@ export class AgentOrchestrator {
     });
 
     this.loopStateMachine = createAgentLoopStateMachine({ enableCycleLogging: false });
+  }
+
+  private resolveApprovalManager(components: OrchestratorComponents): ApprovalManager {
+    if (components.approvalManager) {
+      return components.approvalManager;
+    }
+    return new ApprovalManager();
+  }
+
+  private resolveErrorRecoveryEngine(
+    config: AgentConfig,
+    components: OrchestratorComponents
+  ): ErrorRecoveryEngine | undefined {
+    if (components.errorRecoveryEngine) {
+      return components.errorRecoveryEngine;
+    }
+    if (!config.recovery?.enabled) {
+      return undefined;
+    }
+    return createErrorRecoveryEngine();
+  }
+
+  private resolveToolDiscovery(
+    config: AgentConfig,
+    components: OrchestratorComponents
+  ): ToolDiscoveryEngine | undefined {
+    if (components.toolDiscovery) {
+      components.toolDiscovery.registerServer(new RegistryToolServerAdapter(this.registry));
+      return components.toolDiscovery;
+    }
+    if (!config.toolDiscovery?.enabled) {
+      return undefined;
+    }
+    const discovery = createToolDiscoveryEngine();
+    discovery.registerServer(new RegistryToolServerAdapter(this.registry));
+    return discovery;
+  }
+
+  private resolveMessageCompressor(components: OrchestratorComponents): MessageCompressor {
+    if (components.messageCompressor) {
+      return components.messageCompressor;
+    }
+    return new SmartMessageCompressor({
+      maxTokens: 8000,
+      strategy: "hybrid",
+      preserveCount: 3,
+      estimateTokens: (text: string) => countTokens(text),
+      maxToolResultTokens: 500,
+    });
+  }
+
+  private resolveToolResultCache(components: OrchestratorComponents): ToolResultCache {
+    if (components.toolResultCache) {
+      return components.toolResultCache;
+    }
+    return this.sessionState?.toolCache ?? new ToolResultCache();
+  }
+
+  private resolveNodeResultCache(
+    config: AgentConfig,
+    components: OrchestratorComponents
+  ): NodeResultCache | undefined {
+    if (components.nodeResultCache) {
+      return components.nodeResultCache;
+    }
+    const nodeCache = config.toolExecutionContext?.nodeCache;
+    if (!nodeCache?.enabled) {
+      return undefined;
+    }
+    return new NodeResultCache({
+      ttlMs: nodeCache.ttlMs,
+      includePolicyContext: nodeCache.includePolicyContext,
+    });
+  }
+
+  private resolveRequestCache(components: OrchestratorComponents): RequestCache {
+    if (components.requestCache) {
+      return components.requestCache;
+    }
+    return createRequestCache({
+      enabled: true,
+      ttlMs: 300000, // 5 minutes
+      maxSize: 1000,
+    });
+  }
+
+  private resolveDependencyAnalyzer(components: OrchestratorComponents): DependencyAnalyzer {
+    if (components.dependencyAnalyzer) {
+      return components.dependencyAnalyzer;
+    }
+    return createDependencyAnalyzer();
+  }
+
+  private resolveToolScheduler(
+    components: OrchestratorComponents,
+    dependencyAnalyzer: DependencyAnalyzer
+  ): SmartToolScheduler {
+    if (components.toolScheduler) {
+      return components.toolScheduler;
+    }
+    return new SmartToolScheduler({ dependencyAnalyzer });
+  }
+
+  private resolvePlanningEngine(
+    config: AgentConfig,
+    components: OrchestratorComponents
+  ): PlanningEngine {
+    if (components.planningEngine) {
+      return components.planningEngine;
+    }
+    return createPlanningEngine({
+      enabled: config.planning?.enabled ?? false,
+      requireApproval: config.planning?.requireApproval ?? false,
+      maxRefinements: config.planning?.maxRefinements,
+      planningTimeoutMs: config.planning?.planningTimeoutMs,
+      autoExecuteLowRisk: config.planning?.autoExecuteLowRisk,
+    });
+  }
+
+  private resolveIntentRegistry(components: OrchestratorComponents): IntentRegistry {
+    if (components.intentRegistry) {
+      return components.intentRegistry;
+    }
+    return createIntentRegistry();
   }
 
   /**
@@ -1674,6 +1772,12 @@ export class AgentOrchestrator {
     call: MCPToolCall,
     context: ToolContext
   ): Promise<MCPToolResult> {
+    const nodeCached = this.nodeResultCache?.get(call, context);
+    if (nodeCached) {
+      this.emit("tool:result", { toolName: call.name, result: nodeCached, cached: true });
+      return nodeCached;
+    }
+
     // Try cache first
     let result = this.toolResultCache.get(call.name, call.arguments) as MCPToolResult | undefined;
     if (result) {
@@ -1697,6 +1801,7 @@ export class AgentOrchestrator {
 
     // Cache the result
     this.toolResultCache.set(call.name, call.arguments, result);
+    this.nodeResultCache?.set(call, context, result);
     return result;
   }
 
@@ -1786,7 +1891,7 @@ export class AgentOrchestrator {
   }
 
   private async requestUserConfirmation(request: ConfirmationRequest): Promise<boolean> {
-    if (!this.confirmationHandler) {
+    if (!this.confirmationHandler && !this.approvalManager) {
       // No handler, default to deny
       return false;
     }
@@ -1795,13 +1900,34 @@ export class AgentOrchestrator {
     this.emit("confirmation:required", request);
     this.loopStateMachine.pause();
 
-    const confirmed = await this.confirmationHandler(request);
+    const timeoutMs = this.config.toolExecutionContext?.approvalTimeoutMs;
+    const decision = this.approvalManager
+      ? await this.approvalManager.request(
+          "tool",
+          request,
+          this.confirmationHandler,
+          timeoutMs ? { timeoutMs } : undefined
+        )
+      : (() => {
+          const approved = this.confirmationHandler
+            ? this.confirmationHandler(request)
+            : Promise.resolve(false);
+          return approved.then((value) => ({
+            approved: value,
+            status: value ? "approved" : "rejected",
+          }));
+        })();
 
-    this.emit("confirmation:received", { confirmed });
+    const resolvedDecision = await Promise.resolve(decision);
+
+    this.emit("confirmation:received", {
+      confirmed: resolvedDecision.approved,
+      status: resolvedDecision.status,
+    });
     this.statusController.setStatus(this.state, "executing");
     this.loopStateMachine.resume();
 
-    return confirmed;
+    return resolvedDecision.approved;
   }
 
   private async attemptEscalation(
@@ -1918,6 +2044,7 @@ export class AgentOrchestrator {
             activeSkills: this.skillSession.getActiveSkills(),
           }
         : undefined,
+      a2a: this.config.a2a,
     };
   }
 
@@ -2367,6 +2494,8 @@ function resolveToolExecutor(
     registry,
     policy: permissionChecker,
     policyEngine,
+    promptInjectionGuard: toolExecution?.promptInjectionGuard,
+    promptInjectionPolicy: toolExecution?.promptInjectionPolicy,
     sandboxAdapter: toolExecution?.sandboxAdapter,
     telemetryHandler: toolExecution?.telemetryHandler,
     executionObserver: toolExecution?.executionObserver,

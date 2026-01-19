@@ -127,6 +127,16 @@ export class DelegationToolServer extends BaseToolServer {
     }
 
     const { role, task, constraints } = validation;
+    const a2aTarget = this.resolveA2ATarget(role, toolContext);
+    if (a2aTarget) {
+      return this.delegateViaA2A(toolContext, a2aTarget, {
+        role,
+        task,
+        constraints,
+        expectedOutput: args.expectedOutput as string | undefined,
+      });
+    }
+
     const agentType = ROLE_TO_AGENT_TYPE[role];
     const childDepth = this.parentDepth + 1;
     const agentId = this.lineageManager ? this.createChildAgentId(agentType) : undefined;
@@ -218,6 +228,66 @@ export class DelegationToolServer extends BaseToolServer {
 
     if (this.parentAgentId) {
       this.lineageManager.rollupToParent(agentId);
+    }
+  }
+
+  private resolveA2ATarget(role: DelegationRole, context: ToolContext): string | undefined {
+    const a2a = context.a2a;
+    if (!a2a) {
+      return undefined;
+    }
+
+    const mapped = a2a.routing?.roleToAgentId?.[role];
+    if (mapped) {
+      return mapped;
+    }
+
+    const prefix = a2a.routing?.capabilityPrefix ?? "";
+    return (
+      a2a.adapter.resolveAgentForCapability(`${prefix}${role}`) ??
+      a2a.adapter.resolveAgentForCapability(role)
+    );
+  }
+
+  private async delegateViaA2A(
+    context: ToolContext,
+    targetAgentId: string,
+    payload: {
+      role: DelegationRole;
+      task: string;
+      constraints?: string[];
+      expectedOutput?: string;
+    }
+  ): Promise<MCPToolResult> {
+    const a2a = context.a2a;
+    if (!a2a) {
+      return errorResult("EXECUTION_FAILED", "A2A context is not configured.");
+    }
+
+    try {
+      const response = await a2a.adapter.request(
+        a2a.agentId,
+        targetAgentId,
+        {
+          kind: "delegate",
+          ...payload,
+        },
+        {
+          timeoutMs: a2a.timeoutMs,
+          capabilities: [payload.role],
+        }
+      );
+
+      const result = response.payload as { success?: boolean; output?: string; error?: string };
+      if (result.success) {
+        return textResult(result.output ?? "");
+      }
+
+      const message = result.error ?? "Delegation failed";
+      return errorResult("EXECUTION_FAILED", message);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return errorResult("EXECUTION_FAILED", message);
     }
   }
 

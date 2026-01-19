@@ -23,7 +23,11 @@ export interface MCPTool {
     readOnly?: boolean;
     /** Estimated execution time hint */
     estimatedDuration?: "instant" | "fast" | "medium" | "slow";
+    /** Required OAuth scopes for remote MCP tools */
+    requiredScopes?: string[];
   };
+  /** Optional metadata for tool adapters */
+  metadata?: Record<string, unknown>;
 }
 
 /** JSON Schema subset for tool parameters */
@@ -96,6 +100,7 @@ export type ToolErrorCode =
   | "DRYRUN_REJECTED"
   | "RETRY_EXHAUSTED"
   | "VALIDATION_ERROR"
+  | "PROMPT_INJECTION_BLOCKED"
   | "DUPLICATE_FAILED_ACTION"; // Manus spec: prevent repeating exact same failed action
 
 // ============================================================================
@@ -144,6 +149,8 @@ export interface ToolContext {
   cowork?: CoworkToolContext;
   /** Skill execution context */
   skills?: SkillToolContext;
+  /** Optional A2A routing context */
+  a2a?: A2AContext;
 }
 
 export interface CoworkToolContext {
@@ -187,6 +194,18 @@ export interface SkillToolContext {
   activeSkills: SkillActivation[];
 }
 
+export interface A2ARoutingConfig {
+  roleToAgentId?: Record<string, string>;
+  capabilityPrefix?: string;
+}
+
+export interface A2AContext {
+  adapter: A2AMessageBusAdapter;
+  agentId: string;
+  routing?: A2ARoutingConfig;
+  timeoutMs?: number;
+}
+
 // ============================================================================
 // Completion Contract Types
 // ============================================================================
@@ -208,6 +227,7 @@ export interface CompleteTaskInput {
 import type { DataAccessPolicy, PolicyEngine } from "@ku0/core";
 import type { CoworkPolicyEngine } from "../cowork/policy";
 import type { CoworkSession } from "../cowork/types";
+import type { A2AMessageBusAdapter } from "../events/a2a";
 
 /** Security policy for agent execution */
 export interface SecurityPolicy {
@@ -403,6 +423,16 @@ export interface ToolExecutionContext {
   requiresApproval: string[];
   /** Max parallel calls in batch mode */
   maxParallel: number;
+  /** Optional approval timeout in milliseconds */
+  approvalTimeoutMs?: number;
+  /** Node-level caching configuration */
+  nodeCache?: NodeCachePolicy;
+}
+
+export interface NodeCachePolicy {
+  enabled: boolean;
+  ttlMs?: number;
+  includePolicyContext?: boolean;
 }
 
 /** Configuration for parallel tool execution */
@@ -429,6 +459,8 @@ export interface AgentConfig {
   requireConfirmation?: boolean;
   /** Tool execution policy context */
   toolExecutionContext?: ToolExecutionContext;
+  /** Optional A2A routing context */
+  a2a?: A2AContext;
   /** Parallel tool execution configuration */
   parallelExecution?: ParallelExecutionConfig;
   /** Planning configuration (plan-then-execute pattern) */

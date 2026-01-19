@@ -12,7 +12,13 @@ import {
 } from "../sandbox";
 import {
   createToolPolicyEngine,
+  DEFAULT_PROMPT_INJECTION_POLICY,
+  DefaultPromptInjectionGuard,
   type IPermissionChecker,
+  type PromptInjectionAssessment,
+  type PromptInjectionGuard,
+  type PromptInjectionPolicy,
+  shouldBlockPromptInjection,
   type ToolPolicyDecision,
   type ToolPolicyEngine,
 } from "../security";
@@ -63,6 +69,8 @@ export interface ToolExecutorConfig {
   registry: IToolRegistry;
   policy: IPermissionChecker;
   policyEngine?: ToolPolicyEngine;
+  promptInjectionGuard?: PromptInjectionGuard;
+  promptInjectionPolicy?: PromptInjectionPolicy;
   sandboxAdapter?: ExecutionSandboxAdapter;
   telemetryHandler?: (event: ToolExecutionTelemetry) => void;
   executionObserver?: ToolExecutionObserver;
@@ -78,6 +86,8 @@ export interface ToolExecutorConfig {
 export interface ToolExecutionOptions {
   policy?: IPermissionChecker;
   policyEngine?: ToolPolicyEngine;
+  promptInjectionGuard?: PromptInjectionGuard;
+  promptInjectionPolicy?: PromptInjectionPolicy;
   sandboxAdapter?: ExecutionSandboxAdapter;
   telemetryHandler?: (event: ToolExecutionTelemetry) => void;
   executionObserver?: ToolExecutionObserver;
@@ -104,6 +114,8 @@ export class ToolExecutionPipeline
   private readonly registry: IToolRegistry;
   private readonly policyEngine: ToolPolicyEngine;
   private readonly sandboxAdapter: ExecutionSandboxAdapter;
+  private readonly promptInjectionGuard: PromptInjectionGuard;
+  private readonly promptInjectionPolicy: PromptInjectionPolicy;
   private readonly telemetryHandler?: (event: ToolExecutionTelemetry) => void;
   private readonly executionObserver?: ToolExecutionObserver;
   private readonly audit?: AuditLogger;
@@ -119,6 +131,8 @@ export class ToolExecutionPipeline
     this.registry = config.registry;
     this.policyEngine = config.policyEngine ?? createToolPolicyEngine(config.policy);
     this.sandboxAdapter = config.sandboxAdapter ?? createExecutionSandboxAdapter();
+    this.promptInjectionGuard = config.promptInjectionGuard ?? new DefaultPromptInjectionGuard();
+    this.promptInjectionPolicy = config.promptInjectionPolicy ?? DEFAULT_PROMPT_INJECTION_POLICY;
     this.telemetryHandler = config.telemetryHandler;
     this.executionObserver = config.executionObserver;
     this.audit = config.audit;
@@ -180,7 +194,8 @@ export class ToolExecutionPipeline
     this.auditCall(call, executionContext);
 
     try {
-      const result = await this.executeWithRetry(call, executionContext);
+      let result = await this.executeWithRetry(call, executionContext);
+      result = this.applyPromptInjectionOutput(call, tool, executionContext, result);
       this.recordToolMetric(call.name, result.success ? "success" : "error");
       this.recordDuration(call.name, startTime);
 
@@ -605,6 +620,19 @@ export class ToolExecutionPipeline
       );
     }
 
+    const injectionAssessment = this.evaluatePromptInjectionInput(call, tool, context);
+    if (injectionAssessment) {
+      return this.handlePromptInjectionBlocked(
+        injectionAssessment,
+        policyDecision,
+        call,
+        context,
+        startTime,
+        toolCallId,
+        decisionId
+      );
+    }
+
     const sandboxDecision = this.sandboxAdapter.preflight(call, context);
     if (!sandboxDecision.allowed) {
       return this.handleSandboxDenied(
@@ -708,6 +736,54 @@ export class ToolExecutionPipeline
     return { ok: false, result: invalidResult };
   }
 
+  private handlePromptInjectionBlocked(
+    assessment: PromptInjectionAssessment,
+    policyDecision: ToolPolicyDecision,
+    call: MCPToolCall,
+    context: ToolContext,
+    startTime: number,
+    toolCallId: string,
+    decisionId: string
+  ): ExecutionPreparationResult {
+    const message = `Prompt injection signals detected (${assessment.signals.join(", ")}).`;
+    const decision = this.createExecutionDecision({
+      decisionId,
+      toolName: call.name,
+      toolCallId,
+      taskNodeId: context.taskNodeId,
+      allowed: false,
+      requiresConfirmation: false,
+      reason: message,
+      riskTags: policyDecision.riskTags,
+      sandboxed: context.security.sandbox.type !== "none",
+    });
+    this.emitDecision(decision, context);
+
+    const blocked = this.createErrorResult("PROMPT_INJECTION_BLOCKED", message, {
+      signals: assessment.signals,
+      risk: assessment.risk,
+      source: assessment.source,
+      truncated: assessment.truncated,
+    });
+    this.emitRecord(
+      this.createExecutionRecord({
+        toolCallId,
+        toolName: call.name,
+        taskNodeId: context.taskNodeId,
+        status: "failed",
+        durationMs: Date.now() - startTime,
+        policyDecisionId: decisionId,
+        sandboxed: decision.sandboxed,
+        error: blocked.error?.message ?? "Prompt injection blocked",
+      }),
+      context
+    );
+    this.recordToolMetric(call.name, "error");
+    this.recordDuration(call.name, startTime);
+    this.auditResult(call, context, blocked);
+    return { ok: false, result: blocked };
+  }
+
   private handlePolicyDenied(
     policyDecision: ToolPolicyDecision,
     call: MCPToolCall,
@@ -802,6 +878,64 @@ export class ToolExecutionPipeline
     this.emitSandboxTelemetry(call, context, denied, startTime);
     this.auditResult(call, context, denied);
     return { ok: false, result: denied };
+  }
+
+  private evaluatePromptInjectionInput(
+    call: MCPToolCall,
+    tool: MCPTool | undefined,
+    context: ToolContext
+  ): PromptInjectionAssessment | null {
+    if (!this.promptInjectionPolicy.enabled) {
+      return null;
+    }
+    const result = this.promptInjectionGuard.assessInput(
+      call,
+      tool,
+      context,
+      this.promptInjectionPolicy
+    );
+    if (!result) {
+      return null;
+    }
+    if (!shouldBlockPromptInjection(result.assessment, this.promptInjectionPolicy)) {
+      return null;
+    }
+    return result.assessment;
+  }
+
+  private applyPromptInjectionOutput(
+    call: MCPToolCall,
+    tool: MCPTool | undefined,
+    context: ToolContext,
+    result: MCPToolResult
+  ): MCPToolResult {
+    if (!this.promptInjectionPolicy.enabled || !result.success) {
+      return result;
+    }
+
+    const assessment = this.promptInjectionGuard.assessOutput(
+      call,
+      tool,
+      result,
+      context,
+      this.promptInjectionPolicy
+    );
+    if (!assessment) {
+      return result;
+    }
+    if (!shouldBlockPromptInjection(assessment.assessment, this.promptInjectionPolicy)) {
+      return result;
+    }
+
+    const message = `Prompt injection signals detected (${assessment.assessment.signals.join(
+      ", "
+    )}).`;
+    return this.createErrorResult("PROMPT_INJECTION_BLOCKED", message, {
+      signals: assessment.assessment.signals,
+      risk: assessment.assessment.risk,
+      source: assessment.assessment.source,
+      truncated: assessment.assessment.truncated,
+    });
   }
 
   private handleRateLimitExceeded(

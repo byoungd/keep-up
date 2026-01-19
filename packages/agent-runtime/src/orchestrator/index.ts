@@ -81,6 +81,7 @@ export {
   type ISummarizer,
   MessageCompressor,
 } from "./messageCompression";
+export { NodeResultCache, type NodeResultCacheConfig } from "./nodeResultCache";
 export {
   type AgentControlSignal,
   type AgentLLMChunk,
