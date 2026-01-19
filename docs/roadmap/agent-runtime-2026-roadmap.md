@@ -30,6 +30,10 @@ Deliver the Agent Runtime v2026.1 spec implementation to top-tier product qualit
 | Track F | Model Routing, Context Management, Observability | Dev + QA | Track A |
 | Track G | AI Envelope and LFCC Alignment | TL + Dev + QA | Track B, Track C |
 | Track H | Optimization (M4) | Dev + QA | Track A-G |
+| Track I | LRU Cache Optimization | Dev | Track H |
+| Track J | Docker Container Pooling | Dev | Track H |
+| Track K | Memory Store Cache Layer | Dev | Track H |
+| Track L | Module Decomposition & Architecture | Architect | Track H |
 
 ## Milestones
 
@@ -54,6 +58,12 @@ M4: Optimization and Quality (Weeks 7-8)
 - Observability dashboards and alerts
 - LFCC-aligned AI mutation pipeline
 
+M5: Advanced Performance & Scale (Week 9+)
+- Unified LRU Caching
+- Docker Container Pooling
+- Memory Layer Caching
+- Architecture Decomposition
+
 ## Acceptance Metrics (Release Gates)
 - Completion contract: 100 percent of agent tasks terminate via completion tool
 - Recovery: 100 percent of limit cases produce final summary output
@@ -77,3 +87,7 @@ M4: Optimization and Quality (Weeks 7-8)
 - docs/roadmap/agent-runtime-2026-track-f-model-routing-observability.md
 - docs/roadmap/agent-runtime-2026-track-g-ai-envelope-lfcc.md
 - docs/roadmap/agent-runtime-2026-track-h-optimization.md
+- docs/roadmap/agent-runtime-2026-track-i-lru-cache.md
+- docs/roadmap/agent-runtime-2026-track-j-docker-pooling.md
+- docs/roadmap/agent-runtime-2026-track-k-memory-cache.md
+- docs/roadmap/agent-runtime-2026-track-l-architecture.md
