@@ -153,9 +153,62 @@ export interface ToolContext {
   a2a?: A2AContext;
 }
 
+export interface CoworkFolderGrantLike {
+  rootPath: string;
+  outputRoots?: string[];
+}
+
+export interface CoworkConnectorGrantLike {
+  id: string;
+  allowActions: boolean;
+  scopes?: string[];
+  provider?: string;
+}
+
+export interface CoworkSessionLike {
+  grants: CoworkFolderGrantLike[];
+  connectors: CoworkConnectorGrantLike[];
+}
+
+export type CoworkPolicyActionLike =
+  | "file.read"
+  | "file.write"
+  | "file.create"
+  | "file.delete"
+  | "file.rename"
+  | "file.move"
+  | "file.*"
+  | "network.request"
+  | "connector.read"
+  | "connector.action";
+
+export interface CoworkPolicyInputLike {
+  action: CoworkPolicyActionLike;
+  path?: string;
+  grantRoots?: string[];
+  outputRoots?: string[];
+  fileSizeBytes?: number;
+  host?: string;
+  hostAllowlist?: string[];
+  connectorScopeAllowed?: boolean;
+  caseInsensitivePaths?: boolean;
+}
+
+export interface CoworkPolicyDecisionLike {
+  decision: "allow" | "allow_with_confirm" | "deny";
+  requiresConfirmation: boolean;
+  reason: string;
+  riskTags: string[];
+  ruleId?: string;
+}
+
+export interface CoworkPolicyEngineLike {
+  evaluate(input: CoworkPolicyInputLike): CoworkPolicyDecisionLike;
+}
+
 export interface CoworkToolContext {
-  session: CoworkSession;
-  policyEngine: CoworkPolicyEngine;
+  session: CoworkSessionLike;
+  policyEngine: CoworkPolicyEngineLike;
   caseInsensitivePaths?: boolean;
 }
 
@@ -199,8 +252,30 @@ export interface A2ARoutingConfig {
   capabilityPrefix?: string;
 }
 
+export interface A2AEnvelopeLike {
+  payload: unknown;
+  id?: string;
+  from?: string;
+  to?: string | null;
+  type?: string;
+  requestId?: string;
+  conversationId?: string;
+  capabilities?: string[];
+  timestamp?: number;
+}
+
+export interface A2AAdapterLike {
+  request(
+    from: string,
+    to: string,
+    payload: unknown,
+    options?: { conversationId?: string; timeoutMs?: number; capabilities?: string[] }
+  ): Promise<A2AEnvelopeLike>;
+  resolveAgentForCapability(capability: string): string | undefined;
+}
+
 export interface A2AContext {
-  adapter: A2AMessageBusAdapter;
+  adapter: A2AAdapterLike;
   agentId: string;
   routing?: A2ARoutingConfig;
   timeoutMs?: number;
@@ -225,9 +300,6 @@ export interface CompleteTaskInput {
 // ============================================================================
 
 import type { DataAccessPolicy, PolicyEngine } from "@ku0/core";
-import type { CoworkPolicyEngine } from "../cowork/policy";
-import type { CoworkSession } from "../cowork/types";
-import type { A2AMessageBusAdapter } from "../events/a2a";
 
 /** Security policy for agent execution */
 export interface SecurityPolicy {

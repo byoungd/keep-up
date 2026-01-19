@@ -113,7 +113,7 @@ graph TD
 - [ ] Extract runtime interfaces and shared types into `agent-runtime-core`.
 - [ ] Define `RuntimeComponents` wiring contract.
 - [ ] Design `createRuntime` composition factory for explicit DI.
-- [ ] Break circular dependencies per RFC Cycle Resolution Plan.
+- [x] Break circular dependencies per RFC Cycle Resolution Plan.
 
 ### Phase 3: Package Extraction
 - [ ] Create package scaffolding and move plane modules.

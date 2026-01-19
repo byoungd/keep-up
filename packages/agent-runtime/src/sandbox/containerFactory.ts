@@ -6,7 +6,7 @@
 
 import type Dockerode from "dockerode";
 import type { Container, HostConfig } from "dockerode";
-import type { SandboxPolicy } from "./sandboxManager";
+import type { SandboxPolicy } from "./types";
 
 export interface SandboxContainerConfig {
   docker: Dockerode;

@@ -125,12 +125,14 @@ export type {
 } from "./sandboxContext";
 export type {
   DockerSandboxManagerOptions,
-  DockerSandboxPoolOptions,
   SandboxManager,
-  SandboxPolicy,
-  SandboxSessionConfig,
 } from "./sandboxManager";
 export { DockerSandboxManager } from "./sandboxManager";
+export type {
+  DockerSandboxPoolOptions,
+  SandboxPolicy,
+  SandboxSessionConfig,
+} from "./types";
 
 function parseOperation(name: string): string {
   const parts = name.split(":");

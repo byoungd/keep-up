@@ -30,13 +30,8 @@ import type { SkillRegistry } from "../skills/skillRegistry";
 import type { IMetricsCollector, SpanContext } from "../telemetry";
 import { AGENT_METRICS } from "../telemetry";
 import type { AgentMessage, AgentState, MCPToolCall, TokenUsageStats } from "../types";
+import type { AgentLLMRequest, AgentLLMResponse, AgentToolDefinition, IAgentLLM } from "./llmTypes";
 import type { MessageCompressor } from "./messageCompression";
-import type {
-  AgentLLMRequest,
-  AgentLLMResponse,
-  AgentToolDefinition,
-  IAgentLLM,
-} from "./orchestrator";
 import type { RequestCache } from "./requestCache";
 
 // ============================================================================

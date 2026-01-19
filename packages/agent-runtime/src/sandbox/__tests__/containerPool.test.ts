@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { RuntimeAssetManager } from "../../assets/runtimeAssetManager";
 import { ContainerPool } from "../containerPool";
-import type { SandboxPolicy } from "../sandboxManager";
+import type { SandboxPolicy } from "../types";
 
 const dockerSocketCandidates = ["/var/run/docker.sock", join(homedir(), ".docker/run/docker.sock")];
 const hasDockerSocket =
