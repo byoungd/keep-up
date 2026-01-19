@@ -1,7 +1,7 @@
 # Track E: SOP Roles and Phase Gates
 
 Owner: Runtime Developer + QA
-Status: In Progress
+Status: Completed
 
 ## Objective
 Implement role-based SOPs and phase-gated tool filtering as defined in docs/specs/agent-runtime-spec-2026.md Section 7.
@@ -29,7 +29,7 @@ Implement role-based SOPs and phase-gated tool filtering as defined in docs/spec
 2. [x] Implement SOPExecutor phase gating
 3. [x] Define Coder and Researcher SOPs (+ Reviewer and Architect)
 4. [x] Add tests for phase and quality gates
-5. [ ] Integrate SOPExecutor into AgentOrchestrator
+5. [x] Integrate SOPExecutor into AgentOrchestrator
 
 ## Acceptance Criteria
 - Tool availability matches phase definitions
