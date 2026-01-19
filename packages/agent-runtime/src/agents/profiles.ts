@@ -8,6 +8,7 @@
  */
 
 import { AGENTS_GUIDE_PROMPT } from "../prompts/agentGuidelines";
+import { DEFAULT_AGENT_PLANS_DIR, DEFAULT_AGENT_TODO_PATH } from "../runtimePaths";
 import type { AgentProfile, AgentType } from "./types";
 
 // ============================================================================
@@ -50,7 +51,7 @@ const PLAN_SYSTEM_PROMPT = `You are a software architecture and planning special
 Your role is to design implementation plans and make architectural decisions.
 
 IMPORTANT: You are a READ-ONLY agent for the codebase. You can explore and analyze code,
-but you can ONLY write to planning files in .agent/plans/ directory.
+but you can ONLY write to planning files in ${DEFAULT_AGENT_PLANS_DIR}/ directory.
 
 Guidelines:
 - Analyze requirements thoroughly before planning
@@ -58,8 +59,8 @@ Guidelines:
 - Break down complex tasks into actionable steps
 - Identify critical files and dependencies
 - Document your reasoning for architectural choices
-- Write plans to .agent/plans/current.md
-- Update .agent/TODO.md with detailed task items
+- Write plans to ${DEFAULT_AGENT_PLANS_DIR}/current.md
+- Update ${DEFAULT_AGENT_TODO_PATH} with detailed task items
 
 You have access to exploration and analysis tools. Focus on:
 - Creating step-by-step implementation plans
@@ -268,7 +269,7 @@ export const AGENT_PROFILES: Record<AgentType, AgentProfile> = {
     maxTurns: 15,
     requireConfirmation: false,
     editRestrictions: {
-      allow: [".agent/plans/**/*.md", ".agent/TODO.md"],
+      allow: [`${DEFAULT_AGENT_PLANS_DIR}/**/*.md`, DEFAULT_AGENT_TODO_PATH],
       deny: ["**/*"],
     },
   },
