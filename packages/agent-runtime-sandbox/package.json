@@ -1,0 +1,38 @@
+{
+  "name": "@ku0/agent-runtime-sandbox",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Agent Runtime sandbox and runtime asset management",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write ."
+  },
+  "dependencies": {
+    "@ku0/agent-runtime-core": "workspace:*",
+    "dockerode": "^4.0.0",
+    "playwright": "^1.51.0"
+  },
+  "devDependencies": {
+    "@types/dockerode": "^3.3.14",
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.3",
+    "vitest": "^4.0.0"
+  }
+}

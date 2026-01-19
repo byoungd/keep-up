@@ -5,7 +5,7 @@
  */
 
 import { relative, resolve } from "node:path";
-import type { BashExecuteOptions, BashExecuteResult, IBashExecutor } from "../tools/core/bash";
+import type { BashExecuteOptions, BashExecuteResult, IBashExecutor } from "@ku0/agent-runtime-core";
 import type { SandboxManager } from "./sandboxManager";
 
 export interface DockerBashExecutorOptions {

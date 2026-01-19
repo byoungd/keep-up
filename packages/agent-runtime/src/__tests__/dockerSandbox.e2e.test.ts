@@ -5,8 +5,8 @@ import { join } from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { RuntimeAssetManager } from "../assets/runtimeAssetManager";
-import { DockerSandboxManager } from "../sandbox/sandboxManager";
+import { RuntimeAssetManager } from "../assets";
+import { DockerSandboxManager } from "../sandbox";
 import { SandboxToolServer } from "../tools/sandbox/sandboxToolServer";
 import type { ToolContext } from "../types";
 

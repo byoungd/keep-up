@@ -6,44 +6,19 @@
  */
 
 import { type ChildProcess, type SpawnOptions, spawn } from "node:child_process";
-import type { ToolContext } from "../../types";
+import type {
+  BashExecuteOptions,
+  BashExecuteResult,
+  IBashExecutor,
+  ToolContext,
+} from "../../types";
 import { BaseToolServer, errorResult, type ToolHandler, textResult } from "../mcp/baseServer";
 
 // ============================================================================
 // Bash Executor Interface (for dependency injection)
 // ============================================================================
 
-export interface IBashExecutor {
-  execute(command: string, options: BashExecuteOptions): Promise<BashExecuteResult>;
-}
-
-export interface BashExecuteOptions {
-  /** Working directory */
-  cwd?: string;
-  /** Environment variables */
-  env?: Record<string, string>;
-  /** Timeout in milliseconds */
-  timeoutMs?: number;
-  /** Maximum output size in bytes */
-  maxOutputBytes?: number;
-  /** Abort signal for cancellation */
-  signal?: AbortSignal;
-}
-
-export interface BashExecuteResult {
-  /** Exit code (0 = success) */
-  exitCode: number;
-  /** Standard output */
-  stdout: string;
-  /** Standard error */
-  stderr: string;
-  /** Whether the command timed out */
-  timedOut: boolean;
-  /** Whether output was truncated */
-  truncated: boolean;
-  /** Execution duration in ms */
-  durationMs: number;
-}
+export type { BashExecuteOptions, BashExecuteResult, IBashExecutor };
 
 // ============================================================================
 // Bash Executor Implementation

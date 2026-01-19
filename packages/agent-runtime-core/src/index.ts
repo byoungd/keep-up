@@ -123,6 +123,42 @@ export interface MCPToolServer {
   dispose?(): Promise<void>;
 }
 
+// ============================================================================
+// Bash Executor Interface
+// ============================================================================
+
+export interface IBashExecutor {
+  execute(command: string, options: BashExecuteOptions): Promise<BashExecuteResult>;
+}
+
+export interface BashExecuteOptions {
+  /** Working directory */
+  cwd?: string;
+  /** Environment variables */
+  env?: Record<string, string>;
+  /** Timeout in milliseconds */
+  timeoutMs?: number;
+  /** Maximum output size in bytes */
+  maxOutputBytes?: number;
+  /** Abort signal for cancellation */
+  signal?: AbortSignal;
+}
+
+export interface BashExecuteResult {
+  /** Exit code (0 = success) */
+  exitCode: number;
+  /** Standard output */
+  stdout: string;
+  /** Standard error */
+  stderr: string;
+  /** Whether the command timed out */
+  timedOut: boolean;
+  /** Whether output was truncated */
+  truncated: boolean;
+  /** Execution duration in ms */
+  durationMs: number;
+}
+
 /** Context passed to tool execution */
 export interface ToolContext {
   /** Current user ID */
