@@ -12,6 +12,7 @@ This document serves as a bridge for the architecture documentation. The core te
 | **Recovery Contract** | [Spec Section 5.2](file:///docs/specs/agent-runtime-spec-2026.md#52-recovery-contract) |
 | **Persistence Schema** | [Spec Section 8](file:///docs/specs/agent-runtime-spec-2026.md#8-storage) |
 | **Role SOPs** | [Spec Section 7](file:///docs/specs/agent-runtime-spec-2026.md#7-role-definitions-sops) |
+| **Code Agent Architecture** | [Code Agent Spec](file:///docs/specs/agent-runtime/code-agent-architecture-spec.md) |
 
 ## Relation to Other Docs
 
