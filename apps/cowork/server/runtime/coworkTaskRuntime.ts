@@ -440,7 +440,7 @@ export class CoworkTaskRuntime {
 
     return {
       ...basePolicy,
-      permissions: { ...basePolicy.permissions, lfcc: "write" },
+      permissions: { ...basePolicy.permissions, lfcc: "write" as const },
     };
   }
 
