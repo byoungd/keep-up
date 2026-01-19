@@ -366,6 +366,12 @@ const DEFAULT_TOOL_TTL_BY_PREFIX: Array<{ prefix: string; ttlMs: number }> = [
 
 /**
  * Specialized cache for tool results with content-based keys.
+ *
+ * ## Hydration Behavior
+ * When persistence is configured, the cache begins hydrating from storage
+ * immediately upon construction. The cache is usable during hydration, but
+ * may return cache misses for entries that have not yet been restored.
+ * Call `ready()` to await hydration completion if synchronization is required.
  */
 export class ToolResultCache {
   private readonly entries = new Map<string, ToolCacheEntry>();
@@ -393,6 +399,16 @@ export class ToolResultCache {
 
     this.scheduleFlush(options.persistence);
     this.startHydration();
+  }
+
+  /**
+   * Wait for hydration to complete.
+   * Resolves immediately if no persistence is configured or hydration has already finished.
+   */
+  async ready(): Promise<void> {
+    if (this.hydrationPromise) {
+      await this.hydrationPromise;
+    }
   }
 
   /**

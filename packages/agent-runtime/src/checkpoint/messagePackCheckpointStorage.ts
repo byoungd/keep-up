@@ -4,7 +4,7 @@
  * Persists checkpoints to disk using MessagePack with delta encoding.
  */
 
-import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { stableStringify } from "@ku0/core";
 import { decode, encode } from "@msgpack/msgpack";
@@ -151,11 +151,13 @@ export class MessagePackCheckpointStorage implements ICheckpointStorage {
     }
 
     if (filter?.createdAfter) {
-      results = results.filter((entry) => entry.createdAt >= filter.createdAfter);
+      const threshold = filter.createdAfter;
+      results = results.filter((entry) => entry.createdAt >= threshold);
     }
 
     if (filter?.createdBefore) {
-      results = results.filter((entry) => entry.createdAt <= filter.createdBefore);
+      const threshold = filter.createdBefore;
+      results = results.filter((entry) => entry.createdAt <= threshold);
     }
 
     const sortBy = filter?.sortBy ?? "createdAt";
@@ -325,7 +327,9 @@ export class MessagePackCheckpointStorage implements ICheckpointStorage {
 
   private async persistIndex(): Promise<void> {
     const entries = Array.from(this.index.values());
-    await writeFile(this.indexPath, JSON.stringify({ entries }, null, 2), "utf-8");
+    const tempPath = `${this.indexPath}.tmp`;
+    await writeFile(tempPath, JSON.stringify({ entries }, null, 2), "utf-8");
+    await rename(tempPath, this.indexPath);
   }
 
   private rebuildLatestForAgent(agentId: string): void {
