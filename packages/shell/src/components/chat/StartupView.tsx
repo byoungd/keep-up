@@ -23,7 +23,7 @@ export function StartupView({
   const showSuggestions = suggestions.length > 0;
 
   return (
-    <div className="h-full flex flex-col items-center justify-center px-6 py-10 animate-in fade-in duration-500">
+    <div className="h-full flex flex-col items-center justify-center px-6 py-10 animate-in fade-in duration-slow">
       <div className="flex flex-col items-center text-center max-w-2xl">
         <h1 className="text-4xl md:text-5xl font-semibold tracking-tight text-foreground">
           {title}
@@ -42,11 +42,11 @@ export function StartupView({
                 key={label}
                 type="button"
                 onClick={() => onSuggestionClick(label)}
-                className="group inline-flex items-center gap-2 rounded-full border border-border/50 bg-surface-1/70 px-4 py-2 text-xs font-medium text-foreground/80 hover:text-foreground hover:border-border/80 hover:bg-surface-2/70 transition-colors"
+                className="group inline-flex items-center gap-2 rounded-full border border-border/50 bg-surface-1/70 px-4 py-2 text-xs font-medium text-foreground/80 hover:text-foreground hover:border-border/80 hover:bg-surface-2/70 transition-colors duration-fast"
               >
                 <Icon className="h-4 w-4 text-muted-foreground group-hover:text-foreground/80" />
                 <span>{label}</span>
-                <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/30 group-hover:text-foreground/70 transition-colors" />
+                <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/30 group-hover:text-foreground/70 transition-colors duration-fast" />
               </button>
             );
           })}

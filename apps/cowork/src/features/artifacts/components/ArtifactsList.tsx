@@ -107,7 +107,7 @@ export function ArtifactsList({ artifacts, onApply, onRevert }: ArtifactsListPro
     <div className="space-y-8 p-4">
       <Section
         title="Plans"
-        icon={<div className="w-1.5 h-1.5 rounded-full bg-accent-blue" />}
+        icon={<div className="w-1.5 h-1.5 rounded-full bg-accent-indigo" />}
         items={plans}
       />
       <Section

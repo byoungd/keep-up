@@ -29,7 +29,7 @@ export function PendingApprovalCard({
 
   return (
     <div
-      className={`border-l-4 p-5 rounded-r-xl shadow-lg ring-1 ring-black/5 mx-2 my-4 animate-pulse-subtle ${riskColor}`}
+      className={`border-l-4 p-5 rounded-r-xl shadow-lg ring-1 ring-border/40 mx-2 my-4 animate-pulse-subtle ${riskColor}`}
     >
       <div className="flex items-center justify-between mb-3">
         <div className="flex flex-col">
@@ -38,7 +38,7 @@ export function PendingApprovalCard({
           </span>
           <h3 className="font-bold text-foreground flex items-center gap-2 text-lg">
             Use Tool
-            <code className="text-sm font-mono bg-surface/80 px-1.5 py-0.5 rounded border border-border/50 shadow-sm">
+            <code className="text-sm font-mono bg-surface-1/80 px-1.5 py-0.5 rounded-md border border-border/50 shadow-sm">
               {toolName}
             </code>
           </h3>
@@ -51,7 +51,7 @@ export function PendingApprovalCard({
         </span>
       </div>
 
-      <div className="bg-surface/60 backdrop-blur-sm border border-black/5 p-3.5 rounded-lg text-xs font-mono text-muted-foreground mb-5 shadow-inner">
+      <div className="bg-surface-1/60 backdrop-blur-sm border border-border/40 p-3.5 rounded-lg text-xs font-mono text-muted-foreground mb-5 shadow-inner">
         <pre>{JSON.stringify(args, null, 2)}</pre>
       </div>
 
@@ -59,14 +59,14 @@ export function PendingApprovalCard({
         <button
           type="button"
           onClick={onApprove}
-          className="flex-1 bg-foreground hover:bg-black text-background px-4 py-2.5 rounded-lg text-sm font-semibold shadow-md active:transform active:scale-[0.98] transition-all"
+          className="flex-1 bg-foreground hover:bg-foreground/90 text-background px-4 py-2.5 rounded-lg text-sm font-semibold shadow-md active:transform active:scale-[0.98] transition-all duration-fast"
         >
           Allow Execution
         </button>
         <button
           type="button"
           onClick={onReject}
-          className="px-4 py-2.5 rounded-lg text-sm font-semibold text-muted-foreground hover:bg-muted border border-border shadow-sm hover:border-foreground/20 transition-all"
+          className="px-4 py-2.5 rounded-lg text-sm font-semibold text-muted-foreground hover:bg-muted border border-border shadow-sm hover:border-foreground/20 transition-all duration-fast"
         >
           Block
         </button>

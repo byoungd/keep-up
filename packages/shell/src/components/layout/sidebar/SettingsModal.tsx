@@ -129,7 +129,7 @@ export function SettingsModal({ open, onClose, userConfig, onSave, groups }: Set
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3 scrollbar-thin scrollbar-thumb-transparent hover:scrollbar-thumb-border/40 scrollbar-track-transparent focus-visible:outline-none">
+          <div className="flex-1 overflow-y-auto scrollbar-auto-hide px-5 py-4 space-y-3 focus-visible:outline-none">
             <AppearanceSection t={t} />
 
             <AIPanelSection

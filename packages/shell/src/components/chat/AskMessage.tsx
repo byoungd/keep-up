@@ -27,8 +27,8 @@ function MetadataView({ metadata }: { metadata: Record<string, unknown> }) {
             className={cn(
               "uppercase text-tiny font-bold px-1.5 py-px rounded-[4px] tracking-wider",
               (metadata.riskLevel as string) === "high"
-                ? "bg-red-500/10 text-red-500"
-                : "bg-blue-500/10 text-blue-500"
+                ? "bg-error/10 text-error"
+                : "bg-info/10 text-info"
             )}
           >
             {String(metadata.riskLevel)}
@@ -57,7 +57,7 @@ function ActionButtons({
         <button
           type="button"
           onClick={() => onAction?.("approve")}
-          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-md shadow-amber-500/20 text-sm font-medium"
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-warning text-warning-foreground rounded-lg hover:bg-warning/90 transition-all duration-fast hover:scale-[1.02] active:scale-[0.98] shadow-md shadow-warning/20 text-sm font-medium"
         >
           <Check className="w-4 h-4" />
           Allow
@@ -65,7 +65,7 @@ function ActionButtons({
         <button
           type="button"
           onClick={() => onAction?.("deny")}
-          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-surface-2 hover:bg-surface-3 transition-colors rounded-lg text-sm text-muted-foreground hover:text-foreground border border-transparent hover:border-border/10"
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-surface-2 hover:bg-surface-3 transition-colors duration-fast rounded-lg text-sm text-muted-foreground hover:text-foreground border border-transparent hover:border-border/10"
         >
           <X className="w-4 h-4" />
           Deny
@@ -79,7 +79,7 @@ function ActionButtons({
       <button
         type="button"
         onClick={() => onAction?.("launch_browser")}
-        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-blue-500/20 text-sm font-medium group-hover:shadow-blue-500/30"
+        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-info text-info-foreground rounded-lg hover:bg-info/90 transition-all duration-fast hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-info/20 text-sm font-medium group-hover:shadow-info/30"
       >
         <MonitorPlay className="w-4 h-4 animate-pulse" />
         Launch Browser Control
@@ -92,7 +92,7 @@ function ActionButtons({
       <button
         type="button"
         onClick={() => onAction?.("upgrade")}
-        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white rounded-lg hover:opacity-90 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-violet-500/25 text-sm font-medium"
+        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-linear-to-r from-accent-violet to-accent-rose text-white rounded-lg hover:opacity-90 transition-all duration-fast hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-accent-violet/25 text-sm font-medium"
       >
         <Lock className="w-4 h-4" />
         Upgrade to Pro
@@ -110,17 +110,17 @@ const GlowEffect = ({ suggestedAction }: { suggestedAction: string }) => {
 
   const gradientClass =
     suggestedAction === "confirm_browser_operation"
-      ? "from-amber-500/20 via-transparent to-transparent"
+      ? "from-warning/20 via-transparent to-transparent"
       : suggestedAction === "take_over_browser"
-        ? "from-blue-500/20 via-transparent to-transparent"
+        ? "from-info/20 via-transparent to-transparent"
         : suggestedAction === "upgrade_to_unlock_feature"
-          ? "from-violet-500/30 via-fuchsia-500/10 to-transparent"
+          ? "from-accent-violet/30 via-accent-rose/10 to-transparent"
           : "hidden";
 
   return (
     <div
       className={cn(
-        "absolute inset-0 opacity-20 pointer-events-none bg-gradient-to-br",
+        "absolute inset-0 opacity-20 pointer-events-none bg-linear-to-br",
         gradientClass
       )}
     />
@@ -130,11 +130,11 @@ const GlowEffect = ({ suggestedAction }: { suggestedAction: string }) => {
 const IconWrapper = ({ suggestedAction }: { suggestedAction: string }) => {
   const containerClass =
     suggestedAction === "upgrade_to_unlock_feature"
-      ? "bg-violet-500/10 text-violet-500"
+      ? "bg-accent-violet/10 text-accent-violet"
       : suggestedAction === "confirm_browser_operation"
-        ? "bg-amber-500/10 text-amber-500"
+        ? "bg-warning/10 text-warning"
         : suggestedAction === "take_over_browser"
-          ? "bg-blue-500/10 text-blue-500"
+          ? "bg-info/10 text-info"
           : "bg-surface-2 text-muted-foreground";
 
   return (
@@ -165,7 +165,7 @@ export function AskMessage({
 }: AskMessageProps) {
   const containerClass =
     suggestedAction === "upgrade_to_unlock_feature"
-      ? "bg-gradient-to-br from-surface-1 to-surface-2 border border-violet-500/30 shadow-violet-500/10"
+      ? "bg-linear-to-br from-surface-1 to-surface-2 border border-accent-violet/30 shadow-accent-violet/10"
       : "bg-surface-1 border border-border/50";
 
   return (

@@ -204,7 +204,13 @@ export const MessageBubble = React.memo(function MessageBubble({
         };
 
   return (
-    <div className={cn(containerClass, "max-w-[70ch] text-content leading-[1.65]", className)}>
+    <div
+      className={cn(
+        containerClass,
+        "max-w-[70ch] text-content leading-[1.65] ai-message-enter",
+        className
+      )}
+    >
       {/* biome-ignore lint/suspicious/noExplicitAny: Components type mismatch in ReactMarkdown */}
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={components as any}>
         {content}

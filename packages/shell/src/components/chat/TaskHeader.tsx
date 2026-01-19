@@ -20,13 +20,13 @@ export function TaskHeader({
   return (
     <button
       type="button"
-      className="flex items-center gap-3 w-full text-left py-1.5 px-0 hover:bg-transparent group/header focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-1 rounded-md transition-all active:scale-[0.995]"
+      className="flex items-center gap-3 w-full text-left py-1.5 px-0 hover:bg-transparent group/header focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-1 rounded-md transition-all duration-fast active:scale-[0.995]"
       onClick={onToggle}
       aria-expanded={isExpanded}
     >
       <div
         className={cn(
-          "h-5 w-5 rounded-md flex items-center justify-center transition-colors",
+          "h-5 w-5 rounded-md flex items-center justify-center transition-colors duration-fast",
           statusMeta.bgClass,
           statusMeta.textClass
         )}
@@ -43,7 +43,7 @@ export function TaskHeader({
           {/* Subtle Status Badge - Linear Style */}
           <span
             className={cn(
-              "inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-fine font-medium transition-colors",
+              "inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-fine font-medium transition-colors duration-fast",
               statusMeta.badgeBg,
               statusMeta.textClass
             )}
@@ -64,7 +64,7 @@ export function TaskHeader({
 
       <div
         className={cn(
-          "text-muted-foreground/50 transition-transform duration-200 p-1 opacity-0 group-hover/header:opacity-100",
+          "text-muted-foreground/50 transition-transform duration-normal p-1 opacity-0 group-hover/header:opacity-100",
           isExpanded && "opacity-100 rotate-90"
         )}
       >

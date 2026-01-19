@@ -47,8 +47,8 @@ function ProviderKeyCard({
   const canDelete = provider.hasKey && provider.source === "settings";
   const statusLabel = provider.hasKey ? (provider.source === "env" ? "Env" : "Stored") : "No key";
   const statusClass = provider.hasKey
-    ? "bg-emerald-100 text-emerald-700"
-    : "bg-surface-100 text-muted-foreground";
+    ? "bg-success/10 text-success"
+    : "bg-surface-1 text-muted-foreground";
 
   return (
     <div className="rounded-md border border-border/60 bg-surface-0 p-4 space-y-3">
@@ -74,7 +74,7 @@ function ProviderKeyCard({
         />
         <button
           type="button"
-          className="px-3 py-2 text-xs font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 transition-colors disabled:opacity-60"
+          className="px-3 py-2 text-xs font-medium text-primary-foreground bg-primary rounded-md hover:bg-primary/90 transition-colors duration-fast disabled:opacity-60"
           onClick={onSave}
           disabled={isSaving || inputValue.trim().length === 0}
         >
@@ -83,7 +83,7 @@ function ProviderKeyCard({
         {canDelete ? (
           <button
             type="button"
-            className="px-3 py-2 text-xs font-medium text-muted-foreground border border-border rounded-md hover:text-foreground hover:bg-surface-100 transition-colors disabled:opacity-60"
+            className="px-3 py-2 text-xs font-medium text-muted-foreground border border-border rounded-md hover:text-foreground hover:bg-surface-2 transition-colors duration-fast disabled:opacity-60"
             onClick={onDelete}
             disabled={isSaving}
           >

@@ -69,7 +69,7 @@ export function TaskStreamMessage({ task, onPreview, onAction }: TaskStreamMessa
                     <div className="text-sm text-foreground/80 leading-relaxed font-normal">
                       {summaryText}
                       {task.fallbackNotice && (
-                        <div className="mt-2 text-xs bg-amber-500/10 text-amber-600 px-2 py-1.5 rounded-md inline-block">
+                        <div className="mt-2 text-xs bg-warning/10 text-warning px-2 py-1.5 rounded-md inline-block">
                           {task.fallbackNotice}
                         </div>
                       )}

@@ -1,60 +1,63 @@
 import { Sparkles } from "lucide-react";
-import type { CSSProperties } from "react";
+import { type CSSProperties, useEffect, useState } from "react";
 import { Badge, Button, Card, InputCapsule, StatusDot, ThinkingBar } from "../../components/ui";
 
-const lightThemeTokens = {
-  colorScheme: "light",
-  "--color-background": "#ffffff",
-  "--color-foreground": "#0f172a",
-  "--color-muted": "#f1f5f9",
-  "--color-muted-foreground": "#64748b",
-  "--color-border": "#e2e8f0",
-  "--color-input": "#e2e8f0",
-  "--color-ring": "rgba(15, 23, 42, 0.1)",
-  "--color-primary": "#0f172a",
-  "--color-primary-foreground": "#f8fafc",
-  "--color-theme-base": "#f4f4f5",
-  "--color-sidebar": "#f8fafc",
-  "--color-canvas": "#ffffff",
-  "--color-surface-0": "#ffffff",
-  "--color-surface-1": "#f8fafc",
-  "--color-surface-2": "#f1f5f9",
-  "--color-surface-3": "#e2e8f0",
-  "--color-surface-elevated": "#ffffff",
-  "--color-accent-ai": "#8b5cf6",
-  "--color-accent-indigo": "#6366f1",
-  "--color-success": "#10b981",
-  "--color-warning": "#f59e0b",
-  "--color-info": "#06b6d4",
-  "--color-error": "#ef4444",
-} as CSSProperties;
+const THEME_TOKEN_KEYS = [
+  "--color-background",
+  "--color-foreground",
+  "--color-muted",
+  "--color-muted-foreground",
+  "--color-border",
+  "--color-input",
+  "--color-ring",
+  "--color-primary",
+  "--color-primary-foreground",
+  "--color-theme-base",
+  "--color-sidebar",
+  "--color-canvas",
+  "--color-surface-0",
+  "--color-surface-1",
+  "--color-surface-2",
+  "--color-surface-3",
+  "--color-surface-elevated",
+  "--color-accent-ai",
+  "--color-accent-indigo",
+  "--color-success",
+  "--color-warning",
+  "--color-info",
+  "--color-error",
+] as const;
 
-const darkThemeTokens = {
-  colorScheme: "dark",
-  "--color-background": "#09090b",
-  "--color-foreground": "#fafafa",
-  "--color-muted": "#27272a",
-  "--color-muted-foreground": "#a1a1aa",
-  "--color-border": "#27272a",
-  "--color-input": "#27272a",
-  "--color-ring": "rgba(250, 250, 250, 0.2)",
-  "--color-primary": "#fafafa",
-  "--color-primary-foreground": "#09090b",
-  "--color-theme-base": "#09090b",
-  "--color-sidebar": "#18181b",
-  "--color-canvas": "#18181b",
-  "--color-surface-0": "#09090b",
-  "--color-surface-1": "#18181b",
-  "--color-surface-2": "#27272a",
-  "--color-surface-3": "#3f3f46",
-  "--color-surface-elevated": "#18181b",
-  "--color-accent-ai": "#8b5cf6",
-  "--color-accent-indigo": "#6366f1",
-  "--color-success": "#10b981",
-  "--color-warning": "#f59e0b",
-  "--color-info": "#06b6d4",
-  "--color-error": "#7f1d1d",
-} as CSSProperties;
+type ThemeTokenKey = (typeof THEME_TOKEN_KEYS)[number];
+
+function useThemeTokens(mode: "light" | "dark"): CSSProperties {
+  const [tokens, setTokens] = useState<CSSProperties>({ colorScheme: mode });
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const probe = document.createElement("div");
+    if (mode === "dark") {
+      probe.classList.add("dark");
+    }
+    document.body.appendChild(probe);
+    const computed = window.getComputedStyle(probe);
+    const next: CSSProperties = { colorScheme: mode };
+
+    for (const key of THEME_TOKEN_KEYS) {
+      const value = computed.getPropertyValue(key).trim();
+      if (value) {
+        (next as Record<ThemeTokenKey, string>)[key] = value;
+      }
+    }
+
+    probe.remove();
+    setTokens(next);
+  }, [mode]);
+
+  return tokens;
+}
 
 interface ThemePreviewProps {
   title: string;
@@ -143,6 +146,9 @@ function ThemePreview({ title, style }: ThemePreviewProps) {
 }
 
 export function FoundationRoute() {
+  const lightThemeTokens = useThemeTokens("light");
+  const darkThemeTokens = useThemeTokens("dark");
+
   return (
     <div className="page-grid">
       <section className="rounded-2xl border border-border/70 bg-linear-to-br from-surface-1 via-surface-0 to-surface-2 p-6 shadow-soft">

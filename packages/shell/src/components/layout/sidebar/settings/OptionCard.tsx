@@ -32,7 +32,7 @@ export function OptionCard({
       aria-pressed={selected}
       aria-label={tooltipContent ? `${title} ${tooltipContent}` : title}
       className={cn(
-        "flex items-center justify-between gap-2 rounded-xl border text-left transition-all h-full",
+        "flex items-center justify-between gap-2 rounded-xl border text-left transition-all duration-normal h-full",
         SIZE_CLASSES[size],
         selected
           ? "border-primary/50 bg-primary/5 shadow-sm"
@@ -43,7 +43,7 @@ export function OptionCard({
         <span className="text-sm font-medium text-foreground truncate">{title}</span>
       </div>
       <div className="flex items-center gap-1.5 shrink-0">
-        <div className="opacity-80 grayscale transition-all group-hover:grayscale-0 group-hover:opacity-100">
+        <div className="opacity-80 grayscale transition-all duration-fast group-hover:grayscale-0 group-hover:opacity-100">
           {preview}
         </div>
       </div>

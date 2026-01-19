@@ -52,7 +52,7 @@ export function SlashCommandMenu({
 
   return (
     <div
-      className="fixed z-50 w-64 overflow-hidden rounded-lg border border-border/50 bg-background/95 p-1 text-popover-foreground shadow-md backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
+      className="fixed z-50 w-64 overflow-hidden rounded-lg border border-border/50 bg-background/95 p-1 text-popover-foreground shadow-md backdrop-blur-md animate-in fade-in zoom-in-95 duration-fast"
       tabIndex={-1}
       style={{
         top: position.top,
@@ -82,7 +82,7 @@ export function SlashCommandMenu({
             }}
             tabIndex={-1}
             className={cn(
-              "flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none transition-colors",
+              "flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none transition-colors duration-fast",
               isSelected
                 ? "bg-accent text-accent-foreground"
                 : "hover:bg-accent/50 hover:text-accent-foreground"

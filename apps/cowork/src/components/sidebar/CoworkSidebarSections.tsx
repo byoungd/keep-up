@@ -268,10 +268,10 @@ export function CoworkSidebarSections() {
   return (
     <div className="space-y-2">
       <section className="space-y-1">
-        <div className="flex items-center justify-between rounded-md px-3 py-1.5 group hover:bg-foreground/[0.05] transition-colors">
+        <div className="flex items-center justify-between rounded-md px-3 py-1.5 group hover:bg-surface-2 transition-colors duration-fast">
           <button
             type="button"
-            className="flex flex-1 items-center gap-2 text-left text-fine font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            className="flex flex-1 items-center gap-2 text-left text-fine font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors duration-fast cursor-pointer"
             aria-label="Projects section"
             aria-expanded={isProjectsExpanded}
             onClick={() => setIsProjectsExpanded((prev) => !prev)}
@@ -279,7 +279,7 @@ export function CoworkSidebarSections() {
             <span>Projects</span>
             <ChevronDown
               className={cn(
-                "h-3 w-3 opacity-0 group-hover:opacity-100 transition-all",
+                "h-3 w-3 opacity-0 group-hover:opacity-100 transition-all duration-fast",
                 !isProjectsExpanded && "-rotate-90"
               )}
             />
@@ -288,7 +288,7 @@ export function CoworkSidebarSections() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05]"
+              className="h-6 w-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-surface-2"
               aria-label="Create project"
               onClick={() => setIsDialogOpen(true)}
             >
@@ -309,11 +309,11 @@ export function CoworkSidebarSections() {
           {projects.length === 0 && (
             <button
               type="button"
-              className="flex items-center gap-2.5 w-full rounded-md px-3 py-1.5 text-[13px] text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05] transition-colors cursor-pointer group"
+              className="flex items-center gap-2.5 w-full rounded-md px-3 py-1.5 text-[13px] text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors duration-fast cursor-pointer group"
               onClick={() => setIsDialogOpen(true)}
             >
               <FolderPlus
-                className="h-4 w-4 text-muted-foreground opacity-70 group-hover:opacity-100 group-hover:text-foreground transition-all"
+                className="h-4 w-4 text-muted-foreground opacity-70 group-hover:opacity-100 group-hover:text-foreground transition-all duration-fast"
                 aria-hidden="true"
               />
               <span>New project</span>
@@ -330,10 +330,10 @@ export function CoworkSidebarSections() {
               <div key={project.id} className="space-y-0.5">
                 <div
                   className={cn(
-                    "group relative flex items-center rounded-md px-3 py-1.5 transition-colors",
+                    "group relative flex items-center rounded-md px-3 py-1.5 transition-colors duration-fast",
                     activeProjectId === project.id
                       ? "bg-foreground/[0.08] text-foreground font-medium"
-                      : "text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground"
+                      : "text-muted-foreground hover:bg-surface-2 hover:text-foreground"
                   )}
                 >
                   <button
@@ -343,7 +343,7 @@ export function CoworkSidebarSections() {
                   >
                     <Folder
                       className={cn(
-                        "h-4 w-4 shrink-0 transition-all",
+                        "h-4 w-4 shrink-0 transition-all duration-fast",
                         activeProjectId === project.id
                           ? "text-foreground"
                           : "text-muted-foreground opacity-70 group-hover:opacity-100 group-hover:text-foreground"
@@ -356,7 +356,7 @@ export function CoworkSidebarSections() {
                     type="button"
                     onClick={() => toggleExpandProject(project.id)}
                     className={cn(
-                      "flex items-center justify-center h-5 w-5 rounded hover:bg-black/5 transition-colors cursor-pointer text-muted-foreground hover:text-foreground mr-7",
+                      "flex items-center justify-center h-5 w-5 rounded hover:bg-surface-2 transition-colors duration-fast cursor-pointer text-muted-foreground hover:text-foreground mr-7",
                       hasTasks
                         ? "opacity-0 group-hover:opacity-100"
                         : "opacity-0 pointer-events-none"
@@ -394,7 +394,7 @@ export function CoworkSidebarSections() {
                     >
                       <DropdownMenuItem
                         onSelect={() => togglePinProject(project.id)}
-                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-foreground/[0.05] focus:text-foreground cursor-pointer outline-none"
+                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-2 focus:text-foreground cursor-pointer outline-none"
                       >
                         {isPinned ? (
                           <>
@@ -408,12 +408,12 @@ export function CoworkSidebarSections() {
                           </>
                         )}
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-foreground/[0.05] focus:text-foreground cursor-pointer outline-none">
+                      <DropdownMenuItem className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-2 focus:text-foreground cursor-pointer outline-none">
                         <PencilLine className="h-3.5 w-3.5" />
                         <span>Edit</span>
                       </DropdownMenuItem>
                       <DropdownMenuSeparator className="mx-1" />
-                      <DropdownMenuItem className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] text-destructive focus:text-destructive focus:bg-foreground/[0.05] cursor-pointer outline-none">
+                      <DropdownMenuItem className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] text-destructive focus:text-destructive focus:bg-surface-2 cursor-pointer outline-none">
                         <Trash2 className="h-3.5 w-3.5" />
                         <span>Delete</span>
                       </DropdownMenuItem>
@@ -431,10 +431,10 @@ export function CoworkSidebarSections() {
                         <div
                           key={session.id}
                           className={cn(
-                            "relative flex items-center rounded-md px-3 py-1.5 transition-colors group",
+                            "relative flex items-center rounded-md px-3 py-1.5 transition-colors duration-fast group",
                             isActive
                               ? "bg-foreground/[0.08] text-foreground font-medium"
-                              : "text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground"
+                              : "text-muted-foreground hover:bg-surface-2 hover:text-foreground"
                           )}
                         >
                           <Link
@@ -446,7 +446,7 @@ export function CoworkSidebarSections() {
                               <Loader2 className="h-4 w-4 shrink-0 text-primary animate-spin" />
                             ) : (
                               <Brain
-                                className="h-4 w-4 shrink-0 opacity-70 group-hover:opacity-100 group-hover:text-foreground transition-all"
+                                className="h-4 w-4 shrink-0 opacity-70 group-hover:opacity-100 group-hover:text-foreground transition-all duration-fast"
                                 aria-hidden="true"
                               />
                             )}
@@ -464,10 +464,10 @@ export function CoworkSidebarSections() {
       </section>
 
       <section className="space-y-1">
-        <div className="flex items-center justify-between rounded-md px-3 py-1.5 group hover:bg-foreground/[0.05] transition-colors">
+        <div className="flex items-center justify-between rounded-md px-3 py-1.5 group hover:bg-surface-2 transition-colors duration-fast">
           <button
             type="button"
-            className="flex flex-1 items-center gap-2 text-left text-fine font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            className="flex flex-1 items-center gap-2 text-left text-fine font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors duration-fast cursor-pointer"
             aria-label="All tasks section"
             aria-expanded={isTasksExpanded}
             onClick={() => setIsTasksExpanded((prev) => !prev)}
@@ -481,7 +481,7 @@ export function CoworkSidebarSections() {
             </span>
             <ChevronDown
               className={cn(
-                "h-3 w-3 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all",
+                "h-3 w-3 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all duration-fast",
                 !isTasksExpanded && "-rotate-90"
               )}
             />
@@ -492,7 +492,7 @@ export function CoworkSidebarSections() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05] data-[state=open]:bg-foreground/[0.05] data-[state=open]:text-foreground"
+                className="h-6 w-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-surface-2 data-[state=open]:bg-surface-2 data-[state=open]:text-foreground"
                 aria-label="Task filters"
               >
                 <ListFilter className="h-4 w-4" />
@@ -505,7 +505,7 @@ export function CoworkSidebarSections() {
                   setActiveProject(null);
                 }}
                 className={cn(
-                  "gap-2.5 rounded-md px-2 py-1.5 text-[13px] focus:bg-foreground/[0.05] focus:text-foreground cursor-pointer outline-none",
+                  "gap-2.5 rounded-md px-2 py-1.5 text-[13px] focus:bg-surface-2 focus:text-foreground cursor-pointer outline-none",
                   taskFilter === "all"
                     ? "bg-foreground/[0.08] text-foreground font-medium"
                     : "text-muted-foreground"
@@ -518,7 +518,7 @@ export function CoworkSidebarSections() {
               <DropdownMenuItem
                 onSelect={() => setTaskFilter("favorites")}
                 className={cn(
-                  "gap-2.5 rounded-md px-2 py-1.5 text-[13px] focus:bg-foreground/[0.05] focus:text-foreground cursor-pointer outline-none",
+                  "gap-2.5 rounded-md px-2 py-1.5 text-[13px] focus:bg-surface-2 focus:text-foreground cursor-pointer outline-none",
                   taskFilter === "favorites"
                     ? "bg-foreground/[0.08] text-foreground font-medium"
                     : "text-muted-foreground"
@@ -531,7 +531,7 @@ export function CoworkSidebarSections() {
               <DropdownMenuItem
                 onSelect={() => setTaskFilter("scheduled")}
                 className={cn(
-                  "gap-2.5 rounded-md px-2 py-1.5 text-[13px] focus:bg-foreground/[0.05] focus:text-foreground cursor-pointer outline-none",
+                  "gap-2.5 rounded-md px-2 py-1.5 text-[13px] focus:bg-surface-2 focus:text-foreground cursor-pointer outline-none",
                   taskFilter === "scheduled"
                     ? "bg-foreground/[0.08] text-foreground font-medium"
                     : "text-muted-foreground"
@@ -557,11 +557,11 @@ export function CoworkSidebarSections() {
           {filteredSessions.length === 0 ? (
             <button
               type="button"
-              className="flex items-center gap-2.5 w-full rounded-md px-3 py-1.5 text-[13px] text-muted-foreground hover:text-foreground hover:bg-foreground/[0.05] transition-colors cursor-pointer group"
+              className="flex items-center gap-2.5 w-full rounded-md px-3 py-1.5 text-[13px] text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors duration-fast cursor-pointer group"
               onClick={() => router.push("/new-session")}
             >
               <Sparkles
-                className="h-4 w-4 text-muted-foreground opacity-70 group-hover:opacity-100 group-hover:text-foreground transition-all"
+                className="h-4 w-4 text-muted-foreground opacity-70 group-hover:opacity-100 group-hover:text-foreground transition-all duration-fast"
                 aria-hidden="true"
               />
               <span>{activeProjectId ? "New task in project" : "New task"}</span>
@@ -575,10 +575,10 @@ export function CoworkSidebarSections() {
                 <div
                   key={session.id}
                   className={cn(
-                    "relative flex items-center rounded-md px-3 py-1.5 transition-colors group",
+                    "relative flex items-center rounded-md px-3 py-1.5 transition-colors duration-fast group",
                     isActive
                       ? "bg-foreground/[0.08] text-foreground font-medium"
-                      : "text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground"
+                      : "text-muted-foreground hover:bg-surface-2 hover:text-foreground"
                   )}
                 >
                   <Link
@@ -587,7 +587,7 @@ export function CoworkSidebarSections() {
                     title={session.title}
                   >
                     <Brain
-                      className="h-4 w-4 shrink-0 opacity-70 group-hover:opacity-100 group-hover:text-foreground transition-all"
+                      className="h-4 w-4 shrink-0 opacity-70 group-hover:opacity-100 group-hover:text-foreground transition-all duration-fast"
                       aria-hidden="true"
                     />
                     <span className="overflow-hidden whitespace-nowrap block">{session.title}</span>
@@ -618,21 +618,21 @@ export function CoworkSidebarSections() {
                     >
                       <DropdownMenuItem
                         onSelect={handlePlaceholderAction}
-                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-foreground/[0.05] focus:text-foreground cursor-pointer outline-none"
+                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-2 focus:text-foreground cursor-pointer outline-none"
                       >
                         <Share2 className="h-4 w-4" aria-hidden="true" />
                         <span>Share</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onSelect={() => handleRenamePrompt(session.id)}
-                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-foreground/[0.05] focus:text-foreground cursor-pointer outline-none"
+                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-2 focus:text-foreground cursor-pointer outline-none"
                       >
                         <PencilLine className="h-4 w-4" aria-hidden="true" />
                         <span>Rename</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onSelect={() => toggleFavorite(session.id)}
-                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-foreground/[0.05] focus:text-foreground cursor-pointer outline-none"
+                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-2 focus:text-foreground cursor-pointer outline-none"
                       >
                         <Star
                           className={cn("h-4 w-4", isFavorite ? "fill-current" : undefined)}
@@ -642,14 +642,14 @@ export function CoworkSidebarSections() {
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onSelect={() => handleOpenInNewTab(session.id)}
-                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-foreground/[0.05] focus:text-foreground cursor-pointer outline-none"
+                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-2 focus:text-foreground cursor-pointer outline-none"
                       >
                         <ExternalLink className="h-4 w-4" aria-hidden="true" />
                         <span>Open in new tab</span>
                       </DropdownMenuItem>
 
                       <DropdownMenuSub>
-                        <DropdownMenuSubTrigger className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-foreground/[0.05] focus:text-foreground cursor-pointer outline-none data-[state=open]:bg-foreground/[0.05] data-[state=open]:text-foreground">
+                        <DropdownMenuSubTrigger className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-2 focus:text-foreground cursor-pointer outline-none data-[state=open]:bg-surface-2 data-[state=open]:text-foreground">
                           <Folder className="h-4 w-4" />
                           <span>Move to project</span>
                         </DropdownMenuSubTrigger>
@@ -664,7 +664,7 @@ export function CoworkSidebarSections() {
                                 <DropdownMenuItem
                                   key={project.id}
                                   onSelect={() => handleMoveToProject(session.id, project.id)}
-                                  className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-foreground/[0.05] focus:text-foreground cursor-pointer outline-none"
+                                  className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-2 focus:text-foreground cursor-pointer outline-none"
                                 >
                                   <span>{project.name}</span>
                                   {session.projectId === project.id && (
@@ -677,7 +677,7 @@ export function CoworkSidebarSections() {
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem
                                     onSelect={() => handleMoveToProject(session.id, null)}
-                                    className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-foreground/[0.05] focus:text-foreground cursor-pointer outline-none"
+                                    className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-2 focus:text-foreground cursor-pointer outline-none"
                                   >
                                     <span>Remove from project</span>
                                   </DropdownMenuItem>
@@ -691,7 +691,7 @@ export function CoworkSidebarSections() {
                       <DropdownMenuSeparator className="mx-2" />
                       <DropdownMenuItem
                         onSelect={() => handleDeleteSession(session.id)}
-                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] text-destructive focus:text-destructive focus:bg-foreground/[0.05] cursor-pointer outline-none"
+                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] text-destructive focus:text-destructive focus:bg-surface-2 cursor-pointer outline-none"
                       >
                         <Trash2 className="h-4 w-4" aria-hidden="true" />
                         <span>Delete</span>

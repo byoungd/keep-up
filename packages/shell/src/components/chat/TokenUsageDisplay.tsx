@@ -67,7 +67,7 @@ export function TokenUsageDisplay({
           {/* biome-ignore lint/a11y/useAriaPropsSupportedByRole: Visualization */}
           <div
             className={cn(
-              "absolute left-0 top-0 h-full rounded-full transition-all",
+              "absolute left-0 top-0 h-full rounded-full transition-all duration-fast",
               utilization > 80
                 ? "bg-destructive"
                 : utilization > 60

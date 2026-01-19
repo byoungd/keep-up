@@ -271,7 +271,7 @@ export function ChatThread({ sessionId }: { sessionId: string }) {
   );
 
   const headerContent = (
-    <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200/50 dark:border-gray-800/50 bg-surface-0 min-h-[48px]">
+    <div className="flex items-center justify-between px-3 py-2 border-b border-border/50 bg-surface-0 min-h-[48px]">
       <div className="flex items-center gap-2">
         <span className="font-semibold text-sm">Cowork Session</span>
       </div>

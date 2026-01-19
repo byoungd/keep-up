@@ -33,9 +33,9 @@ export function ConfirmationSection({
   };
 
   return (
-    <div className="bg-amber-500/5 rounded-lg p-4 my-2">
+    <div className="bg-warning/5 rounded-lg p-4 my-2">
       <div className="flex items-center gap-2 mb-3">
-        <div className="h-6 w-6 rounded-full bg-orange-500/10 text-orange-600 flex items-center justify-center shrink-0">
+        <div className="h-6 w-6 rounded-full bg-warning/10 text-warning flex items-center justify-center shrink-0">
           <LucideAlertCircle className="h-3.5 w-3.5" />
         </div>
         <div className="flex flex-wrap items-center gap-2 text-sm font-medium text-foreground">
@@ -70,7 +70,7 @@ export function ConfirmationSection({
           type="button"
           onClick={() => handleAction("approve")}
           disabled={!!busy}
-          className="flex-1 bg-foreground text-background hover:bg-foreground/90 h-8 rounded-md text-xs font-medium transition-all flex items-center justify-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-1 active:scale-[0.98] disabled:opacity-50"
+          className="flex-1 bg-foreground text-background hover:bg-foreground/90 h-8 rounded-md text-xs font-medium transition-all duration-fast flex items-center justify-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-1 active:scale-[0.98] disabled:opacity-50"
           aria-busy={busy === "approve"}
         >
           {busy === "approve" && <Loader2 className="h-3 w-3 animate-spin" />}
@@ -80,7 +80,7 @@ export function ConfirmationSection({
           type="button"
           onClick={() => handleAction("reject")}
           disabled={!!busy}
-          className="flex-1 bg-surface-2 hover:bg-surface-3 text-foreground h-8 rounded-md text-xs font-medium transition-all flex items-center justify-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-1 active:scale-[0.98] disabled:opacity-50"
+          className="flex-1 bg-surface-2 hover:bg-surface-3 text-foreground h-8 rounded-md text-xs font-medium transition-all duration-fast flex items-center justify-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-1 active:scale-[0.98] disabled:opacity-50"
           aria-busy={busy === "reject"}
         >
           {busy === "reject" && <Loader2 className="h-3 w-3 animate-spin" />}
@@ -94,10 +94,10 @@ export function ConfirmationSection({
 function getRiskBadgeClass(riskLevel: "low" | "medium" | "high"): string {
   switch (riskLevel) {
     case "high":
-      return "border-red-500/30 text-red-600 bg-red-500/10";
+      return "border-error/30 text-error bg-error/10";
     case "medium":
-      return "border-amber-500/30 text-amber-600 bg-amber-500/10";
+      return "border-warning/30 text-warning bg-warning/10";
     default:
-      return "border-emerald-500/30 text-emerald-600 bg-emerald-500/10";
+      return "border-success/30 text-success bg-success/10";
   }
 }
