@@ -14,6 +14,7 @@ import type {
   ContentChunk,
   CrossDocReferenceRecord,
   DataAccessPolicy,
+  EditIntent,
   ReferenceStore,
 } from "@ku0/core";
 import {
@@ -2115,7 +2116,7 @@ export class LFCCToolServer extends BaseToolServer {
       ops_xml: doc.ops_xml,
       preconditions: doc.preconditions ?? [],
       intent_id: request.intent_id,
-      intent: request.intent,
+      intent: request.intent as EditIntent,
       policy_context: request.policy_context,
     });
 
