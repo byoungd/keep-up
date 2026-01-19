@@ -25,6 +25,23 @@ export interface CacheEntry<T> {
   sizeBytes: number;
 }
 
+export interface CacheAdaptiveOptions {
+  /** Enable adaptive sizing */
+  enabled?: boolean;
+  /** Memory pressure threshold to shrink cache (0-1) */
+  highWatermark?: number;
+  /** Memory pressure threshold to restore cache (0-1) */
+  lowWatermark?: number;
+  /** Minimum entries when shrinking */
+  minEntries?: number;
+  /** Minimum size in bytes when shrinking */
+  minSizeBytes?: number;
+  /** Scale factor when shrinking (0-1) */
+  scaleDownFactor?: number;
+  /** Custom memory pressure provider (0-1) */
+  pressureProvider?: () => number | undefined;
+}
+
 export interface CacheOptions {
   /** Maximum number of entries */
   maxEntries?: number;
@@ -44,6 +61,9 @@ export interface CacheOptions {
    * @default 0 (disabled)
    */
   autoCleanupIntervalMs?: number;
+
+  /** Adaptive sizing configuration */
+  adaptive?: CacheAdaptiveOptions;
 }
 
 export interface CacheStats {
@@ -63,6 +83,186 @@ export interface CacheStats {
   sizeBytes: number;
 }
 
+export interface ICacheStrategy<K, V> {
+  get(key: K): V | undefined;
+  set(key: K, value: V, ttlMs?: number): void;
+  has(key: K): boolean;
+  delete(key: K): boolean;
+  clear(): void;
+  getStats(): CacheStats;
+}
+
+// ============================================================================
+// Cache Key Helpers
+// ============================================================================
+
+type CacheKeyHasher = {
+  update(value: string): void;
+  digest(): string;
+};
+
+const FNV_OFFSET = 2166136261;
+const FNV_PRIME = 16777619;
+
+class Fnv1aHasher implements CacheKeyHasher {
+  private hash = FNV_OFFSET;
+
+  update(value: string): void {
+    for (let i = 0; i < value.length; i++) {
+      this.hash ^= value.charCodeAt(i);
+      this.hash = (this.hash * FNV_PRIME) >>> 0;
+    }
+  }
+
+  digest(): string {
+    return this.hash.toString(36);
+  }
+}
+
+export function createCacheKeyHasher(): CacheKeyHasher {
+  return new Fnv1aHasher();
+}
+
+export function hashString(value: string): string {
+  const hasher = new Fnv1aHasher();
+  hasher.update(value);
+  return hasher.digest();
+}
+
+export function hashStableValue(value: unknown): string {
+  const hasher = new Fnv1aHasher();
+  appendStableJson(value, hasher, false);
+  return hasher.digest();
+}
+
+function resolveJsonValue(value: unknown): unknown {
+  if (value && typeof value === "object") {
+    const jsonValue = value as { toJSON?: () => unknown };
+    if (typeof jsonValue.toJSON === "function") {
+      return jsonValue.toJSON();
+    }
+  }
+  return value;
+}
+
+function isOmittedJsonValue(value: unknown): boolean {
+  return value === undefined || typeof value === "function" || typeof value === "symbol";
+}
+
+function appendStableJson(value: unknown, hasher: CacheKeyHasher, inArray: boolean): boolean {
+  const resolved = resolveJsonValue(value);
+  return appendResolvedValue(resolved, hasher, inArray);
+}
+
+function appendResolvedValue(value: unknown, hasher: CacheKeyHasher, inArray: boolean): boolean {
+  if (isOmittedJsonValue(value)) {
+    return appendOmittedValue(hasher, inArray);
+  }
+
+  if (value === null) {
+    appendNull(hasher);
+    return true;
+  }
+
+  if (typeof value === "number") {
+    return appendNumber(value, hasher);
+  }
+
+  if (typeof value === "bigint") {
+    appendString(value.toString(), hasher);
+    return true;
+  }
+
+  if (typeof value === "string" || typeof value === "boolean") {
+    appendLiteral(value, hasher);
+    return true;
+  }
+
+  if (Array.isArray(value)) {
+    appendArray(value, hasher);
+    return true;
+  }
+
+  if (typeof value === "object") {
+    appendObject(value as Record<string, unknown>, hasher);
+    return true;
+  }
+
+  appendNull(hasher);
+  return true;
+}
+
+function appendOmittedValue(hasher: CacheKeyHasher, inArray: boolean): boolean {
+  if (!inArray) {
+    return false;
+  }
+  appendNull(hasher);
+  return true;
+}
+
+function appendNull(hasher: CacheKeyHasher): void {
+  hasher.update("null");
+}
+
+function appendNumber(value: number, hasher: CacheKeyHasher): boolean {
+  if (!Number.isFinite(value)) {
+    appendNull(hasher);
+    return true;
+  }
+  hasher.update(JSON.stringify(value));
+  return true;
+}
+
+function appendString(value: string, hasher: CacheKeyHasher): void {
+  hasher.update(JSON.stringify(value));
+}
+
+function appendLiteral(value: string | boolean, hasher: CacheKeyHasher): void {
+  hasher.update(JSON.stringify(value));
+}
+
+function appendArray(values: unknown[], hasher: CacheKeyHasher): void {
+  hasher.update("[");
+  for (let i = 0; i < values.length; i++) {
+    if (i > 0) {
+      hasher.update(",");
+    }
+    appendStableJson(values[i], hasher, true);
+  }
+  hasher.update("]");
+}
+
+function appendObject(obj: Record<string, unknown>, hasher: CacheKeyHasher): void {
+  const entries = Object.entries(obj).sort(([a], [b]) => a.localeCompare(b));
+  hasher.update("{");
+  let wroteEntry = false;
+  for (const [key, entryValue] of entries) {
+    const normalized = resolveJsonValue(entryValue);
+    if (isOmittedJsonValue(normalized)) {
+      continue;
+    }
+    if (wroteEntry) {
+      hasher.update(",");
+    }
+    wroteEntry = true;
+    hasher.update(JSON.stringify(key));
+    hasher.update(":");
+    appendStableJson(normalized, hasher, false);
+  }
+  hasher.update("}");
+}
+
+function defaultMemoryPressureProvider(): number | undefined {
+  if (typeof process === "undefined" || typeof process.memoryUsage !== "function") {
+    return undefined;
+  }
+  const { heapUsed, heapTotal } = process.memoryUsage();
+  if (heapTotal <= 0) {
+    return undefined;
+  }
+  return heapUsed / heapTotal;
+}
+
 // ============================================================================
 // LRU Cache Implementation
 // ============================================================================
@@ -70,12 +270,17 @@ export interface CacheStats {
 /**
  * LRU (Least Recently Used) cache with TTL support.
  */
-export class LRUCache<T> {
+export class LRUCache<T> implements ICacheStrategy<string, T> {
   private readonly cache = new Map<string, CacheEntry<T>>();
-  private readonly maxEntries: number;
+  private readonly baseMaxEntries: number;
+  private readonly baseMaxSizeBytes: number;
   private readonly defaultTtlMs: number;
-  private readonly maxSizeBytes: number;
+  private readonly adaptive?: CacheAdaptiveOptions;
+  private readonly pressureProvider?: () => number | undefined;
+  private maxEntries: number;
+  private maxSizeBytes: number;
   private cleanupTimer?: ReturnType<typeof setInterval>;
+  private mostRecentKey?: string;
 
   private totalHits = 0;
   private totalMisses = 0;
@@ -83,8 +288,12 @@ export class LRUCache<T> {
 
   constructor(options: CacheOptions = {}) {
     this.maxEntries = options.maxEntries ?? 1000;
+    this.baseMaxEntries = this.maxEntries;
     this.defaultTtlMs = options.defaultTtlMs ?? 0;
     this.maxSizeBytes = options.maxSizeBytes ?? 50 * 1024 * 1024; // 50MB default
+    this.baseMaxSizeBytes = this.maxSizeBytes;
+    this.adaptive = options.adaptive?.enabled ? options.adaptive : undefined;
+    this.pressureProvider = this.adaptive?.pressureProvider ?? defaultMemoryPressureProvider;
 
     // Start auto-cleanup if configured
     const autoCleanupIntervalMs = options.autoCleanupIntervalMs ?? 0;
@@ -145,18 +354,30 @@ export class LRUCache<T> {
     }
 
     // Update access order (move to end for LRU)
-    this.cache.delete(key);
     entry.hits++;
-    this.cache.set(key, entry);
+    if (key !== this.mostRecentKey) {
+      this.cache.delete(key);
+      this.cache.set(key, entry);
+      this.mostRecentKey = key;
+    }
 
     this.totalHits++;
     return entry.value;
   }
 
   /**
+   * Peek at cache entry metadata without updating access order.
+   */
+  peekEntry(key: string): CacheEntry<T> | undefined {
+    return this.cache.get(key);
+  }
+
+  /**
    * Set a value in cache.
    */
   set(key: string, value: T, ttlMs?: number): void {
+    this.adjustCapacity();
+
     // Remove existing entry if present
     if (this.cache.has(key)) {
       this.delete(key);
@@ -177,6 +398,7 @@ export class LRUCache<T> {
     this.evictIfNeeded(sizeBytes);
 
     this.cache.set(key, entry);
+    this.mostRecentKey = key;
     this.currentSizeBytes += sizeBytes;
   }
 
@@ -204,7 +426,11 @@ export class LRUCache<T> {
     const entry = this.cache.get(key);
     if (entry) {
       this.currentSizeBytes -= entry.sizeBytes;
-      return this.cache.delete(key);
+      const removed = this.cache.delete(key);
+      if (removed && key === this.mostRecentKey) {
+        this.mostRecentKey = undefined;
+      }
+      return removed;
     }
     return false;
   }
@@ -215,6 +441,7 @@ export class LRUCache<T> {
   clear(): void {
     this.cache.clear();
     this.currentSizeBytes = 0;
+    this.mostRecentKey = undefined;
   }
 
   /**
@@ -260,6 +487,40 @@ export class LRUCache<T> {
     }
 
     return pruned;
+  }
+
+  private adjustCapacity(): void {
+    if (!this.adaptive) {
+      return;
+    }
+    const pressure = this.pressureProvider?.();
+    if (pressure === undefined) {
+      return;
+    }
+
+    const high = this.adaptive.highWatermark ?? 0.85;
+    const low = this.adaptive.lowWatermark ?? 0.65;
+
+    if (pressure >= high) {
+      const scaleDownFactor = this.adaptive.scaleDownFactor ?? 0.5;
+      const minEntries = Math.min(this.baseMaxEntries, this.adaptive.minEntries ?? 1);
+      const scaledEntries = Math.floor(this.baseMaxEntries * scaleDownFactor);
+      this.maxEntries = Math.max(minEntries, scaledEntries);
+
+      if (Number.isFinite(this.baseMaxSizeBytes)) {
+        const minSizeBytes = Math.min(this.baseMaxSizeBytes, this.adaptive.minSizeBytes ?? 0);
+        const scaledSizeBytes = Math.floor(this.baseMaxSizeBytes * scaleDownFactor);
+        this.maxSizeBytes = Math.max(minSizeBytes, scaledSizeBytes);
+      } else {
+        this.maxSizeBytes = this.baseMaxSizeBytes;
+      }
+      return;
+    }
+
+    if (pressure <= low) {
+      this.maxEntries = this.baseMaxEntries;
+      this.maxSizeBytes = this.baseMaxSizeBytes;
+    }
   }
 
   private evictIfNeeded(incomingSizeBytes: number): void {
@@ -356,6 +617,7 @@ export interface ToolResultCacheOptions extends CacheOptions {
 type ToolCacheEntry = CacheEntry<unknown> & { accessHistory: number[] };
 
 const DEFAULT_TOOL_TTL_MS = 60_000;
+const TOOL_RESULT_CACHE_SNAPSHOT_VERSION = 2;
 const DEFAULT_TOOL_TTL_BY_PREFIX: Array<{ prefix: string; ttlMs: number }> = [
   { prefix: "file:", ttlMs: 5 * 60_000 },
   { prefix: "git:", ttlMs: 60_000 },
@@ -375,13 +637,17 @@ const DEFAULT_TOOL_TTL_BY_PREFIX: Array<{ prefix: string; ttlMs: number }> = [
  */
 export class ToolResultCache {
   private readonly entries = new Map<string, ToolCacheEntry>();
-  private readonly maxEntries: number;
-  private readonly maxSizeBytes: number;
+  private readonly baseMaxEntries: number;
+  private readonly baseMaxSizeBytes: number;
   private readonly defaultTtlMs: number;
   private readonly k: number;
   private readonly slidingTtl: boolean;
   private readonly ttlStrategy?: ToolResultTtlStrategy;
   private readonly persistence?: ToolResultCachePersistence;
+  private readonly adaptive?: CacheAdaptiveOptions;
+  private readonly pressureProvider?: () => number | undefined;
+  private maxEntries: number;
+  private maxSizeBytes: number;
   private currentSizeBytes = 0;
   private totalHits = 0;
   private totalMisses = 0;
@@ -390,12 +656,16 @@ export class ToolResultCache {
 
   constructor(options: ToolResultCacheOptions = {}) {
     this.maxEntries = options.maxEntries ?? 500;
+    this.baseMaxEntries = this.maxEntries;
     this.defaultTtlMs = options.defaultTtlMs ?? DEFAULT_TOOL_TTL_MS;
     this.maxSizeBytes = options.maxSizeBytes ?? 10 * 1024 * 1024;
+    this.baseMaxSizeBytes = this.maxSizeBytes;
     this.k = Math.max(1, options.k ?? 2);
     this.slidingTtl = options.slidingTtl ?? true;
     this.ttlStrategy = options.ttlStrategy;
     this.persistence = options.persistence;
+    this.adaptive = options.adaptive?.enabled ? options.adaptive : undefined;
+    this.pressureProvider = this.adaptive?.pressureProvider ?? defaultMemoryPressureProvider;
 
     this.scheduleFlush(options.persistence);
     this.startHydration();
@@ -459,6 +729,8 @@ export class ToolResultCache {
     if (existing) {
       this.deleteEntry(key, existing);
     }
+
+    this.adjustCapacity();
 
     const sizeBytes = this.estimateSize(result);
     const resolvedTtl = ttlMs ?? this.resolveTtl(toolName, args, sizeBytes, 0);
@@ -548,7 +820,7 @@ export class ToolResultCache {
 
     this.hydrationPromise = (async () => {
       const snapshot = await this.persistence?.store.load();
-      if (!snapshot) {
+      if (!snapshot || snapshot.version !== TOOL_RESULT_CACHE_SNAPSHOT_VERSION) {
         return;
       }
 
@@ -572,6 +844,7 @@ export class ToolResultCache {
         this.currentSizeBytes += entry.sizeBytes;
       }
 
+      this.adjustCapacity();
       this.evictIfNeeded(0);
     })();
 
@@ -584,7 +857,7 @@ export class ToolResultCache {
     }
 
     const snapshot: ToolResultCacheSnapshot = {
-      version: 1,
+      version: TOOL_RESULT_CACHE_SNAPSHOT_VERSION,
       entries: Array.from(this.entries.entries()).map(([key, entry]) => ({
         key,
         value: entry.value,
@@ -607,27 +880,41 @@ export class ToolResultCache {
   }
 
   private hashArgs(args: Record<string, unknown>): string {
-    const json = JSON.stringify(this.sortObjectKeys(args));
-    let hash = 0;
-    for (let i = 0; i < json.length; i++) {
-      const char = json.charCodeAt(i);
-      hash = (hash << 5) - hash + char;
-      hash = hash & hash; // Convert to 32-bit integer
-    }
-    return Math.abs(hash).toString(36);
+    return hashStableValue(args);
   }
 
-  private sortObjectKeys(obj: unknown): unknown {
-    if (obj === null || typeof obj !== "object" || Array.isArray(obj)) {
-      return obj;
+  private adjustCapacity(): void {
+    if (!this.adaptive) {
+      return;
+    }
+    const pressure = this.pressureProvider?.();
+    if (pressure === undefined) {
+      return;
     }
 
-    const keys = Object.keys(obj as Record<string, unknown>).sort();
-    const sorted: Record<string, unknown> = {};
-    for (const key of keys) {
-      sorted[key] = this.sortObjectKeys((obj as Record<string, unknown>)[key]);
+    const high = this.adaptive.highWatermark ?? 0.85;
+    const low = this.adaptive.lowWatermark ?? 0.65;
+
+    if (pressure >= high) {
+      const scaleDownFactor = this.adaptive.scaleDownFactor ?? 0.5;
+      const minEntries = Math.min(this.baseMaxEntries, this.adaptive.minEntries ?? 1);
+      const scaledEntries = Math.floor(this.baseMaxEntries * scaleDownFactor);
+      this.maxEntries = Math.max(minEntries, scaledEntries);
+
+      if (Number.isFinite(this.baseMaxSizeBytes)) {
+        const minSizeBytes = Math.min(this.baseMaxSizeBytes, this.adaptive.minSizeBytes ?? 0);
+        const scaledSizeBytes = Math.floor(this.baseMaxSizeBytes * scaleDownFactor);
+        this.maxSizeBytes = Math.max(minSizeBytes, scaledSizeBytes);
+      } else {
+        this.maxSizeBytes = this.baseMaxSizeBytes;
+      }
+      return;
     }
-    return sorted;
+
+    if (pressure <= low) {
+      this.maxEntries = this.baseMaxEntries;
+      this.maxSizeBytes = this.baseMaxSizeBytes;
+    }
   }
 
   private evictIfNeeded(incomingSizeBytes: number): void {

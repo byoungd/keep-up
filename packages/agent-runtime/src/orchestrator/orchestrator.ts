@@ -34,6 +34,7 @@ import {
 import type { KnowledgeRegistry } from "../knowledge";
 import { AGENTS_GUIDE_PROMPT } from "../prompts/agentGuidelines";
 import type { ModelRouter, ModelRoutingDecision } from "../routing/modelRouter";
+import { resolveRuntimeCacheConfig } from "../runtimeConfig";
 import {
   ApprovalManager,
   createAuditLogger,
@@ -71,13 +72,15 @@ import type {
   MCPToolServer,
   ParallelExecutionConfig,
   PermissionEscalation,
+  RuntimeCacheConfig,
+  RuntimeConfig,
   SecurityPolicy,
   TokenUsageStats,
   ToolContext,
   ToolError,
   ToolExecutionContext,
 } from "../types";
-import { ToolResultCache } from "../utils/cache";
+import { ToolResultCache, type ToolResultCacheOptions } from "../utils/cache";
 import { countTokens } from "../utils/tokenCounter";
 import {
   type AgentLoopStateMachine,
@@ -223,6 +226,8 @@ export interface OrchestratorComponents {
   skillPromptAdapter?: SkillPromptAdapter;
   /** Optional task graph for event-sourced task tracking */
   taskGraph?: TaskGraphStore;
+  /** Optional runtime cache configuration */
+  runtimeCacheConfig?: RuntimeCacheConfig;
   /** Optional tool result cache */
   toolResultCache?: ToolResultCache;
   /** Optional node-level result cache */
@@ -463,7 +468,18 @@ export class AgentOrchestrator {
     if (components.toolResultCache) {
       return components.toolResultCache;
     }
-    return this.sessionState?.toolCache ?? new ToolResultCache();
+    const runtimeCache = components.runtimeCacheConfig?.toolResult;
+    const options: ToolResultCacheOptions = {};
+    if (runtimeCache?.ttlMs !== undefined) {
+      options.defaultTtlMs = runtimeCache.ttlMs;
+    }
+    if (runtimeCache?.maxEntries !== undefined) {
+      options.maxEntries = runtimeCache.maxEntries;
+    }
+    if (runtimeCache?.maxSizeBytes !== undefined) {
+      options.maxSizeBytes = runtimeCache.maxSizeBytes;
+    }
+    return this.sessionState?.toolCache ?? new ToolResultCache(options);
   }
 
   private resolveNodeResultCache(
@@ -487,10 +503,11 @@ export class AgentOrchestrator {
     if (components.requestCache) {
       return components.requestCache;
     }
+    const runtimeCache = components.runtimeCacheConfig?.request;
     return createRequestCache({
-      enabled: true,
-      ttlMs: 300000, // 5 minutes
-      maxSize: 1000,
+      enabled: runtimeCache?.enabled ?? true,
+      ttlMs: runtimeCache?.ttlMs ?? 300000, // 5 minutes
+      maxSize: runtimeCache?.maxEntries ?? 1000,
     });
   }
 
@@ -2278,6 +2295,8 @@ export interface CreateOrchestratorOptions {
   maxTurns?: number;
   requireConfirmation?: boolean;
   telemetry?: TelemetryContext;
+  /** Optional runtime configuration (cache defaults, etc) */
+  runtime?: RuntimeConfig;
   toolExecutionContext?: Partial<ToolExecutionContext>;
   /** Enable parallel execution of independent tool calls (default: true) */
   parallelExecution?: boolean | Partial<ParallelExecutionConfig>;
@@ -2361,6 +2380,8 @@ export function createOrchestrator(
     auditLogger,
     toolExecution
   );
+  const runtimeCacheConfig =
+    options.components?.runtimeCacheConfig ?? resolveRuntimeCacheConfig(options.runtime);
   const components: OrchestratorComponents = {
     ...options.components,
     toolExecutor,
@@ -2371,6 +2392,7 @@ export function createOrchestrator(
     taskGraph,
     streamBridge,
     artifactPipeline,
+    runtimeCacheConfig,
   };
 
   const orchestrator = new AgentOrchestrator(config, llm, registry, options.telemetry, components);

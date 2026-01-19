@@ -26,7 +26,7 @@ export class FileToolResultCacheStore implements ToolResultCacheStore {
     try {
       const payload = await readFile(this.filePath);
       const snapshot = decode(payload) as ToolResultCacheSnapshot;
-      if (!snapshot || snapshot.version !== 1) {
+      if (!snapshot || snapshot.version !== 2) {
         return null;
       }
       return snapshot;

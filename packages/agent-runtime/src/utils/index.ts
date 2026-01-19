@@ -20,11 +20,13 @@ export {
 
 // Caching utilities
 export {
+  type CacheAdaptiveOptions,
   type CacheEntry,
   type CacheOptions,
   type CacheStats,
   createCache,
   createToolResultCache,
+  type ICacheStrategy,
   LRUCache,
   ToolResultCache,
   type ToolResultCacheOptions,
