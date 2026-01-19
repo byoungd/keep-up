@@ -71,6 +71,7 @@ export interface MCPToolResult {
     durationMs: number;
     toolName: string;
     sandboxed: boolean;
+    outputSpool?: ToolOutputSpoolMetadata;
   };
 }
 
@@ -593,6 +594,72 @@ export interface NodeCachePolicy {
   ttlMs?: number;
   includePolicyContext?: boolean;
 }
+
+// ============================================================================
+// Tool Output Spooling
+// ============================================================================
+
+export interface ToolOutputSpoolPolicy {
+  /** Max bytes to return in LLM-visible output */
+  maxBytes: number;
+  /** Max lines to return in LLM-visible output */
+  maxLines: number;
+}
+
+export interface ToolOutputSpoolMetadata {
+  spoolId: string;
+  toolName: string;
+  toolCallId: string;
+  createdAt: number;
+  /** File path or URI for the spooled output */
+  uri: string;
+  /** Total bytes in the original output */
+  byteSize: number;
+  /** Total lines in the original output */
+  lineCount: number;
+  /** Bytes removed from the LLM-visible output */
+  truncatedBytes: number;
+  /** Lines removed from the LLM-visible output */
+  truncatedLines: number;
+  /** Policy used for truncation */
+  policy: ToolOutputSpoolPolicy;
+  /** Deterministic hash of the full output content */
+  contentHash: string;
+  /** Whether the spool write succeeded */
+  stored: boolean;
+  /** Error message when spool write fails */
+  error?: string;
+}
+
+export interface ToolOutputSpoolRecord {
+  version: 1;
+  metadata: ToolOutputSpoolMetadata;
+  content: ToolContent[];
+}
+
+export interface ToolOutputSpoolRequest {
+  toolName: string;
+  toolCallId: string;
+  content: ToolContent[];
+  policy?: ToolOutputSpoolPolicy;
+  context?: ToolContext;
+}
+
+export interface ToolOutputSpoolResult {
+  spooled: boolean;
+  truncated: boolean;
+  output: ToolContent[];
+  metadata?: ToolOutputSpoolMetadata;
+}
+
+export interface ToolOutputSpooler {
+  spool(request: ToolOutputSpoolRequest): Promise<ToolOutputSpoolResult>;
+}
+
+export const DEFAULT_TOOL_OUTPUT_SPOOL_POLICY: ToolOutputSpoolPolicy = {
+  maxBytes: 64 * 1024,
+  maxLines: 200,
+};
 
 /** Configuration for parallel tool execution */
 export interface ParallelExecutionConfig {
@@ -1314,3 +1381,4 @@ export const DEFAULT_AGENT_TODO_PATH = `${DEFAULT_AGENT_RUNTIME_DIR}/TODO.md`;
 export const DEFAULT_AGENT_TASK_PATH = `${DEFAULT_AGENT_RUNTIME_DIR}/TASKS.json`;
 export const DEFAULT_AGENT_SCRATCH_DIR = `${DEFAULT_AGENT_RUNTIME_DIR}/scratch`;
 export const DEFAULT_AGENT_KNOWLEDGE_DIR = `${DEFAULT_AGENT_RUNTIME_DIR}/knowledge`;
+export const DEFAULT_AGENT_SPOOL_DIR = `${DEFAULT_AGENT_RUNTIME_DIR}/spool`;
