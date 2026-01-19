@@ -25,17 +25,21 @@ import {
   type ToolPolicyDecision,
   type ToolPolicyEngine,
 } from "../security";
-import type {
-  AuditLogger,
-  ExecutionDecision,
-  JSONSchemaProperty,
-  MCPTool,
-  MCPToolCall,
-  MCPToolResult,
-  ToolContext,
-  ToolError,
-  ToolExecutionRecord,
-  ToolExecutor,
+import { createFileToolOutputSpooler } from "../spooling/toolOutputSpooler";
+import {
+  type AuditLogger,
+  DEFAULT_TOOL_OUTPUT_SPOOL_POLICY,
+  type ExecutionDecision,
+  type JSONSchemaProperty,
+  type MCPTool,
+  type MCPToolCall,
+  type MCPToolResult,
+  type ToolContext,
+  type ToolError,
+  type ToolExecutionRecord,
+  type ToolExecutor,
+  type ToolOutputSpooler,
+  type ToolOutputSpoolPolicy,
 } from "../types";
 import type { ToolResultCache } from "../utils/cache";
 import type { ToolRateLimiter } from "../utils/rateLimit";
@@ -80,6 +84,9 @@ export interface ToolExecutorConfig {
   retryOptions?: RetryOptions;
   cachePredicate?: CachePredicate;
   contextOverrides?: Partial<ToolContext>;
+  outputSpooler?: ToolOutputSpooler;
+  outputSpoolPolicy?: ToolOutputSpoolPolicy;
+  outputSpoolingEnabled?: boolean;
 }
 
 export interface ToolExecutionOptions {
@@ -97,6 +104,9 @@ export interface ToolExecutionOptions {
   retryOptions?: RetryOptions;
   cachePredicate?: CachePredicate;
   contextOverrides?: Partial<ToolContext>;
+  outputSpooler?: ToolOutputSpooler;
+  outputSpoolPolicy?: ToolOutputSpoolPolicy;
+  outputSpoolingEnabled?: boolean;
 }
 
 type ExecutionPreparationResult =
@@ -124,6 +134,9 @@ export class ToolExecutionPipeline
   private readonly retryOptions?: RetryOptions;
   private readonly cachePredicate?: CachePredicate;
   private readonly contextOverrides?: Partial<ToolContext>;
+  private readonly outputSpooler?: ToolOutputSpooler;
+  private readonly outputSpoolPolicy: ToolOutputSpoolPolicy;
+  private readonly outputSpoolingEnabled: boolean;
   private readonly toolCache = new Map<string, MCPTool>();
 
   constructor(config: ToolExecutorConfig) {
@@ -141,6 +154,11 @@ export class ToolExecutionPipeline
     this.retryOptions = config.retryOptions;
     this.cachePredicate = config.cachePredicate;
     this.contextOverrides = config.contextOverrides;
+    this.outputSpoolPolicy = config.outputSpoolPolicy ?? DEFAULT_TOOL_OUTPUT_SPOOL_POLICY;
+    this.outputSpoolingEnabled = config.outputSpoolingEnabled ?? true;
+    this.outputSpooler = this.outputSpoolingEnabled
+      ? (config.outputSpooler ?? createFileToolOutputSpooler({ policy: this.outputSpoolPolicy }))
+      : undefined;
   }
 
   async execute(call: MCPToolCall, context: ToolContext): Promise<MCPToolResult> {
@@ -170,6 +188,14 @@ export class ToolExecutionPipeline
     if (cacheable && this.cache) {
       const cached = this.cache.get(call.name, call.arguments) as MCPToolResult | undefined;
       if (cached) {
+        const spooled = await this.applyOutputSpooling(
+          call,
+          executionContext,
+          cached,
+          toolCallId,
+          startTime
+        );
+
         this.emitRecord(
           this.createExecutionRecord({
             toolCallId,
@@ -185,8 +211,8 @@ export class ToolExecutionPipeline
         );
         this.recordToolMetric(call.name, "success");
         this.recordDuration(call.name, startTime);
-        this.emitSandboxTelemetry(call, executionContext, cached, startTime);
-        return cached;
+        this.emitSandboxTelemetry(call, executionContext, spooled, startTime);
+        return spooled;
       }
     }
 
@@ -195,7 +221,20 @@ export class ToolExecutionPipeline
     try {
       let result = await this.executeWithRetry(call, executionContext);
       result = this.applyPromptInjectionOutput(call, tool, executionContext, result);
-      this.recordToolMetric(call.name, result.success ? "success" : "error");
+
+      if (cacheable && this.cache && result.success) {
+        this.cache.set(call.name, call.arguments, result);
+      }
+
+      const spooled = await this.applyOutputSpooling(
+        call,
+        executionContext,
+        result,
+        toolCallId,
+        startTime
+      );
+
+      this.recordToolMetric(call.name, spooled.success ? "success" : "error");
       this.recordDuration(call.name, startTime);
 
       this.emitRecord(
@@ -203,23 +242,19 @@ export class ToolExecutionPipeline
           toolCallId,
           toolName: call.name,
           taskNodeId: executionContext.taskNodeId,
-          status: result.success ? "completed" : "failed",
+          status: spooled.success ? "completed" : "failed",
           durationMs: Date.now() - startTime,
           affectedPaths: sandboxDecision.affectedPaths,
           policyDecisionId: decisionId,
           sandboxed: sandboxDecision.sandboxed,
-          error: result.success ? undefined : result.error?.message,
+          error: spooled.success ? undefined : spooled.error?.message,
         }),
         executionContext
       );
 
-      if (cacheable && this.cache && result.success) {
-        this.cache.set(call.name, call.arguments, result);
-      }
-
-      this.emitSandboxTelemetry(call, executionContext, result, startTime);
-      this.auditResult(call, executionContext, result);
-      return result;
+      this.emitSandboxTelemetry(call, executionContext, spooled, startTime);
+      this.auditResult(call, executionContext, spooled);
+      return spooled;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const exceptionResult = this.createErrorResult("EXECUTION_FAILED", message);
@@ -935,6 +970,51 @@ export class ToolExecutionPipeline
       source: assessment.assessment.source,
       truncated: assessment.assessment.truncated,
     });
+  }
+
+  private async applyOutputSpooling(
+    call: MCPToolCall,
+    context: ToolContext,
+    result: MCPToolResult,
+    toolCallId: string,
+    startTime: number
+  ): Promise<MCPToolResult> {
+    if (!this.outputSpooler || !this.outputSpoolingEnabled || !result.success) {
+      return result;
+    }
+
+    try {
+      const spoolResult = await this.outputSpooler.spool({
+        toolName: call.name,
+        toolCallId,
+        content: result.content,
+        context,
+        policy: this.outputSpoolPolicy,
+      });
+
+      if (!spoolResult.spooled) {
+        return result;
+      }
+
+      const baseMeta =
+        result.meta ??
+        ({
+          durationMs: Date.now() - startTime,
+          toolName: call.name,
+          sandboxed: context.security.sandbox.type !== "none",
+        } as const);
+
+      return {
+        ...result,
+        content: spoolResult.output,
+        meta: {
+          ...baseMeta,
+          outputSpool: spoolResult.metadata,
+        },
+      };
+    } catch {
+      return result;
+    }
   }
 
   private handleRateLimitExceeded(
