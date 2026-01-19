@@ -13,4 +13,6 @@ export {
   type LoggerConfig,
   MemoryTransport,
 } from "./logging";
+export type { ReplayFrame, ReplayStep, ReplayVisualization } from "./replay/visualizer";
+export { ReplayVisualizer } from "./replay/visualizer";
 export * from "./telemetry";
