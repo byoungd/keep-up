@@ -893,7 +893,7 @@ export function AppShell(props: AppShellProps) {
               "flex-1 flex flex-col min-w-0 relative overflow-hidden transition-all duration-200 ease-in-out",
               layoutStyle === "arc" && isDesktop
                 ? "bg-canvas rounded-lg shadow-soft m-1.5 z-10"
-                : "bg-canvas rounded-lg shadow-sm z-0"
+                : "bg-canvas rounded-none z-0"
             )}
           >
             <Header

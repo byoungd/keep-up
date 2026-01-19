@@ -4,14 +4,14 @@
  * Bridges an external MCP server using the official SDK client + transport.
  */
 
-import { Client } from "@modelcontextprotocol/sdk/client";
-import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth";
+import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import {
   StreamableHTTPClientTransport,
   type StreamableHTTPClientTransportOptions,
-} from "@modelcontextprotocol/sdk/client/streamableHttp";
-import type { FetchLike } from "@modelcontextprotocol/sdk/shared/transport";
-import type { CallToolResult, Tool as SdkTool } from "@modelcontextprotocol/sdk/types";
+} from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import type { FetchLike } from "@modelcontextprotocol/sdk/shared/transport.js";
+import type { CallToolResult, Tool as SdkTool } from "@modelcontextprotocol/sdk/types.js";
 import type { MCPTool, MCPToolCall, MCPToolResult, MCPToolServer, ToolContext } from "../../types";
 import { McpOAuthSession, type McpOAuthSessionConfig } from "./oauth";
 import { fromSdkResult, fromSdkTool, type ToolScopeConfig } from "./sdkAdapter";
