@@ -4,6 +4,7 @@ import * as React from "react";
 import { useReaderShell } from "../../../context/ReaderShellContext";
 import type { SidebarBadgeStyle } from "../../../lib/sidebar";
 import { Badge } from "../../ui/Badge";
+import { Icon as IconWrapper } from "../../ui/Icon";
 
 interface SidebarItemProps {
   id: string;
@@ -20,7 +21,7 @@ interface SidebarItemProps {
 export const SidebarItem = React.memo(function SidebarItem({
   id,
   label,
-  icon: Icon,
+  icon: ItemIcon,
   href,
   isActive,
   isContextSelected = false,
@@ -48,18 +49,21 @@ export const SidebarItem = React.memo(function SidebarItem({
     >
       {/* Active - minimal (no bar) */}
 
-      {Icon && (
-        <Icon
+      {ItemIcon && (
+        <IconWrapper
+          size="lg"
+          aria-hidden="true"
           className={cn(
-            "h-4 w-4 shrink-0 transition-colors duration-fast opacity-70 group-hover:opacity-100 group-hover:text-foreground",
+            "shrink-0 transition-colors duration-fast opacity-70 group-hover:opacity-100 group-hover:text-foreground",
             isActive
               ? "text-foreground opacity-100"
               : isContextSelected
                 ? "text-foreground/60"
                 : "text-muted-foreground"
           )}
-          strokeWidth={isActive ? 2 : 1.5}
-        />
+        >
+          <ItemIcon />
+        </IconWrapper>
       )}
 
       <span className="truncate flex-1">{label}</span>

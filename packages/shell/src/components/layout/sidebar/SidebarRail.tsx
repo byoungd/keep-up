@@ -9,6 +9,7 @@ import { useReaderShell } from "../../../context/ReaderShellContext";
 import type { EffectiveSidebarItem, EffectiveSidebarState } from "../../../lib/sidebar";
 import { Avatar } from "../../ui/Avatar";
 import { Button } from "../../ui/Button";
+import { Icon as IconWrapper } from "../../ui/Icon";
 // command palette hook removed
 import { Tooltip } from "../../ui/Tooltip";
 
@@ -102,7 +103,9 @@ export const SidebarRail = React.memo(function SidebarRail({
           onClick={handleSearch}
           aria-label={t("searchLabel")}
         >
-          <Search className="h-4 w-4" />
+          <IconWrapper size="lg" aria-hidden="true">
+            <Search />
+          </IconWrapper>
         </Button>
       </Tooltip>
 
@@ -131,7 +134,9 @@ export const SidebarRail = React.memo(function SidebarRail({
                           : "text-muted-foreground hover:bg-surface-hover hover:text-foreground"
                       )}
                     >
-                      <item.icon className="h-4 w-4" strokeWidth={isActive ? 2 : 1.5} />
+                      <IconWrapper size="lg" aria-hidden="true">
+                        <item.icon />
+                      </IconWrapper>
                       {renderRailBadge(item, state.badgeStyle)}
                     </Link>
                   </Tooltip>
@@ -150,7 +155,9 @@ export const SidebarRail = React.memo(function SidebarRail({
           onClick={onOpenCustomize}
           aria-label={t("customize")}
         >
-          <Settings2 className="h-4 w-4" />
+          <IconWrapper size="lg" aria-hidden="true">
+            <Settings2 />
+          </IconWrapper>
         </Button>
       </Tooltip>
     </aside>

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Icon as IconWrapper } from "../components/ui/Icon";
 import { cn } from "../utils/cn";
 import type { SidebarItemProps } from "./types";
 
@@ -26,7 +27,7 @@ const DefaultLink: React.FC<{
  */
 export const SidebarItem = React.memo(function SidebarItem({
   label,
-  icon: Icon,
+  icon: ItemIcon,
   href,
   isActive,
   isContextSelected = false,
@@ -50,17 +51,20 @@ export const SidebarItem = React.memo(function SidebarItem({
             : "text-muted-foreground hover:bg-surface-2/70 hover:text-foreground"
       )}
     >
-      <Icon
+      <IconWrapper
+        size="lg"
+        aria-hidden="true"
         className={cn(
-          "h-4 w-4 shrink-0 transition-colors duration-fast",
+          "shrink-0 transition-colors duration-fast",
           isActive
             ? "text-foreground"
             : isContextSelected
               ? "text-foreground/60"
               : "text-muted-foreground group-hover:text-foreground/80"
         )}
-        strokeWidth={isActive ? 2 : 1.5}
-      />
+      >
+        <ItemIcon />
+      </IconWrapper>
 
       <span className="truncate flex-1">{label}</span>
 

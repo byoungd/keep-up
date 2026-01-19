@@ -13,6 +13,7 @@ import {
 import * as React from "react";
 import { useShellTranslations } from "../../hooks/useShellTranslations";
 import type { Artifact } from "../../lib/ai/artifacts";
+import { Icon as IconWrapper } from "../ui/Icon";
 
 type ReviewState = "approved" | "rejected" | "applied" | null;
 type Translator = (key: string) => string;
@@ -54,7 +55,7 @@ function ArtifactCard({ artifact }: { artifact: Artifact }) {
   const reviewLabel = getReviewLabel(reviewState, t);
 
   return (
-    <div className="rounded-xl border border-border/50 bg-surface-1/70 p-4 shadow-sm">
+    <div className="rounded-xl bg-surface-1 p-4 transition-colors transition-shadow duration-fast ease-smooth hover:bg-surface-2 hover:shadow-sm">
       <ArtifactHeader
         artifact={artifact}
         expanded={expanded}
@@ -100,7 +101,9 @@ function ArtifactHeader({
     <div className="flex items-start justify-between gap-3">
       <div className="flex items-start gap-3">
         <span className="mt-0.5 flex h-7 w-7 items-center justify-center rounded-lg bg-surface-2/70 text-muted-foreground">
-          <Icon className="h-4 w-4" aria-hidden="true" />
+          <IconWrapper size="sm" aria-hidden="true">
+            <Icon />
+          </IconWrapper>
         </span>
         <div>
           <div className="text-xs uppercase tracking-widest text-muted-foreground/70">

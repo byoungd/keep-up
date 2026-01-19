@@ -12,9 +12,8 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, type, leftIcon, rightIcon, variant = "default", error, ...props }, ref) => {
     // Determine base classes
     const baseClasses = cn(
-      "flex h-9 w-full rounded-md border border-input bg-transparent py-1 text-sm shadow-sm transition-all duration-fast ease-smooth file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:border-primary/50 disabled:cursor-not-allowed disabled:opacity-50",
-      error &&
-        "border-destructive focus-visible:ring-destructive/30 focus-visible:border-destructive"
+      "flex h-9 w-full rounded-md bg-surface-2 px-3 py-1 text-sm text-foreground transition-colors duration-fast ease-smooth file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50",
+      error && "ring-1 ring-destructive/30 focus-visible:ring-destructive/40"
     );
 
     // Adjust padding if icons are present
