@@ -70,7 +70,7 @@ The app is defined by **Frames (Spaces)**.
 | **Canvas** | `bg-canvas` | White / Gray-950 | The main work area. |
 | **Sidebar** | `bg-sidebar` | Transparent / Tinted | Sits on Theme Base. |
 | **Primary** | `accent-primary` | Indigo-600 | Buttons, Active State. |
-| **AI (Magic)** | `accent-ai` | **Violet-500** | Only for AI generation. |
+| **AI (Magic)** | `accent-ai` | **Violet-500** (base), `violet-600` (active) | Only for AI generation. |
 
 ### 4.2 Status Colors (Restrained)
 *   **Success**: `emerald-600` (Text/Icon) - No full green backgrounds.
@@ -84,3 +84,36 @@ The app is defined by **Frames (Spaces)**.
 1.  **The "Squint Test"**: If you squint, the most prominent thing should be the **Content (Chat/Artifact)**, not the Sidebar or Buttons.
 2.  **No Grey Walls**: The UI is structured by **spacing and frames**, not 1px grey borders everywhere.
 3.  **Themeable**: Changing `bg-theme` should change the "vibe" of the entire app without breaking contrast.
+
+---
+
+## 6. Visual Signature (Arc/Dia Bar)
+
+1.  **Frame/Canvas Separation**: Maintain a `6px` inset between window edge and canvas on desktop. Canvas is never full-bleed.
+2.  **Chrome Restraint**: Shell surfaces are borderless. Use 1px borders only for inputs, focus rings, and data tables.
+3.  **Accent Discipline**: `accent-primary` is for app-level actions and selection. `accent-ai` is for AI-only moments.
+4.  **Material Grammar**: Only three elevations at rest (Frame, Canvas, Overlay). No colored glows.
+
+---
+
+## 7. Typography and Rhythm
+
+*   **Inter Variable** with optical sizing when available.
+*   **Sizes**: UI `13px`, meta `12px`, chat `15px`, headings `20-24px`.
+*   **Line Length**: Chat content targets 72-80 characters per line on desktop.
+
+---
+
+## 8. Iconography
+
+*   **Lucide** only. `2px` stroke.
+*   **Sizes**: `16px` inline, `20px` rails, `24px` empty states.
+*   **Style**: Outline icons for controls; filled icons only for status badges.
+
+---
+
+## 9. AI Signature Layer
+
+*   **Allowed**: A subtle AI sheen line under the active AI message or input.
+*   **Allowed**: A single thinking shimmer (looping) during generation.
+*   **Not Allowed**: Gradients in the shell, sidebar, or at-rest chrome.

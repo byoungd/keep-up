@@ -1,12 +1,12 @@
-# Cowork Design Tokens Spec (v2 - Simplified)
+# Cowork Design Tokens Spec (v3 - Signature)
 
 > **Principle**: Tokens define a **functional palette**, not a decorative one.
 > Implementation: `packages/design-system/src/tokens.ts` & `src/theme.css`.
 
-**Changelog (v2)**:
-- Removed "glow" and "shimmer" effects
-- Simplified accent system (no gradients)
-- Aligned with v2 Visual Design System
+**Changelog (v3)**:
+- Added AI-only sheen token for thinking and input states
+- Added UI and Chat density tokens (13px and 15px)
+- Aligned with v3 Visual Design System
 
 ---
 
@@ -48,8 +48,10 @@ Colors for **meaningful information only**.
 | **Warning** | Amber | `accent-warning` |
 | **Error** | Rose | `accent-error` |
 | **Muted (AI Status)** | Gray/Dim Violet | `accent-muted` |
+| **AI Strong** | Violet (600) | `accent-ai-strong` |
+| **AI Sheen** | Violet gradient (500-600) | `accent-ai-sheen` |
 
-> **Removed**: `accent-indigo-glow`, `accent-gradient`. No "magic" colors.
+> **Note**: `accent-ai-sheen` is allowed only for AI input and thinking indicators.
 
 ---
 
@@ -62,9 +64,9 @@ Colors for **meaningful information only**.
 ### 2.1 Scale
 | Token | Size | Line Height | Tracking | Usage |
 | :--- | :--- | :--- | :--- | :--- |
-| **`text-xs`** | 12px | 16px | 0 | Metadata, Captions |
-| **`text-sm`** | 14px | 20px | 0 | Body, Buttons |
-| **`text-base`** | 16px | 24px | 0 | Main content, Chat |
+| **`text-meta`** | 12px | 16px | 0 | Metadata, Captions |
+| **`text-ui`** | 13px | 18px | 0 | Chrome, Sidebar, Buttons |
+| **`text-chat`** | 15px | 22px | 0 | Chat content |
 | **`text-lg`** | 18px | 28px | -0.01em | Subheadings |
 | **`text-xl`** | 20px | 28px | -0.01em | Page Titles |
 | **`text-2xl`** | 24px | 32px | -0.02em | Hero Titles |
@@ -112,7 +114,12 @@ Colors for **meaningful information only**.
 
 > **Removed**: `shadow-glow`. Colored shadows are decorative.
 
-### 4.2 Backdrop Blur (Functional)
+### 4.2 AI Sheen (Signature)
+| Token | Value | Usage |
+| :--- | :--- | :--- |
+| **`ai-sheen-line`** | `linear-gradient(90deg, rgba(139,92,246,0.0), rgba(139,92,246,0.6), rgba(139,92,246,0.0))` | 1-2px line under active AI message or input. Use `accent-ai-sheen`. |
+
+### 4.3 Backdrop Blur (Functional)
 | Token | Value | Usage |
 | :--- | :--- | :--- |
 | **`backdrop-blur-sm`** | 8px | Sidebar over varied content. |

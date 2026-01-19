@@ -2,14 +2,18 @@
 
 > **Purpose**: Defines the UI for the Cowork App — a task-mode agentic workspace with transparent execution, artifacts, and approvals. Desktop-first; adaptive to tablet/mobile.
 
-**Design System Reference**: [`docs/specs/cowork/cowork-visual-design-system.md`](file:///Users/han/Documents/Code/Parallel/keep-up/docs/specs/cowork/cowork-visual-design-system.md) (v3)
+**Design System Reference**:
+*   [`docs/specs/cowork/cowork-visual-design-system.md`](file:///Users/han/Documents/Code/Parallel/keep-up/docs/specs/cowork/cowork-visual-design-system.md) (v3)
+*   [`docs/specs/cowork/cowork-arc-dia-standards.md`](file:///Users/han/Documents/Code/Parallel/keep-up/docs/specs/cowork/cowork-arc-dia-standards.md) (New: The Experiential & Composition Standard)
 
 ---
 
 ## 1. Design Philosophy
 
-### 1.1 The "Novelty Budget" (Dia Principle)
-We spend our limited "Novelty Budget" **exclusively on AI features**. The rest is "Tuesday Morning" familiar.
+### 1.1 The "Novelty Budget" & Calm Chrome
+We follow the strict standards defined in **Cowork Arc/Dia Standards**.
+*   **Calm Chrome**: Defined as **Curated Minimalism with Optical Precision**. It is not just "absence of decoration", but the precise alignment (4px grid), layering (3-depth rule), and material integrity of the shell.
+*   **Novelty Budget**: Spent **exclusively on AI features** (Violet shimmer, generative UI).
 
 | Scope | Rule |
 | :--- | :--- |
@@ -35,10 +39,19 @@ We spend our limited "Novelty Budget" **exclusively on AI features**. The rest i
 | :--- | :--- | :--- |
 | **Theme Frame** | `zinc-100` (Light) / `zinc-900` (Dark) | The App's background tint. User-customizable per Workspace. |
 | **Canvas** | `white` (Light) / `gray-950` (Dark) | Solid. Elevated with `shadow-sm` and `rounded-lg`. |
-| **AI/Magic** | **`violet-600`** | Reserved for AI thinking, generation, and interactive artifacts. **No cyan**. |
+| **AI/Magic** | **`violet-500` (base) / `violet-600` (active)** | Reserved for AI thinking, generation, and interactive artifacts. **No cyan**. |
 | **Risk/Approval** | **`amber-500`** | Unmissable. High contrast. |
 | **Typography** | `13px` UI / `15px` Chat / `Inter` | Weight as hierarchy. |
 | **Corner Radius** | `12px` ("Squircle") | All panels, cards, modals. |
+
+### 2.1 Global Visual Signature (Arc/Dia Bar)
+*   **Frame + Canvas**: Two distinct planes. Content inset `6px` from window edge on desktop. Canvas never full-bleed.
+*   **Chrome Restraint**: No borders on shell surfaces. Use borders only for inputs, focus, and data tables.
+*   **Accent Discipline**: `indigo-600` for global actions and selection. **Violet is AI-only** (thinking, generation, AI actions).
+*   **Iconography**: Lucide, `2px` stroke. Sizes: `16px` inline, `20px` in rails, `24px` in empty states.
+*   **Type Ramp**: UI `13px`, meta `12px`, chat `15px`, headings `20-24px`. Use Inter variable with optical sizing if available.
+*   **Density Rhythm**: 4px base grid. Chrome padding `16px` x `12px`. Chat vertical rhythm `20-24px`.
+*   **Line Length**: Chat content targets 72-80 characters per line on desktop.
 
 ---
 
@@ -71,6 +84,13 @@ We spend our limited "Novelty Budget" **exclusively on AI features**. The rest i
 *   `/sessions/:id/logs`: Full Logs View.
 *   `/approvals`: Batch Approval Review.
 *   `/settings`: Workspace and Model Settings.
+
+### 3.3 Density & Breakpoints
+*   **>= 1440px**: Left rail `240px`, right rail `360px` (opt-in). Canvas max width `920px`, centered.
+*   **1280-1439px**: Right rail `320px` (hidden by default). Canvas max width `860px`.
+*   **1024-1279px**: Right rail becomes overlay. Left rail collapses to `72px` by default.
+*   **< 1024px**: Single column. Rails become drawers. Bottom drawer becomes full-width sheet.
+*   **< 768px**: Input capsule docks to bottom edge. Peek overlay uses full width.
 
 ---
 
@@ -125,6 +145,11 @@ We spend our limited "Novelty Budget" **exclusively on AI features**. The rest i
 *   **Streaming**: Static text "Streaming..." (no infinite pulse).
 *   **Thinking**: Violet shimmer bar (the **one** place we use decorative motion).
 
+### 5.5 Artifact Card
+*   **Surface**: `bg-surface-2`, `rounded-lg`, `shadow-sm`.
+*   **Header**: Title `13px` medium, meta `12px` muted.
+*   **Actions**: Hidden by default, reveal on hover/focus.
+
 ---
 
 ## 6. Command & AI Surfaces
@@ -156,6 +181,11 @@ We spend our limited "Novelty Budget" **exclusively on AI features**. The rest i
 | **Thinking** | Loop | N/A | The **ONLY** looping animation. Violet shimmer. |
 
 > **`prefers-reduced-motion`**: Disable shimmer. Use static "Working..." text.
+
+**Additional Motion Rules**
+*   **Input Morph**: 150-200ms spring, no bounce. Height and width only.
+*   **Peek -> Pin -> Split**: Shared element transition, preserve scroll and selection.
+*   **Artifact Open**: 180-220ms, layout projection or crossfade only.
 
 ---
 

@@ -1,12 +1,12 @@
-# Cowork Motion Spec (v2 - Functional Motion)
+# Cowork Motion Spec (v3 - Signature Motion)
 
 > **Principle**: Motion provides **feedback** and **context**, not decoration.
-> Motion should feel **responsive**, not **elaborate**.
+> Motion should feel **responsive**, with a single AI signature moment.
 
-**Changelog (v2)**:
-- Removed "Thinking Pulse" looping animation
-- Removed "Hover Lift" scale effects
-- Simplified transitions to functional feedback only
+**Changelog (v3)**:
+- Restored one AI-only looping shimmer for thinking
+- Added shared element transitions for Peek -> Pin -> Split
+- Clarified input capsule morph behavior
 
 ---
 
@@ -15,7 +15,7 @@
 1.  **Motion is invisible when done right.** The user notices when things are slow or jarring, not when they are smooth.
 2.  **Duration < 200ms for most interactions.** Anything longer feels sluggish.
 3.  **Ease-out for entrances.** Elements appear quickly and settle.
-4.  **No looping animations in resting states.** They distract the user.
+4.  **Only one loop is allowed.** The AI thinking shimmer is the only looping motion.
 
 ---
 
@@ -64,6 +64,11 @@
 *   **Duration**: 100ms per item.
 *   **Avoid**: Slide-in effects. They slow reading.
 
+### 2.5 Artifact Open (Peek -> Pin -> Split)
+*   **Effect**: Shared element transition or crossfade only.
+*   **Duration**: 180-220ms.
+*   **Goal**: Preserve visual continuity and scroll position.
+
 ---
 
 ## 3. Interaction Feedback
@@ -82,20 +87,24 @@
 *   **Effect**: Visible ring outline using brand color.
 *   **Duration**: Instant.
 
+### 3.4 Input Capsule Morph
+*   **Effect**: Height and width expansion only.
+*   **Duration**: 150-200ms spring, no bounce.
+
 ---
 
-## 4. Status Indicators (Static)
+## 4. Status Indicators
 
 ### 4.1 Loading / "Thinking"
-*   **Visual**: A simple spinner icon OR a text label ("Working...").
-*   **Behavior**: **Static** until state changes. No looping gradients or pulses.
+*   **Visual**: AI shimmer line OR a text label ("Working...").
+*   **Behavior**: Loop allowed only for AI thinking. Disable in reduced motion.
 
 ```tsx
 // Good
 <span className="text-muted-foreground">Working...</span>
 
-// Bad (removed)
-// <div className="animate-pulse bg-gradient-to-r from-violet-500 to-pink-500" />
+// Optional AI shimmer (only in AI surfaces)
+// <div className="ai-sheen-line" />
 ```
 
 ### 4.2 Streaming Indicator
@@ -114,7 +123,7 @@
 | Feature | Reason for Removal |
 | :--- | :--- |
 | **Hover "Lift" (scale 1.02)** | Distracting. No functional purpose. |
-| **"Thinking" Pulse Animation** | Looping. Draws attention away from content. |
+| **"Thinking" Pulse Animation** | Replaced by a single AI shimmer line. |
 | **Spring "Bouncy" config** | Too playful. Conflicts with "Tool" aesthetic. |
 | **Page transition scale (0.98 -> 1)** | Adds unnecessary visual noise. |
 | **Colored shadow glow** | Decorative. Does not convey information. |
