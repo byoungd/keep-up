@@ -8,12 +8,24 @@
  */
 
 import type {
+  AIEnvelopeDiagnostic,
+  AIEnvelopeResponse,
+  AIRequestEnvelope,
   ContentChunk,
   CrossDocReferenceRecord,
   DataAccessPolicy,
   ReferenceStore,
 } from "@ku0/core";
-import { applyDataAccessPolicyToChunks, documentId, gateway, stableStringify } from "@ku0/core";
+import {
+  applyDataAccessPolicyToChunks,
+  documentId,
+  gateway,
+  is409Conflict as isEnvelopeConflict,
+  isSuccessResponse as isEnvelopeSuccess,
+  isUnprocessableResponse as isEnvelopeUnprocessable,
+  normalizeAIRequestEnvelope,
+  stableStringify,
+} from "@ku0/core";
 import { getLogger } from "../../logging/logger.js";
 import type { MCPToolResult, ToolContext } from "../../types";
 import { BaseToolServer, errorResult, textResult } from "../mcp/baseServer";
@@ -149,10 +161,16 @@ export interface SearchResult {
   highlights?: string[];
 }
 
+export type AIEnvelopeGateway = {
+  processRequest: (request: AIRequestEnvelope) => Promise<AIEnvelopeResponse>;
+};
+
 export type LFCCToolServerOptions = {
   bridge?: ILFCCBridge;
   aiGateway?: gateway.AIGateway;
   aiGatewayResolver?: (docId: string) => gateway.AIGateway | undefined;
+  aiEnvelopeGateway?: AIEnvelopeGateway;
+  aiEnvelopeGatewayResolver?: (docId: string) => AIEnvelopeGateway | undefined;
   rebaseProvider?: gateway.RebaseProvider;
   relocationProvider?: gateway.RelocationProvider;
   retryPolicy?: gateway.RetryPolicy;
@@ -237,6 +255,8 @@ function buildPerDocRequestId(requestId: string, docId: string): string {
   return `${requestId}:${docId}`;
 }
 
+type NormalizedPrecondition = { span_id: string; if_match_context_hash: string };
+
 type NormalizedMultiDocDocument = {
   doc_id: string;
   role: MultiDocumentRole;
@@ -244,6 +264,19 @@ type NormalizedMultiDocDocument = {
   frontier: DocFrontierObject;
   gateway_request?: gateway.AIGatewayRequest;
   ops_xml?: string;
+  preconditions?: NormalizedPrecondition[];
+};
+
+type MultiDocTargetOutcome = {
+  docResult: MultiDocumentDocResult;
+  frontier?: DocFrontierObject;
+};
+
+type MultiDocTargetAccumulator = {
+  results: MultiDocumentDocResult[];
+  appliedFrontiers: Record<string, DocFrontierObject>;
+  conflicts: MultiDocumentDocResult[];
+  errors: MultiDocumentDocResult[];
 };
 
 type ToolResultOr<T> = { ok: true; value: T } | { ok: false; error: MCPToolResult };
@@ -337,6 +370,90 @@ function normalizeGatewayRequestInput(
     : undefined;
 }
 
+function normalizePreconditionsInput(
+  value: unknown,
+  docId: string
+): { ok: true; preconditions: NormalizedPrecondition[] } | { ok: false; error: string } {
+  if (value === undefined) {
+    return { ok: true, preconditions: [] };
+  }
+  if (!Array.isArray(value)) {
+    return { ok: false, error: `preconditions must be an array for ${docId}` };
+  }
+  const preconditions: NormalizedPrecondition[] = [];
+  for (let index = 0; index < value.length; index += 1) {
+    const entry = value[index];
+    if (!isRecord(entry)) {
+      return { ok: false, error: `preconditions[${index}] must be an object for ${docId}` };
+    }
+    const spanId = entry.span_id;
+    const contextHash = entry.if_match_context_hash;
+    if (typeof spanId !== "string" || spanId.trim().length === 0) {
+      return {
+        ok: false,
+        error: `preconditions[${index}].span_id must be a non-empty string for ${docId}`,
+      };
+    }
+    if (typeof contextHash !== "string" || contextHash.trim().length === 0) {
+      return {
+        ok: false,
+        error: `preconditions[${index}].if_match_context_hash must be a non-empty string for ${docId}`,
+      };
+    }
+    preconditions.push({ span_id: spanId, if_match_context_hash: contextHash });
+  }
+  return { ok: true, preconditions };
+}
+
+function normalizeOpsXmlInput(
+  doc: Record<string, unknown>,
+  docId: string
+): { ok: true; opsXml?: string } | { ok: false; error: string } {
+  if (doc.ops_xml !== undefined && typeof doc.ops_xml !== "string") {
+    return { ok: false, error: `ops_xml must be a string for ${docId}` };
+  }
+  const opsXml = typeof doc.ops_xml === "string" ? doc.ops_xml : undefined;
+  return { ok: true, opsXml };
+}
+
+function validateMultiDocRoleConstraints(input: {
+  role: MultiDocumentRole;
+  docId: string;
+  gatewayRequestInput?: gateway.AIGatewayRequest;
+  opsXml?: string;
+  preconditions: NormalizedPrecondition[];
+}): string | undefined {
+  const { role, docId, gatewayRequestInput, opsXml, preconditions } = input;
+  if (role !== "target") {
+    if (gatewayRequestInput) {
+      return `gateway_request is only allowed for target documents (${docId})`;
+    }
+    if (opsXml) {
+      return `ops_xml is only allowed for target documents (${docId})`;
+    }
+    if (preconditions.length > 0) {
+      return `preconditions are only allowed for target documents (${docId})`;
+    }
+    return undefined;
+  }
+
+  const hasGatewayRequest = Boolean(gatewayRequestInput);
+  const hasOpsXml = Boolean(opsXml);
+  if (hasGatewayRequest && hasOpsXml) {
+    return `Target document ${docId} cannot include both gateway_request and ops_xml`;
+  }
+  if (!hasGatewayRequest && !hasOpsXml) {
+    return `Target document ${docId} must include gateway_request or ops_xml`;
+  }
+  if (hasGatewayRequest && preconditions.length > 0) {
+    return `preconditions are only allowed with ops_xml targets (${docId})`;
+  }
+  if (hasOpsXml && opsXml?.trim().length === 0) {
+    return `ops_xml must be non-empty for target document ${docId}`;
+  }
+  return undefined;
+}
+
 function normalizeDocumentFrontier(
   doc: Record<string, unknown>,
   gatewayRequestInput: gateway.AIGatewayRequest | undefined,
@@ -423,11 +540,27 @@ function normalizeMultiDocDocumentEntry(
   }
 
   const gatewayRequestInput = normalizeGatewayRequestInput(doc);
-  if (roleResult.role !== "target" && gatewayRequestInput) {
-    return {
-      ok: false,
-      error: `gateway_request is only allowed for target documents (${docId})`,
-    };
+
+  const preconditionsResult = normalizePreconditionsInput(doc.preconditions, docId);
+  if (!preconditionsResult.ok) {
+    return { ok: false, error: preconditionsResult.error };
+  }
+
+  const opsXmlResult = normalizeOpsXmlInput(doc, docId);
+  if (!opsXmlResult.ok) {
+    return { ok: false, error: opsXmlResult.error };
+  }
+  const opsXml = opsXmlResult.opsXml;
+
+  const roleConstraintError = validateMultiDocRoleConstraints({
+    role: roleResult.role,
+    docId,
+    gatewayRequestInput,
+    opsXml,
+    preconditions: preconditionsResult.preconditions,
+  });
+  if (roleConstraintError) {
+    return { ok: false, error: roleConstraintError };
   }
 
   const frontierResult = normalizeDocumentFrontier(doc, gatewayRequestInput, docId);
@@ -436,7 +569,7 @@ function normalizeMultiDocDocumentEntry(
   }
 
   let gatewayRequest: gateway.AIGatewayRequest | undefined;
-  if (roleResult.role === "target") {
+  if (roleResult.role === "target" && gatewayRequestInput) {
     const normalizedRequest = normalizeTargetGatewayRequest(
       docId,
       gatewayRequestInput,
@@ -457,7 +590,9 @@ function normalizeMultiDocDocumentEntry(
       frontierTag: frontierResult.frontier.tag,
       frontier: frontierResult.frontier.frontier,
       gateway_request: gatewayRequest,
-      ops_xml: typeof doc.ops_xml === "string" ? doc.ops_xml : undefined,
+      ops_xml: opsXml,
+      preconditions:
+        roleResult.role === "target" && opsXml ? preconditionsResult.preconditions : undefined,
     },
   };
 }
@@ -530,6 +665,114 @@ function mapGatewayResult(
         message: result.message,
       },
     },
+  };
+}
+
+function mapEnvelopeDiagnostics(
+  result: AIEnvelopeResponse
+): gateway.GatewayDiagnostic[] | undefined {
+  if (!("diagnostics" in result) || !Array.isArray(result.diagnostics)) {
+    return undefined;
+  }
+  const diagnostics: gateway.GatewayDiagnostic[] = [];
+  for (const entry of result.diagnostics) {
+    if (!entry || typeof entry !== "object") {
+      continue;
+    }
+    const diag = entry as AIEnvelopeDiagnostic;
+    if (typeof diag.kind !== "string" || typeof diag.detail !== "string") {
+      continue;
+    }
+    const severity =
+      diag.severity === "warning" || diag.severity === "error" ? diag.severity : "info";
+    diagnostics.push({
+      severity,
+      kind: diag.kind,
+      detail: diag.detail,
+    });
+  }
+  return diagnostics.length > 0 ? diagnostics : undefined;
+}
+
+function mapEnvelopeResult(
+  document: NormalizedMultiDocDocument,
+  result: AIEnvelopeResponse
+): { docResult: MultiDocumentDocResult; frontier?: DocFrontierObject } {
+  const diagnostics = mapEnvelopeDiagnostics(result);
+  const fallbackFrontier = resolveFrontierFromTag(document.frontierTag);
+  const operationsApplied = countTargetOps({
+    doc_id: document.doc_id,
+    role: document.role,
+    gateway_request: document.gateway_request,
+    ops_xml: document.ops_xml,
+  });
+
+  if (isEnvelopeSuccess(result)) {
+    const frontier = resolveFrontierFromTag(result.applied_frontier ?? document.frontierTag);
+    return {
+      docResult: {
+        doc_id: document.doc_id,
+        success: true,
+        operations_applied: operationsApplied,
+        diagnostics,
+      },
+      frontier: frontier ?? fallbackFrontier,
+    };
+  }
+
+  if (isEnvelopeConflict(result)) {
+    const frontier = resolveFrontierFromTag(result.current_frontier ?? document.frontierTag);
+    return {
+      docResult: {
+        doc_id: document.doc_id,
+        success: false,
+        operations_applied: 0,
+        diagnostics,
+        conflict: {
+          code: "AI_PRECONDITION_FAILED",
+          phase: "ai_gateway",
+          retryable: true,
+          current_frontier: frontier ?? fallbackFrontier,
+          failed_preconditions: result.failed_preconditions.map((pre) => ({
+            span_id: pre.span_id,
+            reason: pre.reason,
+          })),
+        },
+      },
+      frontier: frontier ?? fallbackFrontier,
+    };
+  }
+
+  if (isEnvelopeUnprocessable(result)) {
+    return {
+      docResult: {
+        doc_id: document.doc_id,
+        success: false,
+        operations_applied: 0,
+        diagnostics,
+        error: {
+          status: 422,
+          code: result.code,
+          message: "AI envelope rejected",
+        },
+      },
+      frontier: fallbackFrontier,
+    };
+  }
+
+  return {
+    docResult: {
+      doc_id: document.doc_id,
+      success: false,
+      operations_applied: 0,
+      diagnostics,
+      error: {
+        status: result.status,
+        code: result.code,
+        message: result.message,
+      },
+    },
+    frontier: fallbackFrontier,
   };
 }
 
@@ -643,6 +886,13 @@ function validateMultiDocDocumentsLimit(
   return { ok: true, value: undefined };
 }
 
+function getTargetPreconditionCount(document: NormalizedMultiDocDocument): number {
+  if (document.gateway_request) {
+    return document.gateway_request.target_spans.length;
+  }
+  return document.preconditions?.length ?? 0;
+}
+
 function resolveTargetDocuments(
   documents: NormalizedMultiDocDocument[],
   policy: MultiDocumentPolicy
@@ -659,7 +909,7 @@ function resolveTargetDocuments(
 
   if (policy.require_target_preconditions) {
     const missingPreconditions = targetDocuments.filter(
-      (doc) => (doc.gateway_request?.target_spans.length ?? 0) === 0
+      (doc) => getTargetPreconditionCount(doc) === 0
     );
     if (missingPreconditions.length > 0) {
       return {
@@ -1296,6 +1546,8 @@ export class LFCCToolServer extends BaseToolServer {
   private readonly bridge: ILFCCBridge;
   private readonly aiGateway?: gateway.AIGateway;
   private readonly aiGatewayResolver?: (docId: string) => gateway.AIGateway | undefined;
+  private readonly aiEnvelopeGateway?: AIEnvelopeGateway;
+  private readonly aiEnvelopeGatewayResolver?: (docId: string) => AIEnvelopeGateway | undefined;
   private readonly rebaseProvider?: gateway.RebaseProvider;
   private readonly relocationProvider?: gateway.RelocationProvider;
   private readonly retryPolicy?: gateway.RetryPolicy;
@@ -1315,6 +1567,8 @@ export class LFCCToolServer extends BaseToolServer {
     this.bridge = options.bridge ?? new MockLFCCBridge();
     this.aiGateway = options.aiGateway;
     this.aiGatewayResolver = options.aiGatewayResolver;
+    this.aiEnvelopeGateway = options.aiEnvelopeGateway;
+    this.aiEnvelopeGatewayResolver = options.aiEnvelopeGatewayResolver;
     this.rebaseProvider = options.rebaseProvider;
     this.relocationProvider = options.relocationProvider;
     this.retryPolicy = options.retryPolicy;
@@ -1326,7 +1580,12 @@ export class LFCCToolServer extends BaseToolServer {
       options.multiDocIdempotencyWindowMs ?? DEFAULT_MULTI_DOC_IDEMPOTENCY_WINDOW_MS;
 
     this.registerTools();
-    if (this.aiGateway || this.aiGatewayResolver) {
+    if (
+      this.aiGateway ||
+      this.aiGatewayResolver ||
+      this.aiEnvelopeGateway ||
+      this.aiEnvelopeGatewayResolver
+    ) {
       this.registerAIGatewayTools();
     }
   }
@@ -1585,6 +1844,20 @@ export class LFCCToolServer extends BaseToolServer {
     return this.aiGateway;
   }
 
+  private resolveEnvelopeGateway(
+    docId?: string,
+    allowFallback = true
+  ): AIEnvelopeGateway | undefined {
+    if (docId && this.aiEnvelopeGatewayResolver) {
+      const resolved = this.aiEnvelopeGatewayResolver(docId);
+      if (resolved) {
+        return resolved;
+      }
+      return allowFallback ? this.aiEnvelopeGateway : undefined;
+    }
+    return this.aiEnvelopeGateway;
+  }
+
   private resolveReferenceStore(policyDomainId?: string): ReferenceStore | undefined {
     if (policyDomainId && this.referenceStoreResolver) {
       return this.referenceStoreResolver(policyDomainId);
@@ -1739,6 +2012,117 @@ export class LFCCToolServer extends BaseToolServer {
     };
   }
 
+  private createMultiDocTargetAccumulator(): MultiDocTargetAccumulator {
+    return {
+      results: [],
+      appliedFrontiers: {},
+      conflicts: [],
+      errors: [],
+    };
+  }
+
+  private recordMultiDocOutcome(
+    accumulator: MultiDocTargetAccumulator,
+    docId: string,
+    outcome: MultiDocTargetOutcome
+  ): void {
+    accumulator.results.push(outcome.docResult);
+    if (outcome.frontier) {
+      accumulator.appliedFrontiers[docId] = outcome.frontier;
+    }
+    if (outcome.docResult.conflict) {
+      accumulator.conflicts.push(outcome.docResult);
+    }
+    if (outcome.docResult.error) {
+      accumulator.errors.push(outcome.docResult);
+    }
+  }
+
+  private async executeMultiDocTarget(
+    request: MultiDocumentGatewayRequest,
+    doc: NormalizedMultiDocDocument
+  ): Promise<ToolResultOr<MultiDocTargetOutcome>> {
+    if (doc.gateway_request) {
+      return this.processGatewayTarget(request, doc);
+    }
+    return this.processEnvelopeTarget(request, doc);
+  }
+
+  private async processGatewayTarget(
+    request: MultiDocumentGatewayRequest,
+    doc: NormalizedMultiDocDocument
+  ): Promise<ToolResultOr<MultiDocTargetOutcome>> {
+    const aiGateway = this.resolveGateway(doc.doc_id, false);
+    if (!aiGateway) {
+      const response: MultiDocumentGatewayResponse = {
+        status: 400,
+        code: "AI_MULTI_DOCUMENT_UNSUPPORTED",
+        message: `AI Gateway is not configured for ${doc.doc_id}`,
+      };
+      return { ok: false, error: textResult(JSON.stringify(response, null, 2)) };
+    }
+
+    if (!doc.gateway_request) {
+      const response: MultiDocumentGatewayResponse = {
+        status: 400,
+        code: "AI_MULTI_DOCUMENT_UNSUPPORTED",
+        message: `Target document ${doc.doc_id} is missing gateway_request`,
+      };
+      return { ok: false, error: textResult(JSON.stringify(response, null, 2)) };
+    }
+
+    const perDocRequestId = buildPerDocRequestId(request.request_id, doc.doc_id);
+    const gatewayRequest: gateway.AIGatewayRequest = {
+      ...doc.gateway_request,
+      request_id: perDocRequestId,
+      client_request_id: perDocRequestId,
+    };
+
+    const gatewayResult = await aiGateway.processRequest(gatewayRequest);
+    return { ok: true, value: mapGatewayResult(doc.doc_id, gatewayResult) };
+  }
+
+  private async processEnvelopeTarget(
+    request: MultiDocumentGatewayRequest,
+    doc: NormalizedMultiDocDocument
+  ): Promise<ToolResultOr<MultiDocTargetOutcome>> {
+    if (!doc.ops_xml) {
+      const response: MultiDocumentGatewayResponse = {
+        status: 400,
+        code: "AI_MULTI_DOCUMENT_UNSUPPORTED",
+        message: `Target document ${doc.doc_id} is missing gateway_request or ops_xml`,
+      };
+      return { ok: false, error: textResult(JSON.stringify(response, null, 2)) };
+    }
+
+    const envelopeGateway = this.resolveEnvelopeGateway(doc.doc_id, false);
+    if (!envelopeGateway) {
+      const response: MultiDocumentGatewayResponse = {
+        status: 400,
+        code: "AI_MULTI_DOCUMENT_UNSUPPORTED",
+        message: `AI Envelope gateway is not configured for ${doc.doc_id}`,
+      };
+      return { ok: false, error: textResult(JSON.stringify(response, null, 2)) };
+    }
+
+    const perDocRequestId = buildPerDocRequestId(request.request_id, doc.doc_id);
+    const envelopeRequest = normalizeAIRequestEnvelope({
+      request_id: perDocRequestId,
+      client_request_id: perDocRequestId,
+      agent_id: request.agent_id ?? "",
+      doc_frontier: doc.frontierTag,
+      doc_frontier_tag: doc.frontierTag,
+      ops_xml: doc.ops_xml,
+      preconditions: doc.preconditions ?? [],
+      intent_id: request.intent_id,
+      intent: request.intent,
+      policy_context: request.policy_context,
+    });
+
+    const envelopeResult = await envelopeGateway.processRequest(envelopeRequest);
+    return { ok: true, value: mapEnvelopeResult(doc, envelopeResult) };
+  }
+
   private async processMultiDocTargets(
     request: MultiDocumentGatewayRequest,
     targetDocuments: NormalizedMultiDocDocument[]
@@ -1750,44 +2134,17 @@ export class LFCCToolServer extends BaseToolServer {
       errors: MultiDocumentDocResult[];
     }>
   > {
-    const results: MultiDocumentDocResult[] = [];
-    const appliedFrontiers: Record<string, DocFrontierObject> = {};
-    const conflicts: MultiDocumentDocResult[] = [];
-    const errors: MultiDocumentDocResult[] = [];
+    const accumulator = this.createMultiDocTargetAccumulator();
 
     for (const doc of targetDocuments) {
-      const aiGateway = this.resolveGateway(doc.doc_id, false);
-      if (!aiGateway || !doc.gateway_request) {
-        const response: MultiDocumentGatewayResponse = {
-          status: 400,
-          code: "AI_MULTI_DOCUMENT_UNSUPPORTED",
-          message: `AI Gateway is not configured for ${doc.doc_id}`,
-        };
-        return { ok: false, error: textResult(JSON.stringify(response, null, 2)) };
+      const outcome = await this.executeMultiDocTarget(request, doc);
+      if (!outcome.ok) {
+        return outcome;
       }
-
-      const perDocRequestId = buildPerDocRequestId(request.request_id, doc.doc_id);
-      const gatewayRequest: gateway.AIGatewayRequest = {
-        ...doc.gateway_request,
-        request_id: perDocRequestId,
-        client_request_id: perDocRequestId,
-      };
-
-      const gatewayResult = await aiGateway.processRequest(gatewayRequest);
-      const { docResult, frontier } = mapGatewayResult(doc.doc_id, gatewayResult);
-      results.push(docResult);
-      if (frontier) {
-        appliedFrontiers[doc.doc_id] = frontier;
-      }
-      if (docResult.conflict) {
-        conflicts.push(docResult);
-      }
-      if (docResult.error) {
-        errors.push(docResult);
-      }
+      this.recordMultiDocOutcome(accumulator, doc.doc_id, outcome.value);
     }
 
-    return { ok: true, value: { results, appliedFrontiers, conflicts, errors } };
+    return { ok: true, value: accumulator };
   }
 
   private async processReferences(

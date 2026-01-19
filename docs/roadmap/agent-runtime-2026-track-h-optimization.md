@@ -58,28 +58,28 @@ Optimize the agent runtime for production readiness per docs/specs/agent-runtime
 ## Tasks
 
 ### Phase 1: Routing & Caching (Week 1)
-- [ ] Implement model capability cache (`packages/agent-runtime/src/routing/cache.ts`)
-- [ ] Add cost/latency scoring to ModelRouter
-- [ ] Implement fallback chain with metrics
-- [ ] Add tool result cache for idempotent tools
+- [x] Implement model capability cache (`packages/agent-runtime/src/routing/cache.ts`)
+- [x] Add cost/latency scoring to ModelRouter
+- [x] Implement fallback chain with metrics
+- [x] Add tool result cache for idempotent tools
 
 ### Phase 2: Context & Compression (Week 2)
-- [ ] Enhance ContextManager with sliding window
-- [ ] Add compression metrics (tokens saved, quality score)
-- [ ] Implement configurable preservation rules
-- [ ] Add unit tests for compression edge cases
+- [x] Enhance ContextManager with sliding window
+- [x] Add compression metrics (tokens saved, quality score)
+- [x] Implement configurable preservation rules
+- [x] Add unit tests for compression edge cases
 
 ### Phase 3: Observability (Week 3)
-- [ ] Add timing instrumentation to orchestrator
-- [ ] Create metric aggregation service
-- [ ] Export metrics in Prometheus format
-- [ ] Add alerting hooks for error rates
+- [x] Add timing instrumentation to orchestrator
+- [x] Create metric aggregation service
+- [x] Export metrics in Prometheus format
+- [x] Add alerting hooks for error rates
 
 ### Phase 4: LFCC Finalization (Week 4)
-- [ ] Review LFCC 0.9.4 spec compliance
-- [ ] Implement missing multi-document operations
-- [ ] Standardize physical store backend
-- [ ] Add integration tests for conflict resolution
+- [x] Review LFCC 0.9.4 spec compliance
+- [x] Implement missing multi-document operations
+- [x] Standardize physical store backend
+- [x] Add integration tests for conflict resolution
 
 ## Acceptance Criteria
 - [ ] Model routing includes cost/latency scoring with configurable weights.

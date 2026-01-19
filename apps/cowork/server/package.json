@@ -10,6 +10,7 @@
   "dependencies": {
     "@ku0/agent-runtime": "workspace:*",
     "@ku0/ai-core": "workspace:*",
+    "@ku0/lfcc-bridge": "workspace:*",
     "@hono/node-server": "^1.19.9",
     "better-sqlite3": "^9.6.0",
     "hono": "^4.11.4"

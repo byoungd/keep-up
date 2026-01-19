@@ -1,8 +1,12 @@
-import type { ReferenceStore } from "@ku0/core";
+import type { AIEnvelopeResponse, ReferenceStore } from "@ku0/core";
 import { documentId, gateway } from "@ku0/core";
 import { describe, expect, it } from "vitest";
 import { createSecurityPolicy } from "../security";
-import { createLFCCToolServer, type MultiDocumentPolicy } from "../tools/lfcc/lfccServer";
+import {
+  type AIEnvelopeGateway,
+  createLFCCToolServer,
+  type MultiDocumentPolicy,
+} from "../tools/lfcc/lfccServer";
 import type { ToolContext } from "../types";
 
 const baseContext: ToolContext = {
@@ -40,6 +44,28 @@ const multiDocPolicy: MultiDocumentPolicy = {
   require_target_preconditions: true,
   require_citation_preconditions: false,
 };
+
+function createEnvelopeGateway(): AIEnvelopeGateway {
+  return {
+    async processRequest(request): Promise<AIEnvelopeResponse> {
+      const conflict = request.preconditions.find((pre) => pre.span_id === "s2");
+      if (conflict) {
+        return {
+          status: 409,
+          code: "CONFLICT",
+          current_frontier: request.doc_frontier,
+          failed_preconditions: [{ span_id: conflict.span_id, reason: "hash_mismatch" }],
+          diagnostics: [],
+        };
+      }
+      return {
+        status: 200,
+        applied_frontier: request.doc_frontier,
+        diagnostics: [],
+      };
+    },
+  };
+}
 
 describe("LFCCToolServer multi-document AI Gateway", () => {
   it("returns best-effort results when one document conflicts", async () => {
@@ -209,6 +235,57 @@ describe("LFCCToolServer multi-document AI Gateway", () => {
     expect(payload.status).toBe(409);
     expect(payload.code).toBe("AI_PRECONDITION_FAILED");
     expect(payload.failed_documents).toHaveLength(1);
+  });
+
+  it("supports ops_xml targets via AI envelope gateway", async () => {
+    const server = createLFCCToolServer({
+      aiEnvelopeGateway: createEnvelopeGateway(),
+      policyDomainResolver: () => "policy-1",
+      multiDocumentPolicy: multiDocPolicy,
+    });
+
+    const request = {
+      request_id: "req-multi-envelope",
+      agent_id: "agent-1",
+      intent_id: "intent-1",
+      atomicity: "best_effort",
+      documents: [
+        {
+          doc_id: "doc-a",
+          role: "target",
+          doc_frontier_tag: "peer-a:1",
+          ops_xml: '<replace_spans annotation="anno-a"><span span_id="s1"/></replace_spans>',
+          preconditions: [{ span_id: "s1", if_match_context_hash: "hash-1" }],
+        },
+        {
+          doc_id: "doc-b",
+          role: "target",
+          doc_frontier_tag: "peer-b:1",
+          ops_xml: '<replace_spans annotation="anno-b"><span span_id="s2"/></replace_spans>',
+          preconditions: [{ span_id: "s2", if_match_context_hash: "hash-2" }],
+        },
+      ],
+    };
+
+    const result = await server.callTool(
+      { name: "ai_gateway_multi_request", arguments: { request } },
+      baseContext
+    );
+
+    expect(result.success).toBe(true);
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.status).toBe(200);
+    const docAResult = payload.results.find(
+      (entry: { doc_id: string }) => entry.doc_id === "doc-a"
+    );
+    const docBResult = payload.results.find(
+      (entry: { doc_id: string }) => entry.doc_id === "doc-b"
+    );
+    expect(docAResult.success).toBe(true);
+    expect(docAResult.operations_applied).toBe(1);
+    expect(docBResult.success).toBe(false);
+    expect(docBResult.conflict.code).toBe("AI_PRECONDITION_FAILED");
+    expect(docBResult.conflict.failed_preconditions[0].reason).toBe("hash_mismatch");
   });
 
   it("reports reference conflicts for non-target documents in best-effort mode", async () => {
