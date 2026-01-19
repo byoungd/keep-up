@@ -563,6 +563,10 @@ export interface AgentConfig {
     maxRefinements?: number;
     planningTimeoutMs?: number;
     autoExecuteLowRisk?: boolean;
+    /** Persist plans to disk (default handled by planning engine) */
+    persistToFile?: boolean;
+    /** Working directory for plan persistence */
+    workingDirectory?: string;
   };
   /** Error recovery configuration */
   recovery?: {

@@ -91,7 +91,7 @@ export function createCodeAgentOrchestrator(
     ...rest,
     name,
     eventBus: resolvedEventBus,
-    planning: { enabled: true, ...planning },
+    planning: { enabled: true, persistToFile: false, ...planning },
     components: mergedComponents,
   });
 }

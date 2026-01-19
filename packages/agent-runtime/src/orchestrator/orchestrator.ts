@@ -508,6 +508,8 @@ export class AgentOrchestrator {
       maxRefinements: config.planning?.maxRefinements,
       planningTimeoutMs: config.planning?.planningTimeoutMs,
       autoExecuteLowRisk: config.planning?.autoExecuteLowRisk,
+      persistToFile: config.planning?.persistToFile,
+      workingDirectory: config.planning?.workingDirectory,
     });
   }
 
@@ -2404,6 +2406,8 @@ export interface CreateOrchestratorOptions {
     maxRefinements?: number;
     planningTimeoutMs?: number;
     autoExecuteLowRisk?: boolean;
+    persistToFile?: boolean;
+    workingDirectory?: string;
   };
   components?: OrchestratorComponents;
   toolExecution?: ToolExecutionOptions;
@@ -2537,6 +2541,8 @@ function buildPlanningConfig(
     maxRefinements: planning?.maxRefinements,
     planningTimeoutMs: planning?.planningTimeoutMs,
     autoExecuteLowRisk: planning?.autoExecuteLowRisk,
+    persistToFile: planning?.persistToFile,
+    workingDirectory: planning?.workingDirectory,
   };
 }
 
