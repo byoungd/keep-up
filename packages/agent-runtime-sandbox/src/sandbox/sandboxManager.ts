@@ -5,8 +5,10 @@
  */
 
 import { PassThrough } from "node:stream";
-import Dockerode, { type Container } from "dockerode";
+import type Dockerode from "dockerode";
+import type { Container } from "dockerode";
 import type { RuntimeAssetManager } from "../assets";
+import { createDockerClient } from "../docker/dockerClient";
 import { createSandboxContainer } from "./containerFactory";
 import { ContainerPool } from "./containerPool";
 import type {
@@ -68,7 +70,7 @@ export class DockerSandboxManager implements SandboxManager {
 
   constructor(options: DockerSandboxManagerOptions = {}) {
     this.assetManager = options.assetManager;
-    this.docker = options.docker ?? options.assetManager?.getDockerClient() ?? new Dockerode();
+    this.docker = options.docker ?? options.assetManager?.getDockerClient() ?? createDockerClient();
     this.image = options.image ?? DEFAULT_IMAGE;
     this.workspacePath = options.workspacePath ?? process.cwd();
     this.containerWorkspacePath = options.containerWorkspacePath ?? DEFAULT_CONTAINER_WORKSPACE;

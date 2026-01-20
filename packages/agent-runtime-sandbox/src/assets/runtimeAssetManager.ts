@@ -4,8 +4,10 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { join } from "node:path";
 
-import Dockerode from "dockerode";
+import type Dockerode from "dockerode";
 import { chromium } from "playwright";
+
+import { createDockerClient } from "../docker/dockerClient";
 
 type Logger = Pick<Console, "info" | "warn" | "error">;
 
@@ -92,7 +94,7 @@ export class RuntimeAssetManager {
       client: options.docker?.client,
     };
     this.statePath = join(this.cacheDir, "runtime-assets.json");
-    this.dockerClient = options.docker?.client ?? new Dockerode();
+    this.dockerClient = options.docker?.client ?? createDockerClient();
   }
 
   getDockerClient(): Dockerode {
