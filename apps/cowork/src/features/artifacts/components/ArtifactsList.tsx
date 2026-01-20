@@ -1,4 +1,4 @@
-import type { ArtifactPayload } from "../../tasks/types";
+import type { EnrichedArtifact } from "../../tasks/types";
 import { ChecklistCard } from "./ChecklistCard";
 import { DiffCard } from "./DiffCard";
 import { DiffCardArtifact } from "./DiffCardArtifact";
@@ -14,13 +14,7 @@ import { TestReportCard } from "./TestReportCard";
 import { VisualDiffCard } from "./VisualDiffCard";
 
 interface ArtifactsListProps {
-  artifacts: Record<
-    string,
-    ArtifactPayload & {
-      status?: "pending" | "applied" | "reverted";
-      appliedAt?: number;
-    }
-  >;
+  artifacts: Record<string, EnrichedArtifact>;
   onApply?: (artifactId: string) => void;
   onRevert?: (artifactId: string) => void;
 }
@@ -98,7 +92,7 @@ export function ArtifactsList({ artifacts, onApply, onRevert }: ArtifactsListPro
                     key={id}
                     file={artifact.file}
                     diff={artifact.diff}
-                    status={artifact.status}
+                    status={artifact.applicationStatus}
                     appliedAt={artifact.appliedAt}
                     onApply={onApply ? () => onApply(id) : undefined}
                     onRevert={onRevert ? () => onRevert(id) : undefined}

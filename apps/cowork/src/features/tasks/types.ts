@@ -204,6 +204,24 @@ export const ArtifactPayloadSchema = z.union([
 
 export type ArtifactPayload = z.infer<typeof ArtifactPayloadSchema>;
 
+/**
+ * Metadata fields for enriched artifacts.
+ */
+export type ArtifactMetadata = {
+  updatedAt?: number;
+  taskId?: string;
+  version?: number;
+  applicationStatus?: "pending" | "applied" | "reverted";
+  appliedAt?: number;
+};
+
+/**
+ * Enriched artifact combining payload with metadata.
+ * The intersection is straightforward - assignments need type assertions
+ * after Zod validation since TS struggles with complex union spreading.
+ */
+export type EnrichedArtifact = ArtifactPayload & ArtifactMetadata;
+
 // --- Node Types ---
 
 export type TaskNodeType =
@@ -287,16 +305,7 @@ export interface TaskGraph {
   sessionId: string;
   status: TaskStatus;
   nodes: TaskNode[];
-  artifacts: Record<
-    string,
-    ArtifactPayload & {
-      updatedAt?: number;
-      taskId?: string;
-      version?: number;
-      status?: "pending" | "applied" | "reverted";
-      appliedAt?: number;
-    }
-  >; // map of artifactId -> payload with versioning and task association
+  artifacts: Record<string, EnrichedArtifact>; // Properly typed artifact map
   pendingApprovalId?: string;
   savedAt?: number;
   agentMode?: "plan" | "build" | "review";
