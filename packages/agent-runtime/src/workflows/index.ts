@@ -5,6 +5,7 @@
  * Based on Claude Code Agent best practices for structured, repeatable workflows.
  */
 
+import type { GraphDefinition } from "../graph";
 import type { ExecutionPlan, PlanStep } from "../orchestrator/planning";
 
 // ============================================================================
@@ -31,6 +32,8 @@ export interface WorkflowTemplate {
   estimatedDuration?: number;
   /** Risk level */
   riskLevel: "low" | "medium" | "high";
+  /** Optional graph definition for execution */
+  graph?: GraphDefinition;
 }
 
 /**
@@ -394,6 +397,13 @@ export class WorkflowTemplateManager {
    */
   listTemplates(): WorkflowTemplate[] {
     return Array.from(this.templates.values());
+  }
+
+  /**
+   * Get a graph definition by template ID.
+   */
+  getGraphDefinition(id: string): GraphDefinition | undefined {
+    return this.templates.get(id)?.graph;
   }
 
   /**
