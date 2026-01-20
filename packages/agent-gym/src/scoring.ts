@@ -54,7 +54,11 @@ async function evaluateExpectation(
     case "max_turns":
       return evaluateMaxTurns(expectation.count, context);
     default:
-      return { type: expectation.type, pass: false, reason: "unknown_expectation" };
+      return {
+        type: (expectation as { type: string }).type as GymExpectation["type"],
+        pass: false,
+        reason: "unknown_expectation",
+      };
   }
 }
 
@@ -125,14 +129,18 @@ async function evaluateSyntax(
     ts.ScriptTarget.ES2022,
     true
   );
-  const diagnostics = sourceFile.parseDiagnostics;
+  // parseDiagnostics is internal but available on SourceFile
+  const diagnostics = (sourceFile as unknown as { parseDiagnostics: ts.Diagnostic[] })
+    .parseDiagnostics;
   const pass = diagnostics.length === 0;
 
   return {
     type: "no_syntax_errors",
     pass,
     reason: pass ? undefined : "syntax",
-    details: pass ? undefined : diagnostics.map((diag) => diag.messageText).join("; "),
+    details: pass
+      ? undefined
+      : diagnostics.map((diag: ts.Diagnostic) => diag.messageText).join("; "),
   };
 }
 

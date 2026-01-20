@@ -158,6 +158,7 @@ export class PipelineRunner {
               code: "sandbox",
               network: "none",
               lfcc: "read",
+              computer: "disabled",
             },
             limits: {
               maxExecutionTimeMs: stage.timeoutMs ?? 30_000,

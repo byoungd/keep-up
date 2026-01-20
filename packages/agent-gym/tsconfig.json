@@ -8,8 +8,8 @@
     "composite": true,
     "baseUrl": ".",
     "paths": {
-      "@ku0/agent-runtime": ["../agent-runtime/src/index.ts"],
-      "@ku0/agent-runtime-core": ["../agent-runtime-core/src/index.ts"]
+      "@ku0/agent-runtime": ["../agent-runtime/dist/index.d.ts"],
+      "@ku0/agent-runtime-core": ["../agent-runtime-core/dist/index.d.ts"]
     }
   },
   "include": ["src/**/*"],
