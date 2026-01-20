@@ -65,6 +65,54 @@ export type MemoryType =
   | "tool_result" // Tool execution results
   | "summary"; // Consolidated summaries
 
+// ============================================================================
+// Lesson Types
+// ============================================================================
+
+export type LessonScope = "project" | "global";
+
+export type LessonProfile = "default" | "strict-reviewer" | "creative-prototyper";
+
+export type LessonSource = "critic" | "manual";
+
+export interface Lesson {
+  /** Unique lesson ID */
+  id: string;
+
+  /** Trigger text that should surface this lesson */
+  trigger: string;
+
+  /** The learned rule to apply */
+  rule: string;
+
+  /** Confidence score (0-1) */
+  confidence: number;
+
+  /** Scope for the lesson */
+  scope: LessonScope;
+
+  /** Project ID for scoped lessons */
+  projectId?: string;
+
+  /** Personality profile */
+  profile: LessonProfile;
+
+  /** Origin of the lesson */
+  source: LessonSource;
+
+  /** Created timestamp */
+  createdAt: number;
+
+  /** Updated timestamp */
+  updatedAt: number;
+
+  /** Optional embedding for vector search */
+  embedding?: number[];
+
+  /** Additional metadata */
+  metadata?: Record<string, unknown>;
+}
+
 /**
  * A single memory entry.
  */

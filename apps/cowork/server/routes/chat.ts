@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { TokenUsageStats } from "@ku0/agent-runtime";
+import type { CoworkSession, CriticAgent, TokenUsageStats } from "@ku0/agent-runtime";
 import {
   createAnthropicAdapter,
   createGoogleAdapter,
@@ -27,6 +27,7 @@ interface ChatRouteDeps {
   getSettings: () => Promise<CoworkSettings>;
   providerKeys: ProviderKeyService;
   events: SessionEventHub;
+  critic?: CriticAgent;
 }
 
 interface ChatRequestBody {
@@ -95,6 +96,12 @@ export function createChatRoutes(deps: ChatRouteDeps) {
     }
 
     await ensureUserMessage(deps.chatMessageStore, sessionId, userMessageId, body, requestId);
+    void maybeCaptureFeedback({
+      critic: deps.critic,
+      session,
+      settings,
+      body,
+    });
     await deps.chatMessageStore.create({
       messageId: assistantMessageId,
       sessionId,
@@ -422,6 +429,31 @@ export function createChatRoutes(deps: ChatRouteDeps) {
   });
 
   return app;
+}
+
+function maybeCaptureFeedback(params: {
+  critic?: CriticAgent;
+  session: CoworkSession;
+  settings: CoworkSettings;
+  body: ChatRequestBody;
+}): void {
+  if (!params.critic) {
+    return;
+  }
+  if (!params.body.parentId) {
+    return;
+  }
+  const projectId = params.session.projectId ?? params.session.grants[0]?.rootPath;
+  void params.critic.ingestFeedback({
+    feedback: params.body.content,
+    projectId,
+    profile: params.settings.memoryProfile ?? "default",
+    metadata: {
+      parentId: params.body.parentId,
+      sessionId: params.session.sessionId,
+      messageId: params.body.messageId,
+    },
+  });
 }
 
 function toResponseMessage(message: CoworkChatMessage) {

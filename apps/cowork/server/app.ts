@@ -1,3 +1,4 @@
+import type { CriticAgent, LessonStore } from "@ku0/agent-runtime";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { jsonError } from "./http";
@@ -11,6 +12,7 @@ import { createAuditLogRoutes } from "./routes/auditLogs";
 import { createChatRoutes } from "./routes/chat";
 import { createContextRoutes } from "./routes/context";
 import { createCostRoutes } from "./routes/cost";
+import { createLessonRoutes } from "./routes/lessons";
 import { createPipelineRoutes } from "./routes/pipelines";
 import { createPreflightRoutes } from "./routes/preflight";
 import { createProjectRoutes } from "./routes/projects";
@@ -37,6 +39,8 @@ export interface CoworkAppDeps {
   pipelineStore?: PipelineStore;
   pipelineRunner?: PipelineRunner;
   logger?: Pick<typeof serverLogger, "info" | "warn" | "error">;
+  lessonStore?: LessonStore;
+  critic?: CriticAgent;
 }
 
 export function createCoworkApp(deps: CoworkAppDeps) {
@@ -185,8 +189,18 @@ export function createCoworkApp(deps: CoworkAppDeps) {
       getSettings: () => deps.storage.configStore.get(),
       providerKeys,
       events: eventHub,
+      critic: deps.critic,
     })
   );
+
+  if (deps.lessonStore) {
+    app.route(
+      "/api",
+      createLessonRoutes({
+        lessonStore: deps.lessonStore,
+      })
+    );
+  }
 
   app.onError((error, c) => {
     logger.error("Server error", error);

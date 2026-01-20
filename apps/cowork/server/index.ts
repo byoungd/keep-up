@@ -1,5 +1,7 @@
 import "./env";
+import { join } from "node:path";
 import { serve } from "@hono/node-server";
+import { CriticAgent, createLessonStore } from "@ku0/agent-runtime";
 import { createCoworkApp } from "./app";
 import { serverConfig } from "./config";
 import { serverLogger } from "./logger";
@@ -20,6 +22,8 @@ const pipelineStore = await createPipelineStore();
 const pipelineRunner = createPipelineRunner({ store: pipelineStore, logger: serverLogger });
 void pipelineRunner.resumePendingRuns();
 const aiEnvelopeGateway = createAIEnvelopeGateway(serverLogger);
+const lessonStore = createLessonStore({ filePath: join(stateDir, "lessons.json") });
+const critic = new CriticAgent({ lessonStore, logger: serverLogger });
 const taskRuntime = new CoworkTaskRuntime({
   storage,
   events: eventHub,
@@ -27,6 +31,7 @@ const taskRuntime = new CoworkTaskRuntime({
   contextIndexManager,
   runtimePersistence: serverConfig.runtimePersistence,
   lfcc: aiEnvelopeGateway ? { aiEnvelopeGateway } : undefined,
+  lessonStore,
 });
 const app = createCoworkApp({
   storage,
@@ -37,6 +42,8 @@ const app = createCoworkApp({
   contextIndexManager,
   pipelineStore,
   pipelineRunner,
+  lessonStore,
+  critic,
 });
 
 export default app;

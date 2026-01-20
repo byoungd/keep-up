@@ -105,7 +105,7 @@ function ProviderKeyCard({
 export function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const [state, setState] = React.useState<SettingsState>({
-    data: { defaultModel: "gpt-4.1" },
+    data: { defaultModel: "gpt-4.1", memoryProfile: "default" },
     isLoading: true,
     error: null,
     isSaving: false,
@@ -337,6 +337,30 @@ export function SettingsPage() {
           <option value="deepseek-r1">DeepSeek R1</option>
           <option value="gemini-3-pro-high">Gemini 3 Pro High</option>
           <option value="gemini-3-flash">Gemini 3 Flash</option>
+        </select>
+      </section>
+
+      <section className="card-panel space-y-4">
+        <div>
+          <p className="text-sm font-semibold text-foreground">Memory Profile</p>
+          <p className="text-xs text-muted-foreground">
+            Choose which lesson set the agent should load by default.
+          </p>
+        </div>
+        <select
+          className="text-input"
+          aria-label="Memory profile"
+          value={state.data.memoryProfile ?? "default"}
+          onChange={(event) =>
+            handleUpdate({
+              memoryProfile: event.target.value as SettingsState["data"]["memoryProfile"],
+            })
+          }
+          disabled={state.isSaving}
+        >
+          <option value="default">Default</option>
+          <option value="strict-reviewer">Strict Reviewer</option>
+          <option value="creative-prototyper">Creative Prototyper</option>
         </select>
       </section>
 

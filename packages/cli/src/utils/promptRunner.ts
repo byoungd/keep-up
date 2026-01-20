@@ -140,13 +140,17 @@ function handleError(data: unknown, quiet: boolean) {
 }
 
 function handlePlanEvent(type: string, quiet: boolean) {
-  if (quiet) return;
+  if (quiet) {
+    return;
+  }
   const status = type.split(":")[1];
   writeStdout(`[plan] ${status}`);
 }
 
 function handleAgentEvent(type: string, quiet: boolean) {
-  if (quiet) return;
+  if (quiet) {
+    return;
+  }
   if (type === "thinking") {
     writeStdout("[agent] thinking...");
   } else if (type === "completion") {

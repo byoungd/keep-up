@@ -21,6 +21,7 @@ import {
   createDockerBashExecutor,
   createFileToolServer,
   createGhostAgent,
+  createLessonStore,
   createLFCCToolServer,
   createMem0MemoryAdapter,
   createSandboxToolServer,
@@ -30,6 +31,8 @@ import {
   DockerSandboxManager,
   FileToolResultCacheStore,
   type GhostAgent,
+  type LessonProfile,
+  type LessonStore,
   type Mem0MemoryAdapter,
   MessagePackCheckpointStorage,
   ProcessCodeExecutor,
@@ -139,6 +142,7 @@ export class CoworkTaskRuntime {
   private readonly projectContextManager: ProjectContextManager;
   private readonly providerKeys: ProviderKeyService;
   private readonly configStore: StorageLayer["configStore"];
+  private readonly lessonStore: LessonStore;
   // Optional Advanced Services (enabled per ARCHITECTURE.md standards)
   private memoryAdapter?: Mem0MemoryAdapter;
 
@@ -152,6 +156,7 @@ export class CoworkTaskRuntime {
     contextIndexManager?: ContextIndexManager;
     runtimePersistence?: RuntimePersistenceConfig;
     lfcc?: LfccRuntimeConfig;
+    lessonStore?: LessonStore;
   }) {
     this.logger = deps.logger ?? console; // Assign to property
     const logger = this.logger;
@@ -162,6 +167,7 @@ export class CoworkTaskRuntime {
     this.referenceVerifier = deps.lfcc?.referenceVerifier ?? DEFAULT_REFERENCE_VERIFIER;
     this.providerKeys =
       deps.providerKeys ?? new ProviderKeyService(deps.storage.configStore, logger);
+    this.lessonStore = deps.lessonStore ?? createLessonStore();
 
     if (this.runtimePersistence?.toolCachePath) {
       const store = new FileToolResultCacheStore({
@@ -319,12 +325,20 @@ export class CoworkTaskRuntime {
 
     // Context Injection via Mem0
     let finalPrompt = task.prompt;
+    await this.appendLessonContext({
+      session,
+      prompt: task.prompt,
+      settings,
+      apply: (context) => {
+        finalPrompt = `${finalPrompt}\n\n${context}`;
+      },
+    });
     if (this.memoryAdapter) {
       try {
         const memories = await this.memoryAdapter.recall(task.prompt, { limit: 5 });
         if (memories.length > 0) {
           const contextStr = memories.map((m) => `- ${m.content}`).join("\n");
-          finalPrompt = `${task.prompt}\n\n<IncomingContext>\n${contextStr}\n</IncomingContext>`;
+          finalPrompt = `${finalPrompt}\n\n<IncomingContext>\n${contextStr}\n</IncomingContext>`;
           this.logger.info(" injected Mem0 memories", { count: memories.length });
         }
       } catch (err) {
@@ -363,6 +377,44 @@ export class CoworkTaskRuntime {
       throw new Error(`Session ${sessionId} not found`);
     }
     return session;
+  }
+
+  private async appendLessonContext(params: {
+    session: CoworkSession;
+    prompt: string;
+    settings: { memoryProfile?: LessonProfile };
+    apply: (context: string) => void;
+  }): Promise<void> {
+    try {
+      const projectId = this.resolveLessonProjectId(params.session);
+      const profile = params.settings.memoryProfile ?? "default";
+      const results = await this.lessonStore.search(params.prompt, {
+        projectId,
+        profiles: [profile],
+        minConfidence: 0.5,
+        limit: 6,
+      });
+      if (results.length === 0) {
+        return;
+      }
+      const lines = results.map((result) => {
+        const confidence = Math.round(result.lesson.confidence * 100);
+        return `- (${confidence}%) ${result.lesson.rule}`;
+      });
+      const context = `<LessonContext profile="${profile}">\n${lines.join("\n")}\n</LessonContext>`;
+      params.apply(context);
+      this.logger.info("Injected lesson context", { count: results.length, profile });
+    } catch (error) {
+      this.logger.warn("Failed to inject lesson context", error);
+    }
+  }
+
+  private resolveLessonProjectId(session: CoworkSession): string | undefined {
+    if (session.projectId) {
+      return session.projectId;
+    }
+    const rootPath = session.grants[0]?.rootPath;
+    return rootPath ?? undefined;
   }
 
   private async buildRuntime(

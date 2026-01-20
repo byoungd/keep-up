@@ -1,4 +1,9 @@
-import type { AgentState, CoworkRiskTag, CoworkWorkflowTemplate } from "@ku0/agent-runtime";
+import type {
+  AgentState,
+  CoworkRiskTag,
+  CoworkWorkflowTemplate,
+  LessonProfile,
+} from "@ku0/agent-runtime";
 
 // ============================================================================
 // Audit Log Types
@@ -70,6 +75,7 @@ export interface CoworkSettings {
   geminiKey?: string;
   defaultModel?: string;
   theme?: "light" | "dark";
+  memoryProfile?: LessonProfile;
 }
 
 export type CoworkProviderId = "openai" | "anthropic" | "gemini" | "ollama" | "deepseek";

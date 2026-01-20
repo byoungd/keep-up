@@ -3,6 +3,9 @@ import type {
   CoworkRiskTag,
   CoworkSession,
   CoworkTask,
+  Lesson,
+  LessonProfile,
+  LessonScope,
   PreflightCheckDefinition,
   PreflightPlan,
   PreflightReport,
@@ -22,6 +25,9 @@ export type ApiResult<T> = {
   settings?: CoworkSettings;
   providers?: CoworkProvider[];
   result?: ToolCheckResult;
+  lessons?: CoworkLesson[];
+  lesson?: CoworkLesson;
+  results?: LessonSearchResult[];
   artifacts?: CoworkArtifact[];
   artifact?: CoworkArtifact;
 } & T;
@@ -43,6 +49,26 @@ export type CoworkApproval = {
 export type CoworkSettings = {
   defaultModel?: string;
   theme?: "light" | "dark";
+  memoryProfile?: LessonProfile;
+};
+
+export type CoworkLesson = Omit<Lesson, "embedding">;
+
+export type LessonSearchResult = {
+  score: number;
+  lesson: CoworkLesson;
+};
+
+export type LessonListOptions = {
+  projectId?: string;
+  scope?: LessonScope | "all";
+  profile?: LessonProfile | "all";
+  limit?: number;
+  minConfidence?: number;
+};
+
+export type LessonSearchOptions = LessonListOptions & {
+  query: string;
 };
 
 export type CoworkProviderKeySource = "settings" | "env" | "none";
@@ -226,6 +252,97 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(data.error?.message ?? "Request failed");
   }
   return data;
+}
+
+export async function listLessons(options: LessonListOptions = {}): Promise<CoworkLesson[]> {
+  const params = new URLSearchParams();
+  if (options.projectId) {
+    params.set("projectId", options.projectId);
+  }
+  if (options.scope && options.scope !== "all") {
+    params.set("scope", options.scope);
+  }
+  if (options.profile && options.profile !== "all") {
+    params.set("profile", options.profile);
+  }
+  if (options.limit !== undefined) {
+    params.set("limit", String(options.limit));
+  }
+  if (options.minConfidence !== undefined) {
+    params.set("minConfidence", String(options.minConfidence));
+  }
+  const query = params.toString();
+  const data = await fetchJson<ApiResult<unknown>>(`/api/lessons${query ? `?${query}` : ""}`);
+  return data.lessons ?? [];
+}
+
+export async function searchLessons(options: LessonSearchOptions): Promise<LessonSearchResult[]> {
+  const params = new URLSearchParams();
+  params.set("q", options.query);
+  if (options.projectId) {
+    params.set("projectId", options.projectId);
+  }
+  if (options.scope && options.scope !== "all") {
+    params.set("scope", options.scope);
+  }
+  if (options.profile && options.profile !== "all") {
+    params.set("profile", options.profile);
+  }
+  if (options.limit !== undefined) {
+    params.set("limit", String(options.limit));
+  }
+  if (options.minConfidence !== undefined) {
+    params.set("minConfidence", String(options.minConfidence));
+  }
+  const data = await fetchJson<ApiResult<unknown>>(`/api/lessons?${params.toString()}`);
+  return data.results ?? [];
+}
+
+export async function createLesson(payload: {
+  trigger: string;
+  rule: string;
+  confidence?: number;
+  scope?: LessonScope;
+  projectId?: string;
+  profile?: LessonProfile;
+}): Promise<CoworkLesson> {
+  const data = await fetchJson<ApiResult<unknown>>("/api/lessons", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!data.lesson) {
+    throw new Error("Lesson not returned");
+  }
+  return data.lesson;
+}
+
+export async function updateLesson(
+  lessonId: string,
+  payload: {
+    trigger?: string;
+    rule?: string;
+    confidence?: number;
+    scope?: LessonScope;
+    projectId?: string;
+    profile?: LessonProfile;
+  }
+): Promise<CoworkLesson> {
+  const data = await fetchJson<ApiResult<unknown>>(`/api/lessons/${lessonId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!data.lesson) {
+    throw new Error("Lesson not returned");
+  }
+  return data.lesson;
+}
+
+export async function deleteLesson(lessonId: string): Promise<void> {
+  await fetchJson<ApiResult<unknown>>(`/api/lessons/${lessonId}`, {
+    method: "DELETE",
+  });
 }
 
 export async function listSessions(): Promise<CoworkSession[]> {
