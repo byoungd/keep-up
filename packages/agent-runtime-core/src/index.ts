@@ -734,20 +734,6 @@ export interface RuntimeCacheConfig {
   };
 }
 
-export interface VisionConfig {
-  autoApplyConfidenceThreshold: number;
-  maxScreenshotWidth: number;
-  maxScreenshotHeight: number;
-  ocrEnabled: boolean;
-}
-
-export const DEFAULT_VISION_CONFIG: VisionConfig = {
-  autoApplyConfidenceThreshold: 0.85,
-  maxScreenshotWidth: 1920,
-  maxScreenshotHeight: 1080,
-  ocrEnabled: true,
-};
-
 export interface RuntimeConfig {
   cache?: RuntimeCacheConfig;
   execution?: ExecutionConfig;
@@ -819,6 +805,31 @@ export const DEFAULT_EXECUTION_CONFIG: ExecutionConfig = {
   maxInFlightPerWorker: 4,
   queueDepthLimit: 1000,
   batchBackpressureThreshold: 500,
+};
+
+// ============================================================================
+// Vision Types
+// ============================================================================
+
+export interface VisionConfig {
+  /** Whether OCR blocks are processed in layout scans */
+  ocrEnabled: boolean;
+  /** Confidence threshold for auto-applying region mappings */
+  autoApplyConfidenceThreshold: number;
+  /** Maximum nodes for layout graphs */
+  maxNodes: number;
+  /** Max screenshot width for processing */
+  maxScreenshotWidth: number;
+  /** Max screenshot height for processing */
+  maxScreenshotHeight: number;
+}
+
+export const DEFAULT_VISION_CONFIG: VisionConfig = {
+  ocrEnabled: true,
+  autoApplyConfidenceThreshold: 0.85,
+  maxNodes: 1000,
+  maxScreenshotWidth: 1920,
+  maxScreenshotHeight: 1080,
 };
 
 export interface ExecutionTaskSnapshot {

@@ -11,7 +11,9 @@ import type { TelemetryContext } from "@ku0/agent-runtime-telemetry/telemetry";
 import { AGENT_METRICS } from "@ku0/agent-runtime-telemetry/telemetry";
 import { z } from "zod";
 import { LRUCache } from "../utils/cache";
-import type { CoworkRiskTag } from "./types";
+
+// Defined locally to avoid circular dependency with cowork/types.ts
+export type CoworkRiskTag = "delete" | "overwrite" | "network" | "connector" | "batch";
 
 export type CoworkPolicyDecisionType = "allow" | "allow_with_confirm" | "deny";
 

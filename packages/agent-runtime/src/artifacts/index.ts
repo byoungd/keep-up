@@ -8,6 +8,13 @@ import type { RuntimeEventBus } from "@ku0/agent-runtime-control";
 import { z } from "zod";
 import type { TaskGraphStore } from "../tasks/taskGraph";
 import type { ArtifactEnvelope, ArtifactType } from "../types";
+import type { ArtifactEmissionContext, ArtifactEmissionResult } from "./artifactTypes";
+
+export type {
+  ArtifactEmissionContext,
+  ArtifactEmissionResult,
+  ArtifactEmitter,
+} from "./artifactTypes";
 
 export interface ArtifactValidationResult {
   valid: boolean;
@@ -81,16 +88,6 @@ export class ArtifactRegistry {
   private schemaKey(type: ArtifactType, version: string): string {
     return `${type}@${version}`;
   }
-}
-
-export interface ArtifactEmissionContext {
-  correlationId?: string;
-  source?: string;
-  idempotencyKey?: string;
-}
-
-export interface ArtifactEmissionResult extends ArtifactStoreResult {
-  artifactNodeId?: string;
 }
 
 export interface ArtifactPipelineConfig {

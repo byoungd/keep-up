@@ -23,7 +23,11 @@ describe("editFile Boundary Conditions", () => {
       validateSyntax: false,
     });
     expect(result.success).toBe(false);
-    expect(result.syntaxError).toContain("Invalid start line");
+    // Range validation errors are returned in result.error (or diff for some legacy impl),
+    // but looking at PR 139 impl, it returns { success: false, diff: "", error: "..." } for pre-validation failures.
+    // Wait, the new impl uses ctx.error.
+    expect(result.error).toBeDefined();
+    expect(result.error).toContain("Invalid start line");
   });
 
   it("should handle end line < start line", async () => {
@@ -31,7 +35,8 @@ describe("editFile Boundary Conditions", () => {
       validateSyntax: false,
     });
     expect(result.success).toBe(false);
-    expect(result.syntaxError).toContain("End line (1) must be >= start line (2)");
+    expect(result.error).toBeDefined();
+    expect(result.error).toContain("End line (1) must be >= start line (2)");
   });
 
   it("should handle start line > total lines", async () => {
@@ -39,31 +44,23 @@ describe("editFile Boundary Conditions", () => {
       validateSyntax: false,
     });
     expect(result.success).toBe(false);
-    expect(result.syntaxError).toContain("exceeds file length");
+    expect(result.error).toBeDefined();
+    expect(result.error).toContain("exceeds file length");
   });
 
   it("should handle end line > total lines", async () => {
-    // Current implementation doesn't explicitly check endLine > totalLines in validateEditRanges
-    // Let's see how it behaves.
+    // Strict implementation in PR 139 checks endLine > totalLines
     const result = await editFile(testFile, [{ startLine: 2, endLine: 10, replacement: "new" }], {
       validateSyntax: false,
     });
-    // splice handles this by deleting until end of array.
-    // If the tool is intended to be strict, this should perhaps fail.
-    // But let's see current behavior.
-    expect(result.success).toBe(true);
-    const content = await fs.readFile(testFile, "utf-8");
-    expect(content).toBe("line1\nnew");
-    // Wait, if it replaces line 2-10 (but only has 4 lines), it replaces 2, 3, 4.
-    // So line1 + new.
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("exceeds file length");
   });
 
   it("should handle editing an empty file", async () => {
     const emptyFile = path.join(tempDir, "empty.txt");
     await fs.writeFile(emptyFile, "");
 
-    // If file is empty, totalLines is 1 (after split('\n') on empty string)
-    // Actually, "".split('\n') is ['']. So 1 line.
     const result = await editFile(
       emptyFile,
       [{ startLine: 1, endLine: 1, replacement: "first line" }],
@@ -71,7 +68,7 @@ describe("editFile Boundary Conditions", () => {
     );
     expect(result.success).toBe(true);
     const content = await fs.readFile(emptyFile, "utf-8");
-    expect(content).toBe("first line");
+    expect(content).toBe("first line\n"); // Expect trailing newline
   });
 
   it("should handle large number of line insertions", async () => {
