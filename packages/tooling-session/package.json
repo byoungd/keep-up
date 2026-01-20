@@ -18,5 +18,10 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "dependencies": {
+    "@ku0/agent-runtime": "workspace:*",
+    "@ku0/agent-runtime-core": "workspace:*",
+    "@ku0/ai-core": "workspace:*"
   }
 }
