@@ -14,6 +14,7 @@ import type {
   Position,
   Range,
   SymbolInformation,
+  WorkspaceEdit,
 } from "./protocol";
 import { createStdioTransport, type JsonRpcMessage, type Transport } from "./transport";
 
@@ -22,6 +23,7 @@ export interface LSPClientOptions {
   args?: string[];
   cwd?: string;
   timeout?: number;
+  initializationOptions?: Record<string, unknown>;
 }
 
 export interface LSPClient {
@@ -33,6 +35,7 @@ export interface LSPClient {
   findReferences(path: string, position: Position): Promise<Location[]>;
   getDocumentSymbols(path: string): Promise<DocumentSymbol[]>;
   getDiagnostics(path: string): Promise<Diagnostic[]>;
+  renameSymbol(path: string, position: Position, newName: string): Promise<WorkspaceEdit | null>;
   shutdown(): Promise<void>;
 }
 
@@ -163,6 +166,7 @@ export class LSPClientImpl implements LSPClient {
 
   async goToDefinition(filePath: string, position: Position): Promise<Location[]> {
     await this.openFile(filePath);
+    await this.waitForReady();
     const uri = pathToFileURL(path.resolve(filePath)).href;
 
     const result = await this.sendRequest<Location | Location[] | LocationLink[] | null>(
@@ -178,6 +182,7 @@ export class LSPClientImpl implements LSPClient {
 
   async findReferences(filePath: string, position: Position): Promise<Location[]> {
     await this.openFile(filePath);
+    await this.waitForReady();
     const uri = pathToFileURL(path.resolve(filePath)).href;
 
     const result = await this.sendRequest<Location[] | null>("textDocument/references", {
@@ -191,6 +196,7 @@ export class LSPClientImpl implements LSPClient {
 
   async getDocumentSymbols(filePath: string): Promise<DocumentSymbol[]> {
     await this.openFile(filePath);
+    await this.waitForReady();
     const uri = pathToFileURL(path.resolve(filePath)).href;
 
     const result = await this.sendRequest<Array<DocumentSymbol | SymbolInformation> | null>(
@@ -218,6 +224,7 @@ export class LSPClientImpl implements LSPClient {
 
   async getDiagnostics(filePath: string): Promise<Diagnostic[]> {
     await this.openFile(filePath);
+    await this.waitForReady();
     const uri = pathToFileURL(path.resolve(filePath)).href;
     const cached = this.diagnosticsByUri.get(uri);
     if (cached) {
@@ -225,6 +232,24 @@ export class LSPClientImpl implements LSPClient {
     }
 
     return this.waitForDiagnostics(uri, Math.min(this.options.timeout, 5000));
+  }
+
+  async renameSymbol(
+    filePath: string,
+    position: Position,
+    newName: string
+  ): Promise<WorkspaceEdit | null> {
+    await this.openFile(filePath);
+    await this.waitForReady();
+    const uri = pathToFileURL(path.resolve(filePath)).href;
+
+    const result = await this.sendRequest<WorkspaceEdit | null>("textDocument/rename", {
+      textDocument: { uri },
+      position,
+      newName,
+    });
+
+    return result ?? null;
   }
 
   async shutdown(): Promise<void> {
@@ -277,7 +302,17 @@ export class LSPClientImpl implements LSPClient {
     this.transport = createStdioTransport(this.process);
     this.transport.onMessage(this.handleMessage);
 
-    const initParams = {
+    const initParams: {
+      processId: number;
+      rootUri: string | null;
+      rootPath: string | null;
+      capabilities: {
+        workspace: { workspaceFolders: boolean };
+        textDocument: { synchronization: { didSave: boolean } };
+      };
+      workspaceFolders: Array<{ uri: string | null; name: string }>;
+      initializationOptions?: Record<string, unknown>;
+    } = {
       processId: process.pid,
       rootUri: this.rootUri,
       rootPath: this.rootPath,
@@ -293,6 +328,10 @@ export class LSPClientImpl implements LSPClient {
       },
       workspaceFolders: [{ uri: this.rootUri, name: path.basename(this.rootPath) }],
     };
+
+    if (this.options.initializationOptions) {
+      initParams.initializationOptions = this.options.initializationOptions;
+    }
 
     await this.sendRequest("initialize", initParams);
     await this.transport.send({ jsonrpc: "2.0", method: "initialized", params: {} });

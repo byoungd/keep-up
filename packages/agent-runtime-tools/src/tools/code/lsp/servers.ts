@@ -4,6 +4,7 @@
 
 import { execFile } from "node:child_process";
 import * as fs from "node:fs";
+import { createRequire } from "node:module";
 import * as path from "node:path";
 import { promisify } from "node:util";
 
@@ -16,12 +17,15 @@ export interface ServerConfig {
   args: string[];
   filePatterns: string[];
   projectMarkers: string[];
+  initializationOptions?: Record<string, unknown>;
 }
 
 export interface DetectedLanguageServer {
   config: ServerConfig;
   rootPath: string;
 }
+
+const typescriptServerPath = resolveTypeScriptServerPath();
 
 export const LANGUAGE_SERVERS: ServerConfig[] = [
   {
@@ -31,6 +35,14 @@ export const LANGUAGE_SERVERS: ServerConfig[] = [
     args: ["--stdio"],
     filePatterns: ["*.ts", "*.tsx", "*.js", "*.jsx"],
     projectMarkers: ["tsconfig.json", "jsconfig.json", "package.json"],
+    initializationOptions: typescriptServerPath
+      ? {
+          tsserver: {
+            path: typescriptServerPath,
+            fallbackPath: typescriptServerPath,
+          },
+        }
+      : undefined,
   },
   {
     id: "go",
@@ -58,11 +70,75 @@ export const LANGUAGE_SERVERS: ServerConfig[] = [
   },
 ];
 
+function resolveTypeScriptServerPath(): string | null {
+  const require = createRequire(import.meta.url);
+  try {
+    return require.resolve("typescript/lib/tsserver.js");
+  } catch {
+    return null;
+  }
+}
+
+function isCommandPath(command: string): boolean {
+  return (
+    command.includes(path.sep) ||
+    command.includes("/") ||
+    command.includes("\\") ||
+    path.isAbsolute(command)
+  );
+}
+
+function resolveLocalBinary(command: string, startPath: string): string | null {
+  const candidates =
+    process.platform === "win32"
+      ? [`${command}.cmd`, `${command}.exe`, `${command}.bat`]
+      : [command];
+  let current = path.resolve(startPath);
+
+  while (true) {
+    for (const candidate of candidates) {
+      const binPath = path.join(current, "node_modules", ".bin", candidate);
+      if (fs.existsSync(binPath)) {
+        return binPath;
+      }
+    }
+    const parent = path.dirname(current);
+    if (parent === current) {
+      return null;
+    }
+    current = parent;
+  }
+}
+
+export function resolveLanguageServerCommand(config: ServerConfig, rootPath: string): string {
+  if (isCommandPath(config.command)) {
+    return config.command;
+  }
+
+  const resolved =
+    resolveLocalBinary(config.command, rootPath) ??
+    resolveLocalBinary(config.command, process.cwd());
+
+  return resolved ?? config.command;
+}
+
+export function resolveLanguageServerConfig(config: ServerConfig, rootPath: string): ServerConfig {
+  const command = resolveLanguageServerCommand(config, rootPath);
+  if (command === config.command) {
+    return config;
+  }
+  return { ...config, command };
+}
+
 /**
  * Detect the appropriate language server for a project root.
  */
 export function detectLanguageServer(rootPath: string): ServerConfig | null {
-  return detectLanguageServerFromConfigs(rootPath, LANGUAGE_SERVERS);
+  const config = detectLanguageServerFromConfigs(rootPath, LANGUAGE_SERVERS);
+  if (!config) {
+    return null;
+  }
+  return resolveLanguageServerConfig(config, rootPath);
 }
 
 /**
@@ -77,7 +153,7 @@ export function detectLanguageServerForPath(targetPath: string): DetectedLanguag
   while (true) {
     const config = detectLanguageServerFromConfigs(current, candidateServers);
     if (config) {
-      return { config, rootPath: current };
+      return { config: resolveLanguageServerConfig(config, current), rootPath: current };
     }
     const parent = path.dirname(current);
     if (parent === current) {
@@ -149,11 +225,7 @@ function matchesExtension(extension: string, patterns: string[]): boolean {
  * Check if a language server is available on the system.
  */
 export async function isServerAvailable(config: ServerConfig): Promise<boolean> {
-  const hasPathSeparator =
-    config.command.includes(path.sep) ||
-    config.command.includes("/") ||
-    config.command.includes("\\");
-  if (hasPathSeparator || path.isAbsolute(config.command)) {
+  if (isCommandPath(config.command)) {
     return fs.existsSync(config.command);
   }
 

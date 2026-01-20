@@ -64,6 +64,7 @@ import type {
   MCPTool,
   MCPToolCall,
   RuntimeMessageBus,
+  SecurityPolicy,
   ToolContext,
 } from "../types";
 

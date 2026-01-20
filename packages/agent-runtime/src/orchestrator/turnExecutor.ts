@@ -28,6 +28,7 @@ import type { SkillRegistry } from "@ku0/agent-runtime-tools";
 import { SkillPromptAdapter, type SkillPromptOptions } from "@ku0/agent-runtime-tools";
 import type { ContextFrameBuilder, ContextFrameOutput, ContextItem } from "../context";
 import type { KnowledgeMatchResult, KnowledgeRegistry } from "../knowledge";
+import type { SymbolContextProvider } from "../lsp";
 import { AGENTS_GUIDE_PROMPT } from "../prompts/agentGuidelines";
 import type { AgentMessage, AgentState, MCPToolCall, TokenUsageStats } from "../types";
 import type { AgentLLMRequest, AgentLLMResponse, AgentToolDefinition, IAgentLLM } from "./llmTypes";
@@ -99,6 +100,8 @@ export interface TurnExecutorDependencies {
   readonly getContextItems?: () => ContextItem[];
   /** Optional knowledge registry for context injection */
   readonly knowledgeRegistry?: KnowledgeRegistry;
+  /** Optional symbol context provider for semantic code perception */
+  readonly symbolContextProvider?: SymbolContextProvider;
   /** Optional skill registry for available skills prompt injection */
   readonly skillRegistry?: SkillRegistry;
   /** Optional skill prompt adapter */
@@ -192,8 +195,9 @@ export class TurnExecutor implements ITurnExecutor {
       metrics.compressionRatio = compressionResult.ratio;
       metrics.compressionTimeMs = compressionResult.timeMs;
 
-      // Step 2: Match relevant knowledge
+      // Step 2: Match relevant knowledge and symbol context
       const knowledgeContent = this.matchKnowledge(state, span);
+      const symbolContext = this.matchSymbolContext(state, span);
       metrics.knowledgeMatched = knowledgeContent ? 1 : 0;
 
       // Step 3: Build LLM request
@@ -202,6 +206,7 @@ export class TurnExecutor implements ITurnExecutor {
       const request = this.buildRequest(
         compressionResult.messages,
         knowledgeContent,
+        symbolContext,
         skillPrompt,
         contextFrame?.content
       );
@@ -296,6 +301,25 @@ export class TurnExecutor implements ITurnExecutor {
     return undefined;
   }
 
+  private matchSymbolContext(state: AgentState, span?: SpanContext): string | undefined {
+    if (!this.deps.symbolContextProvider) {
+      return undefined;
+    }
+
+    const latestUserMessage = this.getLatestUserMessage(state);
+    if (!latestUserMessage) {
+      return undefined;
+    }
+
+    const context = this.deps.symbolContextProvider.getSymbolContext(latestUserMessage);
+    if (context) {
+      span?.setAttribute("symbol.context_length", context.length);
+      return context;
+    }
+
+    return undefined;
+  }
+
   private buildContextFrame(): ContextFrameOutput | undefined {
     if (!this.deps.contextFrameBuilder || !this.deps.getContextItems) {
       return undefined;
@@ -314,6 +338,7 @@ export class TurnExecutor implements ITurnExecutor {
   private buildRequest(
     messages: AgentMessage[],
     knowledgeContent?: string,
+    symbolContext?: string,
     skillPrompt?: string,
     contextFrameContent?: string
   ): AgentLLMRequest {
@@ -324,6 +349,9 @@ export class TurnExecutor implements ITurnExecutor {
     }
     if (contextFrameContent) {
       promptParts.push(`## Context Frame\n\n${contextFrameContent}`);
+    }
+    if (symbolContext) {
+      promptParts.push(`## Code Perception\n\n${symbolContext}`);
     }
     if (knowledgeContent) {
       promptParts.push(`## Relevant Knowledge\n\n${knowledgeContent}`);

@@ -5,6 +5,7 @@
  */
 
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { MCPTool, MCPToolResult, ToolContext } from "@ku0/agent-runtime-core";
 import { BaseToolServer, errorResult, textResult } from "../mcp/baseServer";
 import * as editor from "./editor";
@@ -19,6 +20,11 @@ import {
   lspLocationToPath,
   type ServerConfig,
 } from "./lsp";
+import {
+  type ApplyWorkspaceEditResult,
+  applyWorkspaceEdit,
+  collectWorkspaceChanges,
+} from "./lsp/workspaceEdit";
 import * as patch from "./patch";
 import { type SearchResult, searchCode } from "./search";
 import { getOutline, type OutlineItem, type OutlineResult } from "./skeleton";
@@ -48,12 +54,19 @@ interface LspSession {
   rootPath: string;
 }
 
+interface LspWarmupSummary {
+  opened: number;
+  total: number;
+  truncated: boolean;
+}
+
 export class CodeInteractionServer extends BaseToolServer {
   readonly name = "code_interaction";
   readonly description = "Code file reading, editing, and navigation tools";
 
   private readonly windowViewer = createWindowViewer();
   private readonly lspSessions = new Map<string, Promise<LspSession>>();
+  private readonly lspWarmups = new Map<string, Promise<LspWarmupSummary | null>>();
 
   constructor() {
     super();
@@ -66,6 +79,9 @@ export class CodeInteractionServer extends BaseToolServer {
     this.registerTool(this.createScrollFileTool(), this.handleScrollFile.bind(this));
     this.registerTool(this.createGoToDefinitionTool(), this.handleGoToDefinition.bind(this));
     this.registerTool(this.createFindReferencesTool(), this.handleFindReferences.bind(this));
+    this.registerTool(this.createNavDefTool(), this.handleGoToDefinition.bind(this));
+    this.registerTool(this.createNavRefsTool(), this.handleFindReferences.bind(this));
+    this.registerTool(this.createRenameSymbolTool(), this.handleRenameSymbol.bind(this));
     this.registerTool(this.createDiagnosticsTool(), this.handleDiagnostics.bind(this));
   }
 
@@ -735,6 +751,102 @@ export class CodeInteractionServer extends BaseToolServer {
     };
   }
 
+  private createNavDefTool(): MCPTool {
+    return {
+      name: "nav_def",
+      description: "Navigate to the definition of a symbol at a given position.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          path: {
+            type: "string",
+            description: "Path to the source file",
+          },
+          line: {
+            type: "number",
+            description: "1-indexed line number",
+          },
+          character: {
+            type: "number",
+            description: "1-indexed character position",
+          },
+        },
+        required: ["path", "line", "character"],
+      },
+      annotations: {
+        requiresConfirmation: false,
+        readOnly: true,
+      },
+    };
+  }
+
+  private createNavRefsTool(): MCPTool {
+    return {
+      name: "nav_refs",
+      description: "Find references to a symbol at a given position.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          path: {
+            type: "string",
+            description: "Path to the source file",
+          },
+          line: {
+            type: "number",
+            description: "1-indexed line number",
+          },
+          character: {
+            type: "number",
+            description: "1-indexed character position",
+          },
+        },
+        required: ["path", "line", "character"],
+      },
+      annotations: {
+        requiresConfirmation: false,
+        readOnly: true,
+      },
+    };
+  }
+
+  private createRenameSymbolTool(): MCPTool {
+    return {
+      name: "rename_sym",
+      description:
+        "Rename a symbol across the project using LSP. Applies a workspace edit across all references.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          path: {
+            type: "string",
+            description: "Path to the source file containing the symbol",
+          },
+          line: {
+            type: "number",
+            description: "1-indexed line number",
+          },
+          character: {
+            type: "number",
+            description: "1-indexed character position",
+          },
+          new_name: {
+            type: "string",
+            description: "New name for the symbol",
+          },
+          apply: {
+            type: "boolean",
+            description: "Apply the edits to disk (default: true)",
+          },
+        },
+        required: ["path", "line", "character", "new_name"],
+      },
+      annotations: {
+        requiresConfirmation: true,
+        readOnly: false,
+      },
+    };
+  }
+
   private createDiagnosticsTool(): MCPTool {
     return {
       name: "get_diagnostics",
@@ -817,6 +929,7 @@ export class CodeInteractionServer extends BaseToolServer {
     try {
       const absolutePath = path.resolve(filePath);
       const session = await this.getLspSession(absolutePath);
+      await this.ensureWorkspaceWarmup(session);
       const locations = await session.client.findReferences(absolutePath, {
         line: position.line - 1,
         character: position.character - 1,
@@ -827,6 +940,67 @@ export class CodeInteractionServer extends BaseToolServer {
       }
 
       return textResult(formatLocations("References", locations));
+    } catch (err) {
+      return this.formatLspError(err);
+    }
+  }
+
+  private async handleRenameSymbol(
+    args: Record<string, unknown>,
+    context: ToolContext
+  ): Promise<MCPToolResult> {
+    const filePath = args.path as string | undefined;
+    const position = parsePosition(args.line, args.character);
+    const newName = args.new_name as string | undefined;
+    const apply = typeof args.apply === "boolean" ? args.apply : true;
+
+    if (!filePath) {
+      return errorResult("INVALID_ARGUMENTS", "path is required");
+    }
+    if (!position) {
+      return errorResult("INVALID_ARGUMENTS", "line and character must be >= 1");
+    }
+    if (!newName) {
+      return errorResult("INVALID_ARGUMENTS", "new_name is required");
+    }
+
+    const filePermission = context.security?.permissions?.file;
+    if (filePermission === "none") {
+      return errorResult("PERMISSION_DENIED", "File system access is disabled");
+    }
+
+    try {
+      const absolutePath = path.resolve(filePath);
+      const session = await this.getLspSession(absolutePath);
+      const warmup = await this.ensureWorkspaceWarmup(session);
+      const edit = await session.client.renameSymbol(
+        absolutePath,
+        {
+          line: position.line - 1,
+          character: position.character - 1,
+        },
+        newName
+      );
+
+      if (!edit) {
+        return errorResult("EXECUTION_FAILED", "Rename not available at this location");
+      }
+
+      const changes = collectWorkspaceChanges(edit);
+      if (changes.length === 0) {
+        return textResult("Rename completed with no edits.");
+      }
+
+      if (!apply) {
+        return textResult(
+          formatRenamePreview(filePath, position, newName, changes, warmup ?? undefined)
+        );
+      }
+
+      const result = await applyWorkspaceEdit(edit);
+      return textResult(
+        formatRenameResult(filePath, position, newName, result, warmup ?? undefined)
+      );
     } catch (err) {
       return this.formatLspError(err);
     }
@@ -865,6 +1039,64 @@ export class CodeInteractionServer extends BaseToolServer {
   // LSP Session Management
   // --------------------------------------------------------------------------
 
+  private async ensureWorkspaceWarmup(session: LspSession): Promise<LspWarmupSummary | null> {
+    if (session.config.id !== "typescript") {
+      return null;
+    }
+
+    const key = `${session.config.id}:${session.rootPath}`;
+    const existing = this.lspWarmups.get(key);
+    if (existing) {
+      return existing;
+    }
+
+    const promise = this.warmupWorkspaceFiles(session);
+    this.lspWarmups.set(key, promise);
+
+    try {
+      return await promise;
+    } catch {
+      this.lspWarmups.delete(key);
+      return null;
+    }
+  }
+
+  private async warmupWorkspaceFiles(session: LspSession): Promise<LspWarmupSummary | null> {
+    const extensions = extractExtensions(session.config.filePatterns);
+    if (extensions.length === 0) {
+      return null;
+    }
+
+    let entries: fileSystem.FileEntry[];
+    try {
+      entries = await fileSystem.listFiles(session.rootPath, {
+        includeHidden: false,
+        respectGitignore: true,
+      });
+    } catch {
+      return null;
+    }
+
+    const files = entries
+      .filter((entry) => entry.type === "file")
+      .filter((entry) => matchesExtension(entry.path, extensions))
+      .sort((a, b) => a.path.localeCompare(b.path));
+
+    const limitedFiles = files.slice(0, MAX_LSP_WARMUP_FILES);
+    for (const entry of limitedFiles) {
+      const filePath = path.isAbsolute(entry.path)
+        ? entry.path
+        : path.join(session.rootPath, entry.path);
+      await session.client.openFile(filePath);
+    }
+
+    return {
+      opened: limitedFiles.length,
+      total: files.length,
+      truncated: files.length > MAX_LSP_WARMUP_FILES,
+    };
+  }
+
   private async getLspSession(filePath: string): Promise<LspSession> {
     const detection = detectLanguageServerForPath(filePath);
     if (!detection) {
@@ -898,6 +1130,7 @@ export class CodeInteractionServer extends BaseToolServer {
       command: config.command,
       args: config.args,
       cwd: rootPath,
+      initializationOptions: config.initializationOptions,
     });
     await client.initialize(rootPath);
     return { client, config, rootPath };
@@ -926,6 +1159,7 @@ export class CodeInteractionServer extends BaseToolServer {
       }
     }
     this.lspSessions.clear();
+    this.lspWarmups.clear();
   }
 }
 
@@ -1030,6 +1264,91 @@ function formatDiagnostics(filePath: string, diagnostics: Diagnostic[]): string 
     lines.push(`${severity} L${d.range.start.line + 1}: ${d.message}`);
   }
   return lines.join("\n");
+}
+
+function formatRenamePreview(
+  filePath: string,
+  position: { line: number; character: number },
+  newName: string,
+  changes: ReturnType<typeof collectWorkspaceChanges>,
+  warmup?: LspWarmupSummary
+): string {
+  const lines: string[] = [
+    `Rename preview: ${filePath}:${position.line}:${position.character} -> ${newName}`,
+    `Files to update: ${changes.length}`,
+    "",
+  ];
+
+  if (warmup?.truncated) {
+    lines.push(
+      `Note: opened ${warmup.opened}/${warmup.total} project files; rename may be incomplete.`,
+      ""
+    );
+  }
+
+  for (const change of changes) {
+    const target = resolveWorkspaceUri(change.uri);
+    lines.push(`- ${target} (${change.edits.length} edit(s))`);
+  }
+
+  return lines.join("\n");
+}
+
+function formatRenameResult(
+  filePath: string,
+  position: { line: number; character: number },
+  newName: string,
+  result: ApplyWorkspaceEditResult,
+  warmup?: LspWarmupSummary
+): string {
+  const lines: string[] = [
+    `Renamed symbol: ${filePath}:${position.line}:${position.character} -> ${newName}`,
+    `Updated ${result.files.length} file(s):`,
+    "",
+  ];
+
+  if (warmup?.truncated) {
+    lines.push(
+      `Note: opened ${warmup.opened}/${warmup.total} project files; rename may be incomplete.`,
+      ""
+    );
+  }
+
+  for (const file of result.files) {
+    lines.push(`- ${file.file} (${file.editCount} edit(s))`);
+  }
+
+  return lines.join("\n");
+}
+
+const MAX_LSP_WARMUP_FILES = 2000;
+
+function extractExtensions(patterns: string[]): string[] {
+  const extensions = new Set<string>();
+  for (const pattern of patterns) {
+    if (pattern.startsWith("*.")) {
+      extensions.add(pattern.slice(1).toLowerCase());
+      continue;
+    }
+    if (pattern.startsWith(".")) {
+      extensions.add(pattern.toLowerCase());
+    }
+  }
+  return Array.from(extensions);
+}
+
+function matchesExtension(filePath: string, extensions: string[]): boolean {
+  if (extensions.length === 0) {
+    return true;
+  }
+  return extensions.includes(path.extname(filePath).toLowerCase());
+}
+
+function resolveWorkspaceUri(uri: string): string {
+  if (uri.startsWith("file://")) {
+    return fileURLToPath(uri);
+  }
+  return path.resolve(uri);
 }
 
 // ============================================================================

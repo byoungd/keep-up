@@ -165,7 +165,10 @@ async function executeStreamingTurn(
 
   const normalizedToolCalls = streamed.toolCalls.map(ensureToolCallId);
   if (normalizedToolCalls.length === 0) {
-    const nextMessages = [...messages, { role: "assistant", content: streamed.response.content }];
+    const nextMessages: AgentMessage[] = [
+      ...messages,
+      { role: "assistant" as const, content: streamed.response.content },
+    ];
     await config.stream.writeDone("complete");
     return {
       messages: nextMessages,
@@ -288,6 +291,10 @@ async function completeWithStream(
   const toolResults: MCPToolResult[] = [];
   const toolResultsMap = new Map<string, MCPToolResult>();
   let usage: TokenUsageStats | undefined;
+
+  if (!llm.stream) {
+    throw new Error("LLM does not support streaming");
+  }
 
   for await (const chunk of llm.stream(request)) {
     if (chunk.type === "content" && chunk.content) {

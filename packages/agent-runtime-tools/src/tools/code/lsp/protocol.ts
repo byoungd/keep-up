@@ -25,6 +25,21 @@ export interface Diagnostic {
   message: string;
 }
 
+export interface TextEdit {
+  range: Range;
+  newText: string;
+}
+
+export interface TextDocumentEdit {
+  textDocument: { uri: string; version: number | null };
+  edits: TextEdit[];
+}
+
+export interface WorkspaceEdit {
+  changes?: Record<string, TextEdit[]>;
+  documentChanges?: TextDocumentEdit[];
+}
+
 export interface TextDocumentIdentifier {
   uri: string;
 }

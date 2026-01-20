@@ -56,6 +56,7 @@ import {
   type ToolExecutor,
 } from "../executor";
 import type { KnowledgeRegistry } from "../knowledge";
+import type { SymbolContextProvider } from "../lsp";
 import { AGENTS_GUIDE_PROMPT } from "../prompts/agentGuidelines";
 import type { ModelRouter, ModelRoutingDecision } from "../routing/modelRouter";
 import { resolveRuntimeCacheConfig } from "../runtimeConfig";
@@ -200,6 +201,8 @@ export interface OrchestratorComponents {
   intentRegistry?: IntentRegistry;
   /** Knowledge registry for scoped knowledge injection */
   knowledgeRegistry?: KnowledgeRegistry;
+  /** Symbol context provider for semantic code perception */
+  symbolContextProvider?: SymbolContextProvider;
   /** Optional context frame builder */
   contextFrameBuilder?: ContextFrameBuilder;
   /** Optional provider for context items */
@@ -403,6 +406,7 @@ export class AgentOrchestrator {
       messageCompressor: this.messageCompressor,
       requestCache: this.requestCache,
       knowledgeRegistry: this.knowledgeRegistry,
+      symbolContextProvider: components.symbolContextProvider,
       contextFrameBuilder: components.contextFrameBuilder,
       getContextItems: components.contextItemsProvider,
       skillRegistry: this.skillRegistry,

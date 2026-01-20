@@ -244,4 +244,35 @@ describe("TurnExecutor", () => {
       );
     });
   });
+
+  describe("symbol context", () => {
+    it("injects symbol context into system prompt", async () => {
+      const completeFn = vi.fn().mockResolvedValue({
+        content: "Test",
+        finishReason: "stop",
+      } satisfies AgentLLMResponse);
+      const deps = createMockDeps({
+        llm: { complete: completeFn } as unknown as IAgentLLM,
+        symbolContextProvider: {
+          getSymbolContext: vi.fn().mockReturnValue("### Symbols\n- AuthService"),
+        },
+      });
+      const executor = createTurnExecutor(deps);
+      const state: AgentState = {
+        ...createMockState(),
+        messages: [
+          { role: "system", content: "System prompt" },
+          { role: "user", content: "User query" },
+        ],
+      };
+
+      await executor.execute(state);
+
+      expect(completeFn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          systemPrompt: expect.stringContaining("## Code Perception"),
+        })
+      );
+    });
+  });
 });

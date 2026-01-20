@@ -54,6 +54,7 @@ export interface LspSymbol {
   column: number;
   endLine: number;
   endColumn: number;
+  detail?: string;
   children?: LspSymbol[];
 }
 
