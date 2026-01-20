@@ -71,6 +71,8 @@ export class PermissionChecker implements IPermissionChecker {
         return this.checkFilePermission(operation, check.resource);
       case "code":
         return this.checkCodePermission(operation);
+      case "computer":
+        return this.checkComputerPermission(operation);
       case "lfcc":
         return this.checkLFCCPermission(operation);
       default:
@@ -149,6 +151,41 @@ export class PermissionChecker implements IPermissionChecker {
         };
       case "sandbox":
         return { allowed: true, requiresConfirmation: true };
+      case "full":
+        return { allowed: true };
+      default:
+        return { allowed: false, reason: "Unknown permission level" };
+    }
+  }
+
+  private checkComputerPermission(operation: string): PermissionResult {
+    const permission = this.policy.permissions.computer ?? "disabled";
+    const normalized = operation.toLowerCase();
+    const isScreenCapture = normalized === "screenshot" || normalized === "screen";
+    const isInteraction = !isScreenCapture;
+
+    switch (permission) {
+      case "disabled":
+        return {
+          allowed: false,
+          reason: "Computer use is disabled",
+          escalation: this.buildEscalation("computer", "observe"),
+        };
+      case "observe":
+        if (isScreenCapture) {
+          return { allowed: true };
+        }
+        return {
+          allowed: false,
+          reason: "Computer control is disabled",
+          escalation: this.buildEscalation("computer", "control"),
+        };
+      case "control":
+        return {
+          allowed: true,
+          requiresConfirmation: isInteraction,
+          riskTags: isInteraction ? ["computer:input"] : undefined,
+        };
       case "full":
         return { allowed: true };
       default:
@@ -511,6 +548,7 @@ export class SecurityPolicyBuilder {
     bash: "disabled",
     file: "read",
     code: "disabled",
+    computer: "disabled",
     network: "none",
     lfcc: "read",
   };
@@ -576,6 +614,12 @@ export class SecurityPolicyBuilder {
   /** Set code permission */
   withCodePermission(permission: ToolPermissions["code"]): this {
     this.permissions.code = permission;
+    return this;
+  }
+
+  /** Set computer permission */
+  withComputerPermission(permission: ToolPermissions["computer"]): this {
+    this.permissions.computer = permission;
     return this;
   }
 

@@ -325,6 +325,7 @@ function createMockContext(overrides?: Partial<ToolContext>): ToolContext {
         file: "read",
         network: "none",
         code: "disabled",
+        computer: "disabled",
         lfcc: "read",
       },
       limits: {

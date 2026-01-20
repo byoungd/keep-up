@@ -10,6 +10,7 @@ export {
   attachRuntimeEventStreamBridge,
   type RuntimeEventStreamBridgeConfig,
 } from "./runtimeEventBridge";
+export { attachStreamEventBus, type StreamEventBridgeConfig } from "./streamEventBridge";
 // Streaming Cache
 export {
   createStreamingCache,
@@ -18,6 +19,12 @@ export {
   type StreamingCacheConfig,
   type StreamingCacheStats,
 } from "./streamingCache";
+// Streaming execution loop
+export {
+  runStreamingLoop,
+  type StreamingLoopConfig,
+  type StreamingLoopResult,
+} from "./streamingLoop";
 // Legacy stream writer (for backward compatibility)
 export {
   collectStream,
@@ -42,7 +49,6 @@ export {
   transformStream,
   withStreamTimeout,
 } from "./streamWriter";
-
 // Token streamer
 export {
   createStreamPair,

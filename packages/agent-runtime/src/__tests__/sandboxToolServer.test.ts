@@ -121,6 +121,7 @@ function createContext(sessionId = "session-1"): ToolContext {
         bash: "sandbox",
         file: "workspace",
         code: "sandbox",
+        computer: "disabled",
         network: "none",
         lfcc: "read",
       },

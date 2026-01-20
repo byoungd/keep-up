@@ -22,10 +22,13 @@ import {
   type SkillRegistry,
   type SkillSession,
 } from "@ku0/agent-runtime-tools";
-import type {
-  ArtifactEmissionContext,
-  ArtifactEmissionResult,
-  ArtifactPipeline,
+import {
+  type ArtifactEmissionContext,
+  type ArtifactEmissionResult,
+  type ArtifactPipeline,
+  createArtifactPipeline,
+  createArtifactRegistry,
+  createImageArtifactStore,
 } from "../artifacts";
 import { createCheckpointManager } from "../checkpoint";
 import type { FileContextTracker } from "../context";
@@ -51,6 +54,7 @@ import {
 } from "../security";
 import type { SessionState } from "../session";
 import { createSessionState } from "../session";
+import { createTaskGraphStore, type TaskGraphStore } from "../tasks/taskGraph";
 import type {
   A2AContext,
   AgentState,
@@ -121,6 +125,8 @@ export class RuntimeKernel implements Kernel {
   private readonly messageBus: RuntimeMessageBus;
   private readonly a2aContext?: A2AContext;
   private readonly checkpointManager: ICheckpointManager;
+  private readonly taskGraph: TaskGraphStore;
+  private readonly artifactPipeline: ArtifactPipeline;
   private readonly skillRegistry?: SkillRegistry;
   private readonly skillSession?: SkillSession;
   private readonly skillPromptAdapter?: SkillPromptAdapter;
@@ -135,34 +141,17 @@ export class RuntimeKernel implements Kernel {
     this.messageBus = services.messageBus ?? createMessageBus(this.eventBus);
     this.a2aContext = this.resolveA2AContext();
     this.checkpointManager = services.checkpointManager ?? createCheckpointManager();
+    this.taskGraph = this.resolveTaskGraph();
+    this.artifactPipeline = this.resolveArtifactPipeline(this.taskGraph);
     const skillOptions = this.resolveSkillOptions();
-    this.skillRegistry = skillOptions?.registry;
-    this.skillSession =
-      skillOptions?.session ??
-      (this.skillRegistry ? createSkillSession(this.skillRegistry, services.audit) : undefined);
-    this.skillPromptAdapter =
-      skillOptions?.promptAdapter ?? (this.skillRegistry ? createSkillPromptAdapter() : undefined);
+    const skillComponents = this.resolveSkillComponents(skillOptions, services.audit);
+    this.skillRegistry = skillComponents.skillRegistry;
+    this.skillSession = skillComponents.skillSession;
+    this.skillPromptAdapter = skillComponents.skillPromptAdapter;
 
-    const basePolicyEngine = createToolPolicyEngine(services.policy);
-    const skillPolicyEngine = this.skillRegistry
-      ? createSkillPolicyGuard(basePolicyEngine, this.skillRegistry)
-      : basePolicyEngine;
-    const securityPolicy =
-      typeof services.policy.getPolicy === "function"
-        ? services.policy.getPolicy()
-        : createSecurityPolicy("balanced");
-    const toolExecutionContext = resolveToolExecutionContext(
-      this.config.orchestrator?.toolExecutionContext,
-      securityPolicy
-    );
-    const policyEngine = createToolGovernancePolicyEngine(skillPolicyEngine, toolExecutionContext);
-    const defaultExecutor = createToolExecutor({
-      registry: services.registry,
-      policy: services.policy,
-      policyEngine,
-      audit: services.audit,
-      telemetry: services.telemetry,
-    });
+    const securityPolicy = this.resolveSecurityPolicy(services.policy);
+    const policyEngine = this.resolveToolPolicyEngine(services.policy, securityPolicy);
+    const defaultExecutor = this.createDefaultExecutor(policyEngine);
     const rawExecutor = services.executor ?? defaultExecutor;
     this.executor =
       this.skillRegistry && services.executor
@@ -223,6 +212,8 @@ export class RuntimeKernel implements Kernel {
           skillRegistry: this.skillRegistry,
           skillSession: this.skillSession,
           skillPromptAdapter: this.skillPromptAdapter,
+          taskGraph: this.taskGraph,
+          artifactPipeline: this.artifactPipeline,
         },
       };
     }
@@ -246,6 +237,8 @@ export class RuntimeKernel implements Kernel {
         skillSession: this.config.orchestrator.components?.skillSession ?? this.skillSession,
         skillPromptAdapter:
           this.config.orchestrator.components?.skillPromptAdapter ?? this.skillPromptAdapter,
+        taskGraph: this.taskGraph,
+        artifactPipeline: this.artifactPipeline,
       },
     };
   }
@@ -258,6 +251,88 @@ export class RuntimeKernel implements Kernel {
     }
     // Convert kernel skills config to orchestrator skills config format
     return this.config.skills;
+  }
+
+  private resolveTaskGraph(): TaskGraphStore {
+    return this.config.orchestrator?.components?.taskGraph ?? createTaskGraphStore();
+  }
+
+  private resolveArtifactPipeline(taskGraph: TaskGraphStore): ArtifactPipeline {
+    return (
+      this.config.orchestrator?.components?.artifactPipeline ??
+      createArtifactPipeline({
+        registry: createArtifactRegistry(),
+        taskGraph,
+        eventBus: this.eventBus,
+        eventSource: this.config.orchestrator?.name ?? "agent",
+      })
+    );
+  }
+
+  private resolveSkillComponents(
+    skillOptions: CreateOrchestratorOptions["skills"] | undefined,
+    audit?: AuditLogger
+  ): {
+    skillRegistry?: SkillRegistry;
+    skillSession?: SkillSession;
+    skillPromptAdapter?: SkillPromptAdapter;
+  } {
+    const skillRegistry = skillOptions?.registry;
+    const skillSession =
+      skillOptions?.session ??
+      (skillRegistry ? createSkillSession(skillRegistry, audit) : undefined);
+    const skillPromptAdapter =
+      skillOptions?.promptAdapter ?? (skillRegistry ? createSkillPromptAdapter() : undefined);
+    return { skillRegistry, skillSession, skillPromptAdapter };
+  }
+
+  private resolveSecurityPolicy(policy: IPermissionChecker): SecurityPolicy {
+    return typeof policy.getPolicy === "function"
+      ? policy.getPolicy()
+      : createSecurityPolicy("balanced");
+  }
+
+  private resolveToolPolicyEngine(
+    policy: IPermissionChecker,
+    securityPolicy: SecurityPolicy
+  ): ToolPolicyEngine {
+    const basePolicyEngine = createToolPolicyEngine(policy);
+    const skillPolicyEngine = this.skillRegistry
+      ? createSkillPolicyGuard(basePolicyEngine, this.skillRegistry)
+      : basePolicyEngine;
+    const toolExecutionContext = resolveToolExecutionContext(
+      this.config.orchestrator?.toolExecutionContext,
+      securityPolicy
+    );
+    return createToolGovernancePolicyEngine(skillPolicyEngine, toolExecutionContext);
+  }
+
+  private createDefaultExecutor(policyEngine: ToolPolicyEngine): ToolExecutor {
+    const toolExecution = this.config.orchestrator?.toolExecution;
+    const imageArtifactStore =
+      toolExecution?.imageArtifactStore ??
+      createImageArtifactStore({ pipeline: this.artifactPipeline });
+    return createToolExecutor({
+      registry: this.services.registry,
+      policy: this.services.policy,
+      policyEngine,
+      promptInjectionGuard: toolExecution?.promptInjectionGuard,
+      promptInjectionPolicy: toolExecution?.promptInjectionPolicy,
+      sandboxAdapter: toolExecution?.sandboxAdapter,
+      telemetryHandler: toolExecution?.telemetryHandler,
+      executionObserver: toolExecution?.executionObserver,
+      audit: toolExecution?.audit ?? this.services.audit,
+      telemetry: toolExecution?.telemetry ?? this.services.telemetry,
+      rateLimiter: toolExecution?.rateLimiter,
+      cache: toolExecution?.cache,
+      retryOptions: toolExecution?.retryOptions,
+      cachePredicate: toolExecution?.cachePredicate,
+      contextOverrides: toolExecution?.contextOverrides,
+      outputSpooler: toolExecution?.outputSpooler,
+      outputSpoolPolicy: toolExecution?.outputSpoolPolicy,
+      outputSpoolingEnabled: toolExecution?.outputSpoolingEnabled,
+      imageArtifactStore,
+    });
   }
 
   private resolveA2AContext(): A2AContext | undefined {

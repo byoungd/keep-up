@@ -99,6 +99,34 @@ describe("FileToolOutputSpooler", () => {
     const record = JSON.parse(payload) as { content: ToolContent[] };
     expect(record.content).toEqual(content);
   });
+
+  it("spools image payloads into binary resources", async () => {
+    tmpRoot = await mkdtemp(join(tmpdir(), "tool-spool-binary-"));
+    const spooler = new FileToolOutputSpooler({
+      rootDir: tmpRoot,
+      policy: { maxBytes: 1, maxLines: 1 },
+    });
+    const data = Buffer.from("image-bytes").toString("base64");
+    const content: ToolContent[] = [{ type: "image", data, mimeType: "image/png" }];
+
+    const result = await spooler.spool({
+      toolName: "test:image",
+      toolCallId: "call-image",
+      content,
+    });
+
+    expect(result.spooled).toBe(true);
+    expect(result.metadata?.stored).toBe(true);
+
+    const payload = await readFile(result.metadata?.uri ?? "", "utf8");
+    const record = JSON.parse(payload) as { content: ToolContent[] };
+    const resource = record.content.find((item) => item.type === "resource");
+    expect(resource?.type).toBe("resource");
+
+    const binaryPath = resource?.type === "resource" ? resource.uri : "";
+    const binary = await readFile(binaryPath);
+    expect(binary.equals(Buffer.from(data, "base64"))).toBe(true);
+  });
 });
 
 describe("ToolExecutionPipeline spooling integration", () => {
