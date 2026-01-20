@@ -6,10 +6,8 @@ import {
   Brain,
   ChevronDown,
   Eye,
-  Feather,
   FileText,
   Filter,
-  Gauge,
   Image,
   Info,
   LayoutGrid,
@@ -60,7 +58,7 @@ export interface ModelSelectorProps {
 
 const FAVORITES_STORAGE_KEY = "ai-model-favorites-v1";
 
-type ProviderFilter =
+export type ProviderFilter =
   | "all"
   | "favorites"
   | "openai"
@@ -75,7 +73,7 @@ type ProviderFilter =
   | "zai"
   | "stealth"
   | "custom";
-type FeatureId =
+export type FeatureId =
   | "fast"
   | "vision"
   | "effort"
@@ -100,6 +98,27 @@ type ProviderMeta = {
   tone: string;
   iconTone: string;
   disabled?: boolean;
+};
+
+export type ModelView = {
+  id: string;
+  model: ModelCapability;
+  providerLabel: string;
+  searchText: string;
+  featureMask: number;
+  mainLabel: string;
+  suffixLabel: string;
+  contextLabel: string;
+};
+
+export const FEATURE_MASK: Record<FeatureId, number> = {
+  fast: 1 << 0,
+  vision: 1 << 1,
+  effort: 1 << 2,
+  toolCalling: 1 << 3,
+  imageGeneration: 1 << 4,
+  nativePDFs: 1 << 5,
+  video: 1 << 6,
 };
 
 const PROVIDER_ACCENTS: Record<ModelCapability["provider"], { chip: string; icon: string }> = {
@@ -177,14 +196,14 @@ const splitModelLabel = (label: string) => {
   return { main: match[1].trim(), suffix: match[2].trim() };
 };
 
-const getModelFeatureSet = (model: ModelCapability) => {
-  const features = new Set<FeatureId>();
+const getModelFeatureMask = (model: ModelCapability) => {
+  let mask = 0;
 
   if (model.tags.includes("fast")) {
-    features.add("fast");
+    mask |= FEATURE_MASK.fast;
   }
   if (model.supports.vision) {
-    features.add("vision");
+    mask |= FEATURE_MASK.vision;
   }
   // Map both 'thinking' and 'reasoning' to the 'effort' (Thinking) feature
   if (
@@ -192,22 +211,125 @@ const getModelFeatureSet = (model: ModelCapability) => {
     model.tags.includes("thinking") ||
     model.tags.includes("reasoning")
   ) {
-    features.add("effort");
+    mask |= FEATURE_MASK.effort;
   }
   if (model.supports.tools) {
-    features.add("toolCalling");
+    mask |= FEATURE_MASK.toolCalling;
   }
   if (model.id.includes("image")) {
-    features.add("imageGeneration");
+    mask |= FEATURE_MASK.imageGeneration;
   }
   if (model.tags.includes("pdf")) {
-    features.add("nativePDFs");
+    mask |= FEATURE_MASK.nativePDFs;
   }
   if (model.tags.includes("video") || model.id.includes("video")) {
-    features.add("video");
+    mask |= FEATURE_MASK.video;
   }
 
-  return features;
+  return mask;
+};
+
+const buildSearchText = (model: ModelCapability, providerLabel: string) =>
+  [
+    model.label,
+    model.shortLabel,
+    model.description,
+    model.group,
+    providerLabel,
+    model.tags.join(" "),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+type FilterModelViewsInput = {
+  modelViews: ModelView[];
+  activeProvider: ProviderFilter;
+  favoriteIds: Set<string>;
+  searchTokens: string[];
+  activeFilterMask: number;
+  matchAllFilters: boolean;
+};
+
+const matchesProviderFilter = (
+  entry: ModelView,
+  activeProvider: ProviderFilter,
+  favoriteIds: Set<string>
+) => {
+  if (activeProvider === "favorites") {
+    return favoriteIds.has(entry.id);
+  }
+
+  if (activeProvider === "all") {
+    return true;
+  }
+
+  const activeModelProvider = PROVIDER_TO_MODEL_PROVIDER[activeProvider];
+  return Boolean(activeModelProvider && entry.model.provider === activeModelProvider);
+};
+
+const matchesSearchTokens = (entry: ModelView, searchTokens: string[]) => {
+  if (searchTokens.length === 0) {
+    return true;
+  }
+
+  for (const token of searchTokens) {
+    if (!entry.searchText.includes(token)) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
+const matchesFeatureMask = (
+  entry: ModelView,
+  activeFilterMask: number,
+  matchAllFilters: boolean
+) => {
+  if (activeFilterMask === 0) {
+    return true;
+  }
+
+  if (matchAllFilters) {
+    return (entry.featureMask & activeFilterMask) === activeFilterMask;
+  }
+
+  return (entry.featureMask & activeFilterMask) !== 0;
+};
+
+export const filterModelViews = ({
+  modelViews,
+  activeProvider,
+  favoriteIds,
+  searchTokens,
+  activeFilterMask,
+  matchAllFilters,
+}: FilterModelViewsInput) => {
+  const current: ModelView[] = [];
+  const legacy: ModelView[] = [];
+
+  for (const entry of modelViews) {
+    if (!matchesProviderFilter(entry, activeProvider, favoriteIds)) {
+      continue;
+    }
+
+    if (!matchesSearchTokens(entry, searchTokens)) {
+      continue;
+    }
+
+    if (!matchesFeatureMask(entry, activeFilterMask, matchAllFilters)) {
+      continue;
+    }
+
+    if (entry.model.legacy) {
+      legacy.push(entry);
+    } else {
+      current.push(entry);
+    }
+  }
+
+  return { currentModels: current, legacyModels: legacy };
 };
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: complex UI component with multiple interactive states
@@ -221,23 +343,21 @@ export function ModelSelector({
   // const t = useTranslations("AIPanel");
   const t = useShellTranslations("AIPanel");
   const [search, setSearch] = React.useState("");
+  const deferredSearch = React.useDeferredValue(search);
   const [activeProvider, setActiveProvider] = React.useState<ProviderFilter>("all");
   const [activeFilters, setActiveFilters] = React.useState<Set<FeatureId>>(new Set());
-  const [matchAllFilters] = React.useState(false); // setMatchAllFilters unused
+  const matchAllFilters = false;
   const [favoriteIds, setFavoriteIds] = React.useState<Set<string>>(new Set());
   const [settingsMode, setSettingsMode] = React.useState(false);
+  const [hoveredModelId, setHoveredModelId] = React.useState<string | null>(null);
   // Reset settings mode when closing
   const onOpenChange = (open: boolean) => {
     if (!open) {
       setSettingsMode(false);
+      setHoveredModelId(null);
     }
   };
   const [isLegacyExpanded, setIsLegacyExpanded] = React.useState(false);
-
-  const selectedModel = React.useMemo(
-    () => models.find((entry) => entry.id === model),
-    [models, model]
-  );
 
   React.useEffect(() => {
     if (typeof window === "undefined") {
@@ -266,27 +386,6 @@ export function ModelSelector({
 
     window.localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify([...favoriteIds]));
   }, [favoriteIds]);
-
-  const _tagMeta = React.useMemo(
-    () => ({
-      balanced: {
-        label: t("modelTagBalanced"),
-        icon: Gauge,
-        tone: "bg-surface-2 text-muted-foreground border border-border/40",
-      },
-      quality: {
-        label: t("modelTagQuality"),
-        icon: Star,
-        tone: "bg-surface-2 text-muted-foreground border border-border/40",
-      },
-      lite: {
-        label: t("modelTagLite"),
-        icon: Feather,
-        tone: "bg-surface-2 text-muted-foreground border border-border/40",
-      },
-    }),
-    [t]
-  );
 
   const modelProviderLabels = React.useMemo(
     () => ({
@@ -354,10 +453,41 @@ export function ModelSelector({
     [t]
   );
 
-  const availableFilters = React.useMemo(() => {
-    // Show all filters regardless of model availability to aid discovery
-    return featureDefinitions;
-  }, [featureDefinitions]);
+  const activeFilterMask = React.useMemo(() => {
+    let mask = 0;
+    for (const filter of activeFilters) {
+      mask |= FEATURE_MASK[filter];
+    }
+    return mask;
+  }, [activeFilters]);
+
+  const modelViews = React.useMemo<ModelView[]>(
+    () =>
+      models.map((entry) => {
+        const providerLabel = modelProviderLabels[entry.provider] ?? entry.provider;
+        const { main, suffix } = splitModelLabel(entry.label);
+
+        return {
+          id: entry.id,
+          model: entry,
+          providerLabel,
+          searchText: buildSearchText(entry, providerLabel),
+          featureMask: getModelFeatureMask(entry),
+          mainLabel: main,
+          suffixLabel: suffix,
+          contextLabel: formatContextWindow(entry.contextWindow),
+        };
+      }),
+    [models, modelProviderLabels]
+  );
+
+  const modelViewById = React.useMemo(() => {
+    const viewById = new Map<string, ModelView>();
+    for (const view of modelViews) {
+      viewById.set(view.id, view);
+    }
+    return viewById;
+  }, [modelViews]);
 
   const providerAvailability = React.useMemo(() => {
     // All providers are enabled (unified proxy handles routing)
@@ -491,80 +621,48 @@ export function ModelSelector({
     [providerAvailability, t]
   );
 
-  const normalizedSearch = search.trim().toLowerCase();
+  const selectedView = React.useMemo(() => {
+    const direct = modelViewById.get(model);
+    if (direct) {
+      return direct;
+    }
+
+    const migratedId = normalizeModelId(model);
+    if (migratedId) {
+      return modelViewById.get(migratedId) ?? null;
+    }
+
+    return null;
+  }, [modelViewById, model]);
+
+  const selectedLabel = React.useMemo(() => {
+    if (selectedView) {
+      return selectedView.model.shortLabel || selectedView.model.label;
+    }
+
+    return model
+      .split(/[-_]/)
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  }, [selectedView, model]);
+
+  const normalizedSearch = deferredSearch.trim().toLowerCase();
   const searchTokens = React.useMemo(
     () => normalizedSearch.split(/\s+/).filter(Boolean),
     [normalizedSearch]
   );
 
-  const { currentModels, legacyModels } = React.useMemo(() => {
-    const current: ModelCapability[] = [];
-    const legacy: ModelCapability[] = [];
-
-    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: filtering logic
-    const allFiltered = models.filter((entry) => {
-      const activeModelProvider = PROVIDER_TO_MODEL_PROVIDER[activeProvider];
-
-      if (activeProvider === "favorites" && !favoriteIds.has(entry.id)) {
-        return false;
-      }
-
-      if (activeProvider !== "favorites" && activeProvider !== "all") {
-        if (!activeModelProvider || entry.provider !== activeModelProvider) {
-          return false;
-        }
-      }
-
-      if (searchTokens.length > 0) {
-        const haystack = [
-          entry.label,
-          entry.shortLabel,
-          entry.description,
-          entry.group,
-          modelProviderLabels[entry.provider],
-          entry.tags.join(" "),
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
-
-        if (!searchTokens.every((token) => haystack.includes(token))) {
-          return false;
-        }
-      }
-
-      if (activeFilters.size === 0) {
-        return true;
-      }
-
-      const modelFeatures = getModelFeatureSet(entry);
-      const matches = Array.from(activeFilters).map((feature) => modelFeatures.has(feature));
-
-      return matchAllFilters ? matches.every(Boolean) : matches.some(Boolean);
-    });
-
-    for (const m of allFiltered) {
-      if (m.legacy) {
-        legacy.push(m);
-      } else {
-        current.push(m);
-      }
-    }
-
-    return { currentModels: current, legacyModels: legacy };
-  }, [
-    models,
-    activeProvider,
-    favoriteIds,
-    searchTokens,
-    activeFilters,
-    matchAllFilters,
-    modelProviderLabels,
-  ]);
-
-  const _activeFilterDetails = React.useMemo(
-    () => availableFilters.filter((option) => activeFilters.has(option.id)),
-    [availableFilters, activeFilters]
+  const { currentModels, legacyModels } = React.useMemo(
+    () =>
+      filterModelViews({
+        modelViews,
+        activeProvider,
+        favoriteIds,
+        searchTokens,
+        activeFilterMask,
+        matchAllFilters,
+      }),
+    [modelViews, activeProvider, favoriteIds, searchTokens, activeFilterMask]
   );
 
   const handleFilterToggle = React.useCallback((filterId: FeatureId) => {
@@ -594,6 +692,13 @@ export function ModelSelector({
       return next;
     });
   }, []);
+
+  const handleSelectModel = React.useCallback(
+    (modelId: string) => {
+      onSelect(modelId);
+    },
+    [onSelect]
+  );
 
   const showFavoritesEmpty = activeProvider === "favorites" && favoriteIds.size === 0;
   const actionLabels = React.useMemo(
@@ -625,7 +730,7 @@ export function ModelSelector({
           )}
         >
           <div className="flex items-center gap-2 min-w-0">
-            {selectedModel && (
+            {selectedView && (
               <div
                 className={cn(
                   "flex items-center justify-center shrink-0",
@@ -633,13 +738,13 @@ export function ModelSelector({
                   panelPosition === "main"
                     ? "h-4 w-4"
                     : "h-7 w-7 rounded-lg transition-all duration-normal group-hover:scale-105 group-data-[state=open]:scale-105",
-                  panelPosition !== "main" && PROVIDER_ACCENTS[selectedModel.provider].chip
+                  panelPosition !== "main" && PROVIDER_ACCENTS[selectedView.model.provider].chip
                 )}
               >
-                {React.createElement(PROVIDER_ICONS[selectedModel.provider], {
+                {React.createElement(PROVIDER_ICONS[selectedView.model.provider], {
                   className: cn(
                     panelPosition === "main" ? "h-3.5 w-3.5" : "h-3.5 w-3.5",
-                    panelPosition !== "main" && PROVIDER_ACCENTS[selectedModel.provider].icon
+                    panelPosition !== "main" && PROVIDER_ACCENTS[selectedView.model.provider].icon
                   ),
                   "aria-hidden": true,
                 })}
@@ -653,25 +758,7 @@ export function ModelSelector({
                     panelPosition === "main" ? "text-xs" : "text-sm text-foreground"
                   )}
                 >
-                  {(() => {
-                    if (selectedModel) {
-                      return selectedModel.shortLabel || selectedModel.label;
-                    }
-
-                    const migratedId = normalizeModelId(model);
-                    if (migratedId) {
-                      const migratedModel = models.find((entry) => entry.id === migratedId);
-                      if (migratedModel) {
-                        return migratedModel.shortLabel || migratedModel.label;
-                      }
-                    }
-
-                    // Fallback: Title Case the ID
-                    return model
-                      .split(/[-_]/)
-                      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-                      .join(" ");
-                  })()}
+                  {selectedLabel}
                 </span>
                 <ChevronDown
                   className={cn(
@@ -834,6 +921,7 @@ export function ModelSelector({
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         placeholder="Search models..."
+                        aria-label="Search models"
                         className="flex-1 bg-transparent border-none p-0 text-xs placeholder:text-muted-foreground/40 focus:outline-none focus:ring-0"
                       />
                       {search && (
@@ -850,31 +938,27 @@ export function ModelSelector({
 
                     {/* Feature filters - Compact Single Line */}
                     <div className="flex items-center gap-1 overflow-x-auto py-2.5 px-3 scrollbar-none snap-x [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] border-b border-border/20 bg-surface-1/30">
-                      {availableFilters.length > 0 &&
-                        featureDefinitions.map((feature) => {
-                          if (!availableFilters.some((f) => f.id === feature.id)) {
-                            return null;
-                          }
-                          const isActive = activeFilters.has(feature.id);
-                          const Icon = feature.icon;
+                      {featureDefinitions.map((feature) => {
+                        const isActive = activeFilters.has(feature.id);
+                        const Icon = feature.icon;
 
-                          return (
-                            <button
-                              key={feature.id}
-                              type="button"
-                              onClick={() => handleFilterToggle(feature.id)}
-                              className={cn(
-                                "shrink-0 snap-start flex items-center gap-1 px-1.5 py-1 rounded-full text-micro tracking-tight font-medium border transition-all duration-normal",
-                                isActive
-                                  ? "bg-primary/10 border-primary/20 text-primary shadow-sm"
-                                  : "bg-surface-1/50 border-border/10 text-muted-foreground/70 hover:bg-surface-2 hover:text-foreground hover:border-border/30"
-                              )}
-                            >
-                              <Icon className="h-3 w-3" />
-                              {feature.label}
-                            </button>
-                          );
-                        })}
+                        return (
+                          <button
+                            key={feature.id}
+                            type="button"
+                            onClick={() => handleFilterToggle(feature.id)}
+                            className={cn(
+                              "shrink-0 snap-start flex items-center gap-1 px-1.5 py-1 rounded-full text-micro tracking-tight font-medium border transition-all duration-normal",
+                              isActive
+                                ? "bg-primary/10 border-primary/20 text-primary shadow-sm"
+                                : "bg-surface-1/50 border-border/10 text-muted-foreground/70 hover:bg-surface-2 hover:text-foreground hover:border-border/30"
+                            )}
+                          >
+                            <Icon className="h-3 w-3" />
+                            {feature.label}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -911,9 +995,9 @@ export function ModelSelector({
                         <List
                           className="space-y-1"
                           onSelect={(value) => {
-                            const model = currentModels.find((m) => m.id === value);
-                            if (model) {
-                              onSelect(model.id);
+                            const selected = currentModels.find((entry) => entry.id === value);
+                            if (selected) {
+                              handleSelectModel(selected.id);
                             }
                           }}
                         >
@@ -921,15 +1005,24 @@ export function ModelSelector({
                             <DropdownMenuItem
                               key={entry.id}
                               className="gap-2 cursor-pointer"
-                              onClick={() => onSelect(entry.id)}
+                              data-value={entry.id}
+                              onSelect={() => handleSelectModel(entry.id)}
+                              onPointerEnter={() => setHoveredModelId(entry.id)}
+                              onPointerLeave={() =>
+                                setHoveredModelId((prev) => (prev === entry.id ? null : prev))
+                              }
+                              onFocus={() => setHoveredModelId(entry.id)}
+                              onBlur={() =>
+                                setHoveredModelId((prev) => (prev === entry.id ? null : prev))
+                              }
+                              asChild
                             >
                               <ModelItem
-                                model={entry}
+                                view={entry}
                                 isSelected={entry.id === model}
+                                isHovered={hoveredModelId === entry.id}
                                 isFavorite={favoriteIds.has(entry.id)}
-                                onSelect={() => onSelect(entry.id)}
-                                onToggleFavorite={() => handleFavoriteToggle(entry.id)}
-                                providerName={modelProviderLabels[entry.provider]}
+                                onToggleFavorite={handleFavoriteToggle}
                                 labels={actionLabels}
                               />
                             </DropdownMenuItem>
@@ -956,9 +1049,11 @@ export function ModelSelector({
                                 <List
                                   className="p-1"
                                   onSelect={(value) => {
-                                    const model = legacyModels.find((m) => m.id === value);
-                                    if (model) {
-                                      onSelect(model.id);
+                                    const selected = legacyModels.find(
+                                      (entry) => entry.id === value
+                                    );
+                                    if (selected) {
+                                      handleSelectModel(selected.id);
                                     }
                                   }}
                                 >
@@ -966,27 +1061,28 @@ export function ModelSelector({
                                     <DropdownMenuItem
                                       key={entry.id}
                                       className="gap-2 cursor-pointer"
-                                      onClick={() => onSelect(entry.id)}
+                                      data-value={entry.id}
+                                      onClick={() => handleSelectModel(entry.id)}
                                     >
                                       <div className="flex items-center gap-2 flex-1 min-w-0">
                                         <div className="shrink-0 text-muted-foreground">
-                                          {entry.provider === "openai" && (
+                                          {entry.model.provider === "openai" && (
                                             <Brain className="h-4 w-4" />
                                           )}
-                                          {entry.provider === "claude" && (
+                                          {entry.model.provider === "claude" && (
                                             <Brain className="h-4 w-4" />
                                           )}
-                                          {entry.provider === "gemini" && (
+                                          {entry.model.provider === "gemini" && (
                                             <Brain className="h-4 w-4" />
                                           )}
                                         </div>
                                         <div className="flex flex-col overflow-hidden">
                                           <div className="flex items-center gap-2">
                                             <span className="font-medium truncate">
-                                              {entry.label}
+                                              {entry.model.label}
                                             </span>
                                             <span className="text-xs text-muted-foreground shrink-0 border px-1 rounded">
-                                              {modelProviderLabels[entry.provider]}
+                                              {entry.providerLabel}
                                             </span>
                                           </div>
                                         </div>
@@ -1013,32 +1109,30 @@ export function ModelSelector({
 
 // Sub-components to keep clean
 interface ModelItemProps {
-  model: ModelCapability;
+  view: ModelView;
   isSelected: boolean;
+  isHovered: boolean;
   isFavorite: boolean;
-  onSelect: () => void;
-  onToggleFavorite: () => void;
-  providerName: string;
+  onToggleFavorite: (modelId: string) => void;
   labels: { favoriteAdd: string; favoriteRemove: string; detailOpen: string };
   variant?: "default" | "legacy";
 }
 
-function ModelItem({
-  model,
+const ModelItem = React.memo(function ModelItem({
+  view,
   isSelected,
+  isHovered,
   isFavorite,
-  onSelect,
   onToggleFavorite,
-  providerName,
   labels,
   variant = "default",
 }: ModelItemProps) {
-  const { main, suffix } = splitModelLabel(model.label);
+  const { model, mainLabel, suffixLabel, contextLabel, providerLabel } = view;
   const isLegacy = variant === "legacy";
+  const showActions = isSelected || isHovered;
 
   return (
-    <button
-      type="button"
+    <div
       className={cn(
         "group relative flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors duration-normal cursor-pointer w-full text-left",
         isSelected
@@ -1046,7 +1140,6 @@ function ModelItem({
           : "text-muted-foreground hover:bg-surface-2/50 hover:text-foreground",
         isLegacy && "opacity-70 hover:opacity-100"
       )}
-      onClick={onSelect}
     >
       {/* Icon */}
       <div
@@ -1074,7 +1167,7 @@ function ModelItem({
                 isSelected ? "text-foreground" : "text-foreground/80"
               )}
             >
-              {main}
+              {mainLabel}
             </span>
             {model.supports.thinking && (
               <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-tiny font-medium bg-accent-indigo/10 text-accent-indigo border border-accent-indigo/20">
@@ -1082,60 +1175,58 @@ function ModelItem({
                 Think
               </span>
             )}
-            {!isLegacy && suffix && (
+            {!isLegacy && suffixLabel && (
               <span className="text-micro text-muted-foreground/60 truncate max-w-[80px]">
-                {suffix}
+                {suffixLabel}
               </span>
             )}
           </div>
         </div>
         <div className="flex items-center gap-2 text-fine text-muted-foreground/60">
-          <span className="truncate">{providerName}</span>
+          <span className="truncate">{providerLabel}</span>
           <span className="text-border/40">|</span>
-          <span>{formatContextWindow(model.contextWindow)}</span>
+          <span>{contextLabel}</span>
           {/* Cost logic removed */}
         </div>
       </div>
 
       {/* Actions (visible on hover/focus/selected) */}
-      <div
-        className={cn(
-          "absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 pl-2 bg-gradient-to-l from-surface-2 via-surface-2 to-transparent",
-          "opacity-0 group-hover:opacity-100 transition-opacity duration-normal",
-          isSelected && "opacity-100"
-        )}
-      >
-        <Tooltip content={isFavorite ? labels.favoriteRemove : labels.favoriteAdd}>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleFavorite();
-            }}
-            className={cn(
-              "p-1.5 rounded-lg transition-colors duration-fast",
-              isFavorite
-                ? "text-warning hover:text-warning hover:bg-warning/10"
-                : "text-muted-foreground/40 hover:text-foreground hover:bg-surface-3"
-            )}
-          >
-            <Star className={cn("h-3.5 w-3.5", isFavorite && "fill-current")} />
-          </button>
-        </Tooltip>
+      {showActions && (
+        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 pl-2 bg-gradient-to-l from-surface-2 via-surface-2 to-transparent">
+          <Tooltip content={isFavorite ? labels.favoriteRemove : labels.favoriteAdd}>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleFavorite(view.id);
+              }}
+              aria-label={isFavorite ? labels.favoriteRemove : labels.favoriteAdd}
+              className={cn(
+                "p-1.5 rounded-lg transition-colors duration-fast",
+                isFavorite
+                  ? "text-warning hover:text-warning hover:bg-warning/10"
+                  : "text-muted-foreground/40 hover:text-foreground hover:bg-surface-3"
+              )}
+            >
+              <Star className={cn("h-3.5 w-3.5", isFavorite && "fill-current")} />
+            </button>
+          </Tooltip>
 
-        <Tooltip content={labels.detailOpen}>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              // Open detail view (not implemented in this simplified version yet)
-            }}
-            className="p-1.5 rounded-lg text-muted-foreground/40 hover:text-foreground hover:bg-surface-3 transition-colors duration-fast"
-          >
-            <Info className="h-3.5 w-3.5" />
-          </button>
-        </Tooltip>
-      </div>
-    </button>
+          <Tooltip content={labels.detailOpen}>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                // Open detail view (not implemented in this simplified version yet)
+              }}
+              aria-label={labels.detailOpen}
+              className="p-1.5 rounded-lg text-muted-foreground/40 hover:text-foreground hover:bg-surface-3 transition-colors duration-fast"
+            >
+              <Info className="h-3.5 w-3.5" />
+            </button>
+          </Tooltip>
+        </div>
+      )}
+    </div>
   );
-}
+});
