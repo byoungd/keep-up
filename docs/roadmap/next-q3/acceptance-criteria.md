@@ -1,125 +1,140 @@
-# Q3 验收标准 (Acceptance Criteria)
+# Q3 Acceptance Criteria
 
-> **目的**: 防止"理想化"规划，确保每个 Track 交付可量化、可验证的实际价值。
-> **原则**: 每项标准必须是 **可测试的**，拒绝主观描述。
+> **Purpose**: Prevent aspirational planning and ensure each track delivers measurable, verifiable value.
+> **Principle**: Every criterion must be testable; avoid subjective language.
 
 ---
 
-## 验收流程
+## Acceptance Workflow
 
 ```mermaid
 graph LR
-    A[代码实现] --> B[单元测试通过]
-    B --> C[集成测试通过]
-    C --> D[Gym 基准测试]
-    D --> E{KPI 达标?}
-    E -->|是| F[✅ 验收通过]
-    E -->|否| G[❌ 返工]
+    A[Implementation] --> B[Unit Tests Pass]
+    B --> C[Integration Tests Pass]
+    C --> D[Gym Benchmarks]
+    D --> E{KPI Met?}
+    E -->|Yes| F[Accept]
+    E -->|No| G[Rework]
 ```
+
+---
+
+## Test Command Conventions
+
+- Track X and Y tests should be tagged with AC IDs and executed via `pnpm test:x1` through `pnpm test:y4`.
+- Track Z tests run via `pnpm test:z1` and `pnpm test:z2`.
+- Use `pnpm test:q3` to run the full Q3 AC suite before declaring completion.
 
 ---
 
 ## Track X: Deep Code Perception
 
-### 必须通过的测试用例
+### Must-pass test cases
 
-| ID | 场景 | 输入 | 预期输出 | 验收命令 |
-|----|------|------|----------|----------|
-| X-AC-1 | 符号定位 | "找到 AuthService 类" | 返回正确文件路径和行号 | `pnpm test:x1` |
-| X-AC-2 | 引用查找 | "findReferences('login')" | 返回 >=3 个调用位置 | `pnpm test:x2` |
-| X-AC-3 | 安全重命名 | "rename UserService -> AccountService" | 所有 import 语句自动更新，0 编译错误 | `pnpm test:x3` |
-| X-AC-4 | 影响分析 | "编辑 utils/auth.ts" | 返回受影响文件列表 | `pnpm test:x4` |
+| ID | Scenario | Input | Expected Output | Test Command |
+|----|----------|-------|-----------------|--------------|
+| X-AC-1 | Symbol resolution | "Find the AuthService class" | Correct file path and line number | `pnpm test:x1` |
+| X-AC-2 | Reference search | "findReferences('login')" | 3 or more call sites | `pnpm test:x2` |
+| X-AC-3 | Safe rename | "rename UserService -> AccountService" | Imports updated, 0 compile errors | `pnpm test:x3` |
+| X-AC-4 | Impact analysis | "Edit utils/auth.ts" | List of affected files | `pnpm test:x4` |
 
-### 量化 KPI
+### Quantitative KPIs
 
-| 指标 | 基准值 | 目标值 | 测量方法 |
-|------|--------|--------|----------|
-| 符号解析成功率 | N/A | >95% | `agent-gym` 符号定位测试集 |
-| 幻觉率 (发明不存在的方法) | N/A | <1% | `agent-gym` 代码生成验证 |
-| LSP 响应延迟 | N/A | <100ms | P95 延迟监控 |
+| Metric | Baseline | Target | Measurement |
+|--------|----------|--------|-------------|
+| Symbol resolution success rate | N/A | >95% | agent-gym symbol suite |
+| Hallucination rate | N/A | <1% | agent-gym code validation |
+| LSP response latency | N/A | <100ms | P95 latency monitoring |
 
-### 交付物检查清单
+### Deliverables checklist
 
-- [ ] `packages/agent-runtime/src/lsp/` 目录存在且包含 `LSPService.ts`
-- [ ] `SymbolGraph` 类导出并有完整类型定义
-- [ ] `nav_def`, `nav_refs`, `rename_sym` 工具注册到 MCP
-- [ ] 10+ 单元测试覆盖核心逻辑
+- [ ] `packages/agent-runtime/src/lsp/` exists and includes `LSPService.ts`
+- [ ] `SymbolGraph` is exported with full type coverage
+- [ ] `nav_def`, `nav_refs`, `rename_sym` tools are registered in MCP
+- [ ] 10 or more unit tests cover core logic
 
 ---
 
 ## Track Y: Adaptive Learning
 
-### 必须通过的测试用例
+### Must-pass test cases
 
-| ID | 场景 | 输入 | 预期输出 | 验收命令 |
-|----|------|------|----------|----------|
-| Y-AC-1 | 偏好学习 | 用户说 "不要用 var" | 规则被持久化到 LessonStore | `pnpm test:y1` |
-| Y-AC-2 | 跨会话记忆 | 新会话，Agent 生成代码 | 代码不包含 `var` | `pnpm test:y2` |
-| Y-AC-3 | 规则删除 | 用户删除规则 | 下次生成代码可包含 `var` | `pnpm test:y3` |
-| Y-AC-4 | 噪音过滤 | 无关任务 | 不应用无关规则 | `pnpm test:y4` |
+| ID | Scenario | Input | Expected Output | Test Command |
+|----|----------|-------|-----------------|--------------|
+| Y-AC-1 | Preference learning | User says "Do not use var" | Rule is persisted to LessonStore | `pnpm test:y1` |
+| Y-AC-2 | Cross-session memory | New session, agent generates code | Output contains no `var` | `pnpm test:y2` |
+| Y-AC-3 | Rule deletion | User deletes a rule | Next output can include `var` | `pnpm test:y3` |
+| Y-AC-4 | Noise filtering | Unrelated task | Unrelated rules are not applied | `pnpm test:y4` |
 
-### 量化 KPI
+### Quantitative KPIs
 
-| 指标 | 基准值 | 目标值 | 测量方法 |
-|------|--------|--------|----------|
-| 召回准确率 (Precision@1) | N/A | >90% | `agent-gym` 记忆检索测试 |
-| 规则遵守率 | N/A | 100% | 10 个偏好测试用例 |
-| 检索延迟 | N/A | <50ms | 1000 条规则下的 P95 |
+| Metric | Baseline | Target | Measurement |
+|--------|----------|--------|-------------|
+| Recall Precision@1 | N/A | >90% | agent-gym memory suite |
+| Rule adherence | N/A | 100% | 10 preference tests |
+| Retrieval latency | N/A | <50ms | P95 at 1000 rules |
 
-### 交付物检查清单
+### Deliverables checklist
 
-- [ ] `packages/agent-runtime-memory/src/lessons/` 目录存在
-- [ ] `Lesson` 类型定义包含 `trigger`, `rule`, `confidence`
-- [ ] 支持 SQLite VSS 或 LanceDB 向量存储
-- [ ] Cowork App 中可查看/删除已学习规则
+- [ ] `packages/agent-runtime-memory/src/lessons/` exists
+- [ ] `Lesson` type includes `trigger`, `rule`, `confidence`
+- [ ] SQLite VSS or LanceDB vector storage is supported
+- [ ] Cowork app can view and delete learned rules
 
 ---
 
 ## Track Z: Agent Gym
 
-### 必须通过的测试用例
+### Must-pass test cases
 
-| ID | 场景 | 输入 | 预期输出 | 验收命令 |
-|----|------|------|----------|----------|
-| Z-AC-1 | Harness 启动 | 空项目 | Agent Runtime 正常初始化 | `pnpm test:z1` |
-| Z-AC-2 | 评分引擎 | 语法错误代码 | 返回 `{pass: false, reason: "syntax"}` | `pnpm test:z2` |
-| Z-AC-3 | CI 集成 | PR 提交 | GitHub Action 运行并报告 IQ | `gh workflow run gym` |
-| Z-AC-4 | 回归检测 | 降低模型能力 | CI 失败并阻止合并 | 手动验证 |
+| ID | Scenario | Input | Expected Output | Test Command |
+|----|----------|-------|-----------------|--------------|
+| Z-AC-1 | Harness boot | Empty project | Agent runtime initializes | `pnpm test:z1` |
+| Z-AC-2 | Scoring engine | Syntax-error code | Returns `{pass: false, reason: "syntax"}` | `pnpm test:z2` |
+| Z-AC-3 | CI integration | PR submission | GitHub Action runs and reports IQ | `gh workflow run gym` |
+| Z-AC-4 | Regression detection | Lower model quality | CI fails and blocks merge | Manual verification |
 
-### 量化 KPI
+### Quantitative KPIs
 
-| 指标 | 基准值 | 目标值 | 测量方法 |
-|------|--------|--------|----------|
-| Easy 测试集通过率 | N/A | >90% | 10 个简单任务 |
-| Medium 测试集通过率 | N/A | >70% | 15 个中等任务 |
-| 测试执行时间 | N/A | <5min | Easy 测试集完整运行 |
+| Metric | Baseline | Target | Measurement |
+|--------|----------|--------|-------------|
+| Easy suite pass rate | N/A | >90% | 10 easy tasks |
+| Medium suite pass rate | N/A | >70% | 15 medium tasks |
+| Runtime | N/A | <5min | Easy suite runtime |
 
-### 交付物检查清单
+### Deliverables checklist
 
-- [ ] `packages/agent-gym/` 独立包存在
-- [ ] `benchmarks/` 包含 50+ 测试场景 YAML
-- [ ] `.github/workflows/gym.yml` CI 配置
-- [ ] IQ 分数可在 Cowork 开发者设置中查看
-
----
-
-## 整体验收标准
-
-> [!CAUTION]
-> 以下任一条件不满足，Q3 **不得视为完成**：
-
-1. **所有 AC 测试通过**: `pnpm test:q3` 返回 0 错误
-2. **CI IQ Gate 正常工作**: 至少 1 个 PR 被 IQ 下降阻止
-3. **无回归**: 现有 `agent-runtime` 测试 100% 通过
-4. **文档更新**: 每个 Track 有对应的 WALKTHROUGH.md
+- [ ] `packages/agent-gym/` package exists
+- [ ] `benchmarks/` includes 50 or more test scenarios
+- [ ] `.github/workflows/gym.yml` CI workflow exists
+- [ ] IQ score is visible in Cowork developer settings
 
 ---
 
-## 验收时间表
+## Overall Acceptance Criteria
 
-| 里程碑 | 日期 | 验收内容 |
-|--------|------|----------|
-| M1 完成 | 2026-04-30 | Track X (X-AC-1, X-AC-2, X-AC-3) |
-| M2 完成 | 2026-05-31 | Track X (X-AC-4) + Track Y (Y-AC-1, Y-AC-2) |
-| M3 完成 | 2026-06-30 | Track Y (Y-AC-3, Y-AC-4) + Track Z 全部 |
-| Q3 总验收 | 2026-07-07 | 整体验收标准全部通过 |
+If any condition fails, Q3 is not complete:
+
+1. All AC tests pass: `pnpm test:q3` exits with 0 errors.
+2. CI IQ Gate works: at least one PR is blocked by a regression.
+3. No regressions: existing `agent-runtime` tests pass.
+4. Documentation updated: each track has a walkthrough doc.
+
+---
+
+## Walkthrough References
+
+- Track X: [track-x-walkthrough.md](./track-x-walkthrough.md)
+- Track Y: [track-y-walkthrough.md](./track-y-walkthrough.md)
+- Track Z: [track-z-walkthrough.md](./track-z-walkthrough.md)
+
+---
+
+## Acceptance Schedule
+
+| Milestone | Date | Scope |
+|-----------|------|-------|
+| M1 complete | 2026-04-30 | Track X (X-AC-1, X-AC-2, X-AC-3) |
+| M2 complete | 2026-05-31 | Track X (X-AC-4) + Track Y (Y-AC-1, Y-AC-2) |
+| M3 complete | 2026-06-30 | Track Y (Y-AC-3, Y-AC-4) + Track Z all |
+| Q3 final acceptance | 2026-07-07 | All acceptance criteria met |
