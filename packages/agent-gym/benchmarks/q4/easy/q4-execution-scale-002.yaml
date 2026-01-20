@@ -1,0 +1,44 @@
+{
+  "id": "q4-execution-scale-002",
+  "title": "Execution scale warmup 2",
+  "category": "execution-scale",
+  "difficulty": "easy",
+  "prompt": "Update notes/todo.md to mark the scale task complete.",
+  "setup": {
+    "files": [
+      {
+        "path": "notes/todo.md",
+        "content": "- [ ] Ship execution plane\n"
+      }
+    ]
+  },
+  "expectations": [
+    {
+      "type": "file_equals",
+      "path": "notes/todo.md",
+      "content": "- [x] Ship execution plane\n"
+    }
+  ],
+  "script": {
+    "responses": [
+      {
+        "content": "Marking task complete.",
+        "finishReason": "tool_use",
+        "toolCalls": [
+          {
+            "name": "file:write",
+            "arguments": {
+              "path": "notes/todo.md",
+              "content": "- [x] Ship execution plane\n",
+              "createDirs": true
+            }
+          }
+        ]
+      },
+      {
+        "content": "Updated.",
+        "finishReason": "stop"
+      }
+    ]
+  }
+}

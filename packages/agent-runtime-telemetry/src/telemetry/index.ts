@@ -167,6 +167,24 @@ export const AGENT_METRICS = {
     description: "Cycles detected in dependency analysis",
     labels: [],
   },
+  executionQueueDepth: {
+    name: "execution_queue_depth",
+    type: "gauge" as const,
+    description: "Current execution queue depth",
+    labels: [],
+  },
+  executionQueueWait: {
+    name: "execution_queue_wait_ms",
+    type: "histogram" as const,
+    description: "Execution queue wait time in milliseconds",
+    labels: ["queue_class"],
+  },
+  executionLeasePreemptions: {
+    name: "execution_lease_preemptions_total",
+    type: "counter" as const,
+    description: "Execution lease preemption events",
+    labels: [],
+  },
 } as const;
 
 // ============================================================================
