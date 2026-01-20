@@ -215,6 +215,11 @@ export class TaskToolServer extends BaseToolServer {
     args: Record<string, unknown>,
     context: ToolContext
   ): Promise<MCPToolResult> {
+    const writeAccess = this.ensureWriteAccess(context);
+    if (writeAccess) {
+      return writeAccess;
+    }
+
     const title = args.title as string;
     const description = (args.description as string) ?? "";
     const subtaskDescs = (args.subtasks as string[]) ?? [];
@@ -253,7 +258,7 @@ export class TaskToolServer extends BaseToolServer {
         }
       }
 
-      return textResult(output.join("\n"));
+      return this.formatOutput(output.join("\n"), context);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return errorResult("EXECUTION_FAILED", `Failed to create task: ${message}`);
@@ -264,6 +269,11 @@ export class TaskToolServer extends BaseToolServer {
     args: Record<string, unknown>,
     context: ToolContext
   ): Promise<MCPToolResult> {
+    const readAccess = this.ensureReadAccess(context);
+    if (readAccess) {
+      return readAccess;
+    }
+
     const taskId = args.taskId as string | undefined;
 
     try {
@@ -296,7 +306,7 @@ export class TaskToolServer extends BaseToolServer {
         output.push(`  ${icon} ${st.id}: ${st.description} [${st.status}]`);
       }
 
-      return textResult(output.join("\n"));
+      return this.formatOutput(output.join("\n"), context);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return errorResult("EXECUTION_FAILED", `Failed to get status: ${message}`);
@@ -307,6 +317,11 @@ export class TaskToolServer extends BaseToolServer {
     args: Record<string, unknown>,
     context: ToolContext
   ): Promise<MCPToolResult> {
+    const writeAccess = this.ensureWriteAccess(context);
+    if (writeAccess) {
+      return writeAccess;
+    }
+
     const taskId = args.taskId as string | undefined;
     const subtaskId = args.subtaskId as string | undefined;
     const status = args.status as ToolTask["status"] | ToolSubtask["status"] | undefined;
@@ -356,7 +371,10 @@ export class TaskToolServer extends BaseToolServer {
       task.updatedAt = Date.now();
       await this.saveStore(store, context);
 
-      return textResult(updates.length > 0 ? updates.join("\n") : "No updates made");
+      return this.formatOutput(
+        updates.length > 0 ? updates.join("\n") : "No updates made",
+        context
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return errorResult("EXECUTION_FAILED", `Failed to update task: ${message}`);
@@ -367,6 +385,11 @@ export class TaskToolServer extends BaseToolServer {
     args: Record<string, unknown>,
     context: ToolContext
   ): Promise<MCPToolResult> {
+    const readAccess = this.ensureReadAccess(context);
+    if (readAccess) {
+      return readAccess;
+    }
+
     const filter = (args.filter as string) ?? "all";
 
     try {
@@ -390,11 +413,40 @@ export class TaskToolServer extends BaseToolServer {
         );
       }
 
-      return textResult(output.join("\n"));
+      return this.formatOutput(output.join("\n"), context);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return errorResult("EXECUTION_FAILED", `Failed to list tasks: ${message}`);
     }
+  }
+
+  private ensureReadAccess(context: ToolContext): MCPToolResult | null {
+    if (context.security.permissions.file === "none") {
+      return errorResult("PERMISSION_DENIED", "File access is disabled");
+    }
+
+    return null;
+  }
+
+  private ensureWriteAccess(context: ToolContext): MCPToolResult | null {
+    if (
+      context.security.permissions.file === "none" ||
+      context.security.permissions.file === "read"
+    ) {
+      return errorResult("PERMISSION_DENIED", "File write access is disabled");
+    }
+
+    return null;
+  }
+
+  private formatOutput(output: string, context: ToolContext): MCPToolResult {
+    const maxOutputBytes = context.security.limits.maxOutputBytes;
+    if (Buffer.byteLength(output) > maxOutputBytes) {
+      const truncated = Buffer.from(output).subarray(0, maxOutputBytes).toString();
+      return textResult(`${truncated}\n\n[Output truncated at ${maxOutputBytes} bytes]`);
+    }
+
+    return textResult(output);
   }
 }
 

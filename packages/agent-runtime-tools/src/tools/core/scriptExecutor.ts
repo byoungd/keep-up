@@ -7,6 +7,7 @@
  * Provides safe, sandboxed execution with access to tool registry.
  */
 
+import { createContext, Script } from "node:vm";
 import type { MCPToolCall, ToolContext } from "@ku0/agent-runtime-core";
 import type { IToolRegistry } from "../mcp/registry";
 
@@ -173,19 +174,14 @@ export class ScriptExecutor {
     };
 
     try {
-      // Create async function from script
-      // Variables available in script:
-      // - tools: Tool registry proxy
-      // - variables: Script state
-      const asyncFunc = this.config.captureConsole
-        ? new Function("tools", "variables", "console", `return (async () => { ${script} })();`)
-        : new Function("tools", "variables", `return (async () => { ${script} })();`);
+      const sandbox = this.createSandbox(tools, context.variables, scriptConsole);
+      const vmContext = createContext(sandbox);
+      const wrappedScript = this.wrapScript(script);
+      const compiled = new Script(wrappedScript, { filename: "scriptExecutor.vm" });
 
-      // Execute with timeout
+      // Execute with timeout (vm timeout guards sync loops; promise timeout guards async work)
       const result = await this.executeWithTimeout(
-        this.config.captureConsole
-          ? asyncFunc(tools, context.variables, scriptConsole)
-          : asyncFunc(tools, context.variables),
+        Promise.resolve(compiled.runInContext(vmContext, { timeout: this.config.timeoutMs })),
         this.config.timeoutMs
       );
 
@@ -205,6 +201,31 @@ export class ScriptExecutor {
         logs,
       };
     }
+  }
+
+  private createSandbox(
+    tools: Record<string, Record<string, (args: Record<string, unknown>) => Promise<unknown>>>,
+    variables: Record<string, unknown>,
+    scriptConsole: {
+      log: (...args: unknown[]) => void;
+      info: (...args: unknown[]) => void;
+      warn: (...args: unknown[]) => void;
+      error: (...args: unknown[]) => void;
+    }
+  ): Record<string, unknown> {
+    return {
+      tools,
+      variables,
+      console: this.config.captureConsole ? scriptConsole : console,
+      setTimeout,
+      clearTimeout,
+      setInterval,
+      clearInterval,
+    };
+  }
+
+  private wrapScript(script: string): string {
+    return `"use strict";\n(async () => {\n${script}\n})()`;
   }
 
   /**
@@ -233,8 +254,7 @@ export class ScriptExecutor {
    */
   validateSyntax(script: string): { valid: boolean; error?: string } {
     try {
-      // Try to create function to check syntax
-      new Function(script);
+      new Script(this.wrapScript(script));
       return { valid: true };
     } catch (error) {
       return {
