@@ -297,6 +297,79 @@ export class CodeInteractionServer extends BaseToolServer {
   // Handlers
   // --------------------------------------------------------------------------
 
+  private getStaleEditResult(filePaths: string[], context: ToolContext): MCPToolResult | null {
+    const fileContext = context.fileContext;
+    if (!fileContext) {
+      return null;
+    }
+
+    const uniquePaths = Array.from(new Set(filePaths));
+    const stale = uniquePaths.filter((filePath) => fileContext.isStale(filePath));
+    if (stale.length === 0) {
+      return null;
+    }
+
+    const staleList = stale.map((filePath) => fileContext.getEntry(filePath)?.path ?? filePath);
+    const message = `Stale file context detected. Reload before editing:\n${staleList
+      .map((entry) => `- ${entry}`)
+      .join("\n")}`;
+
+    return errorResult("CONFLICT", message);
+  }
+
+  private ensureWriteAccess(context: ToolContext): MCPToolResult | null {
+    const filePermission = context.security?.permissions?.file;
+    if (filePermission === "read" || filePermission === "none") {
+      return errorResult("PERMISSION_DENIED", "File system write access is disabled");
+    }
+    return null;
+  }
+
+  private resolveEditRequest(args: Record<string, unknown>):
+    | {
+        filePath: string;
+        edits: Array<{ start_line: number; end_line: number; replacement: string }>;
+      }
+    | MCPToolResult {
+    const filePath = args.path as string | undefined;
+    if (!filePath) {
+      return errorResult("INVALID_ARGUMENTS", "path is required");
+    }
+
+    const edits = args.edits as
+      | Array<{
+          start_line: number;
+          end_line: number;
+          replacement: string;
+        }>
+      | undefined;
+
+    if (!edits || !Array.isArray(edits) || edits.length === 0) {
+      return errorResult("INVALID_ARGUMENTS", "edits array is required and must not be empty");
+    }
+
+    return { filePath, edits };
+  }
+
+  private isToolResult(
+    value:
+      | {
+          filePath: string;
+          edits: Array<{ start_line: number; end_line: number; replacement: string }>;
+        }
+      | MCPToolResult
+  ): value is MCPToolResult {
+    return "success" in value;
+  }
+
+  private markRead(filePath: string, context: ToolContext): void {
+    context.fileContext?.markRead(filePath);
+  }
+
+  private markWrite(filePath: string, context: ToolContext): void {
+    context.fileContext?.markWrite(filePath);
+  }
+
   private async handleReadFile(
     args: Record<string, unknown>,
     context: ToolContext
@@ -318,6 +391,8 @@ export class CodeInteractionServer extends BaseToolServer {
         endLine: args.end_line as number | undefined,
         withLineNumbers: (args.with_line_numbers as boolean | undefined) ?? true,
       });
+
+      this.markRead(result.path, context);
 
       const header = `[File: ${result.path}] (${result.totalLines} lines total, showing ${result.range[0]}-${result.range[1]})`;
       return textResult(`${header}\n\n${result.content}`);
@@ -375,38 +450,35 @@ export class CodeInteractionServer extends BaseToolServer {
     args: Record<string, unknown>,
     context: ToolContext
   ): Promise<MCPToolResult> {
-    const filePath = args.path as string | undefined;
-    const edits = args.edits as
-      | Array<{
-          start_line: number;
-          end_line: number;
-          replacement: string;
-        }>
-      | undefined;
-
-    if (!filePath) {
-      return errorResult("INVALID_ARGUMENTS", "path is required");
-    }
-    if (!edits || !Array.isArray(edits) || edits.length === 0) {
-      return errorResult("INVALID_ARGUMENTS", "edits array is required and must not be empty");
+    const request = this.resolveEditRequest(args);
+    if (this.isToolResult(request)) {
+      return request;
     }
 
-    const filePermission = context.security?.permissions?.file;
-    if (filePermission === "read" || filePermission === "none") {
-      return errorResult("PERMISSION_DENIED", "File system write access is disabled");
+    const permissionResult = this.ensureWriteAccess(context);
+    if (permissionResult) {
+      return permissionResult;
     }
+
+    const staleResult = this.getStaleEditResult([request.filePath], context);
+    if (staleResult) {
+      return staleResult;
+    }
+
+    const dryRun = (args.dry_run as boolean | undefined) ?? false;
+    const validateSyntax = (args.validate_syntax as boolean | undefined) ?? true;
 
     try {
       const result = await editor.editFile(
-        filePath,
-        edits.map((e) => ({
+        request.filePath,
+        request.edits.map((e) => ({
           startLine: e.start_line,
           endLine: e.end_line,
           replacement: e.replacement,
         })),
         {
-          dryRun: (args.dry_run as boolean | undefined) ?? false,
-          validateSyntax: (args.validate_syntax as boolean | undefined) ?? true,
+          dryRun,
+          validateSyntax,
         }
       );
 
@@ -418,7 +490,10 @@ export class CodeInteractionServer extends BaseToolServer {
         );
       }
 
-      const dryRunNote = args.dry_run ? " (dry run - not applied)" : "";
+      const dryRunNote = dryRun ? " (dry run - not applied)" : "";
+      if (!dryRun) {
+        this.markWrite(request.filePath, context);
+      }
       return textResult(
         `✅ Edit successful${dryRunNote}\n\n**Diff:**\n\`\`\`diff\n${result.diff}\n\`\`\`\n\nNew file has ${result.newTotalLines} lines.`
       );
@@ -445,9 +520,26 @@ export class CodeInteractionServer extends BaseToolServer {
     }
 
     try {
+      const patchPaths = patch.getPatchFilePaths(
+        patchContent,
+        args.base_path as string | undefined
+      );
+      if (!patchPaths.success) {
+        return errorResult("INVALID_ARGUMENTS", patchPaths.error);
+      }
+
+      const staleResult = this.getStaleEditResult(patchPaths.filePaths, context);
+      if (staleResult) {
+        return staleResult;
+      }
+
       const result = await patch.applyPatch(patchContent, args.base_path as string | undefined);
       if (!result.success) {
         return errorResult("EXECUTION_FAILED", result.error ?? "Failed to apply patch");
+      }
+
+      for (const filePath of result.filesModified) {
+        this.markWrite(filePath, context);
       }
 
       const fuzzNote = result.fuzzLevel === 0 ? "exact match" : `fuzz level ${result.fuzzLevel}`;
@@ -481,6 +573,7 @@ export class CodeInteractionServer extends BaseToolServer {
     try {
       const outline = await getOutline(filePath);
       const formatted = formatOutline(outline);
+      this.markRead(filePath, context);
       return textResult(formatted);
     } catch (err) {
       return errorResult(
@@ -566,6 +659,8 @@ export class CodeInteractionServer extends BaseToolServer {
         default:
           return errorResult("INVALID_ARGUMENTS", `Unknown action: ${action}`);
       }
+
+      this.markRead(result.path, context);
 
       const header = `[File: ${result.path}] (${result.totalLines} lines total, showing ${result.viewportStart}-${result.viewportEnd})`;
       const stats = `Lines above: ${result.linesAbove}, lines below: ${result.linesBelow}`;

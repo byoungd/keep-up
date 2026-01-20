@@ -88,6 +88,11 @@ export {
   type ISummarizer,
   MessageCompressor,
 } from "./messageCompression";
+export {
+  MessageRewindManager,
+  type MessageRewindOptions,
+  type MessageRewindResult,
+} from "./messageRewind";
 export { NodeResultCache, type NodeResultCacheConfig } from "./nodeResultCache";
 export {
   type AgentControlSignal,

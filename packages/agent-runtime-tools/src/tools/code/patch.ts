@@ -79,6 +79,27 @@ export async function applyPatch(
   };
 }
 
+export function getPatchFilePaths(
+  patchContent: string,
+  basePath?: string
+): { success: true; filePaths: string[] } | { success: false; error: string } {
+  const parsed = parsePatchContent(patchContent);
+  if (!parsed.success) {
+    return { success: false, error: (parsed as { error: string }).error };
+  }
+
+  const filePaths: string[] = [];
+  for (const patch of parsed.patches) {
+    const target = resolvePatchTarget(patch, basePath);
+    if (!target) {
+      return { success: false, error: "Patch entry is missing a valid file path." };
+    }
+    filePaths.push(target.filePath);
+  }
+
+  return { success: true, filePaths };
+}
+
 function parsePatchContent(
   patchContent: string
 ): { success: true; patches: ParsedDiff[] } | { success: false; error: string } {
