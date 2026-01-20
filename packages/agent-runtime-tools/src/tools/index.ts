@@ -8,6 +8,8 @@
 export * from "./browser";
 // Code Interaction Tools
 export * from "./code";
+// Computer Tools
+export * from "./computer";
 // Core Tools
 export * from "./core";
 // Digest Tools

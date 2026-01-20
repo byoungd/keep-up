@@ -33,6 +33,7 @@ function createContext(sessionId = "session-docker-e2e"): ToolContext {
         bash: "sandbox",
         file: "workspace",
         code: "sandbox",
+        computer: "disabled",
         network: "none",
         lfcc: "read",
       },

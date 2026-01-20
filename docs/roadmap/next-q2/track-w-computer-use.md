@@ -48,6 +48,7 @@ streaming loops and explicit safety controls.
 - `packages/agent-runtime/src/tools/computer/` module.
 - Streaming integration tests for tool loop control.
 - Documentation for computer-use safety and artifacts.
+- `docs/specs/agent-runtime/computer-use-safety-and-artifacts.md`.
 
 ---
 

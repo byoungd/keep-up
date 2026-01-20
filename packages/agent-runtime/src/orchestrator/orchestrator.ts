@@ -41,7 +41,11 @@ import type {
   ArtifactEmissionResult,
   ArtifactPipeline,
 } from "../artifacts";
-import { createArtifactPipeline, createArtifactRegistry } from "../artifacts";
+import {
+  createArtifactPipeline,
+  createArtifactRegistry,
+  createImageArtifactStore,
+} from "../artifacts";
 import type { ContextFrameBuilder, ContextItem, FileContextTracker } from "../context";
 import {
   createToolExecutor,
@@ -2478,8 +2482,15 @@ export class AgentOrchestrator {
   }
 
   private assessRisk(call: MCPToolCall): "low" | "medium" | "high" {
-    const highRiskTools = ["bash:execute", "file:delete", "file:write"];
-    const mediumRiskTools = ["code:run", "lfcc:delete_block"];
+    const highRiskTools = [
+      "bash:execute",
+      "file:delete",
+      "file:write",
+      "computer:click",
+      "computer:keypress",
+      "computer:type",
+    ];
+    const mediumRiskTools = ["code:run", "lfcc:delete_block", "computer:pointer_move"];
 
     if (highRiskTools.some((t) => call.name.includes(t))) {
       return "high";
@@ -2876,12 +2887,19 @@ export function createOrchestrator(
       eventBus,
       eventSource: config.name,
     });
+  const imageArtifactStore =
+    options.toolExecution?.imageArtifactStore ??
+    createImageArtifactStore({ pipeline: artifactPipeline });
   const executionObserver = mergeExecutionObservers(
     options.toolExecution?.executionObserver,
     taskGraph ? createTaskGraphExecutionObserver(taskGraph) : undefined,
     eventBus ? createEventBusExecutionObserver(eventBus, config.name) : undefined
   );
-  const toolExecution = { ...(options.toolExecution ?? {}), executionObserver };
+  const toolExecution = {
+    ...(options.toolExecution ?? {}),
+    executionObserver,
+    imageArtifactStore,
+  };
   const policyEngine = resolvePolicyEngine(
     options,
     permissionChecker,
@@ -3048,6 +3066,10 @@ function resolveToolExecutor(
     retryOptions: toolExecution?.retryOptions,
     cachePredicate: toolExecution?.cachePredicate,
     contextOverrides: toolExecution?.contextOverrides,
+    outputSpooler: toolExecution?.outputSpooler,
+    outputSpoolPolicy: toolExecution?.outputSpoolPolicy,
+    outputSpoolingEnabled: toolExecution?.outputSpoolingEnabled,
+    imageArtifactStore: toolExecution?.imageArtifactStore,
   });
 }
 
@@ -3162,6 +3184,7 @@ const DEFAULT_SECURITY: SecurityPolicy = {
     bash: "sandbox",
     file: "workspace",
     code: "sandbox",
+    computer: "control",
     network: "allowlist",
     lfcc: "write",
   },

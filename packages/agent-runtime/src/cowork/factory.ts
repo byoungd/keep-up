@@ -101,6 +101,8 @@ export function createCoworkToolExecutor(
     registry,
     policy,
     policyEngine: toolPolicyEngine,
+    promptInjectionGuard: config.promptInjectionGuard,
+    promptInjectionPolicy: config.promptInjectionPolicy,
     sandboxAdapter: config.sandboxAdapter,
     telemetryHandler: config.telemetryHandler,
     executionObserver: config.executionObserver,
@@ -111,6 +113,10 @@ export function createCoworkToolExecutor(
     retryOptions: config.retryOptions,
     cachePredicate: config.cachePredicate,
     contextOverrides: mergeContextOverrides(config.contextOverrides, coworkContext),
+    outputSpooler: config.outputSpooler,
+    outputSpoolPolicy: config.outputSpoolPolicy,
+    outputSpoolingEnabled: config.outputSpoolingEnabled,
+    imageArtifactStore: config.imageArtifactStore,
   });
 }
 

@@ -96,10 +96,16 @@ export class FileToolOutputSpooler implements ToolOutputSpooler {
       stored: true,
     };
 
+    const storedContent = await this.persistBinarySegments(
+      request.toolName,
+      spoolId,
+      request.content
+    );
+
     const record: ToolOutputSpoolRecord = {
       version: SPOOL_RECORD_VERSION,
       metadata,
-      content: request.content,
+      content: storedContent,
     };
 
     try {
@@ -130,6 +136,53 @@ export class FileToolOutputSpooler implements ToolOutputSpooler {
   private resolveSpoolPath(toolName: string, spoolId: string): string {
     const safeTool = sanitizeSegment(toolName);
     return join(this.rootDir, safeTool, `${spoolId}.json`);
+  }
+
+  private async persistBinarySegments(
+    toolName: string,
+    spoolId: string,
+    content: ToolContent[]
+  ): Promise<ToolContent[]> {
+    const output: ToolContent[] = [];
+    let index = 0;
+
+    for (const segment of content) {
+      if (segment.type !== "image") {
+        output.push(segment);
+        continue;
+      }
+
+      const decoded = decodeBase64(segment.data);
+      if (!decoded) {
+        output.push(segment);
+        continue;
+      }
+
+      const extension = resolveImageExtension(segment.mimeType);
+      const binaryPath = this.resolveBinaryPath(toolName, spoolId, index, extension);
+      index += 1;
+
+      try {
+        await mkdir(dirname(binaryPath), { recursive: true });
+        await writeFile(binaryPath, decoded);
+        output.push({ type: "resource", uri: binaryPath, mimeType: segment.mimeType });
+      } catch {
+        output.push(segment);
+      }
+    }
+
+    return output;
+  }
+
+  private resolveBinaryPath(
+    toolName: string,
+    spoolId: string,
+    index: number,
+    extension: string
+  ): string {
+    const safeTool = sanitizeSegment(toolName);
+    const safeSpool = sanitizeSegment(spoolId);
+    return join(this.rootDir, safeTool, safeSpool, `image_${index}.${extension}`);
   }
 }
 
@@ -179,8 +232,9 @@ function buildContentStats(content: ToolContent[]): ContentStats {
       parts.push(segment.text);
       totalBytes += Buffer.byteLength(segment.text);
     } else if (segment.type === "image") {
-      parts.push(`[image:${segment.mimeType};bytes=${segment.data.length}]`);
-      totalBytes += Buffer.byteLength(segment.data);
+      const imageBytes = estimateImageBytes(segment.data);
+      parts.push(`[image:${segment.mimeType};bytes=${imageBytes}]`);
+      totalBytes += imageBytes;
     } else {
       parts.push(`[resource:${segment.uri}]`);
       totalBytes += Buffer.byteLength(segment.uri);
@@ -283,6 +337,35 @@ function buildDisclosure(metadata: ToolOutputSpoolMetadata): string {
   }
   const error = metadata.error ?? "spool write failed";
   return `[Tool output truncated to ${policy.maxBytes} bytes / ${policy.maxLines} lines. Full output not persisted (${error}).]`;
+}
+
+function resolveImageExtension(mimeType: string): string {
+  switch (mimeType) {
+    case "image/jpeg":
+      return "jpg";
+    case "image/png":
+      return "png";
+    case "image/webp":
+      return "webp";
+    default:
+      return "bin";
+  }
+}
+
+function decodeBase64(data: string): Buffer | null {
+  try {
+    return Buffer.from(data, "base64");
+  } catch {
+    return null;
+  }
+}
+
+function estimateImageBytes(data: string): number {
+  const decoded = decodeBase64(data);
+  if (decoded) {
+    return decoded.byteLength;
+  }
+  return Buffer.byteLength(data);
 }
 
 function stableJsonStringify(value: unknown): string {

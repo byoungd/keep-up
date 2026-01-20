@@ -278,6 +278,15 @@ const reviewReportSchema = z.object({
   recommendations: z.array(z.string().min(1)).optional(),
 });
 
+const imageArtifactSchema = z.object({
+  uri: z.string().min(1),
+  mimeType: z.string().min(1),
+  byteSize: z.number().int().positive(),
+  contentHash: z.string().min(1),
+  sourceTool: z.string().min(1).optional(),
+  toolOutputSpoolId: z.string().min(1).optional(),
+});
+
 function createSchemaValidator<T extends z.ZodTypeAny>(
   schema: T
 ): (payload: Record<string, unknown>) => ArtifactValidationResult {
@@ -329,4 +338,12 @@ function registerDefaultSchemas(registry: ArtifactRegistry): void {
     version: "1.0.0",
     validate: createSchemaValidator(reviewReportSchema),
   });
+
+  registry.registerSchema({
+    type: "ImageArtifact",
+    version: "1.0.0",
+    validate: createSchemaValidator(imageArtifactSchema),
+  });
 }
+
+export * from "./imageArtifacts";

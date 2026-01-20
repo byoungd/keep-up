@@ -450,6 +450,8 @@ export interface ToolPermissions {
   file: "none" | "read" | "workspace" | "home" | "full";
   /** Code execution permission */
   code: "disabled" | "sandbox" | "full";
+  /** Computer use permission */
+  computer: "disabled" | "observe" | "control" | "full";
   /** Network access permission */
   network: "none" | "allowlist" | "full";
   /** LFCC document permission */
@@ -486,6 +488,7 @@ export const SECURITY_PRESETS = {
       bash: "disabled" as const,
       file: "read" as const,
       code: "disabled" as const,
+      computer: "disabled" as const,
       network: "none" as const,
       lfcc: "read" as const,
     },
@@ -506,6 +509,7 @@ export const SECURITY_PRESETS = {
       bash: "sandbox" as const,
       file: "workspace" as const,
       code: "sandbox" as const,
+      computer: "control" as const,
       network: "allowlist" as const,
       lfcc: "write" as const,
     },
@@ -526,6 +530,7 @@ export const SECURITY_PRESETS = {
       bash: "confirm" as const,
       file: "home" as const,
       code: "full" as const,
+      computer: "full" as const,
       network: "full" as const,
       lfcc: "write" as const,
     },
@@ -546,6 +551,7 @@ export const SECURITY_PRESETS = {
       bash: "full" as const,
       file: "full" as const,
       code: "full" as const,
+      computer: "full" as const,
       network: "full" as const,
       lfcc: "admin" as const,
     },
@@ -1074,7 +1080,8 @@ export type ArtifactType =
   | "ReportCard"
   | "ChecklistCard"
   | "TestReport"
-  | "ReviewReport";
+  | "ReviewReport"
+  | "ImageArtifact";
 
 export interface ArtifactEnvelope {
   id: string;

@@ -7,6 +7,7 @@
 import type { TelemetryContext } from "@ku0/agent-runtime-telemetry/telemetry";
 import { AGENT_METRICS } from "@ku0/agent-runtime-telemetry/telemetry";
 import type { IToolRegistry } from "@ku0/agent-runtime-tools";
+import type { ImageArtifactStore } from "../artifacts";
 import {
   createExecutionSandboxAdapter,
   type ExecutionSandboxAdapter,
@@ -35,6 +36,7 @@ import {
   type MCPTool,
   type MCPToolCall,
   type MCPToolResult,
+  type ToolContent,
   type ToolContext,
   type ToolError,
   type ToolExecutionRecord,
@@ -89,6 +91,7 @@ export interface ToolExecutorConfig {
   outputSpooler?: ToolOutputSpooler;
   outputSpoolPolicy?: ToolOutputSpoolPolicy;
   outputSpoolingEnabled?: boolean;
+  imageArtifactStore?: ImageArtifactStore;
 }
 
 export interface ToolExecutionOptions {
@@ -109,6 +112,7 @@ export interface ToolExecutionOptions {
   outputSpooler?: ToolOutputSpooler;
   outputSpoolPolicy?: ToolOutputSpoolPolicy;
   outputSpoolingEnabled?: boolean;
+  imageArtifactStore?: ImageArtifactStore;
 }
 
 type ExecutionPreparationResult =
@@ -139,6 +143,7 @@ export class ToolExecutionPipeline
   private readonly outputSpooler?: ToolOutputSpooler;
   private readonly outputSpoolPolicy: ToolOutputSpoolPolicy;
   private readonly outputSpoolingEnabled: boolean;
+  private readonly imageArtifactStore?: ImageArtifactStore;
   private readonly toolCache = new Map<string, MCPTool>();
 
   constructor(config: ToolExecutorConfig) {
@@ -161,6 +166,7 @@ export class ToolExecutionPipeline
     this.outputSpooler = this.outputSpoolingEnabled
       ? (config.outputSpooler ?? createFileToolOutputSpooler({ policy: this.outputSpoolPolicy }))
       : undefined;
+    this.imageArtifactStore = config.imageArtifactStore;
   }
 
   async execute(call: MCPToolCall, context: ToolContext): Promise<MCPToolResult> {
@@ -190,10 +196,11 @@ export class ToolExecutionPipeline
     if (cacheable && this.cache) {
       const cached = this.cache.get(call.name, call.arguments) as MCPToolResult | undefined;
       if (cached) {
+        const withArtifacts = await this.applyImageArtifacts(call, executionContext, cached);
         const spooled = await this.applyOutputSpooling(
           call,
           executionContext,
-          cached,
+          withArtifacts,
           toolCallId,
           startTime
         );
@@ -223,6 +230,7 @@ export class ToolExecutionPipeline
     try {
       let result = await this.executeWithRetry(call, executionContext);
       result = this.applyPromptInjectionOutput(call, tool, executionContext, result);
+      result = await this.applyImageArtifacts(call, executionContext, result);
 
       if (cacheable && this.cache && result.success) {
         this.cache.set(call.name, call.arguments, result);
@@ -974,6 +982,61 @@ export class ToolExecutionPipeline
   private resolvePromptPolicy(call: MCPToolCall, tool: MCPTool | undefined): PromptInjectionPolicy {
     const toolName = tool?.name ?? call.name;
     return resolvePromptInjectionPolicy(this.promptInjectionPolicy, toolName);
+  }
+
+  private async applyImageArtifacts(
+    call: MCPToolCall,
+    context: ToolContext,
+    result: MCPToolResult
+  ): Promise<MCPToolResult> {
+    if (!this.imageArtifactStore || !result.success) {
+      return result;
+    }
+
+    const content: ToolContent[] = [];
+    let replaced = false;
+
+    for (const segment of result.content) {
+      if (segment.type !== "image") {
+        content.push(segment);
+        continue;
+      }
+
+      const stored = await this.imageArtifactStore.store({
+        data: segment.data,
+        mimeType: segment.mimeType,
+        title: `Image from ${call.name}`,
+        sourceTool: call.name,
+        taskNodeId: context.taskNodeId,
+        context: {
+          correlationId: context.correlationId,
+          source: call.name,
+        },
+      });
+
+      if (stored.resource) {
+        content.push(stored.resource);
+        replaced = true;
+        continue;
+      }
+
+      const fallback = stored.skippedReason ?? stored.error;
+      if (fallback) {
+        content.push({ type: "text", text: `Image omitted: ${fallback}` });
+        replaced = true;
+      } else {
+        content.push(segment);
+      }
+    }
+
+    if (!replaced) {
+      return result;
+    }
+
+    return {
+      ...result,
+      content,
+    };
   }
 
   private async applyOutputSpooling(
