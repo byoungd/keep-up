@@ -32,6 +32,8 @@ export type {
   SidebarItemRenderProps,
   SidebarNewAction,
 } from "./components/layout/sidebar/types";
+export type { AgentRun, DashboardMetrics } from "./components/observability/metrics";
+export { ObservabilityDashboard } from "./components/observability/ObservabilityDashboard";
 export type { ArtifactPreviewPaneProps } from "./components/ui/ArtifactPreviewPane";
 export { ArtifactPreviewPane } from "./components/ui/ArtifactPreviewPane";
 export type { AvatarProps } from "./components/ui/Avatar";
