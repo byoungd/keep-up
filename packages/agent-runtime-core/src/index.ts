@@ -1217,7 +1217,9 @@ export type ArtifactType =
   | "ChecklistCard"
   | "TestReport"
   | "ReviewReport"
-  | "ImageArtifact";
+  | "ImageArtifact"
+  | "LayoutGraph"
+  | "VisualDiffReport";
 
 export interface ArtifactEnvelope {
   id: string;
