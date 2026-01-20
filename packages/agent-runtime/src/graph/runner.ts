@@ -17,6 +17,7 @@ import type {
   GraphNodeCacheEntry,
   GraphNodeContext,
   GraphNodeDefinition,
+  GraphNodeResult,
   GraphNodeStatus,
   GraphRunnerConfig,
   GraphRunResult,
@@ -208,7 +209,7 @@ export class GraphRunner {
 
       const runResult = await this.executeNodes(runnableNodes, signal);
       if (runResult.status !== "ok") {
-        return runResult;
+        return { status: runResult.status, error: runResult.error };
       }
 
       this.iteration += 1;
