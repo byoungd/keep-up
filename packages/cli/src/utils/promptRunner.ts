@@ -11,17 +11,28 @@ export interface PromptRunnerOptions {
 }
 
 export async function runPromptWithStreaming(options: PromptRunnerOptions): Promise<AgentState> {
+  const staleSubscription = options.runtime.eventBus?.subscribe("context:file-stale", (event) => {
+    if (options.quiet) {
+      return;
+    }
+    writeStderr(formatStaleWarning(event.payload));
+  });
+
   const iterator = options.runtime.kernel.runStream(options.prompt)[Symbol.asyncIterator]();
   let finalState: AgentState | undefined;
 
-  while (true) {
-    const result = await iterator.next();
-    if (result.done) {
-      finalState = result.value;
-      break;
-    }
+  try {
+    while (true) {
+      const result = await iterator.next();
+      if (result.done) {
+        finalState = result.value;
+        break;
+      }
 
-    handleRuntimeEvent(result.value, options.quiet ?? false, options.toolCalls);
+      handleRuntimeEvent(result.value, options.quiet ?? false, options.toolCalls);
+    }
+  } finally {
+    staleSubscription?.unsubscribe();
   }
 
   if (!finalState) {
@@ -178,4 +189,18 @@ function formatArgs(args: Record<string, unknown>): string {
   } catch {
     return "{...}";
   }
+}
+
+function formatStaleWarning(payload: unknown): string {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return "Stale file context detected. Reload before editing.";
+  }
+  const record = payload as Record<string, unknown>;
+  const path =
+    typeof record.path === "string"
+      ? record.path
+      : typeof record.absolutePath === "string"
+        ? record.absolutePath
+        : "unknown";
+  return `Stale file context detected: ${path}. Reload before editing.`;
 }

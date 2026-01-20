@@ -2,7 +2,7 @@
 
 Date: 2026-01-20
 Owner: Keep-Up Engineering
-Status: Proposed
+Status: Completed
 Dependencies: docs/roadmap/next (core completed; Track Q DX merge pending), Track L architecture, Track O A2A baseline, Track P state/memory baseline
 
 ---
@@ -42,9 +42,9 @@ The following Track Q developer experience tasks are actively being built and wi
 
 ---
 
-## Selected Track
+## Selected Tracks
 
-Track T (Multi-Agent Teams and Protocols) is selected for Q2 implementation.
+Tracks S/T/U/V/W delivered for Q2 implementation.
 
 ---
 

@@ -78,6 +78,7 @@ export interface GraphCheckpointSnapshot {
 export interface GraphRunContext {
   readonly runId: string;
   readonly signal: AbortSignal;
+  readonly cacheContext?: Record<string, unknown>;
 }
 
 export interface GraphRunResult {
@@ -105,6 +106,7 @@ export interface GraphRunnerConfig {
   readonly checkpoint?: GraphCheckpointOptions;
   readonly cache?: GraphNodeCache;
   readonly eventSource?: string;
+  readonly cacheContext?: Record<string, unknown>;
 }
 
 export interface GraphNodeCacheEntry {

@@ -154,6 +154,7 @@ export class GraphRunner {
   private readonly maxIterations: number;
   private readonly cache: GraphNodeCache;
   private readonly eventSource: string;
+  private readonly cacheContext?: Record<string, unknown>;
 
   private store?: ChannelStore;
   private nodeStates = new Map<string, MutableGraphNodeState>();
@@ -171,6 +172,7 @@ export class GraphRunner {
     this.maxIterations = config.maxIterations ?? DEFAULT_MAX_ITERATIONS;
     this.cache = config.cache ?? createGraphNodeCache();
     this.eventSource = config.eventSource ?? "graph-runtime";
+    this.cacheContext = config.cacheContext;
     this.checkpointManager = config.checkpoint?.manager;
     this.checkpointId = config.checkpoint?.checkpointId;
     this.checkpointResume = config.checkpoint?.resume ?? false;
@@ -649,7 +651,11 @@ export class GraphRunner {
   }
 
   private getRunContext() {
-    return { runId: this.runId, signal: this.activeSignal ?? new AbortController().signal };
+    return {
+      runId: this.runId,
+      signal: this.activeSignal ?? new AbortController().signal,
+      cacheContext: this.cacheContext,
+    };
   }
 
   private emitEvent<T>(type: string, payload: T): void {

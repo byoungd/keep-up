@@ -46,11 +46,28 @@ export interface RuntimeEventStreamBridgeConfig {
   includeDecisions?: boolean;
 }
 
+interface FileStalePayload {
+  contextId?: string;
+  path?: string;
+  absolutePath?: string;
+  status?: string;
+  recordSource?: string;
+  lastReadAt?: number;
+  lastWriteAt?: number;
+  lastExternalEditAt?: number;
+}
+
 export function attachRuntimeEventStreamBridge(config: RuntimeEventStreamBridgeConfig): () => void {
   const { eventBus, stream, correlationId, source, includeDecisions = true } = config;
   const subscriptions: Subscription[] = [];
 
   const shouldHandle = (event: RuntimeEvent) => {
+    if (event.type === "context:file-stale") {
+      if (source && event.meta.source && event.meta.source !== source) {
+        return false;
+      }
+      return true;
+    }
     if (correlationId && event.meta.correlationId !== correlationId) {
       return false;
     }
@@ -176,6 +193,12 @@ export function attachRuntimeEventStreamBridge(config: RuntimeEventStreamBridgeC
     stream.writeMetadata("checkpoint", payload);
   };
 
+  const handleFileStale = (payload: FileStalePayload) => {
+    const displayPath = payload.path ?? payload.absolutePath ?? "unknown";
+    stream.writeMetadata("context:file-stale", payload);
+    stream.writeError(`Stale file context detected: ${displayPath}`, "STALE_CONTEXT", true);
+  };
+
   if (includeDecisions) {
     subscriptions.push(
       eventBus.subscribe("execution:decision", (event) => {
@@ -238,6 +261,15 @@ export function attachRuntimeEventStreamBridge(config: RuntimeEventStreamBridgeC
         return;
       }
       handleCheckpointEvent(event.payload as CheckpointEvent);
+    })
+  );
+
+  subscriptions.push(
+    eventBus.subscribe("context:file-stale", (event) => {
+      if (!shouldHandle(event)) {
+        return;
+      }
+      handleFileStale(event.payload as FileStalePayload);
     })
   );
 
