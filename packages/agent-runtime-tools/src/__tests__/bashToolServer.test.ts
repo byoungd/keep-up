@@ -7,11 +7,11 @@ import { SECURITY_PRESETS } from "@ku0/agent-runtime-core";
 import { describe, expect, it, vi } from "vitest";
 import { BashToolServer, type IBashExecutor } from "../tools/core/bash";
 
-function createContext(): ToolContext {
+function createContext(workingDirectory?: string): ToolContext {
   const base = SECURITY_PRESETS.balanced;
   return {
     security: {
-      sandbox: { ...base.sandbox },
+      sandbox: { ...base.sandbox, workingDirectory },
       permissions: { ...base.permissions, bash: "confirm" },
       limits: { ...base.limits },
     },
@@ -59,5 +59,35 @@ describe("BashToolServer", () => {
 
     expect(result.success).toBe(true);
     expect(executor.execute).toHaveBeenCalled();
+  });
+
+  it("blocks command substitution", async () => {
+    const executor = createExecutor();
+    const server = new BashToolServer(executor);
+    const context = createContext();
+
+    const result = await server.callTool(
+      { name: "execute", arguments: { command: "echo $(whoami)" } },
+      context
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error?.code).toBe("PERMISSION_DENIED");
+    expect(executor.execute).not.toHaveBeenCalled();
+  });
+
+  it("rejects working directories outside the sandbox root", async () => {
+    const executor = createExecutor();
+    const server = new BashToolServer(executor);
+    const context = createContext("/tmp/sandbox");
+
+    const result = await server.callTool(
+      { name: "execute", arguments: { command: "echo ok", cwd: "/tmp/other" } },
+      context
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error?.code).toBe("PERMISSION_DENIED");
+    expect(executor.execute).not.toHaveBeenCalled();
   });
 });

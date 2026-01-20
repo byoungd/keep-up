@@ -6,6 +6,7 @@
  */
 
 import { type ChildProcess, type SpawnOptions, spawn } from "node:child_process";
+import * as path from "node:path";
 import type {
   BashExecuteOptions,
   BashExecuteResult,
@@ -186,7 +187,7 @@ export class BashToolServer extends BaseToolServer {
     context: ToolContext
   ): ReturnType<ToolHandler> {
     const command = args.command as string;
-    const cwd = (args.cwd as string) ?? context.security.sandbox.workingDirectory;
+    const cwdInput = (args.cwd as string) ?? context.security.sandbox.workingDirectory;
     const timeout = (args.timeout as number) ?? context.security.limits.maxExecutionTimeMs;
 
     // Check permissions
@@ -221,19 +222,24 @@ export class BashToolServer extends BaseToolServer {
       );
     }
 
+    const cwdValidation = validateCwd(cwdInput, context.security.sandbox.workingDirectory);
+    if (!cwdValidation.valid) {
+      return errorResult("PERMISSION_DENIED", cwdValidation.reason ?? "Invalid working directory");
+    }
+
     // Log to audit
     context.audit?.log({
       timestamp: Date.now(),
       toolName: "bash:execute",
       action: "call",
       userId: context.userId,
-      input: { command, cwd },
+      input: { command, cwd: cwdValidation.resolvedPath },
       sandboxed: context.security.sandbox.type !== "none",
     });
 
     // Execute command
     const result = await this.executor.execute(command, {
-      cwd,
+      cwd: cwdValidation.resolvedPath,
       timeoutMs: timeout,
       maxOutputBytes: context.security.limits.maxOutputBytes,
       signal: context.signal,
@@ -304,6 +310,7 @@ const SHELL_OPERATOR_DESCRIPTIONS: Record<string, string> = {
   "||": "command chaining (OR)",
   "|": "pipe",
   "|&": "pipe with stderr",
+  "$(": "command substitution",
   ">": "output redirection",
   ">>": "append redirection",
   "<": "input redirection",
@@ -347,13 +354,17 @@ function detectShellOperator(command: string): ShellOperatorMatch | null {
       continue;
     }
 
-    if (quoteState.inSingleQuote || quoteState.inDoubleQuote) {
-      continue;
-    }
-
     const lineSeparatorMatch = LINE_SEPARATOR_MATCHES[char];
     if (lineSeparatorMatch) {
       return lineSeparatorMatch;
+    }
+
+    if (!quoteState.inSingleQuote && char === "$" && command[index + 1] === "(") {
+      return matchOperator("$(");
+    }
+
+    if (quoteState.inSingleQuote || quoteState.inDoubleQuote) {
+      continue;
     }
 
     const operatorMatch = matchOperatorAt(command, index);
@@ -424,6 +435,31 @@ function matchOperator(operator: string): ShellOperatorMatch {
     operator,
     description: SHELL_OPERATOR_DESCRIPTIONS[operator] ?? `shell operator (${operator})`,
   };
+}
+
+function validateCwd(
+  cwd: string | undefined,
+  sandboxRoot: string | undefined
+): { valid: boolean; reason?: string; resolvedPath?: string } {
+  if (!cwd) {
+    return { valid: true, resolvedPath: sandboxRoot };
+  }
+
+  const resolved = path.resolve(cwd);
+  if (!sandboxRoot) {
+    return { valid: true, resolvedPath: resolved };
+  }
+
+  const resolvedRoot = path.resolve(sandboxRoot);
+  const relative = path.relative(resolvedRoot, resolved);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    return {
+      valid: false,
+      reason: "Working directory is outside sandbox root",
+    };
+  }
+
+  return { valid: true, resolvedPath: resolved };
 }
 
 /**
