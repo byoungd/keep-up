@@ -1,0 +1,48 @@
+{
+  "id": "feature-008",
+  "title": "Feature add 8",
+  "category": "feature-add",
+  "difficulty": "hard",
+  "prompt": "Add multiply8 to src/feature-008.ts.",
+  "setup": {
+    "files": [
+      {
+        "path": "src/feature-008.ts",
+        "content": "export function add8(a: number, b: number) {\n  return a + b;\n}\n"
+      }
+    ]
+  },
+  "expectations": [
+    {
+      "type": "file_equals",
+      "path": "src/feature-008.ts",
+      "content": "export function add8(a: number, b: number) {\n  return a + b;\n}\n\nexport function multiply8(a: number, b: number) {\n  return a * b;\n}\n"
+    },
+    {
+      "type": "no_syntax_errors",
+      "path": "src/feature-008.ts"
+    }
+  ],
+  "script": {
+    "responses": [
+      {
+        "content": "Adding feature.",
+        "finishReason": "tool_use",
+        "toolCalls": [
+          {
+            "name": "file:write",
+            "arguments": {
+              "path": "src/feature-008.ts",
+              "content": "export function add8(a: number, b: number) {\n  return a + b;\n}\n\nexport function multiply8(a: number, b: number) {\n  return a * b;\n}\n",
+              "createDirs": true
+            }
+          }
+        ]
+      },
+      {
+        "content": "Done.",
+        "finishReason": "stop"
+      }
+    ]
+  }
+}

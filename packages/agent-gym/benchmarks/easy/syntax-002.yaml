@@ -1,0 +1,48 @@
+{
+  "id": "syntax-002",
+  "title": "Syntax repair 2",
+  "category": "syntax-repair",
+  "difficulty": "easy",
+  "prompt": "Fix the syntax error in src/syntax-002.ts.",
+  "setup": {
+    "files": [
+      {
+        "path": "src/syntax-002.ts",
+        "content": "export const value2 = ;\nexport function getValue2() {\n  return value2;\n}\n"
+      }
+    ]
+  },
+  "expectations": [
+    {
+      "type": "file_equals",
+      "path": "src/syntax-002.ts",
+      "content": "export const value2 = 2;\nexport function getValue2() {\n  return value2;\n}\n"
+    },
+    {
+      "type": "no_syntax_errors",
+      "path": "src/syntax-002.ts"
+    }
+  ],
+  "script": {
+    "responses": [
+      {
+        "content": "Fixing syntax.",
+        "finishReason": "tool_use",
+        "toolCalls": [
+          {
+            "name": "file:write",
+            "arguments": {
+              "path": "src/syntax-002.ts",
+              "content": "export const value2 = 2;\nexport function getValue2() {\n  return value2;\n}\n",
+              "createDirs": true
+            }
+          }
+        ]
+      },
+      {
+        "content": "Done.",
+        "finishReason": "stop"
+      }
+    ]
+  }
+}

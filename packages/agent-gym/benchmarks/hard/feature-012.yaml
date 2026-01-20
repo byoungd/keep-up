@@ -1,0 +1,48 @@
+{
+  "id": "feature-012",
+  "title": "Feature add 12",
+  "category": "feature-add",
+  "difficulty": "hard",
+  "prompt": "Add multiply12 to src/feature-012.ts.",
+  "setup": {
+    "files": [
+      {
+        "path": "src/feature-012.ts",
+        "content": "export function add12(a: number, b: number) {\n  return a + b;\n}\n"
+      }
+    ]
+  },
+  "expectations": [
+    {
+      "type": "file_equals",
+      "path": "src/feature-012.ts",
+      "content": "export function add12(a: number, b: number) {\n  return a + b;\n}\n\nexport function multiply12(a: number, b: number) {\n  return a * b;\n}\n"
+    },
+    {
+      "type": "no_syntax_errors",
+      "path": "src/feature-012.ts"
+    }
+  ],
+  "script": {
+    "responses": [
+      {
+        "content": "Adding feature.",
+        "finishReason": "tool_use",
+        "toolCalls": [
+          {
+            "name": "file:write",
+            "arguments": {
+              "path": "src/feature-012.ts",
+              "content": "export function add12(a: number, b: number) {\n  return a + b;\n}\n\nexport function multiply12(a: number, b: number) {\n  return a * b;\n}\n",
+              "createDirs": true
+            }
+          }
+        ]
+      },
+      {
+        "content": "Done.",
+        "finishReason": "stop"
+      }
+    ]
+  }
+}

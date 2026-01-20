@@ -1,0 +1,48 @@
+{
+  "id": "syntax-004",
+  "title": "Syntax repair 4",
+  "category": "syntax-repair",
+  "difficulty": "easy",
+  "prompt": "Fix the syntax error in src/syntax-004.ts.",
+  "setup": {
+    "files": [
+      {
+        "path": "src/syntax-004.ts",
+        "content": "export const value4 = ;\nexport function getValue4() {\n  return value4;\n}\n"
+      }
+    ]
+  },
+  "expectations": [
+    {
+      "type": "file_equals",
+      "path": "src/syntax-004.ts",
+      "content": "export const value4 = 4;\nexport function getValue4() {\n  return value4;\n}\n"
+    },
+    {
+      "type": "no_syntax_errors",
+      "path": "src/syntax-004.ts"
+    }
+  ],
+  "script": {
+    "responses": [
+      {
+        "content": "Fixing syntax.",
+        "finishReason": "tool_use",
+        "toolCalls": [
+          {
+            "name": "file:write",
+            "arguments": {
+              "path": "src/syntax-004.ts",
+              "content": "export const value4 = 4;\nexport function getValue4() {\n  return value4;\n}\n",
+              "createDirs": true
+            }
+          }
+        ]
+      },
+      {
+        "content": "Done.",
+        "finishReason": "stop"
+      }
+    ]
+  }
+}

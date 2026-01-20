@@ -1,0 +1,48 @@
+{
+  "id": "syntax-005",
+  "title": "Syntax repair 5",
+  "category": "syntax-repair",
+  "difficulty": "easy",
+  "prompt": "Fix the syntax error in src/syntax-005.ts.",
+  "setup": {
+    "files": [
+      {
+        "path": "src/syntax-005.ts",
+        "content": "export const value5 = ;\nexport function getValue5() {\n  return value5;\n}\n"
+      }
+    ]
+  },
+  "expectations": [
+    {
+      "type": "file_equals",
+      "path": "src/syntax-005.ts",
+      "content": "export const value5 = 5;\nexport function getValue5() {\n  return value5;\n}\n"
+    },
+    {
+      "type": "no_syntax_errors",
+      "path": "src/syntax-005.ts"
+    }
+  ],
+  "script": {
+    "responses": [
+      {
+        "content": "Fixing syntax.",
+        "finishReason": "tool_use",
+        "toolCalls": [
+          {
+            "name": "file:write",
+            "arguments": {
+              "path": "src/syntax-005.ts",
+              "content": "export const value5 = 5;\nexport function getValue5() {\n  return value5;\n}\n",
+              "createDirs": true
+            }
+          }
+        ]
+      },
+      {
+        "content": "Done.",
+        "finishReason": "stop"
+      }
+    ]
+  }
+}

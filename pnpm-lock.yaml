@@ -181,6 +181,28 @@ importers:
         specifier: ^39.2.7
         version: 39.2.7
 
+  packages/agent-gym:
+    dependencies:
+      '@ku0/agent-runtime':
+        specifier: workspace:*
+        version: link:../agent-runtime
+      '@ku0/agent-runtime-core':
+        specifier: workspace:*
+        version: link:../agent-runtime-core
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.19.3
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      vitest:
+        specifier: ^4.0.0
+        version: 4.0.16(@opentelemetry/api@1.9.0)(@types/node@22.19.3)(jiti@2.6.1)(jsdom@26.1.0)(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2)
+
   packages/agent-runtime:
     dependencies:
       '@ku0/agent-runtime-control':

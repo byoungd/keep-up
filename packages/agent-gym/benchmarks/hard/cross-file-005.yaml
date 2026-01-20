@@ -1,0 +1,61 @@
+{
+  "id": "cross-file-005",
+  "title": "Cross-file update 5",
+  "category": "cross-file",
+  "difficulty": "hard",
+  "prompt": "Update src/module-5.ts and src/index-5.ts to export version5.",
+  "setup": {
+    "files": [
+      {
+        "path": "src/module-5.ts",
+        "content": "export function build5() {\n  return \"v1\";\n}\n"
+      },
+      {
+        "path": "src/index-5.ts",
+        "content": "export { build5 } from \"./module-5\";\n"
+      }
+    ]
+  },
+  "expectations": [
+    {
+      "type": "file_equals",
+      "path": "src/module-5.ts",
+      "content": "export const version5 = \"v2\";\nexport function build5() {\n  return version5;\n}\n"
+    },
+    {
+      "type": "file_equals",
+      "path": "src/index-5.ts",
+      "content": "export { build5, version5 } from \"./module-5\";\n"
+    }
+  ],
+  "script": {
+    "responses": [
+      {
+        "content": "Updating module and index.",
+        "finishReason": "tool_use",
+        "toolCalls": [
+          {
+            "name": "file:write",
+            "arguments": {
+              "path": "src/module-5.ts",
+              "content": "export const version5 = \"v2\";\nexport function build5() {\n  return version5;\n}\n",
+              "createDirs": true
+            }
+          },
+          {
+            "name": "file:write",
+            "arguments": {
+              "path": "src/index-5.ts",
+              "content": "export { build5, version5 } from \"./module-5\";\n",
+              "createDirs": true
+            }
+          }
+        ]
+      },
+      {
+        "content": "Done.",
+        "finishReason": "stop"
+      }
+    ]
+  }
+}

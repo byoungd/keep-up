@@ -1,0 +1,48 @@
+{
+  "id": "syntax-010",
+  "title": "Syntax repair 10",
+  "category": "syntax-repair",
+  "difficulty": "easy",
+  "prompt": "Fix the syntax error in src/syntax-010.ts.",
+  "setup": {
+    "files": [
+      {
+        "path": "src/syntax-010.ts",
+        "content": "export const value10 = ;\nexport function getValue10() {\n  return value10;\n}\n"
+      }
+    ]
+  },
+  "expectations": [
+    {
+      "type": "file_equals",
+      "path": "src/syntax-010.ts",
+      "content": "export const value10 = 10;\nexport function getValue10() {\n  return value10;\n}\n"
+    },
+    {
+      "type": "no_syntax_errors",
+      "path": "src/syntax-010.ts"
+    }
+  ],
+  "script": {
+    "responses": [
+      {
+        "content": "Fixing syntax.",
+        "finishReason": "tool_use",
+        "toolCalls": [
+          {
+            "name": "file:write",
+            "arguments": {
+              "path": "src/syntax-010.ts",
+              "content": "export const value10 = 10;\nexport function getValue10() {\n  return value10;\n}\n",
+              "createDirs": true
+            }
+          }
+        ]
+      },
+      {
+        "content": "Done.",
+        "finishReason": "stop"
+      }
+    ]
+  }
+}
