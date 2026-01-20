@@ -5,6 +5,9 @@
  * with sandboxing, timeout controls, and output capture.
  */
 
+import * as fs from "node:fs/promises";
+import * as os from "node:os";
+import * as path from "node:path";
 import type { MCPToolResult, ToolContext } from "@ku0/agent-runtime-core";
 import { BaseToolServer, errorResult, textResult } from "../mcp/baseServer";
 import { type IBashExecutor, ProcessBashExecutor } from "./bash";
@@ -54,6 +57,8 @@ interface LanguageConfig {
   runCommand: (filePath: string) => string;
   /** Optional: Command to check if runtime is available */
   checkCommand?: string;
+  /** Optional: Additional files to remove after execution */
+  cleanupPaths?: (filePath: string) => string[];
 }
 
 const LANGUAGE_CONFIGS: Record<string, LanguageConfig> = {
@@ -90,6 +95,14 @@ const LANGUAGE_CONFIGS: Record<string, LanguageConfig> = {
       return `rustc "${f}" -o "${out}" && "${out}"`;
     },
     checkCommand: "rustc --version",
+    cleanupPaths: (filePath) => {
+      const baseName = path.basename(filePath, ".rs");
+      const outputBase = path.join(path.dirname(filePath), baseName);
+      if (process.platform === "win32") {
+        return [outputBase, `${outputBase}.exe`];
+      }
+      return [outputBase];
+    },
   },
   bash: {
     extension: ".sh",
@@ -116,7 +129,7 @@ export class ProcessCodeExecutor implements ICodeExecutor {
 
   constructor(options: { bashExecutor?: IBashExecutor; tempDir?: string } = {}) {
     this.bashExecutor = options.bashExecutor ?? new ProcessBashExecutor();
-    this.tempDir = options.tempDir ?? "/tmp/code-executor";
+    this.tempDir = options.tempDir ?? path.join(os.tmpdir(), "code-executor");
   }
 
   get supportedLanguages(): string[] {
@@ -128,6 +141,7 @@ export class ProcessCodeExecutor implements ICodeExecutor {
     code: string,
     options: CodeExecuteOptions
   ): Promise<CodeExecuteResult> {
+    const startTime = Date.now();
     const config = LANGUAGE_CONFIGS[language.toLowerCase()];
     if (!config) {
       return {
@@ -136,7 +150,7 @@ export class ProcessCodeExecutor implements ICodeExecutor {
         stderr: `Unsupported language: ${language}. Supported: ${this.supportedLanguages.join(", ")}`,
         exitCode: 1,
         timedOut: false,
-        durationMs: 0,
+        durationMs: Date.now() - startTime,
       };
     }
 
@@ -147,25 +161,8 @@ export class ProcessCodeExecutor implements ICodeExecutor {
     const filePath = `${this.tempDir}/${filename}`;
 
     try {
-      // Ensure temp directory exists and write code file
-      const setupCommand = `mkdir -p "${this.tempDir}" && cat > "${filePath}" << 'CODEEOF'
-${code}
-CODEEOF`;
-
-      const setupResult = await this.bashExecutor.execute(setupCommand, {
-        timeoutMs: 5000,
-      });
-
-      if (setupResult.exitCode !== 0) {
-        return {
-          success: false,
-          stdout: "",
-          stderr: `Failed to write code file: ${setupResult.stderr}`,
-          exitCode: setupResult.exitCode,
-          timedOut: false,
-          durationMs: setupResult.durationMs,
-        };
-      }
+      await fs.mkdir(this.tempDir, { recursive: true });
+      await fs.writeFile(filePath, code, "utf-8");
 
       // Execute the code
       const runCommand = config.runCommand(filePath);
@@ -183,13 +180,28 @@ CODEEOF`;
         stderr: result.stderr,
         exitCode: result.exitCode,
         timedOut: result.timedOut,
-        durationMs: result.durationMs,
+        durationMs: Date.now() - startTime,
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return {
+        success: false,
+        stdout: "",
+        stderr: `Failed to prepare code execution: ${message}`,
+        exitCode: 1,
+        timedOut: false,
+        durationMs: Date.now() - startTime,
       };
     } finally {
-      // Cleanup temp file
-      await this.bashExecutor.execute(`rm -f "${filePath}"`, { timeoutMs: 5000 }).catch(() => {
-        // Ignore cleanup errors
-      });
+      const cleanupPaths = [
+        filePath,
+        ...(config.cleanupPaths ? config.cleanupPaths(filePath) : []),
+      ];
+      await Promise.allSettled(
+        cleanupPaths.map((cleanupPath) =>
+          fs.rm(cleanupPath, { force: true }).catch(() => undefined)
+        )
+      );
     }
   }
 }

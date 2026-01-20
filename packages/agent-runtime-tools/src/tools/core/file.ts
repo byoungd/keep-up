@@ -110,7 +110,7 @@ export class PathValidator {
    */
   validate(targetPath: string): { valid: boolean; reason?: string } {
     // Normalize path
-    const normalized = path.resolve(targetPath);
+    const normalized = normalizePath(targetPath);
 
     // Check blocked patterns
     for (const pattern of this.config.blockedPatterns) {
@@ -122,8 +122,8 @@ export class PathValidator {
     // Check if path is within allowed directories
     if (this.config.allowedPaths.length > 0) {
       const isAllowed = this.config.allowedPaths.some((allowed) => {
-        const normalizedAllowed = path.resolve(allowed);
-        return normalized.startsWith(normalizedAllowed);
+        const normalizedAllowed = normalizePath(allowed);
+        return isPathWithin(normalized, normalizedAllowed);
       });
 
       if (!isAllowed) {
@@ -133,6 +133,16 @@ export class PathValidator {
 
     return { valid: true };
   }
+}
+
+function normalizePath(input: string): string {
+  const resolved = path.resolve(input);
+  return process.platform === "win32" ? resolved.toLowerCase() : resolved;
+}
+
+function isPathWithin(targetPath: string, basePath: string): boolean {
+  const relative = path.relative(basePath, targetPath);
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
 // ============================================================================
@@ -323,13 +333,13 @@ export class FileToolServer extends BaseToolServer {
 
     try {
       const content = await this.fileSystem.readFile(filePath, encoding);
+      const maxOutputBytes = context.security.limits.maxOutputBytes;
+      const contentBytes = Buffer.byteLength(content);
 
       // Check output size limit
-      if (content.length > context.security.limits.maxOutputBytes) {
-        const truncated = content.slice(0, context.security.limits.maxOutputBytes);
-        return textResult(
-          `${truncated}\n\n[Content truncated at ${context.security.limits.maxOutputBytes} bytes]`
-        );
+      if (contentBytes > maxOutputBytes) {
+        const truncated = Buffer.from(content).subarray(0, maxOutputBytes).toString();
+        return textResult(`${truncated}\n\n[Content truncated at ${maxOutputBytes} bytes]`);
       }
 
       return textResult(content);
@@ -349,6 +359,7 @@ export class FileToolServer extends BaseToolServer {
     const filePath = args.path as string;
     const content = args.content as string;
     const createDirs = (args.createDirs as boolean) ?? false;
+    const contentBytes = Buffer.byteLength(content);
 
     // Check permissions
     if (
@@ -379,11 +390,11 @@ export class FileToolServer extends BaseToolServer {
         toolName: "file:write",
         action: "result",
         userId: context.userId,
-        input: { path: filePath, contentLength: content.length },
+        input: { path: filePath, contentLength: contentBytes },
         sandboxed: context.security.sandbox.type !== "none",
       });
 
-      return textResult(`Successfully wrote ${content.length} bytes to ${filePath}`);
+      return textResult(`Successfully wrote ${contentBytes} bytes to ${filePath}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return errorResult("EXECUTION_FAILED", `Failed to write file: ${message}`);
@@ -421,7 +432,14 @@ export class FileToolServer extends BaseToolServer {
         }
       }
 
-      return textResult(detailed.join("\n") || "(empty directory)");
+      const output = detailed.join("\n") || "(empty directory)";
+      const maxOutputBytes = context.security.limits.maxOutputBytes;
+      if (Buffer.byteLength(output) > maxOutputBytes) {
+        const truncated = Buffer.from(output).subarray(0, maxOutputBytes).toString();
+        return textResult(`${truncated}\n\n[Output truncated at ${maxOutputBytes} bytes]`);
+      }
+
+      return textResult(output);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return errorResult("EXECUTION_FAILED", `Failed to list directory: ${message}`);
@@ -504,53 +522,97 @@ export class FileToolServer extends BaseToolServer {
     context: ToolContext,
     intent: CoworkFileIntent
   ): Promise<{ valid: boolean; reason?: string }> {
-    if (context.cowork?.policyEngine && context.cowork.session) {
-      const resolvedPath = await this.resolveCoworkPath(targetPath, intent);
-      const decision = context.cowork.policyEngine.evaluate({
-        action: toCoworkAction(intent),
-        path: resolvedPath ?? targetPath,
-        grantRoots: collectGrantRoots(context.cowork.session),
-        outputRoots: collectOutputRoots(context.cowork.session),
-        caseInsensitivePaths: context.cowork.caseInsensitivePaths,
-      });
-
-      if (decision.decision === "deny") {
-        return { valid: false, reason: decision.reason };
-      }
-
-      return { valid: true };
+    const coworkDecision = await this.evaluateCoworkPolicy(targetPath, context, intent);
+    if (coworkDecision) {
+      return coworkDecision;
     }
 
-    // Build allowed paths based on permission level
-    const allowedPaths: string[] = [];
-
-    switch (context.security.permissions.file) {
-      case "workspace":
-        if (context.security.sandbox.workingDirectory) {
-          allowedPaths.push(context.security.sandbox.workingDirectory);
-        }
-        break;
-      case "home":
-        if (process.env.HOME) {
-          allowedPaths.push(process.env.HOME);
-        }
-        break;
-      case "full":
-        // No restrictions
-        break;
-      default:
-        return { valid: false, reason: "File access not permitted" };
+    const allowedPaths = this.getAllowedPaths(context);
+    if (!allowedPaths) {
+      return { valid: false, reason: "File access not permitted" };
     }
 
-    // Create validator with context-specific allowed paths
     const validator = new PathValidator({
       allowedPaths: allowedPaths.length > 0 ? allowedPaths : undefined,
     });
 
-    return validator.validate(targetPath);
+    return this.validateWithResolver(validator, targetPath, intent);
+  }
+
+  private async evaluateCoworkPolicy(
+    targetPath: string,
+    context: ToolContext,
+    intent: CoworkFileIntent
+  ): Promise<{ valid: boolean; reason?: string } | null> {
+    if (!context.cowork?.policyEngine || !context.cowork.session) {
+      return null;
+    }
+
+    const resolvedPath = await this.resolveCoworkPath(targetPath, intent);
+    const decision = context.cowork.policyEngine.evaluate({
+      action: toCoworkAction(intent),
+      path: resolvedPath ?? targetPath,
+      grantRoots: collectGrantRoots(context.cowork.session),
+      outputRoots: collectOutputRoots(context.cowork.session),
+      caseInsensitivePaths: context.cowork.caseInsensitivePaths,
+    });
+
+    if (decision.decision === "deny") {
+      return { valid: false, reason: decision.reason };
+    }
+
+    return { valid: true };
+  }
+
+  private getAllowedPaths(context: ToolContext): string[] | null {
+    switch (context.security.permissions.file) {
+      case "workspace":
+        return context.security.sandbox.workingDirectory
+          ? [context.security.sandbox.workingDirectory]
+          : [];
+      case "home":
+        return process.env.HOME ? [process.env.HOME] : [];
+      case "full":
+        return [];
+      default:
+        return null;
+    }
+  }
+
+  private async validateWithResolver(
+    validator: PathValidator,
+    targetPath: string,
+    intent: CoworkFileIntent
+  ): Promise<{ valid: boolean; reason?: string }> {
+    const validation = validator.validate(targetPath);
+    if (!validation.valid) {
+      return validation;
+    }
+
+    const resolvedPath = await this.resolvePathForValidation(targetPath, intent);
+    if (!resolvedPath) {
+      return { valid: true };
+    }
+
+    const resolvedValidation = validator.validate(resolvedPath);
+    if (!resolvedValidation.valid) {
+      return {
+        valid: false,
+        reason: resolvedValidation.reason ?? "Resolved path validation failed",
+      };
+    }
+
+    return { valid: true };
   }
 
   private async resolveCoworkPath(
+    targetPath: string,
+    intent: CoworkFileIntent
+  ): Promise<string | null> {
+    return this.resolvePathForValidation(targetPath, intent);
+  }
+
+  private async resolvePathForValidation(
     targetPath: string,
     intent: CoworkFileIntent
   ): Promise<string | null> {
@@ -565,8 +627,10 @@ export class FileToolServer extends BaseToolServer {
     if (intent === "write") {
       const parent = path.dirname(targetPath);
       try {
-        const realParent = await this.resolveRealPath(parent);
-        return path.join(realParent, path.basename(targetPath));
+        if (this.fileSystem.exists(parent)) {
+          const realParent = await this.resolveRealPath(parent);
+          return path.join(realParent, path.basename(targetPath));
+        }
       } catch {
         return null;
       }

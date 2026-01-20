@@ -460,7 +460,14 @@ export class CodeInteractionServer extends BaseToolServer {
         })
         .join("\n");
 
-      return textResult(`## Files in ${dirPath}\n\n${formatted}`);
+      const output = `## Files in ${dirPath}\n\n${formatted}`;
+      const maxOutputBytes = context.security?.limits?.maxOutputBytes;
+      if (maxOutputBytes && Buffer.byteLength(output) > maxOutputBytes) {
+        const truncated = Buffer.from(output).subarray(0, maxOutputBytes).toString();
+        return textResult(`${truncated}\n\n[Output truncated at ${maxOutputBytes} bytes]`);
+      }
+
+      return textResult(output);
     } catch (err) {
       return errorResult(
         "EXECUTION_FAILED",
