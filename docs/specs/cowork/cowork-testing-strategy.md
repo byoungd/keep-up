@@ -45,15 +45,17 @@ We simulate the **User Journey**.
 
 ```
 tests/
-  ├── unit/
-  │   ├── reducers.test.ts
-  │   └── parsers.test.ts
   ├── e2e/
   │   ├── flows/
   │   │   ├── happy-path.spec.ts
   │   │   └── correction.spec.ts
   │   └── fixtures/
   │       └── mock-llm-responses.json
+packages/
+  ├── agent-runtime/
+  │   └── src/__tests__/
+  └── agent-runtime-tools/
+      └── src/tools/code/__tests__/
 ```
 
 ## 4. Quality Gates
