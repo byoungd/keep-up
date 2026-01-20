@@ -39,6 +39,7 @@ export const MessageBubble = React.memo(function MessageBubble({
     );
   }
 
+  const showPlainStreaming = isStreaming && content.length > 0;
   const containerClass = cn(
     "max-w-none leading-normal break-words",
     isUser ? "text-foreground/90" : "text-foreground"
@@ -202,6 +203,21 @@ export const MessageBubble = React.memo(function MessageBubble({
             <td className="border-b border-border/30 px-2 py-1 text-xs">{children}</td>
           ),
         };
+
+  if (showPlainStreaming) {
+    return (
+      <div
+        className={cn(
+          containerClass,
+          "max-w-[70ch] text-content leading-[1.65] ai-message-enter",
+          className
+        )}
+      >
+        <div className="whitespace-pre-wrap break-words">{content}</div>
+        <TypingCursor />
+      </div>
+    );
+  }
 
   return (
     <div

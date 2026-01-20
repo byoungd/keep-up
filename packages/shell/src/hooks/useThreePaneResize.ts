@@ -87,6 +87,73 @@ export function useThreePaneResize({
     startLeftWidth: 0,
     startRightWidth: 0,
   });
+  const pendingLayoutRef = React.useRef<{
+    leftWidth: number;
+    rightWidth: number;
+    isLeftCollapsed: boolean;
+    isRightCollapsed: boolean;
+  } | null>(null);
+  const lastDragLayoutRef = React.useRef<{
+    leftWidth: number;
+    rightWidth: number;
+    isLeftCollapsed: boolean;
+    isRightCollapsed: boolean;
+  } | null>(null);
+  const rafIdRef = React.useRef<number | null>(null);
+
+  const flushPendingLayout = React.useCallback(() => {
+    rafIdRef.current = null;
+    const pending = pendingLayoutRef.current;
+    if (!pending) {
+      return;
+    }
+    setLeftWidth(pending.leftWidth);
+    setRightWidth(pending.rightWidth);
+    setIsLeftCollapsed(pending.isLeftCollapsed);
+    setIsRightCollapsed(pending.isRightCollapsed);
+    pendingLayoutRef.current = null;
+  }, []);
+
+  const queueLayoutUpdate = React.useCallback(
+    (next: {
+      leftWidth: number;
+      rightWidth: number;
+      isLeftCollapsed: boolean;
+      isRightCollapsed: boolean;
+    }) => {
+      pendingLayoutRef.current = next;
+      lastDragLayoutRef.current = next;
+      if (typeof requestAnimationFrame !== "function") {
+        flushPendingLayout();
+        return;
+      }
+      if (rafIdRef.current === null) {
+        rafIdRef.current = requestAnimationFrame(flushPendingLayout);
+      }
+    },
+    [flushPendingLayout]
+  );
+
+  const commitPendingLayout = React.useCallback(() => {
+    const pending = pendingLayoutRef.current;
+    if (!pending) {
+      return null;
+    }
+    pendingLayoutRef.current = null;
+    setLeftWidth(pending.leftWidth);
+    setRightWidth(pending.rightWidth);
+    setIsLeftCollapsed(pending.isLeftCollapsed);
+    setIsRightCollapsed(pending.isRightCollapsed);
+    return pending;
+  }, []);
+
+  const getLatestWidths = React.useCallback(
+    () => ({
+      leftWidth: lastDragLayoutRef.current?.leftWidth ?? leftWidth,
+      rightWidth: lastDragLayoutRef.current?.rightWidth ?? rightWidth,
+    }),
+    [leftWidth, rightWidth]
+  );
 
   // Handle mouse down on resize handles
   const handleMouseDown = React.useCallback(
@@ -134,9 +201,11 @@ export function useThreePaneResize({
         layoutUnit
       );
 
+      const { leftWidth: currentLeftWidth, rightWidth: currentRightWidth } = getLatestWidths();
+
       if (dragState.handle === "left") {
         const totalSize = layoutUnit === "percent" ? 100 : containerWidth;
-        const maxAvailable = totalSize - effectiveMinSizes[1] - rightWidth;
+        const maxAvailable = totalSize - effectiveMinSizes[1] - currentRightWidth;
         const newLeftWidth = calculatePanelResize(
           dragState.startLeftWidth,
           delta,
@@ -144,12 +213,16 @@ export function useThreePaneResize({
           maxAvailable
         );
 
-        setLeftWidth(newLeftWidth);
-        setIsLeftCollapsed(newLeftWidth < 1);
+        queueLayoutUpdate({
+          leftWidth: newLeftWidth,
+          rightWidth: currentRightWidth,
+          isLeftCollapsed: newLeftWidth < 1,
+          isRightCollapsed: currentRightWidth < 1,
+        });
       } else if (dragState.handle === "right") {
         const totalSize = layoutUnit === "percent" ? 100 : containerWidth;
         // Delta is inverted for right panel width
-        const maxAvailable = totalSize - effectiveMinSizes[1] - leftWidth;
+        const maxAvailable = totalSize - effectiveMinSizes[1] - currentLeftWidth;
         const newRightWidth = calculatePanelResize(
           dragState.startRightWidth,
           -delta,
@@ -157,8 +230,12 @@ export function useThreePaneResize({
           maxAvailable
         );
 
-        setRightWidth(newRightWidth);
-        setIsRightCollapsed(newRightWidth < 1);
+        queueLayoutUpdate({
+          leftWidth: currentLeftWidth,
+          rightWidth: newRightWidth,
+          isLeftCollapsed: currentLeftWidth < 1,
+          isRightCollapsed: newRightWidth < 1,
+        });
       }
     };
 
@@ -166,10 +243,24 @@ export function useThreePaneResize({
       // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: cleanup logic with state persistence
       () => {
         if (dragState.isDragging) {
+          if (rafIdRef.current !== null && typeof cancelAnimationFrame === "function") {
+            cancelAnimationFrame(rafIdRef.current);
+            rafIdRef.current = null;
+          }
+          const committed = commitPendingLayout();
+          const latest = committed ??
+            lastDragLayoutRef.current ?? {
+              leftWidth,
+              rightWidth,
+              isLeftCollapsed,
+              isRightCollapsed,
+            };
+          lastDragLayoutRef.current = null;
+
           updatePanelMemory(
             dragState.handle,
-            leftWidth,
-            rightWidth,
+            latest.leftWidth,
+            latest.rightWidth,
             minSizes,
             setPrevLeftWidth,
             setPrevRightWidth
@@ -180,8 +271,8 @@ export function useThreePaneResize({
             const containerWidth =
               containerRef.current?.offsetWidth || (layoutUnit === "percent" ? 100 : 0);
             const totalSize = layoutUnit === "percent" ? 100 : containerWidth;
-            const centerWidth = totalSize - leftWidth - rightWidth;
-            onLayoutChange([leftWidth, centerWidth, rightWidth]);
+            const centerWidth = totalSize - latest.leftWidth - latest.rightWidth;
+            onLayoutChange([latest.leftWidth, centerWidth, latest.rightWidth]);
           }
         }
         setDragState((prev) => ({ ...prev, isDragging: false, handle: null }));
@@ -194,7 +285,20 @@ export function useThreePaneResize({
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [dragState, minSizes, minWidthsPx, leftWidth, rightWidth, onLayoutChange, layoutUnit]);
+  }, [
+    dragState,
+    minSizes,
+    minWidthsPx,
+    leftWidth,
+    rightWidth,
+    onLayoutChange,
+    layoutUnit,
+    getLatestWidths,
+    queueLayoutUpdate,
+    commitPendingLayout,
+    isLeftCollapsed,
+    isRightCollapsed,
+  ]);
 
   // Update body cursor during drag
   React.useEffect(() => {

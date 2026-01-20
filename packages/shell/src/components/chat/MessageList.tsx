@@ -139,6 +139,7 @@ export function MessageList({
 
   const containerClass = cn(
     "flex-1 overflow-y-auto overflow-x-hidden px-6 py-6 space-y-6 scrollbar-auto-hide",
+    !isStreaming && "scroll-smooth",
     isMain && "px-0" // Remove global padding in main mode to allow full-width scrollbar area (though padding usually inside scrollbar?)
     // Actually, distinct padding logic for items?
     // If I keep px-6, the scrollbar is at the edge of the container (which has padding).
