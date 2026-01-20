@@ -1,0 +1,44 @@
+{
+  "id": "refactor-003",
+  "title": "Refactor rename 3",
+  "category": "refactor",
+  "difficulty": "medium",
+  "prompt": "Rename tempName to userName in src/refactor-003.ts.",
+  "setup": {
+    "files": [
+      {
+        "path": "src/refactor-003.ts",
+        "content": "export function greet3() {\n  const tempName = \"User3\";\n  return \"Hello \" + tempName;\n}\n"
+      }
+    ]
+  },
+  "expectations": [
+    {
+      "type": "file_equals",
+      "path": "src/refactor-003.ts",
+      "content": "export function greet3() {\n  const userName = \"User3\";\n  return \"Hello \" + userName;\n}\n"
+    }
+  ],
+  "script": {
+    "responses": [
+      {
+        "content": "Applying rename.",
+        "finishReason": "tool_use",
+        "toolCalls": [
+          {
+            "name": "file:write",
+            "arguments": {
+              "path": "src/refactor-003.ts",
+              "content": "export function greet3() {\n  const userName = \"User3\";\n  return \"Hello \" + userName;\n}\n",
+              "createDirs": true
+            }
+          }
+        ]
+      },
+      {
+        "content": "Done.",
+        "finishReason": "stop"
+      }
+    ]
+  }
+}

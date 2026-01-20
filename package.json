@@ -12,6 +12,8 @@
     "test:unit": "vitest run",
     "test:unit:ci": "vitest run --coverage",
     "test:watch": "vitest",
+    "test:z1": "pnpm --filter @ku0/agent-gym test -- --grep \"Z-AC-1\"",
+    "test:z2": "pnpm --filter @ku0/agent-gym test -- --grep \"Z-AC-2\"",
     "test:pr": "pnpm test:unit",
     "test:ci": "pnpm test:unit:ci",
     "test:nightly": "pnpm test:unit:ci",

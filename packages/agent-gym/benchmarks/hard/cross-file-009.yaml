@@ -1,0 +1,61 @@
+{
+  "id": "cross-file-009",
+  "title": "Cross-file update 9",
+  "category": "cross-file",
+  "difficulty": "hard",
+  "prompt": "Update src/module-9.ts and src/index-9.ts to export version9.",
+  "setup": {
+    "files": [
+      {
+        "path": "src/module-9.ts",
+        "content": "export function build9() {\n  return \"v1\";\n}\n"
+      },
+      {
+        "path": "src/index-9.ts",
+        "content": "export { build9 } from \"./module-9\";\n"
+      }
+    ]
+  },
+  "expectations": [
+    {
+      "type": "file_equals",
+      "path": "src/module-9.ts",
+      "content": "export const version9 = \"v2\";\nexport function build9() {\n  return version9;\n}\n"
+    },
+    {
+      "type": "file_equals",
+      "path": "src/index-9.ts",
+      "content": "export { build9, version9 } from \"./module-9\";\n"
+    }
+  ],
+  "script": {
+    "responses": [
+      {
+        "content": "Updating module and index.",
+        "finishReason": "tool_use",
+        "toolCalls": [
+          {
+            "name": "file:write",
+            "arguments": {
+              "path": "src/module-9.ts",
+              "content": "export const version9 = \"v2\";\nexport function build9() {\n  return version9;\n}\n",
+              "createDirs": true
+            }
+          },
+          {
+            "name": "file:write",
+            "arguments": {
+              "path": "src/index-9.ts",
+              "content": "export { build9, version9 } from \"./module-9\";\n",
+              "createDirs": true
+            }
+          }
+        ]
+      },
+      {
+        "content": "Done.",
+        "finishReason": "stop"
+      }
+    ]
+  }
+}

@@ -23,6 +23,7 @@ export type ApiResult<T> = {
   projects?: CoworkProject[];
   project?: CoworkProject;
   settings?: CoworkSettings;
+  gymReport?: GymReport | null;
   providers?: CoworkProvider[];
   result?: ToolCheckResult;
   lessons?: CoworkLesson[];
@@ -69,6 +70,27 @@ export type LessonListOptions = {
 
 export type LessonSearchOptions = LessonListOptions & {
   query: string;
+};
+
+export type GymReportSummary = {
+  total: number;
+  passed: number;
+  failed: number;
+  passRate: number;
+  durationMs: number;
+  avgTurns: number;
+  avgToolCalls: number;
+  iqScore: number;
+};
+
+export type GymReport = {
+  runId: string;
+  startedAt: string;
+  finishedAt: string;
+  durationMs: number;
+  summary: {
+    total: GymReportSummary;
+  };
 };
 
 export type CoworkProviderKeySource = "settings" | "env" | "none";
@@ -619,6 +641,11 @@ export async function updateSettings(patch: Partial<CoworkSettings>): Promise<Co
     body: JSON.stringify(patch),
   });
   return data.settings ?? {};
+}
+
+export async function getGymReport(): Promise<GymReport | null> {
+  const data = await fetchJson<ApiResult<unknown>>("/api/settings/gym-report");
+  return data.gymReport ?? null;
 }
 
 export async function listProviders(): Promise<CoworkProvider[]> {

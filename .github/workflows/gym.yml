@@ -1,0 +1,41 @@
+name: KeepUpGym IQ Gate
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gym:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run KeepUpGym Easy suite
+        run: pnpm --filter @ku0/agent-gym gym:ci
+
+      - name: Upload gym report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: keepup-gym-report
+          path: packages/agent-gym/reports/latest.json
+          retention-days: 7

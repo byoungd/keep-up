@@ -1,0 +1,48 @@
+{
+  "id": "syntax-007",
+  "title": "Syntax repair 7",
+  "category": "syntax-repair",
+  "difficulty": "easy",
+  "prompt": "Fix the syntax error in src/syntax-007.ts.",
+  "setup": {
+    "files": [
+      {
+        "path": "src/syntax-007.ts",
+        "content": "export const value7 = ;\nexport function getValue7() {\n  return value7;\n}\n"
+      }
+    ]
+  },
+  "expectations": [
+    {
+      "type": "file_equals",
+      "path": "src/syntax-007.ts",
+      "content": "export const value7 = 7;\nexport function getValue7() {\n  return value7;\n}\n"
+    },
+    {
+      "type": "no_syntax_errors",
+      "path": "src/syntax-007.ts"
+    }
+  ],
+  "script": {
+    "responses": [
+      {
+        "content": "Fixing syntax.",
+        "finishReason": "tool_use",
+        "toolCalls": [
+          {
+            "name": "file:write",
+            "arguments": {
+              "path": "src/syntax-007.ts",
+              "content": "export const value7 = 7;\nexport function getValue7() {\n  return value7;\n}\n",
+              "createDirs": true
+            }
+          }
+        ]
+      },
+      {
+        "content": "Done.",
+        "finishReason": "stop"
+      }
+    ]
+  }
+}

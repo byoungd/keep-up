@@ -195,3 +195,6 @@ apps/reader/public/assets/
 # Cowork E2E
 apps/cowork-e2e/test-results/
 apps/cowork-e2e/playwright-report/
+
+# KeepUpGym reports
+packages/agent-gym/reports/

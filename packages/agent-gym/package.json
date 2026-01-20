@@ -1,0 +1,27 @@
+{
+  "name": "@ku0/agent-gym",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "KeepUpGym runner and scoring for agent benchmarks",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --config vitest.config.ts",
+    "test:watch": "vitest --config vitest.config.ts",
+    "gym:run": "tsx src/cli/run.ts",
+    "gym:ci": "tsx src/cli/run.ts --suite easy --baseline baselines/easy.json --min-score 90 --report reports/latest.json"
+  },
+  "dependencies": {
+    "@ku0/agent-runtime": "workspace:*",
+    "@ku0/agent-runtime-core": "workspace:*",
+    "typescript": "^5.7.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.21.0",
+    "vitest": "^4.0.0"
+  }
+}

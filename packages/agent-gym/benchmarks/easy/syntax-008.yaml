@@ -1,0 +1,48 @@
+{
+  "id": "syntax-008",
+  "title": "Syntax repair 8",
+  "category": "syntax-repair",
+  "difficulty": "easy",
+  "prompt": "Fix the syntax error in src/syntax-008.ts.",
+  "setup": {
+    "files": [
+      {
+        "path": "src/syntax-008.ts",
+        "content": "export const value8 = ;\nexport function getValue8() {\n  return value8;\n}\n"
+      }
+    ]
+  },
+  "expectations": [
+    {
+      "type": "file_equals",
+      "path": "src/syntax-008.ts",
+      "content": "export const value8 = 8;\nexport function getValue8() {\n  return value8;\n}\n"
+    },
+    {
+      "type": "no_syntax_errors",
+      "path": "src/syntax-008.ts"
+    }
+  ],
+  "script": {
+    "responses": [
+      {
+        "content": "Fixing syntax.",
+        "finishReason": "tool_use",
+        "toolCalls": [
+          {
+            "name": "file:write",
+            "arguments": {
+              "path": "src/syntax-008.ts",
+              "content": "export const value8 = 8;\nexport function getValue8() {\n  return value8;\n}\n",
+              "createDirs": true
+            }
+          }
+        ]
+      },
+      {
+        "content": "Done.",
+        "finishReason": "stop"
+      }
+    ]
+  }
+}
