@@ -3,6 +3,7 @@ import { createRootRoute, createRoute, createRouter } from "@tanstack/react-rout
 import { RootLayout } from "./layouts/RootLayout";
 import { FoundationRoute } from "./routes/FoundationRoute";
 import { HomeRoute } from "./routes/HomeRoute";
+import { LessonsRoute } from "./routes/LessonsRoute";
 import { LibraryRoute } from "./routes/LibraryRoute";
 import { NewSessionRoute } from "./routes/NewSessionRoute";
 import { SearchRoute } from "./routes/SearchRoute";
@@ -51,6 +52,12 @@ const libraryRoute = createRoute({
   component: LibraryRoute,
 });
 
+const lessonsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/lessons",
+  component: LessonsRoute,
+});
+
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/settings",
@@ -64,6 +71,7 @@ const routeTree = rootRoute.addChildren([
   searchRoute,
   foundationRoute,
   libraryRoute,
+  lessonsRoute,
   settingsRoute,
 ]);
 

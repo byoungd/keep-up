@@ -68,6 +68,7 @@ export const settingsPatchSchema = z
     geminiKey: z.string().min(1).optional(),
     defaultModel: z.string().min(1).optional(),
     theme: z.enum(["light", "dark"]).optional(),
+    memoryProfile: z.enum(["default", "strict-reviewer", "creative-prototyper"]).optional(),
   })
   .strict();
 

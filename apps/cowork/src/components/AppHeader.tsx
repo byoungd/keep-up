@@ -3,6 +3,7 @@ import { cn } from "../lib/cn";
 
 const STATUS_BY_PATH: Record<string, string> = {
   "/settings": "Configuring",
+  "/lessons": "Learning",
 };
 
 export function AppHeader() {

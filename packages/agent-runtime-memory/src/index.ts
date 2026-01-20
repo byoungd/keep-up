@@ -26,6 +26,13 @@ export {
   createMemoryEntry,
 } from "./consolidation/memoryManager";
 export { CachedEmbeddingProvider, createCachedEmbeddingProvider } from "./embeddingCache";
+export type {
+  LessonSearchResult,
+  LessonStoreConfig,
+  LessonStoreQuery,
+} from "./lessons/lessonStore";
+// Lessons
+export { createLessonStore, LessonStore } from "./lessons/lessonStore";
 // Mem0 Adapter (recommended for production)
 export {
   createMem0MemoryAdapter,
@@ -59,6 +66,10 @@ export type {
   IEmbeddingProvider,
   IMemoryManager,
   IMemoryStore,
+  Lesson,
+  LessonProfile,
+  LessonScope,
+  LessonSource,
   Memory,
   MemoryConfig,
   MemoryEvent,

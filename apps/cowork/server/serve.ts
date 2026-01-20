@@ -4,6 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
+import { CriticAgent, createLessonStore } from "@ku0/agent-runtime";
 import { createCoworkApp } from "./app";
 import { serverConfig } from "./config";
 import { serverLogger } from "./logger";
@@ -17,12 +18,15 @@ const storage = await createStorageLayer(serverConfig.storage);
 const stateDir = await ensureStateDir();
 const eventHub = new SessionEventHub();
 const contextIndexManager = new ContextIndexManager({ stateDir });
+const lessonStore = createLessonStore({ filePath: join(stateDir, "lessons.json") });
+const critic = new CriticAgent({ lessonStore, logger: serverLogger });
 const taskRuntime = new CoworkTaskRuntime({
   storage,
   events: eventHub,
   logger: serverLogger,
   contextIndexManager,
   runtimePersistence: serverConfig.runtimePersistence,
+  lessonStore,
 });
 const app = createCoworkApp({
   storage,
@@ -31,6 +35,8 @@ const app = createCoworkApp({
   events: eventHub,
   taskRuntime,
   contextIndexManager,
+  lessonStore,
+  critic,
 });
 
 const baseDir = dirname(fileURLToPath(import.meta.url));
