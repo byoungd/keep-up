@@ -10,6 +10,8 @@ export {
   textResult,
 } from "./baseServer";
 export {
+  FileMcpOAuthTokenStore,
+  type FileMcpOAuthTokenStoreConfig,
   hasScopes,
   InMemoryMcpOAuthTokenStore,
   type McpOAuthClientConfig,
@@ -35,13 +37,16 @@ export {
 } from "./registryView";
 export {
   createMcpRemoteToolServer,
+  type McpConnectionStatus,
   type McpRemoteServerConfig,
   McpRemoteToolServer,
 } from "./remoteServer";
 export {
   fromSdkResult,
   fromSdkTool,
+  normalizeSdkTool,
   type ToolScopeConfig,
   toSdkResult,
   toSdkTool,
 } from "./sdkAdapter";
+export { createMcpTransport, type McpTransportConfig } from "./transport";

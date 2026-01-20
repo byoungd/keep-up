@@ -44,7 +44,13 @@ export interface PromptInjectionPolicy {
   blockOnRisk: PromptInjectionRisk;
   maxContentChars: number;
   maxDepth: number;
+  /** Per-tool or per-connector overrides keyed by tool name or server prefix. */
+  connectorOverrides?: Record<string, PromptInjectionPolicyOverride>;
 }
+
+export type PromptInjectionPolicyOverride = Partial<
+  Omit<PromptInjectionPolicy, "connectorOverrides">
+>;
 
 export const DEFAULT_PROMPT_INJECTION_POLICY: PromptInjectionPolicy = {
   enabled: true,
@@ -124,6 +130,31 @@ export function shouldBlockPromptInjection(
   policy: PromptInjectionPolicy
 ): boolean {
   return RISK_ORDER[assessment.risk] >= RISK_ORDER[policy.blockOnRisk];
+}
+
+export function resolvePromptInjectionPolicy(
+  policy: PromptInjectionPolicy,
+  toolName?: string
+): PromptInjectionPolicy {
+  if (!toolName || !policy.connectorOverrides) {
+    return policy;
+  }
+
+  const overrides = policy.connectorOverrides;
+  const prefix = toolName.includes(":") ? toolName.split(":")[0] : undefined;
+  const prefixOverride = prefix ? overrides[prefix] : undefined;
+  const toolOverride = overrides[toolName];
+
+  if (!prefixOverride && !toolOverride) {
+    return policy;
+  }
+
+  return {
+    ...policy,
+    ...(prefixOverride ?? {}),
+    ...(toolOverride ?? {}),
+    connectorOverrides: policy.connectorOverrides,
+  };
 }
 
 function resolveSource(tool?: MCPTool): CoworkContentSource {

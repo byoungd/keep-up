@@ -677,6 +677,8 @@ export {
   type PromptInjectionGuard,
   type PromptInjectionGuardResult,
   type PromptInjectionPolicy,
+  type PromptInjectionPolicyOverride,
   type PromptInjectionRisk,
+  resolvePromptInjectionPolicy,
   shouldBlockPromptInjection,
 } from "./promptInjection";

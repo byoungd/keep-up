@@ -17,6 +17,7 @@ export interface ToolScopeConfig {
 }
 
 const CATEGORY_VALUES = new Set(["core", "knowledge", "external", "communication", "control"]);
+const SCHEMA_TYPES = new Set(["object", "string", "number", "boolean", "array"]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -125,6 +126,33 @@ function normalizeInputSchema(schema: JSONSchema): JSONSchema {
   };
 }
 
+function normalizeSdkInputSchema(schema: SdkTool["inputSchema"] | undefined): JSONSchema {
+  if (schema && isRecord(schema)) {
+    const type = (schema as { type?: unknown }).type;
+    if (typeof type === "string" && SCHEMA_TYPES.has(type)) {
+      return schema as JSONSchema;
+    }
+  }
+
+  return {
+    type: "object",
+    properties: {},
+    required: [],
+  };
+}
+
+export function normalizeSdkTool(tool: SdkTool): SdkTool | null {
+  if (!tool || typeof tool.name !== "string" || tool.name.trim().length === 0) {
+    return null;
+  }
+
+  return {
+    ...tool,
+    description: tool.description ?? "MCP tool",
+    inputSchema: normalizeSdkInputSchema(tool.inputSchema) as SdkTool["inputSchema"],
+  };
+}
+
 export function toSdkTool(tool: MCPTool): SdkTool {
   const inputSchema = normalizeInputSchema(tool.inputSchema);
   const meta: Record<string, unknown> = { ...(tool.metadata ?? {}) };
@@ -152,7 +180,7 @@ export function toSdkTool(tool: MCPTool): SdkTool {
 }
 
 export function fromSdkTool(tool: SdkTool, scopeConfig?: ToolScopeConfig): MCPTool {
-  const meta = tool._meta ? { ...(tool._meta as Record<string, unknown>) } : undefined;
+  const meta = isRecord(tool._meta) ? { ...(tool._meta as Record<string, unknown>) } : undefined;
   const annotations = applyScopeOverrides(
     fromSdkAnnotations(tool.annotations, meta),
     scopeConfig,
@@ -169,7 +197,7 @@ export function fromSdkTool(tool: SdkTool, scopeConfig?: ToolScopeConfig): MCPTo
   return {
     name: tool.name,
     description: tool.description ?? "MCP tool",
-    inputSchema: tool.inputSchema as unknown as JSONSchema,
+    inputSchema: normalizeSdkInputSchema(tool.inputSchema),
     annotations,
     metadata: meta,
   };

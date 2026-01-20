@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_PROMPT_INJECTION_POLICY,
   DefaultPromptInjectionGuard,
+  resolvePromptInjectionPolicy,
   shouldBlockPromptInjection,
 } from "../security/promptInjection";
 import type { MCPToolCall, MCPToolResult } from "../types";
@@ -95,5 +96,19 @@ describe("promptInjectionGuard", () => {
     expect(shouldBlockPromptInjection(assessment.assessment, DEFAULT_PROMPT_INJECTION_POLICY)).toBe(
       false
     );
+  });
+
+  it("resolves connector overrides by tool name", () => {
+    const policy = {
+      ...DEFAULT_PROMPT_INJECTION_POLICY,
+      connectorOverrides: {
+        web: { blockOnRisk: "medium" },
+        "web:fetch": { maxContentChars: 1000 },
+      },
+    };
+
+    const resolved = resolvePromptInjectionPolicy(policy, "web:fetch");
+    expect(resolved.blockOnRisk).toBe("medium");
+    expect(resolved.maxContentChars).toBe(1000);
   });
 });

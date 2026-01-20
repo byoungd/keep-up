@@ -11,21 +11,35 @@ import type {
   MCPToolServer,
   ToolContext,
 } from "@ku0/agent-runtime-core";
-import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import {
-  StreamableHTTPClientTransport,
-  type StreamableHTTPClientTransportOptions,
-} from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import type { FetchLike } from "@modelcontextprotocol/sdk/shared/transport.js";
+  type OAuthClientProvider,
+  UnauthorizedError,
+} from "@modelcontextprotocol/sdk/client/auth.js";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import type { CallToolResult, Tool as SdkTool } from "@modelcontextprotocol/sdk/types.js";
 import { McpOAuthSession, type McpOAuthSessionConfig } from "./oauth";
-import { fromSdkResult, fromSdkTool, type ToolScopeConfig } from "./sdkAdapter";
+import { fromSdkResult, fromSdkTool, normalizeSdkTool, type ToolScopeConfig } from "./sdkAdapter";
+import { createMcpTransport, type McpTransportConfig } from "./transport";
+
+export type McpConnectionState = "disconnected" | "connecting" | "connected" | "error";
+
+export interface McpConnectionStatus {
+  state: McpConnectionState;
+  transport: McpTransportConfig["type"];
+  serverUrl?: string;
+  lastError?: string;
+  authRequired?: boolean;
+}
 
 export interface McpRemoteServerConfig {
   name: string;
   description: string;
-  serverUrl: string;
+  /**
+   * @deprecated Use transport instead.
+   */
+  serverUrl?: string;
+  transport?: McpTransportConfig;
   clientInfo?: {
     name: string;
     version: string;
@@ -36,12 +50,7 @@ export interface McpRemoteServerConfig {
     authorizationCode?: string;
   };
   toolScopes?: ToolScopeConfig;
-  transport?: {
-    requestInit?: RequestInit;
-    fetch?: FetchLike;
-    reconnectionOptions?: StreamableHTTPClientTransportOptions["reconnectionOptions"];
-    sessionId?: string;
-  };
+  onStatusChange?: (status: McpConnectionStatus) => void;
 }
 
 export class McpRemoteToolServer implements MCPToolServer {
@@ -49,32 +58,52 @@ export class McpRemoteToolServer implements MCPToolServer {
   readonly description: string;
 
   private readonly client: Client;
-  private readonly transport: StreamableHTTPClientTransport;
+  private readonly transport: Transport;
+  private readonly transportType: McpTransportConfig["type"];
+  private readonly serverUrl?: URL;
   private readonly authSession?: McpOAuthSession;
   private readonly toolScopes?: ToolScopeConfig;
+  private readonly authScopes?: string[];
+  private readonly onStatusChange?: (status: McpConnectionStatus) => void;
   private tools: MCPTool[] = [];
   private connected = false;
+  private connecting?: Promise<void>;
+  private status: McpConnectionStatus;
 
   constructor(config: McpRemoteServerConfig) {
     this.name = config.name;
     this.description = config.description;
     this.toolScopes = config.toolScopes;
+    this.authScopes = config.auth?.scopes;
+    this.onStatusChange = config.onStatusChange;
 
     const clientInfo = config.clientInfo ?? { name: "keepup-agent-runtime", version: "1.0.0" };
     this.client = new Client(clientInfo);
 
-    this.transport = new StreamableHTTPClientTransport(new URL(config.serverUrl), {
-      authProvider: config.auth?.provider,
-      requestInit: config.transport?.requestInit,
-      fetch: config.transport?.fetch,
-      reconnectionOptions: config.transport?.reconnectionOptions,
-      sessionId: config.transport?.sessionId,
-    });
+    const transportConfig = this.resolveTransportConfig(config);
+    const transportInstance = createMcpTransport(transportConfig, config.auth?.provider);
+    this.transport = transportInstance.transport;
+    this.transportType = transportInstance.type;
+    this.serverUrl = transportInstance.serverUrl;
 
-    if (config.auth?.provider) {
+    this.transport.onerror = (error) => {
+      this.updateStatus({ state: "error", lastError: error.message });
+    };
+    this.transport.onclose = () => {
+      this.connected = false;
+      this.updateStatus({ state: "disconnected" });
+    };
+
+    this.status = {
+      state: "disconnected",
+      transport: this.transportType,
+      serverUrl: this.serverUrl?.toString(),
+    };
+
+    if (config.auth?.provider && this.serverUrl) {
       const sessionConfig: McpOAuthSessionConfig = {
         provider: config.auth.provider,
-        serverUrl: config.serverUrl,
+        serverUrl: this.serverUrl,
         authorizationCode: config.auth.authorizationCode,
       };
       this.authSession = new McpOAuthSession(sessionConfig);
@@ -93,7 +122,13 @@ export class McpRemoteToolServer implements MCPToolServer {
   async callTool(call: MCPToolCall, _context: ToolContext): Promise<MCPToolResult> {
     await this.ensureConnected();
     const toolName = call.name.includes(":") ? call.name.split(":")[1] : call.name;
-    await this.ensureScopes(toolName);
+    const requiredScopes = this.resolveRequiredScopes(toolName);
+
+    try {
+      await this.ensureScopes(requiredScopes);
+    } catch (error) {
+      return this.createScopeDeniedResult(toolName, requiredScopes, error);
+    }
 
     try {
       const result = (await this.client.callTool({
@@ -116,34 +151,136 @@ export class McpRemoteToolServer implements MCPToolServer {
   }
 
   async dispose(): Promise<void> {
-    if (this.connected) {
-      await this.transport.close();
-      this.connected = false;
+    await this.transport.close();
+    this.connected = false;
+    this.updateStatus({ state: "disconnected" });
+  }
+
+  getStatus(): McpConnectionStatus {
+    return { ...this.status };
+  }
+
+  private resolveTransportConfig(config: McpRemoteServerConfig): McpTransportConfig {
+    if (config.transport) {
+      return config.transport;
     }
+    if (config.serverUrl) {
+      return { type: "streamableHttp", url: config.serverUrl };
+    }
+    throw new Error("MCP remote server requires a transport or serverUrl.");
   }
 
   private async ensureConnected(): Promise<void> {
     if (this.connected) {
       return;
     }
-    await this.client.connect(this.transport);
-    this.connected = true;
+    if (this.connecting) {
+      await this.connecting;
+      return;
+    }
+
+    this.updateStatus({ state: "connecting", authRequired: false, lastError: undefined });
+    this.connecting = this.client
+      .connect(this.transport)
+      .then(() => {
+        this.connected = true;
+        this.updateStatus({ state: "connected", authRequired: false, lastError: undefined });
+      })
+      .catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        this.updateStatus({ state: "error", lastError: message });
+        throw error;
+      })
+      .finally(() => {
+        this.connecting = undefined;
+      });
+
+    await this.connecting;
   }
 
   private async refreshTools(): Promise<void> {
     const response = await this.client.listTools();
     const sdkTools = response.tools ?? [];
-    this.tools = sdkTools.map((tool: SdkTool) => fromSdkTool(tool, this.toolScopes));
+    const normalized = sdkTools
+      .map((tool: SdkTool) => normalizeSdkTool(tool))
+      .filter((tool): tool is SdkTool => tool !== null);
+
+    this.tools = normalized.map((tool) => this.decorateTool(fromSdkTool(tool, this.toolScopes)));
   }
 
-  private async ensureScopes(toolName: string): Promise<void> {
+  private decorateTool(tool: MCPTool): MCPTool {
+    const annotations = tool.annotations ?? {};
+    const category = annotations.category ?? "external";
+
+    return {
+      ...tool,
+      annotations: {
+        ...annotations,
+        category,
+      },
+      metadata: {
+        ...tool.metadata,
+        mcpServer: this.name,
+        mcpTransport: this.transportType,
+      },
+    };
+  }
+
+  private resolveRequiredScopes(toolName: string): string[] {
     const tool = this.tools.find((entry) => entry.name === toolName);
-    const scopes =
+    return (
       tool?.annotations?.requiredScopes ??
       this.toolScopes?.toolScopes?.[toolName] ??
       this.toolScopes?.defaultScopes ??
-      [];
-    await this.authSession?.ensureAuthorized(scopes);
+      this.authScopes ??
+      []
+    );
+  }
+
+  private async ensureScopes(requiredScopes: string[]): Promise<void> {
+    if (!requiredScopes || requiredScopes.length === 0) {
+      return;
+    }
+    if (!this.authSession) {
+      throw new UnauthorizedError("OAuth provider is not configured for this MCP server.");
+    }
+    await this.authSession.ensureAuthorized(requiredScopes);
+  }
+
+  private createScopeDeniedResult(
+    toolName: string,
+    requiredScopes: string[],
+    error: unknown
+  ): MCPToolResult {
+    const message = error instanceof Error ? error.message : String(error);
+    const authRequired = error instanceof UnauthorizedError;
+    if (authRequired) {
+      this.updateStatus({ authRequired: true, lastError: message, state: this.status.state });
+    }
+
+    return {
+      success: false,
+      content: [{ type: "text", text: message }],
+      error: {
+        code: "PERMISSION_DENIED",
+        message,
+        details: {
+          toolName,
+          requiredScopes,
+          authRequired,
+        },
+      },
+    };
+  }
+
+  private updateStatus(update: Partial<McpConnectionStatus>): void {
+    this.status = {
+      ...this.status,
+      ...update,
+      transport: this.transportType,
+      serverUrl: this.serverUrl?.toString(),
+    };
+    this.onStatusChange?.(this.status);
   }
 }
 
