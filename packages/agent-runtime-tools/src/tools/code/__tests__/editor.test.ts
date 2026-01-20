@@ -92,4 +92,76 @@ describe("editFile", () => {
     const content = await fs.readFile(testFile, "utf-8");
     expect(content).toBe("line1\nline4\n");
   });
+
+  describe("boundary conditions", () => {
+    it("handles editing an empty file", async () => {
+      const emptyFile = path.join(tempDir, "empty.txt");
+      await fs.writeFile(emptyFile, "");
+      const result = await editFile(
+        emptyFile,
+        [{ startLine: 1, endLine: 1, replacement: "first line" }],
+        {
+          validateSyntax: false,
+        }
+      );
+      expect(result.success).toBe(true);
+      const content = await fs.readFile(emptyFile, "utf-8");
+      expect(content).toBe("first line\n"); // Tool now adds trailing newline
+    });
+
+    it("errors on invalid line range (start > end)", async () => {
+      const result = await editFile(testFile, [{ startLine: 5, endLine: 2, replacement: "fail" }], {
+        validateSyntax: false,
+      });
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("End line (2) must be >= start line (5)");
+    });
+
+    it("errors on out-of-range lines", async () => {
+      const result = await editFile(
+        testFile,
+        [{ startLine: 100, endLine: 101, replacement: "fail" }],
+        {
+          validateSyntax: false,
+        }
+      );
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("exceeds file length");
+    });
+
+    it("handles extremely large files", async () => {
+      const largeFile = path.join(tempDir, "large.txt");
+      const lines = Array.from({ length: 10000 }, (_, i) => `line${i + 1}`);
+      await fs.writeFile(largeFile, `${lines.join("\n")}\n`);
+
+      const result = await editFile(
+        largeFile,
+        [{ startLine: 5000, endLine: 5000, replacement: "new-middle-line" }],
+        { validateSyntax: false }
+      );
+
+      expect(result.success).toBe(true);
+      const content = await fs.readFile(largeFile, "utf-8");
+      const readLines = content.split("\n");
+      expect(readLines[4999]).toBe("new-middle-line");
+    });
+
+    it("handles concurrent edits to the same file (sequential handling)", async () => {
+      const promises = [
+        editFile(testFile, [{ startLine: 1, endLine: 1, replacement: "a" }], {
+          validateSyntax: false,
+        }),
+        editFile(testFile, [{ startLine: 4, endLine: 4, replacement: "b" }], {
+          validateSyntax: false,
+        }),
+      ];
+
+      const results = await Promise.all(promises);
+      expect(results.every((r) => r.success)).toBe(true);
+
+      const content = await fs.readFile(testFile, "utf-8");
+      expect(content).toContain("a");
+      expect(content).toContain("b");
+    });
+  });
 });

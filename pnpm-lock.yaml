@@ -166,15 +166,6 @@ importers:
         specifier: ^7.3.0
         version: 7.3.1(@types/node@22.19.3)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2)
 
-  apps/cowork-e2e:
-    devDependencies:
-      '@playwright/test':
-        specifier: ^1.49.0
-        version: 1.57.0
-      '@types/node':
-        specifier: ^20.0.0
-        version: 20.19.27
-
   apps/desktop:
     devDependencies:
       electron:
@@ -921,6 +912,15 @@ importers:
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
+
+  tests/e2e:
+    devDependencies:
+      '@playwright/test':
+        specifier: ^1.49.0
+        version: 1.57.0
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.27
 
 packages:
 

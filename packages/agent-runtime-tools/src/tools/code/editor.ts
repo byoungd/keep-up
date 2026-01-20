@@ -37,6 +37,8 @@ export interface EditResult {
   success: boolean;
   /** Unified diff of the change */
   diff: string;
+  /** General error message (e.g., range validation) */
+  error?: string;
   /** If syntax validation failed, the error message */
   syntaxError?: string;
   /** If rollback occurred */
@@ -236,28 +238,76 @@ function getValidationError(
 // Edit Validation
 // ============================================================================
 
-/**
- * Validate edit ranges against the file length.
- * Returns an error message if invalid, undefined if valid.
- */
-function validateEditRanges(edits: EditChunk[], totalLines: number): string | undefined {
-  for (const edit of edits) {
-    if (edit.startLine < 1) {
-      return `Invalid start line: ${edit.startLine}. Lines are 1-indexed.`;
-    }
-    if (edit.endLine < edit.startLine) {
-      return `End line (${edit.endLine}) must be >= start line (${edit.startLine}).`;
-    }
+function validateIndividualEdit(edit: EditChunk, totalLines: number): string | undefined {
+  if (edit.startLine < 1) {
+    return `Invalid start line: ${edit.startLine}. Lines are 1-indexed.`;
+  }
+  if (edit.endLine < edit.startLine) {
+    return `End line (${edit.endLine}) must be >= start line (${edit.startLine}).`;
+  }
+  if (totalLines > 0) {
     if (edit.startLine > totalLines) {
       return `Start line ${edit.startLine} exceeds file length (${totalLines} lines).`;
+    }
+    if (edit.endLine > totalLines) {
+      return `End line ${edit.endLine} exceeds file length (${totalLines} lines).`;
     }
   }
   return undefined;
 }
 
+/**
+ * Validate edit ranges against the file length and check for overlaps.
+ * Returns an error message if invalid, undefined if valid.
+ */
+function validateEditRanges(edits: EditChunk[], totalLines: number): string | undefined {
+  if (edits.length === 0) {
+    return "No edits provided.";
+  }
+
+  for (const edit of edits) {
+    const error = validateIndividualEdit(edit, totalLines);
+    if (error) {
+      return error;
+    }
+  }
+
+  const sorted = [...edits].sort((a, b) => a.startLine - b.startLine);
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const current = sorted[i];
+    const next = sorted[i + 1];
+    if (current.endLine >= next.startLine) {
+      return `Overlapping edit ranges detected: [${current.startLine}, ${current.endLine}] and [${next.startLine}, ${next.endLine}].`;
+    }
+  }
+
+  return undefined;
+}
+
 // ============================================================================
-// Core Edit Function
+// Edit Queue (for Concurrency Rigor)
 // ============================================================================
+
+const editQueues = new Map<string, Promise<void>>();
+
+async function queueEdit(filePath: string, fn: () => Promise<EditResult>): Promise<EditResult> {
+  const current = editQueues.get(filePath) ?? Promise.resolve();
+  let resolve!: (value?: void | PromiseLike<void>) => void;
+  const next = new Promise<void>((r) => {
+    resolve = r;
+  });
+  editQueues.set(filePath, next);
+
+  try {
+    await current;
+    return await fn();
+  } finally {
+    resolve?.();
+    if (editQueues.get(filePath) === next) {
+      editQueues.delete(filePath);
+    }
+  }
+}
 
 /**
  * Apply one or more edits to a file atomically.
@@ -269,90 +319,87 @@ export async function editFile(
   options: EditOptions = {}
 ): Promise<EditResult> {
   const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(filePath);
-  const dryRun = options.dryRun ?? false;
-  const shouldValidate = options.validateSyntax ?? true;
+  return queueEdit(absolutePath, () => editFileInternal(absolutePath, edits, options));
+}
 
-  // Read original content
-  const originalContent = await fs.readFile(absolutePath, "utf-8");
-  const originalLines = originalContent.split("\n");
-
-  // Validate edit ranges
-  const validationError = validateEditRanges(edits, originalLines.length);
-  if (validationError) {
+async function prepareEditContext(
+  absolutePath: string,
+  edits: EditChunk[]
+): Promise<
+  { success: true; content: string; lines: string[] } | { success: false; error: string }
+> {
+  try {
+    const content = await fs.readFile(absolutePath, "utf-8");
+    const lines = content === "" ? [] : content.split("\n");
+    const error = validateEditRanges(edits, lines.length);
+    if (error) {
+      return { success: false, error };
+    }
+    return { success: true, content, lines };
+  } catch (err) {
     return {
       success: false,
-      diff: "",
-      syntaxError: validationError,
+      error: `Failed to read file: ${err instanceof Error ? err.message : String(err)}`,
     };
   }
+}
 
-  // Sort edits by start line in DESCENDING order to avoid index shifting
-  const sortedEdits = [...edits].sort((a, b) => b.startLine - a.startLine);
-
-  // Apply edits
-  const newLines = [...originalLines];
-  for (const edit of sortedEdits) {
-    // If replacement is empty string, we want to delete (empty array).
-    // Otherwise split by newline.
-    const replacementLines = edit.replacement === "" ? [] : edit.replacement.split("\n");
-    // Convert to 0-indexed
+function applyEditChunks(lines: string[], edits: EditChunk[]): string[] {
+  const sorted = [...edits].sort((a, b) => b.startLine - a.startLine);
+  const newLines = [...lines];
+  for (const edit of sorted) {
+    const replacement = edit.replacement === "" ? [] : edit.replacement.split("\n");
     const startIdx = edit.startLine - 1;
-    const endIdx = edit.endLine; // splice uses exclusive end, so no -1 needed
-    const deleteCount = endIdx - startIdx;
+    newLines.splice(startIdx, edit.endLine - startIdx, ...replacement);
+  }
+  return newLines;
+}
 
-    newLines.splice(startIdx, deleteCount, ...replacementLines);
+async function editFileInternal(
+  absolutePath: string,
+  edits: EditChunk[],
+  options: EditOptions = {}
+): Promise<EditResult> {
+  const shouldValidate = options.validateSyntax ?? true;
+  const ctx = await prepareEditContext(absolutePath, edits);
+  if (!ctx.success) {
+    return { success: false, diff: "", error: ctx.error };
   }
 
-  const newContent = newLines.join("\n");
+  const newLines = applyEditChunks(ctx.lines, edits);
+  let newContent = newLines.join("\n");
+  if (newContent !== "" && !newContent.endsWith("\n")) {
+    newContent += "\n";
+  }
 
-  // Generate diff
   const diff = createTwoFilesPatch(
     absolutePath,
     absolutePath,
-    originalContent,
+    ctx.content,
     newContent,
     "original",
     "modified"
   );
-
-  // If dry run, return early
-  if (dryRun) {
-    return {
-      success: true,
-      diff,
-      newTotalLines: newLines.length,
-    };
+  if (options.dryRun) {
+    return { success: true, diff, newTotalLines: newLines.length };
   }
 
   const language = detectLanguage(absolutePath);
   const baseline =
     shouldValidate && language !== "unknown" ? await runValidation(absolutePath, language) : null;
 
-  // Write new content
   await fs.writeFile(absolutePath, newContent, "utf-8");
 
-  // Validate syntax if requested
   if (shouldValidate && language !== "unknown" && baseline) {
     const validation = await runValidation(absolutePath, language);
-    const validationError = getValidationError(baseline, validation);
-
-    if (validationError) {
-      // Rollback
-      await fs.writeFile(absolutePath, originalContent, "utf-8");
-      return {
-        success: false,
-        diff,
-        syntaxError: validationError,
-        rolledBack: true,
-      };
+    const error = getValidationError(baseline, validation);
+    if (error) {
+      await fs.writeFile(absolutePath, ctx.content, "utf-8");
+      return { success: false, diff, syntaxError: error, rolledBack: true };
     }
   }
 
-  return {
-    success: true,
-    diff,
-    newTotalLines: newLines.length,
-  };
+  return { success: true, diff, newTotalLines: newLines.length };
 }
 
 // ============================================================================

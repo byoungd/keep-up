@@ -1,5 +1,5 @@
 {
-  "name": "cowork-e2e",
+  "name": "@ku0/e2e-tests",
   "version": "0.0.0",
   "private": true,
   "scripts": {
