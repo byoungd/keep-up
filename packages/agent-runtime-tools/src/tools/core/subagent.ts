@@ -216,7 +216,7 @@ export class SubagentToolServer extends BaseToolServer {
           contextId: toolContext.contextId,
         }
       );
-      return textResult(JSON.stringify(result, null, 2));
+      return this.formatOutput(JSON.stringify(result, null, 2), toolContext);
     } catch (error) {
       return errorResult(
         "EXECUTION_FAILED",
@@ -267,7 +267,7 @@ export class SubagentToolServer extends BaseToolServer {
         baseSecurity: this.cloneSecurity(toolContext.security),
         contextId: toolContext.contextId,
       });
-      return textResult(
+      return this.formatOutput(
         JSON.stringify(
           {
             results: results.results,
@@ -278,7 +278,8 @@ export class SubagentToolServer extends BaseToolServer {
           },
           null,
           2
-        )
+        ),
+        toolContext
       );
     } catch (error) {
       return errorResult(
@@ -325,7 +326,7 @@ export class SubagentToolServer extends BaseToolServer {
         }
       );
 
-      return textResult(JSON.stringify(results as WorkflowResult, null, 2));
+      return this.formatOutput(JSON.stringify(results as WorkflowResult, null, 2), toolContext);
     } catch (error) {
       return errorResult(
         "EXECUTION_FAILED",
@@ -336,9 +337,9 @@ export class SubagentToolServer extends BaseToolServer {
 
   private async handleTypes(
     _args: Record<string, unknown>,
-    _context: ToolContext
+    context: ToolContext
   ): Promise<MCPToolResult> {
-    return textResult(JSON.stringify({ types: this.availableTypes }, null, 2));
+    return this.formatOutput(JSON.stringify({ types: this.availableTypes }, null, 2), context);
   }
 
   private parseAgentType(value: unknown): AgentType | null {
@@ -413,6 +414,16 @@ export class SubagentToolServer extends BaseToolServer {
       permissions: { ...policy.permissions },
       limits: { ...policy.limits },
     };
+  }
+
+  private formatOutput(output: string, context: ToolContext): MCPToolResult {
+    const maxOutputBytes = context.security.limits.maxOutputBytes;
+    if (Buffer.byteLength(output) > maxOutputBytes) {
+      const truncated = Buffer.from(output).subarray(0, maxOutputBytes).toString();
+      return textResult(`${truncated}\n\n[Output truncated at ${maxOutputBytes} bytes]`);
+    }
+
+    return textResult(output);
   }
 }
 

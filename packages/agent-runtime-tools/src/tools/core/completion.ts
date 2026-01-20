@@ -224,7 +224,7 @@ export class CompletionToolServer extends BaseToolServer {
 
   private async handleComplete(
     args: Record<string, unknown>,
-    _context: ToolContext
+    context: ToolContext
   ): Promise<MCPToolResult> {
     const validation = validateCompletionInput(args);
     if (!validation.ok) {
@@ -248,7 +248,7 @@ export class CompletionToolServer extends BaseToolServer {
       messageParts.push(`Next steps: ${nextSteps}`);
     }
 
-    return textResult(messageParts.join("\n"));
+    return this.formatOutput(messageParts.join("\n"), context);
   }
 
   private recordCompletion(event: CompletionEvent): void {
@@ -260,6 +260,16 @@ export class CompletionToolServer extends BaseToolServer {
 
   getCompletionHistory(): CompletionEvent[] {
     return [...this.completionHistory];
+  }
+
+  private formatOutput(output: string, context: ToolContext): MCPToolResult {
+    const maxOutputBytes = context.security.limits.maxOutputBytes;
+    if (Buffer.byteLength(output) > maxOutputBytes) {
+      const truncated = Buffer.from(output).subarray(0, maxOutputBytes).toString();
+      return textResult(`${truncated}\n\n[Output truncated at ${maxOutputBytes} bytes]`);
+    }
+
+    return textResult(output);
   }
 }
 
