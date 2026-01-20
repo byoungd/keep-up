@@ -41,7 +41,14 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write ."
   },
+  "dependencies": {
+    "@ku0/ai-core": "workspace:*",
+    "@ku0/agent-runtime": "workspace:*",
+    "@ku0/tooling-session": "workspace:*",
+    "diff": "^5.2.0"
+  },
   "devDependencies": {
+    "@types/diff": "^5.2.0",
     "@types/node": "^22.10.2",
     "@types/vscode": "^1.86.0",
     "typescript": "^5.7.3"

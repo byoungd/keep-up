@@ -7,16 +7,16 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand("keepup.newTask", () => {
       agentPanel.show();
-      agentPanel.startNewTask();
+      void agentPanel.startNewTask();
     }),
     vscode.commands.registerCommand("keepup.continueTask", () => {
       agentPanel.show();
     }),
     vscode.commands.registerCommand("keepup.showDiff", (filePath: string) => {
-      agentPanel.showDiffPreview(filePath);
+      void agentPanel.showDiffPreview(filePath);
     }),
     vscode.commands.registerCommand("keepup.applyChanges", () => {
-      agentPanel.applyPendingChanges();
+      void agentPanel.applyPendingChanges();
     }),
     vscode.commands.registerCommand("keepup.explainFile", async (uri: vscode.Uri) => {
       const content = await vscode.workspace.fs.readFile(uri);

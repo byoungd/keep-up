@@ -1,4 +1,7 @@
 import { Command } from "commander";
+import { ConfigStore } from "../utils/configStore";
+import { runInteractiveSession } from "../utils/interactiveSession";
+import { resolveOutput, resolveRuntimeConfigString } from "../utils/runtimeOptions";
 import { SessionStore } from "../utils/sessionStore";
 import { writeStderr, writeStdout } from "../utils/terminal";
 
@@ -33,7 +36,19 @@ function resumeCommand(): Command {
         writeStderr(`Session ${id} not found`);
         process.exit(1);
       }
+      const configStore = new ConfigStore();
+      const config = await configStore.load();
+      const model = resolveRuntimeConfigString(undefined, config.model) ?? "auto";
+      const provider = resolveRuntimeConfigString(undefined, config.provider);
+      const output = resolveOutput(resolveRuntimeConfigString(undefined, config.output) ?? "text");
+
       writeStdout(`Resuming session ${id}...`);
+      await runInteractiveSession({
+        sessionId: id,
+        model,
+        provider,
+        output,
+      });
     });
 }
 
