@@ -126,6 +126,37 @@ git checkout -b feat/short-task-name
   - Risks/known issues (if any).
 - The PR description is the canonical record; do not rely on local artifacts.
 
+## 4. Codex Execution Best Practices (Quality + Speed)
+
+### 4.1 Scope & Understanding
+- Start from the user request and minimal repo context. Load only what you need.
+- If blocked by ambiguity, ask the smallest clarifying question; otherwise proceed and record assumptions in the PR.
+- Do not wait on or over-invest in local artifacts; they are optional references only.
+
+### 4.2 Change Strategy
+- Keep diffs minimal and scoped to the request. Avoid refactors unless explicitly asked.
+- Follow existing patterns and `CODING_STANDARDS.md` for types, structure, and style.
+- Avoid adding new dependencies unless required; justify any additions in the PR.
+
+### 4.3 Search & Editing
+- Prefer `rg` for searches and targeted file reads over broad scans.
+- Use `apply_patch` for small edits; use scripts for bulk or repetitive changes.
+- Avoid unrelated formatting noise; touch only the files needed.
+
+### 4.4 Validation
+- Run the most relevant tests for the change area (see E2E category mapping).
+- Run `pnpm biome check --write` before finalizing changes.
+- If tests are not run, state the reason in the PR ("Not run (docs-only)" or rationale).
+
+### 4.5 PR Quality
+- Provide a concise summary, test results, and explicit risks/known issues.
+- Include UI evidence (screenshots or recordings) for visual changes.
+- List any behavioral changes or migration steps.
+
+### 4.6 Efficiency
+- Prefer small, reviewable commits over large, mixed changes.
+- Avoid slow or global operations unless the task explicitly requires them.
+
 ---
 
 # Part 2: Technical Protocol (The "AI Envelope")
