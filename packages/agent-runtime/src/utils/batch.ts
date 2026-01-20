@@ -60,9 +60,10 @@ export class BatchProcessor<T, R> {
   private batch: T[] = [];
   private timer: ReturnType<typeof setTimeout> | null = null;
   private processing = false;
+  private flushRequested = false;
   private pendingResolvers: Array<{
-    items: T[];
-    resolve: (results: R[]) => void;
+    index: number;
+    resolve: (result: R) => void;
     reject: (error: Error) => void;
   }> = [];
 
@@ -74,43 +75,32 @@ export class BatchProcessor<T, R> {
   /**
    * Add item to batch.
    */
-  async add(item: T): Promise<R> {
+  add(item: T): Promise<R> {
     this.batch.push(item);
+    const index = this.batch.length - 1;
 
     // Start timer if not already running
     if (!this.timer) {
       this.timer = setTimeout(() => this.flush(), this.config.maxWaitMs);
     }
 
+    const promise = new Promise<R>((resolve, reject) => {
+      this.pendingResolvers.push({ index, resolve, reject });
+    });
+
     // Flush if batch is full
     if (this.batch.length >= this.config.maxSize) {
-      return this.flushAndGetResult(item);
+      void this.flush();
     }
 
-    // Wait for batch to complete
-    return new Promise<R>((resolve, reject) => {
-      const existing = this.pendingResolvers.find((p) => p.items.includes(item));
-      if (existing) {
-        // Already tracked
-        return;
-      }
-      this.pendingResolvers.push({
-        items: [item],
-        resolve: (results) => resolve(results[0]),
-        reject,
-      });
-    });
+    return promise;
   }
 
   /**
    * Add multiple items to batch.
    */
-  async addMany(items: T[]): Promise<R[]> {
-    const results: R[] = [];
-    for (const item of items) {
-      results.push(await this.add(item));
-    }
-    return results;
+  addMany(items: T[]): Promise<R[]> {
+    return Promise.all(items.map((item) => this.add(item)));
   }
 
   /**
@@ -122,13 +112,18 @@ export class BatchProcessor<T, R> {
       this.timer = null;
     }
 
-    if (this.batch.length === 0 || this.processing) {
+    if (this.processing) {
+      this.flushRequested = true;
+      return;
+    }
+
+    if (this.batch.length === 0) {
       return;
     }
 
     this.processing = true;
-    const currentBatch = [...this.batch];
-    const currentResolvers = [...this.pendingResolvers];
+    const currentBatch = this.batch;
+    const currentResolvers = this.pendingResolvers;
     this.batch = [];
     this.pendingResolvers = [];
 
@@ -137,9 +132,7 @@ export class BatchProcessor<T, R> {
 
       // Resolve pending promises
       for (const resolver of currentResolvers) {
-        const indices = resolver.items.map((item) => currentBatch.indexOf(item));
-        const itemResults = indices.map((i) => results[i]);
-        resolver.resolve(itemResults);
+        resolver.resolve(results[resolver.index]);
       }
     } catch (error) {
       for (const resolver of currentResolvers) {
@@ -147,18 +140,25 @@ export class BatchProcessor<T, R> {
       }
     } finally {
       this.processing = false;
+      this.scheduleNextFlush();
     }
   }
 
-  private async flushAndGetResult(item: T): Promise<R> {
-    return new Promise<R>((resolve, reject) => {
-      this.pendingResolvers.push({
-        items: [item],
-        resolve: (results) => resolve(results[0]),
-        reject,
-      });
-      this.flush();
-    });
+  private scheduleNextFlush(): void {
+    if (this.batch.length === 0) {
+      this.flushRequested = false;
+      return;
+    }
+
+    if (this.batch.length >= this.config.maxSize || this.flushRequested) {
+      this.flushRequested = false;
+      void this.flush();
+      return;
+    }
+
+    if (!this.timer) {
+      this.timer = setTimeout(() => this.flush(), this.config.maxWaitMs);
+    }
   }
 
   /**
