@@ -15,6 +15,7 @@ import { createToolRegistryView, type IToolRegistry } from "@ku0/agent-runtime-t
 import { type AgentOrchestrator, createOrchestrator } from "../orchestrator/orchestrator";
 import { createSecurityPolicy } from "../security";
 import { createSessionState, type SessionState } from "../session";
+import { createIsolatedToolRegistry } from "../tools/workbench/registry";
 import type { AgentMessage, MCPToolCall, SecurityPolicy } from "../types";
 import { AGENT_PROFILES, getAgentProfile, listAgentTypes } from "./profiles";
 import type {
@@ -394,7 +395,8 @@ export class AgentManager implements IAgentManager {
   }
 
   private createFilteredRegistry(allowedTools: string[]): IToolRegistry {
-    return createToolRegistryView(this.config.registry, { allowedTools });
+    const isolated = createIsolatedToolRegistry(this.config.registry);
+    return createToolRegistryView(isolated, { allowedTools });
   }
 
   private resolveAllowedTools(profileAllowed: string[], scopedAllowed?: string[]): string[] {

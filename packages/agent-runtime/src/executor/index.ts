@@ -60,6 +60,7 @@ export interface ToolConfirmationResolver extends ToolExecutor {
 export interface ToolConfirmationDetails {
   requiresConfirmation: boolean;
   reason?: string;
+  reasonCode?: string;
   riskTags?: string[];
 }
 
@@ -306,6 +307,7 @@ export class ToolExecutionPipeline
     return {
       requiresConfirmation,
       reason: policyDecision.reason,
+      reasonCode: policyDecision.reasonCode,
       riskTags: policyDecision.riskTags,
     };
   }
@@ -689,6 +691,7 @@ export class ToolExecutionPipeline
       allowed: true,
       requiresConfirmation: policyDecision.requiresConfirmation,
       reason: policyDecision.reason,
+      reasonCode: policyDecision.reasonCode,
       riskTags: mergeRiskTags(policyDecision.riskTags, sandboxDecision.riskTags),
       sandboxed: sandboxDecision.sandboxed,
       affectedPaths: sandboxDecision.affectedPaths,
@@ -742,6 +745,7 @@ export class ToolExecutionPipeline
       allowed: false,
       requiresConfirmation: false,
       reason: validationError.message,
+      reasonCode: policyDecision.reasonCode,
       riskTags: policyDecision.riskTags,
       sandboxed: context.security.sandbox.type !== "none",
     });
@@ -789,6 +793,7 @@ export class ToolExecutionPipeline
       allowed: false,
       requiresConfirmation: false,
       reason: message,
+      reasonCode: policyDecision.reasonCode,
       riskTags: policyDecision.riskTags,
       sandboxed: context.security.sandbox.type !== "none",
     });
@@ -836,6 +841,7 @@ export class ToolExecutionPipeline
       allowed: false,
       requiresConfirmation: policyDecision.requiresConfirmation,
       reason: policyDecision.reason ?? "Permission denied",
+      reasonCode: policyDecision.reasonCode,
       riskTags: policyDecision.riskTags,
       escalation,
       sandboxed: context.security.sandbox.type !== "none",
@@ -884,6 +890,7 @@ export class ToolExecutionPipeline
       allowed: false,
       requiresConfirmation: policyDecision.requiresConfirmation,
       reason: sandboxDecision.reason ?? "Sandbox policy violation",
+      reasonCode: policyDecision.reasonCode,
       riskTags: mergeRiskTags(policyDecision.riskTags, sandboxDecision.riskTags),
       sandboxed: sandboxDecision.sandboxed,
       affectedPaths: sandboxDecision.affectedPaths,

@@ -568,7 +568,7 @@ export type SecurityPreset = keyof typeof SECURITY_PRESETS;
 export interface AuditEntry {
   timestamp: number;
   toolName: string;
-  action: "call" | "result" | "error";
+  action: "call" | "result" | "error" | "policy";
   userId?: string;
   correlationId?: string;
   input?: Record<string, unknown>;
@@ -801,6 +801,7 @@ export interface ConfirmationRequest {
   arguments: Record<string, unknown>;
   risk: "low" | "medium" | "high";
   reason?: string;
+  reasonCode?: string;
   riskTags?: string[];
   taskNodeId?: string;
   escalation?: PermissionEscalation;
@@ -822,6 +823,7 @@ export interface ExecutionDecision {
   allowed: boolean;
   requiresConfirmation: boolean;
   reason?: string;
+  reasonCode?: string;
   riskTags?: string[];
   escalation?: PermissionEscalation;
   sandboxed: boolean;
@@ -1200,6 +1202,7 @@ export interface ToolPolicyDecision {
   allowed: boolean;
   requiresConfirmation: boolean;
   reason?: string;
+  reasonCode?: string;
   riskTags?: string[];
   escalation?: PermissionEscalation;
 }
