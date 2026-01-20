@@ -15,6 +15,7 @@ import type {
   ConfigStoreLike,
   ProjectStoreLike,
   SessionStoreLike,
+  StepStoreLike,
   StorageLayer,
   TaskStoreLike,
   WorkflowTemplateStoreLike,
@@ -28,6 +29,7 @@ import type {
   CoworkAuditFilter,
   CoworkChatMessage,
   CoworkSettings,
+  CoworkTaskStepRecord,
 } from "./types";
 
 export interface D1PreparedStatement {
@@ -78,6 +80,25 @@ async function ensureSchema(db: D1Database): Promise<void> {
     `,
     `
       CREATE INDEX IF NOT EXISTS idx_tasks_session ON tasks(session_id)
+    `,
+    `
+      CREATE TABLE IF NOT EXISTS task_steps (
+        step_id TEXT PRIMARY KEY,
+        task_id TEXT NOT NULL,
+        name TEXT,
+        input TEXT NOT NULL,
+        additional_input TEXT DEFAULT '{}',
+        status TEXT NOT NULL,
+        output TEXT,
+        additional_output TEXT DEFAULT '{}',
+        artifacts TEXT NOT NULL DEFAULT '[]',
+        is_last INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    `,
+    `
+      CREATE INDEX IF NOT EXISTS idx_task_steps_task ON task_steps(task_id)
     `,
     `
       CREATE TABLE IF NOT EXISTS artifacts (
@@ -372,6 +393,23 @@ function rowToTask(row: Record<string, unknown>): CoworkTask {
   };
 }
 
+function rowToTaskStep(row: Record<string, unknown>): CoworkTaskStepRecord {
+  return {
+    stepId: String(row.step_id),
+    taskId: String(row.task_id),
+    name: row.name ? String(row.name) : undefined,
+    input: String(row.input),
+    additionalInput: parseJsonObject(row.additional_input),
+    status: String(row.status) as CoworkTaskStepRecord["status"],
+    output: row.output ? String(row.output) : undefined,
+    additionalOutput: parseJsonObject(row.additional_output),
+    artifacts: parseJsonArray<string>(row.artifacts),
+    isLast: Boolean(row.is_last),
+    createdAt: Number(row.created_at),
+    updatedAt: Number(row.updated_at),
+  };
+}
+
 function rowToApproval(row: Record<string, unknown>): CoworkApproval {
   return {
     approvalId: String(row.approval_id),
@@ -630,6 +668,79 @@ async function createD1TaskStore(db: D1Database): Promise<TaskStoreLike> {
           JSON.stringify(updated.metadata ?? {}),
           updated.updatedAt,
           updated.taskId,
+        ]
+      ).run();
+      return updated;
+    },
+  };
+}
+async function createD1StepStore(db: D1Database): Promise<StepStoreLike> {
+  return {
+    async getById(stepId: string): Promise<CoworkTaskStepRecord | null> {
+      const row = await prepare(db, "SELECT * FROM task_steps WHERE step_id = ?", [stepId]).first();
+      return row ? rowToTaskStep(row) : null;
+    },
+
+    async getByTask(taskId: string): Promise<CoworkTaskStepRecord[]> {
+      const result = await prepare(
+        db,
+        "SELECT * FROM task_steps WHERE task_id = ? ORDER BY created_at ASC",
+        [taskId]
+      ).all();
+      return result.results.map(rowToTaskStep);
+    },
+
+    async create(step: CoworkTaskStepRecord): Promise<CoworkTaskStepRecord> {
+      await prepare(
+        db,
+        `INSERT INTO task_steps
+          (step_id, task_id, name, input, additional_input, status, output, additional_output, artifacts, is_last, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          step.stepId,
+          step.taskId,
+          step.name ?? null,
+          step.input,
+          JSON.stringify(step.additionalInput ?? {}),
+          step.status,
+          step.output ?? null,
+          JSON.stringify(step.additionalOutput ?? {}),
+          JSON.stringify(step.artifacts ?? []),
+          step.isLast ? 1 : 0,
+          step.createdAt,
+          step.updatedAt,
+        ]
+      ).run();
+      return step;
+    },
+
+    async update(
+      stepId: string,
+      updater: (step: CoworkTaskStepRecord) => CoworkTaskStepRecord
+    ): Promise<CoworkTaskStepRecord | null> {
+      const existing = await prepare(db, "SELECT * FROM task_steps WHERE step_id = ?", [
+        stepId,
+      ]).first();
+      if (!existing) {
+        return null;
+      }
+      const updated = updater(rowToTaskStep(existing));
+      await prepare(
+        db,
+        `UPDATE task_steps
+          SET name = ?, input = ?, additional_input = ?, status = ?, output = ?, additional_output = ?, artifacts = ?, is_last = ?, updated_at = ?
+          WHERE step_id = ?`,
+        [
+          updated.name ?? null,
+          updated.input,
+          JSON.stringify(updated.additionalInput ?? {}),
+          updated.status,
+          updated.output ?? null,
+          JSON.stringify(updated.additionalOutput ?? {}),
+          JSON.stringify(updated.artifacts ?? []),
+          updated.isLast ? 1 : 0,
+          updated.updatedAt,
+          updated.stepId,
         ]
       ).run();
       return updated;
@@ -1307,6 +1418,7 @@ export async function createD1StorageLayer(db: D1Database): Promise<StorageLayer
   const [
     sessionStore,
     taskStore,
+    stepStore,
     artifactStore,
     chatMessageStore,
     approvalStore,
@@ -1318,6 +1430,7 @@ export async function createD1StorageLayer(db: D1Database): Promise<StorageLayer
   ] = await Promise.all([
     createD1SessionStore(db),
     createD1TaskStore(db),
+    createD1StepStore(db),
     createD1ArtifactStore(db),
     createD1ChatMessageStore(db),
     createD1ApprovalStore(db),
@@ -1331,6 +1444,7 @@ export async function createD1StorageLayer(db: D1Database): Promise<StorageLayer
   return {
     sessionStore,
     taskStore,
+    stepStore,
     artifactStore,
     chatMessageStore,
     approvalStore,

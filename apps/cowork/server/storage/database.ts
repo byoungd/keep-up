@@ -83,6 +83,28 @@ function initSchema(database: DatabaseInstance): void {
   `);
 
   database.exec(`
+    CREATE TABLE IF NOT EXISTS task_steps (
+      step_id TEXT PRIMARY KEY,
+      task_id TEXT NOT NULL,
+      name TEXT,
+      input TEXT NOT NULL,
+      additional_input TEXT DEFAULT '{}',
+      status TEXT NOT NULL,
+      output TEXT,
+      additional_output TEXT DEFAULT '{}',
+      artifacts TEXT NOT NULL DEFAULT '[]',
+      is_last INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      FOREIGN KEY (task_id) REFERENCES tasks(task_id)
+    )
+  `);
+
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_task_steps_task ON task_steps(task_id)
+  `);
+
+  database.exec(`
     CREATE TABLE IF NOT EXISTS artifacts (
       artifact_id TEXT PRIMARY KEY,
       session_id TEXT NOT NULL,

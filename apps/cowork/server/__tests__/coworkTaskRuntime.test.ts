@@ -20,6 +20,7 @@ import { createConfigStore } from "../storage/configStore";
 import type { StorageLayer } from "../storage/contracts";
 import { createProjectStore } from "../storage/projectStore";
 import { createSessionStore } from "../storage/sessionStore";
+import { createStepStore } from "../storage/stepStore";
 import { createTaskStore } from "../storage/taskStore";
 import { createWorkflowTemplateStore } from "../storage/workflowTemplateStore";
 import { SessionEventHub } from "../streaming/eventHub";
@@ -33,6 +34,7 @@ async function createStorageLayer() {
   const storage: StorageLayer = {
     sessionStore: createSessionStore(join(dir, "sessions.json")),
     taskStore: createTaskStore(join(dir, "tasks.json")),
+    stepStore: createStepStore(join(dir, "task_steps.json")),
     artifactStore: createArtifactStore(join(dir, "artifacts.json")),
     chatMessageStore: createChatMessageStore(join(dir, "chat_messages.json")),
     approvalStore: createApprovalStore(join(dir, "approvals.json")),

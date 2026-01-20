@@ -7,6 +7,7 @@ import type {
   CoworkAuditFilter,
   CoworkChatMessage,
   CoworkSettings,
+  CoworkTaskStepRecord,
   CoworkWorkflowTemplateRecord,
 } from "./types";
 
@@ -27,6 +28,16 @@ export interface TaskStoreLike {
   getBySession(sessionId: string): Promise<CoworkTask[]>;
   create(task: CoworkTask): Promise<CoworkTask>;
   update(taskId: string, updater: (task: CoworkTask) => CoworkTask): Promise<CoworkTask | null>;
+}
+
+export interface StepStoreLike {
+  getById(stepId: string): Promise<CoworkTaskStepRecord | null>;
+  getByTask(taskId: string): Promise<CoworkTaskStepRecord[]>;
+  create(step: CoworkTaskStepRecord): Promise<CoworkTaskStepRecord>;
+  update(
+    stepId: string,
+    updater: (step: CoworkTaskStepRecord) => CoworkTaskStepRecord
+  ): Promise<CoworkTaskStepRecord | null>;
 }
 
 export interface ApprovalStoreLike {
@@ -115,6 +126,7 @@ export interface ChatMessageStoreLike {
 export interface StorageLayer {
   sessionStore: SessionStoreLike;
   taskStore: TaskStoreLike;
+  stepStore: StepStoreLike;
   artifactStore: ArtifactStoreLike;
   chatMessageStore: ChatMessageStoreLike;
   approvalStore: ApprovalStoreLike;

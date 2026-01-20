@@ -11,13 +11,20 @@ import { ConfigStore } from "./configStore";
 import { getDatabase } from "./database";
 import { SessionStore } from "./sessionStore";
 import { ensureStateDir } from "./statePaths";
+import { StepStore } from "./stepStore";
 import { TaskStore } from "./taskStore";
-import type { CoworkChatMessage, CoworkSettings, CoworkWorkflowTemplateRecord } from "./types";
+import type {
+  CoworkChatMessage,
+  CoworkSettings,
+  CoworkTaskStepRecord,
+  CoworkWorkflowTemplateRecord,
+} from "./types";
 import { WorkflowTemplateStore } from "./workflowTemplateStore";
 
 export interface MigrationResult {
   sessions: number;
   tasks: number;
+  steps: number;
   artifacts: number;
   chatMessages: number;
   approvals: number;
@@ -46,6 +53,7 @@ export async function migrateJsonToSqlite(
 
   const sessionStore = new SessionStore(join(stateDir, "sessions.json"));
   const taskStore = new TaskStore(join(stateDir, "tasks.json"));
+  const stepStore = new StepStore(join(stateDir, "task_steps.json"));
   const artifactStore = new ArtifactStore(join(stateDir, "artifacts.json"));
   const chatMessageStore = new ChatMessageStore(join(stateDir, "chat_messages.json"));
   const approvalStore = new ApprovalStore(join(stateDir, "approvals.json"));
@@ -57,21 +65,32 @@ export async function migrateJsonToSqlite(
     join(stateDir, "workflow_templates.json")
   );
 
-  const [sessions, tasks, artifacts, chatMessages, approvals, checkpoints, settings, templates] =
-    await Promise.all([
-      sessionStore.getAll(),
-      taskStore.getAll(),
-      artifactStore.getAll(),
-      chatMessageStore.getAll(),
-      approvalStore.getAll(),
-      agentStateStore.getAll(),
-      configStore.get(),
-      workflowTemplateStore.getAll(),
-    ]);
+  const [
+    sessions,
+    tasks,
+    steps,
+    artifacts,
+    chatMessages,
+    approvals,
+    checkpoints,
+    settings,
+    templates,
+  ] = await Promise.all([
+    sessionStore.getAll(),
+    taskStore.getAll(),
+    stepStore.getAll(),
+    artifactStore.getAll(),
+    chatMessageStore.getAll(),
+    approvalStore.getAll(),
+    agentStateStore.getAll(),
+    configStore.get(),
+    workflowTemplateStore.getAll(),
+  ]);
 
   const result: MigrationResult = {
     sessions: sessions.length,
     tasks: tasks.length,
+    steps: steps.length,
     artifacts: artifacts.length,
     chatMessages: chatMessages.length,
     approvals: approvals.length,
@@ -95,6 +114,12 @@ export async function migrateJsonToSqlite(
     INSERT OR REPLACE INTO tasks
     (task_id, session_id, title, prompt, status, metadata, created_at, updated_at)
     VALUES ($taskId, $sessionId, $title, $prompt, $status, $metadata, $createdAt, $updatedAt)
+  `);
+
+  const insertStep = db.prepare(`
+    INSERT OR REPLACE INTO task_steps
+    (step_id, task_id, name, input, additional_input, status, output, additional_output, artifacts, is_last, created_at, updated_at)
+    VALUES ($stepId, $taskId, $name, $input, $additionalInput, $status, $output, $additionalOutput, $artifacts, $isLast, $createdAt, $updatedAt)
   `);
 
   const insertApproval = db.prepare(`
@@ -136,6 +161,7 @@ export async function migrateJsonToSqlite(
   try {
     insertSessions(insertSession, sessions);
     insertTasks(insertTask, tasks);
+    insertSteps(insertStep, steps);
     insertArtifacts(insertArtifact, artifacts);
     insertChatMessages(insertChatMessage, chatMessages);
     insertCheckpoints(insertCheckpoint, checkpoints);
@@ -223,6 +249,28 @@ function insertTasks(
       $metadata: JSON.stringify(task.metadata ?? {}),
       $createdAt: task.createdAt,
       $updatedAt: task.updatedAt,
+    });
+  }
+}
+
+function insertSteps(
+  stmt: { run: (params: Record<string, unknown>) => void },
+  steps: CoworkTaskStepRecord[]
+): void {
+  for (const step of steps) {
+    stmt.run({
+      $stepId: step.stepId,
+      $taskId: step.taskId,
+      $name: step.name ?? null,
+      $input: step.input,
+      $additionalInput: JSON.stringify(step.additionalInput ?? {}),
+      $status: step.status,
+      $output: step.output ?? null,
+      $additionalOutput: JSON.stringify(step.additionalOutput ?? {}),
+      $artifacts: JSON.stringify(step.artifacts ?? []),
+      $isLast: step.isLast ? 1 : 0,
+      $createdAt: step.createdAt,
+      $updatedAt: step.updatedAt,
     });
   }
 }

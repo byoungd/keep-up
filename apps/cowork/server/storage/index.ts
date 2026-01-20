@@ -21,9 +21,11 @@ import { createSqliteChatMessageStore } from "./sqliteChatMessageStore";
 import { createSqliteConfigStore } from "./sqliteConfigStore";
 import { createSqliteProjectStore } from "./sqliteProjectStore";
 import { createSqliteSessionStore } from "./sqliteSessionStore";
+import { createSqliteStepStore } from "./sqliteStepStore";
 import { createSqliteTaskStore } from "./sqliteTaskStore";
 import { createSqliteWorkflowTemplateStore } from "./sqliteWorkflowTemplateStore";
 import { ensureStateDir } from "./statePaths";
+import { createStepStore } from "./stepStore";
 import { createTaskStore } from "./taskStore";
 import { createWorkflowTemplateStore } from "./workflowTemplateStore";
 
@@ -45,6 +47,7 @@ export type {
   ConfigStoreLike,
   ProjectStoreLike,
   SessionStoreLike,
+  StepStoreLike,
   StorageLayer,
   TaskStoreLike,
   WorkflowTemplateStoreLike,
@@ -70,6 +73,7 @@ export {
 export { createSqliteConfigStore, type SqliteConfigStore } from "./sqliteConfigStore";
 export { createSqliteProjectStore, type SqliteProjectStore } from "./sqliteProjectStore";
 export { createSqliteSessionStore, type SqliteSessionStore } from "./sqliteSessionStore";
+export { createSqliteStepStore, type SqliteStepStore } from "./sqliteStepStore";
 export { createSqliteTaskStore, type SqliteTaskStore } from "./sqliteTaskStore";
 export {
   createSqliteWorkflowTemplateStore,
@@ -77,6 +81,7 @@ export {
 } from "./sqliteWorkflowTemplateStore";
 // Utilities
 export { ensureStateDir, resolveStateDir } from "./statePaths";
+export { createStepStore, type StepStore } from "./stepStore";
 export { createTaskStore, type TaskStore } from "./taskStore";
 export { createWorkflowTemplateStore, type WorkflowTemplateStore } from "./workflowTemplateStore";
 
@@ -90,6 +95,7 @@ export async function createStorageLayer(mode: StorageMode = "json"): Promise<St
     const [
       sessionStore,
       taskStore,
+      stepStore,
       artifactStore,
       chatMessageStore,
       approvalStore,
@@ -101,6 +107,7 @@ export async function createStorageLayer(mode: StorageMode = "json"): Promise<St
     ] = await Promise.all([
       createSqliteSessionStore(),
       createSqliteTaskStore(),
+      createSqliteStepStore(),
       createSqliteArtifactStore(),
       createSqliteChatMessageStore(),
       createSqliteApprovalStore(),
@@ -114,6 +121,7 @@ export async function createStorageLayer(mode: StorageMode = "json"): Promise<St
     return {
       sessionStore,
       taskStore,
+      stepStore,
       artifactStore,
       chatMessageStore,
       approvalStore,
@@ -129,6 +137,7 @@ export async function createStorageLayer(mode: StorageMode = "json"): Promise<St
   return {
     sessionStore: createSessionStore(join(stateDir, "sessions.json")),
     taskStore: createTaskStore(join(stateDir, "tasks.json")),
+    stepStore: createStepStore(join(stateDir, "task_steps.json")),
     artifactStore: createArtifactStore(join(stateDir, "artifacts.json")),
     chatMessageStore: createChatMessageStore(join(stateDir, "chat_messages.json")),
     approvalStore: createApprovalStore(join(stateDir, "approvals.json")),
