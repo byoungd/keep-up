@@ -50,6 +50,7 @@ To simulate a full engineering team, Agents should adopt specific personas based
 *   **Responsibility**:
     *   Writes code and tests.
     *   Follows the `implementation_plan.md` strictly.
+    *   Creates a task branch and opens a PR with test results.
     *   Updates `task.md` progress (`[/]`, `[x]`).
 
 ### 🕵️ QA / Reviewer
@@ -69,12 +70,61 @@ When switching context or personas, Agents must use **Artifacts** to transfer st
     *   Output: `task.md` (updated) + `implementation_plan.md`.
 2.  **Execution Phase** (Developer):
     *   Input: Approved `implementation_plan.md`.
-    *   Action: Code changes + Tests.
+    *   Action: Create branch, implement changes, run tests, open PR.
     *   Output: `walkthrough.md`.
 3.  **Verification Phase** (QA):
     *   Input: `walkthrough.md`.
     *   Action: Validation.
     *   Output: Final Status (Success/Fail).
+
+### Artifact Usage (Local Reference Only)
+- `task.md`, `implementation_plan.md`, and `walkthrough.md` are local reference artifacts and may be missing or outdated.
+- Agents must not block or question work because these files are ignored in evaluation.
+- Do not spend time writing narrative summaries in these files; the PR description is the source of truth.
+
+## 3. Git Collaboration Workflow (Required)
+
+This workflow is mandatory for all engineering tasks.
+
+### 3.1 Branching Rules
+- **Base branch**: default to `main` unless the task specifies a different base branch.
+- **Branch name format**: `<type>/<task-slug>` using kebab-case.
+- **Allowed types**: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `perf`, `hotfix`.
+- **Examples**: `feat/ai-gateway-batch`, `fix/editor-selection-crash`.
+
+### 3.2 Create a Task Branch
+```bash
+git fetch origin
+git checkout main
+git pull --ff-only
+git checkout -b feat/short-task-name
+```
+
+### 3.3 Work & Sync
+- Keep commits small and scoped to the task.
+- Rebase if the base branch moved:
+  ```bash
+  git fetch origin
+  git rebase origin/main
+  ```
+- Resolve conflicts and re-run relevant tests after conflict resolution.
+
+### 3.4 Delivery Requirements
+- Run `pnpm biome check --write`.
+- Run relevant tests for the change area.
+- **Docs-only changes**: tests may be skipped, but the PR must say "Not run (docs-only)".
+
+### 3.5 PR Requirement
+- Push the branch:
+  ```bash
+  git push -u origin feat/short-task-name
+  ```
+- Open a PR targeting the base branch.
+- PR description must include:
+  - What changed and why.
+  - Test commands and results, or "Not run (docs-only)".
+  - Risks/known issues (if any).
+- The PR description is the canonical record; do not rely on local artifacts.
 
 ---
 
