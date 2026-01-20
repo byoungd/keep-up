@@ -255,6 +255,11 @@ export class ScratchToolServer extends BaseToolServer {
     args: Record<string, unknown>,
     context: ToolContext
   ): Promise<MCPToolResult> {
+    const writeAccess = this.ensureWriteAccess(context);
+    if (writeAccess) {
+      return writeAccess;
+    }
+
     try {
       const name = args.name as string;
       const content = args.content as string;
@@ -281,10 +286,11 @@ export class ScratchToolServer extends BaseToolServer {
       await fs.writeFile(metaPath, JSON.stringify(metadata, null, 2), "utf-8");
 
       const sizeKb = (metadata.size / 1024).toFixed(1);
-      return textResult(
+      return this.formatOutput(
         `Saved intermediate result to ${DEFAULT_AGENT_SCRATCH_DIR}/${path.basename(filePath)}\n` +
           `Size: ${sizeKb} KB\n` +
-          `Reference with: scratch:load name="${name}"`
+          `Reference with: scratch:load name="${name}"`,
+        context
       );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -296,6 +302,11 @@ export class ScratchToolServer extends BaseToolServer {
     args: Record<string, unknown>,
     context: ToolContext
   ): Promise<MCPToolResult> {
+    const readAccess = this.ensureReadAccess(context);
+    if (readAccess) {
+      return readAccess;
+    }
+
     try {
       const name = args.name as string;
       const scratchDir = this.getScratchDir(context);
@@ -325,7 +336,7 @@ export class ScratchToolServer extends BaseToolServer {
         // No metadata file
       }
 
-      return textResult(`# Scratch: ${name}${description}${content}`);
+      return this.formatOutput(`# Scratch: ${name}${description}${content}`, context);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return errorResult("EXECUTION_FAILED", `Failed to load scratch file: ${message}`);
@@ -336,6 +347,11 @@ export class ScratchToolServer extends BaseToolServer {
     _args: Record<string, unknown>,
     context: ToolContext
   ): Promise<MCPToolResult> {
+    const readAccess = this.ensureReadAccess(context);
+    if (readAccess) {
+      return readAccess;
+    }
+
     try {
       const scratchDir = this.getScratchDir(context);
       const files = await fs.readdir(scratchDir).catch(() => []);
@@ -344,7 +360,7 @@ export class ScratchToolServer extends BaseToolServer {
       const contentFiles = files.filter((f) => !f.endsWith(".meta.json"));
 
       if (contentFiles.length === 0) {
-        return textResult("No scratch files found.");
+        return this.formatOutput("No scratch files found.", context);
       }
 
       const lines: string[] = ["# Scratch Files", ""];
@@ -370,7 +386,7 @@ export class ScratchToolServer extends BaseToolServer {
         lines.push(`- ${info}`);
       }
 
-      return textResult(lines.join("\n"));
+      return this.formatOutput(lines.join("\n"), context);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return errorResult("EXECUTION_FAILED", `Failed to list scratch files: ${message}`);
@@ -381,6 +397,11 @@ export class ScratchToolServer extends BaseToolServer {
     args: Record<string, unknown>,
     context: ToolContext
   ): Promise<MCPToolResult> {
+    const writeAccess = this.ensureWriteAccess(context);
+    if (writeAccess) {
+      return writeAccess;
+    }
+
     try {
       const maxAgeHours = (args.maxAgeHours as number) ?? 24;
       const clearAll = args.all as boolean;
@@ -389,7 +410,7 @@ export class ScratchToolServer extends BaseToolServer {
       const files = await fs.readdir(scratchDir).catch(() => []);
 
       if (files.length === 0) {
-        return textResult("No scratch files to clear.");
+        return this.formatOutput("No scratch files to clear.", context);
       }
 
       const now = Date.now();
@@ -413,7 +434,7 @@ export class ScratchToolServer extends BaseToolServer {
         }
       }
 
-      return textResult(`Cleared ${deletedCount} scratch file(s).`);
+      return this.formatOutput(`Cleared ${deletedCount} scratch file(s).`, context);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return errorResult("EXECUTION_FAILED", `Failed to clear scratch files: ${message}`);
@@ -424,6 +445,11 @@ export class ScratchToolServer extends BaseToolServer {
     args: Record<string, unknown>,
     context: ToolContext
   ): Promise<MCPToolResult> {
+    const writeAccess = this.ensureWriteAccess(context);
+    if (writeAccess) {
+      return writeAccess;
+    }
+
     try {
       const name = args.name as string;
       const content = args.content as string;
@@ -456,11 +482,40 @@ export class ScratchToolServer extends BaseToolServer {
         // No metadata file
       }
 
-      return textResult(`Appended to scratch file: ${name}`);
+      return this.formatOutput(`Appended to scratch file: ${name}`, context);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return errorResult("EXECUTION_FAILED", `Failed to append to scratch file: ${message}`);
     }
+  }
+
+  private ensureReadAccess(context: ToolContext): MCPToolResult | null {
+    if (context.security.permissions.file === "none") {
+      return errorResult("PERMISSION_DENIED", "File access is disabled");
+    }
+
+    return null;
+  }
+
+  private ensureWriteAccess(context: ToolContext): MCPToolResult | null {
+    if (
+      context.security.permissions.file === "none" ||
+      context.security.permissions.file === "read"
+    ) {
+      return errorResult("PERMISSION_DENIED", "File write access is disabled");
+    }
+
+    return null;
+  }
+
+  private formatOutput(output: string, context: ToolContext): MCPToolResult {
+    const maxOutputBytes = context.security.limits.maxOutputBytes;
+    if (Buffer.byteLength(output) > maxOutputBytes) {
+      const truncated = Buffer.from(output).subarray(0, maxOutputBytes).toString();
+      return textResult(`${truncated}\n\n[Output truncated at ${maxOutputBytes} bytes]`);
+    }
+
+    return textResult(output);
   }
 }
 

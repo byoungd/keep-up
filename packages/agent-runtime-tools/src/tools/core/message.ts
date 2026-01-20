@@ -181,7 +181,7 @@ The frontend will render different UI based on the type and suggested_action.`,
 
   private async handleSend(
     args: Record<string, unknown>,
-    _context: ToolContext
+    context: ToolContext
   ): Promise<MCPToolResult> {
     try {
       const type = args.type as MessageType;
@@ -189,7 +189,14 @@ The frontend will render different UI based on the type and suggested_action.`,
       const suggested_action = args.suggested_action as SuggestedAction | undefined;
       const attachments = args.attachments as string[] | undefined;
       const summary = args.summary as string | undefined;
-      const context = args.context as string | undefined;
+      const messageContext = args.context as string | undefined;
+
+      const normalized = this.normalizeMetadata(type, {
+        suggested_action,
+        attachments,
+        summary,
+        context: messageContext,
+      });
 
       // Create message event
       const event: MessageEvent = {
@@ -197,10 +204,10 @@ The frontend will render different UI based on the type and suggested_action.`,
         message,
         timestamp: Date.now(),
         metadata: {
-          suggested_action,
-          attachments,
-          summary,
-          context,
+          suggested_action: normalized.suggested_action,
+          attachments: normalized.attachments,
+          summary: normalized.summary,
+          context: normalized.context,
         },
       };
 
@@ -209,12 +216,12 @@ The frontend will render different UI based on the type and suggested_action.`,
 
       // Build response
       const response = this.buildResponse(type, message, {
-        suggested_action,
-        attachments,
-        summary,
+        suggested_action: normalized.suggested_action,
+        attachments: normalized.attachments,
+        summary: normalized.summary,
       });
 
-      return textResult(response);
+      return this.formatOutput(response, context);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       return errorResult("EXECUTION_FAILED", `Failed to send message: ${errorMessage}`);
@@ -253,6 +260,48 @@ The frontend will render different UI based on the type and suggested_action.`,
     }
 
     return response;
+  }
+
+  private normalizeMetadata(
+    type: MessageType,
+    metadata: {
+      suggested_action?: SuggestedAction;
+      attachments?: string[];
+      summary?: string;
+      context?: string;
+    }
+  ): {
+    suggested_action?: SuggestedAction;
+    attachments?: string[];
+    summary?: string;
+    context?: string;
+  } {
+    if (type === "ask") {
+      return {
+        suggested_action: metadata.suggested_action ?? "none",
+        context: metadata.context,
+      };
+    }
+
+    if (type === "result") {
+      return {
+        attachments: metadata.attachments,
+        summary: metadata.summary,
+        context: metadata.context,
+      };
+    }
+
+    return { context: metadata.context };
+  }
+
+  private formatOutput(output: string, context: ToolContext): MCPToolResult {
+    const maxOutputBytes = context.security.limits.maxOutputBytes;
+    if (Buffer.byteLength(output) > maxOutputBytes) {
+      const truncated = Buffer.from(output).subarray(0, maxOutputBytes).toString();
+      return textResult(`${truncated}\n\n[Output truncated at ${maxOutputBytes} bytes]`);
+    }
+
+    return textResult(output);
   }
 
   // ============================================================================
