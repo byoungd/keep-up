@@ -3,17 +3,17 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 
-import Dockerode from "dockerode";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { RuntimeAssetManager } from "../../assets/runtimeAssetManager";
+import { createDockerClient } from "../../docker/dockerClient";
 import { ContainerPool } from "../containerPool";
 import type { SandboxPolicy } from "../types";
 
 const dockerSocketCandidates = [
+  join(homedir(), "Library/Containers/com.docker.docker/Data/docker.raw.sock"),
   "/var/run/docker.sock",
   join(homedir(), ".docker/run/docker.sock"),
-  join(homedir(), "Library/Containers/com.docker.docker/Data/docker-cli.sock"),
 ];
 const resolvedDockerSocket = dockerSocketCandidates.find((candidate) => existsSync(candidate));
 if (!process.env.DOCKER_HOST && resolvedDockerSocket) {
@@ -33,7 +33,7 @@ const DEFAULT_POLICY: SandboxPolicy = {
 describeIf("ContainerPool (e2e)", () => {
   let workspaceDir = "";
   let assetCacheDir = "";
-  let docker: Dockerode;
+  let docker: ReturnType<typeof createDockerClient>;
   let assetManager: RuntimeAssetManager;
 
   beforeAll(async () => {
@@ -43,7 +43,7 @@ describeIf("ContainerPool (e2e)", () => {
       cacheDir: assetCacheDir,
       docker: { pullOnDemand: true },
     });
-    docker = new Dockerode();
+    docker = createDockerClient();
 
     const status = await assetManager.ensureDockerImage("node:20-alpine");
     if (!status.available) {

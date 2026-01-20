@@ -9,9 +9,9 @@ import { DockerSandboxManager } from "../sandbox";
 import type { ToolContext } from "../types";
 
 const dockerSocketCandidates = [
+  join(homedir(), "Library/Containers/com.docker.docker/Data/docker.raw.sock"),
   "/var/run/docker.sock",
   join(homedir(), ".docker/run/docker.sock"),
-  join(homedir(), "Library/Containers/com.docker.docker/Data/docker-cli.sock"),
 ];
 const resolvedDockerSocket = dockerSocketCandidates.find((candidate) => existsSync(candidate));
 if (!process.env.DOCKER_HOST && resolvedDockerSocket) {
