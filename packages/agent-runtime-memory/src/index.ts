@@ -16,7 +16,10 @@ export {
   type ResolvedMemoryCacheConfig,
   resolveMemoryCacheConfig,
 } from "./cacheTypes";
-export type { ConsolidationResult, MemoryConsolidationConfig } from "./consolidation/memoryManager";
+export type {
+  MemoryConsolidationConfig,
+  WorkingMemoryConsolidationResult,
+} from "./consolidation/memoryManager";
 // Working memory + consolidation
 export {
   ConsolidationMemoryManager,

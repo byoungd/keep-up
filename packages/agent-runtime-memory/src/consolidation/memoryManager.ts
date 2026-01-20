@@ -11,7 +11,7 @@ export interface MemoryConsolidationConfig {
   embeddingProvider?: EmbeddingProvider;
 }
 
-export interface ConsolidationResult {
+export interface WorkingMemoryConsolidationResult {
   promoted: number;
   evicted: number;
   remaining: number;
@@ -53,7 +53,7 @@ export class ConsolidationMemoryManager {
     return merged;
   }
 
-  async consolidate(): Promise<ConsolidationResult> {
+  async consolidate(): Promise<WorkingMemoryConsolidationResult> {
     let promoted = 0;
     let evicted = 0;
     const now = Date.now();

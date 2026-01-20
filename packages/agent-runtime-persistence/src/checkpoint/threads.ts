@@ -281,10 +281,12 @@ export class InMemoryCheckpointStore implements CheckpointSaver, CheckpointThrea
 
     let filtered = entries;
     if (options?.before !== undefined) {
-      filtered = filtered.filter((checkpoint) => checkpoint.timestamp < options.before);
+      const beforeTs = options.before;
+      filtered = filtered.filter((checkpoint) => checkpoint.timestamp < beforeTs);
     }
     if (options?.after !== undefined) {
-      filtered = filtered.filter((checkpoint) => checkpoint.timestamp > options.after);
+      const afterTs = options.after;
+      filtered = filtered.filter((checkpoint) => checkpoint.timestamp > afterTs);
     }
 
     const order = options?.order ?? "desc";

@@ -129,7 +129,7 @@ async function findNestedGitRepo(
 }
 
 async function scanEntries(
-  entries: Awaited<ReturnType<typeof readdir>>,
+  entries: Array<{ isDirectory: () => boolean; name: string }>,
   current: { path: string; depth: number },
   ignoredDirs: Set<string>,
   queue: Array<{ path: string; depth: number }>
