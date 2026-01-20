@@ -47,6 +47,14 @@ cowork initiatives. Use this index to navigate the active tracks and supporting 
 - docs/roadmap/next/track-q-developer-experience.md
 - docs/roadmap/next/track-r-tool-framework.md
 
+## Next Phase Tracks (Q2 2026)
+- docs/roadmap/next-q2/README.md
+- docs/roadmap/next-q2/track-s-graph-runtime.md
+- docs/roadmap/next-q2/track-t-multi-agent-teams.md
+- docs/roadmap/next-q2/track-u-tool-workbench-policy.md
+- docs/roadmap/next-q2/track-v-workspace-time-travel.md
+- docs/roadmap/next-q2/track-w-computer-use.md
+
 ## Code Agent Capability
 - docs/roadmap/code/README.md
 - docs/roadmap/code/track-c1-editing-primitives.md
