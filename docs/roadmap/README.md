@@ -67,6 +67,7 @@ cowork initiatives. Use this index to navigate the active tracks and supporting 
 - docs/roadmap/next-q4/README.md
 - docs/roadmap/next-q4/acceptance-criteria.md
 - docs/roadmap/next-q4/benchmarks.md
+- docs/roadmap/next-q4/parallel-development.md
 - docs/roadmap/next-q4/track-aa-elastic-execution.md
 - docs/roadmap/next-q4/track-ab-visual-intelligence.md
 - docs/roadmap/next-q4/track-ac-policy-ops.md

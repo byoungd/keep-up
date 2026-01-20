@@ -135,6 +135,7 @@ Details: track-ac-policy-ops.md
 ## Supporting Docs
 
 - Q4 Gym Extensions: `docs/roadmap/next-q4/benchmarks.md`
+- Q4 Parallel Development Interface Freeze: `docs/roadmap/next-q4/parallel-development.md`
 
 ---
 
