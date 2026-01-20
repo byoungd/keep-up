@@ -1,7 +1,7 @@
 import type { ActionItem, AgentTask, ArtifactItem, Message, TaskStep } from "@ku0/shell";
 import { apiUrl } from "../../../lib/config";
 import type {
-  ArtifactPayload,
+  EnrichedArtifact,
   MessageUsage,
   PlanUpdateNode,
   TaskGraph,
@@ -559,23 +559,14 @@ function isTerminalStatus(status: string): boolean {
   return status === "completed" || status === "failed" || status === "cancelled";
 }
 
-function extractArtifactsFromGraph(
-  artifacts: Record<
-    string,
-    ArtifactPayload & {
-      taskId?: string;
-      status?: "pending" | "applied" | "reverted";
-      appliedAt?: number;
-    }
-  >
-): ArtifactItem[] {
+function extractArtifactsFromGraph(artifacts: Record<string, EnrichedArtifact>): ArtifactItem[] {
   return Object.entries(artifacts).map(([id, payload]) => {
     const base: ArtifactItem = {
       id,
       type: "doc",
       title: "Artifact",
       taskId: payload.taskId,
-      status: payload.status,
+      status: payload.applicationStatus,
       appliedAt: payload.appliedAt ? new Date(payload.appliedAt).toISOString() : undefined,
     };
     switch (payload.type) {

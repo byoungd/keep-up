@@ -1,4 +1,4 @@
-import type { Message } from "@ku0/shell";
+import type { AgentTask, Message } from "@ku0/shell";
 import { describe, expect, it } from "vitest";
 import { apiUrl } from "../../../lib/config";
 import {
@@ -215,7 +215,8 @@ describe("projectGraphToMessages", () => {
 
     const result = projectGraphToMessages(graph, []);
     const taskMessage = result.find((msg) => msg.type === "task_stream");
-    const artifacts = taskMessage?.metadata?.task?.artifacts ?? [];
+    const task = taskMessage?.metadata?.task as AgentTask | undefined;
+    const artifacts = task?.artifacts ?? [];
 
     expect(artifacts.find((artifact) => artifact.id === "plan-1")).toMatchObject({
       type: "plan",

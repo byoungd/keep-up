@@ -13,8 +13,8 @@ import {
 } from "../../../api/coworkApi";
 import { apiUrl, config } from "../../../lib/config";
 import {
-  type ArtifactPayload,
   ArtifactPayloadSchema,
+  type EnrichedArtifact,
   PlanStepSchema,
   RiskLevel,
   type TaskGraph,
@@ -515,9 +515,9 @@ export function useTaskStream(sessionId: string) {
           updatedAt: record.updatedAt,
           taskId: record.taskId,
           version: record.version,
-          status: record.status,
+          applicationStatus: record.status,
           appliedAt: record.appliedAt,
-        },
+        } as EnrichedArtifact,
       },
     }));
   }, []);
@@ -1034,10 +1034,10 @@ function handleArtifactUpdate(
         ...parsedArtifact.data,
         updatedAt: eventTime,
         taskId: typeof data.taskId === "string" ? data.taskId : undefined,
-        status: existing?.status,
+        applicationStatus: existing?.applicationStatus,
         appliedAt: existing?.appliedAt,
         version: existing?.version,
-      },
+      } as EnrichedArtifact,
     },
   };
 }
@@ -1179,27 +1179,9 @@ function resolveTaskTitle(
 }
 
 function buildArtifactMap(
-  existing: Record<
-    string,
-    ArtifactPayload & {
-      updatedAt?: number;
-      taskId?: string;
-      version?: number;
-      status?: "pending" | "applied" | "reverted";
-      appliedAt?: number;
-    }
-  >,
+  existing: Record<string, EnrichedArtifact>,
   records: CoworkArtifact[]
-): Record<
-  string,
-  ArtifactPayload & {
-    updatedAt?: number;
-    taskId?: string;
-    version?: number;
-    status?: "pending" | "applied" | "reverted";
-    appliedAt?: number;
-  }
-> {
+): Record<string, EnrichedArtifact> {
   const next = { ...existing };
   for (const record of records) {
     const parsed = ArtifactPayloadSchema.safeParse(record.artifact);
@@ -1214,9 +1196,9 @@ function buildArtifactMap(
         updatedAt: record.updatedAt,
         taskId: record.taskId,
         version: record.version,
-        status: record.status,
+        applicationStatus: record.status,
         appliedAt: record.appliedAt,
-      };
+      } as EnrichedArtifact;
     }
   }
   return next;
