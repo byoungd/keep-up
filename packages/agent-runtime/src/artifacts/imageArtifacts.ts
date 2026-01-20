@@ -10,7 +10,7 @@ import { dirname, join, resolve } from "node:path";
 
 import type { ArtifactEnvelope, ToolContent, ToolContext, ToolOutputSpoolMetadata } from "../types";
 import { DEFAULT_AGENT_SPOOL_DIR } from "../types";
-import type { ArtifactEmissionContext, ArtifactPipeline } from "./index";
+import type { ArtifactEmissionContext, ArtifactEmitter } from "./artifactTypes";
 
 export interface ImageArtifactPolicy {
   maxBytes: number;
@@ -23,7 +23,7 @@ export const DEFAULT_IMAGE_ARTIFACT_POLICY: ImageArtifactPolicy = {
 };
 
 export interface ImageArtifactStoreOptions {
-  pipeline: ArtifactPipeline;
+  pipeline: ArtifactEmitter;
   rootDir?: string;
   policy?: ImageArtifactPolicy;
 }
@@ -49,7 +49,7 @@ export interface ImageArtifactStoreResult {
 }
 
 export class ImageArtifactStore {
-  private readonly pipeline: ArtifactPipeline;
+  private readonly pipeline: ArtifactEmitter;
   private readonly rootDir: string;
   private readonly policy: ImageArtifactPolicy;
 

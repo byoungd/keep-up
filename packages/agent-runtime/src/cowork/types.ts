@@ -7,6 +7,9 @@
 import type { AgentMode } from "../modes";
 import type { TokenUsageStats } from "../types";
 import type { WorkflowContext, WorkflowPhase, WorkflowTemplate } from "../workflows";
+import type { CoworkRiskTag } from "./policy";
+
+export type { CoworkRiskTag };
 
 export type CoworkPlatform = "macos";
 export type CoworkMode = "cowork";
@@ -91,8 +94,6 @@ export interface CoworkPlanDependency {
   stepId: string;
   dependsOn: string[];
 }
-
-export type CoworkRiskTag = "delete" | "overwrite" | "network" | "connector" | "batch";
 
 export interface CoworkTaskSummary {
   taskId: string;
