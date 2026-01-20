@@ -21,9 +21,10 @@ export type { MessageEnvelope, MessageHandler, MessageSubscription };
 
 /** Pending request for response tracking */
 interface PendingRequest {
+  promise: Promise<MessageEnvelope>;
   resolve: (envelope: MessageEnvelope) => void;
   reject: (error: Error) => void;
-  timeout: NodeJS.Timeout;
+  timeout: ReturnType<typeof setTimeout>;
 }
 
 // ============================================================================
@@ -67,6 +68,27 @@ export class RuntimeMessageBusImpl implements RuntimeMessageBusContract {
     return `sub-${this.subscriptionCounter}`;
   }
 
+  private createPendingRequest(
+    correlationId: string,
+    timeoutMs: number,
+    timeoutMessage: string
+  ): PendingRequest {
+    let resolve!: (envelope: MessageEnvelope) => void;
+    let reject!: (error: Error) => void;
+
+    const promise = new Promise<MessageEnvelope>((resolveFn, rejectFn) => {
+      resolve = resolveFn;
+      reject = rejectFn;
+    });
+
+    const timeout = setTimeout(() => {
+      this.pendingRequests.delete(correlationId);
+      reject(new Error(timeoutMessage));
+    }, timeoutMs);
+
+    return { promise, resolve, reject, timeout };
+  }
+
   /**
    * Send a direct message to a specific agent.
    */
@@ -87,12 +109,7 @@ export class RuntimeMessageBusImpl implements RuntimeMessageBusContract {
   /**
    * Send a request and wait for response.
    */
-  async request(
-    from: string,
-    to: string,
-    payload: unknown,
-    timeoutMs = 30000
-  ): Promise<MessageEnvelope> {
+  request(from: string, to: string, payload: unknown, timeoutMs = 30000): Promise<MessageEnvelope> {
     const correlationId = this.generateMessageId();
 
     const envelope: MessageEnvelope = {
@@ -105,16 +122,14 @@ export class RuntimeMessageBusImpl implements RuntimeMessageBusContract {
       timestamp: Date.now(),
     };
 
-    return new Promise<MessageEnvelope>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        this.pendingRequests.delete(correlationId);
-        reject(new Error(`Request timed out after ${timeoutMs}ms`));
-      }, timeoutMs);
-
-      this.pendingRequests.set(correlationId, { resolve, reject, timeout });
-
-      this.eventBus.emit("message:delivered", envelope);
-    });
+    const pending = this.createPendingRequest(
+      correlationId,
+      timeoutMs,
+      `Request timed out after ${timeoutMs}ms`
+    );
+    this.pendingRequests.set(correlationId, pending);
+    this.eventBus.emit("message:delivered", envelope);
+    return pending.promise;
   }
 
   /**
@@ -193,24 +208,20 @@ export class RuntimeMessageBusImpl implements RuntimeMessageBusContract {
   /**
    * Wait for a response with a specific correlation ID.
    */
-  async waitFor(correlationId: string, timeoutMs = 30000): Promise<MessageEnvelope> {
+  waitFor(correlationId: string, timeoutMs = 30000): Promise<MessageEnvelope> {
     // Check if already pending
     const existing = this.pendingRequests.get(correlationId);
     if (existing) {
-      return new Promise((resolve, reject) => {
-        existing.resolve = resolve;
-        existing.reject = reject;
-      });
+      return existing.promise;
     }
 
-    return new Promise<MessageEnvelope>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        this.pendingRequests.delete(correlationId);
-        reject(new Error(`Timed out waiting for response: ${correlationId}`));
-      }, timeoutMs);
-
-      this.pendingRequests.set(correlationId, { resolve, reject, timeout });
-    });
+    const pending = this.createPendingRequest(
+      correlationId,
+      timeoutMs,
+      `Timed out waiting for response: ${correlationId}`
+    );
+    this.pendingRequests.set(correlationId, pending);
+    return pending.promise;
   }
 
   /**
