@@ -40,5 +40,5 @@ export function attachStreamEventBus(config: StreamEventBridgeConfig): () => voi
 }
 
 function isStreamEventEmitter(stream: IStreamWriter): stream is IStreamWriter & StreamEventEmitter {
-  return typeof (stream as StreamEventEmitter).onEvent === "function";
+  return typeof (stream as unknown as StreamEventEmitter).onEvent === "function";
 }

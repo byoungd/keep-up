@@ -62,6 +62,10 @@ const aliases = [
     replacement: path.resolve(__dirname, "packages/agent-runtime-core/src/index.ts"),
   },
   {
+    find: "@ku0/agent-runtime-tools",
+    replacement: path.resolve(__dirname, "packages/agent-runtime-tools/src/index.ts"),
+  },
+  {
     find: "@ku0/agent-runtime-sandbox",
     replacement: path.resolve(__dirname, "packages/agent-runtime-sandbox/src/index.ts"),
   },

@@ -15,6 +15,10 @@
       "types": "./dist/tools/index.d.ts",
       "default": "./dist/tools/index.js"
     },
+    "./tools/computer": {
+      "types": "./dist/tools/computer/index.d.ts",
+      "default": "./dist/tools/computer/index.js"
+    },
     "./browser": {
       "types": "./dist/browser/index.d.ts",
       "default": "./dist/browser/index.js"

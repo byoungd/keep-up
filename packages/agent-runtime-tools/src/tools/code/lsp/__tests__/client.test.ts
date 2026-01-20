@@ -5,24 +5,25 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { createLSPClient } from "../client";
-import { LANGUAGE_SERVERS } from "../servers";
+import { LANGUAGE_SERVERS, resolveLanguageServerCommand } from "../servers";
 
 const fixturesRoot = fileURLToPath(new URL("./fixtures/sample-ts-project", import.meta.url));
 const entryFile = path.join(fixturesRoot, "src", "index.ts");
 
 const tsServer = LANGUAGE_SERVERS.find((server) => server.id === "typescript");
-const runTest = tsServer && isCommandAvailable(tsServer.command) ? it : it.skip;
+const tsCommand = tsServer ? resolveLanguageServerCommand(tsServer, process.cwd()) : null;
+const runTest = tsCommand ? (isCommandAvailable(tsCommand) ? it : it.skip) : it.skip;
 
 describe("LSPClient (TypeScript)", () => {
   runTest(
     "should initialize and get document symbols",
     async () => {
-      if (!tsServer) {
+      if (!tsServer || !tsCommand) {
         return;
       }
 
       const client = await createLSPClient({
-        command: tsServer.command,
+        command: tsCommand,
         args: tsServer.args,
         cwd: fixturesRoot,
         timeout: 60_000,
@@ -30,8 +31,6 @@ describe("LSPClient (TypeScript)", () => {
 
       try {
         await client.initialize(fixturesRoot);
-        await client.waitForReady();
-        await client.openFile(entryFile);
 
         const symbols = await client.getDocumentSymbols(entryFile);
         expect(symbols.length).toBeGreaterThan(0);

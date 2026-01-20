@@ -302,7 +302,8 @@ export class LspToolServer {
     const lines: string[] = [];
 
     for (const sym of symbols) {
-      lines.push(`${prefix}${sym.kind}: ${sym.name} (L${sym.line})`);
+      const detail = sym.detail ? ` - ${sym.detail}` : "";
+      lines.push(`${prefix}${sym.kind}: ${sym.name}${detail} (L${sym.line})`);
       if (sym.children) {
         lines.push(this.formatSymbols(sym.children, indent + 1));
       }

@@ -80,6 +80,7 @@ interface TextEditDescriptor {
 interface DocumentSymbolDescriptor {
   name: string;
   kind: number;
+  detail?: string;
   range?: RangeDescriptor;
   location?: LocationDescriptor;
   children?: DocumentSymbolDescriptor[];
@@ -342,6 +343,7 @@ export class LspClient extends EventEmitter {
     return result.map((s) => ({
       name: s.name,
       kind: this.getSymbolKindName(s.kind),
+      detail: s.detail,
       file: s.location ? fileURLToPath(s.location.uri) : filePath,
       line: (s.location?.range.start.line ?? 0) + 1,
       column: (s.location?.range.start.character ?? 0) + 1,
@@ -457,6 +459,7 @@ export class LspClient extends EventEmitter {
       column: range.start.character + 1,
       endLine: range.end.line + 1,
       endColumn: range.end.character + 1,
+      detail: symbol.detail,
     };
 
     if (symbol.children && symbol.children.length > 0) {
