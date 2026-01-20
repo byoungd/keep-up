@@ -1,5 +1,6 @@
 import type {
   AgentState,
+  CoworkPolicyConfig,
   CoworkRiskTag,
   CoworkWorkflowTemplate,
   LessonProfile,
@@ -33,9 +34,10 @@ export interface CoworkAuditEntry {
   toolName?: string;
   input?: Record<string, unknown>;
   output?: unknown;
-  decision?: "allow" | "allow_with_confirm" | "deny";
-  ruleId?: string;
+  policyDecision?: "allow" | "allow_with_confirm" | "deny";
+  policyRuleId?: string;
   riskTags?: CoworkRiskTag[];
+  riskScore?: number;
   reason?: string;
   durationMs?: number;
   outcome?: "success" | "error" | "denied";
@@ -76,6 +78,8 @@ export interface CoworkSettings {
   defaultModel?: string;
   theme?: "light" | "dark";
   memoryProfile?: LessonProfile;
+  policy?: CoworkPolicyConfig | null;
+  caseInsensitivePaths?: boolean;
 }
 
 export type CoworkProviderId = "openai" | "anthropic" | "gemini" | "ollama" | "deepseek";

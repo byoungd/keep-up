@@ -63,6 +63,7 @@ export class SkillToolServer extends BaseToolServer {
           requiresConfirmation: false,
           readOnly: true,
           estimatedDuration: "fast",
+          policyAction: "connector.read",
         },
       },
       this.handleList.bind(this)
@@ -87,6 +88,7 @@ export class SkillToolServer extends BaseToolServer {
           requiresConfirmation: false,
           readOnly: true,
           estimatedDuration: "fast",
+          policyAction: "connector.read",
         },
       },
       this.handleRead.bind(this)
@@ -120,6 +122,7 @@ export class SkillToolServer extends BaseToolServer {
           requiresConfirmation: false,
           readOnly: true,
           estimatedDuration: "fast",
+          policyAction: "connector.read",
         },
       },
       this.handleReadResource.bind(this)
@@ -152,6 +155,7 @@ export class SkillToolServer extends BaseToolServer {
           requiresConfirmation: false,
           readOnly: false,
           estimatedDuration: "medium",
+          policyAction: "connector.action",
         },
       },
       this.handleRunScript.bind(this)

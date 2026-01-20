@@ -12,7 +12,7 @@ const baseContext: ToolContext = { security: { ...SECURITY_PRESETS.safe } };
 const commandScriptLines = [
   "const mode = process.argv[2];",
   "if (mode === 'list') {",
-  "  const tools = [{ name: 'echo', description: 'Echo', inputSchema: { type: 'object', properties: { message: { type: 'string' } }, required: ['message'] } }];",
+  "  const tools = [{ name: 'echo', description: 'Echo', inputSchema: { type: 'object', properties: { message: { type: 'string' } }, required: ['message'] }, annotations: { policyAction: 'connector.read', readOnly: true } }];",
   "  console.log(JSON.stringify(tools));",
   "} else if (mode === 'call') {",
   "  const toolName = process.argv[3] ?? '';",

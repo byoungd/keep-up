@@ -71,7 +71,7 @@ describe("CoworkRuntimeBridge", () => {
     await rm(dir, { recursive: true, force: true });
   });
 
-  it("requires approval for deletes", async () => {
+  it("allows deletes within grants without approval", async () => {
     const { store, dir } = await createApprovalStore();
     const runtime = new CoworkRuntimeBridge(store);
     const session = createSession();
@@ -82,9 +82,9 @@ describe("CoworkRuntimeBridge", () => {
       intent: "delete",
     });
 
-    expect(result.status).toBe("approval_required");
+    expect(result.status).toBe("allowed");
     const approvals = await store.getAll();
-    expect(approvals.length).toBe(1);
+    expect(approvals.length).toBe(0);
 
     await rm(dir, { recursive: true, force: true });
   });

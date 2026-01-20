@@ -5,24 +5,17 @@
  */
 
 import * as path from "node:path";
+import type { CoworkPolicyActionLike } from "@ku0/agent-runtime-core";
+import { COWORK_POLICY_ACTIONS } from "@ku0/agent-runtime-core";
 import type { TelemetryContext } from "@ku0/agent-runtime-telemetry/telemetry";
 import { AGENT_METRICS } from "@ku0/agent-runtime-telemetry/telemetry";
+import { z } from "zod";
 import { LRUCache } from "../utils/cache";
 import type { CoworkRiskTag } from "./types";
 
 export type CoworkPolicyDecisionType = "allow" | "allow_with_confirm" | "deny";
 
-export type CoworkPolicyAction =
-  | "file.read"
-  | "file.write"
-  | "file.create"
-  | "file.delete"
-  | "file.rename"
-  | "file.move"
-  | "file.*"
-  | "network.request"
-  | "connector.read"
-  | "connector.action";
+export type CoworkPolicyAction = CoworkPolicyActionLike;
 
 export interface CoworkPolicyRule {
   id: string;
@@ -74,6 +67,66 @@ export interface CoworkPolicyEngineOptions {
   telemetry?: TelemetryContext;
   decisionCache?: LRUCache<CoworkPolicyDecision>;
   enableDecisionCache?: boolean;
+}
+
+const COWORK_POLICY_ACTION_SET = new Set<string>(COWORK_POLICY_ACTIONS);
+const COWORK_RISK_TAGS = ["delete", "overwrite", "network", "connector", "batch"] as const;
+
+const policyDecisionSchema = z.enum(["allow", "allow_with_confirm", "deny"]);
+const policyActionSchema = z.enum(COWORK_POLICY_ACTIONS);
+const policyRiskTagSchema = z.enum(COWORK_RISK_TAGS);
+const policyConditionsSchema = z
+  .object({
+    pathWithinGrant: z.boolean().optional(),
+    pathWithinOutputRoot: z.boolean().optional(),
+    matchesPattern: z.array(z.string()).optional(),
+    fileSizeGreaterThan: z.number().optional(),
+    hostInAllowlist: z.boolean().optional(),
+    connectorScopeAllowed: z.boolean().optional(),
+  })
+  .strict();
+
+const policyRuleSchema = z
+  .object({
+    id: z.string().min(1),
+    action: policyActionSchema,
+    when: policyConditionsSchema.optional(),
+    decision: policyDecisionSchema,
+    riskTags: z.array(policyRiskTagSchema).optional(),
+    reason: z.string().optional(),
+  })
+  .strict();
+
+const policyConfigSchema = z
+  .object({
+    version: z.literal("1.0"),
+    defaults: z
+      .object({
+        fallback: policyDecisionSchema,
+      })
+      .strict(),
+    rules: z.array(policyRuleSchema),
+  })
+  .strict();
+
+export function isCoworkPolicyAction(value: string): value is CoworkPolicyAction {
+  return COWORK_POLICY_ACTION_SET.has(value);
+}
+
+export function parseCoworkPolicyConfig(input: unknown): CoworkPolicyConfig | null {
+  const parsed = policyConfigSchema.safeParse(input);
+  if (!parsed.success) {
+    return null;
+  }
+  return parsed.data;
+}
+
+export function createDenyAllPolicy(): CoworkPolicyConfig {
+  return {
+    version: "1.0",
+    defaults: { fallback: "deny" },
+    rules: [],
+  };
 }
 
 export class CoworkPolicyEngine {
@@ -139,9 +192,23 @@ export class CoworkPolicyEngine {
       return cached;
     }
 
-    const matched = this.config.rules.filter((rule) => actionMatches(rule.action, action));
-    this.actionRuleCache.set(action, matched);
-    return matched;
+    const exact: CoworkPolicyRule[] = [];
+    const wildcard: CoworkPolicyRule[] = [];
+
+    for (const rule of this.config.rules) {
+      if (!actionMatches(rule.action, action)) {
+        continue;
+      }
+      if (rule.action === action) {
+        exact.push(rule);
+      } else {
+        wildcard.push(rule);
+      }
+    }
+
+    const ordered = [...exact, ...wildcard];
+    this.actionRuleCache.set(action, ordered);
+    return ordered;
   }
 
   private recordTelemetry(decision: CoworkPolicyDecision, startTime: number): void {

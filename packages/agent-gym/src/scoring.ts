@@ -51,6 +51,8 @@ async function evaluateExpectation(
       return evaluateSyntax(expectation.path, context);
     case "tool_called":
       return evaluateToolCalled(expectation.name, context);
+    case "tool_result_error":
+      return evaluateToolResultError(expectation, context);
     case "max_turns":
       return evaluateMaxTurns(expectation.count, context);
     default:
@@ -151,6 +153,38 @@ function evaluateToolCalled(toolName: string, context: GymEvaluationContext): Gy
     pass,
     reason: pass ? undefined : "tool_not_called",
   };
+}
+
+function evaluateToolResultError(
+  expectation: Extract<GymExpectation, { type: "tool_result_error" }>,
+  context: GymEvaluationContext
+): GymExpectationResult {
+  const toolMessages = context.state.messages.filter(
+    (message): message is Extract<AgentState["messages"][number], { role: "tool" }> =>
+      message.role === "tool"
+  );
+
+  const match = toolMessages.find(
+    (message) => message.toolName === expectation.name && !message.result.success
+  );
+
+  if (!match) {
+    return { type: "tool_result_error", pass: false, reason: "tool_error_missing" };
+  }
+
+  const error = match.result.error;
+  if (expectation.code && error?.code !== expectation.code) {
+    return { type: "tool_result_error", pass: false, reason: "error_code_mismatch" };
+  }
+
+  if (expectation.messageIncludes) {
+    const message = error?.message ?? "";
+    if (!message.includes(expectation.messageIncludes)) {
+      return { type: "tool_result_error", pass: false, reason: "error_message_mismatch" };
+    }
+  }
+
+  return { type: "tool_result_error", pass: true };
 }
 
 function evaluateMaxTurns(count: number, context: GymEvaluationContext): GymExpectationResult {

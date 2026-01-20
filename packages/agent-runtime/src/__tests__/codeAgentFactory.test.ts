@@ -24,7 +24,7 @@ function createReadToolServer(): MCPToolServer {
           properties: { path: { type: "string" } },
           required: ["path"],
         },
-        annotations: { readOnly: true },
+        annotations: { readOnly: true, policyAction: "file.read" },
       },
     ],
     callTool: async () => ({

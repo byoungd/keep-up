@@ -14,6 +14,7 @@ import type {
   ToolContext,
   ToolError,
 } from "@ku0/agent-runtime-core";
+import { COWORK_POLICY_ACTIONS } from "@ku0/agent-runtime-core";
 
 // ============================================================================
 // Event System for Decoupling
@@ -103,6 +104,7 @@ export class ToolRegistry implements IToolRegistry {
 
     // Index all tools
     for (const tool of server.listTools()) {
+      this.assertPolicyAction(server.name, tool);
       this.indexTool(server.name, tool.name);
     }
 
@@ -301,6 +303,19 @@ export class ToolRegistry implements IToolRegistry {
 
   private listToolsForServer(serverName: string, server: MCPToolServer): MCPTool[] {
     return server.listTools().map((tool) => this.formatTool(serverName, tool));
+  }
+
+  private assertPolicyAction(serverName: string, tool: MCPTool): void {
+    const policyAction = tool.annotations?.policyAction;
+    if (!policyAction) {
+      throw new Error(`Tool "${serverName}:${tool.name}" is missing annotations.policyAction`);
+    }
+    const isValid = COWORK_POLICY_ACTIONS.includes(policyAction);
+    if (!isValid) {
+      throw new Error(
+        `Tool "${serverName}:${tool.name}" has invalid policyAction "${policyAction}"`
+      );
+    }
   }
 
   private indexTool(serverName: string, toolName: string): void {

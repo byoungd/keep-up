@@ -2,6 +2,7 @@ import { mkdtemp } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import {
+  createBashToolServer,
   createCompletionToolServer,
   createFileToolServer,
   createRuntime,
@@ -38,7 +39,7 @@ export async function runScenario(
       .withFsIsolation("workspace")
       .withWorkingDirectory(workspacePath)
       .withFilePermission("workspace")
-      .withBashPermission("disabled")
+      .withBashPermission("confirm")
       .withCodePermission("disabled")
       .withNetworkPermission("none")
       .withLFCCPermission("read")
@@ -47,7 +48,7 @@ export async function runScenario(
     const runtime = await createRuntime({
       components: {
         llm,
-        toolServers: [createCompletionToolServer(), createFileToolServer()],
+        toolServers: [createCompletionToolServer(), createFileToolServer(), createBashToolServer()],
         security: policy,
       },
       kernel: {

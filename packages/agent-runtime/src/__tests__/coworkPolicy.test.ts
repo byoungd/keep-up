@@ -12,7 +12,7 @@ const policyConfig: CoworkPolicyConfig = {
   rules: [
     {
       id: "deny-secrets",
-      action: "file.*",
+      action: "file.read",
       when: { matchesPattern: ["**/.env*"] },
       decision: "deny",
       reason: "sensitive",
@@ -115,5 +115,30 @@ describe("CoworkPolicyEngine", () => {
     });
 
     expect(second).toEqual(first);
+  });
+
+  it("prefers exact rules over wildcard rules", () => {
+    const engine = new CoworkPolicyEngine({
+      version: "1.0",
+      defaults: { fallback: "deny" },
+      rules: [
+        {
+          id: "wildcard-allow",
+          action: "file.*",
+          decision: "allow",
+        },
+        {
+          id: "exact-deny",
+          action: "file.read",
+          decision: "deny",
+          reason: "exact rule wins",
+        },
+      ],
+    });
+
+    const decision = engine.evaluate({ action: "file.read" });
+
+    expect(decision.decision).toBe("deny");
+    expect(decision.ruleId).toBe("exact-deny");
   });
 });

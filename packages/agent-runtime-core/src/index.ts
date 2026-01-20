@@ -25,6 +25,8 @@ export interface MCPTool {
     estimatedDuration?: "instant" | "fast" | "medium" | "slow";
     /** Required OAuth scopes for remote MCP tools */
     requiredScopes?: string[];
+    /** Policy action for Cowork policy evaluation */
+    policyAction?: CoworkPolicyActionLike;
   };
   /** Optional metadata for tool adapters */
   metadata?: Record<string, unknown>;
@@ -240,17 +242,16 @@ export interface CoworkSessionLike {
   connectors: CoworkConnectorGrantLike[];
 }
 
-export type CoworkPolicyActionLike =
-  | "file.read"
-  | "file.write"
-  | "file.create"
-  | "file.delete"
-  | "file.rename"
-  | "file.move"
-  | "file.*"
-  | "network.request"
-  | "connector.read"
-  | "connector.action";
+export const COWORK_POLICY_ACTIONS = [
+  "file.read",
+  "file.write",
+  "file.*",
+  "network.request",
+  "connector.read",
+  "connector.action",
+] as const;
+
+export type CoworkPolicyActionLike = (typeof COWORK_POLICY_ACTIONS)[number];
 
 export interface CoworkPolicyInputLike {
   action: CoworkPolicyActionLike;
@@ -572,9 +573,12 @@ export type SecurityPreset = keyof typeof SECURITY_PRESETS;
 
 /** Audit log entry */
 export interface AuditEntry {
+  entryId?: string;
   timestamp: number;
   toolName: string;
   action: "call" | "result" | "error" | "policy";
+  sessionId?: string;
+  taskId?: string;
   userId?: string;
   correlationId?: string;
   input?: Record<string, unknown>;
@@ -582,6 +586,11 @@ export interface AuditEntry {
   error?: string;
   durationMs?: number;
   sandboxed: boolean;
+  policyDecision?: "allow" | "allow_with_confirm" | "deny";
+  policyRuleId?: string;
+  riskTags?: string[];
+  riskScore?: number;
+  reason?: string;
 }
 
 /** Audit logger interface */
@@ -1212,6 +1221,9 @@ export interface ToolPolicyDecision {
   reasonCode?: string;
   riskTags?: string[];
   escalation?: PermissionEscalation;
+  policyDecision?: "allow" | "allow_with_confirm" | "deny";
+  policyRuleId?: string;
+  policyAction?: CoworkPolicyActionLike;
 }
 
 export interface ToolPolicyEngine {

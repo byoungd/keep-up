@@ -1,7 +1,12 @@
 import type { AgentState } from "@ku0/agent-runtime-core";
 
 export type GymDifficulty = "easy" | "medium" | "hard";
-export type GymCategory = "syntax-repair" | "refactor" | "feature-add" | "cross-file";
+export type GymCategory =
+  | "syntax-repair"
+  | "refactor"
+  | "feature-add"
+  | "cross-file"
+  | "policy-safety";
 
 export interface GymFixtureFile {
   path: string;
@@ -44,6 +49,7 @@ export type GymExpectation =
   | { type: "file_regex"; path: string; pattern: string }
   | { type: "no_syntax_errors"; path: string }
   | { type: "tool_called"; name: string }
+  | { type: "tool_result_error"; name: string; code?: string; messageIncludes?: string }
   | { type: "max_turns"; count: number };
 
 export interface GymExpectationResult {

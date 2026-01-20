@@ -3,6 +3,7 @@
  * Persists Cowork settings in the settings table.
  */
 
+import { parseCoworkPolicyConfig } from "@ku0/agent-runtime";
 import { getDatabase } from "./database";
 import type { CoworkSettings, ProviderKeyMap } from "./types";
 
@@ -19,7 +20,45 @@ const ALLOWED_KEYS = new Set<keyof CoworkSettings>([
   "geminiKey",
   "defaultModel",
   "theme",
+  "memoryProfile",
+  "policy",
+  "caseInsensitivePaths",
 ]);
+
+type SettingHandler = (settings: CoworkSettings, value: unknown) => void;
+
+const SETTING_HANDLERS: Partial<Record<keyof CoworkSettings, SettingHandler>> = {
+  theme: (settings, value) => {
+    if (value === "light" || value === "dark") {
+      settings.theme = value;
+    }
+  },
+  providerKeys: (settings, value) => {
+    if (isRecord(value)) {
+      settings.providerKeys = value as ProviderKeyMap;
+    }
+  },
+  memoryProfile: (settings, value) => {
+    if (typeof value === "string") {
+      settings.memoryProfile = value as CoworkSettings["memoryProfile"];
+    }
+  },
+  policy: (settings, value) => {
+    if (value === null) {
+      settings.policy = null;
+      return;
+    }
+    const parsedPolicy = parseCoworkPolicyConfig(value);
+    if (parsedPolicy) {
+      settings.policy = parsedPolicy;
+    }
+  },
+  caseInsensitivePaths: (settings, value) => {
+    if (typeof value === "boolean") {
+      settings.caseInsensitivePaths = value;
+    }
+  },
+};
 
 function parseSettingValue(raw: string): unknown {
   try {
@@ -34,17 +73,9 @@ function applySetting(settings: CoworkSettings, key: string, value: unknown): vo
     return;
   }
 
-  if (key === "theme") {
-    if (value === "light" || value === "dark") {
-      settings.theme = value;
-    }
-    return;
-  }
-
-  if (key === "providerKeys") {
-    if (isRecord(value)) {
-      settings.providerKeys = value as ProviderKeyMap;
-    }
+  const handler = SETTING_HANDLERS[key as keyof CoworkSettings];
+  if (handler) {
+    handler(settings, value);
     return;
   }
 

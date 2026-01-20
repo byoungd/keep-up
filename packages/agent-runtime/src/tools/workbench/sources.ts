@@ -1,14 +1,15 @@
 import { spawn } from "node:child_process";
-import type {
-  JSONSchema,
-  JSONSchemaProperty,
-  MCPTool,
-  MCPToolCall,
-  MCPToolResult,
-  MCPToolServer,
-  ToolContext,
-  ToolError,
-  ToolErrorCode,
+import {
+  COWORK_POLICY_ACTIONS,
+  type JSONSchema,
+  type JSONSchemaProperty,
+  type MCPTool,
+  type MCPToolCall,
+  type MCPToolResult,
+  type MCPToolServer,
+  type ToolContext,
+  type ToolError,
+  type ToolErrorCode,
 } from "@ku0/agent-runtime-core";
 import type {
   AdapterRegistry,
@@ -180,6 +181,7 @@ export class CoordinatorToolServerAdapter implements MCPToolServer {
       name: tool.name,
       description: tool.description,
       inputSchema: tool.parameters,
+      annotations: { policyAction: "connector.action" },
     }));
   }
 
@@ -254,6 +256,13 @@ export function validateMcpTool(tool: MCPTool): SchemaValidationResult {
     errors.push("Tool inputSchema is required");
   } else {
     validateJsonSchema(tool.inputSchema, "inputSchema", errors);
+  }
+
+  const policyAction = tool.annotations?.policyAction;
+  if (!policyAction || typeof policyAction !== "string") {
+    errors.push("Tool annotations.policyAction is required");
+  } else if (!COWORK_POLICY_ACTIONS.includes(policyAction)) {
+    errors.push(`Tool annotations.policyAction "${policyAction}" is not supported`);
   }
 
   return { valid: errors.length === 0, errors };

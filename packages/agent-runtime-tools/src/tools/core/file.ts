@@ -142,7 +142,7 @@ export class PathValidator {
 export type CoworkFileIntent = "read" | "write" | "create" | "delete" | "rename" | "move";
 
 function toCoworkAction(intent: CoworkFileIntent): CoworkPolicyActionLike {
-  return `file.${intent}` as CoworkPolicyActionLike;
+  return intent === "read" ? "file.read" : "file.write";
 }
 
 function collectGrantRoots(session: CoworkSessionLike): string[] {
@@ -199,6 +199,7 @@ export class FileToolServer extends BaseToolServer {
           requiresConfirmation: false,
           readOnly: true,
           estimatedDuration: "fast",
+          policyAction: "file.read",
         },
       },
       this.handleRead.bind(this)
@@ -226,6 +227,7 @@ export class FileToolServer extends BaseToolServer {
           requiresConfirmation: false,
           readOnly: false,
           estimatedDuration: "fast",
+          policyAction: "file.write",
         },
       },
       this.handleWrite.bind(this)
@@ -248,6 +250,7 @@ export class FileToolServer extends BaseToolServer {
           requiresConfirmation: false,
           readOnly: true,
           estimatedDuration: "fast",
+          policyAction: "file.read",
         },
       },
       this.handleList.bind(this)
@@ -270,6 +273,7 @@ export class FileToolServer extends BaseToolServer {
           requiresConfirmation: false,
           readOnly: true,
           estimatedDuration: "fast",
+          policyAction: "file.read",
         },
       },
       this.handleInfo.bind(this)
@@ -292,6 +296,7 @@ export class FileToolServer extends BaseToolServer {
           requiresConfirmation: true,
           readOnly: false,
           estimatedDuration: "fast",
+          policyAction: "file.write",
         },
       },
       this.handleDelete.bind(this)

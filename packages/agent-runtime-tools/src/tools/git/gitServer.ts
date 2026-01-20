@@ -54,6 +54,9 @@ export class GitToolServer implements MCPToolServer, IGitOperations {
           type: "object",
           properties: {},
         },
+        annotations: {
+          policyAction: "connector.read",
+        },
       },
       {
         name: "diff",
@@ -71,6 +74,9 @@ export class GitToolServer implements MCPToolServer, IGitOperations {
             },
           },
         },
+        annotations: {
+          policyAction: "connector.read",
+        },
       },
       {
         name: "add",
@@ -87,6 +93,7 @@ export class GitToolServer implements MCPToolServer, IGitOperations {
         },
         annotations: {
           requiresConfirmation: false,
+          policyAction: "connector.action",
         },
       },
       {
@@ -112,6 +119,7 @@ export class GitToolServer implements MCPToolServer, IGitOperations {
         },
         annotations: {
           requiresConfirmation: true,
+          policyAction: "connector.action",
         },
       },
       {
@@ -130,6 +138,9 @@ export class GitToolServer implements MCPToolServer, IGitOperations {
             },
           },
         },
+        annotations: {
+          policyAction: "connector.read",
+        },
       },
       {
         name: "branches",
@@ -137,6 +148,9 @@ export class GitToolServer implements MCPToolServer, IGitOperations {
         inputSchema: {
           type: "object",
           properties: {},
+        },
+        annotations: {
+          policyAction: "connector.read",
         },
       },
       {
@@ -158,6 +172,7 @@ export class GitToolServer implements MCPToolServer, IGitOperations {
         },
         annotations: {
           requiresConfirmation: true,
+          policyAction: "connector.action",
         },
       },
       {
@@ -172,6 +187,9 @@ export class GitToolServer implements MCPToolServer, IGitOperations {
             },
           },
         },
+        annotations: {
+          policyAction: "connector.read",
+        },
       },
       {
         name: "suggest_commit",
@@ -180,6 +198,9 @@ export class GitToolServer implements MCPToolServer, IGitOperations {
           type: "object",
           properties: {},
         },
+        annotations: {
+          policyAction: "connector.read",
+        },
       },
       {
         name: "conflicts",
@@ -187,6 +208,9 @@ export class GitToolServer implements MCPToolServer, IGitOperations {
         inputSchema: {
           type: "object",
           properties: {},
+        },
+        annotations: {
+          policyAction: "connector.read",
         },
       },
       {
@@ -209,6 +233,7 @@ export class GitToolServer implements MCPToolServer, IGitOperations {
         },
         annotations: {
           requiresConfirmation: true,
+          policyAction: "connector.action",
         },
       },
     ];

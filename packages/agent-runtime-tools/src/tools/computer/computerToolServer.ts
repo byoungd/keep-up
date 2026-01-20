@@ -86,6 +86,7 @@ export class ComputerToolServer extends BaseToolServer {
         requiresConfirmation: false,
         readOnly: true,
         estimatedDuration: "fast",
+        policyAction: "connector.read",
       },
     };
   }
@@ -108,6 +109,7 @@ export class ComputerToolServer extends BaseToolServer {
         requiresConfirmation: false,
         readOnly: false,
         estimatedDuration: "fast",
+        policyAction: "connector.action",
       },
     };
   }
@@ -135,6 +137,7 @@ export class ComputerToolServer extends BaseToolServer {
         requiresConfirmation: false,
         readOnly: false,
         estimatedDuration: "fast",
+        policyAction: "connector.action",
       },
     };
   }
@@ -161,6 +164,7 @@ export class ComputerToolServer extends BaseToolServer {
         requiresConfirmation: false,
         readOnly: false,
         estimatedDuration: "fast",
+        policyAction: "connector.action",
       },
     };
   }
@@ -182,6 +186,7 @@ export class ComputerToolServer extends BaseToolServer {
         requiresConfirmation: false,
         readOnly: false,
         estimatedDuration: "fast",
+        policyAction: "connector.action",
       },
     };
   }

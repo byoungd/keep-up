@@ -1604,7 +1604,12 @@ export class LFCCToolServer extends BaseToolServer {
             sortBy: { type: "string", enum: ["title", "updatedAt", "createdAt"] },
           },
         },
-        annotations: { category: "knowledge", readOnly: true, estimatedDuration: "fast" },
+        annotations: {
+          category: "knowledge",
+          readOnly: true,
+          estimatedDuration: "fast",
+          policyAction: "connector.read",
+        },
       },
       this.handleListDocuments.bind(this)
     );
@@ -1621,7 +1626,12 @@ export class LFCCToolServer extends BaseToolServer {
           },
           required: ["docId"],
         },
-        annotations: { category: "knowledge", readOnly: true, estimatedDuration: "fast" },
+        annotations: {
+          category: "knowledge",
+          readOnly: true,
+          estimatedDuration: "fast",
+          policyAction: "connector.read",
+        },
       },
       this.handleGetDocument.bind(this)
     );
@@ -1638,7 +1648,12 @@ export class LFCCToolServer extends BaseToolServer {
           },
           required: ["docId"],
         },
-        annotations: { category: "knowledge", readOnly: true, estimatedDuration: "fast" },
+        annotations: {
+          category: "knowledge",
+          readOnly: true,
+          estimatedDuration: "fast",
+          policyAction: "connector.read",
+        },
       },
       this.handleReadContent.bind(this)
     );
@@ -1655,7 +1670,12 @@ export class LFCCToolServer extends BaseToolServer {
           },
           required: ["docId"],
         },
-        annotations: { category: "knowledge", readOnly: true, estimatedDuration: "fast" },
+        annotations: {
+          category: "knowledge",
+          readOnly: true,
+          estimatedDuration: "fast",
+          policyAction: "connector.read",
+        },
       },
       this.handleGetBlocks.bind(this)
     );
@@ -1696,6 +1716,7 @@ export class LFCCToolServer extends BaseToolServer {
           requiresConfirmation: false,
           readOnly: false,
           estimatedDuration: "fast",
+          policyAction: "connector.action",
         },
       },
       this.handleInsertBlock.bind(this)
@@ -1720,6 +1741,7 @@ export class LFCCToolServer extends BaseToolServer {
           requiresConfirmation: false,
           readOnly: false,
           estimatedDuration: "fast",
+          policyAction: "connector.action",
         },
       },
       this.handleUpdateBlock.bind(this)
@@ -1743,6 +1765,7 @@ export class LFCCToolServer extends BaseToolServer {
           requiresConfirmation: true,
           readOnly: false,
           estimatedDuration: "fast",
+          policyAction: "connector.action",
         },
       },
       this.handleDeleteBlock.bind(this)
@@ -1762,7 +1785,12 @@ export class LFCCToolServer extends BaseToolServer {
           },
           required: ["query"],
         },
-        annotations: { category: "knowledge", readOnly: true, estimatedDuration: "medium" },
+        annotations: {
+          category: "knowledge",
+          readOnly: true,
+          estimatedDuration: "medium",
+          policyAction: "connector.read",
+        },
       },
       this.handleSearch.bind(this)
     );
@@ -1802,6 +1830,7 @@ export class LFCCToolServer extends BaseToolServer {
           requiresConfirmation: false,
           readOnly: false,
           estimatedDuration: "medium",
+          policyAction: "connector.action",
         },
       },
       this.handleAIGatewayRequest.bind(this)
@@ -1826,6 +1855,7 @@ export class LFCCToolServer extends BaseToolServer {
           requiresConfirmation: false,
           readOnly: false,
           estimatedDuration: "medium",
+          policyAction: "connector.action",
         },
       },
       this.handleAIGatewayMultiRequest.bind(this)

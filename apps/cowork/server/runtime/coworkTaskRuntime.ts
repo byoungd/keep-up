@@ -54,6 +54,8 @@ import type { StorageLayer } from "../storage/contracts";
 import { resolveStateDir } from "../storage/statePaths";
 import type { CoworkSettings } from "../storage/types";
 import type { SessionEventHub } from "../streaming/eventHub";
+import { CoworkAuditLogger } from "./auditLogger";
+import { resolveCoworkPolicyConfig } from "./policyResolver";
 // Service Imports
 import { ApprovalCoordinator } from "./services/ApprovalCoordinator";
 import { ArtifactProcessor } from "./services/ArtifactProcessor";
@@ -142,6 +144,7 @@ export class CoworkTaskRuntime {
   private readonly projectContextManager: ProjectContextManager;
   private readonly providerKeys: ProviderKeyService;
   private readonly configStore: StorageLayer["configStore"];
+  private readonly auditLogStore: StorageLayer["auditLogStore"];
   private readonly lessonStore: LessonStore;
   // Optional Advanced Services (enabled per ARCHITECTURE.md standards)
   private memoryAdapter?: Mem0MemoryAdapter;
@@ -162,6 +165,7 @@ export class CoworkTaskRuntime {
     const logger = this.logger;
     this.runtimeFactory = deps.runtimeFactory;
     this.configStore = deps.storage.configStore;
+    this.auditLogStore = deps.storage.auditLogStore;
     this.runtimePersistence = deps.runtimePersistence;
     this.lfccConfig = deps.lfcc;
     this.referenceVerifier = deps.lfcc?.referenceVerifier ?? DEFAULT_REFERENCE_VERIFIER;
@@ -417,6 +421,11 @@ export class CoworkTaskRuntime {
     return rootPath ?? undefined;
   }
 
+  private resolvePolicyRoot(session: CoworkSession): string {
+    const rootPath = session.grants[0]?.rootPath;
+    return rootPath ? resolve(rootPath) : process.cwd();
+  }
+
   private async buildRuntime(
     session: CoworkSession,
     settings: CoworkSettings,
@@ -443,21 +452,33 @@ export class CoworkTaskRuntime {
     const modelId = resolved.model ?? requestedModel;
     const toolRegistryResult = await this.buildToolRegistry(session);
     const toolRegistry = toolRegistryResult.registry;
+    const policyResolution = await resolveCoworkPolicyConfig({
+      repoRoot: this.resolvePolicyRoot(session),
+      settings,
+      auditLogStore: this.auditLogStore,
+      sessionId: session.sessionId,
+    });
+    const caseInsensitivePaths = settings.caseInsensitivePaths ?? false;
     const adapter = createAICoreAdapter(resolved.provider, {
       model: modelId || undefined,
     });
     const prompt = await this.buildSystemPromptAddition(session, modeManager);
     const securityPolicy = this.buildRuntimeSecurityPolicy(toolRegistryResult.dockerAvailable);
     const components = this.toolResultCache ? { toolResultCache: this.toolResultCache } : undefined;
+    const auditLogger = new CoworkAuditLogger({ auditLogStore: this.auditLogStore });
     const runtime = createCoworkRuntime({
       llm: adapter,
       registry: toolRegistry,
+      auditLogger,
       cowork: {
         session,
         audit: undefined,
         modeManager,
         securityPolicy,
+        policy: policyResolution.config,
+        caseInsensitivePaths,
       },
+      caseInsensitivePaths,
       taskQueueConfig: { maxConcurrent: 1 },
       outputRoots: collectOutputRoots(session),
       orchestratorOptions: {

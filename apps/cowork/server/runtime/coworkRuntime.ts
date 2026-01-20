@@ -5,10 +5,12 @@ import {
   CoworkSandboxAdapter,
   type CoworkSandboxDecision,
   type CoworkSession,
+  computeCoworkRiskScore,
   DEFAULT_COWORK_POLICY,
 } from "@ku0/agent-runtime";
-import type { ApprovalStoreLike, AuditLogStoreLike } from "../storage/contracts";
+import type { ApprovalStoreLike, AuditLogStoreLike, ConfigStoreLike } from "../storage/contracts";
 import type { CoworkApproval, CoworkAuditEntry } from "../storage/types";
+import { resolveCoworkPolicyConfig } from "./policyResolver";
 
 export type ToolCheckRequest =
   | {
@@ -47,22 +49,27 @@ export type ToolCheckResult =
 export class CoworkRuntimeBridge {
   private readonly policyEngine: CoworkPolicyEngine;
   private readonly approvals: ApprovalStoreLike;
-  private readonly sandbox: CoworkSandboxAdapter;
   private readonly auditLogs?: AuditLogStoreLike;
+  private readonly configStore?: ConfigStoreLike;
+  private readonly repoRoot?: string;
 
   constructor(
     approvals: ApprovalStoreLike,
     policyEngine?: CoworkPolicyEngine,
-    auditLogs?: AuditLogStoreLike
+    auditLogs?: AuditLogStoreLike,
+    options: { configStore?: ConfigStoreLike; repoRoot?: string } = {}
   ) {
     this.policyEngine = policyEngine ?? new CoworkPolicyEngine(DEFAULT_COWORK_POLICY);
     this.approvals = approvals;
-    this.sandbox = new CoworkSandboxAdapter(this.policyEngine);
     this.auditLogs = auditLogs;
+    this.configStore = options.configStore;
+    this.repoRoot = options.repoRoot;
   }
 
   async checkAction(session: CoworkSession, request: ToolCheckRequest): Promise<ToolCheckResult> {
-    const decision = this.evaluate(session, request);
+    const { policyEngine, caseInsensitivePaths } = await this.resolvePolicyEngine(session);
+    const sandbox = new CoworkSandboxAdapter(policyEngine);
+    const decision = this.evaluate(sandbox, session, request, caseInsensitivePaths);
     const riskTags = toCoworkRiskTags(decision.riskTags);
     void this.logDecision(session.sessionId, request, decision);
     if (decision.decision === "deny") {
@@ -75,25 +82,52 @@ export class CoworkRuntimeBridge {
     return { status: "allowed", decision };
   }
 
-  private evaluate(session: CoworkSession, request: ToolCheckRequest): CoworkSandboxDecision {
+  private evaluate(
+    sandbox: CoworkSandboxAdapter,
+    session: CoworkSession,
+    request: ToolCheckRequest,
+    caseInsensitivePaths: boolean
+  ): CoworkSandboxDecision {
     if (request.kind === "file") {
-      return this.sandbox.evaluateFileAction({
+      return sandbox.evaluateFileAction({
         session,
         path: request.path,
         intent: request.intent,
         fileSizeBytes: request.fileSizeBytes,
+        caseInsensitivePaths,
       });
     }
     if (request.kind === "network") {
-      return this.sandbox.evaluateNetworkAction({
+      return sandbox.evaluateNetworkAction({
         session,
         host: request.host,
       });
     }
-    return this.sandbox.evaluateConnectorAction({
+    return sandbox.evaluateConnectorAction({
       session,
       connectorScopeAllowed: request.connectorScopeAllowed,
     });
+  }
+
+  private async resolvePolicyEngine(
+    session: CoworkSession
+  ): Promise<{ policyEngine: CoworkPolicyEngine; caseInsensitivePaths: boolean }> {
+    if (!this.configStore) {
+      return { policyEngine: this.policyEngine, caseInsensitivePaths: false };
+    }
+
+    const settings = await this.configStore.get();
+    const resolution = await resolveCoworkPolicyConfig({
+      repoRoot: this.repoRoot ?? process.cwd(),
+      settings,
+      auditLogStore: this.auditLogs,
+      sessionId: session.sessionId,
+    });
+
+    return {
+      policyEngine: new CoworkPolicyEngine(resolution.config),
+      caseInsensitivePaths: settings.caseInsensitivePaths ?? false,
+    };
   }
 
   private async logDecision(
@@ -111,9 +145,10 @@ export class CoworkRuntimeBridge {
       action: "policy_decision",
       toolName: this.describeAction(request),
       input: buildDecisionInput(request),
-      decision: decision.decision,
-      ruleId: decision.ruleId,
+      policyDecision: decision.decision,
+      policyRuleId: decision.ruleId,
       riskTags: toCoworkRiskTags(decision.riskTags),
+      riskScore: computeCoworkRiskScore(decision.riskTags, decision.decision),
       reason: decision.reason,
       outcome: decision.decision === "deny" ? "denied" : "success",
     };

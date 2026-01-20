@@ -244,6 +244,7 @@ export class CodeToolServer extends BaseToolServer {
           requiresConfirmation: true,
           readOnly: false,
           estimatedDuration: "medium",
+          policyAction: "connector.action",
         },
       },
       this.handleRun.bind(this)
@@ -263,6 +264,7 @@ export class CodeToolServer extends BaseToolServer {
           requiresConfirmation: false,
           readOnly: true,
           estimatedDuration: "fast",
+          policyAction: "connector.read",
         },
       },
       this.handleLanguages.bind(this)

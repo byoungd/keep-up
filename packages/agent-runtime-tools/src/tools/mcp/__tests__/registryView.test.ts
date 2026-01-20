@@ -14,6 +14,7 @@ function createTestServer(name: string, toolNames: string[]): MCPToolServer {
         name: toolName,
         description: "test tool",
         inputSchema: { type: "object", properties: {} },
+        annotations: { policyAction: "connector.read" },
       })),
     async callTool(call, _context) {
       if (!toolNames.includes(call.name)) {

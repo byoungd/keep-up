@@ -1,12 +1,18 @@
 import React from "react";
 import {
+  type CoworkAuditAction,
+  type CoworkAuditEntry,
+  type CoworkPolicySource,
   type CoworkProvider,
   type CoworkSettings,
   deleteProviderKey,
+  exportPolicyToRepo,
   type GymReport,
   getGymReport,
+  getPolicyResolution,
   getSettings,
   listProviders,
+  queryAuditLogs,
   setProviderKey,
   updateSettings,
 } from "../../api/coworkApi";
@@ -32,6 +38,27 @@ type ProviderState = {
 
 type GymState = {
   report: GymReport | null;
+  isLoading: boolean;
+  error: string | null;
+};
+
+type PolicyState = {
+  policy: CoworkSettings["policy"];
+  source: CoworkPolicySource | null;
+  reason: string | null;
+  draft: string;
+  isDirty: boolean;
+  isLoading: boolean;
+  isExporting: boolean;
+  exportPath: string | null;
+  error: string | null;
+  exportError: string | null;
+};
+
+type AuditLogState = {
+  entries: CoworkAuditEntry[];
+  sessionId: string;
+  action: CoworkAuditAction | "all";
   isLoading: boolean;
   error: string | null;
 };
@@ -72,6 +99,25 @@ type ThemeSectionProps = {
 
 type GymReportSectionProps = {
   gymState: GymState;
+};
+
+type PolicySectionProps = {
+  policyState: PolicyState;
+  caseInsensitivePaths: boolean;
+  isSaving: boolean;
+  editorError: string | null;
+  onDraftChange: (value: string) => void;
+  onSave: () => void;
+  onClear: () => void;
+  onExport: () => void;
+  onToggleCaseInsensitive: (value: boolean) => void;
+};
+
+type AuditLogSectionProps = {
+  auditState: AuditLogState;
+  onSessionChange: (value: string) => void;
+  onActionChange: (value: CoworkAuditAction | "all") => void;
+  onRefresh: () => void;
 };
 
 function ProviderKeyCard({
@@ -267,6 +313,213 @@ function GymReportSection({ gymState }: GymReportSectionProps) {
   );
 }
 
+function PolicySection({
+  policyState,
+  caseInsensitivePaths,
+  isSaving,
+  editorError,
+  onDraftChange,
+  onSave,
+  onClear,
+  onExport,
+  onToggleCaseInsensitive,
+}: PolicySectionProps) {
+  const sourceLabel = formatPolicySource(policyState.source);
+
+  return (
+    <section className="card-panel space-y-4">
+      <div>
+        <p className="text-sm font-semibold text-foreground">Policy & Governance</p>
+        <p className="text-xs text-muted-foreground">
+          Manage Cowork policy rules, matching, and repo exports.
+        </p>
+      </div>
+
+      {policyState.isLoading ? (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="h-4 w-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+          Loading policy…
+        </div>
+      ) : null}
+
+      {policyState.error ? (
+        <div className="text-xs text-destructive">{policyState.error}</div>
+      ) : null}
+
+      {sourceLabel ? (
+        <div className="text-xs text-muted-foreground">
+          Active source: <span className="text-foreground">{sourceLabel}</span>
+          {policyState.reason ? ` · ${policyState.reason}` : ""}
+        </div>
+      ) : null}
+
+      {policyState.source === "repo" ? (
+        <div className="text-xs text-muted-foreground">
+          Repo policy overrides settings until the file is removed.
+        </div>
+      ) : null}
+
+      <div className="flex items-center justify-between gap-3 rounded-md border border-border/60 bg-surface-0 px-3 py-2">
+        <div>
+          <label htmlFor="case-insensitive-paths" className="text-xs font-medium text-foreground">
+            Case-insensitive paths
+          </label>
+          <p className="text-[11px] text-muted-foreground">
+            Normalize paths when matching policy globs.
+          </p>
+        </div>
+        <input
+          id="case-insensitive-paths"
+          type="checkbox"
+          className="h-4 w-4"
+          checked={caseInsensitivePaths}
+          onChange={(event) => onToggleCaseInsensitive(event.target.checked)}
+          disabled={isSaving}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <textarea
+          aria-label="Policy JSON"
+          className="text-input min-h-[220px] font-mono text-[11px] leading-relaxed"
+          value={policyState.draft}
+          onChange={(event) => onDraftChange(event.target.value)}
+          placeholder={`{\n  "version": "1.0",\n  "defaults": { "fallback": "deny" },\n  "rules": []\n}`}
+          disabled={isSaving}
+        />
+        {editorError ? <div className="text-xs text-destructive">{editorError}</div> : null}
+        {policyState.exportError ? (
+          <div className="text-xs text-destructive">{policyState.exportError}</div>
+        ) : null}
+        {policyState.exportPath ? (
+          <div className="text-xs text-muted-foreground">Exported to {policyState.exportPath}</div>
+        ) : null}
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          className="px-3 py-2 text-xs font-medium text-primary-foreground bg-primary rounded-md hover:bg-primary/90 transition-colors duration-fast disabled:opacity-60"
+          onClick={onSave}
+          disabled={isSaving || policyState.isLoading || policyState.draft.trim().length === 0}
+        >
+          Save Policy
+        </button>
+        <button
+          type="button"
+          className="px-3 py-2 text-xs font-medium text-muted-foreground border border-border rounded-md hover:text-foreground hover:bg-surface-2 transition-colors duration-fast disabled:opacity-60"
+          onClick={onClear}
+          disabled={isSaving || policyState.isLoading}
+        >
+          Clear Policy
+        </button>
+        <button
+          type="button"
+          className="px-3 py-2 text-xs font-medium text-muted-foreground border border-border rounded-md hover:text-foreground hover:bg-surface-2 transition-colors duration-fast disabled:opacity-60"
+          onClick={onExport}
+          disabled={policyState.isExporting || policyState.isLoading}
+        >
+          {policyState.isExporting ? "Exporting…" : "Export to Repo"}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function AuditLogSection({
+  auditState,
+  onSessionChange,
+  onActionChange,
+  onRefresh,
+}: AuditLogSectionProps) {
+  return (
+    <section className="card-panel space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-foreground">Audit Logs</p>
+          <p className="text-xs text-muted-foreground">
+            Review recent tool calls and policy decisions.
+          </p>
+        </div>
+        <button
+          type="button"
+          className="px-3 py-2 text-xs font-medium text-muted-foreground border border-border rounded-md hover:text-foreground hover:bg-surface-2 transition-colors duration-fast disabled:opacity-60"
+          onClick={onRefresh}
+          disabled={auditState.isLoading}
+        >
+          Refresh
+        </button>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <input
+          aria-label="Filter by session id"
+          type="text"
+          className="text-input min-w-[220px]"
+          placeholder="Session ID (optional)"
+          value={auditState.sessionId}
+          onChange={(event) => onSessionChange(event.target.value)}
+          disabled={auditState.isLoading}
+        />
+        <select
+          aria-label="Filter by action"
+          className="text-input min-w-[180px]"
+          value={auditState.action}
+          onChange={(event) => onActionChange(event.target.value as CoworkAuditAction | "all")}
+          disabled={auditState.isLoading}
+        >
+          <option value="all">All actions</option>
+          <option value="policy_decision">Policy decisions</option>
+          <option value="tool_call">Tool calls</option>
+          <option value="tool_result">Tool results</option>
+          <option value="tool_error">Tool errors</option>
+          <option value="approval_requested">Approvals requested</option>
+          <option value="approval_resolved">Approvals resolved</option>
+          <option value="artifact_apply">Artifact applied</option>
+          <option value="artifact_revert">Artifact reverted</option>
+        </select>
+      </div>
+
+      {auditState.isLoading ? (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="h-4 w-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+          Loading audit logs…
+        </div>
+      ) : null}
+
+      {auditState.error ? <div className="text-xs text-destructive">{auditState.error}</div> : null}
+
+      {!auditState.isLoading && auditState.entries.length === 0 ? (
+        <div className="text-xs text-muted-foreground">No audit entries found.</div>
+      ) : null}
+
+      <div className="space-y-2">
+        {auditState.entries.map((entry) => (
+          <div
+            key={entry.entryId}
+            className="rounded-md border border-border/60 bg-surface-0 px-3 py-2"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[11px] text-muted-foreground">
+                {new Date(entry.timestamp).toLocaleString()}
+              </span>
+              <span className="text-[11px] font-semibold text-foreground">{entry.action}</span>
+            </div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              {entry.toolName ? <span className="text-foreground">{entry.toolName}</span> : "—"}
+              {entry.policyDecision ? ` · ${entry.policyDecision}` : ""}
+              {entry.riskScore !== undefined ? ` · risk ${entry.riskScore}` : ""}
+            </div>
+            {entry.reason ? (
+              <div className="mt-1 text-[11px] text-muted-foreground">{entry.reason}</div>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function GymReportDetails({ report }: { report: GymReport }) {
   const metrics = buildGymMetrics(report);
 
@@ -328,6 +581,24 @@ function formatPercent(value: number): string {
 
 function formatSeconds(valueMs: number): string {
   return `${(valueMs / 1000).toFixed(1)}s`;
+}
+
+function formatPolicySource(source: CoworkPolicySource | null): string | null {
+  if (!source) {
+    return null;
+  }
+  switch (source) {
+    case "repo":
+      return "Repo policy";
+    case "settings":
+      return "Settings policy";
+    case "default":
+      return "Default policy";
+    case "deny_all":
+      return "Deny-all fallback";
+    default:
+      return source;
+  }
 }
 
 function useSettingsState() {
@@ -545,11 +816,166 @@ function useGymReportState() {
   return gymState;
 }
 
+function usePolicyState(settingsPolicy: CoworkSettings["policy"]) {
+  const [policyState, setPolicyState] = React.useState<PolicyState>({
+    policy: null,
+    source: null,
+    reason: null,
+    draft: "",
+    isDirty: false,
+    isLoading: true,
+    isExporting: false,
+    exportPath: null,
+    error: null,
+    exportError: null,
+  });
+
+  const refresh = React.useCallback(async () => {
+    setPolicyState((prev) => ({ ...prev, isLoading: true, error: null }));
+    try {
+      const resolved = await getPolicyResolution();
+      setPolicyState((prev) => ({
+        ...prev,
+        policy: resolved.policy ?? null,
+        source: resolved.source ?? null,
+        reason: resolved.reason ?? null,
+        isLoading: false,
+        error: null,
+      }));
+    } catch (err) {
+      setPolicyState((prev) => ({
+        ...prev,
+        isLoading: false,
+        error: err instanceof Error ? err.message : "Failed to load policy",
+      }));
+    }
+  }, []);
+
+  React.useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  React.useEffect(() => {
+    if (policyState.isDirty) {
+      return;
+    }
+    const basePolicy = settingsPolicy ?? policyState.policy;
+    if (!basePolicy) {
+      setPolicyState((prev) => ({ ...prev, draft: "" }));
+      return;
+    }
+    const nextDraft = JSON.stringify(basePolicy, null, 2);
+    setPolicyState((prev) => (prev.draft === nextDraft ? prev : { ...prev, draft: nextDraft }));
+  }, [settingsPolicy, policyState.policy, policyState.isDirty]);
+
+  const setDraft = React.useCallback((value: string) => {
+    setPolicyState((prev) => ({
+      ...prev,
+      draft: value,
+      isDirty: true,
+      exportPath: null,
+      exportError: null,
+    }));
+  }, []);
+
+  const markClean = React.useCallback(() => {
+    setPolicyState((prev) => ({ ...prev, isDirty: false }));
+  }, []);
+
+  const exportPolicy = React.useCallback(async () => {
+    setPolicyState((prev) => ({ ...prev, isExporting: true, exportError: null, exportPath: null }));
+    try {
+      const result = await exportPolicyToRepo();
+      setPolicyState((prev) => ({
+        ...prev,
+        isExporting: false,
+        exportPath: result.path,
+        exportError: null,
+      }));
+    } catch (err) {
+      setPolicyState((prev) => ({
+        ...prev,
+        isExporting: false,
+        exportError: err instanceof Error ? err.message : "Failed to export policy",
+      }));
+    }
+  }, []);
+
+  return { policyState, setDraft, markClean, refresh, exportPolicy };
+}
+
+function useAuditLogState() {
+  const [auditState, setAuditState] = React.useState<AuditLogState>({
+    entries: [],
+    sessionId: "",
+    action: "all",
+    isLoading: true,
+    error: null,
+  });
+
+  const refresh = React.useCallback(async () => {
+    setAuditState((prev) => ({ ...prev, isLoading: true, error: null }));
+    try {
+      const entries = await queryAuditLogs({
+        sessionId: auditState.sessionId.trim() || undefined,
+        action: auditState.action === "all" ? undefined : auditState.action,
+        limit: 100,
+        offset: 0,
+      });
+      setAuditState((prev) => ({ ...prev, entries, isLoading: false }));
+    } catch (err) {
+      setAuditState((prev) => ({
+        ...prev,
+        isLoading: false,
+        error: err instanceof Error ? err.message : "Failed to load audit logs",
+      }));
+    }
+  }, [auditState.action, auditState.sessionId]);
+
+  React.useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const updateSessionId = React.useCallback((value: string) => {
+    setAuditState((prev) => ({ ...prev, sessionId: value }));
+  }, []);
+
+  const updateAction = React.useCallback((value: CoworkAuditAction | "all") => {
+    setAuditState((prev) => ({ ...prev, action: value }));
+  }, []);
+
+  return { auditState, refresh, updateSessionId, updateAction };
+}
+
 export function SettingsPage() {
   const { state, theme, handleUpdate, handleThemeChange } = useSettingsState();
   const { providerState, handleProviderInputChange, handleProviderSave, handleProviderDelete } =
     useProviderState();
   const gymState = useGymReportState();
+  const { policyState, setDraft, markClean, refresh, exportPolicy } = usePolicyState(
+    state.data.policy
+  );
+  const { auditState, refresh: refreshAudit, updateSessionId, updateAction } = useAuditLogState();
+  const [policyEditorError, setPolicyEditorError] = React.useState<string | null>(null);
+
+  const handlePolicySave = React.useCallback(async () => {
+    setPolicyEditorError(null);
+    try {
+      const parsed = JSON.parse(policyState.draft) as CoworkSettings["policy"];
+      await handleUpdate({ policy: parsed ?? null });
+      markClean();
+      void refresh();
+    } catch (err) {
+      setPolicyEditorError(err instanceof Error ? err.message : "Invalid policy JSON");
+    }
+  }, [handleUpdate, markClean, policyState.draft, refresh]);
+
+  const handlePolicyClear = React.useCallback(async () => {
+    setPolicyEditorError(null);
+    await handleUpdate({ policy: null });
+    markClean();
+    void refresh();
+  }, [handleUpdate, markClean, refresh]);
 
   if (state.isLoading) {
     return (
@@ -607,6 +1033,25 @@ export function SettingsPage() {
       </section>
 
       <ThemeSection theme={theme} onChange={handleThemeChange} disabled={state.isSaving} />
+
+      <PolicySection
+        policyState={policyState}
+        caseInsensitivePaths={state.data.caseInsensitivePaths ?? false}
+        isSaving={state.isSaving}
+        editorError={policyEditorError}
+        onDraftChange={setDraft}
+        onSave={handlePolicySave}
+        onClear={handlePolicyClear}
+        onExport={exportPolicy}
+        onToggleCaseInsensitive={(value) => handleUpdate({ caseInsensitivePaths: value })}
+      />
+
+      <AuditLogSection
+        auditState={auditState}
+        onSessionChange={updateSessionId}
+        onActionChange={updateAction}
+        onRefresh={refreshAudit}
+      />
 
       <GymReportSection gymState={gymState} />
     </div>

@@ -47,7 +47,10 @@ export function createCoworkApp(deps: CoworkAppDeps) {
   const eventHub = deps.events ?? new SessionEventHub();
   const runtime =
     deps.runtime ??
-    new CoworkRuntimeBridge(deps.storage.approvalStore, undefined, deps.storage.auditLogStore);
+    new CoworkRuntimeBridge(deps.storage.approvalStore, undefined, deps.storage.auditLogStore, {
+      configStore: deps.storage.configStore,
+      repoRoot: process.cwd(),
+    });
   const taskRuntime = deps.taskRuntime;
   const logger = deps.logger ?? serverLogger;
   const providerKeys =

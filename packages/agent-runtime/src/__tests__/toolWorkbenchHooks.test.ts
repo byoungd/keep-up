@@ -12,6 +12,7 @@ const noopServer: MCPToolServer = {
       name: "noop",
       description: "No-op tool",
       inputSchema: { type: "object", properties: {} },
+      annotations: { policyAction: "connector.read" },
     },
   ],
   async callTool(_call: MCPToolCall, _context: ToolContext): Promise<MCPToolResult> {

@@ -62,6 +62,7 @@ export const COMPLETION_TOOL_DEFINITION: MCPTool = {
     requiresConfirmation: false,
     readOnly: true,
     estimatedDuration: "instant",
+    policyAction: "connector.read",
   },
 };
 

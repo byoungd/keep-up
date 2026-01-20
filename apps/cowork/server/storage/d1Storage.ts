@@ -6,6 +6,7 @@ import type {
   CoworkTask,
   CoworkWorkflowTemplate,
 } from "@ku0/agent-runtime";
+import { parseCoworkPolicyConfig } from "@ku0/agent-runtime";
 import type {
   AgentStateCheckpointStoreLike,
   ApprovalStoreLike,
@@ -154,6 +155,7 @@ async function ensureSchema(db: D1Database): Promise<void> {
         decision TEXT,
         rule_id TEXT,
         risk_tags TEXT DEFAULT '[]',
+        risk_score INTEGER,
         reason TEXT,
         duration_ms INTEGER,
         outcome TEXT
@@ -258,6 +260,7 @@ async function ensureSchema(db: D1Database): Promise<void> {
     "ALTER TABLE artifacts ADD COLUMN status TEXT DEFAULT 'pending'",
     "ALTER TABLE artifacts ADD COLUMN applied_at INTEGER",
     "ALTER TABLE tasks ADD COLUMN metadata TEXT DEFAULT '{}'",
+    "ALTER TABLE audit_logs ADD COLUMN risk_score INTEGER",
   ];
 
   for (const statement of optionalStatements) {
@@ -320,7 +323,45 @@ const ALLOWED_SETTINGS = new Set<keyof CoworkSettings>([
   "geminiKey",
   "defaultModel",
   "theme",
+  "memoryProfile",
+  "policy",
+  "caseInsensitivePaths",
 ]);
+
+type SettingHandler = (settings: CoworkSettings, value: unknown) => void;
+
+const SETTING_HANDLERS: Partial<Record<keyof CoworkSettings, SettingHandler>> = {
+  theme: (settings, value) => {
+    if (value === "light" || value === "dark") {
+      settings.theme = value;
+    }
+  },
+  providerKeys: (settings, value) => {
+    if (isRecord(value)) {
+      settings.providerKeys = value as CoworkSettings["providerKeys"];
+    }
+  },
+  memoryProfile: (settings, value) => {
+    if (typeof value === "string") {
+      settings.memoryProfile = value as CoworkSettings["memoryProfile"];
+    }
+  },
+  policy: (settings, value) => {
+    if (value === null) {
+      settings.policy = null;
+      return;
+    }
+    const parsedPolicy = parseCoworkPolicyConfig(value);
+    if (parsedPolicy) {
+      settings.policy = parsedPolicy;
+    }
+  },
+  caseInsensitivePaths: (settings, value) => {
+    if (typeof value === "boolean") {
+      settings.caseInsensitivePaths = value;
+    }
+  },
+};
 
 function parseSettingValue(raw: string): unknown {
   try {
@@ -335,17 +376,9 @@ function applySetting(settings: CoworkSettings, key: string, value: unknown): vo
     return;
   }
 
-  if (key === "theme") {
-    if (value === "light" || value === "dark") {
-      settings.theme = value;
-    }
-    return;
-  }
-
-  if (key === "providerKeys") {
-    if (isRecord(value)) {
-      settings.providerKeys = value as CoworkSettings["providerKeys"];
-    }
+  const handler = SETTING_HANDLERS[key as keyof CoworkSettings];
+  if (handler) {
+    handler(settings, value);
     return;
   }
 
@@ -1261,11 +1294,13 @@ function rowToAuditEntry(row: Record<string, unknown>): CoworkAuditEntry {
     toolName: row.tool_name ? String(row.tool_name) : undefined,
     input: row.input ? (JSON.parse(String(row.input)) as Record<string, unknown>) : undefined,
     output: row.output ? JSON.parse(String(row.output)) : undefined,
-    decision: row.decision
+    policyDecision: row.decision
       ? (String(row.decision) as "allow" | "allow_with_confirm" | "deny")
       : undefined,
-    ruleId: row.rule_id ? String(row.rule_id) : undefined,
+    policyRuleId: row.rule_id ? String(row.rule_id) : undefined,
     riskTags: parseRiskTags(String(row.risk_tags ?? "[]")),
+    riskScore:
+      row.risk_score === null || row.risk_score === undefined ? undefined : Number(row.risk_score),
     reason: row.reason ? String(row.reason) : undefined,
     durationMs: row.duration_ms ? Number(row.duration_ms) : undefined,
     outcome: row.outcome ? (String(row.outcome) as "success" | "error" | "denied") : undefined,
@@ -1314,7 +1349,7 @@ async function createD1AuditLogStore(db: D1Database): Promise<AuditLogStoreLike>
         db,
         `INSERT INTO audit_logs
           (entry_id, session_id, task_id, timestamp, action, tool_name, input, output,
-           decision, rule_id, risk_tags, reason, duration_ms, outcome)
+           decision, rule_id, risk_tags, risk_score, reason, duration_ms, outcome)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           entry.entryId,
@@ -1325,9 +1360,10 @@ async function createD1AuditLogStore(db: D1Database): Promise<AuditLogStoreLike>
           entry.toolName ?? null,
           entry.input ? JSON.stringify(entry.input) : null,
           entry.output ? JSON.stringify(entry.output) : null,
-          entry.decision ?? null,
-          entry.ruleId ?? null,
+          entry.policyDecision ?? null,
+          entry.policyRuleId ?? null,
           JSON.stringify(entry.riskTags ?? []),
+          entry.riskScore ?? null,
           entry.reason ?? null,
           entry.durationMs ?? null,
           entry.outcome ?? null,

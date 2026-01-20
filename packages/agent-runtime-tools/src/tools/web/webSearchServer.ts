@@ -435,6 +435,7 @@ export class WebSearchToolServer extends BaseToolServer {
       annotations: {
         requiresConfirmation: false,
         readOnly: true,
+        policyAction: "network.request",
       },
     };
   }
@@ -461,6 +462,7 @@ export class WebSearchToolServer extends BaseToolServer {
       annotations: {
         requiresConfirmation: false,
         readOnly: true,
+        policyAction: "network.request",
       },
     };
   }

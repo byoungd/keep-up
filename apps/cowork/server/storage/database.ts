@@ -170,12 +170,15 @@ function initSchema(database: DatabaseInstance): void {
       decision TEXT,
       rule_id TEXT,
       risk_tags TEXT DEFAULT '[]',
+      risk_score INTEGER,
       reason TEXT,
       duration_ms INTEGER,
       outcome TEXT,
       FOREIGN KEY (session_id) REFERENCES sessions(session_id)
     )
   `);
+
+  safeExec("ALTER TABLE audit_logs ADD COLUMN risk_score INTEGER");
 
   database.exec(`
     CREATE INDEX IF NOT EXISTS idx_audit_logs_session ON audit_logs(session_id)

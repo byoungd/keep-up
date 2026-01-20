@@ -65,6 +65,7 @@ export class TodoToolServer extends BaseToolServer {
           requiresConfirmation: false,
           readOnly: true,
           estimatedDuration: "fast",
+          policyAction: "connector.read",
         },
       },
       this.handleRead.bind(this)
@@ -109,6 +110,7 @@ export class TodoToolServer extends BaseToolServer {
           requiresConfirmation: false,
           readOnly: false,
           estimatedDuration: "fast",
+          policyAction: "connector.action",
         },
       },
       this.handleWrite.bind(this)

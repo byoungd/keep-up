@@ -10,12 +10,13 @@
  * - Use MCP as the universal tool protocol bridge
  */
 
-import type {
-  MCPTool,
-  MCPToolCall,
-  MCPToolResult,
-  MCPToolServer,
-  ToolContext,
+import {
+  COWORK_POLICY_ACTIONS,
+  type MCPTool,
+  type MCPToolCall,
+  type MCPToolResult,
+  type MCPToolServer,
+  type ToolContext,
 } from "@ku0/agent-runtime-core";
 
 // ============================================================================
@@ -208,7 +209,8 @@ export class ExternalToolServer implements MCPToolServer {
 
   async initialize(): Promise<void> {
     if (await this.adapter.isAvailable()) {
-      this.cachedTools = await this.adapter.importTools();
+      const tools = await this.adapter.importTools();
+      this.cachedTools = tools.filter(hasValidPolicyAction);
     }
   }
 
@@ -236,4 +238,9 @@ export function createAdapterRegistry(adapters?: IExternalFrameworkAdapter[]): A
     }
   }
   return registry;
+}
+
+function hasValidPolicyAction(tool: MCPTool): boolean {
+  const policyAction = tool.annotations?.policyAction;
+  return typeof policyAction === "string" && COWORK_POLICY_ACTIONS.includes(policyAction);
 }

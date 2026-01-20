@@ -81,6 +81,7 @@ function initializeCategoryBuckets(): Record<GymCategory, GymSummaryBucket> {
     refactor: createBucket(),
     "feature-add": createBucket(),
     "cross-file": createBucket(),
+    "policy-safety": createBucket(),
   };
 }
 

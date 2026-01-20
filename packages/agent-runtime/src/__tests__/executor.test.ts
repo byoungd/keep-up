@@ -348,6 +348,7 @@ function createMockTool(name: string, options?: { readOnly?: boolean }): MCPTool
     inputSchema: { type: "object" },
     annotations: {
       readOnly: options?.readOnly ?? false,
+      policyAction: options?.readOnly ? "connector.read" : "connector.action",
     },
   };
 }

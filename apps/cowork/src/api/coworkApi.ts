@@ -1,4 +1,5 @@
 import type {
+  CoworkPolicyConfig,
   CoworkProject,
   CoworkRiskTag,
   CoworkSession,
@@ -51,6 +52,43 @@ export type CoworkSettings = {
   defaultModel?: string;
   theme?: "light" | "dark";
   memoryProfile?: LessonProfile;
+  policy?: CoworkPolicyConfig | null;
+  caseInsensitivePaths?: boolean;
+};
+
+export type CoworkPolicySource = "repo" | "settings" | "default" | "deny_all";
+
+export type CoworkAuditAction =
+  | "tool_call"
+  | "tool_result"
+  | "tool_error"
+  | "policy_decision"
+  | "artifact_apply"
+  | "artifact_revert"
+  | "approval_requested"
+  | "approval_resolved"
+  | "workflow_run"
+  | "preflight_run"
+  | "agent_protocol_task_created"
+  | "agent_protocol_step_created"
+  | "agent_protocol_artifact_created";
+
+export type CoworkAuditEntry = {
+  entryId: string;
+  sessionId: string;
+  taskId?: string;
+  timestamp: number;
+  action: CoworkAuditAction;
+  toolName?: string;
+  input?: Record<string, unknown>;
+  output?: unknown;
+  policyDecision?: "allow" | "allow_with_confirm" | "deny";
+  policyRuleId?: string;
+  riskTags?: CoworkRiskTag[];
+  riskScore?: number;
+  reason?: string;
+  durationMs?: number;
+  outcome?: "success" | "error" | "denied";
 };
 
 export type CoworkLesson = Omit<Lesson, "embedding">;
@@ -643,9 +681,45 @@ export async function updateSettings(patch: Partial<CoworkSettings>): Promise<Co
   return data.settings ?? {};
 }
 
+export async function getPolicyResolution(): Promise<{
+  policy: CoworkPolicyConfig;
+  source: CoworkPolicySource;
+  reason?: string | null;
+}> {
+  return fetchJson<{
+    policy: CoworkPolicyConfig;
+    source: CoworkPolicySource;
+    reason?: string | null;
+  }>("/api/settings/policy");
+}
+
+export async function exportPolicyToRepo(): Promise<{ source: CoworkPolicySource; path: string }> {
+  return fetchJson<{ source: CoworkPolicySource; path: string }>("/api/settings/policy/export", {
+    method: "POST",
+  });
+}
+
 export async function getGymReport(): Promise<GymReport | null> {
   const data = await fetchJson<ApiResult<unknown>>("/api/settings/gym-report");
   return data.gymReport ?? null;
+}
+
+export async function queryAuditLogs(filter: {
+  sessionId?: string;
+  taskId?: string;
+  toolName?: string;
+  action?: CoworkAuditAction;
+  since?: number;
+  until?: number;
+  limit?: number;
+  offset?: number;
+}): Promise<CoworkAuditEntry[]> {
+  const data = await fetchJson<{ entries?: CoworkAuditEntry[] }>(`/api/audit-logs/query`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(filter),
+  });
+  return data.entries ?? [];
 }
 
 export async function listProviders(): Promise<CoworkProvider[]> {

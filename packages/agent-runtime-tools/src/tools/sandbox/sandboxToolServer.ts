@@ -62,6 +62,7 @@ export class SandboxToolServer extends BaseToolServer {
         requiresConfirmation: true,
         readOnly: false,
         estimatedDuration: "medium",
+        policyAction: "connector.action",
       },
     };
   }
@@ -85,6 +86,7 @@ export class SandboxToolServer extends BaseToolServer {
         requiresConfirmation: true,
         readOnly: false,
         estimatedDuration: "medium",
+        policyAction: "connector.action",
       },
     };
   }
@@ -104,6 +106,7 @@ export class SandboxToolServer extends BaseToolServer {
         requiresConfirmation: false,
         readOnly: true,
         estimatedDuration: "fast",
+        policyAction: "connector.read",
       },
     };
   }
@@ -123,6 +126,7 @@ export class SandboxToolServer extends BaseToolServer {
         requiresConfirmation: true,
         readOnly: false,
         estimatedDuration: "fast",
+        policyAction: "connector.action",
       },
     };
   }
@@ -140,6 +144,7 @@ export class SandboxToolServer extends BaseToolServer {
         requiresConfirmation: false,
         readOnly: true,
         estimatedDuration: "fast",
+        policyAction: "connector.read",
       },
     };
   }

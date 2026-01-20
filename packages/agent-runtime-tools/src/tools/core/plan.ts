@@ -111,6 +111,7 @@ export class PlanToolServer extends BaseToolServer {
           requiresConfirmation: false,
           readOnly: false,
           estimatedDuration: "fast",
+          policyAction: "connector.action",
         },
       },
       this.handleSave.bind(this)
@@ -131,6 +132,7 @@ export class PlanToolServer extends BaseToolServer {
           requiresConfirmation: false,
           readOnly: true,
           estimatedDuration: "fast",
+          policyAction: "connector.read",
         },
       },
       this.handleLoad.bind(this)
@@ -156,6 +158,7 @@ export class PlanToolServer extends BaseToolServer {
           requiresConfirmation: false,
           readOnly: true,
           estimatedDuration: "fast",
+          policyAction: "connector.read",
         },
       },
       this.handleList.bind(this)
@@ -176,6 +179,7 @@ export class PlanToolServer extends BaseToolServer {
           requiresConfirmation: false,
           readOnly: true,
           estimatedDuration: "fast",
+          policyAction: "connector.read",
         },
       },
       this.handleStatus.bind(this)
@@ -206,6 +210,7 @@ export class PlanToolServer extends BaseToolServer {
           requiresConfirmation: false,
           readOnly: false,
           estimatedDuration: "fast",
+          policyAction: "connector.action",
         },
       },
       this.handleStep.bind(this)
@@ -226,6 +231,7 @@ export class PlanToolServer extends BaseToolServer {
           requiresConfirmation: false,
           readOnly: false,
           estimatedDuration: "fast",
+          policyAction: "connector.action",
         },
       },
       this.handleArchive.bind(this)
@@ -251,6 +257,7 @@ export class PlanToolServer extends BaseToolServer {
           requiresConfirmation: false,
           readOnly: false,
           estimatedDuration: "fast",
+          policyAction: "connector.action",
         },
       },
       this.handleAdvance.bind(this)
@@ -295,6 +302,7 @@ export class PlanToolServer extends BaseToolServer {
           requiresConfirmation: false,
           readOnly: false,
           estimatedDuration: "fast",
+          policyAction: "connector.action",
         },
       },
       this.handleUpdate.bind(this)

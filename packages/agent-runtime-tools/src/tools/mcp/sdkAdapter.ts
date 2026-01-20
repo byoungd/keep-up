@@ -4,7 +4,14 @@
  * Maps between agent-runtime MCP tool types and the official MCP SDK types.
  */
 
-import type { JSONSchema, MCPTool, MCPToolResult, ToolContent } from "@ku0/agent-runtime-core";
+import type {
+  CoworkPolicyActionLike,
+  JSONSchema,
+  MCPTool,
+  MCPToolResult,
+  ToolContent,
+} from "@ku0/agent-runtime-core";
+import { COWORK_POLICY_ACTIONS } from "@ku0/agent-runtime-core";
 import type {
   CallToolResult as SdkCallToolResult,
   Tool as SdkTool,
@@ -18,9 +25,14 @@ export interface ToolScopeConfig {
 
 const CATEGORY_VALUES = new Set(["core", "knowledge", "external", "communication", "control"]);
 const SCHEMA_TYPES = new Set(["object", "string", "number", "boolean", "array"]);
+const COWORK_POLICY_ACTION_SET = new Set<string>(COWORK_POLICY_ACTIONS);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isCoworkPolicyActionLike(value: string): value is CoworkPolicyActionLike {
+  return COWORK_POLICY_ACTION_SET.has(value);
 }
 
 function toSdkAnnotations(annotations?: MCPTool["annotations"]): SdkToolAnnotations | undefined {
@@ -65,6 +77,11 @@ function fromSdkAnnotations(
   const category = parseCategory(meta?.category);
   if (category) {
     mapped.category = category;
+  }
+
+  const policyAction = meta?.policyAction;
+  if (typeof policyAction === "string" && isCoworkPolicyActionLike(policyAction)) {
+    mapped.policyAction = policyAction;
   }
 
   return Object.keys(mapped).length > 0 ? mapped : undefined;
@@ -168,6 +185,9 @@ export function toSdkTool(tool: MCPTool): SdkTool {
   }
   if (tool.annotations?.estimatedDuration) {
     meta.estimatedDuration = tool.annotations.estimatedDuration;
+  }
+  if (tool.annotations?.policyAction) {
+    meta.policyAction = tool.annotations.policyAction;
   }
 
   return {
