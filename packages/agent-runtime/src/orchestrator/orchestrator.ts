@@ -2334,11 +2334,16 @@ export class AgentOrchestrator {
     return tool?.annotations?.requiresConfirmation ?? false;
   }
 
-  private getConfirmationDetails(call: MCPToolCall): { reason?: string; riskTags?: string[] } {
+  private getConfirmationDetails(call: MCPToolCall): {
+    reason?: string;
+    reasonCode?: string;
+    riskTags?: string[];
+  } {
     if (this.toolExecutor && isToolConfirmationDetailsProvider(this.toolExecutor)) {
       const details = this.toolExecutor.getConfirmationDetails(call, this.createToolContext(call));
       return {
         reason: details.reason,
+        reasonCode: details.reasonCode,
         riskTags: details.riskTags,
       };
     }
@@ -2355,6 +2360,7 @@ export class AgentOrchestrator {
       arguments: call.arguments,
       risk: this.assessRisk(call),
       reason: confirmationDetails.reason,
+      reasonCode: confirmationDetails.reasonCode,
       riskTags: confirmationDetails.riskTags,
       taskNodeId,
     };
