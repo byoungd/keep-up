@@ -1,6 +1,6 @@
 "use client";
 
-import { type ArtifactItem, AIPanel as ShellAIPanel, useReaderShell } from "@ku0/shell";
+import { type ArtifactItem, AIPanel as ShellAIPanel, useShellPanels } from "@ku0/shell";
 import { useEffect, useMemo } from "react";
 import { CostMeter } from "./components/CostMeter";
 import { useCoworkAIPanelController } from "./useCoworkAIPanelController";
@@ -11,7 +11,7 @@ export interface CoworkAIPanelProps {
 }
 
 export function CoworkAIPanel({ onClose, onPreviewArtifact }: CoworkAIPanelProps) {
-  const { aiPanel } = useReaderShell();
+  const { aiPanel } = useShellPanels();
   const ctrl = useCoworkAIPanelController();
 
   const {

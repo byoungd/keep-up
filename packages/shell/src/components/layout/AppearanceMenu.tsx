@@ -7,7 +7,7 @@ import {
   type ReaderCanvasTone,
   useReaderPreferences,
 } from "../../context/ReaderPreferencesContext";
-import { useReaderShell } from "../../context/ReaderShellContext";
+import { useShellI18n } from "../../context/ReaderShellContext";
 import { SegmentedControl } from "../ui/SegmentedControl";
 import { Slider } from "../ui/Slider";
 
@@ -17,7 +17,7 @@ interface AppearanceMenuProps {
 
 export function AppearanceMenu({ onClose }: AppearanceMenuProps) {
   const { theme, setTheme } = useTheme();
-  const { i18n } = useReaderShell();
+  const i18n = useShellI18n();
   const t = (key: string) => i18n.t(`AppearanceMenu.${key}`, key);
   const { preferences, setFontFamily, setFontSize, setLineHeight, setCanvas } =
     useReaderPreferences();

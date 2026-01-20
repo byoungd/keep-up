@@ -4,7 +4,7 @@ import { cn } from "@ku0/shared/utils";
 import * as FocusScope from "@radix-ui/react-focus-scope";
 import { X } from "lucide-react";
 import * as React from "react";
-import { useReaderShell } from "../../../context/ReaderShellContext";
+import { useShellI18n, useShellPanels } from "../../../context/ReaderShellContext";
 import type { SidebarGroupDefinition, SidebarUserConfig } from "../../../lib/sidebar";
 import { Button } from "../../ui/Button";
 import { AIPanelSection } from "./settings/AIPanelSection";
@@ -23,7 +23,8 @@ export function SettingsModal({ open, onClose, userConfig, onSave, groups }: Set
   const dialogRef = React.useRef<HTMLDialogElement>(null);
   const lastFocusedRef = React.useRef<HTMLElement | null>(null);
   const [liveMessage, setLiveMessage] = React.useState("");
-  const { i18n, aiPanel, auxPanel } = useReaderShell();
+  const i18n = useShellI18n();
+  const { aiPanel, auxPanel } = useShellPanels();
   const t = (key: string, defaultValue?: string) => i18n.t(`Settings.${key}`, defaultValue || key);
   const panelPosition = auxPanel ? auxPanel.position : aiPanel.position;
   const availablePositions = auxPanel

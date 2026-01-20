@@ -3,7 +3,11 @@
 import { cn } from "@ku0/shared/utils";
 import { CircleHelp, MoreHorizontal, Settings2 } from "lucide-react";
 import * as React from "react";
-import { useReaderShell } from "../../../context/ReaderShellContext";
+import {
+  useShellComponents,
+  useShellI18n,
+  useShellRouter,
+} from "../../../context/ReaderShellContext";
 import type {
   EffectiveSidebarItem,
   EffectiveSidebarState,
@@ -66,7 +70,9 @@ export const Sidebar = React.memo(function Sidebar({
   renderGroup,
   showSearch,
 }: SidebarProps) {
-  const { router, components, i18n } = useReaderShell();
+  const router = useShellRouter();
+  const components = useShellComponents();
+  const i18n = useShellI18n();
   const { pathname } = router;
   const { Link } = components;
 

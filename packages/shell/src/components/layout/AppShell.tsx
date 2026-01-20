@@ -2,7 +2,13 @@
 
 import { cn } from "@ku0/shared/utils";
 import * as React from "react";
-import { useReaderShell } from "../../context/ReaderShellContext";
+import {
+  type ReaderShellContextValue,
+  useShellI18n,
+  useShellPanels,
+  useShellSidebar,
+  useShellUser,
+} from "../../context/ReaderShellContext";
 import { useAIPanelSync } from "../../hooks/useAIPanelSync";
 import type {
   EffectiveSidebarState,
@@ -175,7 +181,7 @@ function resolveAuxPanelState({
   isPreviewVisible,
   fallbackWidth,
 }: {
-  auxPanel: ReturnType<typeof useReaderShell>["auxPanel"];
+  auxPanel: ReaderShellContextValue["auxPanel"];
   panelProp?: React.ReactNode;
   previewPanel?: React.ReactNode;
   isPreviewVisible: boolean;
@@ -226,7 +232,7 @@ function resolveHeaderConfig({
   isAuxPanelVisible: boolean;
   auxPanelPosition: "left" | "right";
   isAIPanelVisible: boolean;
-  i18n: ReturnType<typeof useReaderShell>["i18n"];
+  i18n: ReaderShellContextValue["i18n"];
 }): Pick<HeaderProps, "isRightPanelOpen" | "rightPanelLabel"> {
   if (panelState.isMain && hasAuxPanel) {
     return {
@@ -652,21 +658,18 @@ export function AppShell(props: AppShellProps) {
   const [mobilePanel, setMobilePanel] = React.useState<MobilePanel>("center");
   const [customizeOpen, setCustomizeOpen] = React.useState(false);
 
+  const user = useShellUser();
+  const i18n = useShellI18n();
+  const { aiPanel, auxPanel } = useShellPanels();
   const {
-    user,
-    aiPanel,
-    auxPanel,
-    i18n,
-    sidebar: {
-      state: sidebarState,
-      actions: sidebarActions,
-      isCollapsed: _isCollapsed,
-      width: _sidebarWidth,
-      userConfig: sidebarUserConfig,
-      isLoading: sidebarIsLoading,
-      groups: sidebarGroups,
-    },
-  } = useReaderShell();
+    state: sidebarState,
+    actions: sidebarActions,
+    isCollapsed: _isCollapsed,
+    width: _sidebarWidth,
+    userConfig: sidebarUserConfig,
+    isLoading: sidebarIsLoading,
+    groups: sidebarGroups,
+  } = useShellSidebar();
 
   // Safe defaults if accessing before init
 
