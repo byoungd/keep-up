@@ -9,7 +9,6 @@ const DOCKER_SOCKET_CANDIDATES = [
   join(homedir(), "Library/Containers/com.docker.docker/Data/docker.raw.sock"),
   "/var/run/docker.sock",
   join(homedir(), ".docker/run/docker.sock"),
-  join(homedir(), "Library/Containers/com.docker.docker/Data/docker-cli.sock"),
 ];
 
 export function createDockerClient(
