@@ -160,6 +160,36 @@ describe("RuntimeMessageBus", () => {
       expect(response.payload).toEqual({ answer: 42 });
     });
 
+    it("waitFor should reuse pending request promise", async () => {
+      let correlationId: string | undefined;
+
+      bus.registerAgent("responder", (envelope) => {
+        correlationId = envelope.correlationId;
+      });
+
+      const requestPromise = bus.request("requester", "responder", { ping: true }, 1000);
+
+      await new Promise((r) => setTimeout(r, 10));
+
+      if (!correlationId) {
+        throw new Error("Missing correlation ID");
+      }
+
+      const waitPromise = bus.waitFor(correlationId, 1000);
+
+      expect(waitPromise).toBe(requestPromise);
+
+      bus.respond("responder", correlationId, { answer: "ok" });
+
+      const [responseFromRequest, responseFromWait] = await Promise.all([
+        requestPromise,
+        waitPromise,
+      ]);
+
+      expect(responseFromRequest.payload).toEqual({ answer: "ok" });
+      expect(responseFromWait.payload).toEqual({ answer: "ok" });
+    });
+
     it("should timeout if no response", async () => {
       await expect(bus.request("requester", "nonexistent", { question: "?" }, 50)).rejects.toThrow(
         "timed out"
