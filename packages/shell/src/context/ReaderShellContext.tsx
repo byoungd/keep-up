@@ -96,13 +96,49 @@ export interface ReaderShellContextValue {
 }
 
 const ReaderShellContext = createContext<ReaderShellContextValue | null>(null);
+const ShellPanelsContext = createContext<ShellPanelsContextValue | null>(null);
+const ShellSidebarContext = createContext<ReaderShellContextValue["sidebar"] | null>(null);
+const ShellRouterContext = createContext<ReaderShellContextValue["router"] | null>(null);
+const ShellComponentsContext = createContext<ReaderShellContextValue["components"] | null>(null);
+const ShellI18nContext = createContext<ReaderShellContextValue["i18n"] | null>(null);
+const ShellUserContext = createContext<ReaderShellContextValue["user"] | null>(null);
+
+type ShellPanelsContextValue = Pick<ReaderShellContextValue, "aiPanel" | "auxPanel" | "preview">;
+
+function useRequiredContext<T>(context: React.Context<T | null>, name: string): T {
+  const value = useContext(context);
+  if (!value) {
+    throw new Error(`${name} must be used within a ReaderShellProvider`);
+  }
+  return value;
+}
 
 export function useReaderShell() {
-  const context = useContext(ReaderShellContext);
-  if (!context) {
-    throw new Error("useReaderShell must be used within a ReaderShellProvider");
-  }
-  return context;
+  return useRequiredContext(ReaderShellContext, "useReaderShell");
+}
+
+export function useShellPanels() {
+  return useRequiredContext(ShellPanelsContext, "useShellPanels");
+}
+
+export function useShellSidebar() {
+  return useRequiredContext(ShellSidebarContext, "useShellSidebar");
+}
+
+export function useShellRouter() {
+  return useRequiredContext(ShellRouterContext, "useShellRouter");
+}
+
+export function useShellComponents() {
+  return useRequiredContext(ShellComponentsContext, "useShellComponents");
+}
+
+export function useShellI18n() {
+  return useRequiredContext(ShellI18nContext, "useShellI18n");
+}
+
+export function useShellUser() {
+  return useRequiredContext(ShellUserContext, "useShellUser");
 }
 
 const ReaderShellProviderContext = ReaderShellContext.Provider;
@@ -131,21 +167,17 @@ export function ReaderShellProvider({ value, children, sidebarConfig }: ReaderSh
 
   const groups = sidebarConfig?.initialGroups ?? DEFAULT_SIDEBAR_GROUPS;
 
-  const contextValue: ReaderShellContextValue = React.useMemo(
+  const sidebarValue = React.useMemo(
     () => ({
-      ...value,
-      sidebar: {
-        ...value.sidebar,
-        state: sidebarLogic.state,
-        actions: sidebarLogic.actions,
-        userConfig: sidebarLogic.userConfig,
-        isLoading: sidebarLogic.isLoading,
-        groups,
-      },
+      ...value.sidebar,
+      state: sidebarLogic.state,
+      actions: sidebarLogic.actions,
+      userConfig: sidebarLogic.userConfig,
+      isLoading: sidebarLogic.isLoading,
+      groups,
     }),
-
     [
-      value,
+      value.sidebar,
       sidebarLogic.state,
       sidebarLogic.actions,
       sidebarLogic.userConfig,
@@ -154,5 +186,38 @@ export function ReaderShellProvider({ value, children, sidebarConfig }: ReaderSh
     ]
   );
 
-  return <ReaderShellProviderContext value={contextValue}>{children}</ReaderShellProviderContext>;
+  const panelsValue = React.useMemo(
+    () => ({
+      aiPanel: value.aiPanel,
+      auxPanel: value.auxPanel,
+      preview: value.preview,
+    }),
+    [value.aiPanel, value.auxPanel, value.preview]
+  );
+
+  const contextValue: ReaderShellContextValue = React.useMemo(
+    () => ({
+      ...value,
+      sidebar: sidebarValue,
+    }),
+    [value, sidebarValue]
+  );
+
+  return (
+    <ReaderShellProviderContext value={contextValue}>
+      <ShellI18nContext.Provider value={value.i18n}>
+        <ShellRouterContext.Provider value={value.router}>
+          <ShellComponentsContext.Provider value={value.components}>
+            <ShellUserContext.Provider value={value.user}>
+              <ShellPanelsContext.Provider value={panelsValue}>
+                <ShellSidebarContext.Provider value={sidebarValue}>
+                  {children}
+                </ShellSidebarContext.Provider>
+              </ShellPanelsContext.Provider>
+            </ShellUserContext.Provider>
+          </ShellComponentsContext.Provider>
+        </ShellRouterContext.Provider>
+      </ShellI18nContext.Provider>
+    </ReaderShellProviderContext>
+  );
 }

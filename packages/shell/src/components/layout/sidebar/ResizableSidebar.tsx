@@ -3,7 +3,7 @@
 import { cn } from "@ku0/shared/utils";
 import { motion } from "framer-motion";
 import * as React from "react";
-import { useReaderShell } from "../../../context/ReaderShellContext";
+import { useShellSidebar } from "../../../context/ReaderShellContext";
 import { SidebarLocalProvider } from "./SidebarLocalContext";
 
 const MIN_WIDTH = 200; // Minimum visible width when expanded
@@ -29,7 +29,7 @@ function ResizableSidebarInner({
   collapseMode = "peek",
 }: ResizableSidebarProps) {
   const [width, setWidth] = React.useState(DEFAULT_WIDTH);
-  const { sidebar: sidebarState } = useReaderShell();
+  const sidebarState = useShellSidebar();
   const { isCollapsed, setCollapsed: setIsCollapsed } = sidebarState;
   const [autoExpanded, setAutoExpanded] = React.useState(false);
   const [isDragging, setIsDragging] = React.useState(false);

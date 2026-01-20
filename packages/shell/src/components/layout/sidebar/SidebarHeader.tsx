@@ -4,7 +4,7 @@ import { cn } from "@ku0/shared/utils";
 import { Search } from "lucide-react";
 import * as React from "react";
 // import { useImportContextOptional } from "@/context/ImportContext";
-import { useReaderShell } from "../../../context/ReaderShellContext";
+import { useShellI18n, useShellSidebar } from "../../../context/ReaderShellContext";
 import { Avatar } from "../../ui/Avatar";
 import { Button } from "../../ui/Button";
 import { Icon as IconWrapper } from "../../ui/Icon";
@@ -30,7 +30,8 @@ export const SidebarHeader = React.memo(function SidebarHeader({
   onOpenSearch,
   showSearch = true,
 }: SidebarHeaderProps) {
-  const { sidebar, i18n } = useReaderShell();
+  const sidebar = useShellSidebar();
+  const i18n = useShellI18n();
   const { isPeeking, onPin } = useSidebarLocal();
   const t = (key: string) => i18n.t(`Sidebar.${key}`, key);
   const { toggle: toggleCollapsed, isCollapsed } = sidebar;

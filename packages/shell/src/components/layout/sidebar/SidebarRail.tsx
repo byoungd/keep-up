@@ -3,7 +3,11 @@
 import { cn } from "@ku0/shared/utils";
 import { Search, Settings2 } from "lucide-react";
 import * as React from "react";
-import { useReaderShell } from "../../../context/ReaderShellContext";
+import {
+  useShellComponents,
+  useShellI18n,
+  useShellRouter,
+} from "../../../context/ReaderShellContext";
 // Link import removed
 // usePathname import removed
 import type { EffectiveSidebarItem, EffectiveSidebarState } from "../../../lib/sidebar";
@@ -49,7 +53,9 @@ export const SidebarRail = React.memo(function SidebarRail({
   workspaceName,
   workspaceAvatarUrl,
 }: SidebarRailProps) {
-  const { router, components, i18n } = useReaderShell();
+  const router = useShellRouter();
+  const components = useShellComponents();
+  const i18n = useShellI18n();
   const { pathname } = router;
   const { Link } = components;
 

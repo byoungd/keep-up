@@ -2,7 +2,7 @@
 
 import { cn } from "@ku0/shared/utils";
 
-import { useReaderShell } from "../../context/ReaderShellContext";
+import { useShellI18n, useShellSidebar } from "../../context/ReaderShellContext";
 import { Button } from "../ui/Button";
 import { SidebarLeftIcon, SidebarRightFilledIcon, SidebarRightIcon } from "../ui/SidebarIcons";
 import { Tooltip } from "../ui/Tooltip";
@@ -24,7 +24,8 @@ export function Header({
   leftSlot,
   rightSlot,
 }: HeaderProps) {
-  const { sidebar, i18n } = useReaderShell();
+  const i18n = useShellI18n();
+  const sidebar = useShellSidebar();
   const t = (key: string, values?: Record<string, string | number>, defaultValue?: string) =>
     i18n.t(`Header.${key}`, values ?? defaultValue ?? key, defaultValue);
   const { isCollapsed, setCollapsed } = sidebar;

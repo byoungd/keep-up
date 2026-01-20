@@ -125,7 +125,16 @@ export {
   useReaderPreferences,
 } from "./context/ReaderPreferencesContext";
 // Context & Hooks
-export { ReaderShellProvider, useReaderShell } from "./context/ReaderShellContext";
+export {
+  ReaderShellProvider,
+  useReaderShell,
+  useShellComponents,
+  useShellI18n,
+  useShellPanels,
+  useShellRouter,
+  useShellSidebar,
+  useShellUser,
+} from "./context/ReaderShellContext";
 export type {
   SidebarConfigActions,
   SidebarGroupDefinition,

@@ -15,7 +15,8 @@ import {
   DropdownMenuTrigger,
   Input,
   Tooltip,
-  useReaderShell,
+  useShellComponents,
+  useShellRouter,
 } from "@ku0/shell";
 import {
   Brain,
@@ -68,7 +69,8 @@ function writeStorageSet(key: string, ids: Set<string>): void {
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Refactoring out of scope for current task
 export function CoworkSidebarSections() {
-  const { router, components } = useReaderShell();
+  const router = useShellRouter();
+  const components = useShellComponents();
   const {
     sessions,
     projects,

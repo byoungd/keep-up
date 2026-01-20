@@ -1,7 +1,7 @@
 import { cn } from "@ku0/shared/utils";
 import type { LucideIcon } from "lucide-react";
 import * as React from "react";
-import { useReaderShell } from "../../../context/ReaderShellContext";
+import { useShellComponents } from "../../../context/ReaderShellContext";
 import type { SidebarBadgeStyle } from "../../../lib/sidebar";
 import { Badge } from "../../ui/Badge";
 import { Icon as IconWrapper } from "../../ui/Icon";
@@ -28,8 +28,7 @@ export const SidebarItem = React.memo(function SidebarItem({
   badgeCount = 0,
   badgeStyle = "COUNT",
 }: SidebarItemProps) {
-  const { components } = useReaderShell();
-  const { Link } = components;
+  const { Link } = useShellComponents();
   const shortcut = id === "search" ? "⌘ K" : null;
 
   return (
