@@ -1,7 +1,7 @@
 # Track AB: Visual Intelligence and Layout Graph
 
 Owner: Applied ML Engineer
-Status: Ready
+Status: Completed
 Priority: High
 Timeline: Month 2-3
 Dependencies: Q3 LSP Perception, Computer-use tooling, Design system tokens

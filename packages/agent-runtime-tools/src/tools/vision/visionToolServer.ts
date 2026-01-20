@@ -74,6 +74,7 @@ export class VisionToolServer extends BaseToolServer {
         requiresConfirmation: false,
         readOnly: true,
         estimatedDuration: "fast",
+        policyAction: "connector.read",
       },
     };
   }
@@ -97,6 +98,7 @@ export class VisionToolServer extends BaseToolServer {
         requiresConfirmation: false,
         readOnly: true,
         estimatedDuration: "fast",
+        policyAction: "connector.read",
       },
     };
   }
@@ -131,6 +133,7 @@ export class VisionToolServer extends BaseToolServer {
         requiresConfirmation: false,
         readOnly: true,
         estimatedDuration: "fast",
+        policyAction: "connector.read",
       },
     };
   }

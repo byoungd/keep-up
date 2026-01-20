@@ -734,9 +734,24 @@ export interface RuntimeCacheConfig {
   };
 }
 
+export interface VisionConfig {
+  autoApplyConfidenceThreshold: number;
+  maxScreenshotWidth: number;
+  maxScreenshotHeight: number;
+  ocrEnabled: boolean;
+}
+
+export const DEFAULT_VISION_CONFIG: VisionConfig = {
+  autoApplyConfidenceThreshold: 0.85,
+  maxScreenshotWidth: 1920,
+  maxScreenshotHeight: 1080,
+  ocrEnabled: true,
+};
+
 export interface RuntimeConfig {
   cache?: RuntimeCacheConfig;
   execution?: ExecutionConfig;
+  vision?: VisionConfig;
 }
 
 // ============================================================================
@@ -1198,7 +1213,9 @@ export type ArtifactType =
   | "ChecklistCard"
   | "TestReport"
   | "ReviewReport"
-  | "ImageArtifact";
+  | "ImageArtifact"
+  | "LayoutGraph"
+  | "VisualDiffReport";
 
 export interface ArtifactEnvelope {
   id: string;
