@@ -55,6 +55,22 @@ cowork initiatives. Use this index to navigate the active tracks and supporting 
 - docs/roadmap/next-q2/track-v-workspace-time-travel.md
 - docs/roadmap/next-q2/track-w-computer-use.md
 
+## Next Phase Tracks (Q3 2026)
+- docs/roadmap/next-q3/README.md
+- docs/roadmap/next-q3/acceptance-criteria.md
+- docs/roadmap/next-q3/sota-gap-analysis.md
+- docs/roadmap/next-q3/track-x-deep-code-perception.md
+- docs/roadmap/next-q3/track-y-adaptive-learning.md
+- docs/roadmap/next-q3/track-z-agent-gym.md
+
+## Next Phase Tracks (Q4 2026)
+- docs/roadmap/next-q4/README.md
+- docs/roadmap/next-q4/acceptance-criteria.md
+- docs/roadmap/next-q4/benchmarks.md
+- docs/roadmap/next-q4/track-aa-elastic-execution.md
+- docs/roadmap/next-q4/track-ab-visual-intelligence.md
+- docs/roadmap/next-q4/track-ac-policy-ops.md
+
 ## Code Agent Capability
 - docs/roadmap/code/README.md
 - docs/roadmap/code/track-c1-editing-primitives.md
