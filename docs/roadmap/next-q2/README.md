@@ -33,6 +33,12 @@ Reference analysis: `docs/analysis/architecture-deep-dive.md`.
 
 ---
 
+## Selected Track
+
+Track T (Multi-Agent Teams and Protocols) is selected for Q2 implementation.
+
+---
+
 ## Timeline (6 Weeks)
 
 Week 1
