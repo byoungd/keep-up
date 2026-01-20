@@ -253,6 +253,12 @@ export const COWORK_POLICY_ACTIONS = [
 
 export type CoworkPolicyActionLike = (typeof COWORK_POLICY_ACTIONS)[number];
 
+const COWORK_POLICY_ACTION_SET = new Set<string>(COWORK_POLICY_ACTIONS);
+
+export function isCoworkPolicyAction(action: string): action is CoworkPolicyActionLike {
+  return COWORK_POLICY_ACTION_SET.has(action);
+}
+
 export interface CoworkPolicyInputLike {
   action: CoworkPolicyActionLike;
   path?: string;
@@ -566,6 +572,20 @@ export const SECURITY_PRESETS = {
 } as const;
 
 export type SecurityPreset = keyof typeof SECURITY_PRESETS;
+
+export function cloneSecurityPolicy(policy: SecurityPolicy): SecurityPolicy {
+  return {
+    sandbox: { ...policy.sandbox },
+    permissions: { ...policy.permissions },
+    limits: { ...policy.limits },
+    aiPolicyEngine: policy.aiPolicyEngine,
+    dataAccessPolicy: policy.dataAccessPolicy,
+  };
+}
+
+export function getSecurityPreset(preset: SecurityPreset): SecurityPolicy {
+  return cloneSecurityPolicy(SECURITY_PRESETS[preset]);
+}
 
 // ============================================================================
 // Audit Types
