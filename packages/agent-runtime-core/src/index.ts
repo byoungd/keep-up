@@ -737,6 +737,7 @@ export interface RuntimeCacheConfig {
 export interface RuntimeConfig {
   cache?: RuntimeCacheConfig;
   execution?: ExecutionConfig;
+  vision?: VisionConfig;
 }
 
 // ============================================================================
@@ -817,12 +818,18 @@ export interface VisionConfig {
   autoApplyConfidenceThreshold: number;
   /** Maximum nodes for layout graphs */
   maxNodes: number;
+  /** Max screenshot width for processing */
+  maxScreenshotWidth: number;
+  /** Max screenshot height for processing */
+  maxScreenshotHeight: number;
 }
 
 export const DEFAULT_VISION_CONFIG: VisionConfig = {
   ocrEnabled: true,
   autoApplyConfidenceThreshold: 0.85,
   maxNodes: 1000,
+  maxScreenshotWidth: 1920,
+  maxScreenshotHeight: 1080,
 };
 
 export interface ExecutionTaskSnapshot {

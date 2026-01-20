@@ -2,7 +2,7 @@
 
 Date: 2026-07-10
 Owner: QA Engineer
-Status: Ready
+Status: Completed
 Dependencies: Q4 tracks AA/AB/AC, Q3 Gym baseline
 
 Purpose: prevent aspirational planning by requiring measurable and testable
@@ -63,11 +63,11 @@ graph LR
 
 ### Deliverable Checklist
 
-- [ ] `packages/agent-runtime/src/execution/` contains scheduler and worker registry.
-- [ ] Execution leases are persisted via `packages/agent-runtime-persistence/`.
-- [ ] Backpressure and quota policies are enforced before tool execution.
-- [ ] 10+ unit tests cover scheduling and cancellation.
-- [ ] `packages/agent-runtime-core/src/index.ts` exposes `ExecutionLease` and `WorkerStatus`.
+- [x] `packages/agent-runtime/src/execution/` contains scheduler and worker registry.
+- [x] Execution leases are persisted via `packages/agent-runtime-persistence/`.
+- [x] Backpressure and quota policies are enforced before tool execution.
+- [x] 10+ unit tests cover scheduling and cancellation.
+- [x] `packages/agent-runtime-core/src/index.ts` exposes `ExecutionLease` and `WorkerStatus`.
 
 ---
 
@@ -97,10 +97,10 @@ graph LR
 
 ### Deliverable Checklist
 
-- [ ] `packages/agent-runtime-vision/` provides LayoutGraph and diff utilities.
-- [ ] `agent-runtime-tools` includes `layout_scan`, `visual_diff`, `map_region`.
-- [ ] 10+ tests cover layout parsing and diff scoring.
-- [ ] Artifact schemas are registered for `LayoutGraph` and `VisualDiffReport`.
+- [x] `packages/agent-runtime-vision/` provides LayoutGraph and diff utilities.
+- [x] `agent-runtime-tools` includes `layout_scan`, `visual_diff`, `map_region`.
+- [x] 10+ tests cover layout parsing and diff scoring.
+- [x] Artifact schemas are registered for `LayoutGraph` and `VisualDiffReport`.
 
 ---
 
@@ -130,14 +130,14 @@ graph LR
 
 ### Deliverable Checklist
 
-- [ ] `packages/agent-runtime/src/cowork/policy.ts` is extended with the Q4 policy DSL.
-- [ ] `packages/agent-runtime/src/security/` includes the tool policy adapter.
-- [ ] `packages/agent-runtime-telemetry/` stores audit records for tools.
-- [ ] Cowork UI exposes policy rule management and audit logs.
-- [ ] 10+ tests cover rule evaluation and audit integrity.
-- [ ] Core tools declare `annotations.policyAction`.
-- [ ] `MCPTool.annotations.policyAction` is defined in `packages/agent-runtime-core/src/index.ts`.
-- [ ] Tool registry rejects tools without `annotations.policyAction`.
+- [x] `packages/agent-runtime/src/cowork/policy.ts` is extended with the Q4 policy DSL.
+- [x] `packages/agent-runtime/src/security/` includes the tool policy adapter.
+- [x] `packages/agent-runtime-telemetry/` stores audit records for tools.
+- [x] Cowork UI exposes policy rule management and audit logs.
+- [x] 10+ tests cover rule evaluation and audit integrity.
+- [x] Core tools declare `annotations.policyAction`.
+- [x] `MCPTool.annotations.policyAction` is defined in `packages/agent-runtime-core/src/index.ts`.
+- [x] Tool registry rejects tools without `annotations.policyAction`.
 
 ---
 

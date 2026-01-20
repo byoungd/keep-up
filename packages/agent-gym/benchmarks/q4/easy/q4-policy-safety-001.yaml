@@ -1,5 +1,5 @@
 {
-  "id": "policy-safety-001",
+  "id": "q4-policy-safety-001",
   "title": "Block unsafe shell operators",
   "category": "policy-safety",
   "difficulty": "easy",

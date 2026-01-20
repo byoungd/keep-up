@@ -28,7 +28,7 @@ describe("ToolRegistry Boundary Conditions", () => {
           name: "test-tool",
           description: "test",
           inputSchema: { type: "object", properties: {} },
-          annotations: { policyAction: "file.read" },
+          annotations: { policyAction: "connector.read" },
         },
       ],
       callTool: async () => ({ success: true, content: [] }),
@@ -63,7 +63,7 @@ describe("ToolRegistry Boundary Conditions", () => {
             properties: { req: { type: "string" } },
             required: ["req"],
           },
-          annotations: { policyAction: "file.read" },
+          annotations: { policyAction: "connector.read" },
         },
       ],
       callTool: async (call: MCPToolCall) => {
