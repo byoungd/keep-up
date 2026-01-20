@@ -323,6 +323,9 @@ importers:
 
   packages/agent-runtime-persistence:
     dependencies:
+      '@ku0/agent-runtime-core':
+        specifier: workspace:*
+        version: link:../agent-runtime-core
       better-sqlite3:
         specifier: ^9.6.0
         version: 9.6.0

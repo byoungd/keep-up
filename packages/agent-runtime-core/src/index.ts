@@ -725,27 +725,116 @@ export interface RuntimeCacheConfig {
   };
 }
 
-export interface VisionConfig {
-  /** Confidence threshold for auto-applying edits (default: 0.85). */
-  autoApplyConfidenceThreshold: number;
-  /** Max width for captured screenshots (default: 1920). */
-  maxScreenshotWidth: number;
-  /** Max height for captured screenshots (default: 1080). */
-  maxScreenshotHeight: number;
-  /** Enable OCR for layout scans (default: true). */
-  ocrEnabled: boolean;
-}
-
-export const DEFAULT_VISION_CONFIG: VisionConfig = {
-  autoApplyConfidenceThreshold: 0.85,
-  maxScreenshotWidth: 1920,
-  maxScreenshotHeight: 1080,
-  ocrEnabled: true,
-};
-
 export interface RuntimeConfig {
   cache?: RuntimeCacheConfig;
-  vision?: VisionConfig;
+  execution?: ExecutionConfig;
+}
+
+// ============================================================================
+// Execution Plane Types
+// ============================================================================
+
+export type ExecutionQueueClass = "interactive" | "normal" | "batch";
+
+export type ExecutionTaskStatus =
+  | "queued"
+  | "running"
+  | "completed"
+  | "failed"
+  | "canceled"
+  | "rejected";
+
+export type ExecutionLeaseStatus = "running" | "completed" | "failed" | "canceled";
+
+export interface ExecutionLease {
+  leaseId: string;
+  taskId: string;
+  workerId: string;
+  status: ExecutionLeaseStatus;
+  acquiredAt: number;
+  expiresAt: number;
+  lastHeartbeatAt: number;
+  attempt: number;
+}
+
+export type ExecutionWorkerState = "idle" | "busy" | "draining";
+
+export interface WorkerStatus {
+  workerId: string;
+  state: ExecutionWorkerState;
+  capacity: number;
+  inFlight: number;
+  lastSeenAt: number;
+}
+
+export interface ExecutionQuotaLimit {
+  maxInFlight: number;
+}
+
+export interface ExecutionQuotaConfig {
+  models?: Record<string, ExecutionQuotaLimit>;
+  tools?: Record<string, ExecutionQuotaLimit>;
+  defaultModel?: ExecutionQuotaLimit;
+  defaultTool?: ExecutionQuotaLimit;
+}
+
+export interface ExecutionConfig {
+  leaseTtlMs: number;
+  heartbeatIntervalMs: number;
+  schedulerTickMs: number;
+  maxInFlightPerWorker: number;
+  queueDepthLimit: number;
+  batchBackpressureThreshold: number;
+  quotaConfig?: ExecutionQuotaConfig;
+}
+
+export const DEFAULT_EXECUTION_CONFIG: ExecutionConfig = {
+  leaseTtlMs: 30_000,
+  heartbeatIntervalMs: 5_000,
+  schedulerTickMs: 100,
+  maxInFlightPerWorker: 4,
+  queueDepthLimit: 1000,
+  batchBackpressureThreshold: 500,
+};
+
+export interface ExecutionTaskSnapshot {
+  taskId: string;
+  type: string;
+  queueClass: ExecutionQueueClass;
+  status: ExecutionTaskStatus;
+  attempt: number;
+  sequence: number;
+  timestamp: number;
+  payload: unknown;
+  workerId?: string;
+  result?: unknown;
+  error?: string;
+  modelId?: string;
+  toolName?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface ExecutionLeaseFilter {
+  status?: ExecutionLeaseStatus | ExecutionLeaseStatus[];
+  taskId?: string;
+  workerId?: string;
+}
+
+export interface ExecutionTaskSnapshotFilter {
+  status?: ExecutionTaskStatus | ExecutionTaskStatus[];
+  taskId?: string;
+  afterSequence?: number;
+  limit?: number;
+}
+
+export interface ExecutionStateStore {
+  saveLease(lease: ExecutionLease): Promise<void>;
+  loadLease(leaseId: string): Promise<ExecutionLease | null>;
+  listLeases(filter?: ExecutionLeaseFilter): Promise<ExecutionLease[]>;
+  deleteLease(leaseId: string): Promise<void>;
+  saveTaskSnapshot(snapshot: ExecutionTaskSnapshot): Promise<void>;
+  listTaskSnapshots(filter?: ExecutionTaskSnapshotFilter): Promise<ExecutionTaskSnapshot[]>;
+  getLatestTaskSnapshots(): Promise<ExecutionTaskSnapshot[]>;
 }
 
 /** Agent configuration */
@@ -1100,9 +1189,7 @@ export type ArtifactType =
   | "ChecklistCard"
   | "TestReport"
   | "ReviewReport"
-  | "ImageArtifact"
-  | "LayoutGraph"
-  | "VisualDiffReport";
+  | "ImageArtifact";
 
 export interface ArtifactEnvelope {
   id: string;

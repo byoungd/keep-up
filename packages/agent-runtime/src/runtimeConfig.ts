@@ -2,7 +2,8 @@
  * Runtime configuration helpers.
  */
 
-import type { RuntimeCacheConfig, RuntimeConfig } from "./types";
+import type { ExecutionConfig, RuntimeCacheConfig, RuntimeConfig } from "./types";
+import { DEFAULT_EXECUTION_CONFIG } from "./types";
 
 export function resolveRuntimeCacheConfig(config?: RuntimeConfig): RuntimeCacheConfig {
   const cache = config?.cache;
@@ -28,6 +29,17 @@ export function resolveRuntimeCacheConfig(config?: RuntimeConfig): RuntimeCacheC
       maxEntries: toolResult?.maxEntries ?? baseMaxEntries,
       maxSizeBytes: toolResult?.maxSizeBytes,
     },
+  };
+}
+
+export function resolveExecutionConfig(
+  config?: RuntimeConfig | { execution?: Partial<ExecutionConfig> }
+): ExecutionConfig {
+  const execution = config?.execution;
+  return {
+    ...DEFAULT_EXECUTION_CONFIG,
+    ...execution,
+    quotaConfig: execution?.quotaConfig,
   };
 }
 

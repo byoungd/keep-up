@@ -9,6 +9,7 @@ import type {
   ArtifactEnvelope,
   CheckpointEvent,
   ExecutionDecision,
+  ExecutionQueueClass,
   MessageEnvelope,
   ToolExecutionRecord,
 } from "@ku0/agent-runtime-core";
@@ -210,6 +211,20 @@ export interface ExecutionEvents {
   "execution:record": ToolExecutionRecord;
 }
 
+/** Task lifecycle events */
+export interface TaskEvents {
+  "task:enqueued": { taskId: string; queueClass: ExecutionQueueClass; attempt: number };
+  "task:started": { taskId: string; workerId: string; attempt: number };
+  "task:completed": { taskId: string; workerId: string; durationMs: number };
+  "task:failed": { taskId: string; workerId?: string; error: string };
+  "task:cancelled": { taskId: string; workerId?: string; reason?: string };
+  "task:requeued": { taskId: string; attempt: number; reason: "lease_expired" };
+  "task:rejected": {
+    taskId: string;
+    reason: "queue_full" | "backpressure" | "quota_exceeded" | "handler_missing";
+  };
+}
+
 /** Checkpoint lifecycle events */
 export interface CheckpointEvents {
   "checkpoint:created": CheckpointEvent;
@@ -251,6 +266,7 @@ export interface RuntimeEventMap
     SystemEvents,
     MessageBusEvents,
     ExecutionEvents,
+    TaskEvents,
     CheckpointEvents,
     SubagentEvents,
     ArtifactEvents {

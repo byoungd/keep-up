@@ -6,9 +6,9 @@ import Dockerode from "dockerode";
 
 const DEFAULT_DOCKER_API_VERSION = "v1.44";
 const DOCKER_SOCKET_CANDIDATES = [
-  join(homedir(), "Library/Containers/com.docker.docker/Data/docker.raw.sock"),
-  "/var/run/docker.sock",
   join(homedir(), ".docker/run/docker.sock"),
+  "/var/run/docker.sock",
+  join(homedir(), "Library/Containers/com.docker.docker/Data/docker.raw.sock"),
 ];
 
 export function createDockerClient(
@@ -29,8 +29,9 @@ export function createDockerClient(
 }
 
 function resolveDockerSocketPath(): string | undefined {
-  if (process.env.DOCKER_HOST) {
-    return undefined;
+  const dockerHost = process.env.DOCKER_HOST;
+  if (dockerHost) {
+    return parseDockerHostSocketPath(dockerHost);
   }
 
   for (const candidate of DOCKER_SOCKET_CANDIDATES) {
@@ -40,6 +41,14 @@ function resolveDockerSocketPath(): string | undefined {
   }
 
   return undefined;
+}
+
+function parseDockerHostSocketPath(dockerHost: string): string | undefined {
+  if (!dockerHost.startsWith("unix://")) {
+    return undefined;
+  }
+
+  return dockerHost.slice("unix://".length);
 }
 
 function resolveDockerApiVersion(): string | undefined {

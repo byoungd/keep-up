@@ -5,4 +5,5 @@
  */
 
 export * from "./checkpoint";
+export * from "./execution";
 export * from "./timetravel";
