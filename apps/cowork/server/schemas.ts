@@ -90,3 +90,21 @@ export const toolCheckSchema = z.discriminatedUnion("kind", [
     reason: z.string().min(1).optional(),
   }),
 ]);
+
+export const agentProtocolTaskSchema = z.object({
+  input: z.string().min(1),
+  additional_input: z.record(z.string(), z.unknown()).optional().default({}),
+});
+
+export const agentProtocolStepSchema = z.object({
+  name: z.string().min(1).optional(),
+  input: z.string().min(1),
+  additional_input: z.record(z.string(), z.unknown()).optional().default({}),
+});
+
+export const agentProtocolArtifactSchema = z.object({
+  title: z.string().min(1),
+  type: z.enum(["diff", "plan", "markdown", "preflight"]),
+  artifact: z.record(z.string(), z.unknown()),
+  sourcePath: z.string().min(1).optional(),
+});

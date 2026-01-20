@@ -4,6 +4,7 @@ import { jsonError } from "./http";
 import { serverLogger } from "./logger";
 import type { PipelineRunner } from "./pipelines/pipelineRunner";
 import type { PipelineStore } from "./pipelines/pipelineStore";
+import { createAgentProtocolRoutes } from "./routes/agentProtocol";
 import { createApprovalRoutes } from "./routes/approvals";
 import { createArtifactRoutes } from "./routes/artifacts";
 import { createAuditLogRoutes } from "./routes/auditLogs";
@@ -68,6 +69,17 @@ export function createCoworkApp(deps: CoworkAppDeps) {
       taskStore: deps.storage.taskStore,
       events: eventHub,
       taskRuntime,
+    })
+  );
+
+  app.route(
+    "/api",
+    createAgentProtocolRoutes({
+      sessionStore: deps.storage.sessionStore,
+      taskStore: deps.storage.taskStore,
+      stepStore: deps.storage.stepStore,
+      artifactStore: deps.storage.artifactStore,
+      auditLogStore: deps.storage.auditLogStore,
     })
   );
 

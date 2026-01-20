@@ -6,7 +6,7 @@ import { createMessageBus } from "@ku0/agent-runtime-control";
 import { describe, expect, it } from "vitest";
 import { createCheckpointManager, InMemoryCheckpointStorage } from "../checkpoint";
 import type { TeamChatPayload, TeamDefinition } from "../teams";
-import { createTeamRegistry, GroupChatSession } from "../teams";
+import { createTeamProcessController, createTeamRegistry, GroupChatSession } from "../teams";
 
 describe("TeamRegistry", () => {
   it("indexes participants by capability", async () => {
@@ -122,5 +122,80 @@ describe("GroupChatSession", () => {
     const metadata = checkpoint?.metadata as Record<string, unknown>;
     const teamMeta = metadata?.team as Record<string, unknown> | undefined;
     expect(teamMeta?.messageCount).toBe(1);
+  });
+});
+
+describe("TeamProcessController", () => {
+  const team: TeamDefinition = {
+    teamId: "team-process",
+    name: "Process Team",
+    participants: [
+      { agentId: "agent-a", displayName: "Agent A", capabilities: ["plan"] },
+      { agentId: "agent-b", displayName: "Agent B", capabilities: ["build"] },
+      { agentId: "agent-c", displayName: "Agent C", capabilities: ["review"] },
+    ],
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+
+  it("runs sequential mode without wrapping", async () => {
+    const controller = createTeamProcessController(team, { mode: "sequential" });
+    const step1 = await controller.selectParticipant({ stepId: "s1", task: "Task 1" });
+    const step2 = await controller.selectParticipant({ stepId: "s2", task: "Task 2" });
+    const step3 = await controller.selectParticipant({ stepId: "s3", task: "Task 3" });
+    const step4 = await controller.selectParticipant({ stepId: "s4", task: "Task 4" });
+
+    expect(step1.agentId).toBe("agent-a");
+    expect(step2.agentId).toBe("agent-b");
+    expect(step3.agentId).toBe("agent-c");
+    expect(step4.agentId).toBe("agent-c");
+  });
+
+  it("round-robins across participants", async () => {
+    const controller = createTeamProcessController(team, { mode: "round_robin" });
+    const step1 = await controller.selectParticipant({ stepId: "s1", task: "Task 1" });
+    const step2 = await controller.selectParticipant({ stepId: "s2", task: "Task 2" });
+    const step3 = await controller.selectParticipant({ stepId: "s3", task: "Task 3" });
+    const step4 = await controller.selectParticipant({ stepId: "s4", task: "Task 4" });
+
+    expect(step1.agentId).toBe("agent-a");
+    expect(step2.agentId).toBe("agent-b");
+    expect(step3.agentId).toBe("agent-c");
+    expect(step4.agentId).toBe("agent-a");
+  });
+
+  it("uses manager arbitration for hierarchical mode", async () => {
+    const controller = createTeamProcessController(team, {
+      mode: "hierarchical",
+      manager: () => ({ agentId: "agent-b", reason: "delegate" }),
+    });
+
+    const decision = await controller.selectParticipant({ stepId: "s1", task: "Task 1" });
+    expect(decision.agentId).toBe("agent-b");
+    expect(decision.reason).toBe("delegate");
+  });
+
+  it("persists process state in checkpoint metadata", async () => {
+    const storage = new InMemoryCheckpointStorage();
+    const checkpointManager = createCheckpointManager({ storage });
+    const checkpoint = await checkpointManager.create({
+      task: "Team Process",
+      agentType: "team",
+      agentId: team.teamId,
+    });
+
+    const controller = createTeamProcessController(team, {
+      mode: "round_robin",
+      checkpointManager,
+      checkpointId: checkpoint.id,
+    });
+
+    await controller.selectParticipant({ stepId: "s1", task: "Task 1" });
+
+    const loaded = await storage.load(checkpoint.id);
+    const metadata = loaded?.metadata as Record<string, unknown> | undefined;
+    const process = metadata?.teamProcess as Record<string, unknown> | undefined;
+    expect(process?.decisionCount).toBe(1);
+    expect(process?.lastAgentId).toBe("agent-a");
   });
 });

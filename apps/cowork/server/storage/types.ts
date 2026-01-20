@@ -14,7 +14,10 @@ export type CoworkAuditAction =
   | "approval_requested"
   | "approval_resolved"
   | "workflow_run"
-  | "preflight_run";
+  | "preflight_run"
+  | "agent_protocol_task_created"
+  | "agent_protocol_step_created"
+  | "agent_protocol_artifact_created";
 
 export interface CoworkAuditEntry {
   entryId: string;
@@ -108,6 +111,23 @@ export interface CoworkChatMessage {
   taskId?: string;
   attachments?: CoworkChatAttachmentRef[];
   metadata?: Record<string, unknown>;
+}
+
+export type CoworkTaskStepStatus = "created" | "running" | "completed";
+
+export interface CoworkTaskStepRecord {
+  stepId: string;
+  taskId: string;
+  name?: string;
+  input: string;
+  additionalInput?: Record<string, unknown>;
+  status: CoworkTaskStepStatus;
+  output?: string;
+  additionalOutput?: Record<string, unknown>;
+  artifacts: string[];
+  isLast: boolean;
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface AgentStateCheckpointRecord {

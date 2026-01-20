@@ -5,6 +5,17 @@
  */
 
 export { GroupChatSession } from "./groupChat";
+export type {
+  TeamManager,
+  TeamManagerDecision,
+  TeamManagerInput,
+  TeamProcessControllerOptions,
+  TeamProcessDecision,
+  TeamProcessState,
+  TeamProcessStatus,
+  TeamProcessStep,
+} from "./processModes";
+export { createTeamProcessController, TeamProcessController } from "./processModes";
 export { createTeamRegistry, TeamRegistry } from "./teamRegistry";
 export type {
   TeamChatPayload,
