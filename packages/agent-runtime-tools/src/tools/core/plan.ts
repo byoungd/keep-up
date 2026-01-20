@@ -51,9 +51,9 @@ export class PlanToolServer extends BaseToolServer {
   private persistence: PlanPersistence;
   private readonly currentPlanPath = `${DEFAULT_AGENT_PLANS_DIR}/current.md`;
 
-  constructor() {
+  constructor(options: { persistence?: PlanPersistence } = {}) {
     super();
-    this.persistence = createPlanPersistence();
+    this.persistence = options.persistence ?? createPlanPersistence();
     this.registerTools();
   }
 
@@ -315,8 +315,13 @@ export class PlanToolServer extends BaseToolServer {
 
   private async handleSave(
     args: Record<string, unknown>,
-    _context: ToolContext
+    context: ToolContext
   ): Promise<MCPToolResult> {
+    const writeAccess = this.ensureWriteAccess(context);
+    if (writeAccess) {
+      return writeAccess;
+    }
+
     try {
       const goal = args.goal as string;
       const stepsInput = args.steps as Array<{
@@ -355,8 +360,9 @@ export class PlanToolServer extends BaseToolServer {
 
       await this.persistence.saveCurrent(plan);
 
-      return textResult(
-        `Plan saved successfully!\n\nGoal: ${goal}\nSteps: ${steps.length}\nRisk: ${riskAssessment}\nLocation: ${this.currentPlanPath}`
+      return this.formatOutput(
+        `Plan saved successfully!\n\nGoal: ${goal}\nSteps: ${steps.length}\nRisk: ${riskAssessment}\nLocation: ${this.currentPlanPath}`,
+        context
       );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -366,13 +372,18 @@ export class PlanToolServer extends BaseToolServer {
 
   private async handleLoad(
     _args: Record<string, unknown>,
-    _context: ToolContext
+    context: ToolContext
   ): Promise<MCPToolResult> {
+    const readAccess = this.ensureReadAccess(context);
+    if (readAccess) {
+      return readAccess;
+    }
+
     try {
       const plan = await this.persistence.loadCurrent();
 
       if (!plan) {
-        return textResult("No active plan found. Create one with plan:save.");
+        return this.formatOutput("No active plan found. Create one with plan:save.", context);
       }
 
       const lines: string[] = [
@@ -399,7 +410,7 @@ export class PlanToolServer extends BaseToolServer {
         }
       }
 
-      return textResult(lines.join("\n"));
+      return this.formatOutput(lines.join("\n"), context);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return errorResult("EXECUTION_FAILED", `Failed to load plan: ${message}`);
@@ -408,14 +419,19 @@ export class PlanToolServer extends BaseToolServer {
 
   private async handleList(
     args: Record<string, unknown>,
-    _context: ToolContext
+    context: ToolContext
   ): Promise<MCPToolResult> {
+    const readAccess = this.ensureReadAccess(context);
+    if (readAccess) {
+      return readAccess;
+    }
+
     try {
       const limit = (args.limit as number) ?? 10;
       const history = await this.persistence.listHistory();
 
       if (history.length === 0) {
-        return textResult("No plan history found.");
+        return this.formatOutput("No plan history found.", context);
       }
 
       const lines: string[] = ["# Plan History", ""];
@@ -426,7 +442,7 @@ export class PlanToolServer extends BaseToolServer {
         lines.push(`- [${meta.status}] ${meta.goal} (${progress} steps) - ${date}`);
       }
 
-      return textResult(lines.join("\n"));
+      return this.formatOutput(lines.join("\n"), context);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return errorResult("EXECUTION_FAILED", `Failed to list plans: ${message}`);
@@ -435,13 +451,18 @@ export class PlanToolServer extends BaseToolServer {
 
   private async handleStatus(
     _args: Record<string, unknown>,
-    _context: ToolContext
+    context: ToolContext
   ): Promise<MCPToolResult> {
+    const readAccess = this.ensureReadAccess(context);
+    if (readAccess) {
+      return readAccess;
+    }
+
     try {
       const plan = await this.persistence.loadCurrent();
 
       if (!plan) {
-        return textResult("No active plan.");
+        return this.formatOutput("No active plan.", context);
       }
 
       const total = plan.steps.length;
@@ -468,7 +489,7 @@ export class PlanToolServer extends BaseToolServer {
       const empty = 20 - filled;
       lines.push(`[${"█".repeat(filled)}${"░".repeat(empty)}] ${progressPct}%`);
 
-      return textResult(lines.join("\n"));
+      return this.formatOutput(lines.join("\n"), context);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return errorResult("EXECUTION_FAILED", `Failed to get status: ${message}`);
@@ -477,8 +498,13 @@ export class PlanToolServer extends BaseToolServer {
 
   private async handleStep(
     args: Record<string, unknown>,
-    _context: ToolContext
+    context: ToolContext
   ): Promise<MCPToolResult> {
+    const writeAccess = this.ensureWriteAccess(context);
+    if (writeAccess) {
+      return writeAccess;
+    }
+
     try {
       const stepNumber = args.stepNumber as number;
       const status = args.status as PlanStep["status"];
@@ -497,7 +523,10 @@ export class PlanToolServer extends BaseToolServer {
       step.status = status;
       await this.persistence.saveCurrent(plan);
 
-      return textResult(`Step ${stepNumber} marked as ${status}: ${step.description}`);
+      return this.formatOutput(
+        `Step ${stepNumber} marked as ${status}: ${step.description}`,
+        context
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return errorResult("EXECUTION_FAILED", `Failed to update step: ${message}`);
@@ -506,16 +535,21 @@ export class PlanToolServer extends BaseToolServer {
 
   private async handleArchive(
     _args: Record<string, unknown>,
-    _context: ToolContext
+    context: ToolContext
   ): Promise<MCPToolResult> {
+    const writeAccess = this.ensureWriteAccess(context);
+    if (writeAccess) {
+      return writeAccess;
+    }
+
     try {
       const historyPath = await this.persistence.archiveCurrent();
 
       if (!historyPath) {
-        return textResult("No active plan to archive.");
+        return this.formatOutput("No active plan to archive.", context);
       }
 
-      return textResult(`Plan archived to: ${historyPath}`);
+      return this.formatOutput(`Plan archived to: ${historyPath}`, context);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return errorResult("EXECUTION_FAILED", `Failed to archive plan: ${message}`);
@@ -524,8 +558,13 @@ export class PlanToolServer extends BaseToolServer {
 
   private async handleAdvance(
     args: Record<string, unknown>,
-    _context: ToolContext
+    context: ToolContext
   ): Promise<MCPToolResult> {
+    const writeAccess = this.ensureWriteAccess(context);
+    if (writeAccess) {
+      return writeAccess;
+    }
+
     try {
       const _phase_id = args.phase_id as string | undefined;
       const plan = await this.persistence.loadCurrent();
@@ -546,10 +585,13 @@ export class PlanToolServer extends BaseToolServer {
       if (nextStep) {
         nextStep.status = "executing";
         await this.persistence.saveCurrent(plan);
-        return textResult(`Advanced to step ${nextStep.order}: ${nextStep.description}`);
+        return this.formatOutput(
+          `Advanced to step ${nextStep.order}: ${nextStep.description}`,
+          context
+        );
       }
 
-      return textResult("All steps completed. Plan finished.");
+      return this.formatOutput("All steps completed. Plan finished.", context);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return errorResult("EXECUTION_FAILED", `Failed to advance phase: ${message}`);
@@ -558,8 +600,13 @@ export class PlanToolServer extends BaseToolServer {
 
   private async handleUpdate(
     args: Record<string, unknown>,
-    _context: ToolContext
+    context: ToolContext
   ): Promise<MCPToolResult> {
+    const writeAccess = this.ensureWriteAccess(context);
+    if (writeAccess) {
+      return writeAccess;
+    }
+
     try {
       const goal = args.goal as string | undefined;
       const add_steps = args.add_steps as
@@ -619,8 +666,9 @@ export class PlanToolServer extends BaseToolServer {
 
       await this.persistence.saveCurrent(plan);
 
-      return textResult(
-        `Plan updated successfully!\nGoal: ${plan.goal}\nSteps: ${plan.steps.length}`
+      return this.formatOutput(
+        `Plan updated successfully!\nGoal: ${plan.goal}\nSteps: ${plan.steps.length}`,
+        context
       );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -645,6 +693,35 @@ export class PlanToolServer extends BaseToolServer {
       default:
         return "○";
     }
+  }
+
+  private ensureReadAccess(context: ToolContext): MCPToolResult | null {
+    if (context.security.permissions.file === "none") {
+      return errorResult("PERMISSION_DENIED", "File access is disabled");
+    }
+
+    return null;
+  }
+
+  private ensureWriteAccess(context: ToolContext): MCPToolResult | null {
+    if (
+      context.security.permissions.file === "none" ||
+      context.security.permissions.file === "read"
+    ) {
+      return errorResult("PERMISSION_DENIED", "File write access is disabled");
+    }
+
+    return null;
+  }
+
+  private formatOutput(output: string, context: ToolContext): MCPToolResult {
+    const maxOutputBytes = context.security.limits.maxOutputBytes;
+    if (Buffer.byteLength(output) > maxOutputBytes) {
+      const truncated = Buffer.from(output).subarray(0, maxOutputBytes).toString();
+      return textResult(`${truncated}\n\n[Output truncated at ${maxOutputBytes} bytes]`);
+    }
+
+    return textResult(output);
   }
 }
 
