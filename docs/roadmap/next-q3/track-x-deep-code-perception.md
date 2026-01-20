@@ -73,3 +73,7 @@ Currently, agents waste steps "searching" for file paths or signatures. With Dee
 - Unit tests for `SymbolGraph` construction and querying.
 - Integration tests for `rename_symbol` across multiple files.
 - Suggested command: `pnpm --filter @ku0/agent-runtime test -- --grep "lsp"`
+
+## Walkthrough
+
+See [track-x-walkthrough.md](./track-x-walkthrough.md).
