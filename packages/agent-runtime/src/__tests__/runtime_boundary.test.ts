@@ -24,7 +24,12 @@ describe("ToolRegistry Boundary Conditions", () => {
     const mockServer = {
       name: "test-server",
       listTools: () => [
-        { name: "test-tool", description: "test", inputSchema: { type: "object", properties: {} } },
+        {
+          name: "test-tool",
+          description: "test",
+          inputSchema: { type: "object", properties: {} },
+          annotations: { policyAction: "file.read" },
+        },
       ],
       callTool: async () => ({ success: true, content: [] }),
     } as unknown as MCPToolServer;
@@ -58,6 +63,7 @@ describe("ToolRegistry Boundary Conditions", () => {
             properties: { req: { type: "string" } },
             required: ["req"],
           },
+          annotations: { policyAction: "file.read" },
         },
       ],
       callTool: async (call: MCPToolCall) => {

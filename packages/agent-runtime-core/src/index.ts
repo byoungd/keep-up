@@ -806,6 +806,25 @@ export const DEFAULT_EXECUTION_CONFIG: ExecutionConfig = {
   batchBackpressureThreshold: 500,
 };
 
+// ============================================================================
+// Vision Types
+// ============================================================================
+
+export interface VisionConfig {
+  /** Whether OCR blocks are processed in layout scans */
+  ocrEnabled: boolean;
+  /** Confidence threshold for auto-applying region mappings */
+  autoApplyConfidenceThreshold: number;
+  /** Maximum nodes for layout graphs */
+  maxNodes: number;
+}
+
+export const DEFAULT_VISION_CONFIG: VisionConfig = {
+  ocrEnabled: true,
+  autoApplyConfidenceThreshold: 0.85,
+  maxNodes: 1000,
+};
+
 export interface ExecutionTaskSnapshot {
   taskId: string;
   type: string;
