@@ -21,6 +21,7 @@ export default defineConfig({
         __dirname,
         "../agent-runtime-telemetry/src/telemetry/index.ts"
       ),
+      "@ku0/agent-runtime-vision": path.resolve(__dirname, "../agent-runtime-vision/src/index.ts"),
     },
   },
   test: {

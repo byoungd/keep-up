@@ -52,6 +52,8 @@ type LessonVectorEntry = {
   embedding: number[];
 };
 
+type LessonWithEmbedding = Lesson & { embedding: number[] };
+
 const DEFAULT_DIMENSION = 384;
 
 export class LessonStore {
@@ -235,7 +237,7 @@ export class LessonStore {
     }
   }
 
-  private async hydrateLesson(item: Lesson): Promise<Lesson | null> {
+  private async hydrateLesson(item: Lesson): Promise<LessonWithEmbedding | null> {
     if (!item.id) {
       return null;
     }
@@ -317,19 +319,20 @@ export function createLessonStore(config?: LessonStoreConfig): LessonStore {
 }
 
 function resolveEmbeddingProvider(config: LessonStoreConfig): EmbeddingProvider {
-  if (config.embeddingProvider) {
-    if ("dimension" in config.embeddingProvider) {
-      return config.embeddingProvider;
+  const configuredProvider = config.embeddingProvider;
+  if (configuredProvider) {
+    if ("dimension" in configuredProvider) {
+      return configuredProvider;
     }
     return {
-      embed: (text: string) => config.embeddingProvider.embed(text),
-      dimension: config.embeddingProvider.getDimension(),
+      embed: (text: string) => configuredProvider.embed(text),
+      dimension: configuredProvider.getDimension(),
     };
   }
   const dimension = config.dimension ?? DEFAULT_DIMENSION;
-  const provider = new MockEmbeddingProvider(dimension);
+  const mockProvider = new MockEmbeddingProvider(dimension);
   return {
-    embed: (text: string) => provider.embed(text),
+    embed: (text: string) => mockProvider.embed(text),
     dimension,
   };
 }

@@ -1,0 +1,47 @@
+{
+  "id": "q4-visual-layout-001",
+  "title": "Layout graph extraction 1",
+  "category": "visual-layout",
+  "difficulty": "easy",
+  "prompt": "Generate a layout graph for the provided nodes.",
+  "expectations": [
+    {
+      "type": "tool_called",
+      "name": "layout_scan"
+    }
+  ],
+  "script": {
+    "responses": [
+      {
+        "content": "Scanning layout.",
+        "finishReason": "tool_use",
+        "toolCalls": [
+          {
+            "name": "layout_scan",
+            "arguments": {
+              "nodes": [
+                {
+                  "id": "header",
+                  "bounds": { "x": 0, "y": 0, "width": 320, "height": 60 },
+                  "role": "banner"
+                },
+                {
+                  "id": "cta",
+                  "bounds": { "x": 20, "y": 80, "width": 120, "height": 40 },
+                  "role": "button",
+                  "text": "Get started"
+                }
+              ],
+              "includeAdjacencyEdges": true,
+              "adjacencyThreshold": 12
+            }
+          }
+        ]
+      },
+      {
+        "content": "Layout graph ready.",
+        "finishReason": "stop"
+      }
+    ]
+  }
+}

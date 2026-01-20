@@ -136,7 +136,7 @@ export type CoworkArtifact = {
   sessionId: string;
   taskId?: string;
   title: string;
-  type: "diff" | "plan" | "markdown" | "preflight";
+  type: "diff" | "plan" | "markdown" | "preflight" | "LayoutGraph" | "VisualDiffReport";
   artifact: unknown;
   sourcePath?: string;
   version: number;

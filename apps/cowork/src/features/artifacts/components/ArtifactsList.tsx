@@ -1,8 +1,10 @@
 import type { ArtifactPayload } from "../../tasks/types";
 import { DiffCard } from "./DiffCard";
+import { LayoutGraphCard } from "./LayoutGraphCard";
 import { PlanCard } from "./PlanCard";
 import { PreflightCard } from "./PreflightCard";
 import { ReportCard } from "./ReportCard";
+import { VisualDiffCard } from "./VisualDiffCard";
 
 interface ArtifactsListProps {
   artifacts: Record<
@@ -45,6 +47,9 @@ export function ArtifactsList({ artifacts, onApply, onRevert }: ArtifactsListPro
 
   const plans = list.filter(([_, a]) => a.type === "plan");
   const diffs = list.filter(([_, a]) => a.type === "diff");
+  const visuals = list.filter(
+    ([_, a]) => a.type === "LayoutGraph" || a.type === "VisualDiffReport"
+  );
   const reports = list.filter(([_, a]) => a.type === "markdown" || a.type === "preflight");
 
   interface SectionProps {
@@ -94,6 +99,10 @@ export function ArtifactsList({ artifacts, onApply, onRevert }: ArtifactsListPro
                 );
               case "preflight":
                 return <PreflightCard key={id} payload={artifact} />;
+              case "LayoutGraph":
+                return <LayoutGraphCard key={id} graph={artifact} />;
+              case "VisualDiffReport":
+                return <VisualDiffCard key={id} report={artifact} />;
               default:
                 return null;
             }
@@ -114,6 +123,11 @@ export function ArtifactsList({ artifacts, onApply, onRevert }: ArtifactsListPro
         title="File Changes"
         icon={<div className="w-1.5 h-1.5 rounded-full bg-accent-amber" />}
         items={diffs}
+      />
+      <Section
+        title="Visuals"
+        icon={<div className="w-1.5 h-1.5 rounded-full bg-accent-emerald" />}
+        items={visuals}
       />
       <Section
         title="Reports"

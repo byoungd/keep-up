@@ -7,7 +7,16 @@ const DEFAULT_REPORT = path.resolve(process.cwd(), "reports/latest.json");
 const DEFAULT_BENCHMARKS = path.resolve(process.cwd(), "benchmarks");
 
 const ALL_DIFFICULTIES: GymDifficulty[] = ["easy", "medium", "hard"];
-const ALL_CATEGORIES: GymCategory[] = ["syntax-repair", "refactor", "feature-add", "cross-file"];
+const ALL_CATEGORIES: GymCategory[] = [
+  "syntax-repair",
+  "refactor",
+  "feature-add",
+  "cross-file",
+  "execution-scale",
+  "visual-layout",
+  "visual-diff",
+  "policy-safety",
+];
 
 interface CliOptions {
   suite: GymDifficulty[];

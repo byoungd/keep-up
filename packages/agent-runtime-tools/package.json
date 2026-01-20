@@ -49,6 +49,7 @@
     "@ku0/agent-runtime-core": "workspace:*",
     "@ku0/agent-runtime-sandbox": "workspace:*",
     "@ku0/agent-runtime-telemetry": "workspace:*",
+    "@ku0/agent-runtime-vision": "workspace:*",
     "@ku0/core": "workspace:*",
     "@ku0/db": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.25.2",

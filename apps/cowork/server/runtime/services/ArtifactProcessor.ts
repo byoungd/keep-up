@@ -232,6 +232,12 @@ function deriveArtifactTitle(artifactId: string, artifact: CoworkArtifactPayload
   if (artifact.type === "preflight") {
     return "Preflight Report";
   }
+  if (artifact.type === "LayoutGraph") {
+    return "Layout Graph";
+  }
+  if (artifact.type === "VisualDiffReport") {
+    return "Visual Diff Report";
+  }
   if (artifactId.startsWith("summary-")) {
     return "Summary";
   }
