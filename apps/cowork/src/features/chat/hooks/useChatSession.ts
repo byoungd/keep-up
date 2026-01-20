@@ -8,6 +8,7 @@ import {
   getChatHistory,
   resolveApproval,
   sendChatMessage,
+  setSessionMode,
   toggleSessionMode,
 } from "../../../api/coworkApi";
 import { useWorkspace } from "../../../app/providers/WorkspaceProvider";
@@ -486,6 +487,16 @@ export function useChatSession(sessionId: string | undefined) {
     []
   );
 
+  const setMode = useCallback(
+    async (mode: "plan" | "build" | "review") => {
+      if (!sessionId) {
+        return;
+      }
+      await setSessionMode(sessionId, mode);
+    },
+    [sessionId]
+  );
+
   return {
     messages,
     sendMessage,
@@ -501,6 +512,7 @@ export function useChatSession(sessionId: string | undefined) {
     branchMessage,
     retryMessage,
     agentMode: graph.agentMode ?? "build",
+    setMode,
     toggleMode: useCallback(async () => {
       if (!sessionId) {
         return;
@@ -541,8 +553,13 @@ function mapTaskStatus(
   switch (status) {
     case "running":
     case "planning":
-    case "ready":
       return "running";
+    case "queued":
+    case "ready":
+      return "queued";
+    case "awaiting_approval":
+    case "awaiting_confirmation":
+      return "paused";
     case "completed":
       return "completed";
     case "failed":

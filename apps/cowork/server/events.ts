@@ -48,7 +48,7 @@ export interface CoworkEventPayloads {
   };
   [COWORK_EVENTS.SESSION_UPDATED]: {
     sessionId: string;
-    agentMode?: "plan" | "build";
+    agentMode?: "plan" | "build" | "review";
     title?: string;
   };
   [COWORK_EVENTS.SESSION_ENDED]: {
@@ -60,8 +60,8 @@ export interface CoworkEventPayloads {
   };
   [COWORK_EVENTS.SESSION_MODE_CHANGED]: {
     sessionId: string;
-    mode: "plan" | "build";
-    previousMode: "plan" | "build";
+    mode: "plan" | "build" | "review";
+    previousMode: "plan" | "build" | "review";
   };
   [COWORK_EVENTS.SESSION_USAGE_UPDATED]: {
     inputTokens: number;

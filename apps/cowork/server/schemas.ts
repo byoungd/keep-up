@@ -107,7 +107,21 @@ export const agentProtocolStepSchema = z.object({
 
 export const agentProtocolArtifactSchema = z.object({
   title: z.string().min(1),
-  type: z.enum(["diff", "plan", "markdown", "preflight", "LayoutGraph", "VisualDiffReport"]),
+  type: z.enum([
+    "diff",
+    "DiffCard",
+    "plan",
+    "PlanCard",
+    "markdown",
+    "ReportCard",
+    "ChecklistCard",
+    "TestReport",
+    "ReviewReport",
+    "ImageArtifact",
+    "preflight",
+    "LayoutGraph",
+    "VisualDiffReport",
+  ]),
   artifact: z.record(z.string(), z.unknown()),
   sourcePath: z.string().min(1).optional(),
 });

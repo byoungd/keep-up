@@ -2,11 +2,14 @@ import { join, resolve } from "node:path";
 import type {
   AgentState,
   AIEnvelopeGateway,
+  ArtifactEnvelope,
+  ArtifactEvents,
   Checkpoint,
   CheckpointStatus,
   ConfirmationRequest,
   CoworkSession,
   CoworkTask,
+  RuntimeEventBus,
 } from "@ku0/agent-runtime";
 import {
   AgentModeManager,
@@ -19,6 +22,7 @@ import {
   createCompletionToolServer,
   createCoworkRuntime,
   createDockerBashExecutor,
+  createEventBus,
   createFileToolServer,
   createGhostAgent,
   createLessonStore,
@@ -46,13 +50,13 @@ import {
   type ReferenceVerificationProvider,
   referenceStoreDocId,
 } from "@ku0/lfcc-bridge";
-import { DEFAULT_PROJECT_CONTEXT_TOKEN_BUDGET } from "@ku0/shared";
+import { DEFAULT_PROJECT_CONTEXT_TOKEN_BUDGET, isRecord } from "@ku0/shared";
 import { ApprovalService } from "../services/approvalService";
 import type { ContextIndexManager } from "../services/contextIndexManager";
 import { ProviderKeyService } from "../services/providerKeyService";
 import type { StorageLayer } from "../storage/contracts";
 import { resolveStateDir } from "../storage/statePaths";
-import type { CoworkSettings } from "../storage/types";
+import type { CoworkArtifactPayload, CoworkSettings } from "../storage/types";
 import type { SessionEventHub } from "../streaming/eventHub";
 import { CoworkAuditLogger } from "./auditLogger";
 import { resolveCoworkPolicyConfig } from "./policyResolver";
@@ -93,6 +97,7 @@ type SessionRuntime = {
   sessionId: string;
   runtime: ReturnType<typeof createCoworkRuntime>;
   modeManager: AgentModeManager;
+  eventBus?: RuntimeEventBus;
   activeTaskId: string | null;
   modelId: string | null;
   providerId: string | null;
@@ -101,6 +106,7 @@ type SessionRuntime = {
   eventQueue: Promise<void>;
   unsubscribeQueue: () => void;
   unsubscribeOrchestrator: () => void;
+  unsubscribeEventBus: () => void;
   checkpointStorage?: MessagePackCheckpointStorage;
   ghostAgent?: GhostAgent;
 };
@@ -116,6 +122,7 @@ type RuntimeBuildResult = {
   providerId: string | null;
   fallbackNotice: string | null;
   contextPackKey: string | null;
+  eventBus?: RuntimeEventBus;
   checkpointStorage?: MessagePackCheckpointStorage;
 };
 
@@ -283,6 +290,7 @@ export class CoworkTaskRuntime {
     if (runtime) {
       runtime.unsubscribeQueue();
       runtime.unsubscribeOrchestrator();
+      runtime.unsubscribeEventBus();
       this.runtimes.delete(sessionId);
     }
 
@@ -296,7 +304,7 @@ export class CoworkTaskRuntime {
   /**
    * Update the agent mode for an active runtime
    */
-  updateSessionMode(sessionId: string, mode: "plan" | "build") {
+  updateSessionMode(sessionId: string, mode: "plan" | "build" | "review") {
     const runtime = this.runtimes.get(sessionId);
     if (!runtime) {
       return;
@@ -305,6 +313,7 @@ export class CoworkTaskRuntime {
     if (!runtime.activeTaskId) {
       runtime.unsubscribeQueue();
       runtime.unsubscribeOrchestrator();
+      runtime.unsubscribeEventBus();
       this.runtimes.delete(sessionId);
     }
   }
@@ -442,6 +451,7 @@ export class CoworkTaskRuntime {
         providerId: null,
         fallbackNotice: null,
         contextPackKey,
+        eventBus: undefined,
         checkpointStorage,
       };
     }
@@ -450,6 +460,7 @@ export class CoworkTaskRuntime {
       prompt: session.title ?? "Cowork Session",
     });
     const modelId = resolved.model ?? requestedModel;
+    const eventBus = createEventBus();
     const toolRegistryResult = await this.buildToolRegistry(session);
     const toolRegistry = toolRegistryResult.registry;
     const policyResolution = await resolveCoworkPolicyConfig({
@@ -487,6 +498,7 @@ export class CoworkTaskRuntime {
           autoExecuteLowRisk: false,
         },
         components,
+        eventBus,
       },
       systemPromptAddition: prompt.addition,
     });
@@ -498,6 +510,7 @@ export class CoworkTaskRuntime {
       providerId: resolved.providerId,
       fallbackNotice: resolved.fallbackNotice ?? null,
       contextPackKey: prompt.contextPackKey,
+      eventBus,
       checkpointStorage,
     };
   }
@@ -649,6 +662,7 @@ export class CoworkTaskRuntime {
       sessionId,
       runtime: runtimeResult.runtime,
       modeManager,
+      eventBus: runtimeResult.eventBus,
       activeTaskId: null,
       modelId: runtimeResult.modelId,
       providerId: runtimeResult.providerId,
@@ -657,6 +671,7 @@ export class CoworkTaskRuntime {
       eventQueue: Promise.resolve(),
       unsubscribeQueue: noop,
       unsubscribeOrchestrator: noop,
+      unsubscribeEventBus: noop,
       checkpointStorage: runtimeResult.checkpointStorage,
       ghostAgent: undefined,
     };
@@ -739,6 +754,62 @@ export class CoworkTaskRuntime {
           )
         )
         .catch((err) => this.logger.error("Orchestrator event error", err));
+    });
+
+    runtimeState.unsubscribeEventBus = this.subscribeToRuntimeArtifacts(runtimeState);
+  }
+
+  private subscribeToRuntimeArtifacts(runtimeState: SessionRuntime): () => void {
+    const eventBus = runtimeState.eventBus;
+    if (!eventBus) {
+      return noop;
+    }
+
+    const subscription = eventBus.subscribe("artifact:emitted", (event) => {
+      const payload = event.payload as ArtifactEvents["artifact:emitted"];
+      if (!payload?.stored) {
+        return;
+      }
+      const coworkPayload = toCoworkArtifactPayload(payload.artifact);
+      if (!coworkPayload) {
+        return;
+      }
+      const taskId = event.meta.correlationId ?? runtimeState.activeTaskId ?? undefined;
+      runtimeState.eventQueue = runtimeState.eventQueue
+        .then(() =>
+          this.persistRuntimeArtifact(
+            runtimeState.sessionId,
+            taskId,
+            payload.artifact,
+            coworkPayload
+          )
+        )
+        .catch((err) => this.logger.error("Artifact event error", err));
+    });
+
+    return subscription.unsubscribe;
+  }
+
+  private async persistRuntimeArtifact(
+    sessionId: string,
+    taskId: string | undefined,
+    artifact: ArtifactEnvelope,
+    payload: CoworkArtifactPayload
+  ): Promise<void> {
+    const persisted = await this.artifactProcessor.persistArtifact(sessionId, {
+      artifactId: artifact.id,
+      artifact: payload,
+      taskId,
+      title: artifact.title,
+      sourcePath: resolveArtifactSourcePath(payload),
+    });
+
+    this.eventPublisher.publishAgentArtifact({
+      sessionId,
+      id: persisted.artifactId,
+      artifact: persisted.artifact,
+      taskId: persisted.taskId ?? undefined,
+      updatedAt: persisted.updatedAt,
     });
   }
 
@@ -1055,6 +1126,42 @@ function buildDockerSecurityPolicy() {
       workingDirectory: "/workspace",
     },
   };
+}
+
+const RUNTIME_ARTIFACT_TYPES = new Set<CoworkArtifactPayload["type"]>([
+  "PlanCard",
+  "DiffCard",
+  "ReportCard",
+  "ChecklistCard",
+  "TestReport",
+  "ReviewReport",
+  "ImageArtifact",
+]);
+
+function toCoworkArtifactPayload(artifact: ArtifactEnvelope): CoworkArtifactPayload | null {
+  if (!RUNTIME_ARTIFACT_TYPES.has(artifact.type as CoworkArtifactPayload["type"])) {
+    return null;
+  }
+  if (!isRecord(artifact.payload)) {
+    return null;
+  }
+  return {
+    type: artifact.type as CoworkArtifactPayload["type"],
+    ...artifact.payload,
+  } as CoworkArtifactPayload;
+}
+
+function resolveArtifactSourcePath(payload: CoworkArtifactPayload): string | undefined {
+  switch (payload.type) {
+    case "diff":
+      return payload.file;
+    case "DiffCard":
+      return payload.files.length === 1 ? payload.files[0]?.path : undefined;
+    case "ImageArtifact":
+      return payload.uri;
+    default:
+      return undefined;
+  }
 }
 
 const DEFAULT_DOCKER_IMAGE = "node:20-alpine";

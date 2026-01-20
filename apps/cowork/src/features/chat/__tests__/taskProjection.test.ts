@@ -1,5 +1,6 @@
 import type { Message } from "@ku0/shell";
 import { describe, expect, it } from "vitest";
+import { apiUrl } from "../../../lib/config";
 import {
   RiskLevel,
   type TaskGraph,
@@ -170,5 +171,72 @@ describe("projectGraphToMessages", () => {
     expect(first?.tokenUsage?.contextWindow).toBe(100);
     expect(second?.tokenUsage?.totalTokens).toBe(4);
     expect(second?.tokenUsage?.contextWindow).toBe(50);
+  });
+
+  it("maps runtime card artifacts into task artifacts", () => {
+    const taskNode: TaskStatusNode = {
+      id: "task-task-4",
+      type: "task_status",
+      taskId: "task-4",
+      title: "Artifact Task",
+      status: "running",
+      mappedStatus: TaskStatus.RUNNING,
+      timestamp: new Date(6000).toISOString(),
+    };
+
+    const graph: TaskGraph = {
+      sessionId: "session-1",
+      status: TaskStatus.RUNNING,
+      nodes: [taskNode],
+      artifacts: {
+        "plan-1": {
+          type: "PlanCard",
+          goal: "Ship updates",
+          steps: [{ title: "Outline changes" }],
+        },
+        "diff-1": {
+          type: "DiffCard",
+          files: [{ path: "src/app.ts", diff: "+const foo = 1;" }],
+        },
+        "review-1": {
+          type: "ReviewReport",
+          summary: "Looks good",
+          risks: ["Minor risk"],
+        },
+        "image-1": {
+          type: "ImageArtifact",
+          uri: "/tmp/render.png",
+          mimeType: "image/png",
+          byteSize: 128,
+          contentHash: "hash-1",
+        },
+      },
+    };
+
+    const result = projectGraphToMessages(graph, []);
+    const taskMessage = result.find((msg) => msg.type === "task_stream");
+    const artifacts = taskMessage?.metadata?.task?.artifacts ?? [];
+
+    expect(artifacts.find((artifact) => artifact.id === "plan-1")).toMatchObject({
+      type: "plan",
+      title: "Ship updates",
+      content: "Outline changes",
+    });
+    expect(artifacts.find((artifact) => artifact.id === "diff-1")).toMatchObject({
+      type: "diff",
+      title: "Diff Summary",
+      content: "src/app.ts",
+    });
+    expect(artifacts.find((artifact) => artifact.id === "review-1")).toMatchObject({
+      type: "report",
+      title: "Review Report",
+      content: "Looks good",
+    });
+    const imageUrl = apiUrl("/api/artifacts/image-1/content");
+    expect(artifacts.find((artifact) => artifact.id === "image-1")).toMatchObject({
+      type: "image",
+      url: imageUrl,
+      previewUrl: imageUrl,
+    });
   });
 });

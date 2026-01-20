@@ -1,9 +1,16 @@
 import type { ArtifactPayload } from "../../tasks/types";
+import { ChecklistCard } from "./ChecklistCard";
 import { DiffCard } from "./DiffCard";
+import { DiffCardArtifact } from "./DiffCardArtifact";
+import { ImageArtifactCard } from "./ImageArtifactCard";
 import { LayoutGraphCard } from "./LayoutGraphCard";
 import { PlanCard } from "./PlanCard";
+import { PlanCardArtifact } from "./PlanCardArtifact";
 import { PreflightCard } from "./PreflightCard";
 import { ReportCard } from "./ReportCard";
+import { ReportCardArtifact } from "./ReportCardArtifact";
+import { ReviewReportCard } from "./ReviewReportCard";
+import { TestReportCard } from "./TestReportCard";
 import { VisualDiffCard } from "./VisualDiffCard";
 
 interface ArtifactsListProps {
@@ -45,12 +52,24 @@ export function ArtifactsList({ artifacts, onApply, onRevert }: ArtifactsListPro
     );
   }
 
-  const plans = list.filter(([_, a]) => a.type === "plan");
-  const diffs = list.filter(([_, a]) => a.type === "diff");
-  const visuals = list.filter(
-    ([_, a]) => a.type === "LayoutGraph" || a.type === "VisualDiffReport"
+  const hasPlanCard = list.some(([_, a]) => a.type === "PlanCard");
+  const plans = list.filter(
+    ([_, a]) => a.type === "PlanCard" || (!hasPlanCard && a.type === "plan")
   );
-  const reports = list.filter(([_, a]) => a.type === "markdown" || a.type === "preflight");
+  const diffs = list.filter(([_, a]) => a.type === "diff" || a.type === "DiffCard");
+  const visuals = list.filter(
+    ([_, a]) =>
+      a.type === "LayoutGraph" || a.type === "VisualDiffReport" || a.type === "ImageArtifact"
+  );
+  const reports = list.filter(
+    ([_, a]) =>
+      a.type === "markdown" ||
+      a.type === "preflight" ||
+      a.type === "ReportCard" ||
+      a.type === "ChecklistCard" ||
+      a.type === "TestReport" ||
+      a.type === "ReviewReport"
+  );
 
   interface SectionProps {
     title: string;
@@ -85,8 +104,12 @@ export function ArtifactsList({ artifacts, onApply, onRevert }: ArtifactsListPro
                     onRevert={onRevert ? () => onRevert(id) : undefined}
                   />
                 );
+              case "DiffCard":
+                return <DiffCardArtifact key={id} payload={artifact} />;
               case "plan":
                 return <PlanCard key={id} steps={artifact.steps} />;
+              case "PlanCard":
+                return <PlanCardArtifact key={id} payload={artifact} />;
               case "markdown":
                 return (
                   <ReportCard
@@ -97,12 +120,22 @@ export function ArtifactsList({ artifacts, onApply, onRevert }: ArtifactsListPro
                     content={artifact.content}
                   />
                 );
+              case "ReportCard":
+                return <ReportCardArtifact key={id} payload={artifact} />;
+              case "ChecklistCard":
+                return <ChecklistCard key={id} payload={artifact} />;
+              case "TestReport":
+                return <TestReportCard key={id} payload={artifact} />;
+              case "ReviewReport":
+                return <ReviewReportCard key={id} payload={artifact} />;
               case "preflight":
                 return <PreflightCard key={id} payload={artifact} />;
               case "LayoutGraph":
                 return <LayoutGraphCard key={id} graph={artifact} />;
               case "VisualDiffReport":
                 return <VisualDiffCard key={id} report={artifact} />;
+              case "ImageArtifact":
+                return <ImageArtifactCard key={id} artifactId={id} payload={artifact} />;
               default:
                 return null;
             }

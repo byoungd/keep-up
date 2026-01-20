@@ -2,11 +2,14 @@ import type { CoworkTaskStatus, TokenUsageStats, ToolActivity } from "@ku0/agent
 import { z } from "zod";
 
 export enum TaskStatus {
+  QUEUED = "queued",
   PLANNING = "planning",
+  READY = "ready",
   RUNNING = "running",
   AWAITING_APPROVAL = "awaiting_approval",
   COMPLETED = "completed",
   FAILED = "failed",
+  CANCELLED = "cancelled",
 }
 
 export enum RiskLevel {
@@ -41,6 +44,77 @@ const PreflightReportSchema = z.object({
   checks: z.array(PreflightCheckResultSchema),
   riskSummary: z.string(),
   createdAt: z.number(),
+});
+
+const PlanCardStepSchema = z.object({
+  title: z.string(),
+  status: z.enum(["pending", "running", "blocked", "completed", "failed"]).optional(),
+});
+
+const PlanCardSchema = z.object({
+  type: z.literal("PlanCard"),
+  goal: z.string(),
+  summary: z.string().optional(),
+  steps: z.array(PlanCardStepSchema).min(1),
+  files: z.array(z.string()).optional(),
+});
+
+const DiffCardFileSchema = z.object({
+  path: z.string(),
+  diff: z.string(),
+});
+
+const DiffCardSchema = z.object({
+  type: z.literal("DiffCard"),
+  summary: z.string().optional(),
+  files: z.array(DiffCardFileSchema).min(1),
+});
+
+const ReportCardSectionSchema = z.object({
+  heading: z.string(),
+  content: z.string(),
+});
+
+const ReportCardSchema = z.object({
+  type: z.literal("ReportCard"),
+  summary: z.string(),
+  sections: z.array(ReportCardSectionSchema).optional(),
+});
+
+const ChecklistItemSchema = z.object({
+  label: z.string(),
+  checked: z.boolean(),
+});
+
+const ChecklistCardSchema = z.object({
+  type: z.literal("ChecklistCard"),
+  title: z.string().optional(),
+  items: z.array(ChecklistItemSchema).min(1),
+});
+
+const TestReportSchema = z.object({
+  type: z.literal("TestReport"),
+  command: z.string(),
+  status: z.enum(["passed", "failed", "skipped"]),
+  durationMs: z.number(),
+  summary: z.string().optional(),
+});
+
+const ReviewReportSchema = z.object({
+  type: z.literal("ReviewReport"),
+  summary: z.string(),
+  risks: z.array(z.string()),
+  recommendations: z.array(z.string()).optional(),
+});
+
+const ImageArtifactSchema = z.object({
+  type: z.literal("ImageArtifact"),
+  uri: z.string(),
+  mimeType: z.string(),
+  byteSize: z.number(),
+  contentHash: z.string(),
+  sourceTool: z.string().optional(),
+  toolOutputSpoolId: z.string().optional(),
 });
 
 const LayoutBoundsSchema = z.object({
@@ -117,6 +191,13 @@ export const ArtifactPayloadSchema = z.union([
     selectionNotes: z.array(z.string()),
     changedFiles: z.array(z.string()),
   }),
+  PlanCardSchema,
+  DiffCardSchema,
+  ReportCardSchema,
+  ChecklistCardSchema,
+  TestReportSchema,
+  ReviewReportSchema,
+  ImageArtifactSchema,
   LayoutGraphSchema,
   VisualDiffReportSchema,
 ]);
@@ -218,7 +299,7 @@ export interface TaskGraph {
   >; // map of artifactId -> payload with versioning and task association
   pendingApprovalId?: string;
   savedAt?: number;
-  agentMode?: "plan" | "build";
+  agentMode?: "plan" | "build" | "review";
   usage?: TokenUsageStats;
   messageUsage?: Record<string, MessageUsage>;
 }

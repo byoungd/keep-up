@@ -174,7 +174,20 @@ export type CoworkArtifact = {
   sessionId: string;
   taskId?: string;
   title: string;
-  type: "diff" | "plan" | "markdown" | "preflight" | "LayoutGraph" | "VisualDiffReport";
+  type:
+    | "diff"
+    | "DiffCard"
+    | "plan"
+    | "PlanCard"
+    | "markdown"
+    | "ReportCard"
+    | "ChecklistCard"
+    | "TestReport"
+    | "ReviewReport"
+    | "ImageArtifact"
+    | "preflight"
+    | "LayoutGraph"
+    | "VisualDiffReport";
   artifact: unknown;
   sourcePath?: string;
   version: number;
@@ -816,7 +829,7 @@ export async function deleteSession(sessionId: string): Promise<void> {
 // Agent Mode API
 // ============================================================================
 
-export type AgentMode = "plan" | "build";
+export type AgentMode = "plan" | "build" | "review";
 
 export async function getSessionMode(sessionId: string): Promise<AgentMode> {
   const data = await fetchJson<ApiResult<{ mode: AgentMode }>>(`/api/sessions/${sessionId}/mode`);

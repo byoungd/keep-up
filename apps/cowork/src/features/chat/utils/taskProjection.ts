@@ -1,4 +1,5 @@
 import type { ActionItem, AgentTask, ArtifactItem, Message, TaskStep } from "@ku0/shell";
+import { apiUrl } from "../../../lib/config";
 import type {
   ArtifactPayload,
   MessageUsage,
@@ -355,6 +356,9 @@ function mapStepStatus(status: string): TaskStep["status"] {
 
 function mapCoworkStatus(status: string): AgentTask["status"] {
   switch (status) {
+    case "queued":
+    case "ready":
+      return "queued";
     case "planning":
     case "running":
       return "running";
@@ -362,6 +366,8 @@ function mapCoworkStatus(status: string): AgentTask["status"] {
       return "completed";
     case "failed":
       return "failed";
+    case "cancelled":
+      return "cancelled";
     case "awaiting_confirmation":
     case "awaiting_approval":
       return "paused";
@@ -449,7 +455,10 @@ function mapTaskStatusToStepStatus(status: string): TaskStep["status"] | null {
   switch (status) {
     case "queued":
       return "pending";
+    case "ready":
+      return "pending";
     case "planning":
+    case "awaiting_approval":
     case "awaiting_confirmation":
     case "running":
       return "running";
@@ -572,10 +581,59 @@ function extractArtifactsFromGraph(
     switch (payload.type) {
       case "diff":
         return { ...base, type: "diff", title: payload.file, content: payload.diff };
+      case "DiffCard":
+        return {
+          ...base,
+          type: "diff",
+          title: payload.summary ?? "Diff Summary",
+          content: payload.files.map((file) => file.path).join("\n"),
+        };
       case "plan":
         return { ...base, type: "plan", title: "Plan", content: JSON.stringify(payload.steps) };
+      case "PlanCard":
+        return {
+          ...base,
+          type: "plan",
+          title: payload.goal || "Plan",
+          content: payload.steps.map((step) => step.title).join("\n"),
+        };
       case "markdown":
         return { ...base, type: "report", title: "Report", content: payload.content };
+      case "ReportCard":
+        return { ...base, type: "report", title: "Report", content: payload.summary };
+      case "ChecklistCard":
+        return {
+          ...base,
+          type: "report",
+          title: payload.title ?? "Checklist",
+          content: payload.items
+            .map((item) => `${item.checked ? "[x]" : "[ ]"} ${item.label}`)
+            .join("\n"),
+        };
+      case "TestReport":
+        return {
+          ...base,
+          type: "report",
+          title: "Test Report",
+          content: payload.summary ?? `Tests ${payload.status}`,
+        };
+      case "ReviewReport":
+        return {
+          ...base,
+          type: "report",
+          title: "Review Report",
+          content: payload.summary,
+        };
+      case "ImageArtifact": {
+        const url = apiUrl(`/api/artifacts/${id}/content`);
+        return {
+          ...base,
+          type: "image",
+          title: "Image Artifact",
+          url,
+          previewUrl: url,
+        };
+      }
       case "preflight":
         return {
           ...base,

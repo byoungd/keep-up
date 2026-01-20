@@ -106,6 +106,7 @@ export function ChatThread({ sessionId }: { sessionId: string }) {
     retryMessage,
     editMessage,
     agentMode,
+    setMode,
     toggleMode,
     usage,
     session,
@@ -460,7 +461,7 @@ export function ChatThread({ sessionId }: { sessionId: string }) {
         <BackgroundTaskIndicator tasks={backgroundTasks} />
         <CostMeter usage={usage} modelId={model} />
         <div className="h-4 w-px bg-border mx-1" />
-        <ModeToggle mode={agentMode} onToggle={toggleMode} />
+        <ModeToggle mode={agentMode} onChange={setMode} />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
