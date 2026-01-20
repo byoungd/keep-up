@@ -1,8 +1,8 @@
 export type { ToolMiddleware } from "./ToolCoordinator";
 export { ToolCoordinator } from "./ToolCoordinator";
 export type {
-  AutoApprovalConfig,
   PartialToolUse,
+  ToolAutoApprovalSettings,
   ToolCallbacks,
   ToolContext,
   ToolDefinition,

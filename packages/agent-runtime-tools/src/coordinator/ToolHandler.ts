@@ -15,7 +15,7 @@ export class ValidationError extends Error {
   }
 }
 
-export interface AutoApprovalConfig {
+export interface ToolAutoApprovalSettings {
   enabled: boolean;
   policyNames?: string[];
 }
@@ -35,7 +35,7 @@ export interface ToolContext {
   /** Task ID */
   taskId: string;
   /** Auto-approval settings */
-  autoApproval?: AutoApprovalConfig;
+  autoApproval?: ToolAutoApprovalSettings;
   /** Services */
   services?: ToolServices;
   /** Callbacks */
