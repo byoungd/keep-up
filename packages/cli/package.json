@@ -28,8 +28,10 @@
     "lint:fix": "biome check --write ."
   },
   "dependencies": {
+    "@ku0/ai-core": "workspace:*",
     "@ku0/agent-runtime": "workspace:*",
     "@ku0/agent-runtime-core": "workspace:*",
+    "@ku0/tooling-session": "workspace:*",
     "commander": "^11.1.0"
   },
   "devDependencies": {

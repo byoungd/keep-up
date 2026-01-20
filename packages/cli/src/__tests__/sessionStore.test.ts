@@ -24,6 +24,7 @@ describe("SessionStore", () => {
       createdAt: Date.now(),
       updatedAt: Date.now(),
       messages: [],
+      toolCalls: [],
     };
 
     await store.save(session);

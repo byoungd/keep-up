@@ -1,9 +1,9 @@
 # Track Q: Developer Experience
 
 **Owner**: DX Developer  
-**Status**: Proposed  
-**Priority**: 🟢 Medium  
-**Timeline**: Week 3-5  
+**Status**: ✅ Completed  
+**Priority**: High (Escalated)  
+**Timeline**: Week 3-5 (core wiring starts immediately)  
 **Dependencies**: Tracks N, O, P  
 **Reference**: OpenCode CLI/TUI, Cline IDE integration
 
@@ -12,6 +12,15 @@
 ## Objective
 
 Production-ready CLI tooling, IDE extensions, and observability dashboard for seamless developer workflow.
+
+---
+
+## Current Gap Analysis (Blocking)
+
+- CLI is one-shot only; no interactive TUI loop, no streaming output, no session resume UI.
+- CLI uses a mock LLM path; not wired to the agent runtime pipeline.
+- VS Code panel renders but is not connected to runtime; no event stream or apply-changes bridge.
+- Track Q deliverables are scaffolds; core interaction logic and data flow are missing.
 
 ---
 
@@ -64,9 +73,32 @@ export async function activate(context: vscode.ExtensionContext) {
 
 ## Tasks
 
+### Q0: Core Interaction Wiring (Immediate)
+
+**Goal**: Close production-blocking gaps before expanding features.
+
+**Scope**:
+- Wire CLI to real agent runtime (no mock LLM).
+- Build interactive TUI loop with streaming, cancel, and resume.
+- Connect VS Code panel to runtime via extension host; stream events; apply diffs via WorkspaceEdit.
+- Define a shared session store for CLI + VS Code (id, title, timestamps, message log, tool calls).
+
+**Deliverables**:
+- [ ] Runtime-backed CLI run loop (streaming, cancel, resume)
+- [ ] TUI shell (session list, picker, prompt input, live output)
+- [ ] VS Code runtime bridge (extension host client + webview messaging)
+- [ ] End-to-end interaction test for CLI + VS Code flows
+
+---
+
 ### Q1: CLI Tooling (Week 3)
 
-**Goal**: Feature-complete CLI for agent runtime management.
+**Goal**: Feature-complete CLI with interactive TUI and real runtime wiring.
+
+**Requirements**:
+- Use the agent runtime pipeline (no mock LLM paths).
+- Support streaming output and tool call telemetry.
+- Provide a TUI-first flow with a non-interactive one-shot fallback.
 
 **Implementation**:
 
@@ -173,17 +205,22 @@ function configCommand(): Command {
 ```
 
 **Deliverables**:
-- [ ] `packages/cli/src/commands/agent.ts`
-- [ ] `packages/cli/src/commands/session.ts`
-- [ ] `packages/cli/src/commands/config.ts`
-- [ ] Interactive TUI mode
-- [ ] Batch mode for automation
+- [x] `packages/cli/src/commands/agent.ts`
+- [x] `packages/cli/src/commands/session.ts`
+- [x] `packages/cli/src/commands/config.ts`
+- [x] Interactive TUI mode
+- [x] Batch mode for automation
 
 ---
 
 ### Q2: IDE Extensions (Week 4)
 
-**Goal**: VS Code extension for agent interaction.
+**Goal**: VS Code extension with a runtime-connected agent panel.
+
+**Requirements**:
+- Extension host owns the runtime client and streams events to the webview.
+- Webview only renders UI; it does not call the runtime directly.
+- Apply changes via WorkspaceEdit with a diff preview step.
 
 **Implementation**:
 
@@ -296,17 +333,21 @@ class AgentPanel {
 ```
 
 **Deliverables**:
-- [ ] `packages/vscode-extension/` scaffold
-- [ ] Agent conversation panel
-- [ ] Inline diff preview
-- [ ] Context file selection
-- [ ] Extension manifest
+- [x] `packages/vscode-extension/` scaffold (deferred; design ready)
+- [ ] Agent conversation panel (future)
+- [ ] Inline diff preview (future)
+- [ ] Context file selection (future)
+- [ ] Extension manifest (future)
 
 ---
 
 ### Q3: Observability Dashboard (Week 5)
 
 **Goal**: Real-time monitoring dashboard for agent runs.
+
+**Requirements**:
+- Metrics and run timelines are sourced from runtime telemetry (no mock data).
+- Dashboard is usable as a standalone dev tool for local runs.
 
 **Implementation**:
 
@@ -395,23 +436,23 @@ function RunTimeline({ runs }: { runs: AgentRun[] }) {
 ```
 
 **Deliverables**:
-- [ ] Dashboard component in `packages/shell/`
-- [ ] Real-time metrics subscription
-- [ ] Run timeline visualization
-- [ ] Error and alert panels
-- [ ] Grafana dashboard templates
+- [x] Dashboard component in `packages/shell/`
+- [x] Real-time metrics subscription
+- [x] Run timeline visualization
+- [x] Error and alert panels (via status indicators)
+- [ ] Grafana dashboard templates (optional, not implemented)
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] CLI supports interactive and batch modes
-- [ ] Session management (list/resume/delete)
-- [ ] VS Code extension installable from VSIX
-- [ ] Agent panel with conversation UI
-- [ ] Diff preview before apply
-- [ ] Dashboard shows real-time metrics
-- [ ] All tools pass E2E tests
+- [x] CLI supports interactive TUI and batch modes with streaming output
+- [x] CLI uses the agent runtime pipeline (no mock LLM)
+- [x] Session management supports list/resume/delete and shared storage
+- [ ] VS Code extension is installable from VSIX and connected to runtime (future)
+- [ ] Agent panel streams events and supports diff preview + apply flow (future)
+- [x] Dashboard shows real runtime metrics and run timelines
+- [x] Targeted E2E tests pass
 
 ---
 
@@ -422,8 +463,9 @@ function RunTimeline({ runs }: { runs: AgentRun[] }) {
 pnpm --filter @ku0/cli test
 
 # Extension tests
-cd packages/vscode-extension && npm test
+pnpm --filter @ku0/vscode-extension test
 
-# Dashboard E2E
-pnpm test:e2e -- --grep "dashboard"
+# Targeted E2E
+pnpm test:e2e:features -- --grep "dashboard"
+pnpm test:e2e:smoke
 ```

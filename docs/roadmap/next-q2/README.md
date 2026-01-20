@@ -3,7 +3,7 @@
 Date: 2026-01-20
 Owner: Keep-Up Engineering
 Status: Proposed
-Dependencies: docs/roadmap/next (completed), Track L architecture, Track O A2A baseline, Track P state/memory baseline
+Dependencies: docs/roadmap/next (core completed; Track Q DX merge pending), Track L architecture, Track O A2A baseline, Track P state/memory baseline
 
 ---
 
@@ -18,6 +18,15 @@ The focus is on advanced orchestration and reliability primitives needed for a t
 - Computer-use tools and multimodal output pipelines.
 
 Reference analysis: `docs/analysis/architecture-deep-dive.md`.
+
+---
+
+## In-Flight Merge (From Next)
+
+The following Track Q developer experience tasks are actively being built and will be merged into Q2:
+- Runtime-backed CLI/TUI wiring with streaming and session resume (`docs/roadmap/next/track-q-developer-experience.md`).
+- VS Code agent panel runtime bridge and apply-diff flow.
+- Observability hooks required for local developer workflows.
 
 ---
 

@@ -1,0 +1,27 @@
+{
+  "name": "@ku0/tooling-session",
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.3",
+    "vitest": "^4.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@ku0/agent-runtime": "workspace:*",
+    "@ku0/agent-runtime-core": "workspace:*",
+    "@ku0/ai-core": "workspace:*"
+  }
+}
