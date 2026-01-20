@@ -26,6 +26,8 @@ export interface FileContextTrackerOptions {
   recentWriteWindowMs?: number;
   /** awaitWriteFinish stability threshold (ms). */
   awaitWriteFinishMs?: number;
+  /** Use polling instead of native fs events; more reliable in temp dirs. */
+  usePolling?: boolean;
 }
 
 const DEFAULT_RECENT_WRITE_WINDOW_MS = 1500;
@@ -40,12 +42,14 @@ export class FileContextTracker {
   private readonly entriesByContext = new Map<string, Map<string, FileContextEntry>>();
   private readonly watchedPaths = new Set<string>();
   private readonly recentWrites = new Map<string, number>();
+  private readonly readyPromise: Promise<void>;
 
   constructor(options: FileContextTrackerOptions) {
     this.options = {
       logger: console,
       recentWriteWindowMs: DEFAULT_RECENT_WRITE_WINDOW_MS,
       awaitWriteFinishMs: DEFAULT_AWAIT_WRITE_FINISH_MS,
+      usePolling: false,
       ...options,
     };
 
@@ -56,6 +60,12 @@ export class FileContextTracker {
         pollInterval: 10,
       },
       followSymlinks: false,
+      usePolling: options.usePolling ?? false,
+      interval: options.usePolling ? 50 : undefined,
+    });
+
+    this.readyPromise = new Promise<void>((resolve) => {
+      this.watcher.once("ready", () => resolve());
     });
 
     this.watcher
@@ -79,6 +89,11 @@ export class FileContextTracker {
   /** Dispose file watchers. */
   async dispose(): Promise<void> {
     await this.watcher.close();
+  }
+
+  /** Wait for watcher to be ready (useful for tests). */
+  waitForReady(): Promise<void> {
+    return this.readyPromise;
   }
 
   private mark(contextId: string, filePath: string, source: FileContextSource): FileContextEntry {
