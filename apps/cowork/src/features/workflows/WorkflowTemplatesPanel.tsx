@@ -113,7 +113,7 @@ function TemplateEditorSection({
           aria-label="Template description"
         />
         <div className="flex flex-wrap gap-2">
-          {(["plan", "build"] as const).map((mode) => (
+          {(["plan", "build", "review"] as const).map((mode) => (
             <button
               key={mode}
               type="button"

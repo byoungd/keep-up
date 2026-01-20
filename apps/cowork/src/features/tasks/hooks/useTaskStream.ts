@@ -95,18 +95,22 @@ function formatStatus(value: string): string {
 function mapTaskStatus(status?: string): TaskStatus | null {
   switch (status) {
     case "queued":
+      return TaskStatus.QUEUED;
     case "planning":
-    case "ready":
       return TaskStatus.PLANNING;
+    case "ready":
+      return TaskStatus.READY;
     case "running":
       return TaskStatus.RUNNING;
     case "awaiting_confirmation":
+    case "awaiting_approval":
       return TaskStatus.AWAITING_APPROVAL;
     case "completed":
       return TaskStatus.COMPLETED;
     case "failed":
-    case "cancelled":
       return TaskStatus.FAILED;
+    case "cancelled":
+      return TaskStatus.CANCELLED;
     default:
       return null;
   }
@@ -257,13 +261,18 @@ export function useTaskStream(sessionId: string) {
           const base = isCacheStale
             ? { sessionId, status: TaskStatus.PLANNING, nodes: [], artifacts: {} }
             : prev;
+          const normalizedMode =
+            session.agentMode === "plan" ||
+            session.agentMode === "build" ||
+            session.agentMode === "review"
+              ? session.agentMode
+              : undefined;
           return deriveInitialState(
             base,
             tasks,
             approvals,
             artifacts,
-            // biome-ignore lint/suspicious/noExplicitAny: Temporary cast for backward compatibility
-            session.agentMode as any,
+            normalizedMode,
             taskTitleRef.current,
             taskPromptRef.current,
             taskMetadataRef.current
@@ -756,7 +765,7 @@ function handleSessionModeChanged(
   }
   return {
     ...prev,
-    agentMode: (data.mode as "plan" | "build") || "build",
+    agentMode: (data.mode as "plan" | "build" | "review") || "build",
   };
 }
 
@@ -1218,7 +1227,7 @@ function deriveInitialState(
   tasks: CoworkTask[],
   approvals: CoworkApproval[],
   artifacts: CoworkArtifact[],
-  agentMode: "plan" | "build" | undefined,
+  agentMode: "plan" | "build" | "review" | undefined,
   taskTitles: Map<string, string>,
   taskPrompts: Map<string, string>,
   taskMetadata: Map<string, Record<string, unknown>>

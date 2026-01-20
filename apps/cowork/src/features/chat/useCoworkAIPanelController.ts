@@ -227,7 +227,11 @@ export function useCoworkAIPanelController() {
   );
 
   const runTemplate = useCallback(
-    async (prompt: string, mode: "plan" | "build", metadata?: Record<string, unknown>) => {
+    async (
+      prompt: string,
+      mode: "plan" | "build" | "review",
+      metadata?: Record<string, unknown>
+    ) => {
       const targetSessionId = await prepareSession(prompt);
       if (targetSessionId) {
         await setSessionMode(targetSessionId, mode);

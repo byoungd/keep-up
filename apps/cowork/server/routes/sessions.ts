@@ -226,8 +226,8 @@ export function createSessionRoutes(deps: SessionRouteDeps) {
     const body = await readJsonBody(c);
 
     const mode = (body as { mode?: string } | null)?.mode;
-    if (mode !== "plan" && mode !== "build") {
-      return jsonError(c, 400, "Invalid mode. Must be 'plan' or 'build'");
+    if (mode !== "plan" && mode !== "build" && mode !== "review") {
+      return jsonError(c, 400, "Invalid mode. Must be 'plan', 'build', or 'review'");
     }
 
     const session = await deps.sessionStore.getById(sessionId);
@@ -276,7 +276,9 @@ export function createSessionRoutes(deps: SessionRouteDeps) {
     }
 
     const currentMode = session.agentMode ?? "build";
-    const newMode = currentMode === "plan" ? "build" : "plan";
+    const modeOrder = ["plan", "build", "review"] as const;
+    const nextIndex = Math.max(0, modeOrder.indexOf(currentMode)) + 1;
+    const newMode = modeOrder[nextIndex % modeOrder.length];
 
     const updated = await deps.sessionStore.update(sessionId, (prev) => ({
       ...prev,

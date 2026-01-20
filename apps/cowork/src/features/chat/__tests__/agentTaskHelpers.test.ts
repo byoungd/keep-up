@@ -11,6 +11,9 @@ function mapGraphStatus(status: string): AgentTask["status"] {
       return "completed";
     case "failed":
       return "failed";
+    case "cancelled":
+      return "cancelled";
+    case "awaiting_confirmation":
     case "awaiting_approval":
       return "paused";
     default:
@@ -27,6 +30,9 @@ function mapCoworkStatus(status: string): AgentTask["status"] {
       return "completed";
     case "failed":
       return "failed";
+    case "cancelled":
+      return "cancelled";
+    case "awaiting_confirmation":
     case "awaiting_approval":
       return "paused";
     default:
@@ -103,6 +109,14 @@ describe("Agent Task Helpers", () => {
       expect(mapGraphStatus("awaiting_approval")).toBe("paused");
     });
 
+    it("should map awaiting_confirmation to paused", () => {
+      expect(mapGraphStatus("awaiting_confirmation")).toBe("paused");
+    });
+
+    it("should map cancelled to cancelled", () => {
+      expect(mapGraphStatus("cancelled")).toBe("cancelled");
+    });
+
     it("should default to running for unknown statuses", () => {
       expect(mapGraphStatus("planning")).toBe("running");
       expect(mapGraphStatus("running")).toBe("running");
@@ -129,6 +143,22 @@ describe("Agent Task Helpers", () => {
 
     it("should map awaiting_approval to paused", () => {
       expect(mapCoworkStatus("awaiting_approval")).toBe("paused");
+    });
+
+    it("should map awaiting_confirmation to paused", () => {
+      expect(mapCoworkStatus("awaiting_confirmation")).toBe("paused");
+    });
+
+    it("should map cancelled to cancelled", () => {
+      expect(mapCoworkStatus("cancelled")).toBe("cancelled");
+    });
+
+    it("should map queued to queued", () => {
+      expect(mapCoworkStatus("queued")).toBe("queued");
+    });
+
+    it("should map ready to queued", () => {
+      expect(mapCoworkStatus("ready")).toBe("queued");
     });
 
     it("should default to queued for unknown statuses", () => {

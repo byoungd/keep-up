@@ -226,8 +226,29 @@ function deriveArtifactTitle(artifactId: string, artifact: CoworkArtifactPayload
   if (artifact.type === "diff") {
     return artifact.file || "Diff";
   }
+  if (artifact.type === "DiffCard") {
+    return "Diff Summary";
+  }
   if (artifact.type === "plan") {
     return "Plan";
+  }
+  if (artifact.type === "PlanCard") {
+    return "Plan";
+  }
+  if (artifact.type === "ReportCard") {
+    return "Report";
+  }
+  if (artifact.type === "ChecklistCard") {
+    return artifact.title ?? "Checklist";
+  }
+  if (artifact.type === "TestReport") {
+    return "Test Report";
+  }
+  if (artifact.type === "ReviewReport") {
+    return "Review Report";
+  }
+  if (artifact.type === "ImageArtifact") {
+    return "Image Artifact";
   }
   if (artifact.type === "preflight") {
     return "Preflight Report";

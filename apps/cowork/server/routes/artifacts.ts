@@ -1,3 +1,6 @@
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import { DEFAULT_AGENT_SPOOL_DIR, isPathWithinRoots } from "@ku0/agent-runtime";
 import { Hono } from "hono";
 import { jsonError } from "../http";
 import type {
@@ -6,6 +9,8 @@ import type {
   SessionStoreLike,
   TaskStoreLike,
 } from "../storage/contracts";
+import { resolveStateDir } from "../storage/statePaths";
+import type { CoworkArtifactRecord } from "../storage/types";
 
 interface ArtifactRouteDeps {
   artifactStore: ArtifactStoreLike;
@@ -40,6 +45,34 @@ export function createArtifactRoutes(deps: ArtifactRouteDeps) {
           })
         )
         .sort((a, b) => b.updatedAt - a.updatedAt),
+    });
+  });
+
+  app.get("/artifacts/:artifactId/content", async (c) => {
+    const artifactId = c.req.param("artifactId");
+    const record = await deps.artifactStore.getById(artifactId);
+    if (!record) {
+      return jsonError(c, 404, "Artifact not found");
+    }
+    const payload = getImageArtifactPayload(record);
+    if (!payload) {
+      return jsonError(c, 400, "Artifact does not include image content");
+    }
+
+    const resolvedPath = resolve(payload.uri);
+    if (!isArtifactPathAllowed(resolvedPath)) {
+      return jsonError(c, 403, "Artifact path not permitted");
+    }
+
+    const data = await readArtifactFile(resolvedPath);
+    if (!data) {
+      return jsonError(c, 404, "Artifact content not found");
+    }
+
+    return c.body(data, 200, {
+      "Content-Type": payload.mimeType ?? "application/octet-stream",
+      "Content-Disposition": "inline",
+      "Cache-Control": "no-store",
     });
   });
 
@@ -145,6 +178,32 @@ function buildSessionTitleMap(
     }
   }
   return map;
+}
+
+function getImageArtifactPayload(
+  record: CoworkArtifactRecord
+): { uri: string; mimeType?: string } | null {
+  if (record.type !== "ImageArtifact" || record.artifact.type !== "ImageArtifact") {
+    return null;
+  }
+  const { uri, mimeType } = record.artifact;
+  if (typeof uri !== "string" || uri.length === 0) {
+    return null;
+  }
+  return { uri, mimeType };
+}
+
+function isArtifactPathAllowed(resolvedPath: string): boolean {
+  const allowedRoots = [resolveStateDir(), resolve(process.cwd(), DEFAULT_AGENT_SPOOL_DIR)];
+  return isPathWithinRoots(resolvedPath, allowedRoots, false);
+}
+
+async function readArtifactFile(resolvedPath: string): Promise<Uint8Array | null> {
+  try {
+    return await readFile(resolvedPath);
+  } catch {
+    return null;
+  }
 }
 
 function buildTaskTitleMap(tasks: Array<{ taskId: string; title: string }>): Map<string, string> {

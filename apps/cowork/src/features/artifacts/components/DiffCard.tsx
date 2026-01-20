@@ -12,6 +12,7 @@ interface DiffCardProps {
 export function DiffCard({ file, diff, status, appliedAt, onApply, onRevert }: DiffCardProps) {
   const [busy, setBusy] = useState<"apply" | "revert" | null>(null);
   const [copied, setCopied] = useState(false);
+  const hasActions = Boolean(onApply || onRevert);
 
   const handleApply = async () => {
     if (!onApply) {
@@ -106,27 +107,28 @@ export function DiffCard({ file, diff, status, appliedAt, onApply, onRevert }: D
               </svg>
             )}
           </button>
-          {status !== "applied" ? (
-            <button
-              type="button"
-              onClick={handleApply}
-              className="text-xs font-black bg-foreground text-background px-3 py-1.5 rounded-lg shadow-sm hover:scale-105 active:scale-95 transition-all duration-fast uppercase tracking-tighter disabled:opacity-50"
-              disabled={busy !== null || !onApply}
-              aria-busy={busy === "apply"}
-            >
-              Apply
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleRevert}
-              className="text-xs font-black bg-surface-2 text-foreground px-3 py-1.5 rounded-lg shadow-sm hover:scale-105 active:scale-95 transition-all duration-fast uppercase tracking-tighter disabled:opacity-50"
-              disabled={busy !== null || !onRevert}
-              aria-busy={busy === "revert"}
-            >
-              Revert
-            </button>
-          )}
+          {hasActions &&
+            (status !== "applied" ? (
+              <button
+                type="button"
+                onClick={handleApply}
+                className="text-xs font-black bg-foreground text-background px-3 py-1.5 rounded-lg shadow-sm hover:scale-105 active:scale-95 transition-all duration-fast uppercase tracking-tighter disabled:opacity-50"
+                disabled={busy !== null || !onApply}
+                aria-busy={busy === "apply"}
+              >
+                Apply
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleRevert}
+                className="text-xs font-black bg-surface-2 text-foreground px-3 py-1.5 rounded-lg shadow-sm hover:scale-105 active:scale-95 transition-all duration-fast uppercase tracking-tighter disabled:opacity-50"
+                disabled={busy !== null || !onRevert}
+                aria-busy={busy === "revert"}
+              >
+                Revert
+              </button>
+            ))}
         </div>
         {status === "applied" && appliedAt && (
           <div className="text-micro text-muted-foreground">

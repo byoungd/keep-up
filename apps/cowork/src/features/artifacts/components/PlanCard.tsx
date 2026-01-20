@@ -9,7 +9,8 @@ interface PlanCardProps {
 
 export function PlanCard({ steps }: PlanCardProps) {
   const completedCount = steps.filter((s) => s.status === "completed").length;
-  const progress = Math.round((completedCount / steps.length) * 100) || 0;
+  const totalSteps = steps.length;
+  const progress = totalSteps === 0 ? 0 : Math.round((completedCount / totalSteps) * 100);
 
   return (
     <div className="bg-surface border border-border rounded-xl shadow-sm p-5 my-4 hover:shadow-md transition-shadow">

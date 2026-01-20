@@ -156,12 +156,59 @@ export type CoworkArtifactPayload =
       language?: string;
     }
   | {
+      type: "DiffCard";
+      summary?: string;
+      files: Array<{ path: string; diff: string }>;
+    }
+  | {
       type: "plan";
       steps: Array<{ id: string; label: string; status: string }>;
     }
   | {
+      type: "PlanCard";
+      goal: string;
+      summary?: string;
+      steps: Array<{
+        title: string;
+        status?: "pending" | "running" | "blocked" | "completed" | "failed";
+      }>;
+      files?: string[];
+    }
+  | {
       type: "markdown";
       content: string;
+    }
+  | {
+      type: "ReportCard";
+      summary: string;
+      sections?: Array<{ heading: string; content: string }>;
+    }
+  | {
+      type: "ChecklistCard";
+      title?: string;
+      items: Array<{ label: string; checked: boolean }>;
+    }
+  | {
+      type: "TestReport";
+      command: string;
+      status: "passed" | "failed" | "skipped";
+      durationMs: number;
+      summary?: string;
+    }
+  | {
+      type: "ReviewReport";
+      summary: string;
+      risks: string[];
+      recommendations?: string[];
+    }
+  | {
+      type: "ImageArtifact";
+      uri: string;
+      mimeType: string;
+      byteSize: number;
+      contentHash: string;
+      sourceTool?: string;
+      toolOutputSpoolId?: string;
     }
   | {
       type: "preflight";
