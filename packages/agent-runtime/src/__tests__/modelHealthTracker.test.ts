@@ -12,6 +12,7 @@ describe("ModelHealthTracker", () => {
       timeoutRate: { degraded: 0.2, unhealthy: 0.5 },
       latencyMs: { degraded: 1000, unhealthy: 2000 },
       sampleAlpha: 0.5,
+      decayHalfLifeMs: 0,
       minSampleCount: 1,
     });
 
@@ -43,6 +44,7 @@ describe("ModelHealthTracker", () => {
       timeoutRate: { degraded: 0.2, unhealthy: 0.4 },
       latencyMs: { degraded: 200, unhealthy: 400 },
       sampleAlpha: 1,
+      decayHalfLifeMs: 0,
       minSampleCount: 1,
     });
 
