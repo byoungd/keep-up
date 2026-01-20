@@ -8,7 +8,8 @@
     "composite": true,
     "baseUrl": ".",
     "paths": {
-      "@modelcontextprotocol/sdk/*": ["./node_modules/@modelcontextprotocol/sdk/dist/esm/*"]
+      "@modelcontextprotocol/sdk/*": ["./node_modules/@modelcontextprotocol/sdk/dist/esm/*"],
+      "@ku0/agent-runtime-vision": ["../agent-runtime-vision/dist/index.d.ts"]
     }
   },
   "include": ["src/**/*"],

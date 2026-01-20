@@ -319,20 +319,20 @@ export function createLessonStore(config?: LessonStoreConfig): LessonStore {
 }
 
 function resolveEmbeddingProvider(config: LessonStoreConfig): EmbeddingProvider {
-  const provider = config.embeddingProvider;
-  if (provider) {
-    if ("dimension" in provider) {
-      return provider;
+  const configuredProvider = config.embeddingProvider;
+  if (configuredProvider) {
+    if ("dimension" in configuredProvider) {
+      return configuredProvider;
     }
     return {
-      embed: (text: string) => provider.embed(text),
-      dimension: provider.getDimension(),
+      embed: (text: string) => configuredProvider.embed(text),
+      dimension: configuredProvider.getDimension(),
     };
   }
   const dimension = config.dimension ?? DEFAULT_DIMENSION;
-  const fallbackProvider = new MockEmbeddingProvider(dimension);
+  const mockProvider = new MockEmbeddingProvider(dimension);
   return {
-    embed: (text: string) => fallbackProvider.embed(text),
+    embed: (text: string) => mockProvider.embed(text),
     dimension,
   };
 }

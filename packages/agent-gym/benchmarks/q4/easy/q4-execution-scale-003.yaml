@@ -1,0 +1,52 @@
+{
+  "id": "q4-execution-scale-003",
+  "title": "Execution scale warmup 3",
+  "category": "execution-scale",
+  "difficulty": "easy",
+  "prompt": "Create two log files in logs/ with the provided contents.",
+  "setup": {
+    "files": []
+  },
+  "expectations": [
+    {
+      "type": "file_equals",
+      "path": "logs/run-1.log",
+      "content": "run-1: ok\n"
+    },
+    {
+      "type": "file_equals",
+      "path": "logs/run-2.log",
+      "content": "run-2: ok\n"
+    }
+  ],
+  "script": {
+    "responses": [
+      {
+        "content": "Writing log files.",
+        "finishReason": "tool_use",
+        "toolCalls": [
+          {
+            "name": "file:write",
+            "arguments": {
+              "path": "logs/run-1.log",
+              "content": "run-1: ok\n",
+              "createDirs": true
+            }
+          },
+          {
+            "name": "file:write",
+            "arguments": {
+              "path": "logs/run-2.log",
+              "content": "run-2: ok\n",
+              "createDirs": true
+            }
+          }
+        ]
+      },
+      {
+        "content": "Logs captured.",
+        "finishReason": "stop"
+      }
+    ]
+  }
+}

@@ -100,3 +100,7 @@ Create 50+ deterministic scenarios covering:
 - Unit tests for scoring engine accuracy.
 - Integration tests for harness reliability.
 - Suggested command: `pnpm --filter @ku0/agent-gym test`
+
+## Walkthrough
+
+See [track-z-walkthrough.md](./track-z-walkthrough.md).

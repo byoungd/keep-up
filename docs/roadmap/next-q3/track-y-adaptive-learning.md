@@ -68,3 +68,7 @@ The agent currently resets its personality every session. Track Y introduces "Lo
 - Unit tests for `MemoryManager` CRUD operations.
 - Integration tests for cross-session rule persistence.
 - Suggested command: `pnpm --filter @ku0/agent-runtime test -- --grep "memory"`
+
+## Walkthrough
+
+See [track-y-walkthrough.md](./track-y-walkthrough.md).

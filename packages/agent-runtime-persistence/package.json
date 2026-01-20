@@ -15,6 +15,10 @@
       "types": "./dist/checkpoint/index.d.ts",
       "default": "./dist/checkpoint/index.js"
     },
+    "./execution": {
+      "types": "./dist/execution/index.d.ts",
+      "default": "./dist/execution/index.js"
+    },
     "./timetravel": {
       "types": "./dist/timetravel/index.d.ts",
       "default": "./dist/timetravel/index.js"
@@ -33,6 +37,7 @@
     "lint:fix": "biome check --write ."
   },
   "dependencies": {
+    "@ku0/agent-runtime-core": "workspace:*",
     "better-sqlite3": "^9.6.0"
   },
   "devDependencies": {

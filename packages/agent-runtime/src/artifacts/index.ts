@@ -287,6 +287,57 @@ const imageArtifactSchema = z.object({
   toolOutputSpoolId: z.string().min(1).optional(),
 });
 
+const layoutBoundsSchema = z.object({
+  x: z.number().int(),
+  y: z.number().int(),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+});
+
+const componentRefSchema = z.object({
+  filePath: z.string().min(1),
+  symbol: z.string().min(1).optional(),
+  line: z.number().int().nonnegative(),
+  column: z.number().int().nonnegative(),
+});
+
+const layoutNodeSchema = z.object({
+  id: z.string().min(1),
+  type: z.enum(["text", "image", "control", "container"]),
+  bounds: layoutBoundsSchema,
+  text: z.string().optional(),
+  role: z.string().optional(),
+  componentRef: componentRefSchema.optional(),
+  confidence: z.number().min(0).max(1),
+});
+
+const layoutEdgeSchema = z.object({
+  from: z.string().min(1),
+  to: z.string().min(1),
+  type: z.enum(["contains", "adjacent"]),
+});
+
+const layoutGraphSchema = z.object({
+  nodes: z.array(layoutNodeSchema),
+  edges: z.array(layoutEdgeSchema),
+});
+
+const visualDiffRegionSchema = z.object({
+  id: z.string().min(1),
+  bounds: layoutBoundsSchema,
+  score: z.number().min(0).max(1),
+  changeType: z.enum(["added", "removed", "modified"]),
+});
+
+const visualDiffReportSchema = z.object({
+  regions: z.array(visualDiffRegionSchema),
+  summary: z.object({
+    totalRegions: z.number().int().nonnegative(),
+    changedRegions: z.number().int().nonnegative(),
+    maxScore: z.number().min(0).max(1),
+  }),
+});
+
 function createSchemaValidator<T extends z.ZodTypeAny>(
   schema: T
 ): (payload: Record<string, unknown>) => ArtifactValidationResult {
@@ -343,6 +394,18 @@ function registerDefaultSchemas(registry: ArtifactRegistry): void {
     type: "ImageArtifact",
     version: "1.0.0",
     validate: createSchemaValidator(imageArtifactSchema),
+  });
+
+  registry.registerSchema({
+    type: "LayoutGraph",
+    version: "1.0.0",
+    validate: createSchemaValidator(layoutGraphSchema),
+  });
+
+  registry.registerSchema({
+    type: "VisualDiffReport",
+    version: "1.0.0",
+    validate: createSchemaValidator(visualDiffReportSchema),
   });
 }
 

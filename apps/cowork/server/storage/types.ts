@@ -184,6 +184,34 @@ export type CoworkArtifactPayload =
       };
       selectionNotes: string[];
       changedFiles: string[];
+    }
+  | {
+      type: "LayoutGraph";
+      nodes: Array<{
+        id: string;
+        type: "text" | "image" | "control" | "container";
+        bounds: { x: number; y: number; width: number; height: number };
+        text?: string;
+        role?: string;
+        componentRef?: {
+          filePath: string;
+          symbol?: string;
+          line: number;
+          column: number;
+        };
+        confidence: number;
+      }>;
+      edges: Array<{ from: string; to: string; type: "contains" | "adjacent" }>;
+    }
+  | {
+      type: "VisualDiffReport";
+      regions: Array<{
+        id: string;
+        bounds: { x: number; y: number; width: number; height: number };
+        score: number;
+        changeType: "added" | "removed" | "modified";
+      }>;
+      summary: { totalRegions: number; changedRegions: number; maxScore: number };
     };
 
 export interface CoworkArtifactRecord {

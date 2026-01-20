@@ -58,12 +58,39 @@ const aliases = [
     replacement: path.resolve(__dirname, "packages/agent-runtime/src/index.ts"),
   },
   {
+    find: "@ku0/agent-runtime-tools/tools/computer",
+    replacement: path.resolve(
+      __dirname,
+      "packages/agent-runtime-tools/src/tools/computer/index.ts"
+    ),
+  },
+  {
+    find: "@ku0/agent-runtime-tools/tools",
+    replacement: path.resolve(__dirname, "packages/agent-runtime-tools/src/tools/index.ts"),
+  },
+  {
+    find: "@ku0/agent-runtime-tools/browser",
+    replacement: path.resolve(__dirname, "packages/agent-runtime-tools/src/browser/index.ts"),
+  },
+  {
+    find: "@ku0/agent-runtime-tools/plugins",
+    replacement: path.resolve(__dirname, "packages/agent-runtime-tools/src/plugins/index.ts"),
+  },
+  {
+    find: "@ku0/agent-runtime-tools/skills",
+    replacement: path.resolve(__dirname, "packages/agent-runtime-tools/src/skills/index.ts"),
+  },
+  {
     find: "@ku0/agent-runtime-core",
     replacement: path.resolve(__dirname, "packages/agent-runtime-core/src/index.ts"),
   },
   {
     find: "@ku0/agent-runtime-tools",
     replacement: path.resolve(__dirname, "packages/agent-runtime-tools/src/index.ts"),
+  },
+  {
+    find: "@ku0/agent-runtime-vision",
+    replacement: path.resolve(__dirname, "packages/agent-runtime-vision/src/index.ts"),
   },
   {
     find: "@ku0/agent-runtime-sandbox",
@@ -213,6 +240,10 @@ export default defineConfig({
             "packages/agent-runtime-memory/src/**/*.test.ts",
             "packages/agent-runtime-telemetry/src/**/*.test.ts",
             "packages/agent-runtime-persistence/src/**/*.test.ts",
+            "packages/agent-runtime-sandbox/src/**/*.test.ts",
+            "packages/agent-runtime-control/src/**/*.test.ts",
+            "packages/agent-runtime-core/src/**/*.test.ts",
+            "packages/agent-runtime-vision/src/**/*.test.ts",
           ],
           exclude: defaultExclude,
           server: {

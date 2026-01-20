@@ -43,6 +43,59 @@ const PreflightReportSchema = z.object({
   createdAt: z.number(),
 });
 
+const LayoutBoundsSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+  width: z.number(),
+  height: z.number(),
+});
+
+const ComponentRefSchema = z.object({
+  filePath: z.string(),
+  symbol: z.string().optional(),
+  line: z.number(),
+  column: z.number(),
+});
+
+const LayoutNodeSchema = z.object({
+  id: z.string(),
+  type: z.enum(["text", "image", "control", "container"]),
+  bounds: LayoutBoundsSchema,
+  text: z.string().optional(),
+  role: z.string().optional(),
+  componentRef: ComponentRefSchema.optional(),
+  confidence: z.number(),
+});
+
+const LayoutEdgeSchema = z.object({
+  from: z.string(),
+  to: z.string(),
+  type: z.enum(["contains", "adjacent"]),
+});
+
+const LayoutGraphSchema = z.object({
+  type: z.literal("LayoutGraph"),
+  nodes: z.array(LayoutNodeSchema),
+  edges: z.array(LayoutEdgeSchema),
+});
+
+const VisualDiffRegionSchema = z.object({
+  id: z.string(),
+  bounds: LayoutBoundsSchema,
+  score: z.number(),
+  changeType: z.enum(["added", "removed", "modified"]),
+});
+
+const VisualDiffReportSchema = z.object({
+  type: z.literal("VisualDiffReport"),
+  regions: z.array(VisualDiffRegionSchema),
+  summary: z.object({
+    totalRegions: z.number(),
+    changedRegions: z.number(),
+    maxScore: z.number(),
+  }),
+});
+
 export const ArtifactPayloadSchema = z.union([
   z.object({
     type: z.literal("diff"),
@@ -64,6 +117,8 @@ export const ArtifactPayloadSchema = z.union([
     selectionNotes: z.array(z.string()),
     changedFiles: z.array(z.string()),
   }),
+  LayoutGraphSchema,
+  VisualDiffReportSchema,
 ]);
 
 export type ArtifactPayload = z.infer<typeof ArtifactPayloadSchema>;

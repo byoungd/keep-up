@@ -72,6 +72,20 @@ function convertArtifact(id: string, artifact: ArtifactPayload): ArtifactItem {
         title: "Preflight Report",
         content: artifact.report.riskSummary,
       };
+    case "LayoutGraph":
+      return {
+        id,
+        type: "doc",
+        title: "Layout Graph",
+        content: `Nodes: ${artifact.nodes.length}`,
+      };
+    case "VisualDiffReport":
+      return {
+        id,
+        type: "doc",
+        title: "Visual Diff Report",
+        content: `Regions: ${artifact.summary.changedRegions}`,
+      };
   }
 }
 
@@ -235,6 +249,58 @@ describe("Agent Task Helpers", () => {
         type: "doc",
         title: "Preflight Report",
         content: "No preflight checks were selected.",
+      });
+    });
+
+    it("should convert layout graph artifact", () => {
+      const artifact: ArtifactPayload = {
+        type: "LayoutGraph",
+        nodes: [
+          {
+            id: "node-1",
+            type: "text",
+            bounds: { x: 0, y: 0, width: 10, height: 10 },
+            confidence: 0.9,
+          },
+        ],
+        edges: [],
+      };
+
+      const result = convertArtifact("art-5", artifact);
+
+      expect(result).toEqual({
+        id: "art-5",
+        type: "doc",
+        title: "Layout Graph",
+        content: "Nodes: 1",
+      });
+    });
+
+    it("should convert visual diff artifact", () => {
+      const artifact: ArtifactPayload = {
+        type: "VisualDiffReport",
+        regions: [
+          {
+            id: "region-1",
+            bounds: { x: 0, y: 0, width: 10, height: 10 },
+            score: 0.8,
+            changeType: "modified",
+          },
+        ],
+        summary: {
+          totalRegions: 1,
+          changedRegions: 1,
+          maxScore: 0.8,
+        },
+      };
+
+      const result = convertArtifact("art-6", artifact);
+
+      expect(result).toEqual({
+        id: "art-6",
+        type: "doc",
+        title: "Visual Diff Report",
+        content: "Regions: 1",
       });
     });
   });

@@ -583,6 +583,20 @@ function extractArtifactsFromGraph(
           title: "Preflight Report",
           content: payload.report.riskSummary,
         };
+      case "LayoutGraph":
+        return {
+          ...base,
+          type: "report",
+          title: "Layout Graph",
+          content: `Nodes: ${payload.nodes.length}, Edges: ${payload.edges.length}`,
+        };
+      case "VisualDiffReport":
+        return {
+          ...base,
+          type: "report",
+          title: "Visual Diff Report",
+          content: `Regions: ${payload.summary.changedRegions}, Max: ${payload.summary.maxScore.toFixed(2)}`,
+        };
       default:
         return base;
     }

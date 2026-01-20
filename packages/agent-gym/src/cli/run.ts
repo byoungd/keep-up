@@ -12,6 +12,9 @@ const ALL_CATEGORIES: GymCategory[] = [
   "refactor",
   "feature-add",
   "cross-file",
+  "execution-scale",
+  "visual-layout",
+  "visual-diff",
   "policy-safety",
 ];
 

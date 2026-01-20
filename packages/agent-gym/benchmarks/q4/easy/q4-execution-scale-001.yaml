@@ -1,0 +1,39 @@
+{
+  "id": "q4-execution-scale-001",
+  "title": "Execution scale warmup 1",
+  "category": "execution-scale",
+  "difficulty": "easy",
+  "prompt": "Create reports/status.txt with the text 'ready'.",
+  "setup": {
+    "files": []
+  },
+  "expectations": [
+    {
+      "type": "file_equals",
+      "path": "reports/status.txt",
+      "content": "ready\n"
+    }
+  ],
+  "script": {
+    "responses": [
+      {
+        "content": "Writing status file.",
+        "finishReason": "tool_use",
+        "toolCalls": [
+          {
+            "name": "file:write",
+            "arguments": {
+              "path": "reports/status.txt",
+              "content": "ready\n",
+              "createDirs": true
+            }
+          }
+        ]
+      },
+      {
+        "content": "Done.",
+        "finishReason": "stop"
+      }
+    ]
+  }
+}

@@ -339,15 +339,28 @@ class DockerSandboxContext implements SandboxContext {
       }
     });
 
-    const timeout = setTimeout(() => {
-      timedOut = true;
-      void this.container.kill().catch(() => undefined);
-    }, timeoutMs);
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const timeoutPromise = new Promise<void>((resolve) => {
+      timeoutId = setTimeout(() => {
+        timedOut = true;
+        void this.container.kill().catch(() => undefined);
+        // End the streams manually to unblock data handlers
+        stdoutStream.end();
+        stderrStream.end();
+        resolve();
+      }, timeoutMs);
+    });
 
-    await new Promise<void>((resolve, reject) => {
+    const streamPromise = new Promise<void>((resolve, reject) => {
       stream.on("end", resolve);
       stream.on("error", reject);
-    }).finally(() => clearTimeout(timeout));
+    });
+
+    await Promise.race([streamPromise, timeoutPromise]).finally(() => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    });
 
     const inspect = await exec.inspect().catch(() => null);
     const exitCode = inspect?.ExitCode ?? (timedOut ? -1 : 0);

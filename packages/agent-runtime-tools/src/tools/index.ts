@@ -28,5 +28,7 @@ export * from "./middleware";
 export * from "./naming";
 // Sandbox Tools
 export * from "./sandbox";
+// Vision Tools
+export * from "./vision";
 // Web Tools
 export * from "./web";
