@@ -255,6 +255,11 @@ export class TodoToolServer extends BaseToolServer {
     args: Record<string, unknown>,
     context: ToolContext
   ): Promise<MCPToolResult> {
+    const readAccess = this.ensureReadAccess(context);
+    if (readAccess) {
+      return readAccess;
+    }
+
     const filter = (args.filter as string) ?? "all";
 
     try {
@@ -265,7 +270,7 @@ export class TodoToolServer extends BaseToolServer {
       }
 
       if (todos.length === 0) {
-        return textResult(`No ${filter === "all" ? "" : `${filter} `}tasks found.`);
+        return this.formatOutput(`No ${filter === "all" ? "" : `${filter} `}tasks found.`, context);
       }
 
       const output: string[] = [];
@@ -275,7 +280,7 @@ export class TodoToolServer extends BaseToolServer {
         output.push(`${statusIcon} ${item.id}: ${item.text}${priorityTag}`);
       }
 
-      return textResult(output.join("\n"));
+      return this.formatOutput(output.join("\n"), context);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return errorResult("EXECUTION_FAILED", `Failed to read todos: ${message}`);
@@ -287,6 +292,11 @@ export class TodoToolServer extends BaseToolServer {
     args: Record<string, unknown>,
     context: ToolContext
   ): Promise<MCPToolResult> {
+    const writeAccess = this.ensureWriteAccess(context);
+    if (writeAccess) {
+      return writeAccess;
+    }
+
     const action = args.action as string;
     const id = args.id as string | undefined;
     const text = args.text as string | undefined;
@@ -310,7 +320,7 @@ export class TodoToolServer extends BaseToolServer {
           };
           todos.push(newItem);
           await this.saveTodos(todos, context);
-          return textResult(`Added task: ${newItem.id} - ${text}`);
+          return this.formatOutput(`Added task: ${newItem.id} - ${text}`, context);
         }
 
         case "update": {
@@ -332,7 +342,7 @@ export class TodoToolServer extends BaseToolServer {
           }
           item.updatedAt = Date.now();
           await this.saveTodos(todos, context);
-          return textResult(`Updated task: ${id}`);
+          return this.formatOutput(`Updated task: ${id}`, context);
         }
 
         case "complete": {
@@ -346,7 +356,7 @@ export class TodoToolServer extends BaseToolServer {
           item.status = "done";
           item.updatedAt = Date.now();
           await this.saveTodos(todos, context);
-          return textResult(`Completed task: ${id} - ${item.text}`);
+          return this.formatOutput(`Completed task: ${id} - ${item.text}`, context);
         }
 
         case "remove": {
@@ -359,7 +369,7 @@ export class TodoToolServer extends BaseToolServer {
           }
           const removed = todos.splice(idx, 1)[0];
           await this.saveTodos(todos, context);
-          return textResult(`Removed task: ${id} - ${removed.text}`);
+          return this.formatOutput(`Removed task: ${id} - ${removed.text}`, context);
         }
 
         default:
@@ -369,6 +379,35 @@ export class TodoToolServer extends BaseToolServer {
       const message = err instanceof Error ? err.message : String(err);
       return errorResult("EXECUTION_FAILED", `Failed to write todo: ${message}`);
     }
+  }
+
+  private ensureReadAccess(context: ToolContext): MCPToolResult | null {
+    if (context.security.permissions.file === "none") {
+      return errorResult("PERMISSION_DENIED", "File access is disabled");
+    }
+
+    return null;
+  }
+
+  private ensureWriteAccess(context: ToolContext): MCPToolResult | null {
+    if (
+      context.security.permissions.file === "none" ||
+      context.security.permissions.file === "read"
+    ) {
+      return errorResult("PERMISSION_DENIED", "File write access is disabled");
+    }
+
+    return null;
+  }
+
+  private formatOutput(output: string, context: ToolContext): MCPToolResult {
+    const maxOutputBytes = context.security.limits.maxOutputBytes;
+    if (Buffer.byteLength(output) > maxOutputBytes) {
+      const truncated = Buffer.from(output).subarray(0, maxOutputBytes).toString();
+      return textResult(`${truncated}\n\n[Output truncated at ${maxOutputBytes} bytes]`);
+    }
+
+    return textResult(output);
   }
 }
 
