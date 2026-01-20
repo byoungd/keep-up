@@ -240,6 +240,10 @@ export default defineConfig({
             "packages/agent-runtime-memory/src/**/*.test.ts",
             "packages/agent-runtime-telemetry/src/**/*.test.ts",
             "packages/agent-runtime-persistence/src/**/*.test.ts",
+            "packages/agent-runtime-sandbox/src/**/*.test.ts",
+            "packages/agent-runtime-control/src/**/*.test.ts",
+            "packages/agent-runtime-core/src/**/*.test.ts",
+            "packages/agent-runtime-vision/src/**/*.test.ts",
           ],
           exclude: defaultExclude,
           server: {
