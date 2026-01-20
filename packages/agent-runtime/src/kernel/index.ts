@@ -28,6 +28,7 @@ import type {
   ArtifactPipeline,
 } from "../artifacts";
 import { createCheckpointManager } from "../checkpoint";
+import type { FileContextTracker } from "../context";
 import type {
   ToolConfirmationDetailsProvider,
   ToolConfirmationResolver,
@@ -81,6 +82,7 @@ export interface RuntimeServices {
   messageBus?: RuntimeMessageBus;
   state?: SessionState;
   checkpointManager?: ICheckpointManager;
+  fileContextTracker?: FileContextTracker;
   audit?: AuditLogger;
   telemetry?: TelemetryContext;
   clock?: Clock;
@@ -198,17 +200,26 @@ export class RuntimeKernel implements Kernel {
 
   private resolveOrchestratorOptions(): CreateOrchestratorOptions {
     const skillOptions = this.resolveSkillOptions();
+    const configuredToolExecution = this.config.orchestrator?.toolExecution;
+    let toolExecution = configuredToolExecution;
+    if (!toolExecution && this.services.audit) {
+      toolExecution = { audit: this.services.audit };
+    } else if (toolExecution && !toolExecution.audit && this.services.audit) {
+      toolExecution = { ...toolExecution, audit: this.services.audit };
+    }
 
     if (!this.config.orchestrator) {
       return {
         telemetry: this.services.telemetry,
         skills: skillOptions,
         a2a: this.a2aContext,
+        toolExecution,
         components: {
           toolExecutor: this.executor,
           eventBus: this.eventBus,
           sessionState: this.sessionState,
           checkpointManager: this.checkpointManager,
+          fileContextTracker: this.services.fileContextTracker,
           skillRegistry: this.skillRegistry,
           skillSession: this.skillSession,
           skillPromptAdapter: this.skillPromptAdapter,
@@ -220,6 +231,7 @@ export class RuntimeKernel implements Kernel {
       telemetry: this.services.telemetry ?? this.config.orchestrator.telemetry,
       skills: this.config.orchestrator.skills ?? skillOptions,
       a2a: this.config.orchestrator.a2a ?? this.a2aContext,
+      toolExecution,
       components: {
         ...this.config.orchestrator.components,
         toolExecutor: this.executor,
@@ -227,6 +239,9 @@ export class RuntimeKernel implements Kernel {
         sessionState: this.sessionState,
         checkpointManager:
           this.config.orchestrator.components?.checkpointManager ?? this.checkpointManager,
+        fileContextTracker:
+          this.config.orchestrator.components?.fileContextTracker ??
+          this.services.fileContextTracker,
         skillRegistry: this.config.orchestrator.components?.skillRegistry ?? this.skillRegistry,
         skillSession: this.config.orchestrator.components?.skillSession ?? this.skillSession,
         skillPromptAdapter:

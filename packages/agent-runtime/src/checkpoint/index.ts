@@ -34,3 +34,4 @@ export {
   MessagePackCheckpointStorage,
   type MessagePackCheckpointStorageConfig,
 } from "./messagePackCheckpointStorage";
+export * from "./shadow";

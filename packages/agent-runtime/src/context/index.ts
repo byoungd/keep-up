@@ -42,3 +42,8 @@ export {
   type CreateContextViewOptions,
   createContextManager,
 } from "./contextManager";
+export {
+  createFileContextTracker,
+  FileContextTracker,
+  type FileContextTrackerOptions,
+} from "./fileContextTracker";

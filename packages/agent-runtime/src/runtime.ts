@@ -17,6 +17,7 @@ import type {
   SkillSession,
 } from "@ku0/agent-runtime-tools";
 import { createToolRegistry } from "@ku0/agent-runtime-tools";
+import { createFileContextTracker, type FileContextTracker } from "./context";
 import type { ToolExecutor } from "./executor";
 import { createKernel, type Kernel, type KernelConfig, type RuntimeServices } from "./kernel";
 import type { IAgentLLM } from "./orchestrator/llmTypes";
@@ -44,6 +45,7 @@ export interface RuntimeComponents {
   messageBus?: RuntimeMessageBus;
   sessionState?: SessionState;
   checkpointManager?: ICheckpointManager;
+  fileContextTracker?: FileContextTracker;
   toolExecutor?: ToolExecutor;
   skillRegistry?: SkillRegistry;
   skillSession?: SkillSession;
@@ -68,6 +70,7 @@ export interface RuntimeInstance {
   messageBus?: RuntimeMessageBus;
   sessionState?: SessionState;
   checkpointManager?: ICheckpointManager;
+  fileContextTracker?: FileContextTracker;
 }
 
 export async function createRuntime(options: CreateRuntimeOptions): Promise<RuntimeInstance> {
@@ -84,9 +87,17 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<Runt
     throw new Error("createRuntime requires toolServers when registry is not provided");
   }
 
+  const resolvedSecurity = resolveSecurityPolicy(components.security);
   const permissionChecker =
-    components.permissionChecker ??
-    createPermissionChecker(resolveSecurityPolicy(components.security));
+    components.permissionChecker ?? createPermissionChecker(resolvedSecurity);
+  const fileContextTracker =
+    components.fileContextTracker ??
+    (resolvedSecurity.sandbox.workingDirectory
+      ? createFileContextTracker({
+          workspacePath: resolvedSecurity.sandbox.workingDirectory,
+          eventBus,
+        })
+      : undefined);
 
   const services: RuntimeServices = {
     llm: components.llm,
@@ -97,6 +108,7 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<Runt
     messageBus,
     state: components.sessionState,
     checkpointManager: components.checkpointManager,
+    fileContextTracker,
     audit: components.auditLogger,
     telemetry: components.telemetry,
     clock: components.clock,
@@ -127,6 +139,7 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<Runt
     messageBus,
     sessionState: components.sessionState,
     checkpointManager: components.checkpointManager,
+    fileContextTracker,
   };
 }
 

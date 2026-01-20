@@ -81,6 +81,37 @@ export type ToolContent =
   | { type: "image"; data: string; mimeType: string }
   | { type: "resource"; uri: string; mimeType?: string };
 
+// ============================================================================
+// File Context Tracking
+// ============================================================================
+
+/** File context status */
+export type FileContextStatus = "active" | "stale";
+
+/** Source of a file context record */
+export type FileContextSource = "read_tool" | "write_tool" | "file_mentioned" | "external_edit";
+
+/** File context entry */
+export interface FileContextEntry {
+  path: string;
+  absolutePath: string;
+  status: FileContextStatus;
+  recordSource: FileContextSource;
+  lastReadAt?: number;
+  lastWriteAt?: number;
+  lastExternalEditAt?: number;
+}
+
+/** Context-bound file tracking handle */
+export interface FileContextHandle {
+  markRead(path: string): void;
+  markWrite(path: string): void;
+  markMentioned(path: string): void;
+  isStale(path: string): boolean;
+  getEntry(path: string): FileContextEntry | undefined;
+  listStale(): FileContextEntry[];
+}
+
 /** Tool error structure */
 export interface ToolError {
   code: ToolErrorCode;
@@ -168,6 +199,8 @@ export interface ToolContext {
   sessionId?: string;
   /** Context ID for shared context views */
   contextId?: string;
+  /** File context tracking handle (optional) */
+  fileContext?: FileContextHandle;
   /** Current document ID (for LFCC tools) */
   docId?: string;
   /** Correlation ID for tracing */

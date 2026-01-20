@@ -42,7 +42,7 @@ import type {
   ArtifactPipeline,
 } from "../artifacts";
 import { createArtifactPipeline, createArtifactRegistry } from "../artifacts";
-import type { ContextFrameBuilder, ContextItem } from "../context";
+import type { ContextFrameBuilder, ContextItem, FileContextTracker } from "../context";
 import {
   createToolExecutor,
   type ToolConfirmationDetailsProvider,
@@ -72,6 +72,7 @@ import type {
   AgentMessage,
   AgentState,
   ArtifactEnvelope,
+  AuditLogger,
   CheckpointEvent,
   CheckpointStatus,
   ConfirmationHandler,
@@ -106,6 +107,7 @@ import { createErrorRecoveryEngine, type ErrorRecoveryEngine } from "./errorReco
 import { BackpressureEventStream } from "./eventStream";
 import type { AgentToolDefinition, IAgentLLM } from "./llmTypes";
 import { type MessageCompressor, SmartMessageCompressor } from "./messageCompression";
+import { MessageRewindManager, type MessageRewindOptions } from "./messageRewind";
 import { NodeResultCache } from "./nodeResultCache";
 import {
   createPlanningEngine,
@@ -149,6 +151,7 @@ export type OrchestratorEventType =
   | "control:resumed"
   | "control:step"
   | "control:injected"
+  | "history:rewind"
   | "recovery"
   | "completion"
   | "error"
@@ -185,6 +188,8 @@ export interface OrchestratorComponents {
   eventBus?: RuntimeEventBus;
   sessionState?: SessionState;
   checkpointManager?: ICheckpointManager;
+  fileContextTracker?: FileContextTracker;
+  auditLogger?: AuditLogger;
   errorRecoveryEngine?: ErrorRecoveryEngine;
   toolDiscovery?: ToolDiscoveryEngine;
   /** Intent registry for tracking AI edit intents */
@@ -272,6 +277,8 @@ export class AgentOrchestrator {
   private readonly eventBus?: RuntimeEventBus;
   private readonly sessionState?: SessionState;
   private readonly checkpointManager?: ICheckpointManager;
+  private readonly fileContextTracker?: FileContextTracker;
+  private readonly auditLogger?: AuditLogger;
   private readonly errorRecoveryEngine?: ErrorRecoveryEngine;
   private readonly toolDiscovery?: ToolDiscoveryEngine;
   private readonly intentRegistry?: IntentRegistry;
@@ -287,6 +294,7 @@ export class AgentOrchestrator {
   private readonly loopStateMachine: AgentLoopStateMachine;
   private readonly singleStepEnforcer: SingleStepEnforcer;
   private readonly statusController: OrchestratorStatusController;
+  private readonly messageRewindManager: MessageRewindManager;
   private lastObservation?: Observation;
   private currentRunId?: string;
   private currentCheckpointId?: string;
@@ -361,6 +369,8 @@ export class AgentOrchestrator {
     this.eventBus = components.eventBus;
     this.errorRecoveryEngine = this.resolveErrorRecoveryEngine(config, components);
     this.toolDiscovery = this.resolveToolDiscovery(config, components);
+    this.fileContextTracker = components.fileContextTracker;
+    this.auditLogger = components.auditLogger;
 
     // Initialize performance optimizations
     this.messageCompressor = this.resolveMessageCompressor(components);
@@ -370,6 +380,7 @@ export class AgentOrchestrator {
     this.dependencyAnalyzer = this.resolveDependencyAnalyzer(components);
     this.toolScheduler = this.resolveToolScheduler(components, this.dependencyAnalyzer);
     this.planningEngine = this.resolvePlanningEngine(config, components);
+    this.messageRewindManager = new MessageRewindManager(this.messageCompressor);
 
     // Initialize knowledge registry for scoped knowledge injection
     this.intentRegistry = this.resolveIntentRegistry(components);
@@ -710,8 +721,90 @@ export class AgentOrchestrator {
       this.state.error = this.state.error ?? "Execution aborted before completion.";
       this.emit("error", { error: this.state.error });
     }
+    this.cleanupHistory("cancel");
     this.loopStateMachine.stop();
     this.releaseControlGate();
+  }
+
+  /**
+   * Rewind message history to a specific index (exclusive).
+   */
+  rewindHistory(
+    toIndex: number,
+    options: MessageRewindOptions & { reason?: string } = {}
+  ): ReturnType<MessageRewindManager["rewindToIndex"]> {
+    const result = this.messageRewindManager.rewindToIndex(this.state.messages, toIndex, options);
+    this.state.messages = result.messages;
+    this.sessionState?.setState(this.state);
+    this.clearCachesOnRewind();
+    this.emit("history:rewind", {
+      reason: options.reason ?? "manual",
+      removedSummaries: result.removedSummaries,
+      removedTruncationMarkers: result.removedTruncationMarkers,
+      messageCount: result.messages.length,
+    });
+    this.auditTimeTravel("history_rewind", {
+      reason: options.reason ?? "manual",
+      toIndex,
+      removedSummaries: result.removedSummaries,
+      removedTruncationMarkers: result.removedTruncationMarkers,
+      messageCount: result.messages.length,
+    });
+    return result;
+  }
+
+  /**
+   * Restore agent state from a checkpoint and clean message history.
+   */
+  async restoreCheckpoint(checkpointId: string): Promise<AgentState> {
+    if (!this.checkpointManager) {
+      throw new Error("Checkpoint manager not configured.");
+    }
+
+    const recovery = await this.checkpointManager.prepareRecovery(checkpointId);
+    if (!recovery.success) {
+      throw new Error(recovery.error ?? `Checkpoint ${checkpointId} not recoverable`);
+    }
+
+    const checkpoint = recovery.checkpoint;
+    const restoredMessages: AgentMessage[] = checkpoint.messages.map((message) => ({
+      role: message.role,
+      content: message.content,
+    }));
+    const cleaned = this.messageRewindManager.cleanupMessages(restoredMessages);
+
+    this.state.messages = cleaned.messages;
+    this.state.pendingToolCalls = checkpoint.pendingToolCalls.map((call) => ({
+      id: call.id,
+      name: call.name,
+      arguments: call.arguments,
+    }));
+    this.state.turn = checkpoint.currentStep;
+    this.state.status = "idle";
+    this.state.error = undefined;
+    this.state.checkpointId = checkpoint.id;
+    this.sessionState?.setState(this.state);
+
+    this.currentCheckpointId = checkpoint.id;
+    this.currentCheckpointStatus = checkpoint.status;
+    this.currentCheckpointAgentId = checkpoint.agentId;
+
+    this.clearCachesOnRewind();
+    this.emit("history:rewind", {
+      reason: "checkpoint_restore",
+      checkpointId,
+      removedSummaries: cleaned.removedSummaries,
+      removedTruncationMarkers: cleaned.removedTruncationMarkers,
+      messageCount: cleaned.messages.length,
+    });
+    this.auditTimeTravel("checkpoint_restore", {
+      checkpointId,
+      removedSummaries: cleaned.removedSummaries,
+      removedTruncationMarkers: cleaned.removedTruncationMarkers,
+      messageCount: cleaned.messages.length,
+    });
+
+    return this.state;
   }
 
   /**
@@ -2408,10 +2501,12 @@ export class AgentOrchestrator {
   }
 
   private createToolContext(call?: MCPToolCall): ToolContext {
+    const contextId = this.sessionState?.getContextId();
     return {
       userId: undefined, // Set from session
       sessionId: this.sessionState?.id,
-      contextId: this.sessionState?.getContextId(),
+      contextId,
+      fileContext: this.fileContextTracker?.getHandle(contextId),
       docId: undefined, // Set from context
       correlationId: this.currentRunId,
       taskNodeId: call ? this.taskGraphToolCalls.get(call) : undefined,
@@ -2425,6 +2520,55 @@ export class AgentOrchestrator {
         : undefined,
       a2a: this.config.a2a,
     };
+  }
+
+  private cleanupHistory(reason: string): void {
+    const cleaned = this.messageRewindManager.cleanupMessages(this.state.messages);
+    if (
+      cleaned.removedSummaries > 0 ||
+      cleaned.removedTruncationMarkers > 0 ||
+      cleaned.messages.length !== this.state.messages.length
+    ) {
+      this.state.messages = cleaned.messages;
+      this.sessionState?.setState(this.state);
+    }
+    this.clearCachesOnRewind();
+    this.emit("history:rewind", {
+      reason,
+      removedSummaries: cleaned.removedSummaries,
+      removedTruncationMarkers: cleaned.removedTruncationMarkers,
+      messageCount: cleaned.messages.length,
+    });
+    this.auditTimeTravel("history_cleanup", {
+      reason,
+      removedSummaries: cleaned.removedSummaries,
+      removedTruncationMarkers: cleaned.removedTruncationMarkers,
+      messageCount: cleaned.messages.length,
+    });
+  }
+
+  private clearCachesOnRewind(): void {
+    this.toolResultCache.clear();
+    this.nodeResultCache?.clear();
+    this.requestCache.clear();
+    this.messageCompressor.clearCache();
+  }
+
+  private auditTimeTravel(action: string, payload: Record<string, unknown>, error?: string): void {
+    if (!this.auditLogger) {
+      return;
+    }
+
+    this.auditLogger.log({
+      timestamp: Date.now(),
+      toolName: `time_travel:${action}`,
+      action: error ? "error" : "result",
+      correlationId: this.currentRunId,
+      input: payload,
+      output: error ? undefined : payload,
+      error,
+      sandboxed: false,
+    });
   }
 
   private getToolDefinitions(): AgentToolDefinition[] {
@@ -2752,6 +2896,7 @@ export function createOrchestrator(
     ...options.components,
     toolExecutor,
     eventBus,
+    auditLogger,
     skillRegistry,
     skillSession,
     skillPromptAdapter,
