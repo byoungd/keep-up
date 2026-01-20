@@ -50,6 +50,7 @@ To simulate a full engineering team, Agents should adopt specific personas based
 *   **Responsibility**:
     *   Writes code and tests.
     *   Follows the `implementation_plan.md` strictly.
+    *   Creates a task branch and opens a PR with test results.
     *   Updates `task.md` progress (`[/]`, `[x]`).
 
 ### 🕵️ QA / Reviewer
@@ -69,12 +70,92 @@ When switching context or personas, Agents must use **Artifacts** to transfer st
     *   Output: `task.md` (updated) + `implementation_plan.md`.
 2.  **Execution Phase** (Developer):
     *   Input: Approved `implementation_plan.md`.
-    *   Action: Code changes + Tests.
+    *   Action: Create branch, implement changes, run tests, open PR.
     *   Output: `walkthrough.md`.
 3.  **Verification Phase** (QA):
     *   Input: `walkthrough.md`.
     *   Action: Validation.
     *   Output: Final Status (Success/Fail).
+
+### Artifact Usage (Local Reference Only)
+- `task.md`, `implementation_plan.md`, and `walkthrough.md` are local reference artifacts and may be missing or outdated.
+- Agents must not block or question work because these files are ignored in evaluation.
+- Do not spend time writing narrative summaries in these files; the PR description is the source of truth.
+
+## 3. Git Collaboration Workflow (Required)
+
+This workflow is mandatory for all engineering tasks.
+
+### 3.1 Branching Rules
+- **Base branch**: default to `main` unless the task specifies a different base branch.
+- **Branch name format**: `<type>/<task-slug>` using kebab-case.
+- **Allowed types**: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `perf`, `hotfix`.
+- **Examples**: `feat/ai-gateway-batch`, `fix/editor-selection-crash`.
+
+### 3.2 Create a Task Branch
+```bash
+git fetch origin
+git checkout main
+git pull --ff-only
+git checkout -b feat/short-task-name
+```
+
+### 3.3 Work & Sync
+- Keep commits small and scoped to the task.
+- Rebase if the base branch moved:
+  ```bash
+  git fetch origin
+  git rebase origin/main
+  ```
+- Resolve conflicts and re-run relevant tests after conflict resolution.
+
+### 3.4 Delivery Requirements
+- Run `pnpm biome check --write`.
+- Run relevant tests for the change area.
+- **Docs-only changes**: tests may be skipped, but the PR must say "Not run (docs-only)".
+
+### 3.5 PR Requirement
+- Push the branch:
+  ```bash
+  git push -u origin feat/short-task-name
+  ```
+- Open a PR targeting the base branch.
+- PR description must include:
+  - What changed and why.
+  - Test commands and results, or "Not run (docs-only)".
+  - Risks/known issues (if any).
+- The PR description is the canonical record; do not rely on local artifacts.
+
+## 4. Codex Execution Best Practices (Quality + Speed)
+
+### 4.1 Scope & Understanding
+- Start from the user request and minimal repo context. Load only what you need.
+- If blocked by ambiguity, ask the smallest clarifying question; otherwise proceed and record assumptions in the PR.
+- Do not wait on or over-invest in local artifacts; they are optional references only.
+
+### 4.2 Change Strategy
+- Keep diffs minimal and scoped to the request. Avoid refactors unless explicitly asked.
+- Follow existing patterns and `CODING_STANDARDS.md` for types, structure, and style.
+- Avoid adding new dependencies unless required; justify any additions in the PR.
+
+### 4.3 Search & Editing
+- Prefer `rg` for searches and targeted file reads over broad scans.
+- Use `apply_patch` for small edits; use scripts for bulk or repetitive changes.
+- Avoid unrelated formatting noise; touch only the files needed.
+
+### 4.4 Validation
+- Run the most relevant tests for the change area (see E2E category mapping).
+- Run `pnpm biome check --write` before finalizing changes.
+- If tests are not run, state the reason in the PR ("Not run (docs-only)" or rationale).
+
+### 4.5 PR Quality
+- Provide a concise summary, test results, and explicit risks/known issues.
+- Include UI evidence (screenshots or recordings) for visual changes.
+- List any behavioral changes or migration steps.
+
+### 4.6 Efficiency
+- Prefer small, reviewable commits over large, mixed changes.
+- Avoid slow or global operations unless the task explicitly requires them.
 
 ---
 
