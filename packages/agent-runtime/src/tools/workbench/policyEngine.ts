@@ -361,6 +361,9 @@ function mergePolicyDecision(base: ToolPolicyDecision, outcome: PolicyOutcome): 
       reasonCode: outcome.reasonCode ?? base.reasonCode,
       riskTags: mergeRiskTags(base.riskTags, outcome.riskTags),
       escalation: base.escalation,
+      policyDecision: base.policyDecision,
+      policyRuleId: base.policyRuleId,
+      policyAction: base.policyAction,
     };
   }
 
@@ -371,6 +374,9 @@ function mergePolicyDecision(base: ToolPolicyDecision, outcome: PolicyOutcome): 
     reasonCode: outcome.reasonCode ?? base.reasonCode,
     riskTags: mergeRiskTags(base.riskTags, outcome.riskTags),
     escalation: base.escalation,
+    policyDecision: base.policyDecision,
+    policyRuleId: base.policyRuleId,
+    policyAction: base.policyAction,
   };
 }
 

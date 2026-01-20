@@ -27,6 +27,11 @@ export class ModeToolPolicyEngine implements ToolPolicyEngine {
         requiresConfirmation: false,
         reason: this.modeManager.getDenialMessage(context.call.name),
         riskTags: baseDecision.riskTags,
+        policyDecision: baseDecision.policyDecision,
+        policyRuleId: baseDecision.policyRuleId,
+        policyAction: baseDecision.policyAction,
+        reasonCode: baseDecision.reasonCode,
+        escalation: baseDecision.escalation,
       };
     }
 

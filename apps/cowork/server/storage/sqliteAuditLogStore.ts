@@ -58,9 +58,15 @@ function rowToEntry(row: Record<string, unknown>): CoworkAuditEntry {
     toolName: row.tool_name ? (row.tool_name as string) : undefined,
     input: parseJson(row.input as string | null),
     output: parseJson(row.output as string | null),
-    decision: row.decision ? (row.decision as "allow" | "allow_with_confirm" | "deny") : undefined,
-    ruleId: row.rule_id ? (row.rule_id as string) : undefined,
+    policyDecision: row.decision
+      ? (row.decision as "allow" | "allow_with_confirm" | "deny")
+      : undefined,
+    policyRuleId: row.rule_id ? (row.rule_id as string) : undefined,
     riskTags: parseRiskTags(row.risk_tags as string | null),
+    riskScore:
+      row.risk_score === null || row.risk_score === undefined
+        ? undefined
+        : (row.risk_score as number),
     reason: row.reason ? (row.reason as string) : undefined,
     durationMs: row.duration_ms ? (row.duration_ms as number) : undefined,
     outcome: row.outcome ? (row.outcome as "success" | "error" | "denied") : undefined,
@@ -108,9 +114,9 @@ export async function createSqliteAuditLogStore(): Promise<AuditLogStoreLike> {
   const insertStmt = db.prepare(`
     INSERT INTO audit_logs
     (entry_id, session_id, task_id, timestamp, action, tool_name, input, output,
-     decision, rule_id, risk_tags, reason, duration_ms, outcome)
+     decision, rule_id, risk_tags, risk_score, reason, duration_ms, outcome)
     VALUES ($entryId, $sessionId, $taskId, $timestamp, $action, $toolName, $input, $output,
-            $decision, $ruleId, $riskTags, $reason, $durationMs, $outcome)
+            $decision, $ruleId, $riskTags, $riskScore, $reason, $durationMs, $outcome)
   `);
 
   const selectBySessionStmt = db.prepare(`
@@ -148,9 +154,10 @@ export async function createSqliteAuditLogStore(): Promise<AuditLogStoreLike> {
         $toolName: entry.toolName ?? null,
         $input: entry.input ? JSON.stringify(entry.input) : null,
         $output: entry.output ? JSON.stringify(entry.output) : null,
-        $decision: entry.decision ?? null,
-        $ruleId: entry.ruleId ?? null,
+        $decision: entry.policyDecision ?? null,
+        $ruleId: entry.policyRuleId ?? null,
         $riskTags: JSON.stringify(entry.riskTags ?? []),
+        $riskScore: entry.riskScore ?? null,
         $reason: entry.reason ?? null,
         $durationMs: entry.durationMs ?? null,
         $outcome: entry.outcome ?? null,

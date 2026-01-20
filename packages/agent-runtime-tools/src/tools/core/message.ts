@@ -168,6 +168,7 @@ The frontend will render different UI based on the type and suggested_action.`,
           requiresConfirmation: false,
           readOnly: true,
           estimatedDuration: "instant",
+          policyAction: "connector.read",
         },
       },
       this.handleSend.bind(this)

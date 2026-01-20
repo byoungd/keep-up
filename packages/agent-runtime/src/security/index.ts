@@ -21,6 +21,7 @@ import type {
   ToolPolicyEngine,
 } from "../types";
 import { SECURITY_PRESETS, type SecurityPreset } from "../types";
+import { CoworkToolPolicyAdapter } from "./coworkPolicyAdapter";
 
 // ============================================================================
 // Permission Checker
@@ -280,7 +281,7 @@ export class PermissionPolicyEngine implements ToolPolicyEngine {
 }
 
 export function createToolPolicyEngine(checker: IPermissionChecker): ToolPolicyEngine {
-  return new PermissionPolicyEngine(checker);
+  return new CoworkToolPolicyAdapter(new PermissionPolicyEngine(checker));
 }
 
 const DEFAULT_EXECUTION_POLICY: ExecutionPolicy = "batch";
@@ -349,6 +350,9 @@ export class ToolGovernancePolicyEngine implements ToolPolicyEngine {
         requiresConfirmation: false,
         reason: `Tool "${context.call.name}" not allowed by execution policy`,
         riskTags: mergeRiskTags(baseDecision.riskTags, ["policy:allowlist"]),
+        policyDecision: baseDecision.policyDecision,
+        policyRuleId: baseDecision.policyRuleId,
+        policyAction: baseDecision.policyAction,
       };
     }
 
@@ -366,6 +370,9 @@ export class ToolGovernancePolicyEngine implements ToolPolicyEngine {
         baseDecision.riskTags,
         approvalRequired ? ["policy:approval"] : undefined
       ),
+      policyDecision: baseDecision.policyDecision,
+      policyRuleId: baseDecision.policyRuleId,
+      policyAction: baseDecision.policyAction,
     };
   }
 }
@@ -716,6 +723,7 @@ export {
   type ApprovalRequestOptions,
   type ApprovalStatus,
 } from "./approvalManager";
+export { CoworkToolPolicyAdapter } from "./coworkPolicyAdapter";
 export {
   DEFAULT_PROMPT_INJECTION_POLICY,
   DefaultPromptInjectionGuard,

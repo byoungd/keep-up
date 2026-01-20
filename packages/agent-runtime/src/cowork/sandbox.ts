@@ -59,9 +59,11 @@ export class CoworkSandboxAdapter {
       fileSizeBytes: request.fileSizeBytes,
       caseInsensitivePaths,
     });
+    const riskTags = mergeRiskTags(decision.riskTags, deriveFileRiskTags(request.intent));
 
     return {
       ...decision,
+      riskTags,
       normalizedPath,
       withinGrant,
       withinOutputRoot,
@@ -89,7 +91,7 @@ export class CoworkSandboxAdapter {
 }
 
 function toFileAction(intent: CoworkFileIntent): CoworkPolicyAction {
-  return `file.${intent}` as CoworkPolicyAction;
+  return intent === "read" ? "file.read" : "file.write";
 }
 
 function collectGrantRoots(session: CoworkSessionLike): string[] {
@@ -109,4 +111,28 @@ function collectOutputRoots(session: CoworkSessionLike): string[] {
 function normalizePath(input: string, caseInsensitive: boolean): string {
   const normalized = path.resolve(input).replace(/\\/g, "/");
   return caseInsensitive ? normalized.toLowerCase() : normalized;
+}
+
+function deriveFileRiskTags(intent: CoworkFileIntent): CoworkSandboxDecision["riskTags"] {
+  if (intent === "delete") {
+    return ["delete"];
+  }
+  if (intent !== "read") {
+    return ["overwrite"];
+  }
+  return [];
+}
+
+function mergeRiskTags(
+  base: CoworkSandboxDecision["riskTags"],
+  extra: CoworkSandboxDecision["riskTags"]
+): CoworkSandboxDecision["riskTags"] {
+  const tags = new Set<string>();
+  for (const entry of base ?? []) {
+    tags.add(entry);
+  }
+  for (const entry of extra ?? []) {
+    tags.add(entry);
+  }
+  return tags.size > 0 ? Array.from(tags) : [];
 }

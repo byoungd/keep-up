@@ -28,6 +28,11 @@ const auditQuerySchema = z.object({
       "artifact_revert",
       "approval_requested",
       "approval_resolved",
+      "workflow_run",
+      "preflight_run",
+      "agent_protocol_task_created",
+      "agent_protocol_step_created",
+      "agent_protocol_artifact_created",
     ])
     .optional(),
   since: z.number().optional(),

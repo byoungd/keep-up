@@ -47,7 +47,11 @@ function createPingServer(): MCPToolServer {
         name: "ping",
         description: "Ping the runtime",
         inputSchema: { type: "object", properties: {}, required: [] },
-        annotations: { requiresConfirmation: false, readOnly: false },
+        annotations: {
+          requiresConfirmation: false,
+          readOnly: false,
+          policyAction: "connector.read",
+        },
       },
     ],
     callTool: async () => ({

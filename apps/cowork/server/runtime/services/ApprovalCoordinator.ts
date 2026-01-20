@@ -71,7 +71,7 @@ export class ApprovalCoordinator {
       timestamp: Date.now(),
       action: "approval_resolved",
       toolName: params.toolName,
-      decision: decision === "approved" ? "allow" : "deny",
+      policyDecision: decision === "approved" ? "allow" : "deny",
       outcome: decision === "approved" ? "success" : "denied",
     });
 

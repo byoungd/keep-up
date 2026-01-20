@@ -4,12 +4,13 @@
  * Bridges an external MCP server using the official SDK client + transport.
  */
 
-import type {
-  MCPTool,
-  MCPToolCall,
-  MCPToolResult,
-  MCPToolServer,
-  ToolContext,
+import {
+  COWORK_POLICY_ACTIONS,
+  type MCPTool,
+  type MCPToolCall,
+  type MCPToolResult,
+  type MCPToolServer,
+  type ToolContext,
 } from "@ku0/agent-runtime-core";
 import {
   type OAuthClientProvider,
@@ -205,7 +206,9 @@ export class McpRemoteToolServer implements MCPToolServer {
       .map((tool: SdkTool) => normalizeSdkTool(tool))
       .filter((tool): tool is SdkTool => tool !== null);
 
-    this.tools = normalized.map((tool) => this.decorateTool(fromSdkTool(tool, this.toolScopes)));
+    this.tools = normalized
+      .map((tool) => this.decorateTool(fromSdkTool(tool, this.toolScopes)))
+      .filter(hasValidPolicyAction);
   }
 
   private decorateTool(tool: MCPTool): MCPTool {
@@ -282,6 +285,11 @@ export class McpRemoteToolServer implements MCPToolServer {
     };
     this.onStatusChange?.(this.status);
   }
+}
+
+function hasValidPolicyAction(tool: MCPTool): boolean {
+  const policyAction = tool.annotations?.policyAction;
+  return typeof policyAction === "string" && COWORK_POLICY_ACTIONS.includes(policyAction);
 }
 
 export function createMcpRemoteToolServer(config: McpRemoteServerConfig): McpRemoteToolServer {

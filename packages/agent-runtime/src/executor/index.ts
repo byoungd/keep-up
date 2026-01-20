@@ -8,6 +8,7 @@ import type { TelemetryContext } from "@ku0/agent-runtime-telemetry/telemetry";
 import { AGENT_METRICS } from "@ku0/agent-runtime-telemetry/telemetry";
 import type { IToolRegistry } from "@ku0/agent-runtime-tools";
 import type { ImageArtifactStore } from "../artifacts";
+import { computeCoworkRiskScore } from "../cowork/risk";
 import {
   createExecutionSandboxAdapter,
   type ExecutionSandboxAdapter,
@@ -225,7 +226,7 @@ export class ToolExecutionPipeline
       }
     }
 
-    this.auditCall(call, executionContext);
+    this.auditCall(call, executionContext, toolCallId);
 
     try {
       let result = await this.executeWithRetry(call, executionContext);
@@ -263,7 +264,7 @@ export class ToolExecutionPipeline
       );
 
       this.emitSandboxTelemetry(call, executionContext, spooled, startTime);
-      this.auditResult(call, executionContext, spooled);
+      this.auditResult(call, executionContext, spooled, toolCallId);
       return spooled;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -285,7 +286,7 @@ export class ToolExecutionPipeline
         executionContext
       );
       this.emitSandboxTelemetry(call, executionContext, exceptionResult, startTime);
-      this.auditResult(call, executionContext, exceptionResult);
+      this.auditResult(call, executionContext, exceptionResult, toolCallId);
       return exceptionResult;
     }
   }
@@ -640,6 +641,7 @@ export class ToolExecutionPipeline
   }): ExecutionPreparationResult {
     const { call, tool, context, startTime, toolCallId, decisionId } = input;
     const policyDecision = this.evaluatePolicy(call, tool, context);
+    this.auditPolicyDecision(call, context, policyDecision, decisionId);
 
     if (!policyDecision.allowed) {
       return this.handlePolicyDenied(
@@ -779,7 +781,7 @@ export class ToolExecutionPipeline
     );
     this.recordToolMetric(call.name, "error");
     this.recordDuration(call.name, startTime);
-    this.auditResult(call, context, invalidResult);
+    this.auditResult(call, context, invalidResult, toolCallId);
     return { ok: false, result: invalidResult };
   }
 
@@ -828,7 +830,7 @@ export class ToolExecutionPipeline
     );
     this.recordToolMetric(call.name, "error");
     this.recordDuration(call.name, startTime);
-    this.auditResult(call, context, blocked);
+    this.auditResult(call, context, blocked, toolCallId);
     return { ok: false, result: blocked };
   }
 
@@ -877,7 +879,7 @@ export class ToolExecutionPipeline
     this.recordDenied(call, startTime, policyDecision.reason);
     this.recordToolMetric(call.name, "error");
     this.emitSandboxTelemetry(call, context, denied, startTime);
-    this.auditResult(call, context, denied);
+    this.auditResult(call, context, denied, toolCallId);
     return { ok: false, result: denied };
   }
 
@@ -926,7 +928,7 @@ export class ToolExecutionPipeline
     this.recordToolMetric(call.name, "error");
     this.recordDuration(call.name, startTime);
     this.emitSandboxTelemetry(call, context, denied, startTime);
-    this.auditResult(call, context, denied);
+    this.auditResult(call, context, denied, toolCallId);
     return { ok: false, result: denied };
   }
 
@@ -1114,7 +1116,7 @@ export class ToolExecutionPipeline
     this.recordToolMetric(call.name, "error");
     this.recordDuration(call.name, startTime);
     this.emitSandboxTelemetry(call, context, limited, startTime);
-    this.auditResult(call, context, limited);
+    this.auditResult(call, context, limited, toolCallId);
     return { ok: false, result: limited };
   }
 
@@ -1135,11 +1137,14 @@ export class ToolExecutionPipeline
     return tool?.annotations?.readOnly === true;
   }
 
-  private auditCall(call: MCPToolCall, context: ToolContext): void {
+  private auditCall(call: MCPToolCall, context: ToolContext, toolCallId?: string): void {
     this.audit?.log({
+      entryId: toolCallId ? `${toolCallId}:call` : undefined,
       timestamp: Date.now(),
       toolName: call.name,
       action: "call",
+      sessionId: context.sessionId,
+      taskId: context.taskNodeId,
       userId: context.userId,
       correlationId: context.correlationId,
       input: call.arguments,
@@ -1147,14 +1152,46 @@ export class ToolExecutionPipeline
     });
   }
 
-  private auditResult(call: MCPToolCall, context: ToolContext, result: MCPToolResult): void {
+  private auditResult(
+    call: MCPToolCall,
+    context: ToolContext,
+    result: MCPToolResult,
+    toolCallId?: string
+  ): void {
     this.audit?.log({
+      entryId: toolCallId ? `${toolCallId}:result` : undefined,
       timestamp: Date.now(),
       toolName: call.name,
       action: result.success ? "result" : "error",
+      sessionId: context.sessionId,
+      taskId: context.taskNodeId,
       userId: context.userId,
       correlationId: context.correlationId,
       output: result.success ? result.content : result.error,
+      sandboxed: context.security.sandbox.type !== "none",
+    });
+  }
+
+  private auditPolicyDecision(
+    call: MCPToolCall,
+    context: ToolContext,
+    decision: ToolPolicyDecision,
+    decisionId: string
+  ): void {
+    const policyDecision = decision.policyDecision ?? (decision.allowed ? "allow" : "deny");
+    this.audit?.log({
+      entryId: decisionId,
+      timestamp: Date.now(),
+      toolName: call.name,
+      action: "policy",
+      sessionId: context.sessionId,
+      taskId: context.taskNodeId,
+      userId: context.userId,
+      correlationId: context.correlationId,
+      policyDecision,
+      policyRuleId: decision.policyRuleId,
+      riskScore: computeCoworkRiskScore(decision.riskTags, policyDecision),
+      reason: decision.reason,
       sandboxed: context.security.sandbox.type !== "none",
     });
   }

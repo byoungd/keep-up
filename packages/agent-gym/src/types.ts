@@ -52,6 +52,7 @@ export type GymExpectation =
   | { type: "file_regex"; path: string; pattern: string }
   | { type: "no_syntax_errors"; path: string }
   | { type: "tool_called"; name: string }
+  | { type: "tool_result_error"; name: string; code?: string; messageIncludes?: string }
   | { type: "max_turns"; count: number };
 
 export interface GymExpectationResult {

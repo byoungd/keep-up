@@ -18,7 +18,7 @@ function createFileServer(): MCPToolServer {
         name: "write",
         description: "Write file",
         inputSchema: { type: "object", properties: {}, required: [] },
-        annotations: { requiresConfirmation: false, readOnly: false },
+        annotations: { requiresConfirmation: false, readOnly: false, policyAction: "file.write" },
       },
     ],
     callTool: async () => ({ success: true, content: [] }),

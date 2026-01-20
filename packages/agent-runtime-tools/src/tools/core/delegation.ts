@@ -101,6 +101,9 @@ export class DelegationToolServer extends BaseToolServer {
           },
           required: ["role", "task"],
         },
+        annotations: {
+          policyAction: "connector.action",
+        },
       },
       (args: Record<string, unknown>, context: ToolContext) => this.handleDelegate(args, context)
     );
@@ -113,6 +116,9 @@ export class DelegationToolServer extends BaseToolServer {
           type: "object" as const,
           properties: {},
           required: [],
+        },
+        annotations: {
+          policyAction: "connector.read",
         },
       },
       () => this.handleListRoles()

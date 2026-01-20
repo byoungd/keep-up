@@ -8,6 +8,7 @@ export * from "./memory";
 export * from "./permissionChecker";
 export * from "./planSync";
 export * from "./policy";
+export * from "./risk";
 export * from "./runtime";
 export * from "./sandbox";
 export * from "./session";

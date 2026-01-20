@@ -29,6 +29,7 @@ class MockToolRegistry {
       name: toolName,
       description: "mock tool",
       inputSchema: { type: "object" },
+      annotations: { policyAction: "connector.read" },
     };
     this.result = result;
   }

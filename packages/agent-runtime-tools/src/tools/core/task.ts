@@ -85,6 +85,7 @@ export class TaskToolServer extends BaseToolServer {
           requiresConfirmation: false,
           readOnly: false,
           estimatedDuration: "fast",
+          policyAction: "connector.action",
         },
       },
       this.handleCreate.bind(this)
@@ -107,6 +108,7 @@ export class TaskToolServer extends BaseToolServer {
           requiresConfirmation: false,
           readOnly: true,
           estimatedDuration: "fast",
+          policyAction: "connector.read",
         },
       },
       this.handleStatus.bind(this)
@@ -136,6 +138,7 @@ export class TaskToolServer extends BaseToolServer {
           requiresConfirmation: false,
           readOnly: false,
           estimatedDuration: "fast",
+          policyAction: "connector.action",
         },
       },
       this.handleUpdate.bind(this)
@@ -162,6 +165,7 @@ export class TaskToolServer extends BaseToolServer {
           requiresConfirmation: false,
           readOnly: true,
           estimatedDuration: "fast",
+          policyAction: "connector.read",
         },
       },
       this.handleList.bind(this)

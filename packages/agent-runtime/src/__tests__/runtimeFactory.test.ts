@@ -28,7 +28,11 @@ function createPingServer(): MCPToolServer {
           properties: { message: { type: "string" } },
           required: ["message"],
         },
-        annotations: { requiresConfirmation: false, readOnly: true },
+        annotations: {
+          requiresConfirmation: false,
+          readOnly: true,
+          policyAction: "connector.read",
+        },
       },
     ],
     callTool: async (call, _context) => ({

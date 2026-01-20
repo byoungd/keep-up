@@ -85,6 +85,7 @@ export class BrowserToolServer extends BaseToolServer {
         requiresConfirmation: true,
         readOnly: false,
         estimatedDuration: "medium",
+        policyAction: "network.request",
       },
     };
   }
@@ -108,6 +109,7 @@ export class BrowserToolServer extends BaseToolServer {
         requiresConfirmation: false,
         readOnly: true,
         estimatedDuration: "fast",
+        policyAction: "connector.read",
       },
     };
   }
@@ -138,6 +140,7 @@ export class BrowserToolServer extends BaseToolServer {
         requiresConfirmation: true,
         readOnly: false,
         estimatedDuration: "fast",
+        policyAction: "connector.action",
       },
     };
   }
@@ -158,6 +161,7 @@ export class BrowserToolServer extends BaseToolServer {
         requiresConfirmation: false,
         readOnly: true,
         estimatedDuration: "fast",
+        policyAction: "connector.read",
       },
     };
   }
@@ -177,6 +181,7 @@ export class BrowserToolServer extends BaseToolServer {
         requiresConfirmation: false,
         readOnly: false,
         estimatedDuration: "fast",
+        policyAction: "connector.action",
       },
     };
   }

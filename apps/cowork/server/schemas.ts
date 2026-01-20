@@ -69,6 +69,8 @@ export const settingsPatchSchema = z
     defaultModel: z.string().min(1).optional(),
     theme: z.enum(["light", "dark"]).optional(),
     memoryProfile: z.enum(["default", "strict-reviewer", "creative-prototyper"]).optional(),
+    caseInsensitivePaths: z.boolean().optional(),
+    policy: z.unknown().nullable().optional(),
   })
   .strict();
 

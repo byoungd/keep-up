@@ -75,6 +75,7 @@ export class SubagentToolServer extends BaseToolServer {
           requiresConfirmation: false,
           readOnly: false,
           estimatedDuration: "medium",
+          policyAction: "connector.action",
         },
       },
       this.handleSpawn.bind(this)
@@ -129,6 +130,7 @@ export class SubagentToolServer extends BaseToolServer {
           requiresConfirmation: false,
           readOnly: false,
           estimatedDuration: "slow",
+          policyAction: "connector.action",
         },
       },
       this.handleSpawnParallel.bind(this)
@@ -163,6 +165,7 @@ export class SubagentToolServer extends BaseToolServer {
           requiresConfirmation: false,
           readOnly: false,
           estimatedDuration: "slow",
+          policyAction: "connector.action",
         },
       },
       this.handleWorkflow.bind(this)
@@ -181,6 +184,7 @@ export class SubagentToolServer extends BaseToolServer {
           requiresConfirmation: false,
           readOnly: true,
           estimatedDuration: "fast",
+          policyAction: "connector.read",
         },
       },
       this.handleTypes.bind(this)

@@ -174,6 +174,7 @@ export class BashToolServer extends BaseToolServer {
           requiresConfirmation: true,
           readOnly: false,
           estimatedDuration: "medium",
+          policyAction: "connector.action",
         },
       },
       this.handleExecute.bind(this)
@@ -210,6 +211,14 @@ export class BashToolServer extends BaseToolServer {
           `Command contains potentially dangerous pattern: ${pattern.source}`
         );
       }
+    }
+
+    const shellOperator = detectShellOperator(command);
+    if (shellOperator) {
+      return errorResult(
+        "PERMISSION_DENIED",
+        `Command contains unsafe shell operator: ${shellOperator.description}`
+      );
     }
 
     // Log to audit
@@ -282,6 +291,139 @@ export class BashToolServer extends BaseToolServer {
 
     return parts.join("\n");
   }
+}
+
+type ShellOperatorMatch = {
+  operator: string;
+  description: string;
+};
+
+const SHELL_OPERATOR_DESCRIPTIONS: Record<string, string> = {
+  ";": "command chaining (semicolon)",
+  "&&": "command chaining (AND)",
+  "||": "command chaining (OR)",
+  "|": "pipe",
+  "|&": "pipe with stderr",
+  ">": "output redirection",
+  ">>": "append redirection",
+  "<": "input redirection",
+  ">&": "file descriptor redirection",
+  "<&": "file descriptor duplication",
+  "`": "command substitution (backtick)",
+  "\\n": "newline (command separator)",
+  "\\r": "carriage return (potential command separator)",
+  "U+2028": "unicode line separator",
+  "U+2029": "unicode paragraph separator",
+  "U+0085": "unicode next line",
+};
+
+const LINE_SEPARATOR_MATCHES: Record<string, ShellOperatorMatch> = {
+  "\n": { operator: "\\n", description: "newline (command separator)" },
+  "\r": { operator: "\\r", description: "carriage return (potential command separator)" },
+  "\u2028": { operator: "U+2028", description: "unicode line separator" },
+  "\u2029": { operator: "U+2029", description: "unicode paragraph separator" },
+  "\u0085": { operator: "U+0085", description: "unicode next line" },
+};
+
+type QuoteState = {
+  inSingleQuote: boolean;
+  inDoubleQuote: boolean;
+  escaped: boolean;
+};
+
+const SINGLE_CHAR_OPERATORS = new Set([";", "|", "&", ">", "<", "`"]);
+
+function detectShellOperator(command: string): ShellOperatorMatch | null {
+  const quoteState: QuoteState = {
+    inSingleQuote: false,
+    inDoubleQuote: false,
+    escaped: false,
+  };
+
+  for (let index = 0; index < command.length; index++) {
+    const char = command[index];
+
+    if (updateQuoteState(char, quoteState)) {
+      continue;
+    }
+
+    if (quoteState.inSingleQuote || quoteState.inDoubleQuote) {
+      continue;
+    }
+
+    const lineSeparatorMatch = LINE_SEPARATOR_MATCHES[char];
+    if (lineSeparatorMatch) {
+      return lineSeparatorMatch;
+    }
+
+    const operatorMatch = matchOperatorAt(command, index);
+    if (operatorMatch) {
+      return operatorMatch;
+    }
+  }
+
+  return null;
+}
+
+function updateQuoteState(char: string, state: QuoteState): boolean {
+  if (state.escaped) {
+    state.escaped = false;
+    return true;
+  }
+
+  if (char === "\\" && !state.inSingleQuote) {
+    state.escaped = true;
+    return true;
+  }
+
+  if (char === '"' && !state.inSingleQuote) {
+    state.inDoubleQuote = !state.inDoubleQuote;
+    return true;
+  }
+
+  if (char === "'" && !state.inDoubleQuote) {
+    state.inSingleQuote = !state.inSingleQuote;
+    return true;
+  }
+
+  return false;
+}
+
+function matchOperatorAt(command: string, index: number): ShellOperatorMatch | null {
+  const char = command[index];
+  const next = command[index + 1];
+
+  if (char === "&" && next === "&") {
+    return matchOperator("&&");
+  }
+  if (char === "|" && next === "|") {
+    return matchOperator("||");
+  }
+  if (char === "|" && next === "&") {
+    return matchOperator("|&");
+  }
+  if (char === ">" && next === ">") {
+    return matchOperator(">>");
+  }
+  if (char === ">" && next === "&") {
+    return matchOperator(">&");
+  }
+  if (char === "<" && next === "&") {
+    return matchOperator("<&");
+  }
+
+  if (SINGLE_CHAR_OPERATORS.has(char)) {
+    return matchOperator(char);
+  }
+
+  return null;
+}
+
+function matchOperator(operator: string): ShellOperatorMatch {
+  return {
+    operator,
+    description: SHELL_OPERATOR_DESCRIPTIONS[operator] ?? `shell operator (${operator})`,
+  };
 }
 
 /**

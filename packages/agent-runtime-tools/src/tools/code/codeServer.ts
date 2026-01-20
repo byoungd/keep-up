@@ -119,6 +119,7 @@ export class CodeInteractionServer extends BaseToolServer {
       annotations: {
         requiresConfirmation: false,
         readOnly: true,
+        policyAction: "file.read",
       },
     };
   }
@@ -149,6 +150,7 @@ export class CodeInteractionServer extends BaseToolServer {
       annotations: {
         requiresConfirmation: false,
         readOnly: true,
+        policyAction: "file.read",
       },
     };
   }
@@ -201,6 +203,7 @@ export class CodeInteractionServer extends BaseToolServer {
       annotations: {
         requiresConfirmation: true,
         readOnly: false,
+        policyAction: "file.write",
       },
     };
   }
@@ -227,6 +230,7 @@ export class CodeInteractionServer extends BaseToolServer {
       annotations: {
         requiresConfirmation: true,
         readOnly: false,
+        policyAction: "file.write",
       },
     };
   }
@@ -246,6 +250,7 @@ export class CodeInteractionServer extends BaseToolServer {
       annotations: {
         requiresConfirmation: false,
         readOnly: true,
+        policyAction: "file.read",
       },
     };
   }
@@ -281,6 +286,7 @@ export class CodeInteractionServer extends BaseToolServer {
       annotations: {
         requiresConfirmation: false,
         readOnly: true,
+        policyAction: "file.read",
       },
     };
   }
@@ -305,6 +311,7 @@ export class CodeInteractionServer extends BaseToolServer {
       annotations: {
         requiresConfirmation: false,
         readOnly: true,
+        policyAction: "file.read",
       },
     };
   }
@@ -718,6 +725,7 @@ export class CodeInteractionServer extends BaseToolServer {
       annotations: {
         requiresConfirmation: false,
         readOnly: true,
+        policyAction: "file.read",
       },
     };
   }
@@ -747,6 +755,7 @@ export class CodeInteractionServer extends BaseToolServer {
       annotations: {
         requiresConfirmation: false,
         readOnly: true,
+        policyAction: "file.read",
       },
     };
   }
@@ -776,6 +785,7 @@ export class CodeInteractionServer extends BaseToolServer {
       annotations: {
         requiresConfirmation: false,
         readOnly: true,
+        policyAction: "file.read",
       },
     };
   }
@@ -805,6 +815,7 @@ export class CodeInteractionServer extends BaseToolServer {
       annotations: {
         requiresConfirmation: false,
         readOnly: true,
+        policyAction: "file.read",
       },
     };
   }
@@ -843,6 +854,7 @@ export class CodeInteractionServer extends BaseToolServer {
       annotations: {
         requiresConfirmation: true,
         readOnly: false,
+        policyAction: "file.write",
       },
     };
   }
@@ -864,6 +876,7 @@ export class CodeInteractionServer extends BaseToolServer {
       annotations: {
         requiresConfirmation: false,
         readOnly: true,
+        policyAction: "file.read",
       },
     };
   }

@@ -5,6 +5,7 @@
 import { createToolRegistry } from "@ku0/agent-runtime-tools";
 import { describe, expect, it } from "vitest";
 import { createCoworkToolExecutor } from "../cowork/factory";
+import type { CoworkPolicyConfig } from "../cowork/policy";
 import type { CoworkSession } from "../cowork/types";
 import { createSecurityPolicy } from "../security";
 import type { MCPToolServer, ToolContext } from "../types";
@@ -18,13 +19,13 @@ function createFileServer(): MCPToolServer {
         name: "write",
         description: "Write file",
         inputSchema: { type: "object", properties: {}, required: [] },
-        annotations: { requiresConfirmation: false, readOnly: false },
+        annotations: { requiresConfirmation: false, readOnly: false, policyAction: "file.write" },
       },
       {
         name: "delete",
         description: "Delete file",
         inputSchema: { type: "object", properties: {}, required: [] },
-        annotations: { requiresConfirmation: false, readOnly: false },
+        annotations: { requiresConfirmation: false, readOnly: false, policyAction: "file.write" },
       },
     ],
     callTool: async () => ({ success: true, content: [] }),
@@ -56,7 +57,19 @@ describe("Cowork factories", () => {
       createdAt: Date.now(),
     };
 
-    const executor = createCoworkToolExecutor(registry, { session });
+    const policy: CoworkPolicyConfig = {
+      version: "1.0",
+      defaults: { fallback: "deny" },
+      rules: [
+        {
+          id: "allow-write-with-confirm",
+          action: "file.write",
+          when: { pathWithinGrant: true },
+          decision: "allow_with_confirm",
+        },
+      ],
+    };
+    const executor = createCoworkToolExecutor(registry, { session, policy });
     const resolver = executor as unknown as {
       requiresConfirmation: (
         call: { name: string; arguments: Record<string, unknown> },
@@ -79,7 +92,7 @@ describe("Cowork factories", () => {
       { security: createSecurityPolicy("balanced") }
     );
 
-    expect(writeRequiresConfirmation).toBe(false);
+    expect(writeRequiresConfirmation).toBe(true);
     expect(deleteRequiresConfirmation).toBe(true);
   });
 });

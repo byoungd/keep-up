@@ -92,6 +92,7 @@ export class ScratchToolServer extends BaseToolServer {
           requiresConfirmation: false,
           readOnly: false,
           estimatedDuration: "fast",
+          policyAction: "connector.action",
         },
       },
       this.handleSave.bind(this)
@@ -117,6 +118,7 @@ export class ScratchToolServer extends BaseToolServer {
           requiresConfirmation: false,
           readOnly: true,
           estimatedDuration: "fast",
+          policyAction: "connector.read",
         },
       },
       this.handleLoad.bind(this)
@@ -137,6 +139,7 @@ export class ScratchToolServer extends BaseToolServer {
           requiresConfirmation: false,
           readOnly: true,
           estimatedDuration: "fast",
+          policyAction: "connector.read",
         },
       },
       this.handleList.bind(this)
@@ -166,6 +169,7 @@ export class ScratchToolServer extends BaseToolServer {
           requiresConfirmation: true,
           readOnly: false,
           estimatedDuration: "fast",
+          policyAction: "connector.action",
         },
       },
       this.handleClear.bind(this)
@@ -199,6 +203,7 @@ export class ScratchToolServer extends BaseToolServer {
           requiresConfirmation: false,
           readOnly: false,
           estimatedDuration: "fast",
+          policyAction: "connector.action",
         },
       },
       this.handleAppend.bind(this)
