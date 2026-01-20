@@ -1,4 +1,4 @@
-import type { ExecutionConfig } from "../types";
+import type { ExecutionConfig } from "@ku0/agent-runtime-core";
 import type { ExecutionTaskQueue } from "./taskQueue";
 import type { ExecutionRejectionReason, ExecutionTask } from "./types";
 import type { WorkerRegistry } from "./workerRegistry";

@@ -4,7 +4,7 @@ import type {
   ExecutionStateStore,
   ExecutionTaskSnapshot,
   ExecutionTaskSnapshotFilter,
-} from "../types";
+} from "@ku0/agent-runtime-core";
 
 export class InMemoryExecutionStateStore implements ExecutionStateStore {
   private readonly leases = new Map<string, ExecutionLease>();

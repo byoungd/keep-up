@@ -1,15 +1,15 @@
 import { randomUUID } from "node:crypto";
 import type { RuntimeEventBus } from "@ku0/agent-runtime-control";
-import type { TelemetryContext } from "@ku0/agent-runtime-telemetry/telemetry";
-import { AGENT_METRICS } from "@ku0/agent-runtime-telemetry/telemetry";
-import { resolveExecutionConfig } from "../runtimeConfig";
 import type {
   ExecutionConfig,
   ExecutionQueueClass,
   ExecutionStateStore,
   ExecutionTaskSnapshot,
   ExecutionWorkerState,
-} from "../types";
+} from "@ku0/agent-runtime-core";
+import type { TelemetryContext } from "@ku0/agent-runtime-telemetry/telemetry";
+import { AGENT_METRICS } from "@ku0/agent-runtime-telemetry/telemetry";
+import { resolveExecutionConfig } from "../runtimeConfig";
 import { getLogger, type RuntimeLogger } from "../utils/logger";
 import { ExecutionScheduler } from "./scheduler";
 import { ExecutionTaskQueue } from "./taskQueue";

@@ -2,8 +2,8 @@
  * Runtime configuration helpers.
  */
 
-import type { ExecutionConfig, RuntimeCacheConfig, RuntimeConfig } from "./types";
-import { DEFAULT_EXECUTION_CONFIG } from "./types";
+import type { ExecutionConfig, RuntimeCacheConfig, RuntimeConfig } from "@ku0/agent-runtime-core";
+import { DEFAULT_EXECUTION_CONFIG } from "@ku0/agent-runtime-core";
 
 export function resolveRuntimeCacheConfig(config?: RuntimeConfig): RuntimeCacheConfig {
   const cache = config?.cache;

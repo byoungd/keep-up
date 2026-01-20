@@ -4,7 +4,7 @@ import type {
   ExecutionLeaseStatus,
   ExecutionWorkerState,
   WorkerStatus,
-} from "../types";
+} from "@ku0/agent-runtime-core";
 
 export interface WorkerRegistryConfig {
   leaseTtlMs: number;

@@ -1,4 +1,4 @@
-import type { ExecutionQueueClass, ExecutionTaskStatus } from "../types";
+import type { ExecutionQueueClass, ExecutionTaskStatus } from "@ku0/agent-runtime-core";
 
 export type ExecutionRejectionReason =
   | "queue_full"
