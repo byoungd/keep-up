@@ -65,6 +65,10 @@ const aliases = [
     find: "@ku0/agent-runtime-sandbox",
     replacement: path.resolve(__dirname, "packages/agent-runtime-sandbox/src/index.ts"),
   },
+  {
+    find: "@ku0/agent-runtime-persistence",
+    replacement: path.resolve(__dirname, "packages/agent-runtime-persistence/src/index.ts"),
+  },
   { find: "@ku0/ai-core", replacement: path.resolve(__dirname, "packages/ai-core/src/index.ts") },
   { find: "@ku0/app", replacement: path.resolve(__dirname, "packages/app/src/index.ts") },
   { find: "@ku0/bench", replacement: path.resolve(__dirname, "packages/bench/src/index.ts") },
@@ -200,6 +204,9 @@ export default defineConfig({
             "packages/ingest-youtube/src/**/*.test.ts",
             "packages/ai-core/src/**/*.test.ts",
             "packages/agent-runtime/src/**/*.test.ts",
+            "packages/agent-runtime-memory/src/**/*.test.ts",
+            "packages/agent-runtime-telemetry/src/**/*.test.ts",
+            "packages/agent-runtime-persistence/src/**/*.test.ts",
           ],
           exclude: defaultExclude,
           server: {

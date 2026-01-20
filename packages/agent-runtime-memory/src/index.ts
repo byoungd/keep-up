@@ -16,6 +16,15 @@ export {
   type ResolvedMemoryCacheConfig,
   resolveMemoryCacheConfig,
 } from "./cacheTypes";
+export type {
+  MemoryConsolidationConfig,
+  WorkingMemoryConsolidationResult,
+} from "./consolidation/memoryManager";
+// Working memory + consolidation
+export {
+  ConsolidationMemoryManager,
+  createMemoryEntry,
+} from "./consolidation/memoryManager";
 export { CachedEmbeddingProvider, createCachedEmbeddingProvider } from "./embeddingCache";
 // Mem0 Adapter (recommended for production)
 export {
@@ -31,9 +40,18 @@ export {
   createMemoryManagerWithStore,
   MemoryManager,
 } from "./memoryManager";
-
 // Memory Store
 export { createInMemoryStore, InMemoryStore } from "./memoryStore";
+export type {
+  EmbeddingProvider,
+  InMemoryVectorStoreConfig,
+  VectorSearchOptions,
+  VectorSearchResult as VectorStoreSearchResult,
+  VectorStore,
+  VectorStoreEntry,
+} from "./semantic/vectorStore";
+// Vector store
+export { InMemoryVectorStore } from "./semantic/vectorStore";
 
 // Types
 export type {
@@ -65,3 +83,5 @@ export {
   MockEmbeddingProvider,
   VectorIndex,
 } from "./vectorIndex";
+export type { MemoryEntry, MemoryEntryType, SessionMemoryConfig } from "./working/sessionMemory";
+export { SessionMemory } from "./working/sessionMemory";
