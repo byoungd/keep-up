@@ -725,8 +725,27 @@ export interface RuntimeCacheConfig {
   };
 }
 
+export interface VisionConfig {
+  /** Confidence threshold for auto-applying edits (default: 0.85). */
+  autoApplyConfidenceThreshold: number;
+  /** Max width for captured screenshots (default: 1920). */
+  maxScreenshotWidth: number;
+  /** Max height for captured screenshots (default: 1080). */
+  maxScreenshotHeight: number;
+  /** Enable OCR for layout scans (default: true). */
+  ocrEnabled: boolean;
+}
+
+export const DEFAULT_VISION_CONFIG: VisionConfig = {
+  autoApplyConfidenceThreshold: 0.85,
+  maxScreenshotWidth: 1920,
+  maxScreenshotHeight: 1080,
+  ocrEnabled: true,
+};
+
 export interface RuntimeConfig {
   cache?: RuntimeCacheConfig;
+  vision?: VisionConfig;
 }
 
 /** Agent configuration */
@@ -1081,7 +1100,9 @@ export type ArtifactType =
   | "ChecklistCard"
   | "TestReport"
   | "ReviewReport"
-  | "ImageArtifact";
+  | "ImageArtifact"
+  | "LayoutGraph"
+  | "VisualDiffReport";
 
 export interface ArtifactEnvelope {
   id: string;

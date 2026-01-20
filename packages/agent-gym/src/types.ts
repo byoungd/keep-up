@@ -1,7 +1,15 @@
 import type { AgentState } from "@ku0/agent-runtime-core";
 
 export type GymDifficulty = "easy" | "medium" | "hard";
-export type GymCategory = "syntax-repair" | "refactor" | "feature-add" | "cross-file";
+export type GymCategory =
+  | "syntax-repair"
+  | "refactor"
+  | "feature-add"
+  | "cross-file"
+  | "execution-scale"
+  | "visual-layout"
+  | "visual-diff"
+  | "policy-safety";
 
 export interface GymFixtureFile {
   path: string;

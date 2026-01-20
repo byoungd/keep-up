@@ -233,6 +233,20 @@ function toArtifactItem(record: CoworkArtifact, payload: ArtifactPayload): Artif
         title: record.title,
         content: formatPreflightMarkdown(payload),
       };
+    case "LayoutGraph":
+      return {
+        id: record.artifactId,
+        type: "report",
+        title: record.title,
+        content: formatLayoutGraphMarkdown(payload),
+      };
+    case "VisualDiffReport":
+      return {
+        id: record.artifactId,
+        type: "report",
+        title: record.title,
+        content: formatVisualDiffMarkdown(payload),
+      };
     default:
       return { id: record.artifactId, type: "doc", title: record.title, content: "" };
   }
@@ -248,6 +262,12 @@ function buildSnippet(payload: ArtifactPayload): string {
       return truncate(payload.content);
     case "preflight":
       return truncate(payload.report.riskSummary);
+    case "LayoutGraph":
+      return truncate(`Nodes: ${payload.nodes.length} · Edges: ${payload.edges.length}`);
+    case "VisualDiffReport":
+      return truncate(
+        `Regions: ${payload.summary.changedRegions} · Max ${payload.summary.maxScore.toFixed(2)}`
+      );
     default:
       return "No preview available.";
   }
@@ -273,6 +293,30 @@ function formatPreflightMarkdown(payload: Extract<ArtifactPayload, { type: "pref
       lines.push(`- ${check.name}: ${check.status}`);
     }
   }
+  return lines.join("\n");
+}
+
+function formatLayoutGraphMarkdown(
+  payload: Extract<ArtifactPayload, { type: "LayoutGraph" }>
+): string {
+  const lines = [
+    "# Layout Graph",
+    "",
+    `Nodes: ${payload.nodes.length}`,
+    `Edges: ${payload.edges.length}`,
+  ];
+  return lines.join("\n");
+}
+
+function formatVisualDiffMarkdown(
+  payload: Extract<ArtifactPayload, { type: "VisualDiffReport" }>
+): string {
+  const lines = [
+    "# Visual Diff Report",
+    "",
+    `Regions: ${payload.summary.changedRegions}`,
+    `Max score: ${payload.summary.maxScore.toFixed(2)}`,
+  ];
   return lines.join("\n");
 }
 

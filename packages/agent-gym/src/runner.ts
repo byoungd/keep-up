@@ -5,6 +5,7 @@ import {
   createCompletionToolServer,
   createFileToolServer,
   createRuntime,
+  createVisionToolServer,
   securityPolicy,
 } from "@ku0/agent-runtime";
 import type { AgentState } from "@ku0/agent-runtime-core";
@@ -47,7 +48,11 @@ export async function runScenario(
     const runtime = await createRuntime({
       components: {
         llm,
-        toolServers: [createCompletionToolServer(), createFileToolServer()],
+        toolServers: [
+          createCompletionToolServer(),
+          createFileToolServer(),
+          createVisionToolServer(),
+        ],
         security: policy,
       },
       kernel: {
