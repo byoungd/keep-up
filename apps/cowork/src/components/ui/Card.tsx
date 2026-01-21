@@ -15,7 +15,15 @@ const toneClasses: Record<CardTone, string> = {
 export const Card = React.forwardRef<HTMLDivElement, CardProps>(
   ({ tone = "default", className, ...props }, ref) => {
     return (
-      <div ref={ref} className={cn("rounded-lg p-4", toneClasses[tone], className)} {...props} />
+      <div
+        ref={ref}
+        className={cn(
+          "rounded-lg p-4 transition-colors duration-150 ease-out",
+          toneClasses[tone],
+          className
+        )}
+        {...props}
+      />
     );
   }
 );

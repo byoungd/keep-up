@@ -42,9 +42,9 @@ export const InputCapsule = React.forwardRef<HTMLInputElement, InputCapsuleProps
     return (
       <div
         className={cn(
-          "relative flex items-center rounded-full border border-border/60 bg-surface-1 shadow-lg",
-          "transition-shadow duration-150",
-          "focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20",
+          "relative flex items-center rounded-full border border-border/50 bg-surface-1 shadow-lg",
+          "transition-[border-color,box-shadow,background-color] duration-150 ease-out",
+          "focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/20",
           positionClasses[position],
           containerClassName
         )}
@@ -54,8 +54,8 @@ export const InputCapsule = React.forwardRef<HTMLInputElement, InputCapsuleProps
           type={type}
           aria-label={ariaLabel}
           className={cn(
-            "w-full bg-transparent px-6 py-4 text-content text-foreground",
-            "placeholder:text-muted-foreground outline-none",
+            "w-full bg-transparent px-5 py-3 text-content text-foreground",
+            "placeholder:text-muted-foreground/70 outline-none",
             inputClassName
           )}
           {...props}
