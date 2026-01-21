@@ -620,6 +620,9 @@ importers:
 
   packages/core:
     dependencies:
+      '@ku0/ai-sanitizer-rs':
+        specifier: workspace:*
+        version: link:../ai-sanitizer-rs
       '@ku0/canonicalizer-rs':
         specifier: workspace:*
         version: link:../canonicalizer-rs

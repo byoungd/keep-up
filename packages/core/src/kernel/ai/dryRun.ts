@@ -221,10 +221,11 @@ export async function dryRunAIPayload(
 
   // Stage 2: Canonicalize
   let canonRoot: CanonNode | undefined;
+  const parseHtml = sanitizer.parseHtmlToInputTree ?? parseHtmlToInputTree;
 
   try {
     if (sanitized.sanitized_html) {
-      const inputTree = parseHtmlToInputTree(sanitized.sanitized_html);
+      const inputTree = parseHtml(sanitized.sanitized_html);
       const canonResult = canonicalizeDocument({ root: inputTree }, canonPolicy);
       canonRoot = canonResult.root;
 

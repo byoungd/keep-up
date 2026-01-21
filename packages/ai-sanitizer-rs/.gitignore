@@ -1,0 +1,23 @@
+# Build artifacts
+dist/
+target/
+*.node
+Cargo.lock
+
+# NAPI artifacts
+npm/
+index.js
+index.d.ts
+index.d.ts.map
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Test coverage
+coverage/
+
+# OS
+.DS_Store

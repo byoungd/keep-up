@@ -47,6 +47,7 @@
     "access": "public"
   },
   "dependencies": {
+    "@ku0/ai-sanitizer-rs": "workspace:*",
     "@ku0/canonicalizer-rs": "workspace:*",
     "zod": "^4.3.5"
   }
