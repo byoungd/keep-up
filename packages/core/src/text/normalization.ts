@@ -3,6 +3,11 @@
  * Used to stabilize content IDs across different import sources.
  */
 
+import {
+  getNativeTextNormalization,
+  type NativeTextNormalizationBinding,
+} from "@ku0/text-normalization-rs";
+
 export interface CanonicalResult {
   blocks: string[];
   canonicalText: string;
@@ -13,6 +18,10 @@ export interface CanonicalHashResult {
   blockHashes: string[];
 }
 
+function resolveNativeTextNormalization(): NativeTextNormalizationBinding | null {
+  return getNativeTextNormalization();
+}
+
 /**
  * Normalizes text into canonical blocks.
  * - Split by newlines
@@ -20,6 +29,19 @@ export interface CanonicalHashResult {
  * - Filter empty blocks
  */
 export function canonicalizeText(text: string): CanonicalResult {
+  const native = resolveNativeTextNormalization();
+  if (native) {
+    try {
+      return native.canonicalizeText(text);
+    } catch {
+      // Fall back to JS normalization if native bindings fail.
+    }
+  }
+
+  return canonicalizeTextFallback(text);
+}
+
+function canonicalizeTextFallback(text: string): CanonicalResult {
   if (!text) {
     return { blocks: [], canonicalText: "" };
   }
@@ -42,6 +64,19 @@ export function canonicalizeText(text: string): CanonicalResult {
  * Synchronous implementation to match ingest usage.
  */
 export function computeCanonicalHash(blocks: { text: string }[]): CanonicalHashResult {
+  const native = resolveNativeTextNormalization();
+  if (native) {
+    try {
+      return native.computeCanonicalHash(blocks);
+    } catch {
+      // Fall back to JS hashing if native bindings fail.
+    }
+  }
+
+  return computeCanonicalHashFallback(blocks);
+}
+
+function computeCanonicalHashFallback(blocks: { text: string }[]): CanonicalHashResult {
   const blockHashes = blocks.map((b) => simpleHash(b.text));
   const docHash = simpleHash(blockHashes.join("|"));
 

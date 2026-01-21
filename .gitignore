@@ -210,6 +210,10 @@ packages/anchor-relocation-rs/Cargo.lock
 packages/anchor-relocation-rs/native/target/
 packages/anchor-relocation-rs/*.node
 
+packages/text-normalization-rs/target/
+packages/text-normalization-rs/Cargo.lock
+packages/text-normalization-rs/*.node
+
 packages/diff-rs/target/
 packages/diff-rs/Cargo.lock
 packages/vector-similarity-rs/target/

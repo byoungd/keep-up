@@ -53,6 +53,7 @@
     "@ku0/policy-hash-rs": "workspace:*",
     "@ku0/ai-sanitizer-rs": "workspace:*",
     "@ku0/canonicalizer-rs": "workspace:*",
+    "@ku0/text-normalization-rs": "workspace:*",
     "zod": "^4.3.5"
   }
 }
