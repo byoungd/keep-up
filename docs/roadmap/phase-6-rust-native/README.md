@@ -38,6 +38,7 @@ All tracks must support macOS, Linux, and Windows with explicit fallbacks:
 | AH | Diff Engine | P1 | Ready | [track-ah-diff-engine.md](./track-ah-diff-engine.md) |
 | AI | Vector Similarity | P1 | Ready | [track-ai-vector-similarity.md](./track-ai-vector-similarity.md) |
 | AJ | JSON Acceleration | P2 | Planning | [track-aj-json-acceleration.md](./track-aj-json-acceleration.md) |
+| AK | Gitignore Matcher | P3 | Planning | [track-ak-gitignore-matcher.md](./track-ak-gitignore-matcher.md) |
 
 ---
 
