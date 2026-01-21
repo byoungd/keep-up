@@ -134,16 +134,11 @@ packages/core/*.tgz
 packages/mdvp-wasm/target/
 packages/mdvp-wasm/pkg/*
 packages/tokenizer-rs/native/target/
-packages/tokenizer-rs/npm/
-packages/tokenizer-rs/*.node
-packages/tokenizer-rs/native/*.node
 !packages/mdvp-wasm/pkg/mdvp_wasm.js
 !packages/mdvp-wasm/pkg/mdvp_wasm.d.ts
 !packages/mdvp-wasm/pkg/package.json
 packages/symbol-index-rs/target/
 packages/symbol-index-rs/Cargo.lock
-packages/diff-rs/target/
-packages/diff-rs/Cargo.lock
 
 implementation_plan.md
 walkthrough.md
@@ -206,6 +201,3 @@ apps/cowork-e2e/playwright-report/
 
 # KeepUpGym reports
 packages/agent-gym/reports/
-
-packages/vector-similarity-rs/target/
-packages/vector-similarity-rs/Cargo.lock

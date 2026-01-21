@@ -50,9 +50,11 @@
     "@ku0/ai-core": "workspace:*",
     "@ku0/core": "workspace:*",
     "@ku0/db": "workspace:*",
+
     "@ku0/json-accel-rs": "workspace:*",
     "@ku0/symbol-index-rs": "workspace:*",
     "@ku0/sandbox-rs": "workspace:*",
+
     "@ku0/tokenizer-rs": "workspace:*",
     "@ku0/tool-lsp": "workspace:*",
     "@msgpack/msgpack": "^3.1.3",
