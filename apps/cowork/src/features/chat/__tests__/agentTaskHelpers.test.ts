@@ -92,6 +92,13 @@ function convertArtifact(id: string, artifact: ArtifactPayload): ArtifactItem {
         title: "Visual Diff Report",
         content: `Regions: ${artifact.summary.changedRegions}`,
       };
+    default:
+      return {
+        id,
+        type: "doc",
+        title: "Artifact",
+        content: "",
+      };
   }
 }
 
