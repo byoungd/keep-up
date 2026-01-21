@@ -1,3 +1,4 @@
+import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import type {
   AgentState,
@@ -7,6 +8,7 @@ import type {
   Checkpoint,
   CheckpointStatus,
   ConfirmationRequest,
+  CoworkPolicyConfig,
   CoworkSession,
   CoworkTask,
   RuntimeEventBus,
@@ -21,6 +23,7 @@ import {
   createCodeToolServer,
   createCompletionToolServer,
   createCoworkRuntime,
+  createCoworkToolExecutor,
   createDockerBashExecutor,
   createEventBus,
   createFileToolServer,
@@ -30,6 +33,9 @@ import {
   createMem0MemoryAdapter,
   createSandboxToolServer,
   createSecurityPolicy,
+  createSkillRegistry,
+  createSkillSession,
+  createSkillToolServer,
   createToolRegistry,
   createWebSearchToolServer,
   DockerSandboxManager,
@@ -41,6 +47,9 @@ import {
   MessagePackCheckpointStorage,
   ProcessCodeExecutor,
   RuntimeAssetManager,
+  type SkillDirectoryConfig,
+  type SkillRegistry,
+  type SkillSession,
   ToolResultCache,
 } from "@ku0/agent-runtime";
 import { normalizeModelId } from "@ku0/ai-core";
@@ -115,6 +124,11 @@ type RuntimeFactory = (
   session: CoworkSession,
   settings: CoworkSettings
 ) => Promise<ReturnType<typeof createCoworkRuntime>>;
+
+type SkillComponents = {
+  registry: SkillRegistry;
+  session: SkillSession;
+};
 
 type RuntimeBuildResult = {
   runtime: ReturnType<typeof createCoworkRuntime>;
@@ -435,6 +449,69 @@ export class CoworkTaskRuntime {
     return rootPath ? resolve(rootPath) : process.cwd();
   }
 
+  private resolveSkillRoots(session: CoworkSession): SkillDirectoryConfig[] {
+    const roots: SkillDirectoryConfig[] = [];
+    const seen = new Set<string>();
+
+    for (const grant of session.grants ?? []) {
+      if (!grant.rootPath) {
+        continue;
+      }
+      const skillRoot = join(resolve(grant.rootPath), ".keep-up", "skills");
+      if (seen.has(skillRoot)) {
+        continue;
+      }
+      seen.add(skillRoot);
+      roots.push({ path: skillRoot, source: "org" });
+    }
+
+    const globalRoot = resolveGlobalSkillsRoot();
+    if (!seen.has(globalRoot)) {
+      roots.push({ path: globalRoot, source: "user" });
+    }
+
+    return roots;
+  }
+
+  private async buildSkillComponents(
+    session: CoworkSession,
+    auditLogger: CoworkAuditLogger
+  ): Promise<SkillComponents> {
+    const roots = this.resolveSkillRoots(session);
+    const registry = createSkillRegistry({ roots });
+    const skillSession = createSkillSession(registry, auditLogger);
+    return { registry, session: skillSession };
+  }
+
+  private async registerSkillTools(options: {
+    registry: ReturnType<typeof createToolRegistry>;
+    session: CoworkSession;
+    skillComponents: SkillComponents;
+    policy: CoworkPolicyConfig;
+    securityPolicy?: ReturnType<typeof createSecurityPolicy>;
+    caseInsensitivePaths: boolean;
+    modeManager: AgentModeManager;
+    auditLogger: CoworkAuditLogger;
+  }): Promise<void> {
+    const executor = createCoworkToolExecutor(options.registry, {
+      session: options.session,
+      policy: options.policy,
+      securityPolicy: options.securityPolicy,
+      caseInsensitivePaths: options.caseInsensitivePaths,
+      modeManager: options.modeManager,
+      audit: options.auditLogger,
+      skillRegistry: options.skillComponents.registry,
+    });
+
+    await options.registry.register(
+      createSkillToolServer({
+        registry: options.skillComponents.registry,
+        executor,
+        session: options.skillComponents.session,
+      })
+    );
+  }
+
   private async buildRuntime(
     session: CoworkSession,
     settings: CoworkSettings,
@@ -470,13 +547,24 @@ export class CoworkTaskRuntime {
       sessionId: session.sessionId,
     });
     const caseInsensitivePaths = settings.caseInsensitivePaths ?? false;
+    const securityPolicy = this.buildRuntimeSecurityPolicy(toolRegistryResult.dockerAvailable);
+    const auditLogger = new CoworkAuditLogger({ auditLogStore: this.auditLogStore });
+    const skillComponents = await this.buildSkillComponents(session, auditLogger);
+    await this.registerSkillTools({
+      registry: toolRegistry,
+      session,
+      skillComponents,
+      policy: policyResolution.config,
+      securityPolicy,
+      caseInsensitivePaths,
+      modeManager,
+      auditLogger,
+    });
     const adapter = createAICoreAdapter(resolved.provider, {
       model: modelId || undefined,
     });
     const prompt = await this.buildSystemPromptAddition(session, modeManager);
-    const securityPolicy = this.buildRuntimeSecurityPolicy(toolRegistryResult.dockerAvailable);
     const components = this.toolResultCache ? { toolResultCache: this.toolResultCache } : undefined;
-    const auditLogger = new CoworkAuditLogger({ auditLogStore: this.auditLogStore });
     const runtime = createCoworkRuntime({
       llm: adapter,
       registry: toolRegistry,
@@ -499,6 +587,10 @@ export class CoworkTaskRuntime {
         },
         components,
         eventBus,
+        skills: {
+          registry: skillComponents.registry,
+          session: skillComponents.session,
+        },
       },
       systemPromptAddition: prompt.addition,
     });
@@ -1171,6 +1263,17 @@ function resolveRuntimeAssetDir(): string {
   return process.env.COWORK_RUNTIME_ASSET_DIR
     ? resolve(process.env.COWORK_RUNTIME_ASSET_DIR)
     : join(resolveStateDir(), "runtime-assets");
+}
+
+function resolveGlobalSkillsRoot(): string {
+  const override = process.env.COWORK_SKILLS_DIR ?? process.env.KEEPUP_SKILLS_DIR;
+  if (override && override.trim().length > 0) {
+    return resolve(override);
+  }
+  const baseDir = process.env.KEEPUP_STATE_DIR
+    ? resolve(process.env.KEEPUP_STATE_DIR)
+    : join(homedir(), ".keep-up");
+  return join(baseDir, "skills");
 }
 
 function parseBooleanEnv(value: string | undefined, fallback: boolean): boolean {

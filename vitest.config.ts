@@ -97,6 +97,10 @@ const aliases = [
     replacement: path.resolve(__dirname, "packages/agent-runtime-sandbox/src/index.ts"),
   },
   {
+    find: "@ku0/agent-runtime-memory",
+    replacement: path.resolve(__dirname, "packages/agent-runtime-memory/src/index.ts"),
+  },
+  {
     find: "@ku0/agent-runtime-persistence",
     replacement: path.resolve(__dirname, "packages/agent-runtime-persistence/src/index.ts"),
   },

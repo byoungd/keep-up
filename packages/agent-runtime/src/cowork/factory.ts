@@ -5,7 +5,8 @@
  */
 
 import type { TelemetryContext } from "@ku0/agent-runtime-telemetry/telemetry";
-import type { IToolRegistry } from "@ku0/agent-runtime-tools";
+import type { IToolRegistry, SkillRegistry } from "@ku0/agent-runtime-tools";
+import { createSkillPolicyGuard } from "@ku0/agent-runtime-tools";
 import type { ToolExecutionOptions } from "../executor";
 import { createToolExecutor } from "../executor";
 import type { AgentModeManager } from "../modes";
@@ -81,7 +82,9 @@ export function createCoworkPermissionChecker(
 
 export interface CoworkToolExecutorConfig
   extends CoworkRuntimeConfig,
-    Omit<ToolExecutionOptions, "policy" | "policyEngine"> {}
+    Omit<ToolExecutionOptions, "policy" | "policyEngine"> {
+  skillRegistry?: SkillRegistry;
+}
 
 export function createCoworkToolExecutor(
   registry: IToolRegistry,
@@ -96,11 +99,14 @@ export function createCoworkToolExecutor(
     undefined,
     config.toolExecutionContext
   );
+  const policyEngine = config.skillRegistry
+    ? createSkillPolicyGuard(toolPolicyEngine, config.skillRegistry)
+    : toolPolicyEngine;
 
   return createToolExecutor({
     registry,
     policy,
-    policyEngine: toolPolicyEngine,
+    policyEngine,
     promptInjectionGuard: config.promptInjectionGuard,
     promptInjectionPolicy: config.promptInjectionPolicy,
     sandboxAdapter: config.sandboxAdapter,

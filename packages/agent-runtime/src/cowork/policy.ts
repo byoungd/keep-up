@@ -71,7 +71,6 @@ export interface CoworkPolicyEngineOptions {
   enableDecisionCache?: boolean;
 }
 
-const COWORK_POLICY_ACTION_SET = new Set<string>(COWORK_POLICY_ACTIONS);
 const COWORK_RISK_TAGS = ["delete", "overwrite", "network", "connector", "batch"] as const;
 
 const policyDecisionSchema = z.enum(["allow", "allow_with_confirm", "deny"]);
@@ -111,9 +110,8 @@ const policyConfigSchema = z
   })
   .strict();
 
-export function isCoworkPolicyAction(value: string): value is CoworkPolicyAction {
-  return COWORK_POLICY_ACTION_SET.has(value);
-}
+// Re-export from core to maintain API compatibility
+export { isCoworkPolicyAction } from "@ku0/agent-runtime-core";
 
 export function parseCoworkPolicyConfig(input: unknown): CoworkPolicyConfig | null {
   const parsed = policyConfigSchema.safeParse(input);
