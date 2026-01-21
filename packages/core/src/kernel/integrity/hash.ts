@@ -23,7 +23,7 @@ import type {
 } from "./types.js";
 
 // biome-ignore lint/suspicious/noControlCharactersInRegex: Control chars must be stripped for checksum inputs
-const CONTROL_CHAR_REGEX = /[\u0000-\u0008\u000B-\u001F\u0080-\u009F]/g;
+const CONTROL_CHAR_REGEX = /[\u0000-\u0008\u000B-\u001F\u007F\u0080-\u009F]/g;
 const BLOCK_HASH_PREFIX = "LFCC_BLOCK_V1\n";
 const DOC_HASH_PREFIX = "LFCC_DOC_V1\n";
 

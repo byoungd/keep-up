@@ -121,7 +121,7 @@ describe("Hash Computation", () => {
         block_id: "b1",
         type: "paragraph",
         attrs: {},
-        inline: [{ text: "Hello\r\nwor\u0001ld", marks: ["italic", "bold"], attrs: {} }],
+        inline: [{ text: "Hello\r\nwor\u0001\u007Fld", marks: ["italic", "bold"], attrs: {} }],
         children: [],
       });
       const digestB = await computeBlockDigest({
