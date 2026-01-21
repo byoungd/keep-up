@@ -225,28 +225,52 @@ function isContainmentParentCandidate(candidate: LayoutNode, child: LayoutNode):
 function buildAdjacencyEdges(nodes: LayoutNode[], threshold: number): LayoutEdge[] {
   const edges: LayoutEdge[] = [];
   const normalizedThreshold = Math.max(0, Math.round(threshold));
+  const indexed = indexNodes(nodes);
+  indexed.sort((a, b) => a.bounds.x - b.bounds.x);
 
-  for (let i = 0; i < nodes.length; i += 1) {
-    const a = nodes[i];
-    if (!a) {
-      continue;
-    }
-    for (let j = i + 1; j < nodes.length; j += 1) {
-      const b = nodes[j];
-      if (!b) {
-        continue;
+  for (let i = 0; i < indexed.length; i += 1) {
+    const a = indexed[i];
+    for (let j = i + 1; j < indexed.length; j += 1) {
+      const b = indexed[j];
+      if (b.bounds.x > a.xEnd + normalizedThreshold) {
+        break;
       }
-      if (containsBounds(a.bounds, b.bounds) || containsBounds(b.bounds, a.bounds)) {
+      if (containsBoundsIndexed(a, b) || containsBoundsIndexed(b, a)) {
         continue;
       }
       if (!areAdjacent(a.bounds, b.bounds, normalizedThreshold)) {
         continue;
       }
-      edges.push({ from: a.id, to: b.id, type: "adjacent" });
+      edges.push({ from: a.node.id, to: b.node.id, type: "adjacent" });
     }
   }
 
   return edges;
+}
+
+type IndexedNode = {
+  node: LayoutNode;
+  bounds: LayoutBounds;
+  xEnd: number;
+  yEnd: number;
+};
+
+function indexNodes(nodes: LayoutNode[]): IndexedNode[] {
+  return nodes.map((node) => ({
+    node,
+    bounds: node.bounds,
+    xEnd: node.bounds.x + node.bounds.width,
+    yEnd: node.bounds.y + node.bounds.height,
+  }));
+}
+
+function containsBoundsIndexed(outer: IndexedNode, inner: IndexedNode): boolean {
+  return (
+    outer.bounds.x <= inner.bounds.x &&
+    outer.bounds.y <= inner.bounds.y &&
+    outer.xEnd >= inner.xEnd &&
+    outer.yEnd >= inner.yEnd
+  );
 }
 
 function containsBounds(outer: LayoutBounds, inner: LayoutBounds): boolean {
