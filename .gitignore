@@ -204,3 +204,22 @@ packages/agent-gym/reports/
 
 packages/storage-engine-rs/target/
 packages/storage-engine-rs/Cargo.lock
+
+packages/diff-rs/target/
+packages/diff-rs/Cargo.lock
+packages/vector-similarity-rs/target/
+packages/vector-similarity-rs/Cargo.lock
+packages/sandbox-rs/target/
+packages/sandbox-rs/Cargo.lock
+packages/json-accel-rs/target/
+packages/json-accel-rs/Cargo.lock
+packages/gitignore-rs/target/
+packages/gitignore-rs/Cargo.lock
+
+packages/json-accel-rs/native/target/
+packages/json-accel-rs/native/Cargo.lock
+
+packages/json-accel-rs/*.js
+packages/json-accel-rs/*.d.ts
+packages/json-accel-rs/*.node
+packages/json-accel-rs/native/Cargo.lock
