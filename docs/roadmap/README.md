@@ -10,83 +10,54 @@ cowork initiatives. Use this index to navigate the active tracks and supporting 
 - Active: In progress with ongoing updates.
 - Completed: Delivered and verified.
 
-## Agent Runtime 2026
-- docs/roadmap/agent-runtime-2026-roadmap.md
-- docs/roadmap/agent-runtime-2026-collaboration-and-coding-contract.md
-- docs/roadmap/agent-runtime-2026-track-a-completion-recovery.md
-- docs/roadmap/agent-runtime-2026-track-b-tool-governance.md
-- docs/roadmap/agent-runtime-2026-track-c-checkpoint-eventlog.md
-- docs/roadmap/agent-runtime-2026-track-d-delegation-messaging.md
-- docs/roadmap/agent-runtime-2026-track-e-sop-roles.md
-- docs/roadmap/agent-runtime-2026-track-f-model-routing-observability.md
-- docs/roadmap/agent-runtime-2026-track-g-ai-envelope-lfcc.md
-- docs/roadmap/agent-runtime-2026-track-h-optimization.md
-- docs/roadmap/agent-runtime-2026-track-i-lru-cache.md
-- docs/roadmap/agent-runtime-2026-track-i-lru-cache-report.md
-- docs/roadmap/agent-runtime-2026-track-j-docker-pooling.md
-- docs/roadmap/agent-runtime-2026-track-k-memory-cache.md
-- docs/roadmap/agent-runtime-2026-track-l-architecture.md
+## Progress Updates
+- docs/roadmap/progress/README.md
+- docs/roadmap/progress/progress-2026-01-21.md
 
-## Architecture Decomposition (Track L and M)
-- docs/roadmap/arch/README.md
-- docs/roadmap/arch/agent-runtime-2026-arch-track-l1-execution-plane.md
-- docs/roadmap/arch/agent-runtime-2026-arch-track-l2-persistence-plane.md
-- docs/roadmap/arch/agent-runtime-2026-arch-track-l3-tools-plane.md
-- docs/roadmap/arch/agent-runtime-2026-arch-track-l4-facade-and-wiring.md
-- docs/roadmap/arch/agent-runtime-2026-arch-track-m1-runtime-message-bus.md
-- docs/roadmap/arch/agent-runtime-2026-arch-track-m2-turn-checkpoints.md
-- docs/roadmap/arch/agent-runtime-2026-arch-track-m3-tool-output-spooling.md
-- docs/roadmap/arch/agent-runtime-2026-arch-track-m4-subagent-registry-isolation.md
-- docs/roadmap/arch/agent-runtime-2026-arch-track-m5-model-routing-fallback.md
+## Phase 1: Foundation (The Core Runtime)
+- **Core**: docs/roadmap/phase-1-foundation/core/README.md
+- **Architecture**: docs/roadmap/phase-1-foundation/arch/README.md
+- **Capabilities**: docs/roadmap/phase-1-foundation/capabilities/README.md
 
-## Next Phase Tracks (Q1 2026)
-- docs/roadmap/next/README.md
-- docs/roadmap/next/track-n-mcp-security.md
-- docs/roadmap/next/track-o-agent-collaboration.md
-- docs/roadmap/next/track-p-state-memory.md
-- docs/roadmap/next/track-q-developer-experience.md
-- docs/roadmap/next/track-r-tool-framework.md
+## Phase 2: Expansion (Q1 2026)
+- docs/roadmap/phase-2-expansion/README.md
+- docs/roadmap/phase-2-expansion/track-n-mcp-security.md
+- docs/roadmap/phase-2-expansion/track-o-agent-collaboration.md
+- docs/roadmap/phase-2-expansion/track-p-state-memory.md
+- docs/roadmap/phase-2-expansion/track-q-developer-experience.md
+- docs/roadmap/phase-2-expansion/track-r-tool-framework.md
 
-## Next Phase Tracks (Q2 2026)
-- docs/roadmap/next-q2/README.md
-- docs/roadmap/next-q2/track-s-graph-runtime.md
-- docs/roadmap/next-q2/track-t-multi-agent-teams.md
-- docs/roadmap/next-q2/track-u-tool-workbench-policy.md
-- docs/roadmap/next-q2/track-v-workspace-time-travel.md
-- docs/roadmap/next-q2/track-w-computer-use.md
+## Phase 3: Graph Runtime (Q2 2026)
+- docs/roadmap/phase-3-graph/README.md
+- docs/roadmap/phase-3-graph/track-s-graph-runtime.md
+- docs/roadmap/phase-3-graph/track-t-multi-agent-teams.md
+- docs/roadmap/phase-3-graph/track-u-tool-workbench-policy.md
+- docs/roadmap/phase-3-graph/track-v-workspace-time-travel.md
+- docs/roadmap/phase-3-graph/track-w-computer-use.md
 
-## Next Phase Tracks (Q3 2026)
-- docs/roadmap/next-q3/README.md
-- docs/roadmap/next-q3/acceptance-criteria.md
-- docs/roadmap/next-q3/sota-gap-analysis.md
-- docs/roadmap/next-q3/track-x-deep-code-perception.md
-- docs/roadmap/next-q3/track-y-adaptive-learning.md
-- docs/roadmap/next-q3/track-z-agent-gym.md
+## Phase 4: Cognition (Q3 2026)
+- docs/roadmap/phase-4-cognition/README.md
+- docs/roadmap/phase-4-cognition/acceptance-criteria.md
+- docs/roadmap/phase-4-cognition/sota-gap-analysis.md
+- docs/roadmap/phase-4-cognition/track-x-deep-code-perception.md
+- docs/roadmap/phase-4-cognition/track-y-adaptive-learning.md
+- docs/roadmap/phase-4-cognition/track-z-agent-gym.md
 
-## Next Phase Tracks (Q4 2026)
-- docs/roadmap/next-q4/README.md
-- docs/roadmap/next-q4/acceptance-criteria.md
-- docs/roadmap/next-q4/benchmarks.md
-- docs/roadmap/next-q4/parallel-development.md
-- docs/roadmap/next-q4/track-aa-elastic-execution.md
-- docs/roadmap/next-q4/track-ab-visual-intelligence.md
-- docs/roadmap/next-q4/track-ac-policy-ops.md
+## Phase 5: Elastic Expansion (Q4 2026)
+- docs/roadmap/phase-5-expansion/README.md
+- docs/roadmap/phase-5-expansion/acceptance-criteria.md
+- docs/roadmap/phase-5-expansion/benchmarks.md
+- docs/roadmap/phase-5-expansion/parallel-development.md
+- docs/roadmap/phase-5-expansion/track-aa-elastic-execution.md
+- docs/roadmap/phase-5-expansion/track-ab-visual-intelligence.md
+- docs/roadmap/phase-5-expansion/track-ac-policy-ops.md
 
-## Code Agent Capability
-- docs/roadmap/code/README.md
-- docs/roadmap/code/track-c1-editing-primitives.md
-- docs/roadmap/code/track-c2-context-management.md
-- docs/roadmap/code/track-c3-lsp-integration.md
-
-## UI and Cowork
-- docs/roadmap/ui/track-1-foundation.md
-- docs/roadmap/ui/track-2-components.md
-- docs/roadmap/ui/track-3-motion.md
-- docs/roadmap/ui/cowork-arc-dia-parallel-tracks.md
-- docs/roadmap/cowork-arc-dia-implementation-plan.md
-- docs/roadmap/cowork-contract-freeze.md
-- docs/roadmap/cowork-parallel-tracks.md
-- docs/roadmap/cowork-track-16-phase-g-agentic-capabilities.md
+## Parallel Product Tracks (UI & Cowork)
+- docs/roadmap/ui-cowork-cowork/README.md
+- docs/roadmap/ui-cowork-cowork/track-1-foundation.md
+- docs/roadmap/ui-cowork-cowork/track-2-components.md
+- docs/roadmap/ui-cowork-cowork/track-3-motion.md
+- docs/roadmap/ui-cowork-cowork/cowork-track-16-phase-g-agentic-capabilities.md
 
 ## Doc Conventions
 - Include a top metadata block where possible (Owner, Status, Date, Timeline, Dependencies).

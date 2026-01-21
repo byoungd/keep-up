@@ -4,7 +4,7 @@ Status: Implemented
 Owner: Agent Runtime  
 Last Updated: 2026-02-15  
 Applies to: Agent Runtime v1  
-Related docs: `docs/roadmap/next-q2/track-t-multi-agent-teams.md`
+Related docs: `docs/roadmap/phase-3-graph/track-t-multi-agent-teams.md`
 
 ## Context
 Team orchestration enables multi-agent collaboration with explicit routing, process modes,
