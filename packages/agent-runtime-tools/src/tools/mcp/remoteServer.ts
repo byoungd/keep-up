@@ -4,7 +4,9 @@
  * Bridges an external MCP server using the official SDK client + transport.
  */
 
+import type { RuntimeEventBus } from "@ku0/agent-runtime-control";
 import {
+  type AuditLogger,
   COWORK_POLICY_ACTIONS,
   type MCPTool,
   type MCPToolCall,
@@ -51,7 +53,15 @@ export interface McpRemoteServerConfig {
     authorizationCode?: string;
   };
   toolScopes?: ToolScopeConfig;
+  eventBus?: RuntimeEventBus;
+  auditLogger?: AuditLogger;
   onStatusChange?: (status: McpConnectionStatus) => void;
+}
+
+export interface McpStatusEventPayload {
+  server: string;
+  status: McpConnectionStatus;
+  previous?: McpConnectionStatus;
 }
 
 export class McpRemoteToolServer implements MCPToolServer {
@@ -65,6 +75,8 @@ export class McpRemoteToolServer implements MCPToolServer {
   private readonly authSession?: McpOAuthSession;
   private readonly toolScopes?: ToolScopeConfig;
   private readonly authScopes?: string[];
+  private readonly eventBus?: RuntimeEventBus;
+  private readonly auditLogger?: AuditLogger;
   private readonly onStatusChange?: (status: McpConnectionStatus) => void;
   private tools: MCPTool[] = [];
   private connected = false;
@@ -76,6 +88,8 @@ export class McpRemoteToolServer implements MCPToolServer {
     this.description = config.description;
     this.toolScopes = config.toolScopes;
     this.authScopes = config.auth?.scopes;
+    this.eventBus = config.eventBus;
+    this.auditLogger = config.auditLogger;
     this.onStatusChange = config.onStatusChange;
 
     const clientInfo = config.clientInfo ?? { name: "keepup-agent-runtime", version: "1.0.0" };
@@ -277,13 +291,60 @@ export class McpRemoteToolServer implements MCPToolServer {
   }
 
   private updateStatus(update: Partial<McpConnectionStatus>): void {
-    this.status = {
-      ...this.status,
+    const previous = this.status;
+    const next: McpConnectionStatus = {
+      ...previous,
       ...update,
       transport: this.transportType,
       serverUrl: this.serverUrl?.toString(),
     };
+    this.status = next;
     this.onStatusChange?.(this.status);
+    if (!this.isSameStatus(previous, next)) {
+      this.emitStatusEvent(previous, next);
+    }
+  }
+
+  private isSameStatus(
+    previous: McpConnectionStatus | undefined,
+    next: McpConnectionStatus
+  ): boolean {
+    if (!previous) {
+      return false;
+    }
+    return (
+      previous.state === next.state &&
+      previous.lastError === next.lastError &&
+      previous.authRequired === next.authRequired &&
+      previous.serverUrl === next.serverUrl &&
+      previous.transport === next.transport
+    );
+  }
+
+  private emitStatusEvent(
+    previous: McpConnectionStatus | undefined,
+    next: McpConnectionStatus
+  ): void {
+    const payload: McpStatusEventPayload = {
+      server: this.name,
+      status: next,
+      previous,
+    };
+
+    this.eventBus?.emitRaw("mcp:status", payload, {
+      source: `mcp:${this.name}`,
+    });
+
+    this.auditLogger?.log({
+      timestamp: Date.now(),
+      toolName: `mcp:${this.name}`,
+      action: next.state === "error" ? "error" : "result",
+      sandboxed: false,
+      input: previous ? { previous } : undefined,
+      output: { status: next },
+      error: next.state === "error" ? next.lastError : undefined,
+      reason: next.authRequired ? "auth_required" : undefined,
+    });
   }
 }
 
