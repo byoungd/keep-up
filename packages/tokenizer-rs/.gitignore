@@ -2,9 +2,13 @@
 dist/
 target/
 *.node
+Cargo.lock
 
 # NAPI artifacts
 npm/
+index.js
+index.d.ts
+index.d.ts.map
 
 # Logs
 npm-debug.log*
