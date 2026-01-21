@@ -85,7 +85,8 @@ describe("editFile Boundary Conditions", () => {
   });
 
   it("should handle special characters in replacement", async () => {
-    const special = "  const x = `hello ${name}`; // \"quote\" 'single' \n  \t tabs";
+    const special = `  const x = \`hello \${name}\`; // "quote" 'single'
+  \t tabs`;
     const result = await editFile(testFile, [{ startLine: 2, endLine: 2, replacement: special }], {
       validateSyntax: false,
     });
