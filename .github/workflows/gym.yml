@@ -29,6 +29,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build agent runtime dependencies
+        run: pnpm --filter @ku0/agent-runtime... build
+
       - name: Run KeepUpGym Easy suite
         run: pnpm --filter @ku0/agent-gym gym:ci
 

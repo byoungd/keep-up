@@ -198,9 +198,10 @@ function isArtifactPathAllowed(resolvedPath: string): boolean {
   return isPathWithinRoots(resolvedPath, allowedRoots, false);
 }
 
-async function readArtifactFile(resolvedPath: string): Promise<Uint8Array | null> {
+async function readArtifactFile(resolvedPath: string): Promise<Uint8Array<ArrayBuffer> | null> {
   try {
-    return await readFile(resolvedPath);
+    const data = await readFile(resolvedPath);
+    return new Uint8Array(data);
   } catch {
     return null;
   }
