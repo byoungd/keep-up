@@ -2,6 +2,7 @@
 dist/
 target/
 *.node
+Cargo.lock
 
 # Logs
 npm-debug.log*
