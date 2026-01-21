@@ -223,6 +223,9 @@ importers:
       '@ku0/db':
         specifier: workspace:*
         version: link:../db
+      '@ku0/json-accel-rs':
+        specifier: workspace:*
+        version: link:../json-accel-rs
       '@ku0/sandbox-rs':
         specifier: workspace:*
         version: link:../sandbox-rs
@@ -621,6 +624,15 @@ importers:
         specifier: ^4.1.18
         version: 4.1.18
 
+  packages/gitignore-rs:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.19.3
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
   packages/ingest-youtube:
     dependencies:
       youtube-caption-extractor:
@@ -686,6 +698,21 @@ importers:
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.27
+
+  packages/json-accel-rs:
+    devDependencies:
+      '@napi-rs/cli':
+        specifier: ^2.18.4
+        version: 2.18.4
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.19.3
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.0.0
+        version: 4.0.16(@opentelemetry/api@1.9.0)(@types/node@22.19.3)(jiti@2.6.1)(jsdom@26.1.0)(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2)
 
   packages/lfcc-bridge:
     dependencies:

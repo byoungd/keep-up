@@ -19,6 +19,7 @@ import {
   type ToolOutputSpoolRequest,
   type ToolOutputSpoolResult,
 } from "../types";
+import { stableJsonStringify } from "../utils/json";
 
 export interface FileToolOutputSpoolerConfig {
   rootDir?: string;
@@ -366,29 +367,4 @@ function estimateImageBytes(data: string): number {
     return decoded.byteLength;
   }
   return Buffer.byteLength(data);
-}
-
-function stableJsonStringify(value: unknown): string {
-  return JSON.stringify(sortJsonValue(value));
-}
-
-function sortJsonValue(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map((entry) => (entry === undefined ? null : sortJsonValue(entry)));
-  }
-
-  if (value && typeof value === "object") {
-    const record = value as Record<string, unknown>;
-    const sorted: Record<string, unknown> = {};
-    for (const key of Object.keys(record).sort()) {
-      const next = record[key];
-      if (next === undefined) {
-        continue;
-      }
-      sorted[key] = sortJsonValue(next);
-    }
-    return sorted;
-  }
-
-  return value;
 }
