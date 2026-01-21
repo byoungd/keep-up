@@ -36,6 +36,21 @@ SDK adapter, remote server, and security guardrails already present in the runti
 - Define a secure token storage policy (key management, rotation).
 - Document connector-specific injection policy overrides.
 
+## Token Storage Policy (Default)
+
+Current MCP OAuth token handling supports two stores:
+
+- Default: in-memory (`InMemoryMcpOAuthTokenStore`) unless a persistent store is provided.
+- Recommended for production: encrypted file store (`FileMcpOAuthTokenStore`) using AES-256-GCM.
+
+Policy guidance:
+
+- Generate a 32-byte encryption key and store it in a secrets manager (not in repo or logs).
+- Provide the key to `FileMcpOAuthTokenStoreConfig.encryptionKey` (hex/base64 supported).
+- Persist tokens under a user-scoped path with `0600` permissions.
+- Rotate keys by re-encrypting existing token payloads and invalidating old keys.
+- Do not emit tokens in logs; audit should record status only.
+
 ---
 
 ## Gaps to Close
