@@ -121,7 +121,7 @@ export class DelegationToolServer extends BaseToolServer {
           policyAction: "connector.read",
         },
       },
-      (_args: Record<string, unknown>, context: ToolContext) => this.handleListRoles(context)
+      async (_args: Record<string, unknown>, context: ToolContext) => this.handleListRoles(context)
     );
   }
 
