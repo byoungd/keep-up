@@ -96,32 +96,89 @@ export class VectorIndex {
     queryEmbedding: number[],
     options?: { limit?: number; threshold?: number }
   ): VectorSearchResult[] {
-    const limit = options?.limit ?? 10;
-    const threshold = options?.threshold ?? 0;
+    const { limit, threshold } = this.resolveSearchOptions(options);
 
+    if (limit <= 0) {
+      return [];
+    }
+
+    this.assertDimension(queryEmbedding);
+
+    const results: VectorSearchResult[] = [];
+    let minScore = Number.POSITIVE_INFINITY;
+    let minIndex = -1;
+
+    for (const entry of this.entries.values()) {
+      const score = cosineSimilarity(queryEmbedding, entry.embedding);
+      if (score < threshold) {
+        continue;
+      }
+
+      const updated = this.updateTopResults(results, entry, score, limit, minScore, minIndex);
+      minScore = updated.minScore;
+      minIndex = updated.minIndex;
+    }
+
+    return this.finalizeResults(results);
+  }
+
+  private resolveSearchOptions(options?: { limit?: number; threshold?: number }): {
+    limit: number;
+    threshold: number;
+  } {
+    return {
+      limit: options?.limit ?? 10,
+      threshold: options?.threshold ?? 0,
+    };
+  }
+
+  private assertDimension(queryEmbedding: number[]): void {
     if (queryEmbedding.length !== this.config.dimension) {
       throw new Error(
         `Query embedding dimension mismatch: expected ${this.config.dimension}, got ${queryEmbedding.length}`
       );
     }
+  }
 
-    const results: VectorSearchResult[] = [];
-
-    for (const entry of this.entries.values()) {
-      const score = cosineSimilarity(queryEmbedding, entry.embedding);
-      if (score >= threshold) {
-        results.push({
-          id: entry.id,
-          score,
-          metadata: entry.metadata,
-        });
+  private updateTopResults(
+    results: VectorSearchResult[],
+    entry: VectorEntry,
+    score: number,
+    limit: number,
+    minScore: number,
+    minIndex: number
+  ): { minScore: number; minIndex: number } {
+    if (results.length < limit) {
+      results.push({ id: entry.id, score, metadata: entry.metadata });
+      if (score < minScore) {
+        return { minScore: score, minIndex: results.length - 1 };
       }
+      return { minScore, minIndex };
     }
 
-    // Sort by score descending
-    results.sort((a, b) => b.score - a.score);
+    if (score <= minScore) {
+      return { minScore, minIndex };
+    }
 
-    return results.slice(0, limit);
+    results[minIndex] = { id: entry.id, score, metadata: entry.metadata };
+    return this.findMinResult(results);
+  }
+
+  private findMinResult(results: VectorSearchResult[]): { minScore: number; minIndex: number } {
+    let minScore = results[0].score;
+    let minIndex = 0;
+    for (let i = 1; i < results.length; i++) {
+      if (results[i].score < minScore) {
+        minScore = results[i].score;
+        minIndex = i;
+      }
+    }
+    return { minScore, minIndex };
+  }
+
+  private finalizeResults(results: VectorSearchResult[]): VectorSearchResult[] {
+    results.sort((a, b) => b.score - a.score);
+    return results;
   }
 
   /**
