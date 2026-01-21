@@ -24,7 +24,7 @@ High-level system design and historical context.
 
 ### 📅 Planning & Roadmap
 *   **`docs/roadmap/`** - Implementation plans and milestones.
-    *   [Cowork Contract Freeze](roadmap/cowork-contract-freeze.md)
+    *   [Cowork Contract Freeze](roadmap/ui-cowork/cowork-contract-freeze.md)
 
 ### 🔬 Research (Historical)
 > **Note:** Documents in this folder are **SUPERSEDED** by the Specs.

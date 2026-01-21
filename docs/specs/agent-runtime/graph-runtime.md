@@ -4,7 +4,7 @@ Status: Implemented
 Owner: Agent Runtime  
 Last Updated: 2026-02-15  
 Applies to: Agent Runtime v1  
-Related docs: `docs/roadmap/next-q2/track-s-graph-runtime.md`
+Related docs: `docs/roadmap/phase-3-graph/track-s-graph-runtime.md`
 
 ## Context
 The graph runtime provides deterministic orchestration for multi-step agent flows. It models
