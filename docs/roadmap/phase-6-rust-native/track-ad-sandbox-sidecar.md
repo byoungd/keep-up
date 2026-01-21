@@ -119,6 +119,20 @@ Migrate sandbox execution from Docker containers to a Rust sidecar for OS-level 
 
 ---
 
+## Alternatives Considered
+
+### 1. Docker (AutoGPT / Open Interpreter)
+- **Pros**: Strongest isolation, industry standard.
+- **Cons**: Startup time (~500ms) violates <100ms tool latency goal. Heavy resource footprint (VM overhead on macOS).
+- **Decision**: Rejected for local desktop use cases; reserved for "cloud mode".
+
+### 2. Python/Node Permission Gating (Open Interpreter Local)
+- **Pros**: Zero overhead, easy to implement in TS `PermissionGate`.
+- **Cons**: Vulnerable to path traversal and race conditions if `path.resolve` logic differs from OS execution.
+- **Decision**: Insufficient security depth. Rust sidecar provides kernel-level enforcement.
+
+---
+
 ## References
 
 - Codex Seatbelt: `.tmp/analysis/codex/codex-rs/core/src/seatbelt.rs`

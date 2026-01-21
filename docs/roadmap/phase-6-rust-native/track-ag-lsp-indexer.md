@@ -126,6 +126,21 @@ impl SymbolIndex {
 
 ---
 
+## Alternatives Considered
+
+### 1. Hybrid TS + Binaries (Roo-Code)
+- **Architecture**: Spawns `ripgrep` for file listing, uses `fzf` (JS) for scoring, separate Vector DB (Qdrant).
+- **Pros**: Quick to assemble from off-the-shelf tools.
+- **Cons**: Overhead of spawning processes; "Frankenstein" architecture difficult to sync; strict dependency on binary paths.
+- **Decision**: Rust Native Indexer offers unified memory model and sub-5ms query without process spawn overhead.
+
+### 2. Pure In-Memory JS Map (Current)
+- **Pros**: Simplest implementation.
+- **Cons**: Garbage collection pauses; memory usage scales linearly (2-3x raw size); startup deserialization slow.
+- **Decision**: Unsustainable for repos > 10k files.
+
+---
+
 ## References
 
 - Current impl: `packages/agent-runtime/src/lsp/symbolGraph.ts`
