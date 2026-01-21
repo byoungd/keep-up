@@ -9,6 +9,17 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { promisify } from "node:util";
 
+// Native gitignore matcher (optional, falls back to git ls-files)
+let gitignoreRs: typeof import("@ku0/gitignore-rs") | null = null;
+try {
+  gitignoreRs = await import("@ku0/gitignore-rs");
+  if (!gitignoreRs.hasNativeSupport()) {
+    gitignoreRs = null;
+  }
+} catch {
+  // Native binding not available
+}
+
 const execFileAsync = promisify(execFile);
 
 // ============================================================================
@@ -108,6 +119,9 @@ export async function readFile(
 
 /**
  * List files in a directory, optionally respecting .gitignore.
+ *
+ * Uses Rust-based gitignore matcher when available for optimal performance,
+ * falls back to `git ls-files`, then to native JavaScript implementation.
  */
 export async function listFiles(
   dirPath: string,
@@ -118,7 +132,25 @@ export async function listFiles(
   const includeHidden = options.includeHidden ?? false;
   const respectGitignore = options.respectGitignore ?? true;
 
-  // Try to use `git ls-files` for gitignore-aware listing
+  // Priority 1: Native Rust gitignore-rs (fastest)
+  if (respectGitignore && gitignoreRs) {
+    try {
+      const entries = gitignoreRs.listFiles(absolutePath, {
+        maxDepth: maxDepth === Infinity ? undefined : maxDepth,
+        includeHidden,
+        respectGitignore: true,
+      });
+      return entries.map((e: { path: string; type: "file" | "directory"; size?: number }) => ({
+        path: e.path,
+        type: e.type,
+        size: e.size,
+      }));
+    } catch {
+      // Fall back to git ls-files
+    }
+  }
+
+  // Priority 2: Git ls-files (respects gitignore)
   if (respectGitignore) {
     try {
       return await listFilesWithGit(absolutePath, maxDepth, includeHidden);
@@ -127,6 +159,7 @@ export async function listFiles(
     }
   }
 
+  // Priority 3: Native JavaScript (no gitignore support)
   return await listFilesNative(absolutePath, maxDepth, includeHidden);
 }
 
