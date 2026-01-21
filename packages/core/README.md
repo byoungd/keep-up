@@ -234,27 +234,46 @@ const negotiated = negotiatePolicies([
 
 ### 6. Integrity
 
-Document integrity checks and checkpoints.
+Context/chain hashing for annotations plus LFCC document checksums.
 
 ```typescript
 import {
-  computeBlockHash,
-  createCheckpoint,
-  verifyCheckpoint,
-  runIntegrityScan,
+  computeContextHash,
+  computeChainHash,
+  computeBlockDigest,
+  computeDocumentChecksum,
+  computeDocumentChecksumTier2,
 } from '@ku0/core';
 
-// Compute a block hash
-const hash = computeBlockHash(block);
+// Span context hash (normalized LF, NFC, control chars stripped)
+const { hash: contextHash } = await computeContextHash({
+  span_id: 's1',
+  block_id: 'b1',
+  text: 'Hello world',
+});
 
-// Create a checkpoint
-const checkpoint = createCheckpoint(doc, annotations);
+// Chain hash for annotation blocks
+const { hash: chainHash } = await computeChainHash({
+  policy_kind: 'strict_adjacency',
+  max_intervening_blocks: 0,
+  block_ids: ['b1', 'b2'],
+});
 
-// Verify a checkpoint
-const valid = verifyCheckpoint(checkpoint, currentDoc);
+// Tier 1: block digest + document checksum using cached child digests
+const digest = await computeBlockDigest({
+  block_id: 'b1',
+  type: 'paragraph',
+  attrs: {},
+  inline: [{ text: 'Hello world', marks: [], attrs: {} }],
+  children: [],
+});
+const docChecksum = await computeDocumentChecksum({
+  blocks: [{ block_id: 'b1', digest }],
+});
 
-// Integrity scan
-const scanResult = runIntegrityScan(doc, annotations, policy);
+// Tier 2: recompute canonical tree, per-block digests, and checksum
+const tier2 = await computeDocumentChecksumTier2(canonRoot);
+console.log(tier2.checksum, tier2.blocks); // ordered block digests
 ```
 
 ### 7. Mapping and Anchors

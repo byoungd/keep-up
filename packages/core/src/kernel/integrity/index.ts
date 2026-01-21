@@ -12,9 +12,12 @@ export {
   shouldTriggerCheckpoint,
 } from "./checkpoint.js";
 export {
+  computeBlockDigest,
   computeChainHash,
   computeContextHash,
   computeContextHashBatch,
+  computeDocumentChecksum,
+  computeDocumentChecksumTier2,
   verifyChainHash,
   verifyContextHash,
 } from "./hash.js";

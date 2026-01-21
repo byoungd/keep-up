@@ -3,6 +3,7 @@
  * @see docs/product/Local-First_Collaboration_Contract_v0.9_RC.md §6, §10
  */
 
+import type { CanonMark } from "../canonicalizer/types.js";
 import type { ChainKind } from "../policy/types.js";
 
 /** Span data for hash computation */
@@ -29,6 +30,33 @@ export type ContextHashResult = {
 export type ChainHashResult = {
   hash: string; // SHA-256 hex
   block_ids: string[];
+};
+
+/** Inline segment used for block digests */
+export type BlockInlineSegment = {
+  text: string;
+  marks: CanonMark[];
+  attrs: { href?: string };
+};
+
+/** Block digest computation input */
+export type BlockDigestInput = {
+  block_id: string;
+  type: string;
+  attrs: Record<string, unknown>;
+  inline: BlockInlineSegment[];
+  children: string[];
+};
+
+/** Block digest output */
+export type BlockDigestEntry = {
+  block_id: string;
+  digest: string; // SHA-256 hex
+};
+
+/** Document checksum payload (Tier 1) */
+export type DocumentChecksumPayload = {
+  blocks: BlockDigestEntry[];
 };
 
 /** Verification status for a span */

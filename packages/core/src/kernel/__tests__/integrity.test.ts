@@ -3,12 +3,16 @@
  */
 
 import { describe, expect, it } from "vitest";
+import type { CanonBlock } from "../canonicalizer/index.js";
 import {
   type AnnotationForVerify,
   type ChainData,
   CheckpointScheduler,
+  computeBlockDigest,
   computeChainHash,
   computeContextHash,
+  computeDocumentChecksum,
+  computeDocumentChecksumTier2,
   createCheckpointSchedulerState,
   DEFAULT_DEV_COMPARE_POLICY,
   type DocumentStateProvider,
@@ -110,6 +114,81 @@ describe("Hash Computation", () => {
       expect(isValid).toBe(false);
     });
   });
+
+  describe("document checksum", () => {
+    it("should normalize text and mark order for block digest", async () => {
+      const digestA = await computeBlockDigest({
+        block_id: "b1",
+        type: "paragraph",
+        attrs: {},
+        inline: [{ text: "Hello\r\nwor\u0001\u007Fld", marks: ["italic", "bold"], attrs: {} }],
+        children: [],
+      });
+      const digestB = await computeBlockDigest({
+        block_id: "b1",
+        type: "paragraph",
+        attrs: {},
+        inline: [{ text: "Hello\nworld", marks: ["bold", "italic"], attrs: {} }],
+        children: [],
+      });
+      expect(digestA).toBe(digestB);
+    });
+
+    it("should be sensitive to document order", async () => {
+      const checksum1 = await computeDocumentChecksum({
+        blocks: [
+          { block_id: "root", digest: "aaa" },
+          { block_id: "child", digest: "bbb" },
+        ],
+      });
+      const checksum2 = await computeDocumentChecksum({
+        blocks: [
+          { block_id: "child", digest: "bbb" },
+          { block_id: "root", digest: "aaa" },
+        ],
+      });
+      expect(checksum1).not.toBe(checksum2);
+    });
+
+    it("computes tier2 checksum and block digests in document order", async () => {
+      const root: CanonBlock = {
+        id: "r/0",
+        type: "document",
+        attrs: { block_id: "root" },
+        children: [
+          {
+            id: "r/1",
+            type: "paragraph",
+            attrs: { block_id: "p1" },
+            children: [{ text: "Hello", marks: [], is_leaf: true }],
+          },
+          {
+            id: "r/2",
+            type: "paragraph",
+            attrs: { block_id: "p2" },
+            children: [{ text: "World", marks: ["bold"], is_leaf: true }],
+          },
+        ],
+      };
+
+      const tier2 = await computeDocumentChecksumTier2(root);
+      const tier1 = await computeDocumentChecksum({ blocks: tier2.blocks });
+
+      expect(tier2.blocks.map((b) => b.block_id)).toEqual(["root", "p1", "p2"]);
+      expect(tier2.checksum).toBe(tier1);
+    });
+
+    it("throws when block_id is missing during tier2 computation", async () => {
+      const root: CanonBlock = {
+        id: "r/0",
+        type: "document",
+        attrs: {},
+        children: [],
+      };
+
+      await expect(computeDocumentChecksumTier2(root)).rejects.toThrow("block_id");
+    });
+  });
 });
 
 describe("Checkpoint Scheduler", () => {
@@ -117,6 +196,12 @@ describe("Checkpoint Scheduler", () => {
     version: "v3",
     context_hash: { enabled: true, mode: "lazy_verify", debounce_ms: 100 },
     chain_hash: { enabled: true, mode: "eager" },
+    document_checksum: {
+      enabled: true,
+      mode: "lazy_verify",
+      strategy: "two_tier",
+      algorithm: "LFCC_DOC_V1",
+    },
     checkpoint: { enabled: true, every_ops: 5, every_ms: 1000 },
   };
 

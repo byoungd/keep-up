@@ -413,6 +413,9 @@ Implementations MAY include additional extension-specific fields under the same 
       "additionalProperties": false
     },
 
+    // NOTE: v0.9.2+ requires integrity_policy.document_checksum to be present.
+    // Negotiation MUST fail-closed when algorithm or strategy diverge across peers.
+
     "canonicalizer_policy": {
       "type": "object",
       "required": ["version","mode","mark_order","normalize_whitespace","drop_empty_nodes"],
