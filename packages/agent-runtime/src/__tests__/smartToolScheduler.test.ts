@@ -72,4 +72,23 @@ describe("SmartToolScheduler", () => {
     expect(schedule[0]).toHaveLength(1);
     expect(schedule[1]).toHaveLength(1);
   });
+
+  it("reduces concurrency after rate limit failures", () => {
+    const scheduler = new SmartToolScheduler({
+      config: { adaptiveConcurrency: true, targetLatencyMs: 1500 },
+    });
+
+    const calls = [
+      makeCall("web:search", { query: "a" }),
+      makeCall("web:search", { query: "b" }),
+      makeCall("web:search", { query: "c" }),
+    ];
+
+    const baseline = scheduler.recommendConcurrency(calls, 4);
+    scheduler.recordResult("web:search", 1200, { success: false, errorCode: "RATE_LIMITED" });
+    scheduler.recordResult("web:search", 1200, { success: false, errorCode: "RATE_LIMITED" });
+    const reduced = scheduler.recommendConcurrency(calls, 4);
+
+    expect(reduced).toBeLessThan(baseline);
+  });
 });

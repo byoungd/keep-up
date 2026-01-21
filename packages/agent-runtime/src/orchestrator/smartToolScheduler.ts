@@ -1,4 +1,4 @@
-import type { MCPToolCall } from "../types";
+import type { MCPToolCall, ToolErrorCode } from "../types";
 import type { DependencyAnalyzer } from "./dependencyAnalyzer";
 import { createDependencyAnalyzer } from "./dependencyAnalyzer";
 
@@ -19,6 +19,10 @@ export interface SmartToolSchedulerConfig {
   targetLatencyMs?: number;
   minConcurrencyScale?: number;
   maxConcurrencyScale?: number;
+  failureDecay?: number;
+  failurePenalty?: number;
+  rateLimitPenalty?: number;
+  minFailureScale?: number;
 }
 
 type ConcurrencyBudget = {
@@ -103,6 +107,17 @@ const DEFAULT_PROFILE: ToolExecutionProfile = {
 const DEFAULT_TARGET_LATENCY_MS = 2000;
 const DEFAULT_MIN_CONCURRENCY_SCALE = 0.5;
 const DEFAULT_MAX_CONCURRENCY_SCALE = 1.5;
+const DEFAULT_FAILURE_DECAY = 0.85;
+const DEFAULT_FAILURE_PENALTY = 0.25;
+const DEFAULT_RATE_LIMIT_PENALTY = 0.4;
+const DEFAULT_MIN_FAILURE_SCALE = 0.25;
+
+const FAILURE_HEAVY_CODES = new Set<ToolErrorCode>(["RATE_LIMITED", "TIMEOUT"]);
+
+export interface ToolExecutionOutcome {
+  success: boolean;
+  errorCode?: ToolErrorCode;
+}
 
 type BatchState = {
   calls: MCPToolCall[];
@@ -119,6 +134,11 @@ export class SmartToolScheduler {
   private readonly targetLatencyMs: number;
   private readonly minConcurrencyScale: number;
   private readonly maxConcurrencyScale: number;
+  private readonly failureDecay: number;
+  private readonly failurePenalty: number;
+  private readonly rateLimitPenalty: number;
+  private readonly minFailureScale: number;
+  private readonly failureScores = new Map<string, number>();
 
   constructor(
     options: { config?: SmartToolSchedulerConfig; dependencyAnalyzer?: DependencyAnalyzer } = {}
@@ -134,6 +154,10 @@ export class SmartToolScheduler {
     this.targetLatencyMs = config.targetLatencyMs ?? DEFAULT_TARGET_LATENCY_MS;
     this.minConcurrencyScale = config.minConcurrencyScale ?? DEFAULT_MIN_CONCURRENCY_SCALE;
     this.maxConcurrencyScale = config.maxConcurrencyScale ?? DEFAULT_MAX_CONCURRENCY_SCALE;
+    this.failureDecay = config.failureDecay ?? DEFAULT_FAILURE_DECAY;
+    this.failurePenalty = config.failurePenalty ?? DEFAULT_FAILURE_PENALTY;
+    this.rateLimitPenalty = config.rateLimitPenalty ?? DEFAULT_RATE_LIMIT_PENALTY;
+    this.minFailureScale = config.minFailureScale ?? DEFAULT_MIN_FAILURE_SCALE;
 
     const mergedProfiles = [...PROFILE_PRESETS, ...(config.profiles ?? [])];
     for (const profile of mergedProfiles) {
@@ -179,6 +203,11 @@ export class SmartToolScheduler {
     this.profiles.set(toolName, { ...profile, avgDurationMs: Math.max(10, next) });
   }
 
+  recordResult(toolName: string, durationMs: number, outcome: ToolExecutionOutcome): void {
+    this.recordExecution(toolName, durationMs);
+    this.updateFailureScore(toolName, outcome);
+  }
+
   recommendConcurrency(calls: MCPToolCall[], baseConcurrency: number): number {
     if (!this.adaptiveConcurrency || calls.length === 0) {
       return baseConcurrency;
@@ -200,6 +229,8 @@ export class SmartToolScheduler {
     if (cpuHeavyRatio > 0.5) {
       scale *= 0.8;
     }
+
+    scale *= this.resolveFailureScale(calls);
 
     return Math.max(1, Math.min(baseConcurrency, Math.round(baseConcurrency * scale)));
   }
@@ -267,6 +298,35 @@ export class SmartToolScheduler {
       return;
     }
     batch.defaultCount += 1;
+  }
+
+  private updateFailureScore(toolName: string, outcome: ToolExecutionOutcome): void {
+    const current = this.failureScores.get(toolName) ?? 0;
+    if (outcome.success) {
+      this.failureScores.set(toolName, current * this.failureDecay);
+      return;
+    }
+
+    const penalty =
+      outcome.errorCode && FAILURE_HEAVY_CODES.has(outcome.errorCode)
+        ? this.rateLimitPenalty
+        : this.failurePenalty;
+    const next = Math.min(1, current * this.failureDecay + penalty);
+    this.failureScores.set(toolName, next);
+  }
+
+  private resolveFailureScale(calls: MCPToolCall[]): number {
+    let maxScore = 0;
+    for (const call of calls) {
+      const score = this.failureScores.get(call.name) ?? 0;
+      if (score > maxScore) {
+        maxScore = score;
+      }
+    }
+    if (maxScore <= 0) {
+      return 1;
+    }
+    return Math.max(this.minFailureScale, 1 - maxScore);
   }
 }
 
