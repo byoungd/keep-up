@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@ku0/ai-core": "workspace:*",
+    "@ku0/vector-similarity-rs": "workspace:*",
     "mem0ai": "^2.2.1"
   },
   "devDependencies": {

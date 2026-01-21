@@ -1,0 +1,20 @@
+[package]
+name = "vector-similarity-rs"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "SIMD-accelerated vector similarity for Node via N-API."
+publish = false
+build = "build.rs"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+napi = { version = "3.5.1", features = ["napi8"] }
+napi-derive = "3.5.1"
+simsimd = "6.5.12"
+thiserror = "1"
+
+[build-dependencies]
+napi-build = "2.1.3"
