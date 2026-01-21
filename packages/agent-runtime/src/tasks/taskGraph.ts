@@ -106,6 +106,15 @@ export interface TaskGraphEventMeta extends TaskGraphEventContext {
 }
 
 /**
+ * Optional persistent event log backing store.
+ */
+export interface TaskGraphEventLog {
+  append(event: TaskGraphEvent): number;
+  replay(fromSequenceId: number, limit?: number): TaskGraphEvent[];
+  prune(beforeSequenceId: number): number;
+}
+
+/**
  * A complete snapshot of the task graph state.
  */
 export interface TaskGraphSnapshot {
@@ -138,6 +147,8 @@ export interface TaskGraphConfig {
   readonly eventVersion?: number;
   /** Shared event context for correlation */
   readonly eventContext?: TaskGraphEventContext;
+  /** Optional persistent event log */
+  readonly eventLog?: TaskGraphEventLog;
   /** Maximum number of nodes to keep (default: 10000) */
   readonly maxNodes?: number;
   /** Maximum number of events to keep (default: 50000) */
@@ -235,6 +246,7 @@ export class TaskGraphStore {
   private readonly maxNodes: number;
   private readonly maxEvents: number;
   private readonly compactionThreshold: number;
+  private readonly eventLog?: TaskGraphEventLog;
   private eventContext: TaskGraphEventContext;
 
   private readonly nodes = new Map<string, TaskGraphNode>();
@@ -254,6 +266,7 @@ export class TaskGraphStore {
     this.graphId = config.graphId ?? this.idFactory();
     this.eventVersion = config.eventVersion ?? DEFAULT_EVENT_VERSION;
     this.eventContext = { ...config.eventContext };
+    this.eventLog = config.eventLog;
     this.maxNodes = config.maxNodes ?? DEFAULT_MAX_NODES;
     this.maxEvents = config.maxEvents ?? DEFAULT_MAX_EVENTS;
     this.compactionThreshold = config.compactionThreshold ?? DEFAULT_COMPACTION_THRESHOLD;
@@ -506,6 +519,7 @@ export class TaskGraphStore {
       payload,
     };
     this.events.push(event);
+    this.eventLog?.append(event);
     this.eventsSinceCompaction++;
 
     this.maybeCompact();
@@ -600,8 +614,13 @@ export class TaskGraphStore {
     this.compactionCount++;
     this.eventsSinceCompaction = 0;
 
+    if (this.eventLog) {
+      const nextSequence = this.events[0]?.sequenceId ?? this.nextSequenceId;
+      this.eventLog.prune(nextSequence);
+    }
+
     // Record compaction event
-    this.events.push({
+    const compactionEvent: TaskGraphEvent = {
       id: this.idFactory(),
       sequenceId: this.nextSequenceId++,
       eventVersion: this.eventVersion,
@@ -611,7 +630,9 @@ export class TaskGraphStore {
       correlationId: this.eventContext.correlationId,
       source: this.eventContext.source,
       payload: { removedCount: removed.length },
-    });
+    };
+    this.events.push(compactionEvent);
+    this.eventLog?.append(compactionEvent);
 
     return removed.length;
   }

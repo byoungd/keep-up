@@ -49,6 +49,7 @@
     "@ku0/agent-runtime-tools": "workspace:*",
     "@ku0/ai-core": "workspace:*",
     "@ku0/core": "workspace:*",
+    "@ku0/storage-engine-rs": "workspace:*",
     "@ku0/db": "workspace:*",
 
     "@ku0/json-accel-rs": "workspace:*",

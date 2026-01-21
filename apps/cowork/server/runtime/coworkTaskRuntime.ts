@@ -11,7 +11,9 @@ import type {
   CoworkPolicyConfig,
   CoworkSession,
   CoworkTask,
+  ICheckpointStorage,
   RuntimeEventBus,
+  TaskGraphStore,
 } from "@ku0/agent-runtime";
 import {
   AgentModeManager,
@@ -36,6 +38,7 @@ import {
   createSkillRegistry,
   createSkillSession,
   createSkillToolServer,
+  createTaskGraphStore,
   createToolRegistry,
   createWebSearchToolServer,
   DockerSandboxManager,
@@ -45,8 +48,10 @@ import {
   type LessonStore,
   type Mem0MemoryAdapter,
   MessagePackCheckpointStorage,
+  NativeTaskGraphEventLog,
   ProcessCodeExecutor,
   RuntimeAssetManager,
+  RustCheckpointStorage,
   type SkillDirectoryConfig,
   type SkillRegistry,
   type SkillSession,
@@ -116,7 +121,7 @@ type SessionRuntime = {
   unsubscribeQueue: () => void;
   unsubscribeOrchestrator: () => void;
   unsubscribeEventBus: () => void;
-  checkpointStorage?: MessagePackCheckpointStorage;
+  checkpointStorage?: ICheckpointStorage;
   ghostAgent?: GhostAgent;
 };
 
@@ -137,7 +142,7 @@ type RuntimeBuildResult = {
   fallbackNotice: string | null;
   contextPackKey: string | null;
   eventBus?: RuntimeEventBus;
-  checkpointStorage?: MessagePackCheckpointStorage;
+  checkpointStorage?: ICheckpointStorage;
 };
 
 const noop = () => undefined;
@@ -564,7 +569,9 @@ export class CoworkTaskRuntime {
       model: modelId || undefined,
     });
     const prompt = await this.buildSystemPromptAddition(session, modeManager);
-    const components = this.toolResultCache ? { toolResultCache: this.toolResultCache } : undefined;
+    const checkpointStorage = this.createCheckpointStorage(session.sessionId);
+    const taskGraph = this.createTaskGraphStoreForSession(session.sessionId);
+    const components = this.buildOrchestratorComponents(taskGraph);
     const runtime = createCoworkRuntime({
       llm: adapter,
       registry: toolRegistry,
@@ -594,7 +601,6 @@ export class CoworkTaskRuntime {
       },
       systemPromptAddition: prompt.addition,
     });
-    const checkpointStorage = this.createCheckpointStorage(session.sessionId);
 
     return {
       runtime,
@@ -1071,13 +1077,45 @@ export class CoworkTaskRuntime {
     );
   }
 
-  private createCheckpointStorage(sessionId: string): MessagePackCheckpointStorage | undefined {
+  private buildOrchestratorComponents(taskGraph?: TaskGraphStore) {
+    if (!this.toolResultCache && !taskGraph) {
+      return undefined;
+    }
+
+    return {
+      ...(this.toolResultCache ? { toolResultCache: this.toolResultCache } : {}),
+      ...(taskGraph ? { taskGraph } : {}),
+    };
+  }
+
+  private createCheckpointStorage(sessionId: string): ICheckpointStorage | undefined {
     if (!this.runtimePersistence?.checkpointDir) {
       return undefined;
     }
-    return new MessagePackCheckpointStorage({
-      rootDir: join(this.runtimePersistence.checkpointDir, sessionId),
-    });
+    const rootDir = join(this.runtimePersistence.checkpointDir, sessionId);
+    try {
+      return new RustCheckpointStorage({ rootDir });
+    } catch (error) {
+      this.logger.warn(
+        "Native checkpoint storage unavailable; falling back to MessagePack.",
+        error
+      );
+      return new MessagePackCheckpointStorage({ rootDir });
+    }
+  }
+
+  private createTaskGraphStoreForSession(sessionId: string): TaskGraphStore | undefined {
+    if (!this.runtimePersistence?.checkpointDir) {
+      return undefined;
+    }
+    const rootDir = join(this.runtimePersistence.checkpointDir, sessionId);
+    try {
+      const eventLog = new NativeTaskGraphEventLog({ rootDir });
+      return createTaskGraphStore({ eventLog });
+    } catch (error) {
+      this.logger.warn("Native task graph event log unavailable; using in-memory store.", error);
+      return undefined;
+    }
   }
 
   private getRuntimeAssetManager(): RuntimeAssetManager {
