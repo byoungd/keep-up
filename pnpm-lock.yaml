@@ -223,9 +223,15 @@ importers:
       '@ku0/db':
         specifier: workspace:*
         version: link:../db
+<<<<<<< HEAD
       '@ku0/symbol-index-rs':
         specifier: workspace:*
         version: link:../symbol-index-rs
+=======
+      '@ku0/sandbox-rs':
+        specifier: workspace:*
+        version: link:../sandbox-rs
+>>>>>>> pr-180
       '@ku0/tool-lsp':
         specifier: workspace:*
         version: link:../tool-lsp
@@ -722,6 +728,19 @@ importers:
       vitest:
         specifier: ^4.0.0
         version: 4.0.16(@opentelemetry/api@1.9.0)(@types/node@22.19.3)(jiti@2.6.1)(jsdom@26.1.0)(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2)
+
+  packages/sandbox-rs:
+    dependencies:
+      '@ku0/agent-runtime-core':
+        specifier: workspace:*
+        version: link:../agent-runtime-core
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.19.3
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
 
   packages/shared:
     dependencies:

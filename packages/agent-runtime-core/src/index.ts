@@ -439,7 +439,7 @@ export interface SecurityPolicy {
 
 export interface SandboxConfig {
   /** Sandbox type */
-  type: "none" | "process" | "docker" | "wasm";
+  type: "none" | "process" | "docker" | "wasm" | "rust";
   /** Network access */
   networkAccess: "none" | "allowlist" | "full";
   /** Allowed hosts for network access */
