@@ -222,4 +222,5 @@ packages/json-accel-rs/native/Cargo.lock
 packages/json-accel-rs/*.js
 packages/json-accel-rs/*.d.ts
 packages/json-accel-rs/*.node
+packages/tokenizer-rs/*.node
 packages/json-accel-rs/native/Cargo.lock

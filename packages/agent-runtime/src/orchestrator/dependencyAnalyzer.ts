@@ -17,6 +17,13 @@ import type { MCPToolCall } from "../types";
 // Types
 // ============================================================================
 
+type AccessMode = "read" | "write";
+
+interface ResourceAccess {
+  id: string;
+  mode: AccessMode;
+}
+
 /** Dependency graph node */
 interface DependencyNode {
   /** Tool call */
@@ -27,8 +34,8 @@ interface DependencyNode {
   dependencies: Set<number>;
   /** Dependents (indices) */
   dependents: Set<number>;
-  /** Resource identifier (if applicable) */
-  resources: string[];
+  /** Resource accesses (if applicable) */
+  resourceAccesses: ResourceAccess[];
   /** Execution group */
   group: number;
 }
@@ -46,7 +53,7 @@ export interface DependencyAnalysis {
 }
 
 /** Resource extractor function */
-type ResourceExtractor = (call: MCPToolCall) => string[];
+type ResourceExtractor = (call: MCPToolCall) => ResourceAccess[];
 
 // ============================================================================
 // Resource Extractors
@@ -54,20 +61,24 @@ type ResourceExtractor = (call: MCPToolCall) => string[];
 
 const RESOURCE_EXTRACTORS: Array<{ pattern: RegExp; extractor: ResourceExtractor }> = [
   {
+    pattern: /^file:(read|list|info)$/,
+    extractor: (call) => extractFileAccesses(call, "read"),
+  },
+  {
     pattern: /^file:(write|delete|move|copy|rename)$/,
-    extractor: (call) => extractFileResources(call),
+    extractor: (call) => extractFileAccesses(call, "write"),
   },
   {
     pattern: /^lfcc:(update_block|delete_block|insert_block)$/,
     extractor: (call) => {
       const docId = call.arguments?.docId as string | undefined;
       const blockId = call.arguments?.blockId as string | undefined;
-      return docId ? [`lfcc:${docId}${blockId ? `:${blockId}` : ""}`] : [];
+      return docId ? [{ id: `lfcc:${docId}${blockId ? `:${blockId}` : ""}`, mode: "write" }] : [];
     },
   },
   {
     pattern: /^git:(commit|push|merge|rebase|checkout|pull)$/,
-    extractor: () => ["git:repository"], // Mutating git ops serialize on repo
+    extractor: () => [{ id: "git:repository", mode: "write" }], // Mutating git ops serialize on repo
   },
 ];
 
@@ -141,50 +152,35 @@ export class DependencyAnalyzer {
    * Build dependency graph from tool calls.
    */
   private buildGraph(calls: MCPToolCall[]): Map<number, DependencyNode> {
-    const { graph, resourceMap } = this.initializeNodes(calls);
-    this.resolveDependencies(calls, graph, resourceMap);
+    const graph = this.initializeNodes(calls);
+    this.resolveDependencies(calls, graph);
     return graph;
   }
 
-  private initializeNodes(calls: MCPToolCall[]): {
-    graph: Map<number, DependencyNode>;
-    resourceMap: Map<string, number[]>;
-  } {
+  private initializeNodes(calls: MCPToolCall[]): Map<number, DependencyNode> {
     const graph = new Map<number, DependencyNode>();
-    const resourceMap = new Map<string, number[]>();
 
     for (let i = 0; i < calls.length; i++) {
       const call = calls[i];
-      const resources = this.extractResources(call);
+      const resourceAccesses = this.extractResources(call);
 
       const node: DependencyNode = {
         call,
         index: i,
         dependencies: new Set(),
         dependents: new Set(),
-        resources,
+        resourceAccesses,
         group: -1,
       };
 
       graph.set(i, node);
-
-      if (resources.length > 0) {
-        for (const resource of resources) {
-          if (!resourceMap.has(resource)) {
-            resourceMap.set(resource, []);
-          }
-          resourceMap.get(resource)?.push(i);
-        }
-      }
     }
-    return { graph, resourceMap };
+    return graph;
   }
 
-  private resolveDependencies(
-    calls: MCPToolCall[],
-    graph: Map<number, DependencyNode>,
-    resourceMap: Map<string, number[]>
-  ): void {
+  private resolveDependencies(calls: MCPToolCall[], graph: Map<number, DependencyNode>): void {
+    const resourceState = new Map<string, { reads: Set<number>; lastWrite?: number }>();
+
     for (let i = 0; i < calls.length; i++) {
       const node = graph.get(i);
       if (!node) {
@@ -196,10 +192,11 @@ export class DependencyAnalyzer {
 
       if (isSerialized) {
         this.addSerializedDependencies(i, node, graph);
-      } else if (node.resources.length > 0) {
-        for (const resource of node.resources) {
-          this.addResourceDependencies(i, node, resource, resourceMap, graph);
-        }
+        continue;
+      }
+
+      for (const access of node.resourceAccesses) {
+        this.applyResourceAccess(i, node, access, resourceState, graph);
       }
     }
   }
@@ -215,26 +212,69 @@ export class DependencyAnalyzer {
     }
   }
 
-  private addResourceDependencies(
-    currentIndex: number,
+  private addDependency(
     node: DependencyNode,
-    resource: string,
-    resourceMap: Map<string, number[]>,
+    currentIndex: number,
+    dependencyIndex: number,
     graph: Map<number, DependencyNode>
   ): void {
-    const resourceCalls = resourceMap.get(resource) || [];
-    for (const j of resourceCalls) {
-      if (j < currentIndex) {
-        node.dependencies.add(j);
-        graph.get(j)?.dependents.add(currentIndex);
-      }
+    if (dependencyIndex >= currentIndex) {
+      return;
     }
+    node.dependencies.add(dependencyIndex);
+    graph.get(dependencyIndex)?.dependents.add(currentIndex);
+  }
+
+  private applyResourceAccess(
+    currentIndex: number,
+    node: DependencyNode,
+    access: ResourceAccess,
+    resourceState: Map<string, { reads: Set<number>; lastWrite?: number }>,
+    graph: Map<number, DependencyNode>
+  ): void {
+    const state = resourceState.get(access.id) ?? { reads: new Set<number>() };
+
+    if (access.mode === "read") {
+      this.applyReadAccess(currentIndex, node, state, graph);
+    } else {
+      this.applyWriteAccess(currentIndex, node, state, graph);
+    }
+
+    resourceState.set(access.id, state);
+  }
+
+  private applyReadAccess(
+    currentIndex: number,
+    node: DependencyNode,
+    state: { reads: Set<number>; lastWrite?: number },
+    graph: Map<number, DependencyNode>
+  ): void {
+    if (state.lastWrite !== undefined) {
+      this.addDependency(node, currentIndex, state.lastWrite, graph);
+    }
+    state.reads.add(currentIndex);
+  }
+
+  private applyWriteAccess(
+    currentIndex: number,
+    node: DependencyNode,
+    state: { reads: Set<number>; lastWrite?: number },
+    graph: Map<number, DependencyNode>
+  ): void {
+    if (state.lastWrite !== undefined) {
+      this.addDependency(node, currentIndex, state.lastWrite, graph);
+    }
+    for (const readIndex of state.reads) {
+      this.addDependency(node, currentIndex, readIndex, graph);
+    }
+    state.reads.clear();
+    state.lastWrite = currentIndex;
   }
 
   /**
    * Extract resource identifier from tool call.
    */
-  private extractResources(call: MCPToolCall): string[] {
+  private extractResources(call: MCPToolCall): ResourceAccess[] {
     for (const { pattern, extractor } of RESOURCE_EXTRACTORS) {
       if (pattern.test(call.name)) {
         return extractor(call);
@@ -381,22 +421,37 @@ export class DependencyAnalyzer {
     resource: string;
     calls: number[];
   }> {
-    const resourceMap = new Map<string, number[]>();
+    const resourceMap = this.collectResourceConflicts(graph);
+    return this.resolveConflictList(resourceMap);
+  }
+
+  private collectResourceConflicts(
+    graph: Map<number, DependencyNode>
+  ): Map<string, { indices: number[]; hasWrite: boolean }> {
+    const resourceMap = new Map<string, { indices: number[]; hasWrite: boolean }>();
 
     for (const [index, node] of graph) {
-      for (const resource of node.resources) {
-        if (!resourceMap.has(resource)) {
-          resourceMap.set(resource, []);
+      for (const access of node.resourceAccesses) {
+        const entry = resourceMap.get(access.id) ?? { indices: [], hasWrite: false };
+        entry.indices.push(index);
+        if (access.mode === "write") {
+          entry.hasWrite = true;
         }
-        resourceMap.get(resource)?.push(index);
+        resourceMap.set(access.id, entry);
       }
     }
 
+    return resourceMap;
+  }
+
+  private resolveConflictList(
+    resourceMap: Map<string, { indices: number[]; hasWrite: boolean }>
+  ): Array<{ resource: string; calls: number[] }> {
     const conflicts: Array<{ resource: string; calls: number[] }> = [];
 
-    for (const [resource, indices] of resourceMap) {
-      if (indices.length > 1) {
-        conflicts.push({ resource, calls: indices });
+    for (const [resource, entry] of resourceMap) {
+      if (entry.indices.length > 1 && entry.hasWrite) {
+        conflicts.push({ resource, calls: entry.indices });
       }
     }
 
@@ -411,7 +466,12 @@ export function createDependencyAnalyzer(): DependencyAnalyzer {
   return new DependencyAnalyzer();
 }
 
-function extractFileResources(call: MCPToolCall): string[] {
+function extractFileAccesses(call: MCPToolCall, mode: AccessMode): ResourceAccess[] {
+  const resources = extractFilePaths(call);
+  return resources.map((resource) => ({ id: resource, mode }));
+}
+
+function extractFilePaths(call: MCPToolCall): string[] {
   const resources: string[] = [];
   const args = call.arguments as Record<string, unknown>;
 
