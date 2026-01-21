@@ -55,6 +55,23 @@ export type {
 } from "./multiDocument";
 
 const logger = getLogger("lfcc-tool");
+const BLOCK_TYPES: BlockType[] = [
+  "paragraph",
+  "heading1",
+  "heading2",
+  "heading3",
+  "bullet_list",
+  "numbered_list",
+  "quote",
+  "code",
+  "divider",
+];
+const BLOCK_TYPE_SET = new Set<BlockType>(BLOCK_TYPES);
+const LIST_SORT_FIELDS = new Set<NonNullable<ListDocumentsOptions["sortBy"]>>([
+  "title",
+  "updatedAt",
+  "createdAt",
+]);
 
 // ============================================================================
 // LFCC Bridge Interface (dependency injection)
@@ -1706,6 +1723,7 @@ export class LFCCToolServer extends BaseToolServer {
                 "numbered_list",
                 "quote",
                 "code",
+                "divider",
               ],
             },
           },
@@ -2269,9 +2287,18 @@ export class LFCCToolServer extends BaseToolServer {
       return errorResult("PERMISSION_DENIED", "Document access is disabled");
     }
 
+    const limit = parseOptionalNumber(args.limit, "limit", { min: 1, integer: true });
+    if (limit.error) {
+      return invalidArgs(limit.error);
+    }
+    const sortBy = parseOptionalEnum(args.sortBy, "sortBy", LIST_SORT_FIELDS);
+    if (sortBy.error) {
+      return invalidArgs(sortBy.error);
+    }
+
     const docs = await this.bridge.listDocuments({
-      limit: args.limit as number,
-      sortBy: args.sortBy as "title" | "updatedAt" | "createdAt",
+      limit: limit.value,
+      sortBy: sortBy.value,
     });
 
     const formatted = docs.map((d) => `- ${d.title} (${d.id})`).join("\n");
@@ -2286,7 +2313,10 @@ export class LFCCToolServer extends BaseToolServer {
       return errorResult("PERMISSION_DENIED", "Document access is disabled");
     }
 
-    const docId = args.docId as string;
+    const docId = parseRequiredId(args.docId, "docId");
+    if (docId.error) {
+      return invalidArgs(docId.error);
+    }
     const doc = await this.bridge.getDocument(docId);
 
     if (!doc) {
@@ -2306,7 +2336,10 @@ export class LFCCToolServer extends BaseToolServer {
       return errorResult("PERMISSION_DENIED", "Document access is disabled");
     }
 
-    const docId = args.docId as string;
+    const docId = parseRequiredId(args.docId, "docId");
+    if (docId.error) {
+      return invalidArgs(docId.error);
+    }
     const dataAccessPolicy = context.security.dataAccessPolicy;
     if (dataAccessPolicy) {
       const blocks = await this.bridge.getBlocks(docId);
@@ -2326,7 +2359,10 @@ export class LFCCToolServer extends BaseToolServer {
       return errorResult("PERMISSION_DENIED", "Document access is disabled");
     }
 
-    const docId = args.docId as string;
+    const docId = parseRequiredId(args.docId, "docId");
+    if (docId.error) {
+      return invalidArgs(docId.error);
+    }
     const blocks = await this.bridge.getBlocks(docId);
     const dataAccessPolicy = context.security.dataAccessPolicy;
     const filteredBlocks = dataAccessPolicy
@@ -2354,12 +2390,29 @@ export class LFCCToolServer extends BaseToolServer {
       return errorResult("PERMISSION_DENIED", "Document write access is disabled");
     }
 
-    const docId = args.docId as string;
-    const afterBlockId = (args.afterBlockId as string) ?? null;
-    const content = args.content as string;
-    const type = (args.type as BlockType) ?? "paragraph";
+    const docId = parseRequiredId(args.docId, "docId");
+    if (docId.error) {
+      return invalidArgs(docId.error);
+    }
+    const afterBlockId = parseOptionalStringOrNull(args.afterBlockId, "afterBlockId");
+    if (afterBlockId.error) {
+      return invalidArgs(afterBlockId.error);
+    }
+    const content = parseRequiredContent(args.content, "content");
+    if (content.error) {
+      return invalidArgs(content.error);
+    }
+    const type = parseBlockType(args.type);
+    if (type.error) {
+      return invalidArgs(type.error);
+    }
 
-    const op = await this.bridge.insertBlock(docId, afterBlockId, content, type);
+    const op = await this.bridge.insertBlock(
+      docId,
+      afterBlockId.value,
+      content.value,
+      type.value ?? "paragraph"
+    );
 
     context.audit?.log({
       timestamp: Date.now(),
@@ -2384,11 +2437,20 @@ export class LFCCToolServer extends BaseToolServer {
       return errorResult("PERMISSION_DENIED", "Document write access is disabled");
     }
 
-    const docId = args.docId as string;
-    const blockId = args.blockId as string;
-    const content = args.content as string;
+    const docId = parseRequiredId(args.docId, "docId");
+    if (docId.error) {
+      return invalidArgs(docId.error);
+    }
+    const blockId = parseRequiredId(args.blockId, "blockId");
+    if (blockId.error) {
+      return invalidArgs(blockId.error);
+    }
+    const content = parseRequiredContent(args.content, "content");
+    if (content.error) {
+      return invalidArgs(content.error);
+    }
 
-    await this.bridge.updateBlock(docId, blockId, content);
+    await this.bridge.updateBlock(docId, blockId, content.value);
 
     context.audit?.log({
       timestamp: Date.now(),
@@ -2413,8 +2475,14 @@ export class LFCCToolServer extends BaseToolServer {
       return errorResult("PERMISSION_DENIED", "Document write access is disabled");
     }
 
-    const docId = args.docId as string;
-    const blockId = args.blockId as string;
+    const docId = parseRequiredId(args.docId, "docId");
+    if (docId.error) {
+      return invalidArgs(docId.error);
+    }
+    const blockId = parseRequiredId(args.blockId, "blockId");
+    if (blockId.error) {
+      return invalidArgs(blockId.error);
+    }
 
     await this.bridge.deleteBlock(docId, blockId);
 
@@ -2438,11 +2506,23 @@ export class LFCCToolServer extends BaseToolServer {
       return errorResult("PERMISSION_DENIED", "Document access is disabled");
     }
 
-    const query = args.query as string;
-    const limit = args.limit as number | undefined;
-    const semantic = args.semantic as boolean | undefined;
+    const query = parseRequiredId(args.query, "query");
+    if (query.error) {
+      return invalidArgs(query.error);
+    }
+    const limit = parseOptionalNumber(args.limit, "limit", { min: 1, integer: true });
+    if (limit.error) {
+      return invalidArgs(limit.error);
+    }
+    const semantic = parseOptionalBoolean(args.semantic, "semantic");
+    if (semantic.error) {
+      return invalidArgs(semantic.error);
+    }
 
-    const results = await this.bridge.search(query, { limit, semantic });
+    const results = await this.bridge.search(query, {
+      limit: limit.value,
+      semantic: semantic.value,
+    });
     const dataAccessPolicy = context.security.dataAccessPolicy;
     const filteredResults = dataAccessPolicy
       ? applyPolicyToSearchResults(results, dataAccessPolicy)
@@ -2475,7 +2555,11 @@ export class LFCCToolServer extends BaseToolServer {
     if (!request || typeof request !== "object" || Array.isArray(request)) {
       return errorResult("INVALID_ARGUMENTS", "request must be an object");
     }
-    const gatewayRequest = request as gateway.AIGatewayRequest;
+    const parsedRequest = gateway.parseGatewayRequest(request);
+    if (!parsedRequest) {
+      return errorResult("INVALID_ARGUMENTS", "request is invalid");
+    }
+    const gatewayRequest = parsedRequest;
 
     const docId = typeof gatewayRequest.doc_id === "string" ? gatewayRequest.doc_id : undefined;
     const aiGateway = this.resolveGateway(docId);
@@ -2660,4 +2744,101 @@ export class LFCCToolServer extends BaseToolServer {
  */
 export function createLFCCToolServer(init?: LFCCToolServerInit): LFCCToolServer {
   return new LFCCToolServer(init);
+}
+
+function invalidArgs(message: string): MCPToolResult {
+  return errorResult("INVALID_ARGUMENTS", message);
+}
+
+function parseRequiredId(value: unknown, label: string): { value: string; error?: string } {
+  if (typeof value !== "string") {
+    return { value: "", error: `${label} is required` };
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return { value: "", error: `${label} is required` };
+  }
+  return { value: trimmed };
+}
+
+function parseRequiredContent(value: unknown, label: string): { value: string; error?: string } {
+  if (typeof value !== "string") {
+    return { value: "", error: `${label} must be a string` };
+  }
+  return { value };
+}
+
+function parseOptionalStringOrNull(
+  value: unknown,
+  label: string
+): { value: string | null; error?: string } {
+  if (value === null || value === undefined) {
+    return { value: null };
+  }
+  if (typeof value !== "string") {
+    return { value: null, error: `${label} must be a string or null` };
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return { value: null, error: `${label} must be a non-empty string or null` };
+  }
+  return { value: trimmed };
+}
+
+function parseBlockType(value: unknown): { value?: BlockType; error?: string } {
+  if (value === undefined) {
+    return {};
+  }
+  if (typeof value !== "string") {
+    return { error: "type must be a string" };
+  }
+  if (!BLOCK_TYPE_SET.has(value as BlockType)) {
+    return { error: `type must be one of: ${BLOCK_TYPES.join(", ")}` };
+  }
+  return { value: value as BlockType };
+}
+
+function parseOptionalEnum<T extends string>(
+  value: unknown,
+  label: string,
+  allowed: Set<T>
+): { value?: T; error?: string } {
+  if (value === undefined) {
+    return {};
+  }
+  if (typeof value !== "string") {
+    return { error: `${label} must be a string` };
+  }
+  if (!allowed.has(value as T)) {
+    return { error: `${label} must be one of: ${Array.from(allowed).join(", ")}` };
+  }
+  return { value: value as T };
+}
+
+function parseOptionalBoolean(value: unknown, label: string): { value?: boolean; error?: string } {
+  if (value === undefined) {
+    return {};
+  }
+  if (typeof value !== "boolean") {
+    return { error: `${label} must be a boolean` };
+  }
+  return { value };
+}
+
+function parseOptionalNumber(
+  value: unknown,
+  label: string,
+  options: { min?: number; integer?: boolean } = {}
+): { value?: number; error?: string } {
+  if (value === undefined) {
+    return {};
+  }
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return { error: `${label} must be a number` };
+  }
+  const normalized = options.integer ? Math.floor(value) : value;
+  if (options.min !== undefined && normalized < options.min) {
+    return { error: `${label} must be >= ${options.min}` };
+  }
+  return { value: normalized };
 }
