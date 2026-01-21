@@ -26,5 +26,23 @@
   },
   "dependencies": {
     "js-tiktoken": "^1.0.21"
+  },
+  "napi": {
+    "name": "tokenizer_rs",
+    "triples": {
+      "defaults": true,
+      "additional": [
+        "x86_64-unknown-linux-musl",
+        "aarch64-unknown-linux-musl",
+        "i686-pc-windows-msvc",
+        "armv7-unknown-linux-gnueabihf",
+        "aarch64-apple-darwin",
+        "aarch64-linux-android",
+        "x86_64-unknown-freebsd",
+        "aarch64-unknown-linux-gnu",
+        "arm-linux-androideabi",
+        "universal-apple-darwin"
+      ]
+    }
   }
 }
