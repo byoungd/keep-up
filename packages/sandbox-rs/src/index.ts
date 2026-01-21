@@ -63,16 +63,17 @@ function normalizeExecOptions(options?: ExecOptions): NativeExecOptions | undefi
   if (!options) {
     return undefined;
   }
-  if (!options.env) {
-    return options;
+  const { env, ...rest } = options;
+  if (!env) {
+    return rest;
   }
-  if (Array.isArray(options.env)) {
-    return { ...options, env: options.env };
+  if (Array.isArray(env)) {
+    return { ...rest, env };
   }
 
-  const env: EnvVar[] = [];
-  for (const [key, value] of Object.entries(options.env)) {
-    env.push({ key, value });
+  const envArray: EnvVar[] = [];
+  for (const [key, value] of Object.entries(env)) {
+    envArray.push({ key, value });
   }
-  return { ...options, env };
+  return { ...rest, env: envArray };
 }
