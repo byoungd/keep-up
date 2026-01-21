@@ -28,7 +28,7 @@ interface DependencyNode {
   /** Dependents (indices) */
   dependents: Set<number>;
   /** Resource identifier (if applicable) */
-  resource?: string;
+  resources: string[];
   /** Execution group */
   group: number;
 }
@@ -46,7 +46,7 @@ export interface DependencyAnalysis {
 }
 
 /** Resource extractor function */
-type ResourceExtractor = (call: MCPToolCall) => string | null;
+type ResourceExtractor = (call: MCPToolCall) => string[];
 
 // ============================================================================
 // Resource Extractors
@@ -54,23 +54,20 @@ type ResourceExtractor = (call: MCPToolCall) => string | null;
 
 const RESOURCE_EXTRACTORS: Array<{ pattern: RegExp; extractor: ResourceExtractor }> = [
   {
-    pattern: /^file:(write|delete|move|copy)$/,
-    extractor: (call) => {
-      const path = call.arguments?.path as string | undefined;
-      return path ? `file:${path}` : null;
-    },
+    pattern: /^file:(write|delete|move|copy|rename)$/,
+    extractor: (call) => extractFileResources(call),
   },
   {
     pattern: /^lfcc:(update_block|delete_block|insert_block)$/,
     extractor: (call) => {
       const docId = call.arguments?.docId as string | undefined;
       const blockId = call.arguments?.blockId as string | undefined;
-      return docId ? `lfcc:${docId}${blockId ? `:${blockId}` : ""}` : null;
+      return docId ? [`lfcc:${docId}${blockId ? `:${blockId}` : ""}`] : [];
     },
   },
   {
     pattern: /^git:(commit|push|merge|rebase|checkout|pull)$/,
-    extractor: () => "git:repository", // Mutating git ops serialize on repo
+    extractor: () => ["git:repository"], // Mutating git ops serialize on repo
   },
 ];
 
@@ -158,24 +155,26 @@ export class DependencyAnalyzer {
 
     for (let i = 0; i < calls.length; i++) {
       const call = calls[i];
-      const resource = this.extractResource(call);
+      const resources = this.extractResources(call);
 
       const node: DependencyNode = {
         call,
         index: i,
         dependencies: new Set(),
         dependents: new Set(),
-        resource: resource ?? undefined, // Fix type mismatch
+        resources,
         group: -1,
       };
 
       graph.set(i, node);
 
-      if (resource) {
-        if (!resourceMap.has(resource)) {
-          resourceMap.set(resource, []);
+      if (resources.length > 0) {
+        for (const resource of resources) {
+          if (!resourceMap.has(resource)) {
+            resourceMap.set(resource, []);
+          }
+          resourceMap.get(resource)?.push(i);
         }
-        resourceMap.get(resource)?.push(i);
       }
     }
     return { graph, resourceMap };
@@ -197,8 +196,10 @@ export class DependencyAnalyzer {
 
       if (isSerialized) {
         this.addSerializedDependencies(i, node, graph);
-      } else if (node.resource) {
-        this.addResourceDependencies(i, node, node.resource, resourceMap, graph);
+      } else if (node.resources.length > 0) {
+        for (const resource of node.resources) {
+          this.addResourceDependencies(i, node, resource, resourceMap, graph);
+        }
       }
     }
   }
@@ -233,13 +234,13 @@ export class DependencyAnalyzer {
   /**
    * Extract resource identifier from tool call.
    */
-  private extractResource(call: MCPToolCall): string | null {
+  private extractResources(call: MCPToolCall): string[] {
     for (const { pattern, extractor } of RESOURCE_EXTRACTORS) {
       if (pattern.test(call.name)) {
         return extractor(call);
       }
     }
-    return null;
+    return [];
   }
 
   /**
@@ -383,11 +384,11 @@ export class DependencyAnalyzer {
     const resourceMap = new Map<string, number[]>();
 
     for (const [index, node] of graph) {
-      if (node.resource) {
-        if (!resourceMap.has(node.resource)) {
-          resourceMap.set(node.resource, []);
+      for (const resource of node.resources) {
+        if (!resourceMap.has(resource)) {
+          resourceMap.set(resource, []);
         }
-        resourceMap.get(node.resource)?.push(index);
+        resourceMap.get(resource)?.push(index);
       }
     }
 
@@ -408,4 +409,29 @@ export class DependencyAnalyzer {
  */
 export function createDependencyAnalyzer(): DependencyAnalyzer {
   return new DependencyAnalyzer();
+}
+
+function extractFileResources(call: MCPToolCall): string[] {
+  const resources: string[] = [];
+  const args = call.arguments as Record<string, unknown>;
+
+  const addPath = (value: unknown): void => {
+    if (typeof value === "string" && value.length > 0) {
+      resources.push(`file:${value}`);
+    }
+  };
+
+  addPath(args.path);
+  addPath(args.srcPath);
+  addPath(args.destPath);
+  addPath(args.from);
+  addPath(args.to);
+
+  if (Array.isArray(args.paths)) {
+    for (const entry of args.paths) {
+      addPath(entry);
+    }
+  }
+
+  return Array.from(new Set(resources));
 }
