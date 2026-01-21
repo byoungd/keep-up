@@ -1,6 +1,6 @@
 FROM node:20-alpine
 
-RUN apk add --no-cache bash git
+RUN apk add --no-cache bash git iptables ipset bind-tools iproute2
 
 WORKDIR /workspace
 
