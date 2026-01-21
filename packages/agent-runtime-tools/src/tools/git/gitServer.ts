@@ -419,7 +419,16 @@ export class GitToolServer implements MCPToolServer, IGitOperations {
 
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: handles diff generation with multiple options and outputs
   private async handleDiff(options: { staged?: boolean; file?: string }): Promise<MCPToolResult> {
-    const diffs = await this.diff(options);
+    const staged = parseOptionalBoolean(options.staged, "staged");
+    if (staged.error) {
+      return invalidArgs(staged.error);
+    }
+    const file = parseOptionalString(options.file, "file");
+    if (file.error) {
+      return invalidArgs(file.error);
+    }
+
+    const diffs = await this.diff({ staged: staged.value, file: file.value });
 
     if (diffs.length === 0) {
       return {
@@ -458,17 +467,39 @@ export class GitToolServer implements MCPToolServer, IGitOperations {
   }
 
   private async handleAdd(args: { files: string | string[] }): Promise<MCPToolResult> {
-    await this.add(args.files);
-    const files = Array.isArray(args.files) ? args.files : [args.files];
+    const files = parseFilesArg(args.files);
+    if (files.error) {
+      return invalidArgs(files.error);
+    }
+
+    await this.add(files.value);
 
     return {
       success: true,
-      content: [{ type: "text", text: `Staged: ${files.join(", ")}` }],
+      content: [{ type: "text", text: `Staged: ${files.value.join(", ")}` }],
     };
   }
 
   private async handleCommit(args: CommitOptions): Promise<MCPToolResult> {
-    const commit = await this.commit(args);
+    const message = parseRequiredString(args.message, "message");
+    if (message.error) {
+      return invalidArgs(message.error);
+    }
+    const all = parseOptionalBoolean(args.all, "all");
+    if (all.error) {
+      return invalidArgs(all.error);
+    }
+    const amend = parseOptionalBoolean(args.amend, "amend");
+    if (amend.error) {
+      return invalidArgs(amend.error);
+    }
+    const options: CommitOptions = {
+      message: message.value,
+      ...(all.value !== undefined ? { all: all.value } : {}),
+      ...(amend.value !== undefined ? { amend: amend.value } : {}),
+    };
+
+    const commit = await this.commit(options);
 
     return {
       success: true,
@@ -482,7 +513,15 @@ export class GitToolServer implements MCPToolServer, IGitOperations {
   }
 
   private async handleLog(args: { limit?: number; file?: string }): Promise<MCPToolResult> {
-    const commits = await this.log(args);
+    const limit = parseOptionalNumber(args.limit, "limit", { min: 1, integer: true, max: 100 });
+    if (limit.error) {
+      return invalidArgs(limit.error);
+    }
+    const file = parseOptionalString(args.file, "file");
+    if (file.error) {
+      return invalidArgs(file.error);
+    }
+    const commits = await this.log({ limit: limit.value, file: file.value });
 
     const lines = commits.map(
       (c) => `${c.shortHash} ${c.date.toISOString().split("T")[0]} ${c.author}: ${c.message}`
@@ -514,7 +553,16 @@ export class GitToolServer implements MCPToolServer, IGitOperations {
   }
 
   private async handleCheckout(args: { branch: string; create?: boolean }): Promise<MCPToolResult> {
-    await this.checkout(args.branch, { create: args.create });
+    const branch = parseRequiredString(args.branch, "branch");
+    if (branch.error) {
+      return invalidArgs(branch.error);
+    }
+    const create = parseOptionalBoolean(args.create, "create");
+    if (create.error) {
+      return invalidArgs(create.error);
+    }
+
+    await this.checkout(branch.value, { create: create.value });
 
     return {
       success: true,
@@ -530,7 +578,11 @@ export class GitToolServer implements MCPToolServer, IGitOperations {
   }
 
   private async handleSemanticDiff(args: { staged?: boolean }): Promise<MCPToolResult> {
-    const analysis = await this.semanticDiff(args);
+    const staged = parseOptionalBoolean(args.staged, "staged");
+    if (staged.error) {
+      return invalidArgs(staged.error);
+    }
+    const analysis = await this.semanticDiff({ staged: staged.value });
 
     const lines: string[] = [
       "## Summary",
@@ -611,7 +663,16 @@ export class GitToolServer implements MCPToolServer, IGitOperations {
     file: string;
     strategy: ConflictStrategy;
   }): Promise<MCPToolResult> {
-    await this.resolveConflict(args.file, args.strategy);
+    const file = parseRequiredString(args.file, "file");
+    if (file.error) {
+      return invalidArgs(file.error);
+    }
+    const strategy = parseConflictStrategy(args.strategy);
+    if (strategy.error) {
+      return invalidArgs(strategy.error);
+    }
+
+    await this.resolveConflict(file.value, strategy.value);
 
     return {
       success: true,
@@ -887,4 +948,98 @@ export function createGitToolServer(
   executor?: IGitExecutor
 ): GitToolServer {
   return new GitToolServer(config, executor);
+}
+
+function invalidArgs(message: string): MCPToolResult {
+  return {
+    success: false,
+    content: [{ type: "text", text: message }],
+    error: { code: "INVALID_ARGUMENTS", message },
+  };
+}
+
+function parseRequiredString(value: unknown, label: string): { value: string; error?: string } {
+  if (typeof value !== "string") {
+    return { value: "", error: `${label} is required` };
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return { value: "", error: `${label} is required` };
+  }
+  return { value: trimmed };
+}
+
+function parseOptionalString(value: unknown, label: string): { value?: string; error?: string } {
+  if (value === undefined) {
+    return {};
+  }
+  if (typeof value !== "string") {
+    return { error: `${label} must be a string` };
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return { error: `${label} cannot be empty` };
+  }
+  return { value: trimmed };
+}
+
+function parseOptionalBoolean(value: unknown, label: string): { value?: boolean; error?: string } {
+  if (value === undefined) {
+    return {};
+  }
+  if (typeof value !== "boolean") {
+    return { error: `${label} must be a boolean` };
+  }
+  return { value };
+}
+
+function parseOptionalNumber(
+  value: unknown,
+  label: string,
+  options: { min?: number; max?: number; integer?: boolean } = {}
+): { value?: number; error?: string } {
+  if (value === undefined) {
+    return {};
+  }
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return { error: `${label} must be a number` };
+  }
+  const normalized = options.integer ? Math.floor(value) : value;
+  if (options.min !== undefined && normalized < options.min) {
+    return { error: `${label} must be >= ${options.min}` };
+  }
+  if (options.max !== undefined && normalized > options.max) {
+    return { error: `${label} must be <= ${options.max}` };
+  }
+  return { value: normalized };
+}
+
+function parseFilesArg(value: unknown): { value: string[]; error?: string } {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return { value: [], error: "files is required" };
+    }
+    return { value: [trimmed] };
+  }
+
+  if (Array.isArray(value)) {
+    const files = value
+      .filter((entry) => typeof entry === "string")
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+    if (files.length === 0) {
+      return { value: [], error: "files is required" };
+    }
+    return { value: files };
+  }
+
+  return { value: [], error: "files is required" };
+}
+
+function parseConflictStrategy(value: unknown): { value: ConflictStrategy; error?: string } {
+  if (value === "ours" || value === "theirs" || value === "merge") {
+    return { value };
+  }
+  return { value: "merge", error: "strategy must be one of ours, theirs, merge" };
 }
