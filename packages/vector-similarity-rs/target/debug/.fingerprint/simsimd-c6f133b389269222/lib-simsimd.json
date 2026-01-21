@@ -1,0 +1,20 @@
+{
+  "rustc": 2629586073275287932,
+  "features": "[\"default\"]",
+  "declared_features": "[\"default\", \"std\"]",
+  "target": 9535926644921574307,
+  "profile": 5347358027863023418,
+  "path": 10965004322360629266,
+  "deps": [[13092602187584952772, "build_script_build", false, 11205390474946346135]],
+  "local": [
+    {
+      "CheckDepInfo": {
+        "dep_info": "debug/.fingerprint/simsimd-c6f133b389269222/dep-lib-simsimd",
+        "checksum": false
+      }
+    }
+  ],
+  "rustflags": [],
+  "config": 2069994364910194474,
+  "compile_kind": 0
+}
