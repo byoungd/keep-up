@@ -4,6 +4,8 @@
  * Provides caching mechanisms for tool results and LLM responses.
  */
 
+import { fastJsonStringify } from "./json";
+
 // ============================================================================
 // Cache Types
 // ============================================================================
@@ -558,11 +560,11 @@ export class LRUCache<T> implements ICacheStrategy<string, T> {
     }
 
     if (typeof value === "object") {
-      try {
-        return JSON.stringify(value).length * 2;
-      } catch {
-        return 1024; // Default estimate for non-serializable objects
+      const serialized = fastJsonStringify(value);
+      if (typeof serialized === "string") {
+        return serialized.length * 2;
       }
+      return 1024; // Default estimate for non-serializable objects
     }
 
     return 64;
@@ -1037,11 +1039,11 @@ export class ToolResultCache {
       return value.reduce((acc, item) => acc + this.estimateSize(item), 64);
     }
     if (typeof value === "object") {
-      try {
-        return JSON.stringify(value).length * 2;
-      } catch {
-        return 1024;
+      const serialized = fastJsonStringify(value);
+      if (typeof serialized === "string") {
+        return serialized.length * 2;
       }
+      return 1024;
     }
     return 64;
   }

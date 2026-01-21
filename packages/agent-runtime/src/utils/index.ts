@@ -48,6 +48,8 @@ export {
   parsePromptTemplate,
   stringifyWithFrontmatter,
 } from "./frontmatter";
+// JSON acceleration helpers
+export { fastJsonParse, fastJsonStringify, stableJsonStringify } from "./json";
 // Lazy initialization
 export {
   type AsyncLazy,
