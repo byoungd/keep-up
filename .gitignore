@@ -224,6 +224,9 @@ packages/gitignore-rs/Cargo.lock
 packages/json-accel-rs/native/target/
 packages/json-accel-rs/native/Cargo.lock
 
+packages/anchor-relocation-rs/target/
+packages/anchor-relocation-rs/Cargo.lock
+
 packages/json-accel-rs/*.js
 packages/json-accel-rs/*.d.ts
 packages/json-accel-rs/*.node
