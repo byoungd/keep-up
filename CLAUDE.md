@@ -3,9 +3,9 @@
 ## Project Overview
 
 **Name**: Keep-Up
-**Stack**: TypeScript, React 19, pnpm monorepo, Turbo, Vite (Cowork)
+**Stack**: TypeScript, React 19, pnpm monorepo, Turbo, Vite (Cowork), Rust (native accelerators)
 **Core**: LFCC (Local-First Collaboration Contract) editor with Loro CRDT
-**Namespace**: `@ku0/*`
+**Namespace**: `@ku0/*` (TS), `ku0-*` (Rust crates)
 
 ## Quick Commands
 
@@ -17,13 +17,18 @@
 | `pnpm lint` | Run biome + turbo lint |
 | `pnpm typecheck` | TypeScript type check |
 | `pnpm biome check --write` | Format & auto-fix |
+| `cargo build --release` | Build Rust crates |
+| `cargo test` | Run Rust tests |
+| `cargo clippy` | Rust linting |
 
 ## Code Standards (Critical)
 
 - **TypeScript only** - No `.js` files
+- **Rust for performance** - OS-level isolation, tokenization, storage engine
 - **No `any`** - Use `unknown` or proper types
 - **No `var`** - Use `const` (default) or `let`
 - **Biome** - Run `biome check --write` before commits
+- **Clippy** - Run `cargo clippy` for Rust code
 - **React buttons** - Always add `type="button"`
 - **Array keys** - Use unique IDs, never indices
 - **Loops** - Use `for...of`, not `forEach`
@@ -64,6 +69,12 @@ packages/
 ├── bench/               # Performance benchmarks
 └── compat/              # Compatibility tests (IME, mobile)
 
+crates/                  # Rust native accelerators (Phase 6)
+├── sandbox-rs/          # OS-level sandbox (Seatbelt/Landlock/AppContainer)
+├── storage-engine-rs/   # Event log + checkpoint engine
+├── tokenizer-rs/        # tiktoken + Zstd compression
+└── symbol-index-rs/     # Inverted/trigram symbol index
+
 docs/                    # Product specs & documentation
 ```
 
@@ -74,6 +85,7 @@ docs/                    # Product specs & documentation
 - [.agent/](./.agent/) - Agent specs, quality gates, workflows
 - [docs/product/](./docs/product/) - Product specs & LFCC protocol
 - [docs/architecture/UI_CONTRACT.md](./docs/architecture/UI_CONTRACT.md) - UI ↔ LFCC Bridge contract
+- [docs/roadmap/phase-6-rust-native/](./docs/roadmap/phase-6-rust-native/) - Rust native integration roadmap
 
 ## LFCC Rules (Non-Negotiable)
 
