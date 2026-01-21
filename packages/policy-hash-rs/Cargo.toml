@@ -1,0 +1,19 @@
+[package]
+name = "policy-hash-rs"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Rust policy hashing helpers for LFCC core."
+publish = false
+build = "build.rs"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+napi = { version = "3.5.1", features = ["napi8"] }
+napi-derive = "3.5.1"
+sha2 = "0.10"
+
+[build-dependencies]
+napi-build = "2.1.3"
