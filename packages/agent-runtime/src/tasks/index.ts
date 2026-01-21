@@ -16,6 +16,7 @@ export type {
   TaskGraphEdge,
   TaskGraphEvent,
   TaskGraphEventContext,
+  TaskGraphEventLog,
   TaskGraphEventMeta,
   TaskGraphEventType,
   TaskGraphNode,
@@ -33,6 +34,7 @@ export {
   NodeNotFoundError,
   TaskGraphStore,
 } from "./taskGraph";
+export { NativeTaskGraphEventLog } from "./taskGraphEventLog";
 // Task Queue
 export { createTaskQueue, TaskQueue } from "./taskQueue";
 // Types
