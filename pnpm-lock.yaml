@@ -223,6 +223,15 @@ importers:
       '@ku0/db':
         specifier: workspace:*
         version: link:../db
+      '@ku0/json-accel-rs':
+        specifier: workspace:*
+        version: link:../json-accel-rs
+      '@ku0/sandbox-rs':
+        specifier: workspace:*
+        version: link:../sandbox-rs
+      '@ku0/symbol-index-rs':
+        specifier: workspace:*
+        version: link:../symbol-index-rs
       '@ku0/tokenizer-rs':
         specifier: workspace:*
         version: link:../tokenizer-rs
@@ -301,6 +310,9 @@ importers:
       '@ku0/ai-core':
         specifier: workspace:*
         version: link:../ai-core
+      '@ku0/vector-similarity-rs':
+        specifier: workspace:*
+        version: link:../vector-similarity-rs
       mem0ai:
         specifier: ^2.2.1
         version: 2.2.1(@anthropic-ai/sdk@0.40.1(encoding@0.1.13))(@azure/identity@4.13.0)(@azure/search-documents@12.2.0)(@cloudflare/workers-types@4.20260117.0)(@google/genai@1.37.0(@modelcontextprotocol/sdk@1.25.2(@cfworker/json-schema@4.1.1)(hono@4.11.4)(zod@3.25.76)))(@langchain/core@0.3.80(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.19.0)(zod@3.25.76)))(@mistralai/mistralai@1.11.0)(@qdrant/js-client-rest@1.13.0(typescript@5.9.3))(@supabase/supabase-js@2.90.1)(@types/jest@29.5.14)(@types/pg@8.11.0)(@types/sqlite3@3.1.11)(cloudflare@4.5.0(encoding@0.1.13))(encoding@0.1.13)(groq-sdk@0.3.0(encoding@0.1.13))(neo4j-driver@5.28.2)(ollama@0.5.18)(pg@8.11.3)(redis@4.7.1)(sqlite3@5.1.7)(ws@8.19.0)
@@ -394,6 +406,9 @@ importers:
       '@ku0/db':
         specifier: workspace:*
         version: link:../db
+      '@ku0/diff-rs':
+        specifier: workspace:*
+        version: link:../diff-rs
       '@modelcontextprotocol/sdk':
         specifier: ^1.25.2
         version: 1.25.2(@cfworker/json-schema@4.1.1)(hono@4.11.4)(zod@4.3.5)
@@ -496,6 +511,22 @@ importers:
         specifier: ^4.7.0
         version: 4.21.0
 
+  packages/canonicalizer-rs:
+    dependencies:
+      '@ku0/native-bindings':
+        specifier: workspace:*
+        version: link:../native-bindings
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.19.3
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
   packages/cli:
     dependencies:
       '@ku0/agent-runtime':
@@ -558,6 +589,9 @@ importers:
       '@ku0/token':
         specifier: workspace:*
         version: link:../token
+      '@ku0/vector-similarity-rs':
+        specifier: workspace:*
+        version: link:../vector-similarity-rs
     devDependencies:
       '@types/node':
         specifier: ^22.10.2
@@ -571,10 +605,16 @@ importers:
 
   packages/core:
     dependencies:
+      '@ku0/canonicalizer-rs':
+        specifier: workspace:*
+        version: link:../canonicalizer-rs
       zod:
         specifier: ^4.3.5
         version: 4.3.5
     devDependencies:
+      '@ku0/native-bindings':
+        specifier: workspace:*
+        version: link:../native-bindings
       fast-check:
         specifier: ^4.5.3
         version: 4.5.3
@@ -614,6 +654,31 @@ importers:
       tailwindcss:
         specifier: ^4.1.18
         version: 4.1.18
+
+  packages/diff-rs:
+    dependencies:
+      diff:
+        specifier: ^8.0.3
+        version: 8.0.3
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.19.3
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
+  packages/gitignore-rs:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.19.3
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
 
   packages/ingest-youtube:
     dependencies:
@@ -681,6 +746,21 @@ importers:
         specifier: ^20.0.0
         version: 20.19.27
 
+  packages/json-accel-rs:
+    devDependencies:
+      '@napi-rs/cli':
+        specifier: ^2.18.4
+        version: 2.18.4
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.19.3
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.0.0
+        version: 4.0.16(@opentelemetry/api@1.9.0)(@types/node@22.19.3)(jiti@2.6.1)(jsdom@26.1.0)(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2)
+
   packages/lfcc-bridge:
     dependencies:
       '@ku0/core':
@@ -702,6 +782,15 @@ importers:
         specifier: ^1.41.4
         version: 1.41.4
 
+  packages/native-bindings:
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.27
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
   packages/overlay:
     dependencies:
       '@ku0/app':
@@ -722,6 +811,19 @@ importers:
       vitest:
         specifier: ^4.0.0
         version: 4.0.16(@opentelemetry/api@1.9.0)(@types/node@22.19.3)(jiti@2.6.1)(jsdom@26.1.0)(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2)
+
+  packages/sandbox-rs:
+    dependencies:
+      '@ku0/agent-runtime-core':
+        specifier: workspace:*
+        version: link:../agent-runtime-core
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.19.3
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
 
   packages/shared:
     dependencies:
@@ -830,6 +932,18 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
+  packages/symbol-index-rs:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.19.3
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
   packages/token: {}
 
   packages/tokenizer-rs:
@@ -903,6 +1017,18 @@ importers:
       vitest:
         specifier: ^4.0.0
         version: 4.0.16(@opentelemetry/api@1.9.0)(@types/node@22.19.3)(jiti@2.6.1)(jsdom@26.1.0)(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2)
+
+  packages/vector-similarity-rs:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.19.3
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
 
   packages/vscode-extension:
     dependencies:

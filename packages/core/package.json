@@ -40,12 +40,14 @@
     "lint:fix": "biome check --write ."
   },
   "devDependencies": {
+    "@ku0/native-bindings": "workspace:*",
     "fast-check": "^4.5.3"
   },
   "publishConfig": {
     "access": "public"
   },
   "dependencies": {
+    "@ku0/canonicalizer-rs": "workspace:*",
     "zod": "^4.3.5"
   }
 }
