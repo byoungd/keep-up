@@ -142,6 +142,8 @@ packages/tokenizer-rs/native/*.node
 !packages/mdvp-wasm/pkg/package.json
 packages/symbol-index-rs/target/
 packages/symbol-index-rs/Cargo.lock
+packages/diff-rs/target/
+packages/diff-rs/Cargo.lock
 
 implementation_plan.md
 walkthrough.md
