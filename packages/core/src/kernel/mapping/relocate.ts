@@ -1,3 +1,7 @@
+import {
+  getNativeAnchorRelocation,
+  type NativeAnchorRelocationBinding,
+} from "@ku0/anchor-relocation-rs";
 import { type Anchor, createAnchor } from "./anchors.js";
 import type { BlockMapping } from "./types.js";
 
@@ -248,11 +252,12 @@ function findByContextHash(
 ): FuzzyMatchResult | null {
   // Slide a window through the block text and compute hashes
   const windowSize = config.contextWindowSize;
+  const native = getNativeAnchorRelocation();
 
   for (let offset = 0; offset <= blockText.length; offset++) {
     const prefix = blockText.slice(Math.max(0, offset - windowSize), offset);
     const suffix = blockText.slice(offset, offset + windowSize);
-    const hash = computeFuzzyContextHash(prefix, suffix);
+    const hash = computeFuzzyContextHashWithNative(prefix, suffix, native);
 
     if (hash === contextHash) {
       return {
@@ -280,15 +285,16 @@ function findByTextSimilarity(
   const windowSize = config.contextWindowSize;
   let bestOffset = -1;
   let bestSimilarity = 0;
+  const native = getNativeAnchorRelocation();
 
   // Slide window and compute similarity
   for (let offset = 0; offset <= blockText.length; offset++) {
     const prefix = blockText.slice(Math.max(0, offset - windowSize), offset);
     const suffix = blockText.slice(offset, offset + windowSize);
-    const currentHash = computeFuzzyContextHash(prefix, suffix);
+    const currentHash = computeFuzzyContextHashWithNative(prefix, suffix, native);
 
     // Compute n-gram similarity between hashes
-    const similarity = computeNgramSimilarity(contextHash, currentHash);
+    const similarity = computeNgramSimilarityWithNative(contextHash, currentHash, 3, native);
 
     if (similarity > bestSimilarity) {
       bestSimilarity = similarity;
@@ -316,6 +322,21 @@ function findByTextSimilarity(
  * Uses a simple but effective hash for context matching.
  */
 export function computeFuzzyContextHash(prefix: string, suffix: string): string {
+  return computeFuzzyContextHashWithNative(prefix, suffix, getNativeAnchorRelocation());
+}
+
+function computeFuzzyContextHashWithNative(
+  prefix: string,
+  suffix: string,
+  native: NativeAnchorRelocationBinding | null
+): string {
+  if (native) {
+    try {
+      return native.computeFuzzyContextHash(prefix, suffix);
+    } catch {
+      // Fall back to JS hash if native binding fails.
+    }
+  }
   const normalized = `${normalizeText(prefix)}|${normalizeText(suffix)}`;
   return fnv1aHash(normalized);
 }
@@ -360,7 +381,23 @@ function fnv1aHash(str: string): string {
 /**
  * Compute n-gram similarity between two strings (Jaccard index).
  */
-function computeNgramSimilarity(a: string, b: string, n = 3): number {
+function computeNgramSimilarityWithNative(
+  a: string,
+  b: string,
+  n: number,
+  native: NativeAnchorRelocationBinding | null
+): number {
+  if (native) {
+    try {
+      return native.computeNgramSimilarity(a, b, n);
+    } catch {
+      // Fall back to JS similarity if native binding fails.
+    }
+  }
+  return computeNgramSimilarityFallback(a, b, n);
+}
+
+function computeNgramSimilarityFallback(a: string, b: string, n: number): number {
   if (a === b) {
     return 1.0;
   }

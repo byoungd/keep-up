@@ -5,7 +5,7 @@
  * Bridges the AI Gateway with the CRDT document model.
  */
 
-import { gateway } from "@ku0/core";
+import { computeTextSimilarity, gateway } from "@ku0/core";
 import { readAllAnnotations } from "../annotations/annotationSchema";
 import { verifyAnnotationSpans } from "../annotations/verificationSync";
 import type { BlockNode } from "../crdt/crdtSchema";
@@ -395,6 +395,40 @@ function buildSelectionSpanState(
   };
 }
 
+function shouldSkipFuzzyCandidate(text: string, candidate: string, threshold: number): boolean {
+  const maxLen = Math.max(text.length, candidate.length);
+  if (maxLen === 0) {
+    return false;
+  }
+  const lengthDiff = Math.abs(text.length - candidate.length);
+  return lengthDiff / maxLen > 1 - threshold;
+}
+
+function findBestFuzzySpan(
+  spanStates: Map<string, SpanState>,
+  text: string,
+  threshold: number
+): SpanState | null {
+  let bestMatch: SpanState | null = null;
+  let bestScore = threshold;
+
+  for (const [, state] of spanStates) {
+    if (!state.text) {
+      continue;
+    }
+    if (shouldSkipFuzzyCandidate(text, state.text, threshold)) {
+      continue;
+    }
+    const score = computeTextSimilarity(text, state.text);
+    if (score >= threshold && (bestMatch === null || score > bestScore)) {
+      bestMatch = state;
+      bestScore = score;
+    }
+  }
+
+  return bestMatch;
+}
+
 // ============================================================================
 // Gateway Document Provider
 // ============================================================================
@@ -510,6 +544,15 @@ export function createLoroGatewayRetryProviders(
           }
         }
         return null;
+      },
+      findByFuzzyText(docId: string, text: string, threshold: number) {
+        if (docId !== facade.docId) {
+          return null;
+        }
+
+        const blockTextMap = buildBlockTextMap(facade.getBlocks());
+        const spanStates = buildSpanStateIndex(blockTextMap, runtime);
+        return findBestFuzzySpan(spanStates, text, threshold);
       },
     },
   };

@@ -6,6 +6,10 @@
  * integrity-check based relocation fails.
  */
 
+import {
+  getNativeAnchorRelocation,
+  type BlockInput as NativeBlockInput,
+} from "@ku0/anchor-relocation-rs";
 import { type Anchor, createAnchor } from "./anchors.js";
 import { relocateAnchor } from "./relocate.js";
 import type { BlockMapping } from "./types.js";
@@ -55,6 +59,14 @@ export type DocumentContentAccessor = {
  * Returns 1.0 for identical strings, 0.0 for completely different.
  */
 export function computeTextSimilarity(a: string, b: string): number {
+  const native = getNativeAnchorRelocation();
+  if (native) {
+    try {
+      return native.computeTextSimilarity(a, b);
+    } catch {
+      // Fall back to JS implementation if native binding fails.
+    }
+  }
   if (a === b) {
     return 1.0;
   }
@@ -109,6 +121,14 @@ export function findSubstringMatches(
   haystack: string,
   _ngramSize = 3
 ): Array<{ start: number; end: number; score: number }> {
+  const native = getNativeAnchorRelocation();
+  if (native) {
+    try {
+      return native.findSubstringMatches(needle, haystack);
+    } catch {
+      // Fall back to JS implementation if native binding fails.
+    }
+  }
   if (needle.length < 3 || haystack.length < 3) {
     return [];
   }
@@ -174,6 +194,11 @@ type FuzzyCandidate = {
   content: string;
   score: number;
   method: "text" | "semantic";
+};
+
+type BlockScanInput = {
+  blockId: string;
+  content: string;
 };
 
 /**
@@ -262,6 +287,57 @@ function searchBlockForMatches(
   return candidates;
 }
 
+function scanBlocksForMatches(
+  blocks: BlockScanInput[],
+  originalContent: string,
+  threshold: number
+): FuzzyCandidate[] {
+  const native = getNativeAnchorRelocation();
+  if (native) {
+    const nativeInputs: NativeBlockInput[] = [];
+    const blockContentById = new Map<string, string>();
+    for (const block of blocks) {
+      nativeInputs.push({ block_id: block.blockId, content: block.content });
+      blockContentById.set(block.blockId, block.content);
+    }
+
+    try {
+      const matches = native.findBlockMatches(originalContent, nativeInputs, threshold);
+      const candidates: FuzzyCandidate[] = [];
+      for (const match of matches) {
+        const blockContent = blockContentById.get(match.block_id);
+        if (!blockContent) {
+          continue;
+        }
+        const end = Math.min(match.end, blockContent.length);
+        const start = Math.min(match.start, end);
+        candidates.push({
+          blockId: match.block_id,
+          offset: start,
+          content: blockContent.slice(start, end),
+          score: match.score,
+          method: "text",
+        });
+      }
+      return candidates;
+    } catch {
+      // Fall back to JS scanning if native binding fails.
+    }
+  }
+
+  const candidates: FuzzyCandidate[] = [];
+  for (const block of blocks) {
+    const blockCandidates = searchBlockForMatches(
+      block.blockId,
+      block.content,
+      originalContent,
+      threshold
+    );
+    candidates.push(...blockCandidates);
+  }
+  return candidates;
+}
+
 /**
  * Perform Level 3 fuzzy anchor relocation.
  *
@@ -292,22 +368,16 @@ export function fuzzyRelocateAnchor(
 
   // 2. Level 3: Fuzzy text matching
   const searchBlocks = getSearchBlocks(anchor, mapping, document, searchRadius);
-  const candidates: FuzzyCandidate[] = [];
-
+  const blocksToScan: BlockScanInput[] = [];
   for (const blockId of searchBlocks) {
     const blockContent = document.getBlockContent(blockId);
     if (!blockContent) {
       continue;
     }
-
-    const blockCandidates = searchBlockForMatches(
-      blockId,
-      blockContent,
-      options.originalContent,
-      threshold
-    );
-    candidates.push(...blockCandidates);
+    blocksToScan.push({ blockId, content: blockContent });
   }
+
+  const candidates = scanBlocksForMatches(blocksToScan, options.originalContent, threshold);
 
   // 3. Sort candidates by score and take best
   candidates.sort((a, b) => b.score - a.score);

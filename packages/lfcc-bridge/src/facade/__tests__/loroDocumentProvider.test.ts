@@ -127,6 +127,27 @@ describe("LoroDocumentProvider", () => {
     expect(relocated?.block_id).toBe(blockId);
   });
 
+  it("supports fuzzy text relocation for retry providers", () => {
+    const annotationId = "anno-fuzzy";
+    createAnnotation(runtime.doc, {
+      id: annotationId,
+      spanList: [{ blockId, start: 0, end: 5 }],
+      chain: {
+        policy: { kind: "required_order", maxInterveningBlocks: 0 },
+        order: [blockId],
+      },
+      content: "note",
+      storedState: "active",
+    });
+    runtime.commit("test:relocate-fuzzy");
+
+    const { relocationProvider } = createLoroGatewayRetryProviders(facade, runtime);
+    const relocated = relocationProvider.findByFuzzyText(facade.docId, "Hella", 0.7);
+
+    expect(relocated?.block_id).toBe(blockId);
+    expect(relocated?.text).toBe("Hello");
+  });
+
   it("compares frontiers correctly", () => {
     const provider = createLoroDocumentProvider(facade, runtime);
     expect(provider.compareFrontiers("p1:1", "p1:1")).toBe("equal");
