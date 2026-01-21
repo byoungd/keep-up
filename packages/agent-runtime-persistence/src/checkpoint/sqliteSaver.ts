@@ -19,34 +19,38 @@ export interface SQLiteCheckpointSaverConfig {
 
 const DEFAULT_COMPRESSION_THRESHOLD = 64 * 1024;
 
+type PreparedStatement = ReturnType<DatabaseInstance["prepare"]>;
+
+type PreparedStatements = {
+  saveThread: PreparedStatement;
+  getThread: PreparedStatement;
+  ensureThread: PreparedStatement;
+  updateThreadStats: PreparedStatement;
+  countThreadCheckpoints: PreparedStatement;
+  upsertCheckpoint: PreparedStatement;
+  getCheckpoint: PreparedStatement;
+  getCheckpointId: PreparedStatement;
+  getThreadForCheckpoint: PreparedStatement;
+  getLatestCheckpoint: PreparedStatement;
+  deleteCheckpoint: PreparedStatement;
+  deleteThreadCheckpoints: PreparedStatement;
+  deleteThread: PreparedStatement;
+};
+
 export class SQLiteCheckpointSaver implements CheckpointSaver, CheckpointThreadStore {
   private readonly db: DatabaseInstance;
   private readonly compressionThreshold: number;
+  private readonly statements: PreparedStatements;
 
   constructor(config: SQLiteCheckpointSaverConfig) {
     this.db = config.database ?? this.createDatabase(config.databasePath);
     this.compressionThreshold = config.compressionThresholdBytes ?? DEFAULT_COMPRESSION_THRESHOLD;
     this.initSchema();
+    this.statements = this.prepareStatements();
   }
 
   async saveThread(thread: CheckpointThread): Promise<void> {
-    const statement = this.db.prepare(`
-      INSERT INTO checkpoint_threads (
-        thread_id,
-        parent_thread_id,
-        name,
-        created_at,
-        updated_at,
-        checkpoint_count
-      ) VALUES (?, ?, ?, ?, ?, ?)
-      ON CONFLICT(thread_id) DO UPDATE SET
-        parent_thread_id = excluded.parent_thread_id,
-        name = excluded.name,
-        updated_at = excluded.updated_at,
-        checkpoint_count = excluded.checkpoint_count
-    `);
-
-    statement.run(
+    this.statements.saveThread.run(
       thread.threadId,
       thread.parentThreadId ?? null,
       thread.metadata.name ?? null,
@@ -57,9 +61,7 @@ export class SQLiteCheckpointSaver implements CheckpointSaver, CheckpointThreadS
   }
 
   async getThread(threadId: string): Promise<CheckpointThread | undefined> {
-    const row = this.db
-      .prepare("SELECT * FROM checkpoint_threads WHERE thread_id = ?")
-      .get(threadId) as ThreadRow | undefined;
+    const row = this.statements.getThread.get(threadId) as ThreadRow | undefined;
 
     return row ? mapThread(row) : undefined;
   }
@@ -86,33 +88,11 @@ export class SQLiteCheckpointSaver implements CheckpointSaver, CheckpointThreadS
       sizeBytes: encoded.sizeBytes,
     };
 
-    const existing = this.db
-      .prepare("SELECT checkpoint_id FROM checkpoints WHERE checkpoint_id = ?")
-      .get(checkpoint.id) as { checkpoint_id: string } | undefined;
+    const existing = this.statements.getCheckpointId.get(checkpoint.id) as
+      | { checkpoint_id: string }
+      | undefined;
 
-    const statement = this.db.prepare(`
-      INSERT INTO checkpoints (
-        checkpoint_id,
-        thread_id,
-        parent_id,
-        timestamp,
-        state,
-        state_encoding,
-        metadata,
-        size_bytes,
-        compressed
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(checkpoint_id) DO UPDATE SET
-        parent_id = excluded.parent_id,
-        timestamp = excluded.timestamp,
-        state = excluded.state,
-        state_encoding = excluded.state_encoding,
-        metadata = excluded.metadata,
-        size_bytes = excluded.size_bytes,
-        compressed = excluded.compressed
-    `);
-
-    statement.run(
+    this.statements.upsertCheckpoint.run(
       checkpoint.id,
       checkpoint.threadId,
       checkpoint.parentId ?? null,
@@ -130,17 +110,13 @@ export class SQLiteCheckpointSaver implements CheckpointSaver, CheckpointThreadS
   }
 
   async get(checkpointId: string): Promise<Checkpoint | undefined> {
-    const row = this.db
-      .prepare("SELECT * FROM checkpoints WHERE checkpoint_id = ?")
-      .get(checkpointId) as CheckpointRow | undefined;
+    const row = this.statements.getCheckpoint.get(checkpointId) as CheckpointRow | undefined;
 
     return row ? mapCheckpoint(row) : undefined;
   }
 
   async getLatest(threadId: string): Promise<Checkpoint | undefined> {
-    const row = this.db
-      .prepare("SELECT * FROM checkpoints WHERE thread_id = ? ORDER BY timestamp DESC LIMIT 1")
-      .get(threadId) as CheckpointRow | undefined;
+    const row = this.statements.getLatestCheckpoint.get(threadId) as CheckpointRow | undefined;
 
     return row ? mapCheckpoint(row) : undefined;
   }
@@ -176,11 +152,11 @@ export class SQLiteCheckpointSaver implements CheckpointSaver, CheckpointThreadS
   }
 
   async delete(checkpointId: string): Promise<void> {
-    const row = this.db
-      .prepare("SELECT thread_id FROM checkpoints WHERE checkpoint_id = ?")
-      .get(checkpointId) as { thread_id: string } | undefined;
+    const row = this.statements.getThreadForCheckpoint.get(checkpointId) as
+      | { thread_id: string }
+      | undefined;
 
-    this.db.prepare("DELETE FROM checkpoints WHERE checkpoint_id = ?").run(checkpointId);
+    this.statements.deleteCheckpoint.run(checkpointId);
 
     if (row?.thread_id) {
       this.refreshThreadStats(row.thread_id);
@@ -188,8 +164,8 @@ export class SQLiteCheckpointSaver implements CheckpointSaver, CheckpointThreadS
   }
 
   async deleteThread(threadId: string): Promise<void> {
-    this.db.prepare("DELETE FROM checkpoints WHERE thread_id = ?").run(threadId);
-    this.db.prepare("DELETE FROM checkpoint_threads WHERE thread_id = ?").run(threadId);
+    this.statements.deleteThreadCheckpoints.run(threadId);
+    this.statements.deleteThread.run(threadId);
   }
 
   close(): void {
@@ -234,29 +210,83 @@ export class SQLiteCheckpointSaver implements CheckpointSaver, CheckpointThreadS
     this.db.exec("CREATE INDEX IF NOT EXISTS idx_checkpoints_time ON checkpoints(timestamp)");
   }
 
-  private ensureThread(threadId: string, timestamp: number): void {
-    this.db
-      .prepare(
+  private prepareStatements(): PreparedStatements {
+    return {
+      saveThread: this.db.prepare(`
+        INSERT INTO checkpoint_threads (
+          thread_id,
+          parent_thread_id,
+          name,
+          created_at,
+          updated_at,
+          checkpoint_count
+        ) VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(thread_id) DO UPDATE SET
+          parent_thread_id = excluded.parent_thread_id,
+          name = excluded.name,
+          updated_at = excluded.updated_at,
+          checkpoint_count = excluded.checkpoint_count
+      `),
+      getThread: this.db.prepare("SELECT * FROM checkpoint_threads WHERE thread_id = ?"),
+      ensureThread: this.db.prepare(
         `INSERT OR IGNORE INTO checkpoint_threads (
           thread_id,
           created_at,
           updated_at,
           checkpoint_count
         ) VALUES (?, ?, ?, 0)`
-      )
-      .run(threadId, timestamp, timestamp);
+      ),
+      updateThreadStats: this.db.prepare(
+        "UPDATE checkpoint_threads SET checkpoint_count = ?, updated_at = ? WHERE thread_id = ?"
+      ),
+      countThreadCheckpoints: this.db.prepare(
+        "SELECT COUNT(*) as count FROM checkpoints WHERE thread_id = ?"
+      ),
+      upsertCheckpoint: this.db.prepare(`
+        INSERT INTO checkpoints (
+          checkpoint_id,
+          thread_id,
+          parent_id,
+          timestamp,
+          state,
+          state_encoding,
+          metadata,
+          size_bytes,
+          compressed
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(checkpoint_id) DO UPDATE SET
+          parent_id = excluded.parent_id,
+          timestamp = excluded.timestamp,
+          state = excluded.state,
+          state_encoding = excluded.state_encoding,
+          metadata = excluded.metadata,
+          size_bytes = excluded.size_bytes,
+          compressed = excluded.compressed
+      `),
+      getCheckpoint: this.db.prepare("SELECT * FROM checkpoints WHERE checkpoint_id = ?"),
+      getCheckpointId: this.db.prepare(
+        "SELECT checkpoint_id FROM checkpoints WHERE checkpoint_id = ?"
+      ),
+      getThreadForCheckpoint: this.db.prepare(
+        "SELECT thread_id FROM checkpoints WHERE checkpoint_id = ?"
+      ),
+      getLatestCheckpoint: this.db.prepare(
+        "SELECT * FROM checkpoints WHERE thread_id = ? ORDER BY timestamp DESC LIMIT 1"
+      ),
+      deleteCheckpoint: this.db.prepare("DELETE FROM checkpoints WHERE checkpoint_id = ?"),
+      deleteThreadCheckpoints: this.db.prepare("DELETE FROM checkpoints WHERE thread_id = ?"),
+      deleteThread: this.db.prepare("DELETE FROM checkpoint_threads WHERE thread_id = ?"),
+    };
+  }
+
+  private ensureThread(threadId: string, timestamp: number): void {
+    this.statements.ensureThread.run(threadId, timestamp, timestamp);
   }
 
   private refreshThreadStats(threadId: string): void {
-    const count = this.db
-      .prepare("SELECT COUNT(*) as count FROM checkpoints WHERE thread_id = ?")
-      .get(threadId) as { count: number };
+    const count = this.statements.countThreadCheckpoints.get(threadId) as { count: number };
 
-    this.db
-      .prepare(
-        "UPDATE checkpoint_threads SET checkpoint_count = ?, updated_at = ? WHERE thread_id = ?"
-      )
-      .run(count.count, Date.now(), threadId);
+    this.statements.updateThreadStats.run(count.count, Date.now(), threadId);
   }
 }
 
