@@ -35,6 +35,7 @@ All tracks must support macOS, Linux, and Windows with explicit fallbacks:
 | AE | Storage Engine | P1 | Ready (blocked by AD) | [track-ae-storage-engine.md](./track-ae-storage-engine.md) |
 | AF | Tokenizer and Compression | P1 | Ready | [track-af-tokenizer-compression.md](./track-af-tokenizer-compression.md) |
 | AG | LSP Indexer | P2 | Planning | [track-ag-lsp-indexer.md](./track-ag-lsp-indexer.md) |
+| AH | Diff Engine | P1 | Ready | [track-ah-diff-engine.md](./track-ah-diff-engine.md) |
 
 ---
 
