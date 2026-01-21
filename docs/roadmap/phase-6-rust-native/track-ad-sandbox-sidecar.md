@@ -32,7 +32,7 @@ Migrate sandbox execution from Docker containers to a Rust sidecar for OS-level 
 
 ### D2: OS-Level Isolation
 - macOS: Seatbelt (`sandbox-exec`)
-- Linux: Landlock + seccomp
+- Linux: Landlock + seccomp + Namespaces (`unshare` user/mount/pid)
 - Windows: AppContainer (future)
 
 ### D3: Path Security
@@ -57,15 +57,25 @@ Migrate sandbox execution from Docker containers to a Rust sidecar for OS-level 
                        │ Unix socket / N-API
                        ▼
 ┌────────────────────────────────────────────────────────┐
+                       │ Unix socket / N-API
+                       ▼
+┌────────────────────────────────────────────────────────┐
 │  codex-sandbox (Rust Daemon)                           │
 │  ┌─────────────┬─────────────┬─────────────┐          │
 │  │ seatbelt.rs │ landlock.rs │ exec.rs     │          │
 │  └─────────────┴─────────────┴─────────────┘          │
-│  - Path normalization (realpath)                       │
+│  - Path normalization (realpath + chroot jail)         │
 │  - Permission convergence (deny-by-default)            │
+│  - Grant Policy Sync (from TS GrantManager)            │
 │  - Audit logging                                       │
 └────────────────────────────────────────────────────────┘
 ```
+
+### Policy Synchronization
+- **GrantManager (TS)**: Manages higher-level user approvals and confirmation UI.
+- **Enforcement (Rust)**: Receives current grant snapshots from TS.
+  - Rust side **MUST NOT** trigger UI confirmations directly.
+  - If an action violates Rust-side policy but is "confirmable", return `NeedsConfirmation` code to TS.
 
 ---
 

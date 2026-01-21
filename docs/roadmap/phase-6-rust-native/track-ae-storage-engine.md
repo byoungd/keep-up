@@ -24,7 +24,7 @@ Replace the TypeScript checkpoint and event log storage with a Rust storage engi
 ## Deliverables
 
 ### D1: Rust Storage Library
-- Append-only event log with mmap
+- Append-only event log with mmap (TaskGraph backing store)
 - Delta compression (Zstd)
 - Fast checkpoint serialization
 
@@ -64,8 +64,14 @@ pub trait StorageEngine {
 │  - mmap for fast reads                                 │
 │  - WAL for durability                                  │
 │  - Compaction for space efficiency                     │
+│  - TaskGraph Event Stream Support                      │
 └────────────────────────────────────────────────────────┘
 ```
+
+### Integration with TaskGraph
+Current `TaskGraph` (Track H) writes heavily to `messagePackCheckpointStorage`. The Rust engine will become the backing store for:
+1. **Event Append**: Fast, non-blocking writes for every tool execution.
+2. **State Rehydration**: Rebuilding `TaskGraph` in-memory state from Rust event stream on startup.
 
 ---
 

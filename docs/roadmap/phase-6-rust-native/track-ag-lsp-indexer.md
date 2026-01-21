@@ -53,14 +53,18 @@ Replace the O(N) full-scan symbol search with a Rust-based inverted/trigram inde
 ┌────────────────────────────────────────────────────────┐
 │  Rust Symbol Indexer                                   │
 │  ┌─────────────┬─────────────┬─────────────┐          │
-│  │ Inverted    │ Trigram     │ FST         │          │
-│  │ Index       │ Index       │ (optional)  │          │
+│  │ Inverted    │ Trigram     │ Tree-sitter │          │
+│  │ Index       │ Index       │ Parser(opt) │          │
 │  └─────────────┴─────────────┴─────────────┘          │
 │  - RoaringBitmap for positions                         │
 │  - Arena allocator for symbols                         │
 │  - mmap for persistence                                │
 └────────────────────────────────────────────────────────┘
 ```
+
+### Data Ingestion Strategy
+1. **LSP Push**: Continue using TS-side LSP clients to push symbol data to Rust index (easiest integration).
+2. **Direct Parsing (Future)**: Use Rust-native `tree-sitter` parsers for faster, parallel file indexing without waiting for full LSP server warmup.
 
 ---
 
