@@ -92,6 +92,11 @@ function extractScopes(meta?: Record<string, unknown>): string[] | undefined {
     return undefined;
   }
 
+  const normalizeScopes = (scopes: string[]): string[] | undefined => {
+    const normalized = scopes.map((scope) => scope.trim()).filter(Boolean);
+    return normalized.length > 0 ? normalized : undefined;
+  };
+
   const candidates: unknown[] = [
     meta.requiredScopes,
     meta.scopes,
@@ -100,7 +105,16 @@ function extractScopes(meta?: Record<string, unknown>): string[] | undefined {
 
   for (const candidate of candidates) {
     if (Array.isArray(candidate) && candidate.every((item) => typeof item === "string")) {
-      return candidate as string[];
+      const normalized = normalizeScopes(candidate as string[]);
+      if (normalized) {
+        return normalized;
+      }
+    }
+    if (typeof candidate === "string") {
+      const normalized = normalizeScopes(candidate.split(/\s+/));
+      if (normalized) {
+        return normalized;
+      }
     }
   }
 
@@ -201,17 +215,18 @@ export function toSdkTool(tool: MCPTool): SdkTool {
 
 export function fromSdkTool(tool: SdkTool, scopeConfig?: ToolScopeConfig): MCPTool {
   const meta = isRecord(tool._meta) ? { ...(tool._meta as Record<string, unknown>) } : undefined;
-  const annotations = applyScopeOverrides(
+  let annotations = applyScopeOverrides(
     fromSdkAnnotations(tool.annotations, meta),
     scopeConfig,
     tool.name
   );
 
-  if (annotations && !annotations.requiredScopes) {
-    const scopes = extractScopes(meta);
-    if (scopes) {
-      annotations.requiredScopes = scopes;
-    }
+  const scopes = extractScopes(meta);
+  if (scopes && (!annotations || !annotations.requiredScopes)) {
+    annotations = {
+      ...(annotations ?? {}),
+      requiredScopes: scopes,
+    };
   }
 
   return {

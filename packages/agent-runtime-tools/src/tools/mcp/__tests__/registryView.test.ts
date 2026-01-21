@@ -63,6 +63,40 @@ describe("ToolRegistryView", () => {
     expect(registry.hasTool("extra:tool")).toBe(false);
   });
 
+  it("matches unqualified allowlist entries against qualified tools", async () => {
+    const registry = createToolRegistry();
+    await registry.register(createTestServer("test", ["allowed"]));
+
+    const view = createToolRegistryView(registry, { allowedTools: ["allowed"] });
+
+    const toolNames = view.listTools().map((tool) => tool.name);
+    expect(toolNames).toEqual(["test:allowed"]);
+    expect(view.hasTool("test:allowed")).toBe(true);
+
+    const allowed = await view.callTool({ name: "test:allowed", arguments: {} }, context);
+    expect(allowed.success).toBe(true);
+  });
+
+  it("does not allow prefix-only wildcard matches", async () => {
+    const registry = createToolRegistry();
+    await registry.register(createTestServer("file", ["read"]));
+    await registry.register(createTestServer("file2", ["read"]));
+
+    const view = createToolRegistryView(registry, { allowedTools: ["file:*"] });
+
+    const toolNames = view.listTools().map((tool) => tool.name);
+    expect(toolNames).toEqual(["file:read"]);
+    expect(view.hasTool("file:read")).toBe(true);
+    expect(view.hasTool("file2:read")).toBe(false);
+
+    const allowed = await view.callTool({ name: "file:read", arguments: {} }, context);
+    expect(allowed.success).toBe(true);
+
+    const blocked = await view.callTool({ name: "file2:read", arguments: {} }, context);
+    expect(blocked.success).toBe(false);
+    expect(blocked.error?.code).toBe("PERMISSION_DENIED");
+  });
+
   it("allows unqualified tools when resolved to an allowed server", async () => {
     const registry = createToolRegistry({ enforceQualifiedNames: false });
     await registry.register(createTestServer("file", ["read"]));
