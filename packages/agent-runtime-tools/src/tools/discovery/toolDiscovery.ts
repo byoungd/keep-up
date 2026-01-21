@@ -18,7 +18,7 @@ export interface ToolSearchCriteria {
   /** Query string for semantic search */
   query?: string;
   /** Tool category filter */
-  category?: "core" | "knowledge" | "external";
+  category?: "core" | "knowledge" | "external" | "communication" | "control";
   /** Required capabilities */
   capabilities?: string[];
   /** Maximum results to return */
@@ -74,6 +74,7 @@ export class ToolDiscoveryEngine {
    * Register a tool server for discovery.
    */
   registerServer(server: MCPToolServer): void {
+    this.removeServerTools(server.name);
     this.servers.set(server.name, server);
 
     // Index tools from this server
@@ -88,10 +89,18 @@ export class ToolDiscoveryEngine {
    */
   search(criteria: ToolSearchCriteria): ToolSearchResult[] {
     const results: ToolSearchResult[] = [];
-    const limit = criteria.limit ?? 10;
+    const limit = normalizeLimit(criteria.limit);
+    if (limit === 0) {
+      return [];
+    }
+    const normalizedCriteria: ToolSearchCriteria = {
+      ...criteria,
+      query: normalizeQuery(criteria.query),
+      capabilities: normalizeCapabilities(criteria.capabilities),
+    };
 
     for (const [toolName, metadata] of this.metadata.entries()) {
-      const score = this.calculateRelevance(metadata, criteria);
+      const score = this.calculateRelevance(metadata, normalizedCriteria);
 
       if (score > 0.3) {
         // Minimum relevance threshold
@@ -103,7 +112,7 @@ export class ToolDiscoveryEngine {
             tool,
             server,
             score,
-            matchReason: this.explainMatch(metadata, criteria),
+            matchReason: this.explainMatch(metadata, normalizedCriteria),
           });
         }
       }
@@ -117,13 +126,18 @@ export class ToolDiscoveryEngine {
    * Get tool by name (loads if not cached).
    */
   getTool(name: string): MCPTool | undefined {
+    const toolKey = this.resolveToolKey(name);
+    if (!toolKey) {
+      return undefined;
+    }
+
     // Check cache first
-    if (this.toolCache.has(name)) {
-      return this.toolCache.get(name);
+    if (this.toolCache.has(toolKey)) {
+      return this.toolCache.get(toolKey);
     }
 
     // Load from server
-    const metadata = this.metadata.get(name);
+    const metadata = this.metadata.get(toolKey);
     if (!metadata) {
       return undefined;
     }
@@ -134,11 +148,11 @@ export class ToolDiscoveryEngine {
     }
 
     const tools = server.listTools();
-    const tool = tools.find((t) => t.name === name);
+    const tool = tools.find((t) => createToolKey(server.name, t.name) === toolKey);
 
     if (tool) {
-      this.toolCache.set(name, tool);
-      this.loadedTools.add(name);
+      this.toolCache.set(toolKey, tool);
+      this.loadedTools.add(toolKey);
     }
 
     return tool;
@@ -166,7 +180,9 @@ export class ToolDiscoveryEngine {
   /**
    * Get tools by category.
    */
-  getByCategory(category: "core" | "knowledge" | "external"): MCPTool[] {
+  getByCategory(
+    category: "core" | "knowledge" | "external" | "communication" | "control"
+  ): MCPTool[] {
     const results: MCPTool[] = [];
 
     for (const [name, metadata] of this.metadata.entries()) {
@@ -212,8 +228,9 @@ export class ToolDiscoveryEngine {
   private indexTool(tool: MCPTool, server: MCPToolServer): void {
     const keywords = this.extractKeywords(tool);
     const categories = this.extractCategories(tool);
+    const toolKey = createToolKey(server.name, tool.name);
 
-    this.metadata.set(tool.name, {
+    this.metadata.set(toolKey, {
       name: tool.name,
       serverName: server.name,
       categories,
@@ -248,6 +265,14 @@ export class ToolDiscoveryEngine {
       }
     }
 
+    // Capability match
+    if (criteria.capabilities && criteria.capabilities.length > 0) {
+      const matches = matchCapabilities(metadata.keywords, criteria.capabilities);
+      if (matches.length > 0) {
+        score += 0.4 + Math.min(matches.length - 1, 2) * 0.1;
+      }
+    }
+
     return Math.min(score, 1.0);
   }
 
@@ -272,6 +297,13 @@ export class ToolDiscoveryEngine {
       reasons.push(`category: ${criteria.category}`);
     }
 
+    if (criteria.capabilities && criteria.capabilities.length > 0) {
+      const matches = matchCapabilities(metadata.keywords, criteria.capabilities);
+      if (matches.length > 0) {
+        reasons.push(`capabilities: ${matches.join(", ")}`);
+      }
+    }
+
     return reasons.join("; ") || "general match";
   }
 
@@ -282,17 +314,18 @@ export class ToolDiscoveryEngine {
     const keywords = new Set<string>();
 
     // From name
-    keywords.add(tool.name);
-    for (const part of tool.name.split(/[_-]/)) {
-      keywords.add(part);
+    addKeyword(keywords, tool.name);
+    for (const part of tool.name.split(/[_:-]/)) {
+      addKeyword(keywords, part);
     }
 
     // From description
-    const words = tool.description.toLowerCase().split(/\s+/);
+    const description = tool.description ?? "";
+    const words = description.toLowerCase().split(/\s+/);
     for (const word of words) {
       if (word.length > 3) {
         // Skip short words
-        keywords.add(word.replace(/[^a-z0-9]/g, ""));
+        addKeyword(keywords, word.replace(/[^a-z0-9]/g, ""));
       }
     }
 
@@ -311,6 +344,31 @@ export class ToolDiscoveryEngine {
 
     return categories;
   }
+
+  private resolveToolKey(name: string): string | undefined {
+    if (this.metadata.has(name)) {
+      return name;
+    }
+    if (!name.includes(":")) {
+      const matches = Array.from(this.metadata.entries()).filter(
+        ([, metadata]) => metadata.name === name
+      );
+      if (matches.length === 1) {
+        return matches[0][0];
+      }
+    }
+    return undefined;
+  }
+
+  private removeServerTools(serverName: string): void {
+    for (const [key, metadata] of this.metadata.entries()) {
+      if (metadata.serverName === serverName) {
+        this.metadata.delete(key);
+        this.toolCache.delete(key);
+        this.loadedTools.delete(key);
+      }
+    }
+  }
 }
 
 /**
@@ -318,4 +376,55 @@ export class ToolDiscoveryEngine {
  */
 export function createToolDiscoveryEngine(): ToolDiscoveryEngine {
   return new ToolDiscoveryEngine();
+}
+
+function createToolKey(serverName: string, toolName: string): string {
+  return toolName.includes(":") ? toolName : `${serverName}:${toolName}`;
+}
+
+function normalizeQuery(value: string | undefined): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function normalizeCapabilities(values: string[] | undefined): string[] | undefined {
+  if (!values || values.length === 0) {
+    return undefined;
+  }
+  const normalized = values.map((value) => value.trim()).filter(Boolean);
+  return normalized.length > 0 ? normalized : undefined;
+}
+
+function normalizeLimit(limit: number | undefined): number {
+  if (limit === undefined) {
+    return 10;
+  }
+  if (!Number.isFinite(limit)) {
+    return 10;
+  }
+  const rounded = Math.floor(limit);
+  return Math.max(rounded, 0);
+}
+
+function matchCapabilities(keywords: string[], capabilities: string[]): string[] {
+  const keywordSet = new Set(keywords.map((keyword) => keyword.toLowerCase()));
+  const matches: string[] = [];
+  for (const capability of capabilities) {
+    const normalized = capability.trim().toLowerCase();
+    if (normalized && keywordSet.has(normalized)) {
+      matches.push(capability);
+    }
+  }
+  return matches;
+}
+
+function addKeyword(bucket: Set<string>, value: string): void {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return;
+  }
+  bucket.add(trimmed);
 }
