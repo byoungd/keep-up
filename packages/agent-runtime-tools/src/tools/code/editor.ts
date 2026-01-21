@@ -372,14 +372,15 @@ async function editFileInternal(
     newContent += "\n";
   }
 
-  const diff = createTwoFilesPatch(
-    absolutePath,
-    absolutePath,
-    ctx.content,
-    newContent,
-    "original",
-    "modified"
-  );
+  const diff =
+    createTwoFilesPatch(
+      absolutePath,
+      absolutePath,
+      ctx.content,
+      newContent,
+      "original",
+      "modified"
+    ) || "";
   if (options.dryRun) {
     return { success: true, diff, newTotalLines: newLines.length };
   }
@@ -451,14 +452,15 @@ export async function insertAfterLine(
   if (afterLine === lines.length) {
     // Appending at end
     const newContent = `${fileContent}\n${content}`;
-    const diff = createTwoFilesPatch(
-      absolutePath,
-      absolutePath,
-      fileContent,
-      newContent,
-      "original",
-      "modified"
-    );
+    const diff =
+      createTwoFilesPatch(
+        absolutePath,
+        absolutePath,
+        fileContent,
+        newContent,
+        "original",
+        "modified"
+      ) || "";
 
     if (!options.dryRun) {
       await fs.writeFile(absolutePath, newContent, "utf-8");

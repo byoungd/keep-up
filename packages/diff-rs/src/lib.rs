@@ -200,3 +200,172 @@ fn strip_trailing_newline(value: &str) -> (&str, bool) {
         (value, false)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_diff_lines_basic() {
+        let old = "hello\nworld\n";
+        let new = "hello\nplanet\n";
+        let hunks = diff_lines(old.to_string(), new.to_string());
+
+        assert_eq!(hunks.len(), 1);
+        let hunk = &hunks[0];
+        assert_eq!(hunk.old_start, 1);
+        assert_eq!(hunk.new_start, 1);
+
+        let remove_lines: Vec<_> = hunk.lines.iter().filter(|l| l.line_type == "remove").collect();
+        let add_lines: Vec<_> = hunk.lines.iter().filter(|l| l.line_type == "add").collect();
+        assert_eq!(remove_lines.len(), 1);
+        assert_eq!(add_lines.len(), 1);
+        assert_eq!(remove_lines[0].content, "world");
+        assert_eq!(add_lines[0].content, "planet");
+    }
+
+    #[test]
+    fn test_diff_lines_identical() {
+        let text = "same\ncontent\n";
+        let hunks = diff_lines(text.to_string(), text.to_string());
+        assert!(hunks.is_empty());
+    }
+
+    #[test]
+    fn test_diff_lines_empty() {
+        let hunks = diff_lines("".to_string(), "".to_string());
+        assert!(hunks.is_empty());
+    }
+
+    #[test]
+    fn test_diff_unified_basic() {
+        let old = "line1\nline2\nline3\n";
+        let new = "line1\nmodified\nline3\n";
+        let result = diff_unified(old.to_string(), new.to_string(), 3);
+
+        assert!(result.contains("---"));
+        assert!(result.contains("+++"));
+        assert!(result.contains("@@"));
+        assert!(result.contains("-line2"));
+        assert!(result.contains("+modified"));
+    }
+
+    #[test]
+    fn test_create_two_files_patch_with_headers() {
+        let old = "a\n";
+        let new = "b\n";
+        let result = create_two_files_patch(
+            "old.txt".to_string(),
+            "new.txt".to_string(),
+            old.to_string(),
+            new.to_string(),
+            Some("2024-01-01".to_string()),
+            Some("2024-01-02".to_string()),
+            Some(3),
+        );
+
+        assert!(result.contains("--- old.txt\t2024-01-01"));
+        assert!(result.contains("+++ new.txt\t2024-01-02"));
+        assert!(result.contains("-a"));
+        assert!(result.contains("+b"));
+    }
+
+    #[test]
+    fn test_create_two_files_patch_same_filename() {
+        let old = "x\n";
+        let new = "y\n";
+        let result = create_two_files_patch(
+            "file.txt".to_string(),
+            "file.txt".to_string(),
+            old.to_string(),
+            new.to_string(),
+            None,
+            None,
+            None,
+        );
+
+        assert!(result.contains("Index: file.txt"));
+    }
+
+    #[test]
+    fn test_apply_patch_success() {
+        let original = "line1\nline2\nline3\n";
+        let patch = "--- a\n+++ b\n@@ -1,3 +1,3 @@\n line1\n-line2\n+modified\n line3\n";
+
+        let result = apply_patch(original.to_string(), patch.to_string());
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "line1\nmodified\nline3\n");
+    }
+
+    #[test]
+    fn test_apply_patch_invalid() {
+        // diffy parses malformed patches as empty patches, so apply succeeds with no changes
+        let result = apply_patch("content".to_string(), "not a valid patch".to_string());
+        // The result is Ok with unchanged content since the patch has no hunks
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "content");
+    }
+
+    #[test]
+    fn test_reverse_patch() {
+        let patch = "--- a\n+++ b\n@@ -1,2 +1,2 @@\n-old\n+new\n context\n";
+        let reversed = reverse_patch(patch.to_string());
+
+        assert!(reversed.contains("+old") || reversed.contains("+ old"));
+        assert!(reversed.contains("-new") || reversed.contains("- new"));
+    }
+
+    #[test]
+    fn test_reverse_patch_invalid() {
+        // diffy parses malformed input as empty patch, which reverses to empty string
+        let invalid = "not a patch";
+        let result = reverse_patch(invalid.to_string());
+        // Empty patch reverses to empty string representation
+        assert!(result.is_empty() || result == invalid);
+    }
+
+    #[test]
+    fn test_strip_trailing_newline() {
+        assert_eq!(strip_trailing_newline("hello\n"), ("hello", true));
+        assert_eq!(strip_trailing_newline("world"), ("world", false));
+        assert_eq!(strip_trailing_newline(""), ("", false));
+    }
+
+    #[test]
+    fn test_trim_trailing_newline() {
+        assert_eq!(trim_trailing_newline("hello\n"), "hello");
+        assert_eq!(trim_trailing_newline("world"), "world");
+    }
+
+    #[test]
+    fn test_format_header() {
+        assert_eq!(format_header("---", "file.txt", None), "--- file.txt");
+        assert_eq!(
+            format_header("+++", "file.txt", Some("2024-01-01")),
+            "+++ file.txt\t2024-01-01"
+        );
+    }
+
+    #[test]
+    fn test_diff_lines_multiline_changes() {
+        let old = "a\nb\nc\nd\ne\n";
+        let new = "a\nx\ny\nd\ne\n";
+        let hunks = diff_lines(old.to_string(), new.to_string());
+
+        assert!(!hunks.is_empty());
+        let hunk = &hunks[0];
+
+        let removes: Vec<_> = hunk.lines.iter().filter(|l| l.line_type == "remove").collect();
+        let adds: Vec<_> = hunk.lines.iter().filter(|l| l.line_type == "add").collect();
+        assert_eq!(removes.len(), 2);
+        assert_eq!(adds.len(), 2);
+    }
+
+    #[test]
+    fn test_diff_no_newline_at_eof() {
+        let old = "line";
+        let new = "line\n";
+        let result = diff_unified(old.to_string(), new.to_string(), 3);
+        assert!(result.contains("\\ No newline at end of file"));
+    }
+}

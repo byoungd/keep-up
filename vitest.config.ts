@@ -101,6 +101,10 @@ const aliases = [
     replacement: path.resolve(__dirname, "packages/sandbox-rs/src/index.ts"),
   },
   {
+    find: "@ku0/diff-rs",
+    replacement: path.resolve(__dirname, "packages/diff-rs/src/index.ts"),
+  },
+  {
     find: "@ku0/agent-runtime-memory",
     replacement: path.resolve(__dirname, "packages/agent-runtime-memory/src/index.ts"),
   },
@@ -253,6 +257,7 @@ export default defineConfig({
             "packages/agent-runtime-core/src/**/*.test.ts",
             "packages/agent-runtime-vision/src/**/*.test.ts",
             "packages/tokenizer-rs/src/**/*.test.ts",
+            "packages/diff-rs/src/**/*.test.ts",
           ],
           exclude: defaultExclude,
           server: {

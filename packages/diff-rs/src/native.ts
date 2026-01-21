@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { DiffHunk } from "./types";
+import type { DiffHunk } from "./types.js";
 
 export interface NativeDiffBinding {
   diffLines(oldText: string, newText: string): DiffHunk[];

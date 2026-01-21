@@ -7,10 +7,10 @@ import {
   reversePatch as reverseStructuredPatch,
   structuredPatch,
 } from "diff";
-import { loadNativeBinding } from "./native";
-import type { DiffHunk, DiffLine } from "./types";
+import { loadNativeBinding } from "./native.js";
+import type { DiffHunk, DiffLine } from "./types.js";
 
-export type { DiffHunk, DiffLine, DiffLineType } from "./types";
+export type { DiffHunk, DiffLine, DiffLineType } from "./types.js";
 
 const DEFAULT_CONTEXT = 4;
 
