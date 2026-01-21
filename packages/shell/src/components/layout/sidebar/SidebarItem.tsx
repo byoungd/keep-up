@@ -36,13 +36,13 @@ export const SidebarItem = React.memo(function SidebarItem({
       href={href}
       aria-current={isActive ? "page" : undefined}
       className={cn(
-        "sidebar-item group relative flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors duration-fast cursor-pointer",
+        "sidebar-item group relative flex items-center gap-2.5 px-3 py-2 min-h-10 rounded-md text-chrome font-medium transition-colors duration-fast ease-out cursor-pointer",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         isActive
-          ? "bg-foreground/[0.08] text-foreground font-medium"
+          ? "bg-surface-2 text-foreground before:content-[''] before:absolute before:left-0 before:top-2 before:bottom-2 before:w-0.5 before:rounded-full before:bg-primary"
           : isContextSelected
-            ? "text-foreground/80 bg-foreground/[0.03]"
-            : "text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+            ? "text-foreground/80 bg-surface-2/40"
+            : "text-muted-foreground hover:bg-surface-2/60 hover:text-foreground"
       )}
       data-value={href}
     >

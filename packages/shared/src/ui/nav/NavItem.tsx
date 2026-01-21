@@ -20,9 +20,9 @@ export interface NavItemProps {
 }
 
 const DENSITY_STYLES = {
-  compact: "py-1 px-2 text-xs gap-2",
-  default: "py-1.5 px-3 text-sm gap-2.5",
-  comfortable: "py-2 px-3 text-sm gap-3",
+  compact: "min-h-8 py-1 px-2 text-[11px] gap-2",
+  default: "min-h-10 py-2 px-3 text-chrome gap-2.5",
+  comfortable: "min-h-11 py-2.5 px-3 text-chrome gap-3",
 } as const;
 
 export function NavItem({
@@ -38,11 +38,11 @@ export function NavItem({
 }: NavItemProps) {
   const ariaCurrent = isActive ? "page" : undefined;
   const baseClassName = cn(
-    "group flex items-center rounded-md font-medium transition-colors",
+    "group relative flex items-center rounded-md font-medium transition-colors duration-fast ease-out",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
     isActive
-      ? "bg-primary/10 text-primary"
-      : "text-muted-foreground hover:bg-surface-2 hover:text-foreground",
+      ? "bg-surface-2 text-foreground before:content-[''] before:absolute before:left-0 before:top-2 before:bottom-2 before:w-0.5 before:rounded-full before:bg-primary"
+      : "text-muted-foreground hover:bg-surface-2/60 hover:text-foreground",
     DENSITY_STYLES[density],
     className
   );
@@ -63,7 +63,7 @@ export function NavItem({
       ) : null}
       <span className="truncate flex-1">{label}</span>
       {badge !== undefined && badge > 0 ? (
-        <span className="ml-auto text-[10px] h-5 min-w-5 px-1.5 flex items-center justify-center bg-surface-3 text-muted-foreground rounded-full">
+        <span className="ml-auto text-[10px] h-5 min-w-5 px-1.5 flex items-center justify-center bg-surface-3/80 text-muted-foreground rounded-full">
           {badge}
         </span>
       ) : null}

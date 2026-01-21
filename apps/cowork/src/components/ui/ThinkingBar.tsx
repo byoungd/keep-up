@@ -9,13 +9,14 @@ export function ThinkingBar({ ariaLabel = "Thinking", className, ...props }: Thi
   return (
     <output
       aria-label={ariaLabel}
+      aria-live="polite"
       className={cn(
-        "thinking-bar relative block h-1.5 w-full overflow-hidden rounded-full bg-surface-2",
+        "relative block h-2 w-full overflow-hidden rounded-full bg-surface-2",
         className
       )}
       {...props}
     >
-      <div className="thinking-bar__fill absolute inset-0" />
+      <span className="ai-sheen-line pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2" />
     </output>
   );
 }

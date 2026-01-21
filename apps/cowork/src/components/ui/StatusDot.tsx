@@ -19,8 +19,8 @@ const toneClasses: Record<StatusTone, string> = {
 };
 
 const sizeClasses: Record<StatusSize, string> = {
-  sm: "h-2.5 w-2.5",
-  md: "h-3.5 w-3.5",
+  sm: "h-2 w-2",
+  md: "h-3 w-3",
 };
 
 /**
@@ -28,6 +28,7 @@ const sizeClasses: Record<StatusSize, string> = {
  * For accessibility, wrap with a Tooltip if status needs description.
  */
 export function StatusDot({ tone = "success", size = "sm", className, ...props }: StatusDotProps) {
+  const hasLabel = props["aria-label"] || props["aria-labelledby"];
   return (
     <span
       className={cn(
@@ -36,7 +37,8 @@ export function StatusDot({ tone = "success", size = "sm", className, ...props }
         sizeClasses[size],
         className
       )}
-      aria-hidden="true"
+      aria-hidden={hasLabel ? undefined : true}
+      role={hasLabel ? "img" : undefined}
       {...props}
     />
   );
