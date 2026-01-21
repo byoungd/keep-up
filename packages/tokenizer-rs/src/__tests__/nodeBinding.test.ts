@@ -4,8 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const packageRoot = path.resolve(testDir, "..", "..");
-const platformArch = `${process.platform}-${process.arch}`;
-const expectedCandidate = path.join(packageRoot, `index.${platformArch}.node`);
+
+const expectedCandidate = path.join(packageRoot, "tokenizer_rs.node");
 
 let binding: Record<string, unknown> = {};
 let requiredPath = "";
@@ -44,11 +44,11 @@ describe("native binding loader", () => {
     };
 
     binding = {
-      countTokens: vi.fn(() => 3),
-      countTokensBatch: vi.fn(() => [1, 2]),
-      estimateJsonTokens: vi.fn(() => 4),
-      compressContext: vi.fn(() => compressedContext),
-      compressPayloadZstd: vi.fn(() => null),
+      count_tokens: vi.fn(() => 3),
+      count_tokens_batch: vi.fn(() => [1, 2]),
+      estimate_json_tokens: vi.fn(() => 4),
+      compress_context: vi.fn(() => compressedContext),
+      compress_payload_zstd: vi.fn(() => null),
     };
 
     const tokenizer = await loadTokenizer();
