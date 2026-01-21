@@ -226,11 +226,19 @@ function parseToolName(name: string): { server?: string; operation: string } {
 }
 
 function resolveToolCandidates(toolName: string, serverName?: string): string[] {
-  const candidates = [toolName];
-  if (!toolName.includes(":") && serverName) {
-    candidates.push(`${serverName}:${toolName}`);
+  const candidates = new Set<string>();
+  candidates.add(toolName);
+
+  const parsed = parseToolName(toolName);
+  if (parsed.operation && parsed.operation !== toolName) {
+    candidates.add(parsed.operation);
   }
-  return candidates;
+
+  if (!toolName.includes(":") && serverName) {
+    candidates.add(`${serverName}:${toolName}`);
+  }
+
+  return Array.from(candidates);
 }
 
 function matchesToolPattern(toolName: string, pattern: string): boolean {
@@ -246,7 +254,7 @@ function matchesToolPattern(toolName: string, pattern: string): boolean {
   }
   if (trimmed.endsWith(":*")) {
     const prefix = trimmed.slice(0, -2);
-    return toolName.startsWith(prefix);
+    return toolName.startsWith(`${prefix}:`);
   }
   return false;
 }

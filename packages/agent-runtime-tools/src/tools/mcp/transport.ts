@@ -10,7 +10,6 @@ import {
   type SSEClientTransportOptions,
 } from "@modelcontextprotocol/sdk/client/sse.js";
 import {
-  getDefaultEnvironment,
   StdioClientTransport,
   type StdioServerParameters,
 } from "@modelcontextprotocol/sdk/client/stdio.js";
@@ -51,6 +50,28 @@ export interface McpTransportInstance {
   serverUrl?: URL;
 }
 
+const HTTP_PROTOCOLS = new Set(["http:", "https:"]);
+
+function parseHttpUrl(value: string, label: string): URL {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    throw new Error(`${label} requires a URL.`);
+  }
+
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    throw new Error(`${label} requires a valid URL.`);
+  }
+
+  if (!HTTP_PROTOCOLS.has(url.protocol)) {
+    throw new Error(`${label} requires an http(s) URL.`);
+  }
+
+  return url;
+}
+
 export function createMcpTransport(
   config: McpTransportConfig,
   authProvider?: OAuthClientProvider
@@ -63,17 +84,14 @@ export function createMcpTransport(
       const transport = new StdioClientTransport({
         command: config.command,
         args: config.args,
-        env: config.env ?? getDefaultEnvironment(),
+        env: config.env,
         stderr: config.stderr,
         cwd: config.cwd,
       });
       return { transport, type: "stdio" };
     }
     case "sse": {
-      if (!config.url) {
-        throw new Error("MCP SSE transport requires a URL.");
-      }
-      const url = new URL(config.url);
+      const url = parseHttpUrl(config.url, "MCP SSE transport");
       const transport = new SSEClientTransport(url, {
         authProvider,
         eventSourceInit: config.eventSourceInit,
@@ -83,10 +101,7 @@ export function createMcpTransport(
       return { transport, type: "sse", serverUrl: url };
     }
     case "streamableHttp": {
-      if (!config.url) {
-        throw new Error("MCP Streamable HTTP transport requires a URL.");
-      }
-      const url = new URL(config.url);
+      const url = parseHttpUrl(config.url, "MCP Streamable HTTP transport");
       const transport = new StreamableHTTPClientTransport(url, {
         authProvider,
         requestInit: config.requestInit,
@@ -107,5 +122,8 @@ export function resolveMcpTransportUrl(config: McpTransportConfig): URL | undefi
   if (config.type === "stdio") {
     return undefined;
   }
-  return new URL(config.url);
+  return parseHttpUrl(
+    config.url,
+    config.type === "sse" ? "MCP SSE transport" : "MCP Streamable HTTP transport"
+  );
 }

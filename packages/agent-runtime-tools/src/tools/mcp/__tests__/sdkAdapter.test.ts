@@ -1,6 +1,6 @@
 import type { Tool as SdkTool } from "@modelcontextprotocol/sdk/types.js";
 import { describe, expect, it } from "vitest";
-import { normalizeSdkTool } from "../sdkAdapter";
+import { fromSdkTool, normalizeSdkTool } from "../sdkAdapter";
 
 describe("mcp sdk adapter normalization", () => {
   it("returns null for invalid tool names", () => {
@@ -25,5 +25,22 @@ describe("mcp sdk adapter normalization", () => {
       properties: {},
       required: [],
     });
+  });
+
+  it("extracts required scopes from metadata when annotations are missing", () => {
+    const tool = {
+      name: "scoped-tool",
+      description: "scope metadata",
+      inputSchema: { type: "object" },
+      _meta: {
+        oauth: {
+          scopes: "read write",
+        },
+      },
+    } as SdkTool;
+
+    const mapped = fromSdkTool(tool);
+
+    expect(mapped.annotations?.requiredScopes).toEqual(["read", "write"]);
   });
 });
