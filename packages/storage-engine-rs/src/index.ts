@@ -6,9 +6,9 @@ export interface NativeStorageEngine {
   saveCheckpoint(id: string, data: Uint8Array): void;
   loadCheckpoint(id: string): Uint8Array | null;
   deleteCheckpoint(id: string): boolean;
-  appendEvent(data: Uint8Array): number;
-  replayEvents(from: number, limit?: number): Uint8Array[];
-  pruneEvents(before: number): number;
+  appendEvent(data: Uint8Array): bigint;
+  replayEvents(from: bigint, limit?: number): Uint8Array[];
+  pruneEvents(before: bigint): bigint;
 }
 
 interface NativeBinding {
@@ -89,15 +89,15 @@ export class StorageEngine {
     return this.engine.deleteCheckpoint(id);
   }
 
-  appendEvent(data: Uint8Array): number {
+  appendEvent(data: Uint8Array): bigint {
     return this.engine.appendEvent(data);
   }
 
-  replayEvents(from: number, limit?: number): Uint8Array[] {
+  replayEvents(from: bigint, limit?: number): Uint8Array[] {
     return this.engine.replayEvents(from, limit);
   }
 
-  pruneEvents(before: number): number {
+  pruneEvents(before: bigint): bigint {
     return this.engine.pruneEvents(before);
   }
 }

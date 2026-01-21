@@ -24,16 +24,18 @@ export class NativeTaskGraphEventLog implements TaskGraphEventLog {
 
   append(event: TaskGraphEvent): number {
     const payload = encode(event);
-    return this.engine.appendEvent(payload);
+    const seq = this.engine.appendEvent(payload);
+    return toSafeNumber(seq, "appendEvent");
   }
 
   replay(fromSequenceId: number, limit?: number): TaskGraphEvent[] {
-    const payloads = this.engine.replayEvents(fromSequenceId, limit);
+    const payloads = this.engine.replayEvents(toBigInt(fromSequenceId, "fromSequenceId"), limit);
     return payloads.map((payload) => decode(payload) as TaskGraphEvent);
   }
 
   prune(beforeSequenceId: number): number {
-    return this.engine.pruneEvents(beforeSequenceId);
+    const removed = this.engine.pruneEvents(toBigInt(beforeSequenceId, "beforeSequenceId"));
+    return toSafeNumber(removed, "pruneEvents");
   }
 }
 
@@ -42,4 +44,23 @@ function createStorageEngine(rootDir: string): NativeStorageEngine {
     throw new Error("Native storage engine binding is not available.");
   }
   return new StorageEngine(rootDir);
+}
+
+const MAX_SAFE_BIGINT = BigInt(Number.MAX_SAFE_INTEGER);
+
+function toBigInt(value: number, label: string): bigint {
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new RangeError(`${label} must be a non-negative safe integer.`);
+  }
+  return BigInt(value);
+}
+
+function toSafeNumber(value: bigint, label: string): number {
+  if (value < 0n) {
+    throw new RangeError(`${label} must be unsigned.`);
+  }
+  if (value > MAX_SAFE_BIGINT) {
+    throw new RangeError(`${label} exceeds Number.MAX_SAFE_INTEGER.`);
+  }
+  return Number(value);
 }

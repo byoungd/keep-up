@@ -1,2 +1,5 @@
 target/
 *.node
+dist/
+tsconfig.tsbuildinfo
+Cargo.lock

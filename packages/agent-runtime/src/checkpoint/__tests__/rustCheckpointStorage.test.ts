@@ -27,20 +27,28 @@ class InMemoryStorageEngine implements NativeStorageEngine {
     return this.checkpoints.delete(id);
   }
 
-  appendEvent(data: Uint8Array): number {
+  appendEvent(data: Uint8Array): bigint {
     this.events.push(new Uint8Array(data));
-    return this.events.length - 1;
+    return BigInt(this.events.length - 1);
   }
 
-  replayEvents(from: number, limit?: number): Uint8Array[] {
-    const end = limit ? from + limit : undefined;
-    return this.events.slice(from, end).map((payload) => new Uint8Array(payload));
+  replayEvents(from: bigint, limit?: number): Uint8Array[] {
+    const start = Number(from);
+    if (!Number.isSafeInteger(start) || start < 0) {
+      throw new RangeError("from must be a non-negative safe integer.");
+    }
+    const end = limit ? start + limit : undefined;
+    return this.events.slice(start, end).map((payload) => new Uint8Array(payload));
   }
 
-  pruneEvents(before: number): number {
-    const removed = Math.min(before, this.events.length);
+  pruneEvents(before: bigint): bigint {
+    const cutoff = Number(before);
+    if (!Number.isSafeInteger(cutoff) || cutoff < 0) {
+      throw new RangeError("before must be a non-negative safe integer.");
+    }
+    const removed = Math.min(cutoff, this.events.length);
     this.events.splice(0, removed);
-    return removed;
+    return BigInt(removed);
   }
 }
 

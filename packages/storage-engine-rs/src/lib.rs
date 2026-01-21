@@ -334,22 +334,32 @@ impl StorageEngineHandle {
   }
 
   #[napi]
-  pub fn append_event(&self, data: Buffer) -> Result<u64> {
-    self.inner.append_event_bytes(data.as_ref()).map_err(to_napi_error)
+  pub fn append_event(&self, data: Buffer) -> Result<BigInt> {
+    let seq = self
+      .inner
+      .append_event_bytes(data.as_ref())
+      .map_err(to_napi_error)?;
+    Ok(big_int_from_u64(seq))
   }
 
   #[napi]
-  pub fn replay_events(&self, from: u64, limit: Option<u32>) -> Result<Vec<Buffer>> {
+  pub fn replay_events(&self, from: BigInt, limit: Option<u32>) -> Result<Vec<Buffer>> {
+    let from_seq = big_int_to_u64(&from, "from")?;
     let events = self
       .inner
-      .replay_event_bytes(from, limit.map(|value| value as usize))
+      .replay_event_bytes(from_seq, limit.map(|value| value as usize))
       .map_err(to_napi_error)?;
     Ok(events.into_iter().map(Buffer::from).collect())
   }
 
   #[napi]
-  pub fn prune_events(&self, before: u64) -> Result<u32> {
-    Ok(self.inner.prune_event_log(before).map_err(to_napi_error)? as u32)
+  pub fn prune_events(&self, before: BigInt) -> Result<BigInt> {
+    let before_seq = big_int_to_u64(&before, "before")?;
+    let removed = self
+      .inner
+      .prune_event_log(before_seq)
+      .map_err(to_napi_error)?;
+    Ok(big_int_from_u64(removed))
   }
 }
 
@@ -471,4 +481,24 @@ fn to_storage_error(error: std::io::Error) -> String {
 
 fn to_napi_error(error: String) -> Error {
   Error::from_reason(error)
+}
+
+fn big_int_to_u64(value: &BigInt, label: &str) -> Result<u64> {
+  let (sign, raw, lossless) = value.get_u64();
+  if sign {
+    return Err(Error::from_reason(format!("{label} must be unsigned")));
+  }
+  if !lossless {
+    return Err(Error::from_reason(format!(
+      "{label} exceeds JavaScript BigInt u64 range"
+    )));
+  }
+  Ok(raw)
+}
+
+fn big_int_from_u64(value: u64) -> BigInt {
+  BigInt {
+    sign_bit: false,
+    words: vec![value],
+  }
 }

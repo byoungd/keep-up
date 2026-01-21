@@ -13,7 +13,8 @@
     }
   },
   "scripts": {
-    "build": "tsc",
+    "build": "pnpm run build:rs && tsc",
+    "build:rs": "cargo build --release",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "lint:fix": "biome check --write ."
