@@ -497,6 +497,22 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
+  packages/anchor-relocation-rs:
+    dependencies:
+      '@ku0/native-bindings':
+        specifier: workspace:*
+        version: link:../native-bindings
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.19.3
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
   packages/app:
     dependencies:
       '@ku0/core':
@@ -623,6 +639,9 @@ importers:
       '@ku0/ai-sanitizer-rs':
         specifier: workspace:*
         version: link:../ai-sanitizer-rs
+      '@ku0/anchor-relocation-rs':
+        specifier: workspace:*
+        version: link:../anchor-relocation-rs
       '@ku0/canonicalizer-rs':
         specifier: workspace:*
         version: link:../canonicalizer-rs

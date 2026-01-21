@@ -1,0 +1,18 @@
+[package]
+name = "anchor-relocation-rs"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Rust text similarity and anchor relocation helpers for LFCC core."
+publish = false
+build = "build.rs"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+napi = { version = "3.5.1", features = ["napi8"] }
+napi-derive = "3.5.1"
+
+[build-dependencies]
+napi-build = "2.1.3"

@@ -1,0 +1,36 @@
+{
+  "name": "@ku0/anchor-relocation-rs",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Rust anchor relocation + text similarity bindings for LFCC core.",
+  "main": "./dist/node.js",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "development": "./src/index.ts",
+      "node": "./dist/node.js",
+      "default": "./src/index.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "*.node"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsx scripts/build-native.ts --release && tsc",
+    "build:debug": "tsx scripts/build-native.ts && tsc",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write ."
+  },
+  "dependencies": {
+    "@ku0/native-bindings": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.3"
+  }
+}
