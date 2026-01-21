@@ -763,6 +763,15 @@ importers:
         specifier: ^1.41.4
         version: 1.41.4
 
+  packages/native-bindings:
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.27
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
   packages/overlay:
     dependencies:
       '@ku0/app':

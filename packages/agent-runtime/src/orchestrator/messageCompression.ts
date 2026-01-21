@@ -720,6 +720,8 @@ export class MessageCompressor {
       summarizedCount: 0,
       compressionRatio: nativeResult.compressionRatio,
       metadata: {
+        timestamp: Date.now(),
+        strategy: this.config.strategy,
         preservedIndices: nativeResult.selectedIndices,
       },
     };
@@ -740,7 +742,7 @@ function toNativeMessages(messages: AgentMessage[]): NativeMessage[] {
       return {
         role: "assistant",
         content: message.content,
-        toolCalls: message.toolCalls,
+        toolCalls: message.toolCalls?.map((tc) => ({ ...tc, id: tc.id ?? "" })),
       };
     }
 
