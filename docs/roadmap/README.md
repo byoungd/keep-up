@@ -52,6 +52,9 @@ cowork initiatives. Use this index to navigate the active tracks and supporting 
 - docs/roadmap/phase-5-expansion/track-ab-visual-intelligence.md
 - docs/roadmap/phase-5-expansion/track-ac-policy-ops.md
 
+## Phase 6: Rust Native Integration (Q1 2027)
+- docs/roadmap/phase-6-rust-native/README.md
+
 ## Parallel Product Tracks (UI & Cowork)
 - docs/roadmap/ui-cowork-cowork/README.md
 - docs/roadmap/ui-cowork-cowork/track-1-foundation.md
