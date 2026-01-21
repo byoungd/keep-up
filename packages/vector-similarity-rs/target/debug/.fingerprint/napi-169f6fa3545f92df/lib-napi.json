@@ -1,0 +1,28 @@
+{
+  "rustc": 2629586073275287932,
+  "features": "[\"default\", \"dyn-symbols\", \"napi1\", \"napi2\", \"napi3\", \"napi4\", \"napi5\", \"napi6\", \"napi7\", \"napi8\"]",
+  "declared_features": "[\"anyhow\", \"async\", \"chrono\", \"chrono_date\", \"compat-mode\", \"default\", \"deferred_trace\", \"dyn-symbols\", \"encoding_rs\", \"error_anyhow\", \"experimental\", \"full\", \"futures-core\", \"indexmap\", \"latin1\", \"napi1\", \"napi10\", \"napi2\", \"napi3\", \"napi4\", \"napi5\", \"napi6\", \"napi7\", \"napi8\", \"napi9\", \"node_version_detect\", \"noop\", \"object_indexmap\", \"serde\", \"serde-json\", \"serde-json-ordered\", \"serde_json\", \"tokio\", \"tokio-stream\", \"tokio_fs\", \"tokio_full\", \"tokio_io_std\", \"tokio_io_util\", \"tokio_macros\", \"tokio_net\", \"tokio_process\", \"tokio_rt\", \"tokio_signal\", \"tokio_sync\", \"tokio_test_util\", \"tokio_time\", \"tracing\", \"web_stream\"]",
+  "target": 6604924358859142166,
+  "profile": 5347358027863023418,
+  "path": 12140486997549100382,
+  "deps": [
+    [1013709957175472082, "napi_sys", false, 10231744414985188096],
+    [2706460456408817945, "futures", false, 14767127513254450048],
+    [3828903661424219164, "build_script_build", false, 1034549385661543773],
+    [5931649091606299019, "nohash_hasher", false, 3853637688282759137],
+    [9001817693037665195, "bitflags", false, 9068111437384512154],
+    [15037967539247944128, "ctor", false, 5294229915319475359],
+    [18335655851112826545, "rustc_hash", false, 8608243572651108113]
+  ],
+  "local": [
+    {
+      "CheckDepInfo": {
+        "dep_info": "debug/.fingerprint/napi-169f6fa3545f92df/dep-lib-napi",
+        "checksum": false
+      }
+    }
+  ],
+  "rustflags": [],
+  "config": 2069994364910194474,
+  "compile_kind": 0
+}

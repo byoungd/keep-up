@@ -112,6 +112,10 @@ const aliases = [
     find: "@ku0/agent-runtime-persistence",
     replacement: path.resolve(__dirname, "packages/agent-runtime-persistence/src/index.ts"),
   },
+  {
+    find: "@ku0/storage-engine-rs",
+    replacement: path.resolve(__dirname, "packages/storage-engine-rs/src/index.ts"),
+  },
   { find: "@ku0/ai-core", replacement: path.resolve(__dirname, "packages/ai-core/src/index.ts") },
   { find: "@ku0/app", replacement: path.resolve(__dirname, "packages/app/src/index.ts") },
   { find: "@ku0/bench", replacement: path.resolve(__dirname, "packages/bench/src/index.ts") },
@@ -258,6 +262,7 @@ export default defineConfig({
             "packages/agent-runtime-vision/src/**/*.test.ts",
             "packages/tokenizer-rs/src/**/*.test.ts",
             "packages/diff-rs/src/**/*.test.ts",
+            "packages/storage-engine-rs/src/**/*.test.ts",
           ],
           exclude: defaultExclude,
           server: {

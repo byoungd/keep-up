@@ -1,0 +1,20 @@
+{
+  "rustc": 2629586073275287932,
+  "features": "[\"default\", \"std\"]",
+  "declared_features": "[\"default\", \"nightly\", \"rand\", \"std\"]",
+  "target": 9398104387793270977,
+  "profile": 5347358027863023418,
+  "path": 11856063308966429743,
+  "deps": [],
+  "local": [
+    {
+      "CheckDepInfo": {
+        "dep_info": "debug/.fingerprint/rustc-hash-3e8cfc6b2c393193/dep-lib-rustc_hash",
+        "checksum": false
+      }
+    }
+  ],
+  "rustflags": [],
+  "config": 2069994364910194474,
+  "compile_kind": 0
+}

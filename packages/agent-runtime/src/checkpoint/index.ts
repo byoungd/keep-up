@@ -34,4 +34,8 @@ export {
   MessagePackCheckpointStorage,
   type MessagePackCheckpointStorageConfig,
 } from "./messagePackCheckpointStorage";
+export {
+  RustCheckpointStorage,
+  type RustCheckpointStorageConfig,
+} from "./rustCheckpointStorage";
 export * from "./shadow";

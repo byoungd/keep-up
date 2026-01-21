@@ -56,4 +56,39 @@ describe("SmartToolScheduler", () => {
     expect(schedule[0]).toHaveLength(1);
     expect(schedule[1]).toHaveLength(1);
   });
+
+  it("serializes moves that share source or destination", () => {
+    const scheduler = new SmartToolScheduler({
+      config: { maxNetworkConcurrent: 2, maxCpuConcurrent: 2, maxDefaultConcurrent: 2 },
+    });
+
+    const calls = [
+      makeCall("file:move", { srcPath: "/tmp/a", destPath: "/tmp/b" }),
+      makeCall("file:move", { from: "/tmp/a", to: "/tmp/c" }),
+    ];
+
+    const schedule = scheduler.schedule(calls);
+    expect(schedule).toHaveLength(2);
+    expect(schedule[0]).toHaveLength(1);
+    expect(schedule[1]).toHaveLength(1);
+  });
+
+  it("reduces concurrency after rate limit failures", () => {
+    const scheduler = new SmartToolScheduler({
+      config: { adaptiveConcurrency: true, targetLatencyMs: 1500 },
+    });
+
+    const calls = [
+      makeCall("web:search", { query: "a" }),
+      makeCall("web:search", { query: "b" }),
+      makeCall("web:search", { query: "c" }),
+    ];
+
+    const baseline = scheduler.recommendConcurrency(calls, 4);
+    scheduler.recordResult("web:search", 1200, { success: false, errorCode: "RATE_LIMITED" });
+    scheduler.recordResult("web:search", 1200, { success: false, errorCode: "RATE_LIMITED" });
+    const reduced = scheduler.recommendConcurrency(calls, 4);
+
+    expect(reduced).toBeLessThan(baseline);
+  });
 });

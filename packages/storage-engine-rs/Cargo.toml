@@ -1,0 +1,20 @@
+[package]
+name = "storage_engine_rs"
+version = "0.1.0"
+edition = "2021"
+build = "build.rs"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+fs2 = "0.4"
+memmap2 = "0.9"
+napi = { version = "2.16.11", features = ["napi8"] }
+napi-derive = "2.16.11"
+tempfile = "3.12"
+unicode-normalization = "0.1"
+zstd = "0.13"
+
+[build-dependencies]
+napi-build = "2.1"

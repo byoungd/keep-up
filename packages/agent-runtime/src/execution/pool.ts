@@ -65,7 +65,10 @@ export class ExecutionPool {
   private readonly logger: RuntimeLogger;
   private sequenceCounter = 0;
   private ticker?: NodeJS.Timeout;
-  private tickInProgress = false;
+  private schedulerRun?: Promise<void>;
+  private schedulerRequested = false;
+  private schedulerNeedsLeaseCheck = false;
+  private schedulerQueued = false;
 
   constructor(config: ExecutionPoolConfig = {}) {
     const resolved = resolveExecutionConfig({ execution: config.execution });
@@ -95,10 +98,12 @@ export class ExecutionPool {
 
   registerWorker(workerId: string, capacity: number): void {
     this.workerRegistry.registerWorker({ workerId, capacity });
+    this.requestSchedule();
   }
 
   setWorkerState(workerId: string, state: ExecutionWorkerState): void {
     this.workerRegistry.setWorkerState(workerId, state);
+    this.requestSchedule();
   }
 
   async heartbeatWorker(workerId: string): Promise<void> {
@@ -163,6 +168,7 @@ export class ExecutionPool {
     await this.persistSnapshot(task as ExecutionTask, sequence);
     this.emitTaskEvent("task:enqueued", { taskId, queueClass, attempt: 0 });
     this.updateQueueDepthMetric();
+    this.requestSchedule();
 
     return { taskId, accepted: true, status: task.status };
   }
@@ -218,6 +224,7 @@ export class ExecutionPool {
       reason,
     });
     this.notifyComplete(task);
+    this.requestSchedule();
     return true;
   }
 
@@ -272,7 +279,7 @@ export class ExecutionPool {
       return;
     }
     this.ticker = setInterval(() => {
-      void this.tick();
+      void this.runScheduler(true);
     }, this.config.schedulerTickMs);
   }
 
@@ -284,15 +291,51 @@ export class ExecutionPool {
   }
 
   async tick(): Promise<void> {
-    if (this.tickInProgress) {
+    await this.runScheduler(true);
+  }
+
+  private requestSchedule(): void {
+    this.schedulerRequested = true;
+
+    if (this.schedulerRun || this.schedulerQueued) {
       return;
     }
-    this.tickInProgress = true;
+
+    this.schedulerQueued = true;
+    setTimeout(() => {
+      this.schedulerQueued = false;
+      void this.runScheduler();
+    }, 0);
+  }
+
+  private runScheduler(includeLeaseCheck: boolean = false): Promise<void> {
+    if (includeLeaseCheck) {
+      this.schedulerNeedsLeaseCheck = true;
+    }
+    this.schedulerRequested = true;
+
+    if (this.schedulerRun) {
+      return this.schedulerRun;
+    }
+
+    this.schedulerRun = this.runSchedulerLoop();
+    return this.schedulerRun;
+  }
+
+  private async runSchedulerLoop(): Promise<void> {
     try {
-      await this.processExpiredLeases();
-      await this.scheduleAssignments();
+      while (this.schedulerRequested || this.schedulerNeedsLeaseCheck) {
+        const includeLeaseCheck = this.schedulerNeedsLeaseCheck;
+        this.schedulerRequested = false;
+        this.schedulerNeedsLeaseCheck = false;
+
+        if (includeLeaseCheck) {
+          await this.processExpiredLeases();
+        }
+        await this.scheduleAssignments();
+      }
     } finally {
-      this.tickInProgress = false;
+      this.schedulerRun = undefined;
     }
   }
 
@@ -356,6 +399,7 @@ export class ExecutionPool {
     }
 
     this.updateQueueDepthMetric();
+    this.requestSchedule();
   }
 
   listWorkers(): ReturnType<WorkerRegistry["listWorkers"]> {
@@ -414,6 +458,7 @@ export class ExecutionPool {
       tool: new Map(),
     };
     const rejections: Array<{ task: ExecutionTask; reason: ExecutionRejectionReason }> = [];
+    const deferred: ExecutionTask[] = [];
 
     const assignments = this.scheduler.schedule({
       queue: this.queue,
@@ -422,12 +467,20 @@ export class ExecutionPool {
       canSchedule: (task) => this.hasQuotaCapacity(task, reservations),
       reserveQuota: (task) => this.reserveQuota(task, reservations),
       rejectTask: (task, reason) => {
+        if (reason === "quota_exceeded") {
+          deferred.push(task);
+          return;
+        }
         rejections.push({ task, reason });
       },
     });
 
     for (const rejection of rejections) {
       await this.rejectTask(rejection.task, rejection.reason);
+    }
+
+    for (const task of deferred) {
+      this.deferTask(task);
     }
 
     if (assignments.length === 0) {
@@ -540,6 +593,7 @@ export class ExecutionPool {
     this.abortControllers.delete(task.id);
     await this.persistSnapshot(task);
     this.notifyComplete(task);
+    this.requestSchedule();
   }
 
   private resolveLeaseStatus(task: ExecutionTask): "completed" | "failed" | "canceled" {
@@ -559,6 +613,21 @@ export class ExecutionPool {
     await this.persistSnapshot(task);
     this.emitTaskEvent("task:rejected", { taskId: task.id, reason });
     this.notifyComplete(task);
+  }
+
+  private deferTask(task: ExecutionTask): void {
+    if (task.status !== "queued") {
+      return;
+    }
+    if (this.queue.has(task.id)) {
+      return;
+    }
+    this.queue.enqueue({
+      taskId: task.id,
+      queueClass: task.queueClass,
+      sequence: this.nextSequence(),
+      enqueuedAt: task.queuedAt ?? this.now(),
+    });
   }
 
   private evaluateBackpressure(queueClass: ExecutionQueueClass): ExecutionRejectionReason | null {
