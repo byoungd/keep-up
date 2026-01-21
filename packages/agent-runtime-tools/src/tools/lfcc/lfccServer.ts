@@ -2317,7 +2317,7 @@ export class LFCCToolServer extends BaseToolServer {
     if (docId.error) {
       return invalidArgs(docId.error);
     }
-    const doc = await this.bridge.getDocument(docId);
+    const doc = await this.bridge.getDocument(docId.value);
 
     if (!doc) {
       return errorResult("RESOURCE_NOT_FOUND", `Document not found: ${docId}`);
@@ -2342,12 +2342,12 @@ export class LFCCToolServer extends BaseToolServer {
     }
     const dataAccessPolicy = context.security.dataAccessPolicy;
     if (dataAccessPolicy) {
-      const blocks = await this.bridge.getBlocks(docId);
+      const blocks = await this.bridge.getBlocks(docId.value);
       const { content } = applyDataAccessPolicyToBlocks(blocks, dataAccessPolicy);
       return textResult(content || "(empty document)");
     }
 
-    const content = await this.bridge.getContent(docId);
+    const content = await this.bridge.getContent(docId.value);
     return textResult(content || "(empty document)");
   }
 
@@ -2363,7 +2363,7 @@ export class LFCCToolServer extends BaseToolServer {
     if (docId.error) {
       return invalidArgs(docId.error);
     }
-    const blocks = await this.bridge.getBlocks(docId);
+    const blocks = await this.bridge.getBlocks(docId.value);
     const dataAccessPolicy = context.security.dataAccessPolicy;
     const filteredBlocks = dataAccessPolicy
       ? applyDataAccessPolicyToBlocks(blocks, dataAccessPolicy).blocks
@@ -2408,7 +2408,7 @@ export class LFCCToolServer extends BaseToolServer {
     }
 
     const op = await this.bridge.insertBlock(
-      docId,
+      docId.value,
       afterBlockId.value,
       content.value,
       type.value ?? "paragraph"
@@ -2450,7 +2450,7 @@ export class LFCCToolServer extends BaseToolServer {
       return invalidArgs(content.error);
     }
 
-    await this.bridge.updateBlock(docId, blockId, content.value);
+    await this.bridge.updateBlock(docId.value, blockId.value, content.value);
 
     context.audit?.log({
       timestamp: Date.now(),
@@ -2484,7 +2484,7 @@ export class LFCCToolServer extends BaseToolServer {
       return invalidArgs(blockId.error);
     }
 
-    await this.bridge.deleteBlock(docId, blockId);
+    await this.bridge.deleteBlock(docId.value, blockId.value);
 
     context.audit?.log({
       timestamp: Date.now(),
@@ -2519,7 +2519,7 @@ export class LFCCToolServer extends BaseToolServer {
       return invalidArgs(semantic.error);
     }
 
-    const results = await this.bridge.search(query, {
+    const results = await this.bridge.search(query.value, {
       limit: limit.value,
       semantic: semantic.value,
     });
