@@ -9,7 +9,7 @@ import { execFile } from "node:child_process";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { promisify } from "node:util";
-import { createTwoFilesPatch } from "diff";
+import { createTwoFilesPatch } from "@ku0/diff-rs";
 
 const execFileAsync = promisify(execFile);
 

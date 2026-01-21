@@ -1,0 +1,19 @@
+[package]
+name = "diff-rs"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Rust diff engine for Keep-Up."
+publish = false
+build = "build.rs"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+diffy = "0.4.2"
+napi = { version = "3.5.1", features = ["napi8"] }
+napi-derive = "3.5.1"
+
+[build-dependencies]
+napi-build = "2.1.3"
