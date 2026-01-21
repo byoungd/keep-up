@@ -223,9 +223,6 @@ importers:
       '@ku0/db':
         specifier: workspace:*
         version: link:../db
-      '@ku0/json-accel-rs':
-        specifier: workspace:*
-        version: link:../json-accel-rs
       '@ku0/sandbox-rs':
         specifier: workspace:*
         version: link:../sandbox-rs
@@ -403,9 +400,6 @@ importers:
       '@ku0/db':
         specifier: workspace:*
         version: link:../db
-      '@ku0/gitignore-rs':
-        specifier: workspace:*
-        version: link:../gitignore-rs
       '@modelcontextprotocol/sdk':
         specifier: ^1.25.2
         version: 1.25.2(@cfworker/json-schema@4.1.1)(hono@4.11.4)(zod@4.3.5)
@@ -627,15 +621,6 @@ importers:
         specifier: ^4.1.18
         version: 4.1.18
 
-  packages/gitignore-rs:
-    devDependencies:
-      '@types/node':
-        specifier: ^22.10.2
-        version: 22.19.3
-      typescript:
-        specifier: ^5.7.3
-        version: 5.9.3
-
   packages/ingest-youtube:
     dependencies:
       youtube-caption-extractor:
@@ -701,21 +686,6 @@ importers:
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.27
-
-  packages/json-accel-rs:
-    devDependencies:
-      '@napi-rs/cli':
-        specifier: ^2.18.4
-        version: 2.18.4
-      '@types/node':
-        specifier: ^22.10.2
-        version: 22.19.3
-      typescript:
-        specifier: ^5.7.3
-        version: 5.9.3
-      vitest:
-        specifier: ^4.0.0
-        version: 4.0.16(@opentelemetry/api@1.9.0)(@types/node@22.19.3)(jiti@2.6.1)(jsdom@26.1.0)(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2)
 
   packages/lfcc-bridge:
     dependencies:
@@ -8538,14 +8508,6 @@ snapshots:
     optionalDependencies:
       vite: 7.3.1(@types/node@20.19.27)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2)
 
-  '@vitest/mocker@4.0.16(vite@7.3.1(@types/node@22.19.3)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2))':
-    dependencies:
-      '@vitest/spy': 4.0.16
-      estree-walker: 3.0.3
-      magic-string: 0.30.21
-    optionalDependencies:
-      vite: 7.3.1(@types/node@22.19.3)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2)
-
   '@vitest/pretty-format@4.0.16':
     dependencies:
       tinyrainbow: 3.0.3
@@ -12537,7 +12499,7 @@ snapshots:
   vitest@4.0.16(@opentelemetry/api@1.9.0)(@types/node@22.19.3)(jiti@2.6.1)(jsdom@26.1.0)(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2):
     dependencies:
       '@vitest/expect': 4.0.16
-      '@vitest/mocker': 4.0.16(vite@7.3.1(@types/node@22.19.3)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2))
+      '@vitest/mocker': 4.0.16(vite@7.3.1(@types/node@20.19.27)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2))
       '@vitest/pretty-format': 4.0.16
       '@vitest/runner': 4.0.16
       '@vitest/snapshot': 4.0.16

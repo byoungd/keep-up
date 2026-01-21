@@ -52,7 +52,6 @@
     "@ku0/agent-runtime-vision": "workspace:*",
     "@ku0/core": "workspace:*",
     "@ku0/db": "workspace:*",
-    "@ku0/gitignore-rs": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.25.2",
     "diff": "^8.0.3",
     "gray-matter": "^4.0.3",
