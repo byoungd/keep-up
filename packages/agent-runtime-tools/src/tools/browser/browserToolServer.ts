@@ -20,6 +20,8 @@ export interface BrowserToolServerOptions {
   managerOptions?: BrowserManagerOptions;
 }
 
+const HTTP_PROTOCOLS = new Set(["http:", "https:"]);
+
 export class BrowserToolServer extends BaseToolServer {
   readonly name = "browser";
   readonly description = "Browser automation tools powered by Playwright";
@@ -190,12 +192,13 @@ export class BrowserToolServer extends BaseToolServer {
     args: Record<string, unknown>,
     context: ToolContext
   ): Promise<MCPToolResult> {
-    if (context.security.permissions.network === "none") {
-      return errorResult("PERMISSION_DENIED", "Network access is disabled");
+    const parsedUrl = parseHttpUrl(args.url);
+    if (!parsedUrl) {
+      return errorResult("INVALID_ARGUMENTS", "url must be an http(s) URL");
     }
-    const url = typeof args.url === "string" ? args.url : "";
-    if (!url) {
-      return errorResult("INVALID_ARGUMENTS", "url is required");
+    const networkError = assertNetworkAccess(parsedUrl, context);
+    if (networkError) {
+      return errorResult("PERMISSION_DENIED", networkError);
     }
 
     const sessionId = resolveSessionId(args, context);
@@ -203,7 +206,7 @@ export class BrowserToolServer extends BaseToolServer {
     const page = await this.manager.getPage(sessionId, sessionConfig);
 
     try {
-      await page.goto(url, {
+      await page.goto(parsedUrl.toString(), {
         waitUntil: parseWaitUntil(args.waitUntil),
         timeout: parseTimeout(args.timeoutMs),
       });
@@ -242,9 +245,9 @@ export class BrowserToolServer extends BaseToolServer {
   ): Promise<MCPToolResult> {
     const sessionId = resolveSessionId(args, context);
     const page = await this.manager.getPage(sessionId);
-    const selector = typeof args.selector === "string" ? args.selector : undefined;
-    const ref = typeof args.ref === "string" ? args.ref : undefined;
-    const snapshot = await this.ensureSnapshot(sessionId);
+    const selector = readStringArg(args.selector);
+    const ref = readStringArg(args.ref);
+    const snapshot = selector ? undefined : await this.ensureSnapshot(sessionId);
     const resolved = resolveLocator(page, snapshot, { ref, selector });
     if (!resolved.locator) {
       return errorResult("INVALID_ARGUMENTS", resolved.reason ?? "ref or selector is required");
@@ -346,7 +349,13 @@ function parseWaitUntil(value: unknown): "load" | "domcontentloaded" | "networki
 }
 
 function parseTimeout(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return undefined;
+  }
+  if (value <= 0) {
+    return undefined;
+  }
+  return value;
 }
 
 function buildSessionConfig(args: Record<string, unknown>): BrowserSessionConfig | undefined {
@@ -369,7 +378,14 @@ function parseViewport(value: unknown): { width: number; height: number } | null
     return null;
   }
   const record = value as { width?: unknown; height?: unknown };
-  if (typeof record.width !== "number" || typeof record.height !== "number") {
+  if (
+    typeof record.width !== "number" ||
+    typeof record.height !== "number" ||
+    !Number.isFinite(record.width) ||
+    !Number.isFinite(record.height) ||
+    record.width <= 0 ||
+    record.height <= 0
+  ) {
     return null;
   }
   return { width: record.width, height: record.height };
@@ -396,17 +412,21 @@ function resolveLocator(
 function resolveLocatorFromRef(page: Page, ref: AccessibilityNodeRef): Locator {
   const role = typeof ref.role === "string" && ref.role.length > 0 ? ref.role : undefined;
   const name = typeof ref.name === "string" && ref.name.length > 0 ? ref.name : undefined;
+  const occurrence =
+    typeof ref.occurrence === "number" && Number.isFinite(ref.occurrence)
+      ? Math.max(0, Math.floor(ref.occurrence))
+      : 0;
   if (role) {
     try {
       const options = name ? { name } : undefined;
       // biome-ignore lint/suspicious/noExplicitAny: AriaRole is not exported in current playwright
-      return page.getByRole(role as any, options).nth(ref.occurrence ?? 0);
+      return page.getByRole(role as any, options).nth(occurrence);
     } catch {
       // Fallback to text selector
     }
   }
   if (name) {
-    return page.getByText(name).nth(ref.occurrence ?? 0);
+    return page.getByText(name).nth(occurrence);
   }
   return page.getByText(ref.ref);
 }
@@ -452,7 +472,7 @@ function parseTypeInteraction(args: Record<string, unknown>): {
   if (!text) {
     return { error: "text is required for type action" };
   }
-  const delayMs = typeof args.delayMs === "number" ? args.delayMs : undefined;
+  const delayMs = parsePositiveNumber(args.delayMs);
   return { interaction: { action: "type", text, delayMs } };
 }
 
@@ -467,7 +487,11 @@ function parseSimpleInteraction(action: string): {
 }
 
 function readStringArg(value: unknown): string | undefined {
-  return typeof value === "string" && value.length > 0 ? value : undefined;
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
 }
 
 async function performInteraction(
@@ -497,4 +521,74 @@ async function performInteraction(
       interaction.delayMs ? { delay: interaction.delayMs } : undefined
     );
   }
+}
+
+function parsePositiveNumber(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return undefined;
+  }
+  return value > 0 ? value : undefined;
+}
+
+function parseHttpUrl(value: unknown): URL | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  try {
+    const url = new URL(trimmed);
+    if (!HTTP_PROTOCOLS.has(url.protocol)) {
+      return undefined;
+    }
+    return url;
+  } catch {
+    return undefined;
+  }
+}
+
+function assertNetworkAccess(url: URL, context: ToolContext): string | undefined {
+  const permission = context.security.permissions.network;
+  const sandboxAccess = context.security.sandbox.networkAccess;
+
+  if (permission === "none" || sandboxAccess === "none") {
+    return "Network access is disabled";
+  }
+
+  if (permission === "allowlist" || sandboxAccess === "allowlist") {
+    const allowedHosts = normalizeAllowedHosts(context.security.sandbox.allowedHosts);
+    if (allowedHosts.length === 0) {
+      return "Network allowlist is empty";
+    }
+    const hostname = url.hostname.toLowerCase();
+    const hostWithPort = url.host.toLowerCase();
+    const allowed = allowedHosts.some((entry) => matchesAllowedHost(entry, hostname, hostWithPort));
+    if (!allowed) {
+      return `Host "${url.hostname}" is not in the network allowlist`;
+    }
+  }
+
+  return undefined;
+}
+
+function normalizeAllowedHosts(allowedHosts: string[] | undefined): string[] {
+  if (!allowedHosts) {
+    return [];
+  }
+  return allowedHosts.map((host) => host.trim().toLowerCase()).filter((host) => host.length > 0);
+}
+
+function matchesAllowedHost(entry: string, hostname: string, hostWithPort: string): boolean {
+  if (entry === "*") {
+    return true;
+  }
+  if (entry.includes(":")) {
+    return hostWithPort === entry;
+  }
+  if (hostname === entry) {
+    return true;
+  }
+  return hostname.endsWith(`.${entry}`);
 }
