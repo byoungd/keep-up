@@ -46,6 +46,17 @@ function findRef(
   return Object.values(snapshot.map).find((node) => node.role === role && node.name === name);
 }
 
+async function waitWithTimeout(promise: Promise<void>, timeoutMs: number): Promise<void> {
+  let timeoutId: NodeJS.Timeout | undefined;
+  const timeoutPromise = new Promise<void>((resolve) => {
+    timeoutId = setTimeout(resolve, timeoutMs);
+  });
+  await Promise.race([promise.catch(() => undefined), timeoutPromise]);
+  if (timeoutId) {
+    clearTimeout(timeoutId);
+  }
+}
+
 describeIf("BrowserToolServer (e2e)", () => {
   let server: ReturnType<typeof createServer> | undefined;
   let baseUrl = "";
@@ -87,10 +98,10 @@ describeIf("BrowserToolServer (e2e)", () => {
 
   afterAll(async () => {
     if (manager) {
-      await manager.dispose();
+      await waitWithTimeout(manager.dispose(), 10_000);
     }
     if (server) {
-      await new Promise<void>((resolve) => server?.close(() => resolve()));
+      await waitWithTimeout(new Promise<void>((resolve) => server?.close(() => resolve())), 5_000);
     }
   }, 30_000);
 
