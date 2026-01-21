@@ -57,6 +57,29 @@ describe("SmartToolScheduler", () => {
     expect(schedule[1]).toHaveLength(1);
   });
 
+  it("allows parallel reads but serializes read/write conflicts", () => {
+    const scheduler = new SmartToolScheduler({
+      config: { maxNetworkConcurrent: 2, maxCpuConcurrent: 2, maxDefaultConcurrent: 2 },
+    });
+
+    const readCalls = [
+      makeCall("file:read", { path: "/tmp/shared.txt" }),
+      makeCall("file:read", { path: "/tmp/shared.txt" }),
+    ];
+    const readSchedule = scheduler.schedule(readCalls);
+    expect(readSchedule).toHaveLength(1);
+    expect(readSchedule[0]).toHaveLength(2);
+
+    const mixedCalls = [
+      makeCall("file:read", { path: "/tmp/shared.txt" }),
+      makeCall("file:write", { path: "/tmp/shared.txt", content: "a" }),
+    ];
+    const mixedSchedule = scheduler.schedule(mixedCalls);
+    expect(mixedSchedule).toHaveLength(2);
+    expect(mixedSchedule[0]).toHaveLength(1);
+    expect(mixedSchedule[1]).toHaveLength(1);
+  });
+
   it("serializes moves that share source or destination", () => {
     const scheduler = new SmartToolScheduler({
       config: { maxNetworkConcurrent: 2, maxCpuConcurrent: 2, maxDefaultConcurrent: 2 },
