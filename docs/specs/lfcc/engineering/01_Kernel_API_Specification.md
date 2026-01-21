@@ -385,7 +385,10 @@ export async function dryRunAIPayload(
 
 ## 6. Document Checksum APIs
 
-Kernel SHOULD provide helpers for `LFCC_DOC_V1` (Appendix A).
+Kernel SHOULD provide helpers for `LFCC_DOC_V1` (Appendix A). Implementations MUST:
+- Normalize text to NFC, convert CRLF/CR to LF, and strip control chars (C0/C1 except Tab/LF) before hashing.
+- Preserve document order; do not sort block digests.
+- Use SHA-256 hex, lower-case, with deterministic JSON serialization.
 
 ### 6.1 Types
 
@@ -411,22 +414,46 @@ export type DocumentChecksumPolicy = {
 
 ```ts
 export interface DocumentChecksumProvider {
+  /**
+   * Tier 1: compute deterministic block digest (LFCC_BLOCK_V1).
+   * Inline text is normalized (NFC, LF endings, control chars stripped) and marks sorted per policy.
+   */
   computeBlockDigest(input: {
     block_id: string;
     type: string;
     attrs: Record<string, unknown>;
     inline: Array<{ text: string; marks: CanonMark[]; attrs: { href?: string } }>;
-    children: string[]; // child block digests
-  }): string;
+    children: string[]; // child block digests (already hashed)
+  }): Promise<string>;
 
-  computeDocumentChecksum(payload: DocumentChecksumPayload): string;
+  /**
+   * Tier 1: assemble document checksum from precomputed block digests.
+   */
+  computeDocumentChecksum(payload: DocumentChecksumPayload): Promise<string>;
 }
 
 export interface DocumentChecksumVerifier {
-  computeTier1(payload: DocumentChecksumPayload): string;
-  computeTier2(input: { doc: unknown }): Promise<string>;
+  /**
+   * Tier 1: checksum using provided block digests (surface check).
+   */
+  computeTier1(payload: DocumentChecksumPayload): Promise<string>;
+
+  /**
+   * Tier 2: recompute canonical tree, per-block digests, and full LFCC_DOC_V1 checksum.
+   * Returns both checksum and ordered block digests for reuse.
+   */
+  computeTier2(input: { doc: unknown }): Promise<{ checksum: string; blocks: BlockDigestEntry[] }>;
 }
 ```
+
+### 6.3 Reference Helpers
+
+Reference implementation exposes:
+- `computeBlockDigest(...)`
+- `computeDocumentChecksum({ blocks })` (Tier 1)
+- `computeDocumentChecksumTier2(canonRoot)` (Tier 2; returns `{ checksum, blocks }`)
+
+Use Tier 1 for fast drift detection when block digests are cached; fall back to Tier 2 on mismatch.
 
 ---
 

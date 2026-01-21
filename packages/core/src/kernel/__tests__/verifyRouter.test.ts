@@ -8,6 +8,12 @@ const defaultPolicy: IntegrityPolicy = {
   version: "v3",
   context_hash: { enabled: true, mode: "lazy_verify", debounce_ms: 10 },
   chain_hash: { enabled: true, mode: "eager" },
+  document_checksum: {
+    enabled: true,
+    mode: "lazy_verify",
+    strategy: "two_tier",
+    algorithm: "LFCC_DOC_V1",
+  },
   checkpoint: { enabled: true, every_ops: 5, every_ms: 1000 },
 };
 

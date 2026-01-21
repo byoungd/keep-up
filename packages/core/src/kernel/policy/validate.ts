@@ -250,6 +250,48 @@ function validateIntegrityPolicy(policy: unknown, errors: ValidationError[]): vo
   // chain_hash
   if (!p.chain_hash || typeof p.chain_hash !== "object") {
     errors.push({ path: "integrity_policy.chain_hash", message: "Must be an object" });
+  } else {
+    const chp = p.chain_hash as Record<string, unknown>;
+    if (typeof chp.enabled !== "boolean") {
+      errors.push({ path: "integrity_policy.chain_hash.enabled", message: "Must be boolean" });
+    }
+    if (chp.mode !== "lazy_verify" && chp.mode !== "eager") {
+      errors.push({
+        path: "integrity_policy.chain_hash.mode",
+        message: 'Must be "lazy_verify" or "eager"',
+      });
+    }
+  }
+
+  // document_checksum
+  if (!p.document_checksum || typeof p.document_checksum !== "object") {
+    errors.push({ path: "integrity_policy.document_checksum", message: "Must be an object" });
+  } else {
+    const doc = p.document_checksum as Record<string, unknown>;
+    if (typeof doc.enabled !== "boolean") {
+      errors.push({
+        path: "integrity_policy.document_checksum.enabled",
+        message: "Must be boolean",
+      });
+    }
+    if (doc.mode !== "lazy_verify" && doc.mode !== "eager") {
+      errors.push({
+        path: "integrity_policy.document_checksum.mode",
+        message: 'Must be "lazy_verify" or "eager"',
+      });
+    }
+    if (doc.strategy !== "two_tier") {
+      errors.push({
+        path: "integrity_policy.document_checksum.strategy",
+        message: 'Must be "two_tier"',
+      });
+    }
+    if (doc.algorithm !== "LFCC_DOC_V1") {
+      errors.push({
+        path: "integrity_policy.document_checksum.algorithm",
+        message: 'Must be "LFCC_DOC_V1"',
+      });
+    }
   }
 
   // checkpoint

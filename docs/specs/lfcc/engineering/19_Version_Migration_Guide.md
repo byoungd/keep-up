@@ -62,6 +62,7 @@ The following items are required to maintain v0.9.2 conformance:
 - **Document Checksum:** `integrity_policy.document_checksum` MUST be present and use `LFCC_DOC_V1` with `two_tier`.
 - **Sanitization v2:** `ai_sanitization_policy.version` MUST be `v2` (Appendix B).
 - **Storage Envelope:** Persisted snapshots/updates MUST use the Appendix D envelope.
+  - Core kernel now ships checksum helpers (`computeBlockDigest`, `computeDocumentChecksum`, `computeDocumentChecksumTier2`) that apply required text normalization (LF endings, NFC, control-char stripping). Integrations SHOULD use these helpers instead of ad-hoc hashing.
 
 ### 1.3.2 Breaking Changes for v0.9.3 (RC Update)
 

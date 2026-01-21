@@ -223,3 +223,7 @@ packages/json-accel-rs/*.js
 packages/json-accel-rs/*.d.ts
 packages/json-accel-rs/*.node
 packages/json-accel-rs/native/Cargo.lock
+packages/tokenizer-rs/native/Cargo.lock
+packages/tokenizer-rs/index.js
+packages/tokenizer-rs/index.d.ts
+packages/tokenizer-rs/index.*.node

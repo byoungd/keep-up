@@ -123,4 +123,30 @@ describe("Policy Negotiation", () => {
       expect(result.manifest.ai_native_policy?.ai_opcodes.allowed).toEqual(["OP_AI_REWRITE"]);
     }
   });
+
+  it("prefers eager document checksums when any participant requires it", () => {
+    const m1 = structuredClone(DEFAULT_POLICY_MANIFEST);
+    const m2 = structuredClone(DEFAULT_POLICY_MANIFEST);
+    m2.integrity_policy.document_checksum.mode = "eager";
+
+    const result = negotiate([m1, m2]);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.manifest.integrity_policy.document_checksum.mode).toBe("eager");
+      expect(result.manifest.integrity_policy.document_checksum.enabled).toBe(true);
+    }
+  });
+
+  it("rejects document checksum algorithm mismatches", () => {
+    const m1 = structuredClone(DEFAULT_POLICY_MANIFEST);
+    const m2 = structuredClone(DEFAULT_POLICY_MANIFEST);
+    // @ts-expect-error - intentional mismatch for test
+    m2.integrity_policy.document_checksum.algorithm = "LFCC_DOC_V0";
+
+    const result = negotiate([m1, m2]);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.errors[0].field).toBe("integrity_policy.document_checksum.algorithm");
+    }
+  });
 });

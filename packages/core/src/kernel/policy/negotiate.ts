@@ -11,6 +11,7 @@ import type {
   ChainKind,
   ChainPolicy,
   ChainPolicyEntry,
+  IntegrityPolicy,
   PartialBehavior,
   PolicyManifestV09,
   RelocationPolicy,
@@ -123,6 +124,28 @@ export function negotiate(manifests: PolicyManifestV09[]): NegotiationResult {
       field: "integrity_policy.version",
       message: "Integrity policy version mismatch - co-edit refused",
       values: integrityPolicyVersions,
+    });
+  }
+
+  const docChecksumAlgorithms = sortedManifests.map(
+    (m) => m.integrity_policy.document_checksum.algorithm
+  );
+  if (!allEqual(docChecksumAlgorithms)) {
+    errors.push({
+      field: "integrity_policy.document_checksum.algorithm",
+      message: "Document checksum algorithm mismatch - co-edit refused",
+      values: docChecksumAlgorithms,
+    });
+  }
+
+  const docChecksumStrategies = sortedManifests.map(
+    (m) => m.integrity_policy.document_checksum.strategy
+  );
+  if (!allEqual(docChecksumStrategies)) {
+    errors.push({
+      field: "integrity_policy.document_checksum.strategy",
+      message: "Document checksum strategy mismatch - co-edit refused",
+      values: docChecksumStrategies,
     });
   }
 
@@ -408,19 +431,7 @@ function restrictPartialPolicies(
  * Compute effective integrity policy
  * P0.1: Eager if any eager; checkpoint cadence = min
  */
-function restrictIntegrityPolicies(
-  policies: Array<{
-    version: string;
-    context_hash: { enabled: boolean; mode: VerifyMode; debounce_ms: number };
-    chain_hash: { enabled: boolean; mode: VerifyMode };
-    checkpoint: { enabled: boolean; every_ops: number; every_ms: number };
-  }>
-): {
-  version: string;
-  context_hash: { enabled: boolean; mode: VerifyMode; debounce_ms: number };
-  chain_hash: { enabled: boolean; mode: VerifyMode };
-  checkpoint: { enabled: boolean; every_ops: number; every_ms: number };
-} {
+function restrictIntegrityPolicies(policies: IntegrityPolicy[]): IntegrityPolicy {
   // Eager if any eager
   const contextHashMode: VerifyMode = policies.some((p) => p.context_hash.mode === "eager")
     ? "eager"
@@ -430,9 +441,16 @@ function restrictIntegrityPolicies(
     ? "eager"
     : "lazy_verify";
 
+  const documentChecksumMode: VerifyMode = policies.some(
+    (p) => p.document_checksum.mode === "eager"
+  )
+    ? "eager"
+    : "lazy_verify";
+
   // Enabled if any enabled
   const contextHashEnabled = policies.some((p) => p.context_hash.enabled);
   const chainHashEnabled = policies.some((p) => p.chain_hash.enabled);
+  const documentChecksumEnabled = policies.some((p) => p.document_checksum.enabled);
   const checkpointEnabled = policies.some((p) => p.checkpoint.enabled);
 
   // Min cadence
@@ -450,6 +468,12 @@ function restrictIntegrityPolicies(
     chain_hash: {
       enabled: chainHashEnabled,
       mode: chainHashMode,
+    },
+    document_checksum: {
+      enabled: documentChecksumEnabled,
+      mode: documentChecksumMode,
+      strategy: policies[0].document_checksum.strategy,
+      algorithm: policies[0].document_checksum.algorithm,
     },
     checkpoint: {
       enabled: checkpointEnabled,
@@ -727,6 +751,10 @@ export function areManifestsCompatible(a: PolicyManifestV09, b: PolicyManifestV0
     a.chain_policy.version === b.chain_policy.version &&
     a.partial_policy.version === b.partial_policy.version &&
     a.integrity_policy.version === b.integrity_policy.version &&
+    a.integrity_policy.document_checksum.algorithm ===
+      b.integrity_policy.document_checksum.algorithm &&
+    a.integrity_policy.document_checksum.strategy ===
+      b.integrity_policy.document_checksum.strategy &&
     a.canonicalizer_policy.version === b.canonicalizer_policy.version &&
     a.history_policy.version === b.history_policy.version &&
     a.ai_sanitization_policy.version === b.ai_sanitization_policy.version &&

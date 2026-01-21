@@ -25,7 +25,9 @@ describe("Native Storage Engine Integration", () => {
     engine.saveCheckpoint(ckptId, data);
 
     const loaded = engine.loadCheckpoint(ckptId);
-    if (!loaded) throw new Error("Failed to load checkpoint");
+    if (!loaded) {
+      throw new Error("Failed to load checkpoint");
+    }
     expect(new Uint8Array(loaded)).toEqual(data);
 
     // Events

@@ -75,6 +75,17 @@ export type ChainHashPolicy = {
   mode: VerifyMode;
 };
 
+/** Document checksum algorithm */
+export type DocumentChecksumAlgorithm = "LFCC_DOC_V1";
+
+/** Document checksum settings */
+export type DocumentChecksumPolicy = {
+  enabled: boolean;
+  mode: VerifyMode;
+  strategy: "two_tier";
+  algorithm: DocumentChecksumAlgorithm;
+};
+
 /** Checkpoint settings */
 export type CheckpointPolicy = {
   enabled: boolean;
@@ -87,6 +98,7 @@ export type IntegrityPolicy = {
   version: string;
   context_hash: ContextHashPolicy;
   chain_hash: ChainHashPolicy;
+  document_checksum: DocumentChecksumPolicy;
   checkpoint: CheckpointPolicy;
 };
 
@@ -307,6 +319,12 @@ export const DEFAULT_POLICY_MANIFEST: PolicyManifestV09 = {
     version: "v3",
     context_hash: { enabled: true, mode: "lazy_verify", debounce_ms: 500 },
     chain_hash: { enabled: true, mode: "eager" },
+    document_checksum: {
+      enabled: true,
+      mode: "lazy_verify",
+      strategy: "two_tier",
+      algorithm: "LFCC_DOC_V1",
+    },
     checkpoint: { enabled: true, every_ops: 200, every_ms: 5000 },
   },
   canonicalizer_policy: {
