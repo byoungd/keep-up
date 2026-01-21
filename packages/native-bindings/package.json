@@ -4,24 +4,32 @@
   "version": "0.0.0",
   "type": "module",
   "main": "./dist/node.js",
-  "types": "./dist/index.d.ts",
+  "types": "./src/index.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "development": "./src/index.ts",
       "node": "./dist/node.js",
-      "default": "./dist/index.js"
+      "default": "./src/index.ts"
     },
     "./bench": {
-      "types": "./dist/bench.d.ts",
-      "default": "./dist/bench.js"
+      "types": "./src/bench.ts",
+      "import": "./src/bench.ts",
+      "development": "./src/bench.ts",
+      "default": "./src/bench.ts"
     },
     "./flags": {
-      "types": "./dist/flags.d.ts",
-      "default": "./dist/flags.js"
+      "types": "./src/flags.ts",
+      "import": "./src/flags.ts",
+      "development": "./src/flags.ts",
+      "default": "./src/flags.ts"
     },
     "./testing": {
-      "types": "./dist/testing/index.d.ts",
-      "default": "./dist/testing/index.js"
+      "types": "./src/testing/index.ts",
+      "import": "./src/testing/index.ts",
+      "development": "./src/testing/index.ts",
+      "default": "./src/testing/index.ts"
     }
   },
   "scripts": {

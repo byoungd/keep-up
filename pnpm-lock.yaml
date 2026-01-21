@@ -485,6 +485,18 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
+  packages/ai-sanitizer-rs:
+    devDependencies:
+      '@napi-rs/cli':
+        specifier: ^2.18.4
+        version: 2.18.4
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.19.3
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
   packages/app:
     dependencies:
       '@ku0/core':
@@ -513,6 +525,22 @@ importers:
       tsx:
         specifier: ^4.7.0
         version: 4.21.0
+
+  packages/canonicalizer-rs:
+    dependencies:
+      '@ku0/native-bindings':
+        specifier: workspace:*
+        version: link:../native-bindings
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.19.3
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
 
   packages/cli:
     dependencies:
@@ -592,10 +620,16 @@ importers:
 
   packages/core:
     dependencies:
+      '@ku0/canonicalizer-rs':
+        specifier: workspace:*
+        version: link:../canonicalizer-rs
       zod:
         specifier: ^4.3.5
         version: 4.3.5
     devDependencies:
+      '@ku0/native-bindings':
+        specifier: workspace:*
+        version: link:../native-bindings
       fast-check:
         specifier: ^4.5.3
         version: 4.5.3

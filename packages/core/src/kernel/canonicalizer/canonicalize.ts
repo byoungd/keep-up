@@ -4,6 +4,7 @@
  * @see docs/product/LFCC_v0.9_RC_Engineering_Docs/10_Recursive_Canonicalization_Deep_Dive.md
  */
 
+import { getNativeCanonicalizer, type NativeCanonicalizerBinding } from "@ku0/canonicalizer-rs";
 import { processMarkAttributes } from "./attrs.js";
 import { isMarkTag, sortMarks, tagToMark } from "./marks.js";
 import { isEmptyText, normalizeWhitespace, wasWhitespaceNormalized } from "./normalizeText.js";
@@ -40,6 +41,10 @@ const DEFAULT_BLOCK_TAGS: Record<string, string> = {
   blockquote: "quote",
   pre: "code_block",
 };
+
+function resolveNativeCanonicalizer(): NativeCanonicalizerBinding | null {
+  return getNativeCanonicalizer();
+}
 
 function defaultMapTagToBlockType(tag: string, _attrs: Record<string, string>): string | null {
   return DEFAULT_BLOCK_TAGS[tag.toLowerCase()] ?? null;
@@ -382,9 +387,9 @@ function canonicalizeNode(
  * @param policy - Canonicalizer policy (defaults to v2)
  * @returns Canonical tree and diagnostics
  */
-export function canonicalizeDocument(
+function canonicalizeDocumentFallback(
   input: CanonicalizeDocumentInput,
-  policy: CanonicalizerPolicyV2 = DEFAULT_CANONICALIZER_POLICY
+  policy: CanonicalizerPolicyV2
 ): CanonicalizeResult {
   const diagnostics: CanonDiag[] = [];
   const mapFn = input.mapTagToBlockType ?? defaultMapTagToBlockType;
@@ -415,6 +420,27 @@ export function canonicalizeDocument(
   }
 
   return { root, diagnostics };
+}
+
+/**
+ * Canonicalize a document tree with optional native acceleration.
+ */
+export function canonicalizeDocument(
+  input: CanonicalizeDocumentInput,
+  policy: CanonicalizerPolicyV2 = DEFAULT_CANONICALIZER_POLICY
+): CanonicalizeResult {
+  if (!input.mapTagToBlockType) {
+    const native = resolveNativeCanonicalizer();
+    if (native) {
+      try {
+        return native.canonicalizeDocument({ root: input.root }, policy);
+      } catch {
+        // Fall back to TS implementation if native fails.
+      }
+    }
+  }
+
+  return canonicalizeDocumentFallback(input, policy);
 }
 
 /**
