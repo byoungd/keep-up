@@ -86,6 +86,54 @@ export interface MetricsAggregatorConfig {
 // ============================================================================
 
 const DEFAULT_HISTOGRAM_BUCKETS = [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000];
+const MAX_SAMPLE_WINDOW = 10000;
+
+class SlidingWindow {
+  private values: number[] = [];
+  private head = 0;
+  private total = 0;
+  private readonly maxSize: number;
+
+  constructor(maxSize: number) {
+    this.maxSize = maxSize;
+  }
+
+  push(value: number): void {
+    this.values.push(value);
+    this.total += value;
+    if (this.size <= this.maxSize) {
+      return;
+    }
+    const removed = this.values[this.head];
+    this.head += 1;
+    this.total -= removed;
+    if (this.head > 64 && this.head * 2 > this.values.length) {
+      this.values = this.values.slice(this.head);
+      this.head = 0;
+    }
+  }
+
+  get size(): number {
+    return this.values.length - this.head;
+  }
+
+  get sum(): number {
+    return this.total;
+  }
+
+  forEach(callback: (value: number) => void): void {
+    for (let i = this.head; i < this.values.length; i++) {
+      callback(this.values[i]);
+    }
+  }
+
+  toArray(): number[] {
+    if (this.head === 0) {
+      return [...this.values];
+    }
+    return this.values.slice(this.head);
+  }
+}
 
 // ============================================================================
 // Metrics Aggregator
@@ -96,8 +144,8 @@ const DEFAULT_HISTOGRAM_BUCKETS = [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 
  */
 export class MetricsAggregator {
   private readonly metrics = new Map<string, AggregatedMetric>();
-  private readonly histogramValues = new Map<string, number[]>();
-  private readonly summaryValues = new Map<string, number[]>();
+  private readonly histogramValues = new Map<string, SlidingWindow>();
+  private readonly summaryValues = new Map<string, SlidingWindow>();
   private readonly config: Required<Omit<MetricsAggregatorConfig, "onFlush">> & {
     onFlush?: (metrics: AggregatedMetric[]) => void;
   };
@@ -163,20 +211,15 @@ export class MetricsAggregator {
     const key = this.makeKey(name, labels);
 
     // Store raw value for histogram calculation
-    let values = this.histogramValues.get(key);
-    if (!values) {
-      values = [];
-      this.histogramValues.set(key, values);
+    let window = this.histogramValues.get(key);
+    if (!window) {
+      window = new SlidingWindow(MAX_SAMPLE_WINDOW);
+      this.histogramValues.set(key, window);
     }
-    values.push(value);
-
-    // Limit stored values
-    if (values.length > 10000) {
-      values.shift();
-    }
+    window.push(value);
 
     // Update aggregated metric
-    this.updateHistogram(key, name, labels, values);
+    this.updateHistogram(key, name, labels, window);
   }
 
   /**
@@ -186,20 +229,15 @@ export class MetricsAggregator {
     const key = this.makeKey(name, labels);
 
     // Store raw value for summary calculation
-    let values = this.summaryValues.get(key);
-    if (!values) {
-      values = [];
-      this.summaryValues.set(key, values);
+    let window = this.summaryValues.get(key);
+    if (!window) {
+      window = new SlidingWindow(MAX_SAMPLE_WINDOW);
+      this.summaryValues.set(key, window);
     }
-    values.push(value);
-
-    // Limit stored values
-    if (values.length > 10000) {
-      values.shift();
-    }
+    window.push(value);
 
     // Update aggregated metric
-    this.updateSummary(key, name, labels, values);
+    this.updateSummary(key, name, labels, window);
   }
 
   /**
@@ -313,15 +351,25 @@ export class MetricsAggregator {
     key: string,
     name: string,
     labels: Record<string, string>,
-    values: number[]
+    window: SlidingWindow
   ): void {
-    const buckets: HistogramBucket[] = this.config.histogramBuckets.map((le) => ({
-      le,
-      count: values.filter((v) => v <= le).length,
-    }));
+    const bucketLimits = this.config.histogramBuckets;
+    const bucketCounts = new Array(bucketLimits.length).fill(0);
+    window.forEach((value) => {
+      const index = this.findBucketIndex(bucketLimits, value);
+      if (index >= 0) {
+        bucketCounts[index] += 1;
+      }
+    });
 
-    // Add +Inf bucket
-    buckets.push({ le: Number.POSITIVE_INFINITY, count: values.length });
+    const buckets: HistogramBucket[] = [];
+    let running = 0;
+    for (let i = 0; i < bucketLimits.length; i++) {
+      running += bucketCounts[i];
+      buckets.push({ le: bucketLimits[i], count: running });
+    }
+
+    buckets.push({ le: Number.POSITIVE_INFINITY, count: window.size });
 
     const isNew = !this.metrics.has(key);
     this.metrics.set(key, {
@@ -330,8 +378,8 @@ export class MetricsAggregator {
       labels,
       histogram: {
         buckets,
-        sum: values.reduce((a, b) => a + b, 0),
-        count: values.length,
+        sum: window.sum,
+        count: window.size,
       },
       lastUpdated: Date.now(),
     });
@@ -344,9 +392,9 @@ export class MetricsAggregator {
     key: string,
     name: string,
     labels: Record<string, string>,
-    values: number[]
+    window: SlidingWindow
   ): void {
-    const sorted = [...values].sort((a, b) => a - b);
+    const sorted = window.toArray().sort((a, b) => a - b);
     const count = sorted.length;
 
     const percentile = (p: number): number => {
@@ -367,7 +415,7 @@ export class MetricsAggregator {
         p90: percentile(90),
         p95: percentile(95),
         p99: percentile(99),
-        sum: values.reduce((a, b) => a + b, 0),
+        sum: window.sum,
         count,
       },
       lastUpdated: Date.now(),
@@ -383,6 +431,22 @@ export class MetricsAggregator {
         this.config.onFlush(this.getMetrics());
       }
     }, this.config.flushIntervalMs);
+  }
+
+  private findBucketIndex(bucketLimits: number[], value: number): number {
+    let left = 0;
+    let right = bucketLimits.length - 1;
+    let result = -1;
+    while (left <= right) {
+      const mid = Math.floor((left + right) / 2);
+      if (value <= bucketLimits[mid]) {
+        result = mid;
+        right = mid - 1;
+      } else {
+        left = mid + 1;
+      }
+    }
+    return result;
   }
 
   /**
