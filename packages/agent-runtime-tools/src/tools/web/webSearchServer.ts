@@ -56,6 +56,11 @@ export interface WebFetchResult {
   contentType: string;
 }
 
+const DEFAULT_MAX_RESULTS = 5;
+const MAX_RESULTS_CAP = 10;
+const FRESHNESS_VALUES = new Set(["day", "week", "month", "year"]);
+const HTTP_PROTOCOLS = new Set(["http:", "https:"]);
+
 // ============================================================================
 // Mock Web Search Provider (for testing)
 // ============================================================================
@@ -72,7 +77,7 @@ export class MockWebSearchProvider implements IWebSearchProvider {
   }
 
   async search(query: string, options?: WebSearchOptions): Promise<WebSearchResult[]> {
-    const maxResults = options?.maxResults ?? 10;
+    const maxResults = options?.maxResults ?? DEFAULT_MAX_RESULTS;
 
     // Return mock results or generate placeholder results
     if (this.mockResults.length > 0) {
@@ -145,7 +150,7 @@ export class TavilyWebSearchProvider implements IWebSearchProvider {
       api_key: this.apiKey,
       query,
       search_depth: "basic",
-      max_results: options?.maxResults ?? 5,
+      max_results: options?.maxResults ?? DEFAULT_MAX_RESULTS,
       include_answer: false,
       include_images: false,
       include_raw_content: false,
@@ -234,7 +239,7 @@ export class SerperWebSearchProvider implements IWebSearchProvider {
   async search(query: string, options?: WebSearchOptions): Promise<WebSearchResult[]> {
     const body: SerperRequestBody = {
       q: query,
-      num: options?.maxResults ?? 5,
+      num: options?.maxResults ?? DEFAULT_MAX_RESULTS,
     };
 
     if (options?.freshness) {
@@ -331,7 +336,7 @@ export class JinaWebSearchProvider implements IWebSearchProvider {
   readonly name = "jina";
 
   async search(query: string, options?: WebSearchOptions): Promise<WebSearchResult[]> {
-    const maxResults = options?.maxResults ?? 5;
+    const maxResults = options?.maxResults ?? DEFAULT_MAX_RESULTS;
     const encodedQuery = encodeURIComponent(query);
 
     const response = await fetch(`https://s.jina.ai/${encodedQuery}`, {
@@ -422,12 +427,22 @@ export class WebSearchToolServer extends BaseToolServer {
           },
           maxResults: {
             type: "number",
-            description: "Maximum number of results (default: 5)",
+            description: "Maximum number of results (default: 5, max: 10)",
           },
           freshness: {
             type: "string",
             enum: ["day", "week", "month", "year"],
             description: "Filter by recency",
+          },
+          allowedDomains: {
+            type: "array",
+            items: { type: "string" },
+            description: "Only include results from these domains",
+          },
+          blockedDomains: {
+            type: "array",
+            items: { type: "string" },
+            description: "Exclude results from these domains",
           },
         },
         required: ["query"],
@@ -477,26 +492,43 @@ export class WebSearchToolServer extends BaseToolServer {
       return errorResult("PERMISSION_DENIED", "Network access is disabled");
     }
 
-    const query = args.query as string | undefined;
-    const maxResults = (args.maxResults as number | undefined) ?? 5;
-    const freshness = args.freshness as "day" | "week" | "month" | "year" | undefined;
-
-    if (!query || typeof query !== "string") {
+    const query = parseQuery(args.query);
+    if (!query) {
       return errorResult("INVALID_ARGUMENTS", "Query is required");
+    }
+
+    const maxResults = normalizeMaxResults(args.maxResults);
+    const freshness = parseFreshness(args.freshness);
+    if (freshness === "invalid") {
+      return errorResult("INVALID_ARGUMENTS", "Invalid freshness value");
+    }
+
+    const allowedDomains = parseDomainList(args.allowedDomains, "allowedDomains");
+    if (allowedDomains.error) {
+      return errorResult("INVALID_ARGUMENTS", allowedDomains.error);
+    }
+
+    const blockedDomains = parseDomainList(args.blockedDomains, "blockedDomains");
+    if (blockedDomains.error) {
+      return errorResult("INVALID_ARGUMENTS", blockedDomains.error);
     }
 
     try {
       const results = await this.provider.search(query, {
         maxResults,
         freshness,
+        allowedDomains: allowedDomains.value,
+        blockedDomains: blockedDomains.value,
       });
 
-      if (results.length === 0) {
+      const normalizedResults = normalizeSearchResults(results).slice(0, maxResults);
+
+      if (normalizedResults.length === 0) {
         return textResult(`No results found for: ${query}`);
       }
 
       // Format results as markdown
-      const formatted = results
+      const formatted = normalizedResults
         .map(
           (r, i) =>
             `${i + 1}. **[${r.title}](${r.url})**\n   ${r.snippet}${r.publishedDate ? `\n   _${r.publishedDate}_` : ""}`
@@ -522,17 +554,15 @@ export class WebSearchToolServer extends BaseToolServer {
       return errorResult("PERMISSION_DENIED", "Network access is disabled");
     }
 
-    const url = args.url as string | undefined;
-
-    if (!url || typeof url !== "string") {
+    const url = parseQuery(args.url);
+    if (!url) {
       return errorResult("INVALID_ARGUMENTS", "URL is required");
     }
 
     // Validate URL
-    try {
-      new URL(url);
-    } catch {
-      return errorResult("INVALID_ARGUMENTS", "Invalid URL format");
+    const parsedUrl = parseHttpUrl(url);
+    if (!parsedUrl) {
+      return errorResult("INVALID_ARGUMENTS", "URL must be an http(s) URL");
     }
 
     // Check if provider supports fetch
@@ -541,7 +571,7 @@ export class WebSearchToolServer extends BaseToolServer {
     }
 
     try {
-      const result = await this.provider.fetch(url);
+      const result = await this.provider.fetch(parsedUrl.toString());
 
       return textResult(`## ${result.title}\n\n**Source:** ${result.url}\n\n${result.content}`);
     } catch (err) {
@@ -577,14 +607,108 @@ export function createWebSearchToolServer(provider?: IWebSearchProvider): WebSea
   }
 
   // Try to detect provider from environment variables (priority order)
-  if (process.env.TAVILY_API_KEY) {
-    return new WebSearchToolServer(new TavilyWebSearchProvider(process.env.TAVILY_API_KEY));
+  const tavilyKey = process.env.TAVILY_API_KEY?.trim();
+  if (tavilyKey) {
+    return new WebSearchToolServer(new TavilyWebSearchProvider(tavilyKey));
   }
 
-  if (process.env.SERPER_API_KEY) {
-    return new WebSearchToolServer(new SerperWebSearchProvider(process.env.SERPER_API_KEY));
+  const serperKey = process.env.SERPER_API_KEY?.trim();
+  if (serperKey) {
+    return new WebSearchToolServer(new SerperWebSearchProvider(serperKey));
   }
 
   // Fallback to Jina (free, no API key required)
   return new WebSearchToolServer(new JinaWebSearchProvider());
+}
+
+function parseQuery(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function normalizeMaxResults(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return DEFAULT_MAX_RESULTS;
+  }
+  const rounded = Math.floor(value);
+  if (rounded < 1) {
+    return DEFAULT_MAX_RESULTS;
+  }
+  return Math.min(rounded, MAX_RESULTS_CAP);
+}
+
+function parseFreshness(value: unknown): WebSearchOptions["freshness"] | "invalid" | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value !== "string") {
+    return "invalid";
+  }
+  return FRESHNESS_VALUES.has(value) ? (value as WebSearchOptions["freshness"]) : "invalid";
+}
+
+function parseDomainList(value: unknown, fieldName: string): { value?: string[]; error?: string } {
+  if (value === undefined) {
+    return {};
+  }
+  if (!Array.isArray(value)) {
+    return { error: `${fieldName} must be an array of strings` };
+  }
+  if (!value.every((entry) => typeof entry === "string")) {
+    return { error: `${fieldName} must be an array of strings` };
+  }
+  const normalized = value.map((entry) => entry.trim()).filter(Boolean);
+  return normalized.length > 0 ? { value: normalized } : {};
+}
+
+function parseHttpUrl(value: string): URL | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  try {
+    const url = new URL(trimmed);
+    if (!HTTP_PROTOCOLS.has(url.protocol)) {
+      return undefined;
+    }
+    return url;
+  } catch {
+    return undefined;
+  }
+}
+
+function normalizeSearchResults(results: WebSearchResult[]): WebSearchResult[] {
+  const normalized: WebSearchResult[] = [];
+  for (const result of results) {
+    const title = parseQuery(result.title);
+    const urlValue = parseQuery(result.url);
+    const snippet = typeof result.snippet === "string" ? result.snippet.trim() : "";
+    if (!title || !urlValue) {
+      continue;
+    }
+    const parsedUrl = parseHttpUrl(urlValue);
+    if (!parsedUrl) {
+      continue;
+    }
+    const publishedDate =
+      typeof result.publishedDate === "string" && result.publishedDate.trim().length > 0
+        ? result.publishedDate.trim()
+        : undefined;
+    const content =
+      typeof result.content === "string" && result.content.trim().length > 0
+        ? result.content
+        : undefined;
+
+    normalized.push({
+      title,
+      url: parsedUrl.toString(),
+      snippet,
+      publishedDate,
+      content,
+    });
+  }
+  return normalized;
 }
