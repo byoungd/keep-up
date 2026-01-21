@@ -155,6 +155,9 @@ export class AdapterRegistry {
    * Register an adapter.
    */
   register(adapter: IExternalFrameworkAdapter): void {
+    if (this.adapters.has(adapter.name)) {
+      throw new Error(`Adapter "${adapter.name}" is already registered`);
+    }
     this.adapters.set(adapter.name, adapter);
   }
 
@@ -179,7 +182,7 @@ export class AdapterRegistry {
     const checks = await Promise.all(
       this.list().map(async (adapter) => ({
         adapter,
-        available: await adapter.isAvailable(),
+        available: await safelyCheckAvailability(adapter),
       }))
     );
     return checks.filter((c) => c.available).map((c) => c.adapter);
@@ -208,10 +211,13 @@ export class ExternalToolServer implements MCPToolServer {
   }
 
   async initialize(): Promise<void> {
-    if (await this.adapter.isAvailable()) {
-      const tools = await this.adapter.importTools();
-      this.cachedTools = tools.filter(hasValidPolicyAction);
+    const available = await safelyCheckAvailability(this.adapter);
+    if (!available) {
+      this.cachedTools = [];
+      return;
     }
+    const tools = await this.adapter.importTools();
+    this.cachedTools = tools.filter(hasValidPolicyAction);
   }
 
   listTools(): MCPTool[] {
@@ -219,7 +225,16 @@ export class ExternalToolServer implements MCPToolServer {
   }
 
   async callTool(call: MCPToolCall, _context: ToolContext): Promise<MCPToolResult> {
-    return this.adapter.executeTool(call.name, call.arguments);
+    try {
+      return await this.adapter.executeTool(call.name, call.arguments);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        success: false,
+        content: [{ type: "text", text: message }],
+        error: { code: "EXECUTION_FAILED", message },
+      };
+    }
   }
 }
 
@@ -243,4 +258,12 @@ export function createAdapterRegistry(adapters?: IExternalFrameworkAdapter[]): A
 function hasValidPolicyAction(tool: MCPTool): boolean {
   const policyAction = tool.annotations?.policyAction;
   return typeof policyAction === "string" && COWORK_POLICY_ACTIONS.includes(policyAction);
+}
+
+async function safelyCheckAvailability(adapter: IExternalFrameworkAdapter): Promise<boolean> {
+  try {
+    return await adapter.isAvailable();
+  } catch {
+    return false;
+  }
 }
