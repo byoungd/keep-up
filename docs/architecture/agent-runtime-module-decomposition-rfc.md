@@ -3,7 +3,7 @@
 Owner: Runtime Architect
 Status: Approved
 Date: 2026-01-19
-Related: docs/roadmap/agent-runtime-2026-track-l-architecture.md
+Related: docs/roadmap/phase-1-foundation/core/track-l-architecture.md
 Spec: docs/specs/agent-runtime-spec-2026.md
 Standards: packages/agent-runtime/ARCHITECTURE.md
 

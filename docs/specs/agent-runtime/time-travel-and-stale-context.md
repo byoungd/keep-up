@@ -4,7 +4,7 @@ Status: Implemented
 Owner: Agent Runtime  
 Last Updated: 2026-02-15  
 Applies to: Agent Runtime v1  
-Related docs: `docs/roadmap/next-q2/track-v-workspace-time-travel.md`
+Related docs: `docs/roadmap/phase-3-graph/track-v-workspace-time-travel.md`
 
 ## Context
 Workspace time travel is built on git-backed shadow checkpoints and deterministic message

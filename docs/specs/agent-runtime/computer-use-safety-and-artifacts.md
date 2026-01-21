@@ -5,7 +5,7 @@ Status: Implemented
 Owner: Agent Runtime  
 Last Updated: 2026-02-15  
 Applies to: Agent Runtime v1  
-Related docs: `docs/roadmap/next-q2/track-w-computer-use.md`, `docs/specs/cowork/cowork-safety-spec.md`
+Related docs: `docs/roadmap/phase-3-graph/track-w-computer-use.md`, `docs/specs/cowork/cowork-safety-spec.md`
 
 ## Context
 Computer-use workflows introduce OS-level screen capture and input control. These actions are
