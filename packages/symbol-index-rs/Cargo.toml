@@ -1,0 +1,11 @@
+[package]
+name = "symbol-index-rs"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Inverted + trigram index for fast LSP symbol search."
+publish = false
+
+[dependencies]
+
+[dev-dependencies]

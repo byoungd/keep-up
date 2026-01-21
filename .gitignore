@@ -136,6 +136,8 @@ packages/mdvp-wasm/pkg/*
 !packages/mdvp-wasm/pkg/mdvp_wasm.js
 !packages/mdvp-wasm/pkg/mdvp_wasm.d.ts
 !packages/mdvp-wasm/pkg/package.json
+packages/symbol-index-rs/target/
+packages/symbol-index-rs/Cargo.lock
 
 implementation_plan.md
 walkthrough.md
