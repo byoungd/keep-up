@@ -14,16 +14,24 @@ interface QueueLaneState {
 }
 
 const LANE_ORDER: ExecutionQueueClass[] = ["interactive", "normal", "batch"];
+const LANE_WEIGHTS: Record<ExecutionQueueClass, number> = {
+  interactive: 5,
+  normal: 3,
+  batch: 1,
+};
 const COMPACT_THRESHOLD = 128;
 
 export class ExecutionTaskQueue {
   private readonly lanes = new Map<ExecutionQueueClass, QueueLaneState>();
   private readonly entries = new Map<string, ExecutionQueueEntry>();
   private depth = 0;
+  private laneCursor = 0;
+  private readonly laneCredits = new Map<ExecutionQueueClass, number>();
 
   constructor() {
     for (const lane of LANE_ORDER) {
       this.lanes.set(lane, { items: [], head: 0 });
+      this.laneCredits.set(lane, LANE_WEIGHTS[lane]);
     }
   }
 
@@ -43,18 +51,20 @@ export class ExecutionTaskQueue {
   }
 
   dequeue(): ExecutionQueueEntry | undefined {
-    for (const lane of LANE_ORDER) {
-      const laneState = this.lanes.get(lane);
-      if (!laneState) {
-        continue;
-      }
-      const entry = this.dequeueFromLane(laneState);
+    if (this.depth === 0) {
+      return undefined;
+    }
+
+    for (let pass = 0; pass < 2; pass += 1) {
+      const entry = this.dequeueWithCredits();
       if (entry) {
         this.entries.delete(entry.taskId);
         this.depth = Math.max(0, this.depth - 1);
         return entry;
       }
+      this.resetLaneCredits();
     }
+
     return undefined;
   }
 
@@ -84,6 +94,41 @@ export class ExecutionTaskQueue {
     }
     this.compactLane(lane);
     return undefined;
+  }
+
+  private dequeueWithCredits(): ExecutionQueueEntry | undefined {
+    let checked = 0;
+    while (checked < LANE_ORDER.length) {
+      const lane = LANE_ORDER[this.laneCursor];
+      this.laneCursor = (this.laneCursor + 1) % LANE_ORDER.length;
+      checked += 1;
+
+      const credits = this.laneCredits.get(lane) ?? 0;
+      if (credits <= 0) {
+        continue;
+      }
+
+      const laneState = this.lanes.get(lane);
+      if (!laneState) {
+        continue;
+      }
+
+      const entry = this.dequeueFromLane(laneState);
+      if (!entry) {
+        continue;
+      }
+
+      this.laneCredits.set(lane, credits - 1);
+      return entry;
+    }
+
+    return undefined;
+  }
+
+  private resetLaneCredits(): void {
+    for (const lane of LANE_ORDER) {
+      this.laneCredits.set(lane, LANE_WEIGHTS[lane]);
+    }
   }
 
   private compactLane(lane: QueueLaneState): void {

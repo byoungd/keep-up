@@ -221,7 +221,7 @@ describe("execution pool", () => {
     expect(pool.getTask(receipt.taskId)?.status).toBe("canceled");
   });
 
-  it("rejects tasks that exceed quota limits", async () => {
+  it("defers tasks that exceed quota limits", async () => {
     const { pool } = createPool({
       execution: {
         leaseTtlMs: 1000,
@@ -242,7 +242,13 @@ describe("execution pool", () => {
     await pool.tick();
 
     expect(pool.getTask(first.taskId)?.status).toBe("running");
-    expect(pool.getTask(second.taskId)?.status).toBe("rejected");
+    expect(pool.getTask(second.taskId)?.status).toBe("queued");
+
+    deferred.resolve();
+    await pool.waitForTask(first.taskId);
+    await pool.waitForTask(second.taskId);
+
+    expect(pool.getTask(second.taskId)?.status).toBe("completed");
   });
 
   it("persists task snapshots at boundaries", async () => {
