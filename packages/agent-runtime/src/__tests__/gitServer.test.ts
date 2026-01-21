@@ -441,7 +441,7 @@ describe("GitToolServer", () => {
       );
 
       expect(result.success).toBe(true);
-      expect(executor.lastAddedFiles).toBe("src/index.ts");
+      expect(executor.lastAddedFiles).toEqual(["src/index.ts"]);
       expect(result.content[0].text).toContain("Staged: src/index.ts");
     });
 
@@ -461,7 +461,7 @@ describe("GitToolServer", () => {
       const result = await server.callTool({ name: "add", arguments: { files: "." } }, context);
 
       expect(result.success).toBe(true);
-      expect(executor.lastAddedFiles).toBe(".");
+      expect(executor.lastAddedFiles).toEqual(["."]);
     });
   });
 

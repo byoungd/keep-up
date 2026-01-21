@@ -11,8 +11,9 @@
  * - Configurable compression strategies
  */
 
+import type { NativeMessage } from "@ku0/tokenizer-rs";
 import type { AgentMessage, MCPToolResult } from "../types";
-import { countTokens } from "../utils/tokenCounter";
+import { countTokens, estimateJsonTokens, tryCompressContext } from "../utils/tokenCounter";
 
 // ============================================================================
 // Types
@@ -198,7 +199,7 @@ export class MessageCompressor {
         result = this.compressSlidingWindow(messages);
         break;
       case "truncate":
-        result = this.compressTruncate(messages);
+        result = this.compressTruncateNative(messages);
         break;
       case "hybrid":
         result = this.compressHybrid(messages);
@@ -208,15 +209,16 @@ export class MessageCompressor {
     }
 
     const utilization = (result.totalTokens / this.config.maxTokens) * 100;
-    const preservedIndices = result.messages
-      .map((msg) => messages.indexOf(msg))
-      .filter((idx) => idx !== -1);
+    const preservedIndices =
+      result.metadata?.preservedIndices ??
+      result.messages.map((msg) => messages.indexOf(msg)).filter((idx) => idx !== -1);
 
     const finalResult: CompressionResult = {
       ...result,
       removedCount: originalCount - result.messages.length,
       utilization,
       metadata: {
+        ...result.metadata,
         timestamp: Date.now(),
         strategy: this.config.strategy,
         preservedIndices,
@@ -324,12 +326,7 @@ export class MessageCompressor {
   }
 
   private estimateStructuredTokens(value: unknown): number {
-    try {
-      const text = JSON.stringify(value);
-      return this.estimateTextTokens(text);
-    } catch {
-      return this.estimateTextTokens(String(value));
-    }
+    return estimateJsonTokens(value);
   }
 
   private estimateTextTokens(text: string): number {
@@ -453,6 +450,10 @@ export class MessageCompressor {
       summarizedCount: 0,
       compressionRatio: 1 - result.length / messages.length,
     };
+  }
+
+  private compressTruncateNative(messages: AgentMessage[]): CompressionResult {
+    return this.tryNativeCompression(messages) ?? this.compressTruncate(messages);
   }
 
   /**
@@ -582,7 +583,7 @@ export class MessageCompressor {
 
     // If still over limit, apply truncation
     if (windowResult.totalTokens > this.config.maxTokens) {
-      return this.compressTruncate(windowResult.messages);
+      return this.compressTruncateNative(windowResult.messages);
     }
 
     return windowResult;
@@ -696,6 +697,84 @@ export class MessageCompressor {
     this.messageTokenCache = new WeakMap();
     this.lastSnapshot = undefined;
   }
+
+  private tryNativeCompression(messages: AgentMessage[]): CompressionResult | null {
+    if (this.config.estimateTokens !== DEFAULT_CONFIG.estimateTokens) {
+      return null;
+    }
+
+    const nativeResult = tryCompressContext(
+      toNativeMessages(messages),
+      this.config.maxTokens,
+      this.config.preserveCount
+    );
+
+    if (!nativeResult) {
+      return null;
+    }
+
+    return {
+      messages: toAgentMessages(nativeResult.messages),
+      totalTokens: nativeResult.totalTokens,
+      removedCount: nativeResult.removedCount,
+      summarizedCount: 0,
+      compressionRatio: nativeResult.compressionRatio,
+      metadata: {
+        preservedIndices: nativeResult.selectedIndices,
+      },
+    };
+  }
+}
+
+function toNativeMessages(messages: AgentMessage[]): NativeMessage[] {
+  return messages.map((message) => {
+    if (message.role === "tool") {
+      return {
+        role: "tool",
+        toolName: message.toolName,
+        result: message.result,
+      };
+    }
+
+    if (message.role === "assistant") {
+      return {
+        role: "assistant",
+        content: message.content,
+        toolCalls: message.toolCalls,
+      };
+    }
+
+    return {
+      role: message.role,
+      content: message.content,
+    };
+  });
+}
+
+function toAgentMessages(messages: NativeMessage[]): AgentMessage[] {
+  return messages.map((message) => {
+    if (message.role === "tool") {
+      return {
+        role: "tool",
+        toolName: message.toolName ?? "tool",
+        result: (message.result ?? { success: false, content: [] }) as MCPToolResult,
+      };
+    }
+
+    const content = message.content ?? "";
+    if (message.role === "assistant") {
+      return {
+        role: "assistant",
+        content,
+        toolCalls: message.toolCalls,
+      };
+    }
+
+    return {
+      role: message.role,
+      content,
+    };
+  });
 }
 
 /**
@@ -744,8 +823,7 @@ export class SmartMessageCompressor extends MessageCompressor {
   override estimateMessageTokens(message: AgentMessage): number {
     if (message.role === "tool" && message.result) {
       // For tool results, use accurate tokens for JSON
-      const resultText = JSON.stringify(message.result);
-      return countTokens(resultText);
+      return estimateJsonTokens(message.result);
     }
     return super.estimateMessageTokens(message);
   }

@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
@@ -15,7 +16,9 @@ const dockerSocketCandidates = [
 ];
 const resolvedDockerSocket = dockerSocketCandidates.find((candidate) => existsSync(candidate));
 const hasDockerSocket = Boolean(resolvedDockerSocket) || Boolean(process.env.DOCKER_HOST);
-const describeIf = hasDockerSocket ? describe : describe.skip;
+const dockerInfo = hasDockerSocket ? spawnSync("docker", ["info"], { stdio: "ignore" }) : null;
+const hasDockerEngine = Boolean(dockerInfo && dockerInfo.status === 0);
+const describeIf = hasDockerSocket && hasDockerEngine ? describe : describe.skip;
 
 function createContext(sessionId = "session-docker-e2e"): ToolContext {
   return {

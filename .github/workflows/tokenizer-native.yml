@@ -1,0 +1,45 @@
+name: Tokenizer Native Prebuilds
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "packages/tokenizer-rs/**"
+      - ".github/workflows/tokenizer-native.yml"
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build native binaries
+        run: pnpm -C packages/tokenizer-rs build:native
+
+      - name: Upload prebuilds
+        uses: actions/upload-artifact@v4
+        with:
+          name: tokenizer-rs-${{ matrix.os }}
+          path: packages/tokenizer-rs/npm
+          if-no-files-found: error

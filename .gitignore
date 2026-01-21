@@ -133,6 +133,7 @@ perf-artifacts/
 packages/core/*.tgz
 packages/mdvp-wasm/target/
 packages/mdvp-wasm/pkg/*
+packages/tokenizer-rs/native/target/
 !packages/mdvp-wasm/pkg/mdvp_wasm.js
 !packages/mdvp-wasm/pkg/mdvp_wasm.d.ts
 !packages/mdvp-wasm/pkg/package.json

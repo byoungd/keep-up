@@ -8,7 +8,7 @@
  * @see https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents
  */
 
-import { countTokens } from "../utils/tokenCounter";
+import { countTokens, estimateJsonTokens } from "../utils/tokenCounter";
 import type { AgentContext, ContextManager } from "./contextManager";
 
 // ============================================================================
@@ -153,6 +153,9 @@ export interface ThresholdCheckResult {
 export class ContextCompactor {
   private readonly options: Required<Omit<CompactionOptions, "contextConfig">>;
   private readonly contextConfig: ContextManagementConfig;
+  private readonly messageTokenCache = new WeakMap<Message, { content: string; tokens: number }>();
+  private lastSystemPrompt?: string;
+  private lastSystemTokens = 0;
 
   constructor(options: CompactionOptions = {}) {
     // Default context config per spec 5.11
@@ -179,7 +182,7 @@ export class ContextCompactor {
    * Triggers when tokens exceed threshold (default: 80% of limit).
    */
   checkThreshold(messages: Message[], systemPrompt?: string): ThresholdCheckResult {
-    const systemTokens = systemPrompt ? countTokens(systemPrompt) : 0;
+    const systemTokens = this.countSystemTokens(systemPrompt);
     const messageTokens = this.estimateTokens(messages);
     const currentTokens = systemTokens + messageTokens;
     const usagePercent = currentTokens / this.contextConfig.maxTokens;
@@ -398,15 +401,15 @@ Do NOT include redundant tool outputs or verbose explanations.`;
   estimateTokens(messages: Message[]): number {
     let total = 0;
     for (const msg of messages) {
-      total += countTokens(msg.content);
+      total += this.countMessageContentTokens(msg);
       if (msg.toolCalls) {
         for (const call of msg.toolCalls) {
-          total += countTokens(JSON.stringify(call.arguments));
+          total += estimateJsonTokens(call.arguments);
         }
       }
       if (msg.toolResults) {
         for (const result of msg.toolResults) {
-          total += countTokens(JSON.stringify(result.result));
+          total += estimateJsonTokens(result.result);
         }
       }
     }
@@ -427,6 +430,34 @@ Do NOT include redundant tool outputs or verbose explanations.`;
     }
 
     return Array.from(merged.values());
+  }
+
+  private countSystemTokens(systemPrompt?: string): number {
+    if (!systemPrompt) {
+      this.lastSystemPrompt = undefined;
+      this.lastSystemTokens = 0;
+      return 0;
+    }
+
+    if (this.lastSystemPrompt === systemPrompt) {
+      return this.lastSystemTokens;
+    }
+
+    const tokens = countTokens(systemPrompt);
+    this.lastSystemPrompt = systemPrompt;
+    this.lastSystemTokens = tokens;
+    return tokens;
+  }
+
+  private countMessageContentTokens(message: Message): number {
+    const cached = this.messageTokenCache.get(message);
+    if (cached && cached.content === message.content) {
+      return cached.tokens;
+    }
+
+    const tokens = countTokens(message.content);
+    this.messageTokenCache.set(message, { content: message.content, tokens });
+    return tokens;
   }
 
   /**
