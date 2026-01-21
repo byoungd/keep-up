@@ -10,14 +10,28 @@ import * as path from "node:path";
 import { promisify } from "node:util";
 
 // Native gitignore matcher (optional, falls back to git ls-files)
-let gitignoreRs: typeof import("@ku0/gitignore-rs") | null = null;
-try {
-  gitignoreRs = await import("@ku0/gitignore-rs");
-  if (!gitignoreRs.hasNativeSupport()) {
-    gitignoreRs = null;
+type GitignoreRsModule = typeof import("@ku0/gitignore-rs");
+let gitignoreRsPromise: Promise<GitignoreRsModule | null> | null = null;
+
+async function loadGitignoreRs(): Promise<GitignoreRsModule | null> {
+  if (gitignoreRsPromise) {
+    return gitignoreRsPromise;
   }
-} catch {
-  // Native binding not available
+
+  gitignoreRsPromise = (async () => {
+    try {
+      const module = await import("@ku0/gitignore-rs");
+      return module.hasNativeSupport() ? module : null;
+    } catch {
+      return null;
+    }
+  })();
+
+  const result = await gitignoreRsPromise;
+  if (!result) {
+    gitignoreRsPromise = null;
+  }
+  return result;
 }
 
 const execFileAsync = promisify(execFile);
@@ -133,6 +147,7 @@ export async function listFiles(
   const respectGitignore = options.respectGitignore ?? true;
 
   // Priority 1: Native Rust gitignore-rs (fastest)
+  const gitignoreRs = respectGitignore ? await loadGitignoreRs() : null;
   if (respectGitignore && gitignoreRs) {
     try {
       const entries = gitignoreRs.listFiles(absolutePath, {
