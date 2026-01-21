@@ -121,7 +121,7 @@ export class DelegationToolServer extends BaseToolServer {
           policyAction: "connector.read",
         },
       },
-      () => this.handleListRoles()
+      (_args: Record<string, unknown>, context: ToolContext) => this.handleListRoles(context)
     );
   }
 
@@ -167,7 +167,7 @@ export class DelegationToolServer extends BaseToolServer {
       });
 
       this.updateLineageStatus(agentId ?? result.agentId, result.success);
-      return this.formatResult(result, role);
+      return this.formatResult(result, role, toolContext);
     } catch (error) {
       if (agentId) {
         this.updateLineageStatus(agentId, false);
@@ -291,7 +291,7 @@ export class DelegationToolServer extends BaseToolServer {
 
       const result = response.payload as { success?: boolean; output?: string; error?: string };
       if (result.success) {
-        return textResult(result.output ?? "");
+        return this.formatOutput(result.output ?? "", context);
       }
 
       const message = result.error ?? "Delegation failed";
@@ -305,7 +305,7 @@ export class DelegationToolServer extends BaseToolServer {
   /**
    * Handle list_roles tool call.
    */
-  private async handleListRoles(): Promise<MCPToolResult> {
+  private handleListRoles(context: ToolContext): MCPToolResult {
     const roleDescriptions = [
       {
         role: "researcher",
@@ -333,7 +333,10 @@ export class DelegationToolServer extends BaseToolServer {
       },
     ];
 
-    return textResult(`Available delegation roles:\n${JSON.stringify(roleDescriptions, null, 2)}`);
+    return this.formatOutput(
+      `Available delegation roles:\n${JSON.stringify(roleDescriptions, null, 2)}`,
+      context
+    );
   }
 
   // ============================================================================
@@ -374,20 +377,35 @@ export class DelegationToolServer extends BaseToolServer {
     return prompt;
   }
 
-  private formatResult(result: AgentResult, role: DelegationRole): MCPToolResult {
+  private formatResult(
+    result: AgentResult,
+    role: DelegationRole,
+    context: ToolContext
+  ): MCPToolResult {
     if (result.success) {
-      return textResult(
+      return this.formatOutput(
         `## Delegation Result (${role})\n\n` +
           `**Agent ID**: ${result.agentId}\n` +
           `**Turns**: ${result.turns}\n` +
           `**Duration**: ${result.durationMs}ms\n\n` +
-          `### Output\n\n${result.output}`
+          `### Output\n\n${result.output}`,
+        context
       );
     }
     return errorResult(
       "EXECUTION_FAILED",
       `Delegation failed after ${result.turns} turns (${result.durationMs}ms): ${result.error ?? "Unknown error"}`
     );
+  }
+
+  private formatOutput(output: string, context: ToolContext): MCPToolResult {
+    const maxOutputBytes = context.security.limits.maxOutputBytes;
+    if (Buffer.byteLength(output) > maxOutputBytes) {
+      const truncated = Buffer.from(output).subarray(0, maxOutputBytes).toString();
+      return textResult(`${truncated}\n\n[Output truncated at ${maxOutputBytes} bytes]`);
+    }
+
+    return textResult(output);
   }
 
   private createChildAgentId(agentType: AgentType): string {
