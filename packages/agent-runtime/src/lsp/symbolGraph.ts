@@ -1,4 +1,5 @@
 import * as path from "node:path";
+import { createSymbolIndex, type NativeSymbolIndex } from "@ku0/symbol-index-rs";
 import type { LspSymbol } from "@ku0/tool-lsp";
 
 export interface SymbolDescriptor {
@@ -27,7 +28,92 @@ const DEFAULT_QUERY_LIMIT = 20;
 
 type LspSymbolWithDetail = LspSymbol & { detail?: string };
 
+type NativeQueryOptions = {
+  limit?: number;
+  kinds?: string[];
+};
+
 export class SymbolGraph {
+  private readonly nativeIndex: NativeSymbolIndex | null;
+  private readonly memoryIndex: MemorySymbolGraph | null;
+  private readonly fileSymbolCounts = new Map<string, number>();
+
+  constructor() {
+    this.nativeIndex = createSymbolIndex();
+    this.memoryIndex = this.nativeIndex ? null : new MemorySymbolGraph();
+  }
+
+  updateFileSymbols(filePath: string, symbols: LspSymbol[]): { added: number; removed: number } {
+    if (this.memoryIndex) {
+      return this.memoryIndex.updateFileSymbols(filePath, symbols);
+    }
+
+    const normalized = normalizeFilePath(filePath);
+    const previousCount = this.fileSymbolCounts.get(normalized) ?? 0;
+    const nativeIndex = this.nativeIndex;
+    const flattened = flattenSymbols(symbols as LspSymbolWithDetail[]).map((symbol) => ({
+      ...symbol,
+      file: normalizeFilePath(symbol.file),
+    }));
+
+    if (!nativeIndex) {
+      return { added: 0, removed: previousCount };
+    }
+
+    nativeIndex.updateFile(normalized, flattened);
+    if (flattened.length > 0) {
+      this.fileSymbolCounts.set(normalized, flattened.length);
+    } else {
+      this.fileSymbolCounts.delete(normalized);
+    }
+
+    return { added: flattened.length, removed: previousCount };
+  }
+
+  removeFile(filePath: string): void {
+    if (this.memoryIndex) {
+      this.memoryIndex.removeFile(filePath);
+      return;
+    }
+
+    const normalized = normalizeFilePath(filePath);
+    const nativeIndex = this.nativeIndex;
+    if (!nativeIndex) {
+      return;
+    }
+    nativeIndex.removeFile(normalized);
+    this.fileSymbolCounts.delete(normalized);
+  }
+
+  query(query: string, options: SymbolQueryOptions = {}): SymbolQueryResult[] {
+    if (this.memoryIndex) {
+      return this.memoryIndex.query(query, options);
+    }
+
+    const nativeIndex = this.nativeIndex;
+    if (!nativeIndex) {
+      return [];
+    }
+
+    const nativeOptions = toNativeQueryOptions(options);
+    return nativeIndex.query(query, nativeOptions);
+  }
+
+  getStats(): { symbolCount: number; fileCount: number } {
+    if (this.memoryIndex) {
+      return this.memoryIndex.getStats();
+    }
+
+    const nativeIndex = this.nativeIndex;
+    if (!nativeIndex) {
+      return { symbolCount: 0, fileCount: 0 };
+    }
+
+    return nativeIndex.stats();
+  }
+}
+
+class MemorySymbolGraph {
   private readonly symbolsByFile = new Map<string, SymbolDescriptor[]>();
   private readonly symbolsByName = new Map<string, SymbolDescriptor[]>();
 
@@ -126,6 +212,17 @@ export class SymbolGraph {
 
 function normalizeFilePath(filePath: string): string {
   return path.resolve(filePath);
+}
+
+function toNativeQueryOptions(options: SymbolQueryOptions): NativeQueryOptions | undefined {
+  if (options.limit === undefined && options.kinds === undefined) {
+    return undefined;
+  }
+
+  return {
+    limit: options.limit,
+    kinds: options.kinds,
+  };
 }
 
 function flattenSymbols(symbols: LspSymbolWithDetail[], container?: string): SymbolDescriptor[] {

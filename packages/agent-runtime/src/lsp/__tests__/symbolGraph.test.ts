@@ -1,9 +1,24 @@
 import type { LspSymbol } from "@ku0/tool-lsp";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { SymbolGraph } from "../symbolGraph";
 
 describe("SymbolGraph", () => {
+  let previousNativeSetting: string | undefined;
+
+  beforeEach(() => {
+    previousNativeSetting = process.env.KU0_SYMBOL_INDEX_DISABLE_NATIVE;
+    process.env.KU0_SYMBOL_INDEX_DISABLE_NATIVE = "1";
+  });
+
+  afterEach(() => {
+    if (previousNativeSetting === undefined) {
+      delete process.env.KU0_SYMBOL_INDEX_DISABLE_NATIVE;
+    } else {
+      process.env.KU0_SYMBOL_INDEX_DISABLE_NATIVE = previousNativeSetting;
+    }
+  });
+
   it("indexes symbols by file and supports queries", () => {
     const graph = new SymbolGraph();
     const symbols: LspSymbol[] = [
