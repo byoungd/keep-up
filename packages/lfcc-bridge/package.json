@@ -13,11 +13,15 @@
   },
   "dependencies": {
     "@ku0/core": "workspace:*",
+    "@ku0/streaming-markdown-rs": "workspace:*",
     "loro-crdt": "^1.10.3",
     "prosemirror-model": "^1.25.4",
     "prosemirror-state": "^1.4.4",
     "prosemirror-transform": "^1.10.2",
     "prosemirror-view": "^1.41.4"
+  },
+  "devDependencies": {
+    "@ku0/native-bindings": "workspace:*"
   },
   "scripts": {
     "build": "tsc",
