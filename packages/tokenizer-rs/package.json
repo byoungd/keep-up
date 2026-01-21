@@ -13,8 +13,9 @@
     }
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && pnpm build:native",
     "build:native": "napi build --cargo-cwd native --platform --release",
+    "test": "vitest run --root ../.. --config vitest.config.ts src/**/*.test.ts",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "lint:fix": "biome check --write ."
@@ -22,7 +23,8 @@
   "devDependencies": {
     "@napi-rs/cli": "^2.18.4",
     "@types/node": "^22.10.2",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "vitest": "^4.0.0"
   },
   "dependencies": {
     "js-tiktoken": "^1.0.21"

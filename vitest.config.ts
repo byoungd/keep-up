@@ -252,6 +252,7 @@ export default defineConfig({
             "packages/agent-runtime-control/src/**/*.test.ts",
             "packages/agent-runtime-core/src/**/*.test.ts",
             "packages/agent-runtime-vision/src/**/*.test.ts",
+            "packages/tokenizer-rs/src/**/*.test.ts",
           ],
           exclude: defaultExclude,
           server: {

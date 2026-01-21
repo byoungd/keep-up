@@ -134,6 +134,9 @@ packages/core/*.tgz
 packages/mdvp-wasm/target/
 packages/mdvp-wasm/pkg/*
 packages/tokenizer-rs/native/target/
+packages/tokenizer-rs/npm/
+packages/tokenizer-rs/*.node
+packages/tokenizer-rs/native/*.node
 !packages/mdvp-wasm/pkg/mdvp_wasm.js
 !packages/mdvp-wasm/pkg/mdvp_wasm.d.ts
 !packages/mdvp-wasm/pkg/package.json
