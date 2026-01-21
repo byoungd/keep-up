@@ -19,7 +19,7 @@ export interface SQLiteCheckpointSaverConfig {
 
 const DEFAULT_COMPRESSION_THRESHOLD = 64 * 1024;
 
-type PreparedStatement = ReturnType<DatabaseInstance["prepare"]>;
+type PreparedStatement = Database.Statement;
 
 type PreparedStatements = {
   saveThread: PreparedStatement;
