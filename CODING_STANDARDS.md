@@ -235,4 +235,76 @@ Before implementing any new feature, specific agents MUST:
 3.  ** Reuse**: Prioritize integrating mature libraries over reinventing wheels.
 4.  **Justify**: In the `implementation_plan.md`, explicitly state *why* a particular stack was chosen.
 
+## 14. Rust Development Standards (Phase 6)
 
+This project uses Rust for performance-critical subsystems. TypeScript remains the control plane; Rust is used only when there is a quantifiable performance or safety benefit.
+
+### 14.1 Core Principles
+*   **TypeScript orchestrates, Rust accelerates**: Orchestrator, policy, and model routing stay in TypeScript.
+*   **N-API first**: Use napi-rs for synchronous Node bindings. UDS for isolated processes (future).
+*   **Cross-platform**: All Rust code must support macOS, Linux, and Windows with explicit fallbacks.
+
+### 14.2 Rust Crates
+
+| Crate | Purpose | Priority |
+|-------|---------|----------|
+| `crates/sandbox-rs/` | OS-level sandbox (Seatbelt/Landlock/AppContainer) | P0 |
+| `crates/storage-engine-rs/` | Event log + checkpoint engine | P1 |
+| `crates/tokenizer-rs/` | tiktoken + Zstd compression | P1 |
+| `crates/symbol-index-rs/` | Inverted/trigram symbol index | P2 |
+
+### 14.3 Code Style
+*   **Edition**: Rust 2024 edition.
+*   **Clippy**: `cargo clippy -- -D warnings` must pass. No `#[allow(clippy::...)]` without justification.
+*   **Formatting**: `cargo fmt` before commits.
+*   **Error handling**: Use `thiserror` for library errors, `anyhow` for applications.
+*   **Unsafe**: Avoid `unsafe` unless absolutely necessary. Document all unsafe blocks.
+*   **Documentation**: Public APIs must have rustdoc comments with examples.
+
+### 14.4 N-API Bindings
+*   **Library**: Use `napi-rs` for TypeScript bindings.
+*   **Thread safety**: All exported functions must be `Send + Sync` or use synchronous APIs.
+*   **Error conversion**: Convert Rust `Result` to N-API errors with meaningful messages.
+*   **WASM fallback**: Provide `wasm32-unknown-unknown` target for browser contexts where applicable.
+
+```rust
+// Example N-API export pattern
+#[napi]
+pub fn count_tokens(text: String, model: String) -> napi::Result<u32> {
+    internal::count_tokens(&text, &model)
+        .map_err(|e| napi::Error::from_reason(e.to_string()))
+}
+```
+
+### 14.5 Cross-Platform Requirements
+*   **macOS**: Seatbelt sandbox policies via `sandbox-exec`.
+*   **Linux**: Landlock (kernel >= 5.13) + seccomp + namespaces. Fallback to Docker.
+*   **Windows**: AppContainer. Fallback to Docker/WSL when unavailable.
+*   **File paths**: Use `std::path::Path` and handle Unicode normalization.
+*   **File locking**: Use platform-safe atomic writes (`tempfile` + rename).
+
+### 14.6 Testing
+*   **Unit tests**: `cargo test` in each crate.
+*   **Integration tests**: `tests/` directory for cross-crate scenarios.
+*   **Benchmarks**: Use `criterion` for performance regression testing.
+*   **CI**: All crates must pass `cargo clippy`, `cargo fmt --check`, and `cargo test` on all platforms.
+
+### 14.7 Performance Targets
+
+| Subsystem | Current (TS) | Target (Rust) |
+|-----------|--------------|---------------|
+| Sandbox startup | ~500ms (Docker) | <10ms |
+| Event log write P99 | ~15ms | <5ms |
+| Token counting | ~10ms/10k tokens | <1ms |
+| Symbol query | ~50ms (full scan) | <5ms |
+
+### 14.8 Feature Flags
+*   Use feature flags for gradual Rust rollout: `runtime.sandbox.mode = rust|docker`.
+*   Automatic fallback on unsupported platforms or missing binaries.
+
+### 14.9 References
+*   [Phase 6 Roadmap](./docs/roadmap/phase-6-rust-native/README.md)
+*   [Track AD: Sandbox Sidecar](./docs/roadmap/phase-6-rust-native/track-ad-sandbox-sidecar.md)
+*   [Track AE: Storage Engine](./docs/roadmap/phase-6-rust-native/track-ae-storage-engine.md)
+*   [Track AF: Tokenizer](./docs/roadmap/phase-6-rust-native/track-af-tokenizer-compression.md)
+*   [Track AG: LSP Indexer](./docs/roadmap/phase-6-rust-native/track-ag-lsp-indexer.md)
