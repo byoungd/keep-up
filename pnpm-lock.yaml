@@ -223,15 +223,12 @@ importers:
       '@ku0/db':
         specifier: workspace:*
         version: link:../db
-<<<<<<< HEAD
-      '@ku0/symbol-index-rs':
-        specifier: workspace:*
-        version: link:../symbol-index-rs
-=======
       '@ku0/sandbox-rs':
         specifier: workspace:*
         version: link:../sandbox-rs
->>>>>>> pr-180
+      '@ku0/symbol-index-rs':
+        specifier: workspace:*
+        version: link:../symbol-index-rs
       '@ku0/tool-lsp':
         specifier: workspace:*
         version: link:../tool-lsp
