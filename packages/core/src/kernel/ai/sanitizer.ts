@@ -4,6 +4,7 @@
  * @see docs/product/LFCC_v0.9_RC_Engineering_Docs/07_AI_Dry_Run_Pipeline_Design.md Section 2
  */
 
+import { loadNativeAiSanitizer } from "./native.js";
 import type { AIPayloadSanitizer, AISanitizationPolicyV1, SanitizedPayload } from "./types.js";
 
 type SanitizeDiag = { kind: string; detail: string; severity?: "error" | "warning" };
@@ -418,7 +419,7 @@ function sanitizeHtmlString(
 /**
  * Create a whitelist-based HTML sanitizer
  */
-export function createSanitizer(): AIPayloadSanitizer {
+export function createFallbackSanitizer(): AIPayloadSanitizer {
   return {
     sanitize(
       input: { html?: string; markdown?: string },
@@ -472,4 +473,21 @@ export function createSanitizer(): AIPayloadSanitizer {
       return result;
     },
   };
+}
+
+/**
+ * Create a sanitizer, preferring native bindings when enabled/available.
+ */
+export function createSanitizer(): AIPayloadSanitizer {
+  const native = loadNativeAiSanitizer();
+  if (native) {
+    const parseHtmlToInputTree =
+      native.parseHtmlToInputTree as AIPayloadSanitizer["parseHtmlToInputTree"];
+    return {
+      sanitize: (input, policy) => native.sanitize(input, policy),
+      parseHtmlToInputTree,
+    };
+  }
+
+  return createFallbackSanitizer();
 }

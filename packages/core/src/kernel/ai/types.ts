@@ -5,7 +5,7 @@
  * @see docs/specs/proposals/LFCC_v0.9.1_AI_Native_Enhancement.md
  */
 
-import type { CanonMark, CanonNode } from "../canonicalizer/types.js";
+import type { CanonInputNode, CanonMark, CanonNode } from "../canonicalizer/types.js";
 import type { EditIntent } from "./intent.js";
 import type { AIOperationMeta } from "./opcodes.js";
 
@@ -140,6 +140,7 @@ export interface AIPayloadSanitizer {
     input: { html?: string; markdown?: string },
     policy: AISanitizationPolicyV1
   ): SanitizedPayload;
+  parseHtmlToInputTree?: (html: string) => CanonInputNode;
 }
 
 /** Default sanitization policy */

@@ -324,6 +324,36 @@ describe("AI Dry-Run Pipeline", () => {
     expect(result.ok).toBe(true);
     expect(result.canon_root).toBeDefined();
   });
+
+  it("should use sanitizer parser when provided", async () => {
+    const validator = createPassThroughValidator();
+    const parserSanitizer = {
+      sanitize: () => ({
+        sanitized_html: "<p>fallback</p>",
+        diagnostics: [],
+      }),
+      parseHtmlToInputTree: () => ({
+        kind: "element" as const,
+        tag: "h1",
+        attrs: {},
+        children: [{ kind: "text" as const, text: "Native parser" }],
+      }),
+    };
+
+    const result = await dryRunAIPayload(
+      { html: "<p>ignored</p>" },
+      parserSanitizer,
+      validator,
+      DEFAULT_AI_SANITIZATION_POLICY
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.canon_root && "type" in result.canon_root) {
+      expect(result.canon_root.type).toBe("heading");
+    } else {
+      throw new Error("Expected canonical block from native parser");
+    }
+  });
 });
 
 describe("AI Envelope", () => {
