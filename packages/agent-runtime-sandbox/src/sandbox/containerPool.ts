@@ -47,14 +47,52 @@ const DEFAULT_HEALTH_CHECK_INTERVAL_MS = 60_000;
 const DEFAULT_RESET_TIMEOUT_MS = 10_000;
 const DEFAULT_RESET_COMMAND = "rm -rf /tmp/* /var/tmp/*";
 
+class Queue<T> {
+  private items: T[] = [];
+  private head = 0;
+
+  enqueue(item: T): void {
+    this.items.push(item);
+  }
+
+  dequeue(): T | undefined {
+    if (this.head >= this.items.length) {
+      return undefined;
+    }
+    const item = this.items[this.head];
+    this.head += 1;
+    if (this.head > 64 && this.head * 2 > this.items.length) {
+      this.items = this.items.slice(this.head);
+      this.head = 0;
+    }
+    return item;
+  }
+
+  drain(): T[] {
+    if (this.head >= this.items.length) {
+      this.items = [];
+      this.head = 0;
+      return [];
+    }
+    const drained = this.items.slice(this.head);
+    this.items = [];
+    this.head = 0;
+    return drained;
+  }
+
+  get size(): number {
+    return this.items.length - this.head;
+  }
+}
+
 class Mutex {
   private locked = false;
-  private readonly queue: Array<() => void> = [];
+  private readonly queue = new Queue<() => void>();
 
   async acquire(): Promise<() => void> {
     return new Promise((resolve) => {
       const release = () => {
-        const next = this.queue.shift();
+        const next = this.queue.dequeue();
         if (next) {
           next();
           return;
@@ -68,7 +106,7 @@ class Mutex {
         return;
       }
 
-      this.queue.push(() => {
+      this.queue.enqueue(() => {
         this.locked = true;
         resolve(release);
       });
@@ -82,7 +120,7 @@ export class ContainerPool {
   private readonly ready: PooledContainer[] = [];
   private readonly leased = new Map<string, PooledContainer>();
   private readonly resetting = new Map<string, PooledContainer>();
-  private readonly waitQueue: Waiter[] = [];
+  private readonly waitQueue = new Queue<Waiter>();
   private readonly mutex = new Mutex();
   private pendingCreates = 0;
   private started = false;
@@ -209,7 +247,7 @@ export class ContainerPool {
     }
 
     const releaseLock = await this.mutex.acquire();
-    const waiters = this.waitQueue.splice(0, this.waitQueue.length);
+    const waiters = this.waitQueue.drain();
     const containers = [
       ...this.ready.map((entry) => entry.container),
       ...Array.from(this.leased.values()).map((entry) => entry.container),
@@ -236,7 +274,7 @@ export class ContainerPool {
       leased: this.leased.size,
       resetting: this.resetting.size,
       pendingCreates: this.pendingCreates,
-      waiters: this.waitQueue.length,
+      waiters: this.waitQueue.size,
     };
   }
 
@@ -286,7 +324,7 @@ export class ContainerPool {
     }
 
     const containerPromise = new Promise<Container>((resolve, reject) => {
-      this.waitQueue.push({ resolve, reject });
+      this.waitQueue.enqueue({ resolve, reject });
     });
     releaseLock();
     return containerPromise;
@@ -333,7 +371,7 @@ export class ContainerPool {
 
   private returnToPoolLocked(pooled: PooledContainer): void {
     pooled.lastUsedAt = Date.now();
-    const waiter = this.waitQueue.shift();
+    const waiter = this.waitQueue.dequeue();
     if (waiter) {
       this.leased.set(pooled.container.id, pooled);
       waiter.resolve(pooled.container);
