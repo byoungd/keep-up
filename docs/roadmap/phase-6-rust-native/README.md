@@ -36,6 +36,7 @@ All tracks must support macOS, Linux, and Windows with explicit fallbacks:
 | AF | Tokenizer and Compression | P1 | Ready | [track-af-tokenizer-compression.md](./track-af-tokenizer-compression.md) |
 | AG | LSP Indexer | P2 | Planning | [track-ag-lsp-indexer.md](./track-ag-lsp-indexer.md) |
 | AH | Diff Engine | P1 | Ready | [track-ah-diff-engine.md](./track-ah-diff-engine.md) |
+| AI | Vector Similarity | P1 | Ready | [track-ai-vector-similarity.md](./track-ai-vector-similarity.md) |
 
 ---
 
