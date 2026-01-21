@@ -154,8 +154,10 @@ export class VisionToolServer extends BaseToolServer {
 
     const includeAdjacencyEdges =
       typeof args.includeAdjacencyEdges === "boolean" ? args.includeAdjacencyEdges : undefined;
-    const adjacencyThreshold =
-      typeof args.adjacencyThreshold === "number" ? args.adjacencyThreshold : undefined;
+    const adjacencyThreshold = readOptionalNonNegativeNumber(args.adjacencyThreshold);
+    if (adjacencyThreshold === null) {
+      return errorResult("INVALID_ARGUMENTS", "adjacencyThreshold must be a non-negative number");
+    }
 
     const input: LayoutScanInput = {
       nodes: nodes ?? undefined,
@@ -183,12 +185,20 @@ export class VisionToolServer extends BaseToolServer {
 
     const weights = readWeights(args.weights);
     if (weights === null) {
-      return errorResult("INVALID_ARGUMENTS", "weights must be an object with numeric fields");
+      return errorResult(
+        "INVALID_ARGUMENTS",
+        "weights must be an object with non-negative numeric fields"
+      );
+    }
+
+    const minScore = readOptionalUnitInterval(args.minScore);
+    if (minScore === null) {
+      return errorResult("INVALID_ARGUMENTS", "minScore must be between 0 and 1");
     }
 
     const options: VisualDiffOptions = {
       weights: weights ?? undefined,
-      minScore: typeof args.minScore === "number" ? args.minScore : undefined,
+      minScore: minScore ?? undefined,
     };
 
     const report = diffLayoutGraphs(before, after, options);
@@ -208,10 +218,11 @@ export class VisionToolServer extends BaseToolServer {
       return errorResult("INVALID_ARGUMENTS", "region must include x, y, width, height");
     }
 
-    const confidenceThreshold =
-      typeof args.confidenceThreshold === "number"
-        ? args.confidenceThreshold
-        : this.config.autoApplyConfidenceThreshold;
+    const confidenceOverride = readOptionalUnitInterval(args.confidenceThreshold);
+    if (confidenceOverride === null) {
+      return errorResult("INVALID_ARGUMENTS", "confidenceThreshold must be between 0 and 1");
+    }
+    const confidenceThreshold = confidenceOverride ?? this.config.autoApplyConfidenceThreshold;
 
     const mapping = mapRegionToComponent(graph, region, { confidenceThreshold });
     return textResult(JSON.stringify(mapping, null, 2));
@@ -249,27 +260,44 @@ function readLayoutNodeInput(value: unknown): LayoutNodeInput | null {
     return null;
   }
 
-  let componentRef: ComponentRef | undefined;
-  if (value.componentRef !== undefined) {
-    const parsedRef = readComponentRef(value.componentRef);
-    if (!parsedRef) {
-      return null;
-    }
-    componentRef = parsedRef;
+  const id = readOptionalString(value.id);
+  if (id === null) {
+    return null;
+  }
+  const text = readOptionalString(value.text);
+  if (text === null) {
+    return null;
+  }
+  const role = readOptionalString(value.role);
+  if (role === null) {
+    return null;
+  }
+  const componentRef = readOptionalComponentRef(value.componentRef);
+  if (componentRef === null) {
+    return null;
   }
 
-  const type = isLayoutNodeType(value.type) ? value.type : undefined;
-  const confidence = typeof value.confidence === "number" ? value.confidence : undefined;
-  const source = isLayoutNodeSource(value.source) ? value.source : undefined;
+  const type = readOptionalLayoutNodeType(value.type);
+  if (type === null) {
+    return null;
+  }
+  const source = readOptionalLayoutNodeSource(value.source);
+  if (source === null) {
+    return null;
+  }
+  const confidence = readOptionalUnitInterval(value.confidence);
+  if (confidence === null) {
+    return null;
+  }
 
   return {
-    id: typeof value.id === "string" ? value.id : undefined,
+    id,
     bounds,
     type,
-    text: typeof value.text === "string" ? value.text : undefined,
-    role: typeof value.role === "string" ? value.role : undefined,
+    text,
+    role,
     componentRef,
-    confidence,
+    confidence: confidence ?? undefined,
     source,
   };
 }
@@ -300,11 +328,18 @@ function readOcrBlock(value: unknown): OcrBlockInput | null {
   if (!bounds || typeof value.text !== "string") {
     return null;
   }
+  if (value.id !== undefined && typeof value.id !== "string") {
+    return null;
+  }
+  const confidence = readOptionalUnitInterval(value.confidence);
+  if (confidence === null) {
+    return null;
+  }
   return {
     id: typeof value.id === "string" ? value.id : undefined,
     text: value.text,
     bounds,
-    confidence: typeof value.confidence === "number" ? value.confidence : undefined,
+    confidence: confidence ?? undefined,
   };
 }
 
@@ -313,6 +348,9 @@ function readLayoutGraph(value: unknown): LayoutGraph | null {
     return null;
   }
   if (!Array.isArray(value.nodes)) {
+    return null;
+  }
+  if (value.edges !== undefined && !Array.isArray(value.edges)) {
     return null;
   }
 
@@ -329,9 +367,10 @@ function readLayoutGraph(value: unknown): LayoutGraph | null {
   if (Array.isArray(value.edges)) {
     for (const entry of value.edges) {
       const edge = readLayoutEdge(entry);
-      if (edge) {
-        edges.push(edge);
+      if (!edge) {
+        return null;
       }
+      edges.push(edge);
     }
   }
 
@@ -352,7 +391,14 @@ function readLayoutNode(value: unknown): LayoutNode | null {
   if (!bounds) {
     return null;
   }
-  if (typeof value.confidence !== "number") {
+  if (value.text !== undefined && typeof value.text !== "string") {
+    return null;
+  }
+  if (value.role !== undefined && typeof value.role !== "string") {
+    return null;
+  }
+  const confidence = readUnitInterval(value.confidence);
+  if (confidence === null) {
     return null;
   }
 
@@ -372,7 +418,7 @@ function readLayoutNode(value: unknown): LayoutNode | null {
     text: typeof value.text === "string" ? value.text : undefined,
     role: typeof value.role === "string" ? value.role : undefined,
     componentRef,
-    confidence: value.confidence,
+    confidence,
   };
 }
 
@@ -396,15 +442,17 @@ function readComponentRef(value: unknown): ComponentRef | null {
   if (typeof value.filePath !== "string") {
     return null;
   }
-  if (typeof value.line !== "number" || typeof value.column !== "number") {
+  const line = readNonNegativeNumber(value.line);
+  const column = readNonNegativeNumber(value.column);
+  if (line === null || column === null) {
     return null;
   }
 
   return {
     filePath: value.filePath,
     symbol: typeof value.symbol === "string" ? value.symbol : undefined,
-    line: value.line,
-    column: value.column,
+    line,
+    column,
   };
 }
 
@@ -412,19 +460,18 @@ function readBounds(value: unknown): LayoutBounds | null {
   if (!isRecord(value)) {
     return null;
   }
-  if (
-    typeof value.x !== "number" ||
-    typeof value.y !== "number" ||
-    typeof value.width !== "number" ||
-    typeof value.height !== "number"
-  ) {
+  const x = readFiniteNumber(value.x);
+  const y = readFiniteNumber(value.y);
+  const width = readPositiveNumber(value.width);
+  const height = readPositiveNumber(value.height);
+  if (x === null || y === null || width === null || height === null) {
     return null;
   }
   return {
-    x: value.x,
-    y: value.y,
-    width: value.width,
-    height: value.height,
+    x,
+    y,
+    width,
+    height,
   };
 }
 
@@ -436,12 +483,12 @@ function readWeights(value: unknown): VisualDiffOptions["weights"] | undefined |
     return null;
   }
 
-  const bounds = typeof value.bounds === "number" ? value.bounds : undefined;
-  const text = typeof value.text === "number" ? value.text : undefined;
-  const role = typeof value.role === "number" ? value.role : undefined;
-  const type = typeof value.type === "number" ? value.type : undefined;
+  const bounds = readNonNegativeNumber(value.bounds);
+  const text = readNonNegativeNumber(value.text);
+  const role = readNonNegativeNumber(value.role);
+  const type = readNonNegativeNumber(value.type);
 
-  if (bounds === undefined || text === undefined || role === undefined || type === undefined) {
+  if (bounds === null || text === null || role === null || type === null) {
     return null;
   }
 
@@ -454,6 +501,103 @@ function isLayoutNodeType(value: unknown): value is LayoutNodeType {
 
 function isLayoutNodeSource(value: unknown): value is LayoutNodeInput["source"] {
   return value === "dom" || value === "ocr" || value === "region";
+}
+
+function readOptionalString(value: unknown): string | undefined | null {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value !== "string") {
+    return null;
+  }
+  return value;
+}
+
+function readOptionalComponentRef(value: unknown): ComponentRef | undefined | null {
+  if (value === undefined) {
+    return undefined;
+  }
+  return readComponentRef(value);
+}
+
+function readOptionalLayoutNodeType(value: unknown): LayoutNodeType | undefined | null {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!isLayoutNodeType(value)) {
+    return null;
+  }
+  return value;
+}
+
+function readOptionalLayoutNodeSource(
+  value: unknown
+): LayoutNodeInput["source"] | undefined | null {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!isLayoutNodeSource(value)) {
+    return null;
+  }
+  return value;
+}
+
+function readOptionalNonNegativeNumber(value: unknown): number | undefined | null {
+  if (value === undefined) {
+    return undefined;
+  }
+  return readNonNegativeNumber(value);
+}
+
+function readOptionalUnitInterval(value: unknown): number | undefined | null {
+  if (value === undefined) {
+    return undefined;
+  }
+  return readUnitInterval(value);
+}
+
+function readUnitInterval(value: unknown): number | null {
+  const number = readFiniteNumber(value);
+  if (number === null) {
+    return null;
+  }
+  if (number < 0 || number > 1) {
+    return null;
+  }
+  return number;
+}
+
+function readNonNegativeNumber(value: unknown): number | null {
+  const number = readFiniteNumber(value);
+  if (number === null) {
+    return null;
+  }
+  if (number < 0) {
+    return null;
+  }
+  return number;
+}
+
+function readPositiveNumber(value: unknown): number | null {
+  const number = readFiniteNumber(value);
+  if (number === null) {
+    return null;
+  }
+  if (number <= 0) {
+    return null;
+  }
+  return number;
+}
+
+function readFiniteNumber(value: unknown): number | null {
+  if (!isFiniteNumber(value)) {
+    return null;
+  }
+  return value;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
