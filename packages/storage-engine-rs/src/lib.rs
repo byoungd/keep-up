@@ -502,3 +502,86 @@ fn big_int_from_u64(value: u64) -> BigInt {
     words: vec![value],
   }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_checkpoint_lifecycle() {
+        let dir = tempdir().unwrap();
+        let engine = FileStorageEngine::new(dir.path().to_path_buf()).unwrap();
+        let id = "ckpt_1";
+        let data = b"some data";
+
+        // Save
+        engine.save_checkpoint_bytes(id, data).unwrap();
+
+        // Load
+        let loaded = engine.load_checkpoint_bytes(id).unwrap();
+        assert_eq!(loaded, Some(data.to_vec()));
+
+        // Overwrite
+        let new_data = b"new data";
+        engine.save_checkpoint_bytes(id, new_data).unwrap();
+        let reloaded = engine.load_checkpoint_bytes(id).unwrap();
+        assert_eq!(reloaded, Some(new_data.to_vec()));
+
+        // Delete
+        let deleted = engine.delete_checkpoint_file(id).unwrap();
+        assert!(deleted);
+        let missing = engine.load_checkpoint_bytes(id).unwrap();
+        assert_eq!(missing, None);
+    }
+
+    #[test]
+    fn test_event_log_append_replay() {
+        let dir = tempdir().unwrap();
+        let engine = FileStorageEngine::new(dir.path().to_path_buf()).unwrap();
+
+        let seq1 = engine.append_event_bytes(b"event 1").unwrap();
+        assert_eq!(seq1, 0);
+
+        let seq2 = engine.append_event_bytes(b"event 2").unwrap();
+        assert_eq!(seq2, 1);
+
+        // Replay all
+        let events = engine.replay_event_bytes(0, None).unwrap();
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0], b"event 1");
+        assert_eq!(events[1], b"event 2");
+
+        // Replay offset
+        let events_offset = engine.replay_event_bytes(1, None).unwrap();
+        assert_eq!(events_offset.len(), 1);
+        assert_eq!(events_offset[0], b"event 2");
+
+        // Replay limit
+        let events_limit = engine.replay_event_bytes(0, Some(1)).unwrap();
+        assert_eq!(events_limit.len(), 1);
+        assert_eq!(events_limit[0], b"event 1");
+    }
+
+    #[test]
+    fn test_event_log_prune() {
+        let dir = tempdir().unwrap();
+        let engine = FileStorageEngine::new(dir.path().to_path_buf()).unwrap();
+
+        engine.append_event_bytes(b"e0").unwrap();
+        engine.append_event_bytes(b"e1").unwrap();
+        engine.append_event_bytes(b"e2").unwrap();
+
+        // Prune before seq 2 (removes 0 and 1)
+        let removed = engine.prune_event_log(2).unwrap();
+        assert_eq!(removed, 2);
+
+        let remaining = engine.replay_event_bytes(0, None).unwrap();
+        assert_eq!(remaining.len(), 1);
+        assert_eq!(remaining[0], b"e2");
+        
+        // Pruning again with older seq should return 0
+        let removed_again = engine.prune_event_log(1).unwrap();
+        assert_eq!(removed_again, 0);
+    }
+}

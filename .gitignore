@@ -201,3 +201,12 @@ apps/cowork-e2e/playwright-report/
 
 # KeepUpGym reports
 packages/agent-gym/reports/
+
+packages/storage-engine-rs/target/
+packages/storage-engine-rs/Cargo.lock
+
+packages/vector-similarity-rs/target/
+packages/vector-similarity-rs/Cargo.lock
+
+packages/diff-rs/target/
+packages/diff-rs/Cargo.lock

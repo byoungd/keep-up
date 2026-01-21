@@ -34,6 +34,7 @@ function loadNativeBinding(): NativeBinding {
   const candidates = [
     override,
     join(baseDir, "storage_engine_rs.node"),
+    join(baseDir, "..", "dist", "storage_engine_rs.node"),
     join(baseDir, "native", "storage_engine_rs.node"),
     join(baseDir, "..", "native", "storage_engine_rs.node"),
     join(baseDir, "..", "target", "release", "storage_engine_rs.node"),
