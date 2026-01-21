@@ -10,6 +10,7 @@ export default defineConfig({
         __dirname,
         "../agent-runtime-sandbox/src/index.ts"
       ),
+      "@ku0/sandbox-rs": path.resolve(__dirname, "../sandbox-rs/src/index.ts"),
       "@ku0/agent-runtime-tools": path.resolve(__dirname, "../agent-runtime-tools/src"),
     },
   },

@@ -6,8 +6,12 @@
 
 export * from "@ku0/agent-runtime-sandbox";
 
+import {
+  createSandbox as createRustSandbox,
+  type SandboxPolicy as RustSandboxPolicy,
+} from "@ku0/sandbox-rs";
 import { type CoworkFileIntent, CoworkSandboxAdapter } from "../cowork/sandbox";
-import type { MCPToolCall, MCPToolResult, ToolContext } from "../types";
+import type { MCPToolCall, MCPToolResult, SandboxConfig, ToolContext } from "../types";
 
 export interface ExecutionSandboxDecision {
   allowed: boolean;
@@ -116,6 +120,13 @@ export class DefaultExecutionSandboxAdapter implements ExecutionSandboxAdapter {
 
 export function createExecutionSandboxAdapter(): ExecutionSandboxAdapter {
   return new DefaultExecutionSandboxAdapter();
+}
+
+export function createSandbox(config: SandboxConfig): RustSandboxPolicy | null {
+  if (config.type !== "rust") {
+    return null;
+  }
+  return createRustSandbox(config);
 }
 
 function parseOperation(name: string): string {

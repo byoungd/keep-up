@@ -1,0 +1,25 @@
+[package]
+name = "sandbox-rs"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+napi = { version = "2", features = ["async"] }
+napi-derive = "2"
+libc = "0.2"
+thiserror = "1"
+
+[build-dependencies]
+napi-build = "2"
+
+
+
+[target.'cfg(target_os = "linux")'.dependencies]
+landlock = "0.3"
+seccompiler = "0.4"
+
+[dev-dependencies]
+tempfile = "3"
