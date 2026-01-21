@@ -58,6 +58,10 @@ Key outcomes:
 - Agents use memory tiers, knowledge retrieval, and tool preparation within task execution. Source: `.tmp/analysis/crewAI/lib/crewai/src/crewai/agent/core.py`.
 - Tasks support guardrails, structured outputs, and async execution. Source: `.tmp/analysis/crewAI/lib/crewai/src/crewai/task.py`.
 
+### Local-First Ecosystem (Open Interpreter, Cline, Roo-Code)
+- **Open Interpreter**: Direct "Computer" API exposes screen/keyboard control; `active_line` markers provide real-time execution feedback. Source: `.tmp/analysis/open-interpreter/interpreter/core/core.py`.
+- **Cline**: `Controller` class manages task lifecycle directly within the VS Code Extension Host. Source: `.tmp/analysis/cline/src/core/controller/index.ts`.
+- **Roo-Code**: **Shadow Git** pattern uses a hidden git repository to track all agent file modifications, enabling "undo" and diff viewing without polluting the user's git history. Source: `.tmp/analysis/Roo-Code/src/core/checkpoints/index.ts`.
 ### Keep-Up Baseline
 - Orchestrator provides a state machine, planning, tool scheduling, and event-driven telemetry. Source: `packages/agent-runtime/src/orchestrator/orchestrator.ts`.
 - TurnExecutor performs message compression, knowledge injection, and request caching. Source: `packages/agent-runtime/src/orchestrator/turnExecutor.ts`.
@@ -88,6 +92,7 @@ Key outcomes:
 ### B. Memory and Persistence
 - Compression and curated history reduce context churn (Gemini CLI, Keep-Up TurnExecutor).
 - Durable state snapshots enable pause/resume and audit (LangGraph, AutoGen).
+- **Shadow Git Persistence** enables zero-overhead versioning and instant rollback of agent actions (Roo-Code).
 - Role memory with structured observation buffers improves multi-role reasoning (MetaGPT).
 
 ### C. Tooling and Execution
@@ -103,6 +108,7 @@ Key outcomes:
 ### E. Observability and DX
 - Structured event streams and OpenTelemetry tracing are consistent differentiators (AutoGen, CrewAI, Keep-Up).
 - Step-level debug output and streamable traces improve tooling UX (LangGraph, Keep-Up).
+- **Active Line Markers** provide immediate visual feedback during code execution (Open Interpreter).
 
 ### F. Provider Abstraction and Model Routing
 - First-class model routing enables cost and quality optimization (Gemini CLI).
@@ -136,6 +142,14 @@ The keep-up runtime is already strong, but these gaps are visible when mapped ag
 - Keep-Up uses provider abstraction but lacks automatic routing and fallback strategies.
 - Recommendation: add routing logic with model health and cost heuristics.
 
+7. Native IDE Integration
+- Keep-Up runs as a server, but lacks the deep "Controller" integration seen in Cline/Roo-Code.
+- Recommendation: Centralize task lifecycle in a `RuntimeController` that bridges the IDE and the Agent Runtime.
+
+8. Safe Local Mutation
+- File modifications are currently direct or via sandbox, but lack an "Undo" button.
+- Recommendation: Adopt **Shadow Git** for all local file operations.
+
 ## 5. Unified 2026 Architecture for Keep-Up
 
 ### 5.1 Design Principles
@@ -149,6 +163,7 @@ The keep-up runtime is already strong, but these gaps are visible when mapped ag
 
 1. Control Plane
 - AgentManager: spawn, track, and limit nested agents.
+- **RuntimeController**: Central task lifecycle owner (Cline pattern).
 - Runtime Message Bus: send, publish, respond envelopes (AutoGen pattern).
 - Policy Engine: per-agent tool registry, escalation, approval gates.
 
@@ -159,6 +174,7 @@ The keep-up runtime is already strong, but these gaps are visible when mapped ag
 
 3. Persistence Plane
 - Checkpoint Manager: turn-level snapshots with tool call states.
+- **Shadow Git**: Git-based file versioning for instant rollbacks (Roo-Code pattern).
 - Plan Persistence: file-backed plan recovery and plan history.
 - Event Log: append-only run stream for audit and replay.
 
