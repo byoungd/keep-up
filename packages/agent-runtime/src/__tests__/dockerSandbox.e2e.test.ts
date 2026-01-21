@@ -14,9 +14,6 @@ const dockerSocketCandidates = [
   join(homedir(), "Library/Containers/com.docker.docker/Data/docker.raw.sock"),
 ];
 const resolvedDockerSocket = dockerSocketCandidates.find((candidate) => existsSync(candidate));
-if (!process.env.DOCKER_HOST && resolvedDockerSocket) {
-  process.env.DOCKER_HOST = `unix://${resolvedDockerSocket}`;
-}
 const hasDockerSocket = Boolean(resolvedDockerSocket) || Boolean(process.env.DOCKER_HOST);
 const describeIf = hasDockerSocket ? describe : describe.skip;
 
@@ -82,7 +79,7 @@ describeIf("DockerSandboxManager (e2e)", () => {
   });
 
   it("executes a command inside the sandbox container", async () => {
-    const available = await manager.isAvailable();
+    const available = await manager.isAvailable(5000);
     if (!available) {
       throw new Error("Docker engine not reachable for sandbox E2E test");
     }
