@@ -215,11 +215,28 @@ export class ComputerToolServer extends BaseToolServer {
     }
 
     try {
+      const displayId = parseOptionalString(args.displayId, "displayId");
+      if (displayId.error) {
+        return invalidArgs(displayId.error);
+      }
+      const format = parseOptionalEnum(args.format, "format", ["png", "jpeg"]);
+      if (format.error) {
+        return invalidArgs(format.error);
+      }
+      const quality = parseOptionalNumber(args.quality, "quality", { min: 0, max: 100 });
+      if (quality.error) {
+        return invalidArgs(quality.error);
+      }
+      const region = parseRegion(args.region);
+      if (region.error) {
+        return invalidArgs(region.error);
+      }
+
       const screenshot = await this.controller.screenshot({
-        displayId: typeof args.displayId === "string" ? args.displayId : undefined,
-        format: args.format === "jpeg" ? "jpeg" : args.format === "png" ? "png" : undefined,
-        quality: typeof args.quality === "number" ? args.quality : undefined,
-        region: isRegion(args.region) ? args.region : undefined,
+        displayId: displayId.value,
+        format: format.value,
+        quality: quality.value,
+        region: region.value,
       });
 
       return {
@@ -248,10 +265,23 @@ export class ComputerToolServer extends BaseToolServer {
     }
 
     try {
+      const x = parseRequiredNumber(args.x, "x");
+      if (x.error) {
+        return invalidArgs(x.error);
+      }
+      const y = parseRequiredNumber(args.y, "y");
+      if (y.error) {
+        return invalidArgs(y.error);
+      }
+      const durationMs = parseOptionalNumber(args.durationMs, "durationMs", { min: 0 });
+      if (durationMs.error) {
+        return invalidArgs(durationMs.error);
+      }
+
       await this.controller.movePointer({
-        x: args.x as number,
-        y: args.y as number,
-        durationMs: typeof args.durationMs === "number" ? args.durationMs : undefined,
+        x: x.value,
+        y: y.value,
+        durationMs: durationMs.value,
       });
       return { success: true, content: [{ type: "text", text: "Pointer moved." }] };
     } catch (error) {
@@ -270,11 +300,31 @@ export class ComputerToolServer extends BaseToolServer {
     }
 
     try {
+      const x = parseRequiredNumber(args.x, "x");
+      if (x.error) {
+        return invalidArgs(x.error);
+      }
+      const y = parseRequiredNumber(args.y, "y");
+      if (y.error) {
+        return invalidArgs(y.error);
+      }
+      const button = parseOptionalEnum(args.button, "button", ["left", "right", "middle"]);
+      if (button.error) {
+        return invalidArgs(button.error);
+      }
+      const clickCount = parseOptionalNumber(args.clickCount, "clickCount", {
+        min: 1,
+        integer: true,
+      });
+      if (clickCount.error) {
+        return invalidArgs(clickCount.error);
+      }
+
       await this.controller.click({
-        x: args.x as number,
-        y: args.y as number,
-        button: isMouseButton(args.button) ? args.button : undefined,
-        clickCount: typeof args.clickCount === "number" ? args.clickCount : undefined,
+        x: x.value,
+        y: y.value,
+        button: button.value,
+        clickCount: clickCount.value,
       });
       return { success: true, content: [{ type: "text", text: "Click executed." }] };
     } catch (error) {
@@ -293,12 +343,23 @@ export class ComputerToolServer extends BaseToolServer {
     }
 
     try {
+      const key = parseRequiredString(args.key, "key");
+      if (key.error) {
+        return invalidArgs(key.error);
+      }
+      const modifiers = parseOptionalStringArray(args.modifiers, "modifiers");
+      if (modifiers.error) {
+        return invalidArgs(modifiers.error);
+      }
+      const repeat = parseOptionalNumber(args.repeat, "repeat", { min: 1, integer: true });
+      if (repeat.error) {
+        return invalidArgs(repeat.error);
+      }
+
       await this.controller.keypress({
-        key: args.key as string,
-        modifiers: Array.isArray(args.modifiers)
-          ? args.modifiers.filter((value) => typeof value === "string")
-          : undefined,
-        repeat: typeof args.repeat === "number" ? args.repeat : undefined,
+        key: key.value,
+        modifiers: modifiers.value,
+        repeat: repeat.value,
       });
       return { success: true, content: [{ type: "text", text: "Key pressed." }] };
     } catch (error) {
@@ -317,9 +378,18 @@ export class ComputerToolServer extends BaseToolServer {
     }
 
     try {
+      const text = parseRequiredText(args.text, "text");
+      if (text.error) {
+        return invalidArgs(text.error);
+      }
+      const delayMs = parseOptionalNumber(args.delayMs, "delayMs", { min: 0 });
+      if (delayMs.error) {
+        return invalidArgs(delayMs.error);
+      }
+
       await this.controller.typeText({
-        text: args.text as string,
-        delayMs: typeof args.delayMs === "number" ? args.delayMs : undefined,
+        text: text.value,
+        delayMs: delayMs.value,
       });
       return { success: true, content: [{ type: "text", text: "Text typed." }] };
     } catch (error) {
@@ -333,21 +403,133 @@ export function createComputerToolServer(options: ComputerToolServerOptions): Co
   return new ComputerToolServer(options);
 }
 
-function isRegion(
-  value: unknown
-): value is { x: number; y: number; width: number; height: number } {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-  const record = value as Record<string, unknown>;
-  return (
-    typeof record.x === "number" &&
-    typeof record.y === "number" &&
-    typeof record.width === "number" &&
-    typeof record.height === "number"
-  );
+function invalidArgs(message: string): MCPToolResult {
+  return errorResult("INVALID_ARGUMENTS", message);
 }
 
-function isMouseButton(value: unknown): value is ComputerMouseButton {
-  return value === "left" || value === "right" || value === "middle";
+function parseRequiredNumber(value: unknown, label: string): { value: number; error?: string } {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return { value: 0, error: `${label} must be a number` };
+  }
+  return { value };
+}
+
+function parseOptionalNumber(
+  value: unknown,
+  label: string,
+  options: { min?: number; max?: number; integer?: boolean } = {}
+): { value?: number; error?: string } {
+  if (value === undefined) {
+    return {};
+  }
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return { error: `${label} must be a number` };
+  }
+  const normalized = options.integer ? Math.floor(value) : value;
+  if (options.min !== undefined && normalized < options.min) {
+    return { error: `${label} must be >= ${options.min}` };
+  }
+  if (options.max !== undefined && normalized > options.max) {
+    return { error: `${label} must be <= ${options.max}` };
+  }
+  return { value: normalized };
+}
+
+function parseOptionalString(value: unknown, label: string): { value?: string; error?: string } {
+  if (value === undefined) {
+    return {};
+  }
+  if (typeof value !== "string") {
+    return { error: `${label} must be a string` };
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return { error: `${label} must be a non-empty string` };
+  }
+  return { value: trimmed };
+}
+
+function parseOptionalEnum<T extends string>(
+  value: unknown,
+  label: string,
+  allowed: readonly T[]
+): { value?: T; error?: string } {
+  if (value === undefined) {
+    return {};
+  }
+  if (typeof value !== "string") {
+    return { error: `${label} must be a string` };
+  }
+  if (!allowed.includes(value as T)) {
+    return { error: `${label} must be one of: ${allowed.join(", ")}` };
+  }
+  return { value: value as T };
+}
+
+function parseOptionalStringArray(
+  value: unknown,
+  label: string
+): { value?: string[]; error?: string } {
+  if (value === undefined) {
+    return {};
+  }
+  if (!Array.isArray(value)) {
+    return { error: `${label} must be an array of strings` };
+  }
+  if (!value.every((entry) => typeof entry === "string")) {
+    return { error: `${label} must be an array of strings` };
+  }
+  const normalized = value.map((entry) => entry.trim()).filter(Boolean);
+  return normalized.length > 0 ? { value: normalized } : { value: [] };
+}
+
+function parseRequiredString(value: unknown, label: string): { value: string; error?: string } {
+  if (typeof value !== "string") {
+    return { value: "", error: `${label} is required` };
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return { value: "", error: `${label} is required` };
+  }
+  return { value: trimmed };
+}
+
+function parseRequiredText(value: unknown, label: string): { value: string; error?: string } {
+  if (typeof value !== "string") {
+    return { value: "", error: `${label} must be a string` };
+  }
+  return { value };
+}
+
+function parseRegion(value: unknown): {
+  value?: { x: number; y: number; width: number; height: number };
+  error?: string;
+} {
+  if (value === undefined) {
+    return {};
+  }
+  if (!value || typeof value !== "object") {
+    return { error: "region must be an object" };
+  }
+  const record = value as Record<string, unknown>;
+  const x = parseRequiredNumber(record.x, "region.x");
+  if (x.error) {
+    return { error: x.error };
+  }
+  const y = parseRequiredNumber(record.y, "region.y");
+  if (y.error) {
+    return { error: y.error };
+  }
+  const width = parseRequiredNumber(record.width, "region.width");
+  if (width.error) {
+    return { error: width.error };
+  }
+  const height = parseRequiredNumber(record.height, "region.height");
+  if (height.error) {
+    return { error: height.error };
+  }
+  if (width.value <= 0 || height.value <= 0) {
+    return { error: "region width and height must be > 0" };
+  }
+  return { value: { x: x.value, y: y.value, width: width.value, height: height.value } };
 }
