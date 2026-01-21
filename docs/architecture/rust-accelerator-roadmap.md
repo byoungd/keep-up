@@ -103,6 +103,16 @@ TypeScript runtime -> gRPC/UDS -> Rust sidecar
 
 ---
 
+## Parallel LFCC/Core Accelerators (High/Medium Yield)
+
+These run in parallel with Phase 6 tracks and target `@ku0/core` + `@ku0/lfcc-bridge`.
+Tracking docs live under `.agent/workflows/`.
+
+High-yield tracking: `.agent/workflows/implement-lfcc-core-accelerators.md`.
+Medium-yield tracking: `.agent/workflows/implement-lfcc-core-accelerators-medium.md`.
+
+---
+
 ## Implementation Phases
 
 | Phase | Module | Integration | Timeline | Risk |

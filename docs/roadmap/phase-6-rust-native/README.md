@@ -40,6 +40,30 @@ All tracks must support macOS, Linux, and Windows with explicit fallbacks:
 | AJ | JSON Acceleration | P2 | Planning | [track-aj-json-acceleration.md](./track-aj-json-acceleration.md) |
 | AK | Gitignore Matcher | P3 | Planning | [track-ak-gitignore-matcher.md](./track-ak-gitignore-matcher.md) |
 
+## Parallelizable LFCC/Core Workstreams (High Yield)
+
+These are parallelizable accelerators for `@ku0/core` and `@ku0/lfcc-bridge` that align with
+Phase 6 principles (TS control plane, Rust hot paths). Tracking doc:
+`.agent/workflows/implement-lfcc-core-accelerators.md`.
+
+- Canonicalizer accelerator (deterministic tree normalization).
+- AI sanitizer + dry-run parser (HTML allowlist and validation).
+- Anchor relocation + text similarity engine.
+- Integrity hashing (context/chain hash batching).
+- Bridge anchor HMAC encoding.
+- Streaming markdown parser.
+- Stable JSON serialization via `@ku0/json-accel-rs`.
+
+## Parallelizable LFCC/Core Workstreams (Medium Yield)
+
+Tracking doc: `.agent/workflows/implement-lfcc-core-accelerators-medium.md`.
+
+- Core anchor codec + checksums (HMAC/CRC32/Adler32).
+- Policy hash utilities (deterministic SHA-256).
+- AI context hash utilities (optimistic hash + batch).
+- Text normalization + canonical hash (ingest).
+- Bridge canonicalizer serialization for checksums.
+
 ---
 
 ## Implementation Phases
