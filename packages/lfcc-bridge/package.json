@@ -13,6 +13,8 @@
   },
   "dependencies": {
     "@ku0/core": "workspace:*",
+    "@ku0/json-accel-rs": "workspace:*",
+    "@ku0/native-bindings": "workspace:*",
     "@ku0/streaming-markdown-rs": "workspace:*",
     "loro-crdt": "^1.10.3",
     "prosemirror-model": "^1.25.4",

@@ -847,6 +847,12 @@ importers:
       '@ku0/core':
         specifier: workspace:*
         version: link:../core
+      '@ku0/json-accel-rs':
+        specifier: workspace:*
+        version: link:../json-accel-rs
+      '@ku0/native-bindings':
+        specifier: workspace:*
+        version: link:../native-bindings
       '@ku0/streaming-markdown-rs':
         specifier: workspace:*
         version: link:../streaming-markdown-rs
@@ -865,10 +871,6 @@ importers:
       prosemirror-view:
         specifier: ^1.41.4
         version: 1.41.4
-    devDependencies:
-      '@ku0/native-bindings':
-        specifier: workspace:*
-        version: link:../native-bindings
 
   packages/native-bindings:
     devDependencies:
