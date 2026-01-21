@@ -2242,7 +2242,10 @@ export class AgentOrchestrator {
     this.updateTaskGraphStatus(taskNodeId, result.success ? "completed" : "failed");
 
     this.recordToolMetrics(call, result, toolStart);
-    this.toolScheduler.recordExecution(call.name, Date.now() - toolStart);
+    this.toolScheduler.recordResult(call.name, Date.now() - toolStart, {
+      success: result.success,
+      errorCode: result.error?.code,
+    });
 
     toolSpan?.setAttribute("result.success", result.success);
     toolSpan?.setStatus(result.success ? "ok" : "error", result.error?.message);
