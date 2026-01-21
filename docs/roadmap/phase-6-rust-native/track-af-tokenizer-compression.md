@@ -30,6 +30,7 @@ Move token counting, JSON size estimation, and context compression out of JavaSc
 
 ### D2: Context Compressor
 - Structured truncation (preserve tool calls)
+- **Prefix + suffix preservation** (based on Codex `truncate.rs` pattern)
 - Zstd compression
 - Token-aware chunking
 

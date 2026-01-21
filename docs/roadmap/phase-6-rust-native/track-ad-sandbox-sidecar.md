@@ -33,7 +33,7 @@ Migrate sandbox execution from Docker containers to a Rust sidecar for OS-level 
 ### D2: OS-Level Isolation
 - macOS: Seatbelt (`sandbox-exec`)
 - Linux: Landlock + seccomp + Namespaces (`unshare` user/mount/pid)
-- Windows: AppContainer (future)
+- Windows: AppContainer (P2, reference: `codex-rs/windows-sandbox-rs/`)
 
 ### D3: Path Security
 - `realpath` normalization

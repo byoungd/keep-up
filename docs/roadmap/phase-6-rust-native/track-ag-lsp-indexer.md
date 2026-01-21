@@ -25,8 +25,9 @@ Replace the O(N) full-scan symbol search with a Rust-based inverted/trigram inde
 
 ### D1: Rust Symbol Indexer
 - Inverted index for symbol names
-- Trigram index for fuzzy search
+- Trigram index for fuzzy search (consider `nucleo_matcher` from Codex)
 - Incremental updates
+- Potential foundation: `codex-rs/file-search/` crate
 
 ### D2: Query Engine
 - O(log N) lookup
