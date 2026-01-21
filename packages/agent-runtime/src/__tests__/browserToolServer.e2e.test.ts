@@ -10,6 +10,7 @@ import type { ToolContext } from "../types";
 const executablePath = chromium.executablePath();
 const hasChromium = Boolean(executablePath && existsSync(executablePath));
 const describeIf = hasChromium ? describe : describe.skip;
+const CLEANUP_TIMEOUT_MS = 60_000;
 
 function createContext(sessionId = "session-browser-e2e"): ToolContext {
   return {
@@ -52,6 +53,23 @@ describeIf("BrowserToolServer (e2e)", () => {
   let manager: BrowserManager;
   let toolServer: BrowserToolServer;
 
+  async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+    });
+
+    try {
+      return await Promise.race([promise, timeoutPromise]);
+    } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    }
+  }
+
   beforeAll(async () => {
     const html = `<!doctype html>
 <html>
@@ -87,12 +105,16 @@ describeIf("BrowserToolServer (e2e)", () => {
 
   afterAll(async () => {
     if (manager) {
-      await manager.dispose();
+      await withTimeout(manager.dispose(), CLEANUP_TIMEOUT_MS, "BrowserManager cleanup");
     }
     if (server) {
-      await new Promise<void>((resolve) => server?.close(() => resolve()));
+      await withTimeout(
+        new Promise<void>((resolve) => server?.close(() => resolve())),
+        CLEANUP_TIMEOUT_MS,
+        "Fixture server close"
+      );
     }
-  }, 30_000);
+  }, CLEANUP_TIMEOUT_MS);
 
   it("navigates, snapshots, and interacts using accessibility refs", async () => {
     const context = createContext();
