@@ -1,0 +1,8 @@
+# Rust build artifacts
+target/
+
+# Native binaries (built from source)
+*.node
+
+# Cargo.lock is ignored for libraries (regenerated on build)
+Cargo.lock

@@ -1,0 +1,40 @@
+{
+  "name": "@ku0/gitignore-rs",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Rust-based gitignore matcher using the ignore crate",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "*.node"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "build:native": "cargo build --release && cp target/release/libgitignore_rs.dylib gitignore_rs.node 2>/dev/null || cp target/release/gitignore_rs.dll gitignore_rs.node 2>/dev/null || cp target/release/libgitignore_rs.so gitignore_rs.node 2>/dev/null || true",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write ."
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.3"
+  },
+  "napi": {
+    "name": "gitignore-rs",
+    "triples": {
+      "defaults": true,
+      "additional": [
+        "aarch64-apple-darwin"
+      ]
+    }
+  }
+}
