@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { cosineSimilarity as nativeCosineSimilarity } from "@ku0/vector-similarity-rs";
 import { chunkText } from "./chunker";
 import { createHashEmbeddingProvider, type EmbeddingProvider } from "./embedding";
 import { scanProjectFiles } from "./scanner";
@@ -438,6 +439,10 @@ function isBinaryContent(content: string): boolean {
 }
 
 function cosineSimilarity(a: number[], b: number[]): number {
+  if (a.length === b.length) {
+    return nativeCosineSimilarity(a, b);
+  }
+
   const length = Math.min(a.length, b.length);
   if (length === 0) {
     return 0;
