@@ -62,12 +62,16 @@ export function MessageContent({ className, ...props }: MessageContentProps) {
 export interface MessageResponseProps extends React.HTMLAttributes<HTMLDivElement> {
   children: string;
   isStreaming?: boolean;
+  showWaitingLabel?: boolean;
+  waitingLabel?: string;
 }
 
 export function MessageResponse({
   children,
   className,
   isStreaming = false,
+  showWaitingLabel,
+  waitingLabel,
   ...props
 }: MessageResponseProps) {
   const { from } = useMessageContext("MessageResponse");
@@ -79,6 +83,8 @@ export function MessageResponse({
         content={children}
         isUser={isUser}
         isStreaming={isStreaming}
+        showWaitingLabel={showWaitingLabel}
+        waitingLabel={waitingLabel}
         className="max-w-full"
       />
     </div>

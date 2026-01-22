@@ -7,13 +7,17 @@ import { parseArtifactsFromContent } from "../../lib/ai/artifacts";
 import type { ReferenceAnchor, ReferenceRange } from "../../lib/ai/referenceAnchors";
 import { ApprovalCard } from "../ai/ApprovalCard";
 import { ConfidenceBadge } from "../ai/ConfidenceBadge";
+import {
+  Message as AiMessage,
+  MessageContent as AiMessageContent,
+  MessageResponse as AiMessageResponse,
+} from "../ai-elements/message";
 import { ArtifactList } from "./ArtifactCard";
 import { AskMessage } from "./AskMessage";
 import { ExecutionSteps } from "./ExecutionSteps";
 import { InfoMessage } from "./InfoMessage";
 import { MessageActions } from "./MessageActions";
 import { MessageAlert } from "./MessageAlert";
-import { MessageBubble } from "./MessageBubble";
 import { MessageReferences } from "./MessageReferences";
 import { MessageStatusBadge } from "./MessageStatusBadge";
 import { ModelBadge } from "./ModelBadge";
@@ -222,12 +226,17 @@ const MessageContent = ({
   if (showBubble) {
     const showWaitingLabel = Boolean(message.metadata?.stalled);
     return (
-      <MessageBubble
-        content={displayContent}
-        isUser={isUser}
-        isStreaming={isStreaming}
-        showWaitingLabel={showWaitingLabel}
-      />
+      <AiMessage from={isUser ? "user" : "assistant"} className="w-full">
+        <AiMessageContent>
+          <AiMessageResponse
+            isStreaming={isStreaming}
+            showWaitingLabel={showWaitingLabel}
+            waitingLabel={showWaitingLabel ? "Working..." : undefined}
+          >
+            {displayContent}
+          </AiMessageResponse>
+        </AiMessageContent>
+      </AiMessage>
     );
   }
   return null;
