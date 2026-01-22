@@ -29,6 +29,8 @@ export function buildNativeBindingCandidates(
     candidates.push(join(packageRoot, "native", "target", "debug", `${name}.node`));
     candidates.push(join(packageRoot, "npm", platformArch, `${name}.${platformArch}.node`));
     candidates.push(join(packageRoot, "npm", platformArch, `${name}.node`));
+    candidates.push(join(packageRoot, "dist", `${name}.${platformArch}.node`));
+    candidates.push(join(packageRoot, "dist", `${name}.node`));
   }
 
   return candidates;

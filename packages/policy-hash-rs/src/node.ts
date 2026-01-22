@@ -40,7 +40,7 @@ export function getNativePolicyHash(): NativePolicyHashBinding | null {
 
   cachedError = result.error;
   cachedBinding = result.binding;
-  return cachedBinding;
+  return cachedBinding ?? null;
 }
 
 export function getNativePolicyHashError(): Error | null {
