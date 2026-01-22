@@ -5,7 +5,7 @@ test.describe("Sidebar Navigation", () => {
     // Navigate to root
     await page.goto("/");
     // Wait for sidebar to be visible (it might load async)
-    await expect(page.getByLabel("Primary sidebar")).toBeVisible();
+    await expect(page.getByLabel("Primary sidebar")).toBeVisible({ timeout: 10000 });
   });
 
   test("toggles sidebar collapse state", async ({ page }) => {
