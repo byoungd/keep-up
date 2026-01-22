@@ -83,6 +83,42 @@ describe("Markdown line-based operations", () => {
     }
   });
 
+  it("resolves semantic preconditions for line ops", async () => {
+    const content = "# Intro\nDetails";
+    const lines = splitMarkdownLines(content);
+    const range = { start: 1, end: 1 };
+    const hash = await computeMarkdownLineHash(lines, range);
+
+    const envelope: MarkdownOperationEnvelope = {
+      mode: "markdown",
+      doc_id: docId,
+      doc_frontier: frontier,
+      preconditions: [
+        {
+          v: 1,
+          mode: "markdown",
+          id: "p1",
+          semantic: { kind: "heading", heading_text: "Intro" },
+          content_hash: hash,
+        },
+      ],
+      ops: [
+        {
+          op: "md_replace_lines",
+          precondition_id: "p1",
+          target: { line_range: range },
+          content: "# Introduction",
+        },
+      ],
+    };
+
+    const result = await applyMarkdownLineOperations(content, envelope);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.content).toBe("# Introduction\nDetails");
+    }
+  });
+
   it("rejects content hash mismatches", async () => {
     const content = "red\nblue\ncyan";
     const range = { start: 2, end: 2 };

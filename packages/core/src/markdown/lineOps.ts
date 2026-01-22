@@ -1,5 +1,6 @@
 import type { MarkdownTargetingPolicyV1 } from "../kernel/policy/types.js";
 import { computeMarkdownLineHash, normalizeMarkdownText, splitMarkdownLines } from "./hash.js";
+import { buildMarkdownSemanticIndex, resolveMarkdownSemanticTarget } from "./semantic.js";
 import type {
   LineRange,
   MarkdownAppliedOperation,
@@ -25,6 +26,10 @@ type PreconditionMapResult =
   | { ok: true; map: Map<string, MarkdownPreconditionV1> }
   | { ok: false; error: MarkdownOperationError };
 
+type PreconditionResolutionResult =
+  | { ok: true; ranges: Map<string, LineRange> }
+  | { ok: false; error: MarkdownOperationError };
+
 type ResolveOpsResult =
   | { ok: true; resolvedOps: ResolvedOperation[] }
   | { ok: false; error: MarkdownOperationError };
@@ -48,16 +53,23 @@ export async function applyMarkdownLineOperations(
     return { ok: false, error: preconditionsResult.error };
   }
 
-  const preconditionError = await validatePreconditions(
+  const semanticIndex = buildMarkdownSemanticIndex(lines);
+  const preconditionResolution = await resolveAndValidatePreconditions(
     envelope.preconditions,
     lines,
+    semanticIndex,
     options.targetingPolicy
   );
-  if (preconditionError) {
-    return { ok: false, error: preconditionError };
+  if (!preconditionResolution.ok) {
+    return { ok: false, error: preconditionResolution.error };
   }
 
-  const resolvedResult = resolveOperations(envelope.ops, preconditionsResult.map, lineCount);
+  const resolvedResult = resolveOperations(
+    envelope.ops,
+    preconditionsResult.map,
+    preconditionResolution.ranges,
+    lineCount
+  );
   if (!resolvedResult.ok) {
     return { ok: false, error: resolvedResult.error };
   }
@@ -139,21 +151,24 @@ function buildPreconditionMap(preconditions: MarkdownPreconditionV1[]): Precondi
   return { ok: true, map: preconditionsById };
 }
 
-async function validatePreconditions(
+async function resolveAndValidatePreconditions(
   preconditions: MarkdownPreconditionV1[],
   lines: string[],
+  semanticIndex: ReturnType<typeof buildMarkdownSemanticIndex>,
   policy?: MarkdownTargetingPolicyV1
-): Promise<MarkdownOperationError | null> {
+): Promise<PreconditionResolutionResult> {
+  const resolvedRanges = new Map<string, LineRange>();
+
   for (const precondition of preconditions) {
-    const rangeResult = resolvePreconditionRange(precondition, lines.length);
+    const rangeResult = resolvePreconditionRange(precondition, semanticIndex, policy);
     if (!rangeResult.ok) {
-      return rangeResult.error;
+      return { ok: false, error: rangeResult.error };
     }
     const range = rangeResult.range;
 
     const policyError = validatePreconditionPolicy(precondition, policy);
     if (policyError) {
-      return policyError;
+      return { ok: false, error: policyError };
     }
 
     const contextError = validateContextPrefix(
@@ -164,47 +179,79 @@ async function validatePreconditions(
     );
     if (contextError) {
       return {
-        code: "MCM_PRECONDITION_FAILED",
-        message: contextError,
-        precondition_id: precondition.id,
+        ok: false,
+        error: {
+          code: "MCM_PRECONDITION_FAILED",
+          message: contextError,
+          precondition_id: precondition.id,
+        },
       };
     }
 
     const hashError = await validatePreconditionContentHash(precondition, range, lines);
     if (hashError) {
-      return hashError;
+      return { ok: false, error: hashError };
     }
+
+    resolvedRanges.set(precondition.id, range);
   }
 
-  return null;
+  return { ok: true, ranges: resolvedRanges };
 }
 
 function resolvePreconditionRange(
   precondition: MarkdownPreconditionV1,
-  lineCount: number
+  semanticIndex: ReturnType<typeof buildMarkdownSemanticIndex>,
+  policy?: MarkdownTargetingPolicyV1
 ): { ok: true; range: LineRange } | { ok: false; error: MarkdownOperationError } {
-  const range = precondition.line_range;
-  if (!range) {
+  const explicitRange = precondition.line_range;
+  const semantic = precondition.semantic;
+
+  if (!explicitRange && !semantic) {
     return {
       ok: false,
       error: {
         code: "MCM_PRECONDITION_FAILED",
-        message: "Line range required for line-based operations",
+        message: "Line range or semantic target required",
         precondition_id: precondition.id,
       },
     };
   }
-  if (!isValidLineRange(range, lineCount)) {
-    return {
-      ok: false,
-      error: {
-        code: "MCM_INVALID_RANGE",
-        message: "Line range is out of bounds",
-        precondition_id: precondition.id,
-      },
-    };
+
+  let resolvedRange: LineRange | null = null;
+  if (semantic) {
+    const semanticResult = resolveMarkdownSemanticTarget(semantic, semanticIndex, policy);
+    if (!semanticResult.ok) {
+      return { ok: false, error: semanticResult.error };
+    }
+    resolvedRange = semanticResult.range;
   }
-  return { ok: true, range };
+
+  if (explicitRange) {
+    if (!isValidLineRange(explicitRange, semanticIndex.line_count)) {
+      return {
+        ok: false,
+        error: {
+          code: "MCM_INVALID_RANGE",
+          message: "Line range is out of bounds",
+          precondition_id: precondition.id,
+        },
+      };
+    }
+    if (resolvedRange && !rangesEqual(explicitRange, resolvedRange)) {
+      return {
+        ok: false,
+        error: {
+          code: "MCM_PRECONDITION_FAILED",
+          message: "Line range does not match semantic target",
+          precondition_id: precondition.id,
+        },
+      };
+    }
+    return { ok: true, range: explicitRange };
+  }
+
+  return { ok: true, range: resolvedRange as LineRange };
 }
 
 function validatePreconditionPolicy(
@@ -250,6 +297,7 @@ async function validatePreconditionContentHash(
 function resolveOperations(
   ops: MarkdownOperation[],
   preconditionsById: Map<string, MarkdownPreconditionV1>,
+  resolvedRanges: Map<string, LineRange>,
   lineCount: number
 ): ResolveOpsResult {
   const resolvedOps: ResolvedOperation[] = [];
@@ -283,7 +331,20 @@ function resolveOperations(
       };
     }
 
-    const resolved = resolveOperation(op, precondition, lineCount, i);
+    const resolvedRange = resolvedRanges.get(op.precondition_id);
+    if (!resolvedRange) {
+      return {
+        ok: false,
+        error: {
+          code: "MCM_PRECONDITION_FAILED",
+          message: `Missing resolved range for ${op.precondition_id}`,
+          op_index: i,
+          precondition_id: op.precondition_id,
+        },
+      };
+    }
+
+    const resolved = resolveOperation(op, resolvedRange, lineCount, i);
     if (!resolved.ok) {
       return resolved;
     }
@@ -295,17 +356,17 @@ function resolveOperations(
 
 function resolveOperation(
   op: MarkdownOperation,
-  precondition: MarkdownPreconditionV1,
+  resolvedRange: LineRange,
   lineCount: number,
   opIndex: number
 ): { ok: true; resolved: ResolvedOperation } | { ok: false; error: MarkdownOperationError } {
   switch (op.op) {
     case "md_replace_lines":
-      return resolveReplaceLines(op, precondition, lineCount, opIndex);
+      return resolveReplaceLines(op, resolvedRange, lineCount, opIndex);
     case "md_delete_lines":
-      return resolveDeleteLines(op, precondition, lineCount, opIndex);
+      return resolveDeleteLines(op, resolvedRange, lineCount, opIndex);
     case "md_insert_lines":
-      return resolveInsertLines(op, precondition, lineCount, opIndex);
+      return resolveInsertLines(op, resolvedRange, lineCount, opIndex);
     default:
       return {
         ok: false,
@@ -321,7 +382,7 @@ function resolveOperation(
 
 function resolveReplaceLines(
   op: Extract<MarkdownOperation, { op: "md_replace_lines" }>,
-  precondition: MarkdownPreconditionV1,
+  resolvedRange: LineRange,
   lineCount: number,
   opIndex: number
 ): { ok: true; resolved: ResolvedOperation } | { ok: false; error: MarkdownOperationError } {
@@ -337,7 +398,7 @@ function resolveReplaceLines(
       },
     };
   }
-  if (!precondition.line_range || !rangesEqual(precondition.line_range, range)) {
+  if (!rangesEqual(resolvedRange, range)) {
     return {
       ok: false,
       error: {
@@ -353,7 +414,7 @@ function resolveReplaceLines(
 
 function resolveDeleteLines(
   op: Extract<MarkdownOperation, { op: "md_delete_lines" }>,
-  precondition: MarkdownPreconditionV1,
+  resolvedRange: LineRange,
   lineCount: number,
   opIndex: number
 ): { ok: true; resolved: ResolvedOperation } | { ok: false; error: MarkdownOperationError } {
@@ -369,7 +430,7 @@ function resolveDeleteLines(
       },
     };
   }
-  if (!precondition.line_range || !rangesEqual(precondition.line_range, range)) {
+  if (!rangesEqual(resolvedRange, range)) {
     return {
       ok: false,
       error: {
@@ -385,7 +446,7 @@ function resolveDeleteLines(
 
 function resolveInsertLines(
   op: Extract<MarkdownOperation, { op: "md_insert_lines" }>,
-  precondition: MarkdownPreconditionV1,
+  resolvedRange: LineRange,
   lineCount: number,
   opIndex: number
 ): { ok: true; resolved: ResolvedOperation } | { ok: false; error: MarkdownOperationError } {
@@ -413,7 +474,7 @@ function resolveInsertLines(
     };
   }
   const anchorRange = { start: anchorLine, end: anchorLine };
-  if (!precondition.line_range || !rangesEqual(precondition.line_range, anchorRange)) {
+  if (!rangesEqual(resolvedRange, anchorRange)) {
     return {
       ok: false,
       error: {
