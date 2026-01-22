@@ -69,6 +69,89 @@ export const aliases: AliasEntry[] = [
     replacement: path.resolve(__dirname, "packages/native-bindings/src/node.ts"),
   },
 
+  // @ku0/agent-runtime-execution subpaths
+  {
+    find: "@ku0/agent-runtime-execution/orchestrator/edge",
+    replacement: path.resolve(
+      __dirname,
+      "packages/agent-runtime-execution/src/orchestrator/edge.ts"
+    ),
+  },
+  {
+    find: "@ku0/agent-runtime-execution/orchestrator",
+    replacement: path.resolve(
+      __dirname,
+      "packages/agent-runtime-execution/src/orchestrator/index.ts"
+    ),
+  },
+  {
+    find: "@ku0/agent-runtime-execution/security",
+    replacement: path.resolve(__dirname, "packages/agent-runtime-execution/src/security/index.ts"),
+  },
+  {
+    find: "@ku0/agent-runtime-execution/tools/computer",
+    replacement: path.resolve(
+      __dirname,
+      "packages/agent-runtime-execution/src/tools/computer/index.ts"
+    ),
+  },
+  {
+    find: "@ku0/agent-runtime-execution/tools",
+    replacement: path.resolve(__dirname, "packages/agent-runtime-execution/src/tools/index.ts"),
+  },
+  {
+    find: "@ku0/agent-runtime-execution/types",
+    replacement: path.resolve(__dirname, "packages/agent-runtime-execution/src/types/index.ts"),
+  },
+  {
+    find: "@ku0/agent-runtime-execution/kernel",
+    replacement: path.resolve(__dirname, "packages/agent-runtime-execution/src/kernel/index.ts"),
+  },
+  {
+    find: "@ku0/agent-runtime-execution/runtime",
+    replacement: path.resolve(__dirname, "packages/agent-runtime-execution/src/runtime.ts"),
+  },
+
+  // @ku0/agent-runtime-persistence subpaths
+  {
+    find: "@ku0/agent-runtime-persistence/artifacts",
+    replacement: path.resolve(
+      __dirname,
+      "packages/agent-runtime-persistence/src/artifacts/index.ts"
+    ),
+  },
+  {
+    find: "@ku0/agent-runtime-persistence/checkpoint",
+    replacement: path.resolve(
+      __dirname,
+      "packages/agent-runtime-persistence/src/checkpoint/index.ts"
+    ),
+  },
+  {
+    find: "@ku0/agent-runtime-persistence/execution",
+    replacement: path.resolve(
+      __dirname,
+      "packages/agent-runtime-persistence/src/execution/index.ts"
+    ),
+  },
+  {
+    find: "@ku0/agent-runtime-persistence/timetravel",
+    replacement: path.resolve(
+      __dirname,
+      "packages/agent-runtime-persistence/src/timetravel/index.ts"
+    ),
+  },
+
+  // @ku0/agent-runtime-telemetry subpaths
+  {
+    find: "@ku0/agent-runtime-telemetry/logging",
+    replacement: path.resolve(__dirname, "packages/agent-runtime-telemetry/src/logging/index.ts"),
+  },
+  {
+    find: "@ku0/agent-runtime-telemetry/telemetry",
+    replacement: path.resolve(__dirname, "packages/agent-runtime-telemetry/src/telemetry/index.ts"),
+  },
+
   // @ku0/agent-runtime-tools subpaths
   {
     find: "@ku0/agent-runtime-tools/tools/computer",
@@ -108,8 +191,16 @@ export const aliases: AliasEntry[] = [
     replacement: path.resolve(__dirname, "packages/agent-runtime/src/index.ts"),
   },
   {
+    find: "@ku0/agent-runtime-control",
+    replacement: path.resolve(__dirname, "packages/agent-runtime-control/src/index.ts"),
+  },
+  {
     find: "@ku0/agent-runtime-core",
     replacement: path.resolve(__dirname, "packages/agent-runtime-core/src/index.ts"),
+  },
+  {
+    find: "@ku0/agent-runtime-execution",
+    replacement: path.resolve(__dirname, "packages/agent-runtime-execution/src/index.ts"),
   },
   {
     find: "@ku0/agent-runtime-memory",
@@ -122,6 +213,10 @@ export const aliases: AliasEntry[] = [
   {
     find: "@ku0/agent-runtime-sandbox",
     replacement: path.resolve(__dirname, "packages/agent-runtime-sandbox/src/index.ts"),
+  },
+  {
+    find: "@ku0/agent-runtime-telemetry",
+    replacement: path.resolve(__dirname, "packages/agent-runtime-telemetry/src/index.ts"),
   },
   {
     find: "@ku0/agent-runtime-tools",
