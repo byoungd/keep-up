@@ -38,6 +38,7 @@ const TOP_LEVEL_FIELDS = [
   "history_policy",
   "ai_sanitization_policy",
   "ai_native_policy",
+  "markdown_policy",
   "relocation_policy",
   "dev_tooling_policy",
   "capabilities",
@@ -76,6 +77,7 @@ export function validateManifest(manifest: unknown): ValidationResult {
   validateHistoryPolicy(m.history_policy, errors);
   validateAISanitizationPolicy(m.ai_sanitization_policy, errors);
   validateAINativePolicy(m.ai_native_policy, errors);
+  validateMarkdownPolicy(m.markdown_policy, errors);
   validateRelocationPolicy(m.relocation_policy, errors);
   validateDevToolingPolicy(m.dev_tooling_policy, errors);
   validateCapabilities(m.capabilities, errors);
@@ -95,8 +97,11 @@ function validateUnknownTopLevelFields(m: Record<string, unknown>): ValidationEr
 
 function validateRequiredFields(m: Record<string, unknown>): ValidationError[] {
   const errors: ValidationError[] = [];
-  if (m.lfcc_version !== "0.9" && m.lfcc_version !== "0.9.1") {
-    errors.push({ path: "lfcc_version", message: 'Must be "0.9" or "0.9.1"' });
+  if (m.lfcc_version !== "0.9" && m.lfcc_version !== "0.9.1" && m.lfcc_version !== "0.9.5") {
+    errors.push({
+      path: "lfcc_version",
+      message: 'Must be "0.9", "0.9.1", or "0.9.5"',
+    });
   }
   if (typeof m.policy_id !== "string" || m.policy_id.length === 0) {
     errors.push({ path: "policy_id", message: "Must be a non-empty string" });
@@ -466,6 +471,288 @@ function validateAINativePolicy(policy: unknown, errors: ValidationError[]): voi
   validateAIOpCodePolicy(p.ai_opcodes, errors);
 }
 
+function validateMarkdownPolicy(policy: unknown, errors: ValidationError[]): void {
+  if (policy === undefined) {
+    return;
+  }
+  if (!policy || typeof policy !== "object") {
+    errors.push({ path: "markdown_policy", message: "Must be an object" });
+    return;
+  }
+  const p = policy as Record<string, unknown>;
+  validateEnumField("markdown_policy.version", p.version, ["v1"], errors);
+  validateBooleanField("markdown_policy.enabled", p.enabled, errors);
+
+  validateMarkdownParserPolicy(p.parser, errors);
+  validateMarkdownCanonicalizerPolicy(p.canonicalizer, errors);
+  validateMarkdownSanitizationPolicy(p.sanitization, errors);
+  validateMarkdownTargetingPolicy(p.targeting, errors);
+
+  const parser = isRecord(p.parser) ? (p.parser as Record<string, unknown>) : null;
+  const sanitization = isRecord(p.sanitization)
+    ? (p.sanitization as Record<string, unknown>)
+    : null;
+  if (
+    parser &&
+    sanitization &&
+    sanitization.allow_frontmatter === true &&
+    Array.isArray(parser.frontmatter_formats) &&
+    parser.frontmatter_formats.length === 0
+  ) {
+    errors.push({
+      path: "markdown_policy.parser.frontmatter_formats",
+      message: "Must be non-empty when allow_frontmatter is true",
+    });
+  }
+}
+
+function validateMarkdownParserPolicy(policy: unknown, errors: ValidationError[]): void {
+  if (!policy || typeof policy !== "object") {
+    errors.push({ path: "markdown_policy.parser", message: "Must be an object" });
+    return;
+  }
+  const p = policy as Record<string, unknown>;
+  validateEnumField("markdown_policy.parser.profile", p.profile, ["commonmark_0_30"], errors);
+
+  if (!p.extensions || typeof p.extensions !== "object") {
+    errors.push({ path: "markdown_policy.parser.extensions", message: "Must be an object" });
+  } else {
+    const ext = p.extensions as Record<string, unknown>;
+    validateBooleanField("markdown_policy.parser.extensions.gfm_tables", ext.gfm_tables, errors);
+    validateBooleanField(
+      "markdown_policy.parser.extensions.gfm_task_lists",
+      ext.gfm_task_lists,
+      errors
+    );
+    validateBooleanField(
+      "markdown_policy.parser.extensions.gfm_strikethrough",
+      ext.gfm_strikethrough,
+      errors
+    );
+    validateBooleanField(
+      "markdown_policy.parser.extensions.gfm_autolink",
+      ext.gfm_autolink,
+      errors
+    );
+    validateBooleanField("markdown_policy.parser.extensions.footnotes", ext.footnotes, errors);
+    validateBooleanField("markdown_policy.parser.extensions.wikilinks", ext.wikilinks, errors);
+    validateBooleanField("markdown_policy.parser.extensions.math", ext.math, errors);
+  }
+
+  if (!Array.isArray(p.frontmatter_formats)) {
+    errors.push({
+      path: "markdown_policy.parser.frontmatter_formats",
+      message: "Must be an array",
+    });
+  } else if (
+    !p.frontmatter_formats.every(
+      (value) => value === "yaml" || value === "toml" || value === "json"
+    )
+  ) {
+    errors.push({
+      path: "markdown_policy.parser.frontmatter_formats",
+      message: "All values must be yaml, toml, or json",
+    });
+  }
+}
+
+function validateMarkdownCanonicalizerPolicy(policy: unknown, errors: ValidationError[]): void {
+  if (!policy || typeof policy !== "object") {
+    errors.push({ path: "markdown_policy.canonicalizer", message: "Must be an object" });
+    return;
+  }
+  const p = policy as Record<string, unknown>;
+  validateEnumField("markdown_policy.canonicalizer.version", p.version, ["v1"], errors);
+  validateEnumField(
+    "markdown_policy.canonicalizer.mode",
+    p.mode,
+    ["source_preserving", "normalized"],
+    errors
+  );
+  validateEnumField("markdown_policy.canonicalizer.line_ending", p.line_ending, ["lf"], errors);
+
+  if (!p.preserve || typeof p.preserve !== "object") {
+    errors.push({ path: "markdown_policy.canonicalizer.preserve", message: "Must be an object" });
+  } else {
+    const preserve = p.preserve as Record<string, unknown>;
+    validateBooleanField(
+      "markdown_policy.canonicalizer.preserve.trailing_whitespace",
+      preserve.trailing_whitespace,
+      errors
+    );
+    validateBooleanField(
+      "markdown_policy.canonicalizer.preserve.multiple_blank_lines",
+      preserve.multiple_blank_lines,
+      errors
+    );
+    validateBooleanField(
+      "markdown_policy.canonicalizer.preserve.heading_style",
+      preserve.heading_style,
+      errors
+    );
+    validateBooleanField(
+      "markdown_policy.canonicalizer.preserve.list_marker_style",
+      preserve.list_marker_style,
+      errors
+    );
+    validateBooleanField(
+      "markdown_policy.canonicalizer.preserve.emphasis_style",
+      preserve.emphasis_style,
+      errors
+    );
+    validateBooleanField(
+      "markdown_policy.canonicalizer.preserve.fence_style",
+      preserve.fence_style,
+      errors
+    );
+  }
+
+  if (!p.normalize || typeof p.normalize !== "object") {
+    errors.push({ path: "markdown_policy.canonicalizer.normalize", message: "Must be an object" });
+  } else {
+    const normalize = p.normalize as Record<string, unknown>;
+    validateEnumField(
+      "markdown_policy.canonicalizer.normalize.heading_style",
+      normalize.heading_style,
+      ["atx"],
+      errors
+    );
+    validateEnumField(
+      "markdown_policy.canonicalizer.normalize.list_marker",
+      normalize.list_marker,
+      ["-"],
+      errors
+    );
+    validateEnumField(
+      "markdown_policy.canonicalizer.normalize.emphasis_char",
+      normalize.emphasis_char,
+      ["*"],
+      errors
+    );
+    validateEnumField(
+      "markdown_policy.canonicalizer.normalize.fence_char",
+      normalize.fence_char,
+      ["`"],
+      errors
+    );
+    validateNumberField(
+      "markdown_policy.canonicalizer.normalize.fence_length",
+      normalize.fence_length,
+      errors,
+      { min: 3 }
+    );
+  }
+}
+
+function validateMarkdownSanitizationPolicy(policy: unknown, errors: ValidationError[]): void {
+  if (!policy || typeof policy !== "object") {
+    errors.push({ path: "markdown_policy.sanitization", message: "Must be an object" });
+    return;
+  }
+  const p = policy as Record<string, unknown>;
+  validateEnumField("markdown_policy.sanitization.version", p.version, ["v1"], errors);
+  validateStringArrayField(
+    "markdown_policy.sanitization.allowed_block_types",
+    p.allowed_block_types,
+    errors
+  );
+  validateStringArrayField(
+    "markdown_policy.sanitization.allowed_mark_types",
+    p.allowed_mark_types,
+    errors
+  );
+  validateBooleanField(
+    "markdown_policy.sanitization.allow_html_blocks",
+    p.allow_html_blocks,
+    errors
+  );
+  validateBooleanField(
+    "markdown_policy.sanitization.allow_frontmatter",
+    p.allow_frontmatter,
+    errors
+  );
+  validateBooleanField(
+    "markdown_policy.sanitization.reject_unknown_structure",
+    p.reject_unknown_structure,
+    errors
+  );
+  validateOptionalStringArrayField(
+    "markdown_policy.sanitization.allowed_languages",
+    p.allowed_languages,
+    errors
+  );
+  validateOptionalStringArrayField(
+    "markdown_policy.sanitization.blocked_languages",
+    p.blocked_languages,
+    errors
+  );
+  validateNumberField(
+    "markdown_policy.sanitization.max_code_fence_lines",
+    p.max_code_fence_lines,
+    errors,
+    { min: 0 }
+  );
+  validateEnumField(
+    "markdown_policy.sanitization.link_url_policy",
+    p.link_url_policy,
+    ["strict", "moderate", "permissive"],
+    errors
+  );
+  validateEnumField(
+    "markdown_policy.sanitization.image_url_policy",
+    p.image_url_policy,
+    ["strict", "moderate", "permissive"],
+    errors
+  );
+  validateNumberField("markdown_policy.sanitization.max_file_lines", p.max_file_lines, errors, {
+    min: 1,
+  });
+  validateNumberField("markdown_policy.sanitization.max_line_length", p.max_line_length, errors, {
+    min: 1,
+  });
+  validateNumberField(
+    "markdown_policy.sanitization.max_heading_depth",
+    p.max_heading_depth,
+    errors,
+    { min: 1 }
+  );
+  validateNumberField("markdown_policy.sanitization.max_list_depth", p.max_list_depth, errors, {
+    min: 1,
+  });
+  validateNumberField(
+    "markdown_policy.sanitization.max_frontmatter_bytes",
+    p.max_frontmatter_bytes,
+    errors,
+    { min: 0 }
+  );
+}
+
+function validateMarkdownTargetingPolicy(policy: unknown, errors: ValidationError[]): void {
+  if (!policy || typeof policy !== "object") {
+    errors.push({ path: "markdown_policy.targeting", message: "Must be an object" });
+    return;
+  }
+  const p = policy as Record<string, unknown>;
+  validateBooleanField(
+    "markdown_policy.targeting.require_content_hash",
+    p.require_content_hash,
+    errors
+  );
+  validateBooleanField("markdown_policy.targeting.require_context", p.require_context, errors);
+  validateNumberField(
+    "markdown_policy.targeting.max_semantic_search_lines",
+    p.max_semantic_search_lines,
+    errors,
+    { min: 1 }
+  );
+  validateNumberField(
+    "markdown_policy.targeting.max_context_prefix_chars",
+    p.max_context_prefix_chars,
+    errors,
+    { min: 1 }
+  );
+}
+
 function validateAIGatewayPolicy(policy: unknown, errors: ValidationError[]): void {
   if (!policy || typeof policy !== "object") {
     errors.push({ path: "ai_native_policy.gateway", message: "Must be an object" });
@@ -798,6 +1085,26 @@ function validateCapabilities(caps: unknown, errors: ValidationError[]): void {
   ];
   for (const field of required) {
     if (typeof c[field] !== "boolean") {
+      errors.push({ path: `capabilities.${field}`, message: "Must be boolean" });
+    }
+  }
+  const optional = [
+    "markdown_content_mode",
+    "markdown_frontmatter",
+    "markdown_frontmatter_json",
+    "markdown_code_fence_syntax",
+    "markdown_line_targeting",
+    "markdown_semantic_targeting",
+    "markdown_gfm_tables",
+    "markdown_gfm_task_lists",
+    "markdown_gfm_strikethrough",
+    "markdown_gfm_autolink",
+    "markdown_footnotes",
+    "markdown_wikilinks",
+    "markdown_math",
+  ];
+  for (const field of optional) {
+    if (c[field] !== undefined && typeof c[field] !== "boolean") {
       errors.push({ path: `capabilities.${field}`, message: "Must be boolean" });
     }
   }

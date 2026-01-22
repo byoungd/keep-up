@@ -138,6 +138,105 @@ export type AISanitizationPolicy = {
   limits?: AISanitizationLimits;
 };
 
+export type MarkdownBlockType =
+  | "md_document"
+  | "md_frontmatter"
+  | "md_heading"
+  | "md_paragraph"
+  | "md_code_fence"
+  | "md_code_indent"
+  | "md_blockquote"
+  | "md_list"
+  | "md_list_item"
+  | "md_table"
+  | "md_table_row"
+  | "md_table_cell"
+  | "md_thematic_break"
+  | "md_link_def"
+  | "md_html_block"
+  | "md_math_block";
+
+export type MarkdownMark =
+  | "md_strong"
+  | "md_emphasis"
+  | "md_code_span"
+  | "md_strikethrough"
+  | "md_link"
+  | "md_image"
+  | "md_autolink"
+  | "md_html_inline"
+  | "md_math_inline"
+  | "md_wikilink"
+  | "md_footnote_ref";
+
+export type MarkdownCanonicalizerPolicyV1 = {
+  version: "v1";
+  mode: "source_preserving" | "normalized";
+  line_ending: "lf";
+  preserve: {
+    trailing_whitespace: boolean;
+    multiple_blank_lines: boolean;
+    heading_style: boolean;
+    list_marker_style: boolean;
+    emphasis_style: boolean;
+    fence_style: boolean;
+  };
+  normalize: {
+    heading_style: "atx";
+    list_marker: "-";
+    emphasis_char: "*";
+    fence_char: "`";
+    fence_length: number;
+  };
+};
+
+export type MarkdownSanitizationPolicyV1 = {
+  version: "v1";
+  allowed_block_types: MarkdownBlockType[];
+  allowed_mark_types: MarkdownMark[];
+  allow_html_blocks: boolean;
+  allow_frontmatter: boolean;
+  reject_unknown_structure: boolean;
+  allowed_languages?: string[];
+  blocked_languages?: string[];
+  max_code_fence_lines: number;
+  link_url_policy: "strict" | "moderate" | "permissive";
+  image_url_policy: "strict" | "moderate" | "permissive";
+  max_file_lines: number;
+  max_line_length: number;
+  max_heading_depth: number;
+  max_list_depth: number;
+  max_frontmatter_bytes: number;
+};
+
+export type MarkdownTargetingPolicyV1 = {
+  require_content_hash: boolean;
+  require_context: boolean;
+  max_semantic_search_lines: number;
+  max_context_prefix_chars: number;
+};
+
+export type MarkdownPolicyV1 = {
+  version: "v1";
+  enabled: boolean;
+  parser: {
+    profile: "commonmark_0_30";
+    extensions: {
+      gfm_tables: boolean;
+      gfm_task_lists: boolean;
+      gfm_strikethrough: boolean;
+      gfm_autolink: boolean;
+      footnotes: boolean;
+      wikilinks: boolean;
+      math: boolean;
+    };
+    frontmatter_formats: Array<"yaml" | "toml" | "json">;
+  };
+  canonicalizer: MarkdownCanonicalizerPolicyV1;
+  sanitization: MarkdownSanitizationPolicyV1;
+  targeting: MarkdownTargetingPolicyV1;
+};
+
 /** AI gateway limits */
 export type AIGatewayPolicy = {
   max_ops_per_request: number;
@@ -259,6 +358,19 @@ export type Capabilities = {
   ai_provenance: boolean;
   semantic_merge: boolean;
   ai_transactions: boolean;
+  markdown_content_mode?: boolean;
+  markdown_frontmatter?: boolean;
+  markdown_frontmatter_json?: boolean;
+  markdown_code_fence_syntax?: boolean;
+  markdown_line_targeting?: boolean;
+  markdown_semantic_targeting?: boolean;
+  markdown_gfm_tables?: boolean;
+  markdown_gfm_task_lists?: boolean;
+  markdown_gfm_strikethrough?: boolean;
+  markdown_gfm_autolink?: boolean;
+  markdown_footnotes?: boolean;
+  markdown_wikilinks?: boolean;
+  markdown_math?: boolean;
 };
 
 /** Conformance kit policy */
@@ -270,7 +382,7 @@ export type ConformanceKitPolicy = {
 
 /** Complete Policy Manifest v0.9 */
 export type PolicyManifestV09 = {
-  lfcc_version: "0.9" | "0.9.1";
+  lfcc_version: "0.9" | "0.9.1" | "0.9.5";
   policy_id: string;
   coords: CoordsPolicy;
   anchor_encoding: AnchorEncodingPolicy;
@@ -283,6 +395,7 @@ export type PolicyManifestV09 = {
   history_policy: HistoryPolicy;
   ai_sanitization_policy: AISanitizationPolicy;
   ai_native_policy?: AINativePolicy;
+  markdown_policy?: MarkdownPolicyV1;
   relocation_policy: RelocationPolicy;
   dev_tooling_policy: DevToolingPolicy;
   capabilities: Capabilities;
@@ -459,6 +572,19 @@ export const DEFAULT_POLICY_MANIFEST: PolicyManifestV09 = {
     ai_provenance: true,
     semantic_merge: true,
     ai_transactions: true,
+    markdown_content_mode: false,
+    markdown_frontmatter: false,
+    markdown_frontmatter_json: false,
+    markdown_code_fence_syntax: false,
+    markdown_line_targeting: false,
+    markdown_semantic_targeting: false,
+    markdown_gfm_tables: false,
+    markdown_gfm_task_lists: false,
+    markdown_gfm_strikethrough: false,
+    markdown_gfm_autolink: false,
+    markdown_footnotes: false,
+    markdown_wikilinks: false,
+    markdown_math: false,
   },
   conformance_kit_policy: {
     version: "v1",

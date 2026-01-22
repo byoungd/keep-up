@@ -25,6 +25,7 @@ const KNOWN_TOP_LEVEL_FIELDS = new Set([
   "history_policy",
   "ai_sanitization_policy",
   "ai_native_policy",
+  "markdown_policy",
   "relocation_policy",
   "dev_tooling_policy",
   "capabilities",
