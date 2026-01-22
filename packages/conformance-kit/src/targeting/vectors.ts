@@ -83,8 +83,8 @@ export const windowHashVectors: Array<{
     expectedCanonical: [
       "LFCC_SPAN_WINDOW_V1",
       "block_id=block_abc123",
-      "left=orld!",
-      "right= This",
+      "left=, wor",
+      "right=s a t",
     ].join("\n"),
     description: "Standard window hash with sufficient context",
   },
@@ -111,12 +111,9 @@ export const windowHashVectors: Array<{
       blockText: "ab\r\ncd\r\nefgh",
       windowSize: { left: 4, right: 4 },
     },
-    expectedCanonical: [
-      "LFCC_SPAN_WINDOW_V1",
-      "block_id=block_crlf",
-      "left=ab\ncd",
-      "right=\nefg",
-    ].join("\n"),
+    expectedCanonical: ["LFCC_SPAN_WINDOW_V1", "block_id=block_crlf", "left=b\nc", "right=gh"].join(
+      "\n"
+    ),
     description: "CRLF normalized to LF",
   },
 ];
@@ -140,10 +137,10 @@ export const neighborHashVectors: Array<{
       blockText: "Hello, world! This is a test.",
       neighborWindow: { left: 3, right: 3 },
     },
-    // Left side: "d! "
-    expectedLeft: ["LFCC_NEIGHBOR_V1", "block_id=block_abc", "side=left", "text=d! "].join("\n"),
-    // Right side: " Th"
-    expectedRight: ["LFCC_NEIGHBOR_V1", "block_id=block_abc", "side=right", "text= Th"].join("\n"),
+    // Left side: "wor"
+    expectedLeft: ["LFCC_NEIGHBOR_V1", "block_id=block_abc", "side=left", "text=wor"].join("\n"),
+    // Right side: "s a"
+    expectedRight: ["LFCC_NEIGHBOR_V1", "block_id=block_abc", "side=right", "text=s a"].join("\n"),
     description: "Standard neighbor hash",
   },
   {

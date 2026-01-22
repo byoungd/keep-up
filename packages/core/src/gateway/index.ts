@@ -78,5 +78,21 @@ export {
   updateRequestAfterRebase,
   updateRetryState,
 } from "./retry.js";
+// Targeting (v0.9.4 helpers)
+export {
+  buildNeighborCanonicals,
+  buildSpanWindowCanonical,
+  buildStructureCanonical,
+  compareMatchVectors,
+  computeNeighborHash,
+  computeSpanWindowHash,
+  computeStructureHash,
+  type MatchVector,
+  type NeighborHashInput,
+  type RankedCandidate,
+  rankCandidates,
+  type StructureHashInput,
+  type WindowHashInput,
+} from "./targeting.js";
 // Types
 export * from "./types.js";
