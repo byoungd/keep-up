@@ -33,6 +33,8 @@ export * as gateway from "./gateway/index.js";
 export type { GatewayTelemetryEvent } from "./gateway/types.js";
 // LFCC v0.9 RC Kernel
 export * from "./kernel/index.js";
+// Markdown Content Mode
+export * from "./markdown/index.js";
 // Observability (Track 12)
 export * as observability from "./observability/index.js";
 // Persistence (Track 10)
