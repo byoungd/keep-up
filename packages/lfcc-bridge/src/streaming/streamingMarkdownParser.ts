@@ -1,3 +1,10 @@
+import {
+  getNativeStreamingMarkdownParser,
+  type ParserOptions as NativeParserOptions,
+  type NativeStreamingMarkdownBinding,
+  type NativeStreamingMarkdownParser as NativeStreamingMarkdownParserInstance,
+} from "@ku0/streaming-markdown-rs";
+
 /**
  * Streaming Markdown Parser
  *
@@ -569,9 +576,56 @@ export class StreamingMarkdownParser {
   }
 }
 
+class NativeStreamingMarkdownParserWrapper extends StreamingMarkdownParser {
+  private native: NativeStreamingMarkdownParserInstance;
+
+  constructor(binding: NativeStreamingMarkdownBinding, options?: ParserOptions) {
+    super(options);
+    this.native = new binding.StreamingMarkdownParser(toNativeOptions(options));
+  }
+
+  override push(chunk: string): ParseResult {
+    return this.native.push(chunk);
+  }
+
+  override flush(): ParseResult {
+    return this.native.flush();
+  }
+
+  override reset(): void {
+    this.native.reset();
+  }
+
+  override getCacheStats(): { hits: number; misses: number; ratio: number } {
+    return this.native.getCacheStats();
+  }
+}
+
 // ============================================================================
 // Utility Functions
 // ============================================================================
+
+function hasCustomParsers(options?: ParserOptions): boolean {
+  return (options?.blockParsers?.length ?? 0) > 0 || (options?.inlineParsers?.length ?? 0) > 0;
+}
+
+function toNativeOptions(options?: ParserOptions): NativeParserOptions | undefined {
+  if (!options) {
+    return undefined;
+  }
+
+  const nativeOptions: NativeParserOptions = {};
+  if (options.gfm !== undefined) {
+    nativeOptions.gfm = options.gfm;
+  }
+  if (options.math !== undefined) {
+    nativeOptions.math = options.math;
+  }
+  if (options.maxBufferSize !== undefined) {
+    nativeOptions.maxBufferSize = options.maxBufferSize;
+  }
+  return nativeOptions;
+}
 
 function escapeRegex(string: string): string {
   return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -581,6 +635,17 @@ function escapeRegex(string: string): string {
  * Create a streaming parser instance.
  */
 export function createStreamingParser(options?: ParserOptions): StreamingMarkdownParser {
+  if (!hasCustomParsers(options)) {
+    const native = getNativeStreamingMarkdownParser();
+    if (native) {
+      try {
+        return new NativeStreamingMarkdownParserWrapper(native, options);
+      } catch {
+        // Fall back to the JS parser if the native binding fails to initialize.
+      }
+    }
+  }
+
   return new StreamingMarkdownParser(options);
 }
 

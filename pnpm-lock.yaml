@@ -825,6 +825,9 @@ importers:
       '@ku0/core':
         specifier: workspace:*
         version: link:../core
+      '@ku0/streaming-markdown-rs':
+        specifier: workspace:*
+        version: link:../streaming-markdown-rs
       loro-crdt:
         specifier: ^1.10.3
         version: 1.10.3
@@ -840,6 +843,10 @@ importers:
       prosemirror-view:
         specifier: ^1.41.4
         version: 1.41.4
+    devDependencies:
+      '@ku0/native-bindings':
+        specifier: workspace:*
+        version: link:../native-bindings
 
   packages/native-bindings:
     devDependencies:
@@ -1012,6 +1019,22 @@ importers:
       '@types/node':
         specifier: ^22.10.2
         version: 22.19.3
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
+  packages/streaming-markdown-rs:
+    dependencies:
+      '@ku0/native-bindings':
+        specifier: workspace:*
+        version: link:../native-bindings
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.19.3
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
       typescript:
         specifier: ^5.7.3
         version: 5.9.3

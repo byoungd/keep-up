@@ -30,6 +30,13 @@
       "import": "./src/testing/index.ts",
       "development": "./src/testing/index.ts",
       "default": "./src/testing/index.ts"
+    },
+    "./node": {
+      "types": "./src/node.ts",
+      "import": "./src/node.ts",
+      "development": "./src/node.ts",
+      "node": "./dist/node.js",
+      "default": "./src/node.ts"
     }
   },
   "scripts": {
