@@ -35,8 +35,32 @@ export {
   createMockLLM,
   MockAgentLLM,
 } from "./aiCoreAdapter";
+// Clarifying Questions Engine
+export {
+  type ClarifyingQuestion,
+  type ClarifyingQuestionsConfig,
+  type ClarifyingQuestionsEngine,
+  ClarifyingQuestionsEngineImpl,
+  createClarifyingQuestionsEngine,
+  DEFAULT_CLARIFYING_CONFIG,
+  type QuestionCategory,
+  type QuestionPriority,
+  type QuestionTemplate,
+} from "./clarifyingQuestionsEngine";
 export type { CreateCodeAgentOrchestratorOptions } from "./codeAgentFactory";
 export { createCodeAgentOrchestrator } from "./codeAgentFactory";
+// Codebase Research Engine
+export {
+  type CodebaseResearchConfig,
+  type CodebaseResearchEngine,
+  CodebaseResearchEngineImpl,
+  createCodebaseResearchEngine,
+  DEFAULT_RESEARCH_CONFIG,
+  type FindingType,
+  type RelevanceLevel,
+  type ResearchFinding,
+  type ResearchStrategy,
+} from "./codebaseResearchEngine";
 // Consensus Orchestration
 export {
   type ConsensusConfig,
@@ -52,6 +76,14 @@ export {
   type DependencyAnalysis,
   DependencyAnalyzer,
 } from "./dependencyAnalyzer";
+// Execution Feedback (Track B)
+export {
+  createExecutionFeedbackTracker,
+  type ExecutionFeedbackConfig,
+  ExecutionFeedbackTracker,
+  type ExecutionOutcome,
+  type ToolStats,
+} from "./executionFeedback";
 // Lifecycle Hooks
 export {
   type AfterToolHook,
@@ -110,6 +142,52 @@ export {
   type OrchestratorEventHandler,
   type OrchestratorEventType,
 } from "./orchestrator";
+// Parallel Plan Reviewer (Multi-Agent Review)
+export {
+  type AgentReviewExecutor,
+  type ConsolidatedReview,
+  createParallelPlanReviewer,
+  DEFAULT_PARALLEL_REVIEWER_CONFIG,
+  DEFAULT_REVIEWER_PROFILES,
+  ParallelPlanReviewer,
+  type ParallelPlanReviewerConfig,
+  type PlanChange,
+  type PlanReview,
+  type PlanReviewRequest,
+  type ReviewerProfile,
+  type ReviewFocus,
+} from "./parallelPlanReviewer";
+// Plan Markdown Renderer
+export {
+  createPlanMarkdownRenderer,
+  DEFAULT_RENDER_CONFIG,
+  PlanMarkdownRenderer,
+  type PlanRenderConfig,
+  type RenderablePlan,
+} from "./planMarkdownRenderer";
+// Plan Mode (Cursor-style planning workflow)
+export {
+  type AlternativeApproach,
+  createPlanModeController,
+  DEFAULT_PLAN_MODE_CONFIG,
+  type PlanModeConfig,
+  PlanModeController,
+  type PlanModeEvent,
+  type PlanModeEventHandler,
+  type PlanModeEventType,
+  type PlanModePhase,
+  type PlanModeState,
+} from "./planModeController";
+// Plan Mode Orchestrator Integration
+export {
+  createPlanModeIntegration,
+  DEFAULT_INTEGRATION_CONFIG,
+  PlanModeIntegration,
+  type PlanModeIntegrationConfig,
+  type PlanModeIntegrationEvent,
+  type PlanModeIntegrationEventHandler,
+  type PlanModeIntegrationEventType,
+} from "./planModeIntegration";
 // Planning with File Persistence
 export {
   createPlanningEngine,
@@ -121,6 +199,14 @@ export {
   type PlanRefinement,
   type PlanStep,
 } from "./planning";
+// Plan Prioritization (Track A)
+export {
+  createPlanPrioritizer,
+  PlanPrioritizer,
+  type PlanPrioritizerConfig,
+  type PlanStepPriority,
+  type PrioritizationResult,
+} from "./planPrioritizer";
 export {
   type CacheConfig,
   createRequestCache,
@@ -149,6 +235,14 @@ export {
   InvalidTransitionError,
   type TransitionHandler,
 } from "./stateMachine";
+// Tool Scoring (Track B)
+export {
+  createToolScorer,
+  type ToolScore,
+  ToolScorer,
+  type ToolScorerConfig,
+  type ToolScorerWeights,
+} from "./toolScorer";
 // Turn Executor (extracted from orchestrator)
 export {
   createTurnExecutor,
