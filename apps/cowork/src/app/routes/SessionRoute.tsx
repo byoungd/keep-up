@@ -1,4 +1,4 @@
-import { Link, useParams } from "@tanstack/react-router";
+import { Link, useParams, useRouter } from "@tanstack/react-router";
 import { ArtifactRail } from "../../components/ArtifactRail";
 import { ChatThread } from "../../features/chat/ChatThread";
 import { useKeyboardShortcuts } from "../../features/chat/hooks/useKeyboardShortcuts";
@@ -6,6 +6,7 @@ import { useTaskStream } from "../../features/tasks/hooks/useTaskStream";
 import { useWorkspace } from "../providers/WorkspaceProvider";
 
 export function SessionRoute() {
+  const router = useRouter();
   const { sessionId } = useParams({ strict: false }) as { sessionId: string };
   const { getSession } = useWorkspace();
   const session = getSession(sessionId);
@@ -21,7 +22,7 @@ export function SessionRoute() {
       // TODO: Navigate to new session
     },
     onSearch: () => {
-      // TODO: Open Search/Command Palette
+      router.navigate({ to: "/search" });
     },
   });
 

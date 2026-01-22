@@ -245,6 +245,47 @@ export function useCoworkAIPanelController() {
     [prepareSession, queueSendAfterNavigation, sendInSession, sessionId]
   );
 
+  const resolveSendContent = useCallback(
+    (content: string) => {
+      const { resolvedContent, mode, error } = resolveMessageMode(content);
+      if (!error) {
+        return { resolvedContent, mode };
+      }
+      setStatusMessage(error);
+      if (error.includes("prompt")) {
+        setInput(content);
+      }
+      return null;
+    },
+    [resolveMessageMode]
+  );
+
+  const getSendError = useCallback(
+    (mode: "chat" | "task") => {
+      const blocker = getSendBlocker();
+      if (blocker) {
+        return blocker;
+      }
+      if (mode === "task" && attachments.length > 0) {
+        return "Attachments are only supported for chat messages.";
+      }
+      return null;
+    },
+    [attachments.length, getSendBlocker]
+  );
+
+  const dispatchSend = useCallback(
+    async (resolvedContent: string, mode: "chat" | "task") => {
+      const targetSessionId = await prepareSession(resolvedContent);
+      if (targetSessionId !== sessionId) {
+        await queueSendAfterNavigation(targetSessionId, resolvedContent, mode);
+        return;
+      }
+      await sendInSession(resolvedContent, mode, branchParentId ?? undefined);
+    },
+    [prepareSession, queueSendAfterNavigation, sendInSession, sessionId, branchParentId]
+  );
+
   const handleSend = useCallback(async () => {
     const content = input.trim();
     if (!content || isSending) {
@@ -255,46 +296,24 @@ export function useCoworkAIPanelController() {
     setInput("");
 
     try {
-      const { resolvedContent, mode, error } = resolveMessageMode(content);
-      if (error) {
-        setStatusMessage(error);
-        if (error.includes("prompt")) {
-          setInput(content);
-        }
+      const resolved = resolveSendContent(content);
+      if (!resolved) {
         return;
       }
-
-      const blocker = getSendBlocker();
-      if (blocker) {
-        setStatusMessage(blocker);
+      const sendError = getSendError(resolved.mode);
+      if (sendError) {
+        setStatusMessage(sendError);
         setInput(content);
         return;
       }
-
-      const targetSessionId = await prepareSession(resolvedContent);
-      if (targetSessionId !== sessionId) {
-        await queueSendAfterNavigation(targetSessionId, resolvedContent, mode);
-        return;
-      }
-
-      await sendInSession(resolvedContent, mode, branchParentId ?? undefined);
+      await dispatchSend(resolved.resolvedContent, resolved.mode);
     } catch (_err) {
       setInput(content);
       setStatusMessage(
         "Unable to send message. Ensure the Cowork server is running, then try again."
       );
     }
-  }, [
-    input,
-    isSending,
-    sessionId,
-    prepareSession,
-    resolveMessageMode,
-    getSendBlocker,
-    queueSendAfterNavigation,
-    sendInSession,
-    branchParentId,
-  ]);
+  }, [input, isSending, resolveSendContent, getSendError, dispatchSend]);
 
   const startEditing = useCallback(
     (id: string) => {

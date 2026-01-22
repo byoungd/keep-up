@@ -20,7 +20,6 @@ import {
 } from "@ku0/shell";
 import {
   Brain,
-  CalendarClock,
   Check,
   ChevronDown,
   ExternalLink,
@@ -41,8 +40,10 @@ import {
 } from "lucide-react";
 import * as React from "react";
 import { useWorkspace } from "../../app/providers/WorkspaceProvider";
+import type { Project, Session } from "../../features/workspace/types";
+import { shareSessionLink } from "../../lib/shareSession";
 
-type TaskFilter = "all" | "favorites" | "scheduled";
+type TaskFilter = "all" | "favorites";
 
 const FAVORITES_STORAGE_KEY = "cowork-task-favorites-v1";
 const PINNED_PROJECTS_STORAGE_KEY = "cowork-pinned-projects-v1";
@@ -67,7 +68,6 @@ function writeStorageSet(key: string, ids: Set<string>): void {
   window.localStorage.setItem(key, JSON.stringify(Array.from(ids)));
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Refactoring out of scope for current task
 export function CoworkSidebarSections() {
   const router = useShellRouter();
   const components = useShellComponents();
@@ -96,7 +96,9 @@ export function CoworkSidebarSections() {
   const [pendingRenameSessionId, setPendingRenameSessionId] = React.useState<string | null>(null);
   const [renameValue, setRenameValue] = React.useState("");
   const [pendingDeleteSessionId, setPendingDeleteSessionId] = React.useState<string | null>(null);
+  const [shareFeedback, setShareFeedback] = React.useState<Record<string, string>>({});
   const renameInputRef = React.useRef<HTMLInputElement | null>(null);
+  const shareTimeoutsRef = React.useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   React.useEffect(() => {
     setFavoriteIds(readStorageSet(FAVORITES_STORAGE_KEY));
@@ -112,6 +114,15 @@ export function CoworkSidebarSections() {
     });
     return () => cancelAnimationFrame(rafId);
   }, [pendingRenameSessionId]);
+
+  React.useEffect(() => {
+    return () => {
+      for (const timeout of shareTimeoutsRef.current.values()) {
+        clearTimeout(timeout);
+      }
+      shareTimeoutsRef.current.clear();
+    };
+  }, []);
 
   const sortedProjects = React.useMemo(() => {
     return [...projects].sort((a, b) => {
@@ -156,10 +167,6 @@ export function CoworkSidebarSections() {
 
     if (taskFilter === "favorites") {
       filtered = filtered.filter((session) => favoriteIds.has(session.id));
-    }
-    if (taskFilter === "scheduled") {
-      // Not implemented
-      return [];
     }
 
     return filtered;
@@ -314,8 +321,25 @@ export function CoworkSidebarSections() {
     return sessions.find((session) => session.id === pendingDeleteSessionId) ?? null;
   }, [pendingDeleteSessionId, sessions]);
 
-  const handlePlaceholderAction = React.useCallback(() => {
-    /* TODO */
+  const handleShareSession = React.useCallback(async (sessionId: string, title: string) => {
+    const outcome = await shareSessionLink(sessionId, title);
+    if (outcome === "cancelled") {
+      return;
+    }
+    const label = outcome === "shared" ? "Shared" : "Link copied";
+    setShareFeedback((prev) => ({ ...prev, [sessionId]: label }));
+    const existing = shareTimeoutsRef.current.get(sessionId);
+    if (existing) {
+      clearTimeout(existing);
+    }
+    const timeout = setTimeout(() => {
+      setShareFeedback((prev) => {
+        const next = { ...prev };
+        delete next[sessionId];
+        return next;
+      });
+    }, 2000);
+    shareTimeoutsRef.current.set(sessionId, timeout);
   }, []);
 
   const activeSessionId = React.useMemo(() => {
@@ -530,13 +554,7 @@ export function CoworkSidebarSections() {
             aria-expanded={isTasksExpanded}
             onClick={() => setIsTasksExpanded((prev) => !prev)}
           >
-            <span>
-              {taskFilter === "favorites"
-                ? "Favorites"
-                : taskFilter === "scheduled"
-                  ? "Scheduled"
-                  : "Tasks"}
-            </span>
+            <span>{taskFilter === "favorites" ? "Favorites" : "Tasks"}</span>
             <ChevronDown
               className={cn(
                 "h-3 w-3 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all duration-fast",
@@ -586,19 +604,6 @@ export function CoworkSidebarSections() {
                 Favorites
                 {taskFilter === "favorites" ? <Check className="ml-auto h-3 w-3" /> : null}
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onSelect={() => setTaskFilter("scheduled")}
-                className={cn(
-                  "gap-2.5 rounded-md px-2 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none",
-                  taskFilter === "scheduled"
-                    ? "bg-foreground/[0.08] text-foreground font-medium"
-                    : "text-muted-foreground"
-                )}
-              >
-                <CalendarClock className="h-4 w-4" />
-                Scheduled
-                {taskFilter === "scheduled" ? <Check className="ml-auto h-3 w-3" /> : null}
-              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -629,134 +634,24 @@ export function CoworkSidebarSections() {
               const isActive = activeSessionId === session.id;
               const isFavorite = favoriteIds.has(session.id);
               const favoriteLabel = isFavorite ? "Remove from favorites" : "Add to favorites";
+              const shareLabel = shareFeedback[session.id];
               return (
-                <div
+                <SidebarSessionRow
                   key={session.id}
-                  className={cn(
-                    "relative flex items-center rounded-md px-3 py-1.5 transition-colors duration-fast group",
-                    isActive
-                      ? "bg-foreground/[0.08] text-foreground font-medium"
-                      : "text-muted-foreground hover:bg-surface-hover hover:text-foreground"
-                  )}
-                >
-                  <Link
-                    href={`/sessions/${session.id}`}
-                    className="flex items-center gap-2.5 flex-1 min-w-0 pr-2 text-[13px] cursor-pointer"
-                    title={session.title}
-                  >
-                    <Brain
-                      className="h-4 w-4 shrink-0 opacity-70 group-hover:opacity-100 group-hover:text-foreground transition-all duration-fast"
-                      aria-hidden="true"
-                    />
-                    <span className="overflow-hidden whitespace-nowrap block">{session.title}</span>
-                  </Link>
-                  <DropdownMenu modal={false}>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className={cn(
-                          "absolute right-2 top-1/2 h-6 w-6 -translate-y-1/2 rounded-md",
-                          "text-muted-foreground hover:text-foreground",
-                          "bg-surface-2 shadow-sm border border-border/20",
-                          "transition-opacity opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto",
-                          "focus-visible:opacity-100 focus-visible:pointer-events-auto",
-                          "data-[state=open]:opacity-100 data-[state=open]:pointer-events-auto data-[state=open]:bg-surface-3"
-                        )}
-                        aria-label="More options"
-                      >
-                        <MoreHorizontal className="h-3.5 w-3.5" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                      align="start"
-                      side="right"
-                      sideOffset={6}
-                      className="w-56 rounded-lg p-1"
-                    >
-                      <DropdownMenuItem
-                        onSelect={handlePlaceholderAction}
-                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none"
-                      >
-                        <Share2 className="h-4 w-4" aria-hidden="true" />
-                        <span>Share</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onSelect={() => openRenameDialog(session.id)}
-                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none"
-                      >
-                        <PencilLine className="h-4 w-4" aria-hidden="true" />
-                        <span>Rename</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onSelect={() => toggleFavorite(session.id)}
-                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none"
-                      >
-                        <Star
-                          className={cn("h-4 w-4", isFavorite ? "fill-current" : undefined)}
-                          aria-hidden="true"
-                        />
-                        <span>{favoriteLabel}</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onSelect={() => handleOpenInNewTab(session.id)}
-                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none"
-                      >
-                        <ExternalLink className="h-4 w-4" aria-hidden="true" />
-                        <span>Open in new tab</span>
-                      </DropdownMenuItem>
-
-                      <DropdownMenuSub>
-                        <DropdownMenuSubTrigger className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none data-[state=open]:bg-foreground/5 data-[state=open]:text-foreground">
-                          <Folder className="h-4 w-4" />
-                          <span>Move to project</span>
-                        </DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent className="w-56 rounded-lg p-1">
-                          {sortedProjects.length === 0 ? (
-                            <DropdownMenuItem disabled>
-                              <span className="text-muted-foreground">No projects</span>
-                            </DropdownMenuItem>
-                          ) : (
-                            <>
-                              {sortedProjects.map((project) => (
-                                <DropdownMenuItem
-                                  key={project.id}
-                                  onSelect={() => handleMoveToProject(session.id, project.id)}
-                                  className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none"
-                                >
-                                  <span>{project.name}</span>
-                                  {session.projectId === project.id && (
-                                    <Check className="ml-auto h-4 w-4" />
-                                  )}
-                                </DropdownMenuItem>
-                              ))}
-                              {session.projectId && (
-                                <>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    onSelect={() => handleMoveToProject(session.id, null)}
-                                    className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none"
-                                  >
-                                    <span>Remove from project</span>
-                                  </DropdownMenuItem>
-                                </>
-                              )}
-                            </>
-                          )}
-                        </DropdownMenuSubContent>
-                      </DropdownMenuSub>
-
-                      <DropdownMenuSeparator className="mx-2" />
-                      <DropdownMenuItem
-                        onSelect={() => openDeleteDialog(session.id)}
-                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] text-destructive focus:text-destructive focus:bg-surface-hover cursor-pointer outline-none"
-                      >
-                        <Trash2 className="h-4 w-4" aria-hidden="true" />
-                        <span>Delete</span>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
+                  session={session}
+                  isActive={isActive}
+                  isFavorite={isFavorite}
+                  favoriteLabel={favoriteLabel}
+                  shareLabel={shareLabel}
+                  projects={sortedProjects}
+                  linkComponent={Link}
+                  onShare={() => void handleShareSession(session.id, session.title)}
+                  onRename={() => openRenameDialog(session.id)}
+                  onToggleFavorite={() => toggleFavorite(session.id)}
+                  onOpenInNewTab={() => handleOpenInNewTab(session.id)}
+                  onMoveToProject={(projectId) => handleMoveToProject(session.id, projectId)}
+                  onDelete={() => openDeleteDialog(session.id)}
+                />
               );
             })
           )}
@@ -905,6 +800,171 @@ export function CoworkSidebarSections() {
           </Button>
         </DialogFooter>
       </Dialog>
+    </div>
+  );
+}
+
+function SidebarSessionRow({
+  session,
+  isActive,
+  isFavorite,
+  favoriteLabel,
+  shareLabel,
+  projects,
+  linkComponent: LinkComponent,
+  onShare,
+  onRename,
+  onToggleFavorite,
+  onOpenInNewTab,
+  onMoveToProject,
+  onDelete,
+}: {
+  session: Session;
+  isActive: boolean;
+  isFavorite: boolean;
+  favoriteLabel: string;
+  shareLabel?: string;
+  projects: Project[];
+  linkComponent: React.ComponentType<{
+    href: string;
+    className?: string;
+    title?: string;
+    children: React.ReactNode;
+  }>;
+  onShare: () => void;
+  onRename: () => void;
+  onToggleFavorite: () => void;
+  onOpenInNewTab: () => void;
+  onMoveToProject: (projectId: string | null) => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div
+      className={cn(
+        "relative flex items-center rounded-md px-3 py-1.5 transition-colors duration-fast group",
+        isActive
+          ? "bg-foreground/[0.08] text-foreground font-medium"
+          : "text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+      )}
+    >
+      <LinkComponent
+        href={`/sessions/${session.id}`}
+        className="flex items-center gap-2.5 flex-1 min-w-0 pr-2 text-[13px] cursor-pointer"
+        title={session.title}
+      >
+        <Brain
+          className="h-4 w-4 shrink-0 opacity-70 group-hover:opacity-100 group-hover:text-foreground transition-all duration-fast"
+          aria-hidden="true"
+        />
+        <span className="overflow-hidden whitespace-nowrap block">{session.title}</span>
+      </LinkComponent>
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "absolute right-2 top-1/2 h-6 w-6 -translate-y-1/2 rounded-md",
+              "text-muted-foreground hover:text-foreground",
+              "bg-surface-2 shadow-sm border border-border/20",
+              "transition-opacity opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto",
+              "focus-visible:opacity-100 focus-visible:pointer-events-auto",
+              "data-[state=open]:opacity-100 data-[state=open]:pointer-events-auto data-[state=open]:bg-surface-3"
+            )}
+            aria-label="More options"
+          >
+            <MoreHorizontal className="h-3.5 w-3.5" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="start"
+          side="right"
+          sideOffset={6}
+          className="w-56 rounded-lg p-1"
+        >
+          <DropdownMenuItem
+            onSelect={onShare}
+            className={cn(
+              "gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none",
+              shareLabel ? "text-success" : ""
+            )}
+          >
+            <Share2 className="h-4 w-4" aria-hidden="true" />
+            <span>{shareLabel ?? "Share"}</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={onRename}
+            className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none"
+          >
+            <PencilLine className="h-4 w-4" aria-hidden="true" />
+            <span>Rename</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={onToggleFavorite}
+            className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none"
+          >
+            <Star
+              className={cn("h-4 w-4", isFavorite ? "fill-current" : undefined)}
+              aria-hidden="true"
+            />
+            <span>{favoriteLabel}</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={onOpenInNewTab}
+            className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none"
+          >
+            <ExternalLink className="h-4 w-4" aria-hidden="true" />
+            <span>Open in new tab</span>
+          </DropdownMenuItem>
+
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none data-[state=open]:bg-foreground/5 data-[state=open]:text-foreground">
+              <Folder className="h-4 w-4" />
+              <span>Move to project</span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="w-56 rounded-lg p-1">
+              {projects.length === 0 ? (
+                <DropdownMenuItem disabled>
+                  <span className="text-muted-foreground">No projects</span>
+                </DropdownMenuItem>
+              ) : (
+                <>
+                  {projects.map((project) => (
+                    <DropdownMenuItem
+                      key={project.id}
+                      onSelect={() => onMoveToProject(project.id)}
+                      className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none"
+                    >
+                      <span>{project.name}</span>
+                      {session.projectId === project.id && <Check className="ml-auto h-4 w-4" />}
+                    </DropdownMenuItem>
+                  ))}
+                  {session.projectId && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onSelect={() => onMoveToProject(null)}
+                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none"
+                      >
+                        <span>Remove from project</span>
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </>
+              )}
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+
+          <DropdownMenuSeparator className="mx-2" />
+          <DropdownMenuItem
+            onSelect={onDelete}
+            className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] text-destructive focus:text-destructive focus:bg-surface-hover cursor-pointer outline-none"
+          >
+            <Trash2 className="h-4 w-4" aria-hidden="true" />
+            <span>Delete</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }

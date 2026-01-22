@@ -17,6 +17,8 @@ import {
 import { Download } from "lucide-react";
 import React, { useCallback, useMemo } from "react";
 import { type ChatAttachmentRef, updateSettings, uploadChatAttachment } from "../../api/coworkApi";
+import { detectIntent } from "../../lib/intentDetector";
+import { parseSlashCommand } from "../../lib/slashCommands";
 import { CostMeter } from "./components/CostMeter";
 import { ModeToggle } from "./components/ModeToggle";
 import { useChatSession } from "./hooks/useChatSession";
@@ -288,6 +290,36 @@ export function ChatThread({ sessionId }: { sessionId: string }) {
     inputRef.current?.focus();
   }, []);
 
+  const resolveMessageMode = useCallback(
+    (content: string): { resolvedContent: string; mode: "chat" | "task"; error?: string } => {
+      const command = parseSlashCommand(content);
+      if (command.type === "help") {
+        return {
+          resolvedContent: content,
+          mode: "chat",
+          error: "Help command not fully supported yet.",
+        };
+      }
+
+      if (command.type === "task") {
+        if (!command.prompt) {
+          return {
+            resolvedContent: content,
+            mode: "chat",
+            error: "Please provide a prompt after /task",
+          };
+        }
+        return { resolvedContent: command.prompt, mode: "task" };
+      }
+
+      const intentResult = detectIntent(content);
+      const mode =
+        intentResult.intent === "task" && intentResult.confidence === "high" ? "task" : "chat";
+      return { resolvedContent: content, mode };
+    },
+    []
+  );
+
   const submitEditIfNeeded = useCallback(
     async (draft: string) => {
       if (!editingMessageId) {
@@ -316,20 +348,20 @@ export function ChatThread({ sessionId }: { sessionId: string }) {
   );
 
   const submitNewMessage = useCallback(
-    async (draft: string) => {
+    async (draft: string, mode: "chat" | "task", parentId?: string) => {
       setStatusMessage(null);
-      const content = draft;
+      const content = draft.trim();
       setInput("");
-      const readyAttachments = getReadyAttachmentRefs();
-      await sendMessage(content, "chat", {
+      const readyAttachments = mode === "chat" ? getReadyAttachmentRefs() : [];
+      await sendMessage(content, mode, {
         modelId: model,
-        attachments: readyAttachments.length > 0 ? readyAttachments : undefined,
-        parentId: branchParentId ?? undefined,
+        attachments: mode === "chat" && readyAttachments.length > 0 ? readyAttachments : undefined,
+        parentId: mode === "chat" ? parentId : undefined,
       });
       clearAttachments();
       setBranchParentId(null);
     },
-    [branchParentId, clearAttachments, getReadyAttachmentRefs, model, sendMessage]
+    [clearAttachments, getReadyAttachmentRefs, model, sendMessage]
   );
 
   const handleSend = useCallback(async () => {
@@ -343,8 +375,28 @@ export function ChatThread({ sessionId }: { sessionId: string }) {
     if (await submitEditIfNeeded(input)) {
       return;
     }
-    await submitNewMessage(input);
-  }, [input, isAttachmentBusy, submitEditIfNeeded, submitNewMessage]);
+    const { resolvedContent, mode, error } = resolveMessageMode(trimmedInput);
+    if (error) {
+      setStatusMessage(error);
+      setInput(input);
+      return;
+    }
+    const resolvedMode = branchParentId ? "chat" : mode;
+    if (resolvedMode === "task" && attachments.length > 0) {
+      setStatusMessage("Attachments are only supported for chat messages.");
+      setInput(input);
+      return;
+    }
+    await submitNewMessage(resolvedContent, resolvedMode, branchParentId ?? undefined);
+  }, [
+    attachments.length,
+    branchParentId,
+    input,
+    isAttachmentBusy,
+    resolveMessageMode,
+    submitEditIfNeeded,
+    submitNewMessage,
+  ]);
 
   const handleEdit = useCallback(
     (id: string) => {

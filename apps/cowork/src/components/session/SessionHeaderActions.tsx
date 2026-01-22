@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import * as React from "react";
 import { useWorkspace } from "../../app/providers/WorkspaceProvider";
+import { shareSessionLink } from "../../lib/shareSession";
 
 const FAVORITES_STORAGE_KEY = "cowork-task-favorites-v1";
 
@@ -64,7 +65,9 @@ export function SessionHeaderActions({ className }: SessionHeaderActionsProps) {
   const [pendingRenameSessionId, setPendingRenameSessionId] = React.useState<string | null>(null);
   const [renameValue, setRenameValue] = React.useState("");
   const [pendingDeleteSessionId, setPendingDeleteSessionId] = React.useState<string | null>(null);
+  const [shareFeedback, setShareFeedback] = React.useState<string | null>(null);
   const renameInputRef = React.useRef<HTMLInputElement | null>(null);
+  const shareTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Load favorites on mount
   React.useEffect(() => {
@@ -81,6 +84,14 @@ export function SessionHeaderActions({ className }: SessionHeaderActionsProps) {
     });
     return () => cancelAnimationFrame(rafId);
   }, [pendingRenameSessionId]);
+
+  React.useEffect(() => {
+    return () => {
+      if (shareTimeoutRef.current) {
+        clearTimeout(shareTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const session = sessionId ? getSession(sessionId) : null;
 
@@ -180,8 +191,22 @@ export function SessionHeaderActions({ className }: SessionHeaderActionsProps) {
     ? (sessions.find((s) => s.id === pendingDeleteSessionId) ?? null)
     : null;
 
-  const handlePlaceholderAction = () => {
-    /* TODO: Implement share */
+  const handleShareSession = async () => {
+    if (!session) {
+      return;
+    }
+    const outcome = await shareSessionLink(session.id, session.title);
+    if (outcome === "cancelled") {
+      return;
+    }
+    const label = outcome === "shared" ? "Shared" : "Link copied";
+    setShareFeedback(label);
+    if (shareTimeoutRef.current) {
+      clearTimeout(shareTimeoutRef.current);
+    }
+    shareTimeoutRef.current = setTimeout(() => {
+      setShareFeedback(null);
+    }, 2000);
   };
 
   return (
@@ -204,11 +229,14 @@ export function SessionHeaderActions({ className }: SessionHeaderActionsProps) {
           className="w-56 rounded-lg p-1"
         >
           <DropdownMenuItem
-            onSelect={handlePlaceholderAction}
-            className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none"
+            onSelect={() => void handleShareSession()}
+            className={cn(
+              "gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none",
+              shareFeedback ? "text-success" : ""
+            )}
           >
             <Share2 className="h-4 w-4" aria-hidden="true" />
-            <span>Share</span>
+            <span>{shareFeedback ?? "Share"}</span>
           </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={openRenameDialog}

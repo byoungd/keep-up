@@ -6,15 +6,17 @@ import {
   type SidebarGroupRenderProps,
   TooltipProvider,
 } from "@ku0/shell";
-import { Link, Outlet, useLocation, useRouter } from "@tanstack/react-router";
+import { Link, Outlet, useLocation, useParams, useRouter } from "@tanstack/react-router";
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
 import React from "react";
+import { createTask, setSessionMode } from "../../api/coworkApi";
 import { SessionHeaderActions } from "../../components/session/SessionHeaderActions";
 import { CoworkSidebarSections } from "../../components/sidebar/CoworkSidebarSections";
 import { COWORK_SIDEBAR_CONFIG_KEY, COWORK_SIDEBAR_GROUPS } from "../../config/sidebar";
 import { AIControlProvider } from "../../features/chat/AIControlContext";
 import { CoworkAIPanel } from "../../features/chat/CoworkAIPanel";
+import { generateTaskTitle } from "../../features/chat/utils/textUtils";
 import { ContextPanel, type ContextPanelTab } from "../../features/context/ContextPanel";
 
 function resolveI18nArgs(
@@ -46,6 +48,8 @@ function interpolate(template: string, values?: Record<string, string | number>)
 export function RootLayout() {
   const router = useRouter();
   const location = useLocation();
+  const { sessionId } = useParams({ strict: false }) as { sessionId?: string };
+  const resolvedSessionId = sessionId && sessionId !== "undefined" ? sessionId : null;
 
   // Use ref for router to avoid useMemo dependency changes
   const routerRef = React.useRef(router);
@@ -84,6 +88,25 @@ export function RootLayout() {
     setPreviewArtifact(null);
     setContextTab((prev) => (prev === "preview" ? "artifacts" : prev));
   }, []);
+
+  const handleRunTemplate = React.useCallback(
+    async (
+      prompt: string,
+      mode: "plan" | "build" | "review",
+      metadata?: Record<string, unknown>
+    ) => {
+      if (!resolvedSessionId) {
+        throw new Error("Start a session to run a workflow.");
+      }
+      await setSessionMode(resolvedSessionId, mode);
+      await createTask(resolvedSessionId, {
+        prompt,
+        title: generateTaskTitle(prompt),
+        metadata,
+      });
+    },
+    [resolvedSessionId]
+  );
 
   // Load state from localStorage on mount
   React.useEffect(() => {
@@ -328,6 +351,7 @@ export function RootLayout() {
             previewArtifact={previewArtifact}
             onClosePreview={handleClosePreview}
             position={auxPanelPosition}
+            onRunTemplate={handleRunTemplate}
             onToggle={() => {
               setIsExiting(true);
               setIsAuxPanelVisible(false);
