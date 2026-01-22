@@ -5,6 +5,8 @@
  * for the agent runtime.
  */
 
+import type { RuntimeEventBus } from "@ku0/agent-runtime-control";
+import { AGENT_METRICS, type TelemetryContext } from "@ku0/agent-runtime-telemetry/telemetry";
 import type {
   AuditEntry,
   AuditFilter,
@@ -472,6 +474,110 @@ function mergeRiskTags(...tags: Array<string[] | undefined>): string[] | undefin
 // Audit Logger Implementation
 // ============================================================================
 
+export interface AuditTelemetryOptions {
+  eventBus?: RuntimeEventBus;
+  telemetry?: TelemetryContext;
+  source?: string;
+}
+
+export interface AuditLoggerOptions extends AuditTelemetryOptions {
+  maxEntries?: number;
+  delegate?: AuditLogger;
+}
+
+const AUDIT_TELEMETRY_WRAPPED = Symbol.for("ku0.audit.telemetry");
+
+class TelemetryAuditLogger implements AuditLogger {
+  private readonly base: AuditLogger;
+  private readonly eventBus?: RuntimeEventBus;
+  private readonly telemetry?: TelemetryContext;
+  private readonly source: string;
+
+  constructor(base: AuditLogger, options: AuditTelemetryOptions) {
+    this.base = base;
+    this.eventBus = options.eventBus;
+    this.telemetry = options.telemetry;
+    this.source = options.source ?? "audit";
+    (this as unknown as { [AUDIT_TELEMETRY_WRAPPED]?: boolean })[AUDIT_TELEMETRY_WRAPPED] = true;
+  }
+
+  log(entry: AuditEntry): void {
+    this.base.log(entry);
+    this.emitEvent(entry);
+    this.recordMetrics(entry);
+    this.recordTrace(entry);
+  }
+
+  getEntries(filter?: AuditFilter): AuditEntry[] {
+    return this.base.getEntries(filter);
+  }
+
+  private emitEvent(entry: AuditEntry): void {
+    if (!this.eventBus) {
+      return;
+    }
+    try {
+      this.eventBus.emit("audit:entry", entry, {
+        source: this.source,
+        correlationId: entry.correlationId,
+        priority: "low",
+      });
+    } catch {
+      // Avoid breaking audit logging if telemetry hooks fail.
+    }
+  }
+
+  private recordMetrics(entry: AuditEntry): void {
+    if (!this.telemetry) {
+      return;
+    }
+    this.telemetry.metrics.increment(AGENT_METRICS.auditEntriesTotal.name, {
+      tool_name: entry.toolName,
+      action: entry.action,
+    });
+    if (entry.action === "policy" && entry.policyDecision) {
+      this.telemetry.metrics.increment(AGENT_METRICS.auditPolicyDecisionsTotal.name, {
+        tool_name: entry.toolName,
+        decision: entry.policyDecision,
+      });
+    }
+  }
+
+  private recordTrace(entry: AuditEntry): void {
+    const tracer = this.telemetry?.tracer;
+    if (!tracer) {
+      return;
+    }
+    const span = tracer.getActiveSpan();
+    if (!span) {
+      return;
+    }
+    span.addEvent("audit:entry", {
+      "audit.tool": entry.toolName,
+      "audit.action": entry.action,
+      "audit.sandboxed": entry.sandboxed,
+      "audit.hasError": entry.action === "error" || Boolean(entry.error),
+      ...(entry.policyDecision ? { "audit.policyDecision": entry.policyDecision } : {}),
+      ...(entry.riskScore !== undefined ? { "audit.riskScore": entry.riskScore } : {}),
+      ...(entry.durationMs !== undefined ? { "audit.durationMs": entry.durationMs } : {}),
+    });
+  }
+}
+
+export function withAuditTelemetry(
+  logger: AuditLogger,
+  options: AuditTelemetryOptions
+): AuditLogger {
+  if (!options.eventBus && !options.telemetry) {
+    return logger;
+  }
+  const wrapped = logger as unknown as { [AUDIT_TELEMETRY_WRAPPED]?: boolean };
+  if (wrapped[AUDIT_TELEMETRY_WRAPPED]) {
+    return logger;
+  }
+  return new TelemetryAuditLogger(logger, options);
+}
+
 /**
  * In-memory audit logger.
  * For production, replace with persistent storage.
@@ -692,8 +798,11 @@ export function createPermissionChecker(policy: SecurityPolicy): IPermissionChec
 /**
  * Create an in-memory audit logger.
  */
-export function createAuditLogger(maxEntries?: number): AuditLogger {
-  return new InMemoryAuditLogger(maxEntries);
+export function createAuditLogger(options?: number | AuditLoggerOptions): AuditLogger {
+  const resolved = typeof options === "number" ? { maxEntries: options } : (options ?? {});
+  const { delegate, maxEntries, ...telemetryOptions } = resolved;
+  const base = delegate ?? new InMemoryAuditLogger(maxEntries);
+  return withAuditTelemetry(base, telemetryOptions);
 }
 
 /**
