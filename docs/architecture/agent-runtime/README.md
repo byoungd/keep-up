@@ -20,6 +20,7 @@ This directory contains architectural designs, specifications, and references fo
 | [code-agent-architecture-spec.md](./code-agent-architecture-spec.md) | Code agent architecture and editing primitives | Active |
 | [tool-workbench-policy.md](./tool-workbench-policy.md) | Policy for tool usage and workbench security | Active |
 | [computer-use-safety-and-artifacts.md](./computer-use-safety-and-artifacts.md) | Safety protocols for computer use tools | Active |
+| [mcp-configuration.md](./mcp-configuration.md) | MCP remote server configuration and OAuth token storage policy | Active |
 | [graph-runtime.md](./graph-runtime.md) | Graph-based runtime execution model | Draft |
 | [team-orchestration.md](./team-orchestration.md) | Multi-agent team orchestration spec | Draft |
 | [time-travel-and-stale-context.md](./time-travel-and-stale-context.md) | Time travel debugging and stale context handling | Draft |

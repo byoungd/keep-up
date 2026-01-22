@@ -10,6 +10,7 @@ export {
   textResult,
 } from "./baseServer";
 export {
+  createMcpOAuthClientProvider,
   FileMcpOAuthTokenStore,
   type FileMcpOAuthTokenStoreConfig,
   hasScopes,
@@ -19,6 +20,8 @@ export {
   McpOAuthSession,
   type McpOAuthSessionConfig,
   type McpOAuthTokenStore,
+  type McpOAuthTokenStoreConfig,
+  resolveMcpOAuthTokenStore,
   splitScopes,
 } from "./oauth";
 export {

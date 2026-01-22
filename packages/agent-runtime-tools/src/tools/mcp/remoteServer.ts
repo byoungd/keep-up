@@ -21,7 +21,14 @@ import {
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import type { CallToolResult, Tool as SdkTool } from "@modelcontextprotocol/sdk/types.js";
-import { McpOAuthSession, type McpOAuthSessionConfig } from "./oauth";
+import {
+  createMcpOAuthClientProvider,
+  type McpOAuthClientConfig,
+  McpOAuthSession,
+  type McpOAuthSessionConfig,
+  type McpOAuthTokenStore,
+  type McpOAuthTokenStoreConfig,
+} from "./oauth";
 import { fromSdkResult, fromSdkTool, normalizeSdkTool, type ToolScopeConfig } from "./sdkAdapter";
 import { createMcpTransport, type McpTransportConfig } from "./transport";
 
@@ -48,7 +55,9 @@ export interface McpRemoteServerConfig {
     version: string;
   };
   auth?: {
-    provider: OAuthClientProvider;
+    provider?: OAuthClientProvider;
+    client?: McpOAuthClientConfig;
+    tokenStore?: McpOAuthTokenStore | McpOAuthTokenStoreConfig;
     scopes?: string[];
     authorizationCode?: string;
   };
@@ -87,7 +96,7 @@ export class McpRemoteToolServer implements MCPToolServer {
     this.name = config.name;
     this.description = config.description;
     this.toolScopes = config.toolScopes;
-    this.authScopes = config.auth?.scopes;
+    this.authScopes = config.auth?.scopes ?? config.auth?.client?.scopes;
     this.eventBus = config.eventBus;
     this.auditLogger = config.auditLogger;
     this.onStatusChange = config.onStatusChange;
@@ -96,7 +105,8 @@ export class McpRemoteToolServer implements MCPToolServer {
     this.client = new Client(clientInfo);
 
     const transportConfig = this.resolveTransportConfig(config);
-    const transportInstance = createMcpTransport(transportConfig, config.auth?.provider);
+    const authProvider = resolveAuthProvider(config.auth);
+    const transportInstance = createMcpTransport(transportConfig, authProvider);
     this.transport = transportInstance.transport;
     this.transportType = transportInstance.type;
     this.serverUrl = transportInstance.serverUrl;
@@ -115,9 +125,9 @@ export class McpRemoteToolServer implements MCPToolServer {
       serverUrl: this.serverUrl?.toString(),
     };
 
-    if (config.auth?.provider && this.serverUrl) {
+    if (authProvider && this.serverUrl) {
       const sessionConfig: McpOAuthSessionConfig = {
-        provider: config.auth.provider,
+        provider: authProvider,
         serverUrl: this.serverUrl,
         authorizationCode: config.auth.authorizationCode,
       };
@@ -351,6 +361,19 @@ export class McpRemoteToolServer implements MCPToolServer {
 function hasValidPolicyAction(tool: MCPTool): boolean {
   const policyAction = tool.annotations?.policyAction;
   return typeof policyAction === "string" && COWORK_POLICY_ACTIONS.includes(policyAction);
+}
+
+function resolveAuthProvider(auth: McpRemoteServerConfig["auth"]): OAuthClientProvider | undefined {
+  if (!auth) {
+    return undefined;
+  }
+  if (auth.provider) {
+    return auth.provider;
+  }
+  if (!auth.client) {
+    return undefined;
+  }
+  return createMcpOAuthClientProvider(auth.client, auth.tokenStore);
 }
 
 export function createMcpRemoteToolServer(config: McpRemoteServerConfig): McpRemoteToolServer {

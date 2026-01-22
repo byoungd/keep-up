@@ -3,7 +3,11 @@ import { mkdtemp, readFile, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { FileMcpOAuthTokenStore } from "../oauth";
+import {
+  createMcpOAuthClientProvider,
+  FileMcpOAuthTokenStore,
+  resolveMcpOAuthTokenStore,
+} from "../oauth";
 
 async function fileExists(path: string): Promise<boolean> {
   try {
@@ -52,5 +56,22 @@ describe("oauth token store", () => {
     await store.clear();
     expect(await fileExists(filePath)).toBe(false);
     expect(await store.getTokens()).toBeUndefined();
+  });
+
+  it("resolves token store config into provider", async () => {
+    const provider = createMcpOAuthClientProvider(
+      {
+        clientId: "client-test",
+        grantType: "client_credentials",
+      },
+      { type: "memory" }
+    );
+
+    await provider.saveTokens({ access_token: "test-access" });
+    expect(await provider.tokens()).toEqual({ access_token: "test-access" });
+
+    const store = resolveMcpOAuthTokenStore({ type: "memory" });
+    await store?.saveTokens({ access_token: "store-access" });
+    expect(await store?.getTokens()).toEqual({ access_token: "store-access" });
   });
 });

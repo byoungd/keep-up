@@ -66,6 +66,7 @@ import {
   createPermissionChecker,
   createToolGovernancePolicyEngine,
   createToolPolicyEngine,
+  withAuditTelemetry,
 } from "../security";
 import type { SessionState } from "../session";
 import type { ISOPExecutor } from "../sop/types";
@@ -2873,18 +2874,29 @@ export function createOrchestrator(
 
   const config = buildAgentConfig(options, parallelExecution);
 
-  const permissionChecker =
-    options.toolExecution?.policy ?? createPermissionChecker(config.security);
-  const auditLogger = options.toolExecution?.audit ?? createAuditLogger();
-  const { skillRegistry, skillSession, skillPromptAdapter } = resolveSkillComponents(
-    options,
-    auditLogger
-  );
   const streamBridge = options.components?.streamBridge;
   const eventBus =
     options.eventBus ??
     options.components?.eventBus ??
     (streamBridge ? getGlobalEventBus() : undefined);
+  const telemetry = options.toolExecution?.telemetry ?? options.telemetry;
+  const permissionChecker =
+    options.toolExecution?.policy ?? createPermissionChecker(config.security);
+  const auditLogger = options.toolExecution?.audit
+    ? withAuditTelemetry(options.toolExecution.audit, {
+        eventBus,
+        telemetry,
+        source: `audit:${config.name}`,
+      })
+    : createAuditLogger({
+        eventBus,
+        telemetry,
+        source: `audit:${config.name}`,
+      });
+  const { skillRegistry, skillSession, skillPromptAdapter } = resolveSkillComponents(
+    options,
+    auditLogger
+  );
   const taskGraph = options.components?.taskGraph ?? createTaskGraphStore();
   const artifactPipeline =
     options.components?.artifactPipeline ??

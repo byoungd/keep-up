@@ -98,6 +98,20 @@ export const AGENT_METRICS = {
     labels: ["tool_name", "result"],
   },
 
+  // Audit metrics
+  auditEntriesTotal: {
+    name: "agent_audit_entries_total",
+    type: "counter" as const,
+    description: "Audit log entries emitted",
+    labels: ["tool_name", "action"],
+  },
+  auditPolicyDecisionsTotal: {
+    name: "agent_audit_policy_decisions_total",
+    type: "counter" as const,
+    description: "Audit policy decisions emitted",
+    labels: ["tool_name", "decision"],
+  },
+
   // Cowork policy metrics
   coworkPolicyEvaluations: {
     name: "cowork_policy_evaluations_total",
