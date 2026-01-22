@@ -112,6 +112,10 @@ export function createGatewayResponse(params: {
   clientRequestId?: string;
   diagnostics?: GatewayDiagnostic[];
   policyContext?: AIGatewayRequest["policy_context"];
+  weakRecoveries?: AIGatewayResponse["weak_recoveries"];
+  trimming?: AIGatewayResponse["trimming"];
+  retargeting?: AIGatewayResponse["retargeting"];
+  delta?: AIGatewayResponse["delta"];
 }): AIGatewayResponse {
   const identifiers = normalizeRequestIdentifiers({
     request_id: params.requestId,
@@ -127,6 +131,10 @@ export function createGatewayResponse(params: {
     client_request_id: identifiers.client_request_id,
     policy_context: params.policyContext,
     diagnostics: params.diagnostics ?? [],
+    weak_recoveries: params.weakRecoveries,
+    trimming: params.trimming,
+    retargeting: params.retargeting,
+    delta: params.delta,
   };
 }
 
@@ -324,6 +332,33 @@ function validateTargeting(req: Record<string, unknown>, errors: ValidationError
   if (req.targeting.version !== "v1") {
     errors.push({ field: "targeting.version", message: 'targeting.version must be "v1"' });
   }
+  if (
+    req.targeting.relocate_policy !== undefined &&
+    req.targeting.relocate_policy !== "exact_span_only" &&
+    req.targeting.relocate_policy !== "same_block" &&
+    req.targeting.relocate_policy !== "sibling_blocks" &&
+    req.targeting.relocate_policy !== "document_scan"
+  ) {
+    errors.push({
+      field: "targeting.relocate_policy",
+      message: "relocate_policy must be a valid policy value if provided",
+    });
+  }
+  if (
+    req.targeting.auto_retarget !== undefined &&
+    typeof req.targeting.auto_retarget !== "boolean"
+  ) {
+    errors.push({
+      field: "targeting.auto_retarget",
+      message: "auto_retarget must be a boolean if provided",
+    });
+  }
+  if (req.targeting.allow_trim !== undefined && typeof req.targeting.allow_trim !== "boolean") {
+    errors.push({
+      field: "targeting.allow_trim",
+      message: "allow_trim must be a boolean if provided",
+    });
+  }
 }
 
 function validatePreconditions(req: Record<string, unknown>, errors: ValidationError[]): void {
@@ -374,14 +409,14 @@ function validateLayeredPreconditions(value: unknown, errors: ValidationError[])
   }
   const { strong, weak } = value;
   const hasStrong = Array.isArray(strong);
-  const hasWeak = Array.isArray(weak);
+  const hasWeak = weak === undefined ? true : Array.isArray(weak);
   if (!hasStrong) {
     errors.push({
       field: "layered_preconditions.strong",
       message: "layered_preconditions.strong must be an array",
     });
   }
-  if (!hasWeak) {
+  if (weak !== undefined && !hasWeak) {
     errors.push({
       field: "layered_preconditions.weak",
       message: "layered_preconditions.weak must be an array",
@@ -390,7 +425,7 @@ function validateLayeredPreconditions(value: unknown, errors: ValidationError[])
   if (hasStrong) {
     validatePreconditionsArray(strong, "layered_preconditions.strong", errors);
   }
-  if (hasWeak) {
+  if (weak !== undefined && hasWeak) {
     validatePreconditionsArray(weak, "layered_preconditions.weak", errors, true);
   }
 }
@@ -673,6 +708,50 @@ function validateOptionalFields(req: Record<string, unknown>, errors: Validation
       }
     }
   }
+
+  if (req.options !== undefined) {
+    if (!isRecord(req.options)) {
+      errors.push({
+        field: "options",
+        message: "options must be an object if provided",
+      });
+    } else {
+      if (
+        req.options.return_canonical_tree !== undefined &&
+        typeof req.options.return_canonical_tree !== "boolean"
+      ) {
+        errors.push({
+          field: "options.return_canonical_tree",
+          message: "return_canonical_tree must be a boolean if provided",
+        });
+      }
+      if (req.options.return_delta !== undefined && typeof req.options.return_delta !== "boolean") {
+        errors.push({
+          field: "options.return_delta",
+          message: "return_delta must be a boolean if provided",
+        });
+      }
+      if (
+        req.options.delta_scope !== undefined &&
+        req.options.delta_scope !== "affected_only" &&
+        req.options.delta_scope !== "affected_with_neighbors"
+      ) {
+        errors.push({
+          field: "options.delta_scope",
+          message: "delta_scope must be a valid value if provided",
+        });
+      }
+      if (
+        req.options.skip_schema_validation !== undefined &&
+        typeof req.options.skip_schema_validation !== "boolean"
+      ) {
+        errors.push({
+          field: "options.skip_schema_validation",
+          message: "skip_schema_validation must be a boolean if provided",
+        });
+      }
+    }
+  }
 }
 
 /**
@@ -693,5 +772,7 @@ export function parseGatewayRequest(request: unknown): AIGatewayRequest | null {
  */
 export function normalizeGatewayRequest(request: AIGatewayRequest): AIGatewayRequest {
   const withFrontier = normalizeDocFrontier(request);
-  return normalizeRequestIdentifiers(withFrontier);
+  const withIds = normalizeRequestIdentifiers(withFrontier);
+  const target_spans = Array.isArray(withIds.target_spans) ? withIds.target_spans : [];
+  return { ...withIds, target_spans };
 }

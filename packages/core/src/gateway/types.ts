@@ -81,7 +81,7 @@ export type WeakTargetPreconditionV1 = TargetPreconditionV1 & {
 
 export type LayeredPreconditionsV1 = {
   strong: TargetPreconditionV1[];
-  weak: WeakTargetPreconditionV1[];
+  weak?: WeakTargetPreconditionV1[];
 };
 
 /** AI request format */
@@ -137,6 +137,10 @@ export type AIGatewayRequest = {
 export type AIGatewayRequestOptions = {
   /** Return canonical tree in response */
   return_canonical_tree?: boolean;
+  /** Return incremental delta response */
+  return_delta?: boolean;
+  /** Delta response scope */
+  delta_scope?: "affected_only" | "affected_with_neighbors";
   /** Skip schema validation (dev only) */
   skip_schema_validation?: boolean;
   /** Custom sanitization policy */
@@ -171,6 +175,14 @@ export type AIGatewayResponse = {
   };
   /** Processing diagnostics */
   diagnostics: GatewayDiagnostic[];
+  /** Weak precondition recoveries */
+  weak_recoveries?: WeakRecovery[];
+  /** Auto-trim records */
+  trimming?: TrimmingRecord[];
+  /** Retargeting records */
+  retargeting?: RetargetingRecord[];
+  /** Optional delta response */
+  delta?: DeltaResponse;
 };
 
 /** Apply plan for the mutation */
@@ -246,6 +258,10 @@ export type AIGateway409Response = {
     redaction_profile?: string;
     data_access_profile?: string;
   };
+  /** Optional diagnostics */
+  diagnostics?: GatewayDiagnostic[];
+  /** Optional delta response */
+  delta?: DeltaResponse;
 };
 
 /** Gateway error response (4xx/5xx) */
@@ -288,6 +304,10 @@ export type GatewayDiagnostic = {
   detail: string;
   /** Source location (if applicable) */
   source?: string;
+  /** Optional stage */
+  stage?: "targeting" | "precondition" | "sanitize" | "normalize" | "schema";
+  /** Optional code */
+  code?: string;
 };
 
 // ============================================================================
@@ -322,6 +342,7 @@ export type SpanState = {
   block_type?: string;
   parent_block_id?: string | null;
   parent_path?: string | null;
+  block_index?: number;
   span_start?: number;
   span_end?: number;
   text: string;
@@ -330,6 +351,102 @@ export type SpanState = {
   structure_hash?: string;
   neighbor_hash?: { left?: string; right?: string };
   is_verified: boolean;
+};
+
+// ============================================================================
+// Targeting Policy (v0.9.4)
+// ============================================================================
+
+export type AiTargetingPolicyV1 = {
+  version: "v1";
+  enabled: boolean;
+  allow_soft_preconditions: boolean;
+  allow_layered_preconditions: boolean;
+  allow_auto_retarget: boolean;
+  allow_auto_trim: boolean;
+  allow_delta_reads: boolean;
+  allowed_relocate_policies: TargetingRelocatePolicy[];
+  default_relocate_policy: TargetingRelocatePolicy;
+  max_candidates: number;
+  max_block_radius: number;
+  max_relocate_distance: number;
+  min_soft_matches_for_retarget: number;
+  require_span_id: boolean;
+  max_weak_preconditions: number;
+  min_preserved_ratio: number;
+  max_diagnostics_bytes: number;
+};
+
+export const DEFAULT_TARGETING_POLICY: AiTargetingPolicyV1 = {
+  version: "v1",
+  enabled: true,
+  allow_soft_preconditions: true,
+  allow_layered_preconditions: true,
+  allow_auto_retarget: false,
+  allow_auto_trim: true,
+  allow_delta_reads: true,
+  allowed_relocate_policies: ["exact_span_only", "same_block", "sibling_blocks"],
+  default_relocate_policy: "same_block",
+  max_candidates: 5,
+  max_block_radius: 3,
+  max_relocate_distance: 200,
+  min_soft_matches_for_retarget: 1,
+  require_span_id: true,
+  max_weak_preconditions: 16,
+  min_preserved_ratio: 0.5,
+  max_diagnostics_bytes: 16_384,
+};
+
+// ============================================================================
+// Recovery + Delta Types (v0.9.4)
+// ============================================================================
+
+export type WeakRecovery = {
+  span_id: string;
+  recovery_action: "relocate" | "trim_range" | "skip";
+  original_block_id?: string;
+  resolved_block_id?: string;
+  block_distance?: number;
+  intra_block_distance?: number;
+  original_range?: TargetRange;
+  trimmed_range?: TargetRange;
+};
+
+export type TrimmingRecord = {
+  span_id: string;
+  original_length: number;
+  trimmed_length: number;
+  preserved_ratio: number;
+};
+
+export type RetargetingRecord = {
+  requested_span_id: string;
+  resolved_span_id: string;
+  match_vector: [boolean, boolean, boolean, boolean, boolean, boolean, boolean];
+};
+
+export type DeltaSpanStatus = "updated" | "relocated" | "deleted" | "created";
+
+export type DeltaResponse = {
+  frontier_delta: {
+    from_frontier: DocFrontierTag;
+    to_frontier: DocFrontierTag;
+    ops_count?: number;
+  };
+  affected_spans: Array<{
+    span_id: string;
+    block_id: string;
+    new_context_hash?: string;
+    new_range?: TargetRange;
+    status: DeltaSpanStatus;
+  }>;
+  neighbor_spans?: Array<{
+    span_id: string;
+    block_id: string;
+    context_hash: string;
+  }>;
+  stale_blocks?: string[];
+  delta_truncated?: boolean;
 };
 
 /** Document state provider for gateway */
@@ -345,6 +462,8 @@ export interface GatewayDocumentProvider {
   getSpanState(spanId: string): SpanState | null;
   /** Get multiple span states */
   getSpanStates(spanIds: string[]): Map<string, SpanState>;
+  /** Get all span states (optional, for targeting relocation) */
+  getAllSpanStates?: () => Map<string, SpanState>;
   /** Check if document exists */
   documentExists(docId: string): boolean;
 }

@@ -16,6 +16,7 @@ import {
   parseGatewayRequest,
   validateGatewayRequest,
 } from "../envelope.js";
+import type { AIGatewayRequest } from "../types.js";
 
 describe("AI Gateway Envelope", () => {
   describe("createGatewayRequest", () => {
@@ -375,14 +376,14 @@ describe("AI Gateway Envelope", () => {
       const normalized = normalizeGatewayRequest({
         doc_id: "doc1",
         doc_frontier_tag: "f1",
-        target_spans: [],
         instructions: "x",
         format: "html",
         client_request_id: "legacy-req",
-      });
+      } as AIGatewayRequest);
 
       expect(normalized.doc_frontier).toBe("f1");
       expect(normalized.request_id).toBe("legacy-req");
+      expect(normalized.target_spans).toEqual([]);
     });
   });
 });
