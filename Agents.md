@@ -6,11 +6,17 @@ This document serves two purposes:
 
 ## Project Context
 
-**Keep-Up Reader** is a local-first collaborative reading/annotation application built on:
-- **LFCC Protocol**: Local-First Collaboration Contract for deterministic sync
-- **Loro CRDT**: Single source of truth for collaborative state
-- **ProseMirror**: Rich text editor with custom NodeViews
-- **Agent Runtime** (`packages/agent-runtime`): MCP tools, orchestration, and AI pipelines
+**Open Wrap** is the product. The **core app is `apps/cowork`** (server + UI).
+Key platform layers include:
+- **Agent Runtime** (`packages/agent-runtime*`): MCP tools, orchestration, execution, memory, telemetry.
+- **AI Core** (`packages/ai-core`): provider adapters + structured outputs.
+- **LFCC Protocol + Loro CRDT**: deterministic document operations (used by the LFCC stack and AI Gateway).
+- **UI ↔ LFCC Bridge** (`packages/lfcc-bridge`, `packages/core`, `packages/app`): editor/bridge contracts.
+
+**Important naming rule (to prevent confusion):**
+- Documents may still mention **Keep-Up / Reader**. Treat those as **legacy names**.
+- When in doubt, use **Open Wrap** and **`apps/cowork`** as the default context.
+- Do **not** assume Reader-specific UI/flows unless the task explicitly targets the LFCC editor packages.
 
 ## Quick Reference
 
@@ -43,7 +49,7 @@ To simulate a full engineering team, Agents should adopt specific personas based
 *   **Responsibility**:
     *   Owns `CODING_STANDARDS.md` and `Agents.md`.
     *   Reviews `implementation_plan.md` for architectural compliance.
-    *   Enforces LFCC constraints (Determinism, SEC).
+    *   Enforces LFCC + Agent Runtime constraints (Determinism, SEC) when applicable.
 
 ### 🔨 Developer
 *   **Focus**: Efficient execution, code quality, test coverage.
@@ -161,7 +167,8 @@ git checkout -b feat/short-task-name
 
 # Part 2: Technical Protocol (The "AI Envelope")
 
-This section outlines how AI features *within the app* interact with the Local-First Collaboration system. The architecture is designed to be **model-agnostic**, **safe**, and **deterministic**.
+This section applies **only** to LFCC-backed document operations (LFCC stack + AI Gateway).  
+If you are working purely in `apps/cowork` app logic without LFCC document mutation, follow general agent-runtime rules and skip LFCC-specific steps.
 
 ## 1. Interaction Protocol (The "AI Envelope")
 
@@ -234,9 +241,10 @@ When writing or modifying code, Agents **MUST** follow the rules in `CODING_STAN
 
 - **Single source of truth**: Loro is the only CRDT used in this project.
 - **Do not introduce Yjs**: Do not add Yjs dependencies or serialize/deserialize Yjs updates anywhere.
-- **Import/persistence/reader alignment**: Pipelines that store or read CRDT data must produce and consume Loro snapshots/updates.
+- **Import/persistence alignment**: Pipelines that store or read CRDT data must produce and consume Loro snapshots/updates.
 - **If Yjs artifacts exist**: Stop and propose a migration plan to Loro before extending behavior.
 - **Pre-flight check**: Confirm the active CRDT and storage format before implementing features that touch import, persistence, or rendering.
+> Applies to LFCC/Loro-related packages. For `apps/cowork` work that does not touch LFCC, this is a guardrail (do not introduce Yjs).
 
 ## 1. Pre-Flight Checklist
 
@@ -263,6 +271,9 @@ Before submitting code changes, verify:
 
 > [!CAUTION]
 > **Do NOT use Framer Motion in ProseMirror editor components.**
+
+This constraint applies **only** to ProseMirror-based editor packages (LFCC UI/bridge).  
+If you are not touching those areas, ignore this section.
 
 Framer Motion's `layout` animations conflict with ProseMirror's DOM management:
 - ProseMirror directly controls cursor and selection positions
