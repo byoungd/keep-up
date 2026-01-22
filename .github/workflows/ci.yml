@@ -129,6 +129,59 @@ jobs:
       - name: Test
         run: pnpm test:ci
 
+  # Native Rust parity tests - verifies Rust bindings match TS implementations
+  native-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [build]
+    env:
+      KU0_NATIVE_ACCELERATORS_ENABLED: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-action@stable
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            packages/*-rs/target/
+          key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-output
+          path: .
+
+      - name: Unarchive build artifacts
+        run: |
+          unzip build-output.zip
+          rm build-output.zip
+
+      - name: Build Rust packages
+        run: pnpm turbo run build --filter="*-rs"
+
+      - name: Run native parity tests
+        run: pnpm vitest run --reporter=verbose packages/**/*.native.test.ts
+
   # Core release gate - runs independently (small and fast)
   core_release_gate:
     runs-on: ubuntu-latest

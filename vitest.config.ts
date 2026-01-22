@@ -156,6 +156,80 @@ const aliases = [
   },
   { find: "@ku0/tts", replacement: path.resolve(__dirname, "packages/tts/src/index.ts") },
 
+  // Rust Native Packages
+  {
+    find: "@ku0/native-bindings/flags",
+    replacement: path.resolve(__dirname, "packages/native-bindings/src/flags.ts"),
+  },
+  {
+    find: "@ku0/native-bindings/testing",
+    replacement: path.resolve(__dirname, "packages/native-bindings/src/testing/index.ts"),
+  },
+  {
+    find: "@ku0/native-bindings/node",
+    replacement: path.resolve(__dirname, "packages/native-bindings/src/node.ts"),
+  },
+  {
+    find: "@ku0/native-bindings",
+    replacement: path.resolve(__dirname, "packages/native-bindings/src/index.ts"),
+  },
+  {
+    find: "@ku0/canonicalizer-rs",
+    replacement: path.resolve(__dirname, "packages/canonicalizer-rs/src/index.ts"),
+  },
+  {
+    find: "@ku0/ai-sanitizer-rs",
+    replacement: path.resolve(__dirname, "packages/ai-sanitizer-rs/src/index.ts"),
+  },
+  {
+    find: "@ku0/anchor-codec-rs",
+    replacement: path.resolve(__dirname, "packages/anchor-codec-rs/src/index.ts"),
+  },
+  {
+    find: "@ku0/anchor-relocation-rs",
+    replacement: path.resolve(__dirname, "packages/anchor-relocation-rs/src/index.ts"),
+  },
+  {
+    find: "@ku0/ai-context-hash-rs",
+    replacement: path.resolve(__dirname, "packages/ai-context-hash-rs/src/index.ts"),
+  },
+  {
+    find: "@ku0/policy-hash-rs",
+    replacement: path.resolve(__dirname, "packages/policy-hash-rs/src/index.ts"),
+  },
+  {
+    find: "@ku0/text-normalization-rs",
+    replacement: path.resolve(__dirname, "packages/text-normalization-rs/src/index.ts"),
+  },
+  {
+    find: "@ku0/streaming-markdown-rs/node",
+    replacement: path.resolve(__dirname, "packages/streaming-markdown-rs/src/node.ts"),
+  },
+  {
+    find: "@ku0/streaming-markdown-rs",
+    replacement: path.resolve(__dirname, "packages/streaming-markdown-rs/src/index.ts"),
+  },
+  {
+    find: "@ku0/json-accel-rs",
+    replacement: path.resolve(__dirname, "packages/json-accel-rs/src/index.ts"),
+  },
+  {
+    find: "@ku0/vector-similarity-rs",
+    replacement: path.resolve(__dirname, "packages/vector-similarity-rs/src/index.ts"),
+  },
+  {
+    find: "@ku0/gitignore-rs",
+    replacement: path.resolve(__dirname, "packages/gitignore-rs/src/index.ts"),
+  },
+  {
+    find: "@ku0/symbol-index-rs",
+    replacement: path.resolve(__dirname, "packages/symbol-index-rs/src/index.ts"),
+  },
+  {
+    find: "@ku0/tokenizer-rs",
+    replacement: path.resolve(__dirname, "packages/tokenizer-rs/src/index.ts"),
+  },
+
   // App alias
   { find: "@", replacement: path.resolve(__dirname, "apps/reader/src") },
 ];
