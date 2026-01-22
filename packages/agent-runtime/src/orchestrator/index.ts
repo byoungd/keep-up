@@ -52,6 +52,14 @@ export {
   type DependencyAnalysis,
   DependencyAnalyzer,
 } from "./dependencyAnalyzer";
+// Execution Feedback (Track B)
+export {
+  createExecutionFeedbackTracker,
+  type ExecutionFeedbackConfig,
+  ExecutionFeedbackTracker,
+  type ExecutionOutcome,
+  type ToolStats,
+} from "./executionFeedback";
 // Lifecycle Hooks
 export {
   type AfterToolHook,
@@ -121,6 +129,14 @@ export {
   type PlanRefinement,
   type PlanStep,
 } from "./planning";
+// Plan Prioritization (Track A)
+export {
+  createPlanPrioritizer,
+  PlanPrioritizer,
+  type PlanPrioritizerConfig,
+  type PlanStepPriority,
+  type PrioritizationResult,
+} from "./planPrioritizer";
 export {
   type CacheConfig,
   createRequestCache,
@@ -149,6 +165,14 @@ export {
   InvalidTransitionError,
   type TransitionHandler,
 } from "./stateMachine";
+// Tool Scoring (Track B)
+export {
+  createToolScorer,
+  type ToolScore,
+  ToolScorer,
+  type ToolScorerConfig,
+  type ToolScorerWeights,
+} from "./toolScorer";
 // Turn Executor (extracted from orchestrator)
 export {
   createTurnExecutor,
