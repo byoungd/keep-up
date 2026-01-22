@@ -119,6 +119,20 @@ export class EventStreamPublisher {
     });
   }
 
+  publishAgentTurnStart(data: { sessionId: string; turn: number; taskId?: string }) {
+    this.events.publish(data.sessionId, COWORK_EVENTS.AGENT_TURN_START, {
+      turn: data.turn,
+      taskId: data.taskId,
+    });
+  }
+
+  publishAgentTurnEnd(data: { sessionId: string; turn: number; taskId?: string }) {
+    this.events.publish(data.sessionId, COWORK_EVENTS.AGENT_TURN_END, {
+      turn: data.turn,
+      taskId: data.taskId,
+    });
+  }
+
   publishAgentArtifact(data: {
     sessionId: string;
     id: string;
@@ -131,6 +145,61 @@ export class EventStreamPublisher {
       artifact: data.artifact,
       taskId: data.taskId,
       updatedAt: data.updatedAt,
+    });
+  }
+
+  publishPolicyDecision(data: {
+    sessionId: string;
+    toolName?: string;
+    decision?: "allow" | "allow_with_confirm" | "deny";
+    policyRuleId?: string;
+    policyAction?: string;
+    riskTags?: string[];
+    riskScore?: number;
+    reason?: string;
+    taskId?: string;
+  }) {
+    this.events.publish(data.sessionId, COWORK_EVENTS.POLICY_DECISION, {
+      toolName: data.toolName,
+      decision: data.decision,
+      policyRuleId: data.policyRuleId,
+      policyAction: data.policyAction,
+      riskTags: data.riskTags ?? [],
+      riskScore: data.riskScore,
+      reason: data.reason,
+      taskId: data.taskId,
+    });
+  }
+
+  publishCheckpointCreated(data: {
+    sessionId: string;
+    checkpointId: string;
+    taskId?: string;
+    status: string;
+    currentStep: number;
+    createdAt: number;
+  }) {
+    this.events.publish(data.sessionId, COWORK_EVENTS.CHECKPOINT_CREATED, {
+      checkpointId: data.checkpointId,
+      taskId: data.taskId,
+      status: data.status,
+      currentStep: data.currentStep,
+      createdAt: data.createdAt,
+    });
+  }
+
+  publishCheckpointRestored(data: {
+    sessionId: string;
+    checkpointId: string;
+    taskId?: string;
+    restoredAt: number;
+    currentStep: number;
+  }) {
+    this.events.publish(data.sessionId, COWORK_EVENTS.CHECKPOINT_RESTORED, {
+      checkpointId: data.checkpointId,
+      taskId: data.taskId,
+      restoredAt: data.restoredAt,
+      currentStep: data.currentStep,
     });
   }
 

@@ -31,6 +31,11 @@ export const COWORK_EVENTS = {
   AGENT_TOOL_RESULT: "agent.tool.result",
   AGENT_PLAN: "agent.plan",
   AGENT_ARTIFACT: "agent.artifact",
+  AGENT_TURN_START: "agent.turn.start",
+  AGENT_TURN_END: "agent.turn.end",
+  POLICY_DECISION: "policy.decision",
+  CHECKPOINT_CREATED: "checkpoint.created",
+  CHECKPOINT_RESTORED: "checkpoint.restored",
 
   // System events
   SYSTEM_HEARTBEAT: "system.heartbeat",
@@ -158,6 +163,37 @@ export interface CoworkEventPayloads {
     artifact: unknown;
     taskId?: string;
     updatedAt: number;
+  };
+  [COWORK_EVENTS.AGENT_TURN_START]: {
+    turn: number;
+    taskId?: string;
+  };
+  [COWORK_EVENTS.AGENT_TURN_END]: {
+    turn: number;
+    taskId?: string;
+  };
+  [COWORK_EVENTS.POLICY_DECISION]: {
+    toolName?: string;
+    decision?: "allow" | "allow_with_confirm" | "deny";
+    policyRuleId?: string;
+    policyAction?: string;
+    riskTags?: string[];
+    riskScore?: number;
+    reason?: string;
+    taskId?: string;
+  };
+  [COWORK_EVENTS.CHECKPOINT_CREATED]: {
+    checkpointId: string;
+    taskId?: string;
+    status: string;
+    currentStep: number;
+    createdAt: number;
+  };
+  [COWORK_EVENTS.CHECKPOINT_RESTORED]: {
+    checkpointId: string;
+    taskId?: string;
+    restoredAt: number;
+    currentStep: number;
   };
   [COWORK_EVENTS.SYSTEM_HEARTBEAT]: {
     timestamp: number;

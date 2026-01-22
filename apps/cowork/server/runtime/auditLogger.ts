@@ -8,16 +8,19 @@ const DEFAULT_MAX_ENTRIES = 10_000;
 export interface CoworkAuditLoggerOptions {
   auditLogStore?: AuditLogStoreLike;
   maxEntries?: number;
+  onEntry?: (entry: AuditEntry, mapped: CoworkAuditEntry) => void;
 }
 
 export class CoworkAuditLogger implements AuditLogger {
   private entries: AuditEntry[] = [];
   private readonly auditLogStore?: AuditLogStoreLike;
   private readonly maxEntries: number;
+  private readonly onEntry?: (entry: AuditEntry, mapped: CoworkAuditEntry) => void;
 
   constructor(options: CoworkAuditLoggerOptions = {}) {
     this.auditLogStore = options.auditLogStore;
     this.maxEntries = options.maxEntries ?? DEFAULT_MAX_ENTRIES;
+    this.onEntry = options.onEntry;
   }
 
   log(entry: AuditEntry): void {
@@ -31,6 +34,13 @@ export class CoworkAuditLogger implements AuditLogger {
       void this.auditLogStore.log(mapped).catch((error) => {
         void error;
       });
+    }
+    if (mapped && this.onEntry) {
+      try {
+        this.onEntry(entry, mapped);
+      } catch (error) {
+        void error;
+      }
     }
   }
 

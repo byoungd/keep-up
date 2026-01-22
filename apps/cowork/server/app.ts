@@ -10,6 +10,7 @@ import { createApprovalRoutes } from "./routes/approvals";
 import { createArtifactRoutes } from "./routes/artifacts";
 import { createAuditLogRoutes } from "./routes/auditLogs";
 import { createChatRoutes } from "./routes/chat";
+import { createCheckpointRoutes } from "./routes/checkpoints";
 import { createContextRoutes } from "./routes/context";
 import { createCostRoutes } from "./routes/cost";
 import { createLessonRoutes } from "./routes/lessons";
@@ -201,6 +202,14 @@ export function createCoworkApp(deps: CoworkAppDeps) {
       providerKeys,
       events: eventHub,
       critic: deps.critic,
+    })
+  );
+
+  app.route(
+    "/api",
+    createCheckpointRoutes({
+      sessions: deps.storage.sessionStore,
+      taskRuntime,
     })
   );
 

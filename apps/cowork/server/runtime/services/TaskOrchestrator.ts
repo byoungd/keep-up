@@ -172,10 +172,16 @@ export class TaskOrchestrator {
   async handleOrchestratorEvent(
     sessionId: string,
     activeTaskId: string | null,
-    event: { type: string; data: unknown },
+    event: { type: string; data: unknown; turn?: number },
     _context?: { modelId?: string; providerId?: string }
   ): Promise<void> {
     switch (event.type) {
+      case "turn:start":
+        this.handleTurnStartEvent(sessionId, activeTaskId, event);
+        break;
+      case "turn:end":
+        this.handleTurnEndEvent(sessionId, activeTaskId, event);
+        break;
       case "thinking":
         this.handleThinkingEvent(sessionId, activeTaskId, event.data);
         break;
@@ -219,6 +225,36 @@ export class TaskOrchestrator {
       default:
         break;
     }
+  }
+
+  private handleTurnStartEvent(
+    sessionId: string,
+    activeTaskId: string | null,
+    event: { turn?: number }
+  ): void {
+    if (typeof event.turn !== "number") {
+      return;
+    }
+    this.eventPublisher.publishAgentTurnStart({
+      sessionId,
+      turn: event.turn,
+      taskId: activeTaskId ?? undefined,
+    });
+  }
+
+  private handleTurnEndEvent(
+    sessionId: string,
+    activeTaskId: string | null,
+    event: { turn?: number }
+  ): void {
+    if (typeof event.turn !== "number") {
+      return;
+    }
+    this.eventPublisher.publishAgentTurnEnd({
+      sessionId,
+      turn: event.turn,
+      taskId: activeTaskId ?? undefined,
+    });
   }
 
   /**
