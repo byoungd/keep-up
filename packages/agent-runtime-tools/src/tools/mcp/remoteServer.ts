@@ -105,7 +105,8 @@ export class McpRemoteToolServer implements MCPToolServer {
     this.client = new Client(clientInfo);
 
     const transportConfig = this.resolveTransportConfig(config);
-    const authProvider = resolveAuthProvider(config.auth);
+    const authConfig = config.auth;
+    const authProvider = resolveAuthProvider(authConfig);
     const transportInstance = createMcpTransport(transportConfig, authProvider);
     this.transport = transportInstance.transport;
     this.transportType = transportInstance.type;
@@ -129,7 +130,7 @@ export class McpRemoteToolServer implements MCPToolServer {
       const sessionConfig: McpOAuthSessionConfig = {
         provider: authProvider,
         serverUrl: this.serverUrl,
-        authorizationCode: config.auth.authorizationCode,
+        authorizationCode: authConfig?.authorizationCode,
       };
       this.authSession = new McpOAuthSession(sessionConfig);
     }
