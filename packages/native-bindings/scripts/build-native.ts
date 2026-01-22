@@ -49,6 +49,7 @@ function getLibraryName(crateName: string): string {
 
 const crateName = getCrateName();
 
+// biome-ignore lint/suspicious/noConsole: Build script needs to log outcome
 console.log(`Building ${crateName}${isRelease ? " (release)" : " (debug)"}...`);
 
 const cargoArgs = process.env.CARGO_ARGS?.split(" ").filter(Boolean) ?? [];
@@ -66,4 +67,5 @@ mkdirSync(distDir, { recursive: true });
 const destination = path.join(distDir, `${crateName}.node`);
 copyFileSync(source, destination);
 
+// biome-ignore lint/suspicious/noConsole: Build script needs to log outcome
 console.log(`✓ Copied ${crateName}.node to ${distDir}`);
