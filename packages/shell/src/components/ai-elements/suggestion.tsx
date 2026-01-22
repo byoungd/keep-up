@@ -23,17 +23,25 @@ export interface SuggestionProps extends Omit<React.ComponentProps<typeof Button
   onClick?: (suggestion: string) => void;
 }
 
-export function Suggestion({ suggestion, onClick, className, ...props }: SuggestionProps) {
+export function Suggestion({
+  suggestion,
+  onClick,
+  className,
+  children,
+  variant = "secondary",
+  size = "sm",
+  ...props
+}: SuggestionProps) {
   return (
     <Button
       type="button"
-      variant="secondary"
-      size="sm"
+      variant={variant}
+      size={size}
       className={cn("whitespace-nowrap", className)}
       onClick={() => onClick?.(suggestion)}
       {...props}
     >
-      {suggestion}
+      {children ?? suggestion}
     </Button>
   );
 }

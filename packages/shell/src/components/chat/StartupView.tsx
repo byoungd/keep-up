@@ -1,5 +1,6 @@
 "use client";
 import { ArrowRight, Lightbulb, MessageSquare, Sparkles, Zap } from "lucide-react";
+import { Suggestion } from "../ai-elements/suggestion";
 
 export interface StartupViewProps {
   title: string;
@@ -38,16 +39,23 @@ export function StartupView({
           {suggestions.map((label, i) => {
             const Icon = getIcon(i);
             return (
-              <button
+              <Suggestion
                 key={label}
-                type="button"
-                onClick={() => onSuggestionClick(label)}
-                className="group inline-flex items-center gap-2 rounded-full border border-border/50 bg-surface-1/70 px-4 py-2 text-xs font-medium text-foreground/80 hover:text-foreground hover:border-border/80 hover:bg-surface-2/70 transition-colors duration-fast"
+                suggestion={label}
+                onClick={onSuggestionClick}
+                size="default"
+                className="group gap-2 rounded-full border border-border/50 bg-surface-1/70 text-xs font-medium text-foreground/80 hover:text-foreground hover:border-border/80 hover:bg-surface-2/70 transition-colors duration-fast"
               >
-                <Icon className="h-4 w-4 text-muted-foreground group-hover:text-foreground/80" />
+                <Icon
+                  className="h-4 w-4 text-muted-foreground group-hover:text-foreground/80"
+                  aria-hidden="true"
+                />
                 <span>{label}</span>
-                <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/30 group-hover:text-foreground/70 transition-colors duration-fast" />
-              </button>
+                <ArrowRight
+                  className="h-3.5 w-3.5 text-muted-foreground/30 group-hover:text-foreground/70 transition-colors duration-fast"
+                  aria-hidden="true"
+                />
+              </Suggestion>
             );
           })}
         </div>
