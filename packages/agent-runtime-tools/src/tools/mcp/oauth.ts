@@ -58,6 +58,10 @@ export interface FileMcpOAuthTokenStoreConfig {
   keyEncoding?: "hex" | "base64";
 }
 
+export type McpOAuthTokenStoreConfig =
+  | { type: "memory" }
+  | ({ type: "file" } & FileMcpOAuthTokenStoreConfig);
+
 export class FileMcpOAuthTokenStore implements McpOAuthTokenStore {
   private readonly filePath: string;
   private readonly key: Buffer;
@@ -97,6 +101,20 @@ export class FileMcpOAuthTokenStore implements McpOAuthTokenStore {
       }
     }
   }
+}
+
+export function resolveMcpOAuthTokenStore(
+  store?: McpOAuthTokenStore | McpOAuthTokenStoreConfig
+): McpOAuthTokenStore | undefined {
+  if (!store) {
+    return undefined;
+  }
+  if ("type" in store) {
+    return store.type === "memory"
+      ? new InMemoryMcpOAuthTokenStore()
+      : new FileMcpOAuthTokenStore(store);
+  }
+  return store;
 }
 
 export interface McpOAuthClientConfig {
@@ -198,6 +216,15 @@ export class McpOAuthClientProvider implements OAuthClientProvider {
     headers.set("Authorization", `Basic ${token}`);
     params.delete("client_secret");
   };
+}
+
+export function createMcpOAuthClientProvider(
+  config: McpOAuthClientConfig,
+  tokenStore?: McpOAuthTokenStore | McpOAuthTokenStoreConfig
+): McpOAuthClientProvider {
+  const resolvedStore = config.tokenStore ?? resolveMcpOAuthTokenStore(tokenStore);
+  const resolvedConfig = resolvedStore ? { ...config, tokenStore: resolvedStore } : config;
+  return new McpOAuthClientProvider(resolvedConfig);
 }
 
 export function splitScopes(scopes?: string): Set<string> {

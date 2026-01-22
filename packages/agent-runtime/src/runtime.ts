@@ -22,7 +22,7 @@ import type { ToolExecutor } from "./executor";
 import { createKernel, type Kernel, type KernelConfig, type RuntimeServices } from "./kernel";
 import type { IAgentLLM } from "./orchestrator/llmTypes";
 import type { IPermissionChecker } from "./security";
-import { createPermissionChecker, createSecurityPolicy } from "./security";
+import { createPermissionChecker, createSecurityPolicy, withAuditTelemetry } from "./security";
 import type { SessionState } from "./session";
 import type {
   AuditLogger,
@@ -78,6 +78,13 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<Runt
   const registry = components.registry ?? createToolRegistry();
   const eventBus = components.eventBus ?? getGlobalEventBus();
   const messageBus = components.messageBus ?? createMessageBus(eventBus);
+  const resolvedAuditLogger = components.auditLogger
+    ? withAuditTelemetry(components.auditLogger, {
+        eventBus,
+        telemetry: components.telemetry,
+        source: "audit:runtime",
+      })
+    : undefined;
 
   if (components.toolServers?.length) {
     for (const server of components.toolServers) {
@@ -109,7 +116,7 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<Runt
     state: components.sessionState,
     checkpointManager: components.checkpointManager,
     fileContextTracker,
-    audit: components.auditLogger,
+    audit: resolvedAuditLogger,
     telemetry: components.telemetry,
     clock: components.clock,
     ids: components.ids,
@@ -133,7 +140,7 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<Runt
     kernel: createKernel(services, kernelConfig),
     registry,
     permissionChecker,
-    auditLogger: components.auditLogger,
+    auditLogger: resolvedAuditLogger,
     telemetry: components.telemetry,
     eventBus,
     messageBus,

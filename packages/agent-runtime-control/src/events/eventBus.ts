@@ -7,6 +7,7 @@
 
 import type {
   ArtifactEnvelope,
+  AuditEntry,
   CheckpointEvent,
   ExecutionDecision,
   ExecutionQueueClass,
@@ -258,9 +259,15 @@ export interface ArtifactEvents {
   };
 }
 
+/** Audit lifecycle events */
+export interface AuditEvents {
+  "audit:entry": AuditEntry;
+}
+
 /** Combined event map */
 export interface RuntimeEventMap
   extends AgentEvents,
+    AuditEvents,
     ToolEvents,
     PluginEvents,
     SystemEvents,

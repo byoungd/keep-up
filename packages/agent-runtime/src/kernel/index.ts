@@ -51,6 +51,7 @@ import {
   createToolGovernancePolicyEngine,
   createToolPolicyEngine,
   resolveToolExecutionContext,
+  withAuditTelemetry,
 } from "../security";
 import type { SessionState } from "../session";
 import { createSessionState } from "../session";
@@ -136,7 +137,14 @@ export class RuntimeKernel implements Kernel {
     services: RuntimeServices,
     private readonly config: KernelConfig = {}
   ) {
-    this.services = services;
+    const resolvedAudit = services.audit
+      ? withAuditTelemetry(services.audit, {
+          eventBus: services.events ?? getGlobalEventBus(),
+          telemetry: services.telemetry,
+          source: "audit:kernel",
+        })
+      : undefined;
+    this.services = { ...services, audit: resolvedAudit ?? services.audit };
     this.eventBus = services.events ?? getGlobalEventBus();
     this.sessionState = services.state ?? createSessionState();
     this.messageBus = services.messageBus ?? createMessageBus(this.eventBus);

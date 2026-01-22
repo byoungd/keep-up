@@ -139,6 +139,35 @@ const codeExecution = createCodeToolServer();
 // Supports: python, javascript, typescript, ruby, go, rust, bash
 ```
 
+### MCP Remote Tool Server
+
+Connect to external MCP servers with OAuth and token persistence:
+
+```typescript
+import { createMcpRemoteToolServer } from "@ku0/agent-runtime-tools";
+
+const mcpServer = createMcpRemoteToolServer({
+  name: "acme",
+  description: "Acme MCP server",
+  transport: { type: "streamableHttp", url: "https://mcp.acme.dev" },
+  auth: {
+    client: {
+      clientId: process.env.MCP_CLIENT_ID ?? "",
+      clientSecret: process.env.MCP_CLIENT_SECRET,
+      grantType: "authorization_code",
+      redirectUrl: "https://keep-up.local/oauth/callback",
+      scopes: ["tools.read", "tools.write"],
+    },
+    tokenStore: {
+      type: "file",
+      filePath: "/var/lib/keep-up/mcp/acme.tokens",
+      encryptionKey: process.env.MCP_OAUTH_ENCRYPTION_KEY ?? "",
+      keyEncoding: "base64",
+    },
+  },
+});
+```
+
 ## Agent Skills
 
 Agent Skills provide progressive, on-demand procedural guidance using `SKILL.md` folders.
