@@ -92,16 +92,19 @@ export function TaskTrigger({ title, className, ...props }: TaskTriggerProps) {
   );
 }
 
-export interface TaskContentProps extends React.HTMLAttributes<HTMLDivElement> {}
+export interface TaskContentProps extends React.HTMLAttributes<HTMLDivElement> {
+  forceMount?: boolean;
+}
 
-export function TaskContent({ className, children, ...props }: TaskContentProps) {
+export function TaskContent({ className, children, forceMount, ...props }: TaskContentProps) {
   const { isOpen, contentId } = useTaskContext("TaskContent");
+  const shouldHide = !forceMount && !isOpen;
 
   return (
     <div
       className={cn("mt-3 space-y-2 text-fine", className)}
       id={contentId}
-      hidden={!isOpen}
+      hidden={shouldHide}
       data-state={isOpen ? "open" : "closed"}
       {...props}
     >

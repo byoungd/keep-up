@@ -1,6 +1,7 @@
 "use client";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
+import { Task, TaskContent } from "../ai-elements/task";
 import { ConfirmationSection } from "./ConfirmationSection";
 import { DeliverableItem } from "./DeliverableItem";
 import { PlanSection } from "./PlanSection";
@@ -42,8 +43,11 @@ export function TaskStreamMessage({ task, onPreview, onAction }: TaskStreamMessa
 
   return (
     <div className="w-full max-w-[92%] md:max-w-3xl my-1 pl-1">
-      {/* Minimal Container - No Borders, No Shadows */}
-      <div className="group/task relative">
+      <Task
+        open={isExpanded}
+        onOpenChange={setIsExpanded}
+        className="group/task relative border-0 bg-transparent p-0 shadow-none"
+      >
         <TaskHeader
           task={task}
           isExpanded={isExpanded}
@@ -60,8 +64,7 @@ export function TaskStreamMessage({ task, onPreview, onAction }: TaskStreamMessa
               exit={{ height: 0, opacity: 0 }}
               transition={TASK_THEME.motion.spring}
             >
-              <div className="pt-2 pl-[19px]">
-                {" "}
+              <TaskContent forceMount className="mt-0 space-y-0 text-sm pt-2 pl-[19px]">
                 {/* Align content with header icon center (approx) */}
                 <div className="border-l border-border/40 pl-4 pb-2 space-y-5">
                   {/* Summary / Fallback Notice */}
@@ -149,11 +152,11 @@ export function TaskStreamMessage({ task, onPreview, onAction }: TaskStreamMessa
                     </div>
                   )}
                 </div>
-              </div>
+              </TaskContent>
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
+      </Task>
     </div>
   );
 }
