@@ -199,16 +199,15 @@ export class AIGateway {
       if (weakResolution.diagnostics.length > 0) {
         weakResolution.response.diagnostics = weakResolution.diagnostics;
       }
-      const delta =
-        weakResolution.response.status === 409
-          ? this.buildDeltaResponse(
-              request,
-              weakResolution.response.server_frontier_tag,
-              weakResolution.appliedSpanIds
-            )
-          : null;
-      if (delta) {
-        weakResolution.response.delta = delta;
+      if (weakResolution.response.status === 409) {
+        const delta = this.buildDeltaResponse(
+          request,
+          weakResolution.response.server_frontier_tag,
+          weakResolution.appliedSpanIds
+        );
+        if (delta) {
+          weakResolution.response.delta = delta;
+        }
       }
       this.storeIdempotentResponse(requestId, weakResolution.response);
       this.emitTelemetry({

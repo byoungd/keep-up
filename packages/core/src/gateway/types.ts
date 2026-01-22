@@ -282,6 +282,8 @@ export type AIGatewayErrorResponse = {
     redaction_profile?: string;
     data_access_profile?: string;
   };
+  /** Optional diagnostics */
+  diagnostics?: GatewayDiagnostic[];
 };
 
 /** Union of all gateway responses */
