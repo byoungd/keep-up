@@ -627,3 +627,211 @@ function negotiateMultiDocument(
 ```
 
 Additionally, when `multi_document.enabled=true`, `gateway.idempotency_window_ms` MUST be >= 604800000 (7 days) per LFCC v0.9.2 MD-043-A.
+
+### 3.3 AI Targeting Resilience Extension (v0.9.4 optional)
+
+See: `docs/specs/lfcc/proposals/LFCC_v0.9.4_AI_Targeting_Resilience.md`.
+
+#### 3.3.1 Capability Flags
+
+```ts
+export type AiTargetingCapabilities = {
+  ai_targeting_v1?: boolean;
+  ai_layered_preconditions?: boolean;
+  ai_delta_reads?: boolean;
+  ai_auto_trim?: boolean;
+};
+```
+
+#### 3.3.2 AiTargetingPolicyV1 (Normative)
+
+```ts
+export type RelocatePolicy = 
+  | "exact_span_only" 
+  | "same_block" 
+  | "sibling_blocks" 
+  | "document_scan";
+
+export type AiTargetingPolicyV1 = {
+  version: "v1";
+  enabled: boolean;
+  
+  // Multi-signal preconditions
+  allow_soft_preconditions: boolean;
+  
+  // Relocation
+  allow_auto_retarget: boolean;
+  allowed_relocate_policies: RelocatePolicy[];
+  default_relocate_policy: RelocatePolicy;
+  max_candidates: number;
+  max_block_radius: number;
+  
+  // Window sizes for hash computation
+  window_size: { left: number; right: number };
+  neighbor_window: { left: number; right: number };
+  
+  // Relocation distance limit
+  max_relocate_distance: number;  // >= 0, UTF-16 code units
+
+  
+  // Retarget thresholds
+  min_soft_matches_for_retarget: number;
+  require_span_id: boolean;
+  
+  // Layered preconditions (§13)
+  allow_layered_preconditions: boolean;
+  max_weak_preconditions: number;
+  
+  // Auto-trimming (§15)
+  allow_auto_trim: boolean;
+  min_preserved_ratio: number;
+  trim_diagnostics: boolean;
+  
+  // Delta reads (§14)
+  allow_delta_reads: boolean;
+  
+  // Rate limiting (§19)
+  rate_limit?: {
+    requests_per_minute: number;
+    burst_size: number;
+    per_agent: boolean;
+  };
+  
+  // Diagnostics
+  max_diagnostics_bytes: number;
+};
+```
+
+#### 3.3.3 PolicyManifestV094 Extension
+
+```ts
+export type PolicyManifestV094 = PolicyManifestV092 & {
+  lfcc_version: "0.9.4";
+  ai_native_policy?: AiNativePolicyV1 & {
+    multi_document?: MultiDocumentPolicyV1;
+    targeting?: AiTargetingPolicyV1;
+  };
+  capabilities: PolicyManifestV092["capabilities"] & AiTargetingCapabilities;
+};
+```
+
+#### 3.3.4 Targeting Negotiation Rules
+
+```ts
+function negotiateTargeting(
+  policies: AiTargetingPolicyV1[]
+): AiTargetingPolicyV1 {
+  const relocatePolicies = ["exact_span_only", "same_block", "sibling_blocks", "document_scan"];
+  
+  return {
+    version: "v1",
+    enabled: policies.every(p => p.enabled),
+    
+    // Boolean AND (stricter)
+    allow_soft_preconditions: policies.every(p => p.allow_soft_preconditions),
+    allow_auto_retarget: policies.every(p => p.allow_auto_retarget),
+    allow_layered_preconditions: policies.every(p => p.allow_layered_preconditions),
+    allow_auto_trim: policies.every(p => p.allow_auto_trim),
+    allow_delta_reads: policies.every(p => p.allow_delta_reads),
+    trim_diagnostics: policies.every(p => p.trim_diagnostics),
+    
+    // Boolean OR (stricter)
+    require_span_id: policies.some(p => p.require_span_id),
+    
+    // Intersection of allowed policies
+    allowed_relocate_policies: setIntersection(
+      policies.map(p => p.allowed_relocate_policies)
+    ) as RelocatePolicy[],
+    
+    // Most restrictive in intersection
+    default_relocate_policy: mostRestrictive(
+      relocatePolicies,
+      policies.map(p => p.default_relocate_policy)
+    ) as RelocatePolicy,
+    
+    // Min values
+    max_candidates: Math.min(...policies.map(p => p.max_candidates)),
+    max_block_radius: Math.min(...policies.map(p => p.max_block_radius)),
+    window_size: {
+      left: Math.min(...policies.map(p => p.window_size.left)),
+      right: Math.min(...policies.map(p => p.window_size.right))
+    },
+    neighbor_window: {
+      left: Math.min(...policies.map(p => p.neighbor_window.left)),
+      right: Math.min(...policies.map(p => p.neighbor_window.right))
+    },
+    max_relocate_distance: Math.min(...policies.map(p => p.max_relocate_distance)),
+    max_weak_preconditions: Math.min(...policies.map(p => p.max_weak_preconditions)),
+    max_diagnostics_bytes: Math.min(...policies.map(p => p.max_diagnostics_bytes)),
+    
+    // Max values (stricter thresholds)
+    min_soft_matches_for_retarget: Math.max(...policies.map(p => p.min_soft_matches_for_retarget)),
+    min_preserved_ratio: Math.max(...policies.map(p => p.min_preserved_ratio)),
+    
+    // Rate limit: use most restrictive
+    rate_limit: negotiateRateLimit(policies.map(p => p.rate_limit))
+  };
+}
+
+function mostRestrictive(order: string[], values: string[]): string {
+  for (const candidate of order) {
+    if (values.includes(candidate)) {
+      return candidate;
+    }
+  }
+  return order[0];
+}
+
+function negotiateRateLimit(
+  limits: Array<AiTargetingPolicyV1["rate_limit"] | undefined>
+): AiTargetingPolicyV1["rate_limit"] | undefined {
+  const defined = limits.filter((l): l is NonNullable<typeof l> => l !== undefined);
+  if (defined.length === 0) return undefined;
+  
+  return {
+    requests_per_minute: Math.min(...defined.map(l => l.requests_per_minute)),
+    burst_size: Math.min(...defined.map(l => l.burst_size)),
+    per_agent: defined.some(l => l.per_agent)
+  };
+}
+```
+
+---
+
+## 4. Default Policy Values (Reference)
+
+### 4.1 Targeting Defaults
+
+```ts
+const defaultTargetingPolicy: AiTargetingPolicyV1 = {
+  version: "v1",
+  enabled: false,
+  allow_soft_preconditions: false,
+  allow_auto_retarget: false,
+  allowed_relocate_policies: ["exact_span_only"],
+  default_relocate_policy: "exact_span_only",
+  max_candidates: 10,
+  max_block_radius: 2,
+  max_relocate_distance: 500,
+  window_size: { left: 50, right: 50 },
+  neighbor_window: { left: 20, right: 20 },
+  min_soft_matches_for_retarget: 2,
+  require_span_id: true,
+  allow_layered_preconditions: false,
+  max_weak_preconditions: 5,
+  allow_auto_trim: false,
+  min_preserved_ratio: 0.5,
+  trim_diagnostics: true,
+  allow_delta_reads: false,
+  max_diagnostics_bytes: 4096
+};
+```
+
+---
+
+## 5. References
+
+- **v0.9.1:** `engineering/23_AI_Native_Extension.md`
+- **v0.9.2:** `proposals/LFCC_v0.9.2_Multi_Document_Support.md`
+- **v0.9.4:** `proposals/LFCC_v0.9.4_AI_Targeting_Resilience.md`, `engineering/24_AI_Targeting_Extension.md`
+

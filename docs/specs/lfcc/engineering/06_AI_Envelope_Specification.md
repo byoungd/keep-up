@@ -127,6 +127,135 @@ Normative notes:
 - 409 is reserved for `AI_PRECONDITION_FAILED` (LFCC v0.9 RC Appendix C). Multi-document conflicts MUST be reported per document.
 - `all_or_nothing` MUST be fail-closed (no partial apply). `best_effort` MAY return 200 with mixed per-document outcomes.
 
+### 2.5 AI Targeting Resilience (v0.9.4 optional)
+
+AI Targeting Resilience extends the request envelope with multi-signal preconditions, deterministic relocation, and auto-recovery. This is an optional extension and MUST be negotiated via `capabilities.ai_targeting_v1`.
+
+See: `docs/specs/lfcc/proposals/LFCC_v0.9.4_AI_Targeting_Resilience.md`.
+
+#### 2.5.1 Targeting Field
+
+When `ai_targeting_v1` is negotiated, requests MAY include a `targeting` field:
+
+```json
+{
+  "targeting": {
+    "version": "v1",
+    "relocate_policy": "same_block",
+    "auto_retarget": true,
+    "allow_trim": false
+  }
+}
+```
+
+- `version`: MUST be `"v1"`.
+- `relocate_policy`: One of `exact_span_only`, `same_block`, `sibling_blocks`, `document_scan`. Defaults to policy `default_relocate_policy`.
+- `auto_retarget`: If `true` and policy allows, gateway MAY apply ops to relocated span.
+- `allow_trim`: If `true` and policy allows, gateway MAY trim range when span has shifted.
+
+#### 2.5.2 Precondition v1 Format
+
+When `targeting.version = "v1"`, preconditions use an extended format:
+
+```json
+{
+  "v": 1,
+  "span_id": "span_uuid",
+  "block_id": "block_uuid",
+  "range": {
+    "start": { "anchor": "B64(...)", "bias": "right" },
+    "end": { "anchor": "B64(...)", "bias": "left" }
+  },
+  "hard": {
+    "context_hash": "sha256_hex",
+    "window_hash": "sha256_hex",
+    "structure_hash": "sha256_hex"
+  },
+  "soft": {
+    "neighbor_hash": { "left": "sha256_hex", "right": "sha256_hex" },
+    "window_hash": "sha256_hex"
+  }
+}
+```
+
+- `block_id` is REQUIRED.
+- At least one `hard` signal MUST be provided.
+- If `range` is omitted, the target is the full span.
+- If `range.end` is omitted, the range is a zero-length insertion point.
+
+#### 2.5.3 Layered Preconditions
+
+When using layered preconditions, the request MUST use `layered_preconditions` instead of `preconditions`:
+
+```json
+{
+  "layered_preconditions": {
+    "strong": [
+      { "v": 1, "span_id": "s1", "block_id": "b1", "hard": { "context_hash": "..." } }
+    ],
+    "weak": [
+      {
+        "v": 1, "span_id": "s2", "block_id": "b1", "hard": { "context_hash": "..." },
+        "on_mismatch": "relocate",
+        "max_relocate_distance": 100
+      }
+    ]
+  }
+}
+```
+
+- `strong`: MUST match or request fails.
+- `weak`: May fail with automatic recovery via `on_mismatch` (`relocate`, `trim_range`, `skip`).
+- `preconditions` and `layered_preconditions` are mutually exclusive; providing both is an error.
+
+#### 2.5.4 Range-Aware Span Attributes
+
+For range-aware operations (required for auto-trimming), `<replace_spans>` MAY include per-span anchors:
+
+```xml
+<replace_spans annotation="anno_uuid">
+  <span span_id="span_1"
+        start_anchor="B64(...)"
+        start_bias="right"
+        end_anchor="B64(...)"
+        end_bias="left">
+    Replacement content
+  </span>
+</replace_spans>
+```
+
+- `start_anchor` + `start_bias`: Optional anchor for range start.
+- `end_anchor` + `end_bias`: Optional anchor for range end.
+- If anchors are absent, the op targets the full span (range-opaque).
+- When `targeting.allow_trim=true`, trimming applies only to range-aware ops.
+
+#### 2.5.5 Delta Reads Response
+
+When `options.return_delta=true`, success and error responses include:
+
+```json
+{
+  "delta": {
+    "frontier_delta": {
+      "from_frontier": { "loro_frontier": ["..."] },
+      "to_frontier": { "loro_frontier": ["..."] }
+    },
+    "affected_spans": [
+      {
+        "span_id": "span_1",
+        "block_id": "block_1",
+        "new_context_hash": "sha256_hex",
+        "status": "updated"
+      }
+    ],
+    "stale_blocks": [],
+    "delta_truncated": false
+  }
+}
+```
+
+
+
 ## 3. Success Response (200)
 
 When `return_canonical_tree=true`, gateway SHOULD return canonicalized representation of the applied edit (or of the payload after dry-run).
