@@ -12,6 +12,8 @@ import type {
   ChainPolicy,
   ChainPolicyEntry,
   IntegrityPolicy,
+  MarkdownBlockType,
+  MarkdownMark,
   MarkdownPolicyV1,
   PartialBehavior,
   PolicyManifestV09,
@@ -418,7 +420,9 @@ function negotiateMarkdownPolicy(policies: MarkdownPolicyV1[]): MarkdownPolicyNe
       wikilinks: policies.every((p) => p.parser.extensions.wikilinks),
       math: policies.every((p) => p.parser.extensions.math),
     },
-    frontmatter_formats: intersectStringArrays(policies.map((p) => p.parser.frontmatter_formats)),
+    frontmatter_formats: intersectStringArrays(
+      policies.map((p) => p.parser.frontmatter_formats)
+    ) as Array<"yaml" | "toml" | "json">,
   };
 
   const sanitizationAllowedLanguages = intersectOptionalStringArrays(
@@ -432,10 +436,10 @@ function negotiateMarkdownPolicy(policies: MarkdownPolicyV1[]): MarkdownPolicyNe
     version: base.sanitization.version,
     allowed_block_types: intersectStringArrays(
       policies.map((p) => p.sanitization.allowed_block_types)
-    ),
+    ) as MarkdownBlockType[],
     allowed_mark_types: intersectStringArrays(
       policies.map((p) => p.sanitization.allowed_mark_types)
-    ),
+    ) as MarkdownMark[],
     allow_html_blocks: policies.every((p) => p.sanitization.allow_html_blocks),
     allow_frontmatter: policies.every((p) => p.sanitization.allow_frontmatter),
     reject_unknown_structure: policies.every((p) => p.sanitization.reject_unknown_structure),
