@@ -52,7 +52,7 @@ export interface MessageItemProps {
 
 /**
  * Container component for a single chat message.
- * Composes MessageBubble, MessageActions, MessageReferences, and MessageAlert.
+ * Composes AI Elements message wrappers with actions, references, and alerts.
  */
 const useMessageArtifacts = (message: Message) => {
   const isUser = message.role === "user";

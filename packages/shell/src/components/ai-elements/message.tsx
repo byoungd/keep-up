@@ -2,8 +2,8 @@
 
 import { cn } from "@ku0/shared/utils";
 import * as React from "react";
-import { MessageBubble } from "../chat/MessageBubble";
 import { Button } from "../ui/Button";
+import { MessageBubble } from "./message-bubble";
 
 export type MessageRole = "user" | "assistant" | "system" | "tool";
 

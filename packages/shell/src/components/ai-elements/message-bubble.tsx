@@ -4,7 +4,7 @@ import { cn } from "@ku0/shared/utils";
 import * as React from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { ThinkingIndicator, TypingCursor } from "./TypingCursor";
+import { ThinkingIndicator, TypingCursor } from "./typing-cursor";
 
 export interface MessageBubbleProps {
   content: string;
