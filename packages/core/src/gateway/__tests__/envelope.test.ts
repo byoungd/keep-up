@@ -263,6 +263,28 @@ describe("AI Gateway Envelope", () => {
       expect(errors.some((e) => e.field.includes("if_match_context_hash"))).toBe(true);
     });
 
+    it("accepts v1 preconditions without target_spans", () => {
+      const request = {
+        doc_id: "doc123",
+        doc_frontier_tag: "frontier:abc",
+        preconditions: [
+          {
+            v: 1,
+            span_id: "s1",
+            block_id: "b1",
+            hard: { context_hash: "sha256:xyz" },
+          },
+        ],
+        instructions: "Test",
+        format: "html",
+        request_id: "req-123",
+      };
+
+      const errors = validateGatewayRequest(request);
+      expect(errors.some((e) => e.field === "target_spans")).toBe(false);
+      expect(errors).toHaveLength(0);
+    });
+
     it("validates format enum", () => {
       const request = {
         doc_id: "doc123",

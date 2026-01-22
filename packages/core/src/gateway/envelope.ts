@@ -234,6 +234,8 @@ export function validateGatewayRequest(request: unknown): ValidationError[] {
 
   validateRequiredFields(req, errors);
   validateTargetSpans(req, errors);
+  validateTargeting(req, errors);
+  validatePreconditions(req, errors);
   validateOptionalFields(req, errors);
 
   return errors;
@@ -268,10 +270,21 @@ function validateRequiredFields(req: Record<string, unknown>, errors: Validation
 }
 
 function validateTargetSpans(req: Record<string, unknown>, errors: ValidationError[]): void {
+  const hasPreconditions = Array.isArray(req.preconditions);
+  const hasLayered = req.layered_preconditions !== undefined;
+  if (req.target_spans === undefined) {
+    if (!hasPreconditions && !hasLayered) {
+      errors.push({
+        field: "target_spans",
+        message: "target_spans is required and must be an array",
+      });
+    }
+    return;
+  }
   if (!Array.isArray(req.target_spans)) {
     errors.push({
       field: "target_spans",
-      message: "target_spans is required and must be an array",
+      message: "target_spans must be an array if provided",
     });
     return;
   }
@@ -298,6 +311,287 @@ function validateTargetSpans(req: Record<string, unknown>, errors: ValidationErr
       });
     }
   }
+}
+
+function validateTargeting(req: Record<string, unknown>, errors: ValidationError[]): void {
+  if (req.targeting === undefined) {
+    return;
+  }
+  if (!isRecord(req.targeting)) {
+    errors.push({ field: "targeting", message: "targeting must be an object if provided" });
+    return;
+  }
+  if (req.targeting.version !== "v1") {
+    errors.push({ field: "targeting.version", message: 'targeting.version must be "v1"' });
+  }
+}
+
+function validatePreconditions(req: Record<string, unknown>, errors: ValidationError[]): void {
+  const hasPreconditions = req.preconditions !== undefined;
+  const hasLayered = req.layered_preconditions !== undefined;
+  if (!hasPreconditions && !hasLayered) {
+    return;
+  }
+  if (hasPreconditions && hasLayered) {
+    errors.push({
+      field: "preconditions",
+      message: "preconditions and layered_preconditions cannot both be provided",
+    });
+    return;
+  }
+  if (hasPreconditions) {
+    validatePreconditionsArray(req.preconditions, "preconditions", errors);
+    return;
+  }
+  validateLayeredPreconditions(req.layered_preconditions, errors);
+}
+
+function validatePreconditionsArray(
+  value: unknown,
+  fieldPrefix: string,
+  errors: ValidationError[],
+  requireMismatch?: boolean
+): void {
+  if (!Array.isArray(value)) {
+    errors.push({
+      field: fieldPrefix,
+      message: `${fieldPrefix} must be an array when provided`,
+    });
+    return;
+  }
+  for (let i = 0; i < value.length; i += 1) {
+    validatePreconditionEntry(value[i], `${fieldPrefix}[${i}]`, errors, requireMismatch);
+  }
+}
+
+function validateLayeredPreconditions(value: unknown, errors: ValidationError[]): void {
+  if (!isRecord(value)) {
+    errors.push({
+      field: "layered_preconditions",
+      message: "layered_preconditions must be an object when provided",
+    });
+    return;
+  }
+  const { strong, weak } = value;
+  const hasStrong = Array.isArray(strong);
+  const hasWeak = Array.isArray(weak);
+  if (!hasStrong) {
+    errors.push({
+      field: "layered_preconditions.strong",
+      message: "layered_preconditions.strong must be an array",
+    });
+  }
+  if (!hasWeak) {
+    errors.push({
+      field: "layered_preconditions.weak",
+      message: "layered_preconditions.weak must be an array",
+    });
+  }
+  if (hasStrong) {
+    validatePreconditionsArray(strong, "layered_preconditions.strong", errors);
+  }
+  if (hasWeak) {
+    validatePreconditionsArray(weak, "layered_preconditions.weak", errors, true);
+  }
+}
+
+function validatePreconditionEntry(
+  value: unknown,
+  fieldPrefix: string,
+  errors: ValidationError[],
+  requireMismatch?: boolean
+): void {
+  if (!isRecord(value)) {
+    errors.push({ field: fieldPrefix, message: "precondition must be an object" });
+    return;
+  }
+  validatePreconditionVersion(value, fieldPrefix, errors);
+  validatePreconditionIdentifiers(value, fieldPrefix, errors);
+  validatePreconditionHard(value.hard, fieldPrefix, errors);
+  validatePreconditionSoft(value.soft, fieldPrefix, errors);
+  validatePreconditionRange(value.range, fieldPrefix, errors);
+  validatePreconditionMismatch(value.on_mismatch, fieldPrefix, errors, requireMismatch);
+}
+
+function validatePreconditionVersion(
+  value: Record<string, unknown>,
+  fieldPrefix: string,
+  errors: ValidationError[]
+): void {
+  if (value.v !== 1) {
+    errors.push({ field: `${fieldPrefix}.v`, message: "v must be 1 for targeting v1" });
+  }
+}
+
+function validatePreconditionIdentifiers(
+  value: Record<string, unknown>,
+  fieldPrefix: string,
+  errors: ValidationError[]
+): void {
+  if (value.span_id !== undefined && typeof value.span_id !== "string") {
+    errors.push({
+      field: `${fieldPrefix}.span_id`,
+      message: "span_id must be a string if provided",
+    });
+  }
+  if (value.block_id === undefined) {
+    errors.push({
+      field: `${fieldPrefix}.block_id`,
+      message: "block_id is required",
+    });
+  } else if (typeof value.block_id !== "string") {
+    errors.push({
+      field: `${fieldPrefix}.block_id`,
+      message: "block_id must be a string if provided",
+    });
+  }
+}
+
+function validatePreconditionHard(
+  value: unknown,
+  fieldPrefix: string,
+  errors: ValidationError[]
+): void {
+  if (!isRecord(value)) {
+    errors.push({ field: `${fieldPrefix}.hard`, message: "hard must be an object" });
+    return;
+  }
+  const { context_hash, window_hash, structure_hash } = value;
+  if (context_hash === undefined && window_hash === undefined) {
+    errors.push({
+      field: `${fieldPrefix}.hard`,
+      message: "hard must include at least one of context_hash or window_hash",
+    });
+  }
+  if (context_hash !== undefined && typeof context_hash !== "string") {
+    errors.push({
+      field: `${fieldPrefix}.hard.context_hash`,
+      message: "context_hash must be a string if provided",
+    });
+  }
+  if (window_hash !== undefined && typeof window_hash !== "string") {
+    errors.push({
+      field: `${fieldPrefix}.hard.window_hash`,
+      message: "window_hash must be a string if provided",
+    });
+  }
+  if (structure_hash !== undefined && typeof structure_hash !== "string") {
+    errors.push({
+      field: `${fieldPrefix}.hard.structure_hash`,
+      message: "structure_hash must be a string if provided",
+    });
+  }
+}
+
+function validatePreconditionSoft(
+  value: unknown,
+  fieldPrefix: string,
+  errors: ValidationError[]
+): void {
+  if (value === undefined) {
+    return;
+  }
+  if (!isRecord(value)) {
+    errors.push({ field: `${fieldPrefix}.soft`, message: "soft must be an object if provided" });
+    return;
+  }
+  if (value.window_hash !== undefined && typeof value.window_hash !== "string") {
+    errors.push({
+      field: `${fieldPrefix}.soft.window_hash`,
+      message: "window_hash must be a string if provided",
+    });
+  }
+  if (value.structure_hash !== undefined && typeof value.structure_hash !== "string") {
+    errors.push({
+      field: `${fieldPrefix}.soft.structure_hash`,
+      message: "structure_hash must be a string if provided",
+    });
+  }
+  validateNeighborHash(value.neighbor_hash, fieldPrefix, errors);
+}
+
+function validateNeighborHash(
+  value: unknown,
+  fieldPrefix: string,
+  errors: ValidationError[]
+): void {
+  if (value === undefined) {
+    return;
+  }
+  if (!isRecord(value)) {
+    errors.push({
+      field: `${fieldPrefix}.soft.neighbor_hash`,
+      message: "neighbor_hash must be an object if provided",
+    });
+    return;
+  }
+  if (value.left !== undefined && typeof value.left !== "string") {
+    errors.push({
+      field: `${fieldPrefix}.soft.neighbor_hash.left`,
+      message: "neighbor_hash.left must be a string if provided",
+    });
+  }
+  if (value.right !== undefined && typeof value.right !== "string") {
+    errors.push({
+      field: `${fieldPrefix}.soft.neighbor_hash.right`,
+      message: "neighbor_hash.right must be a string if provided",
+    });
+  }
+}
+
+function validatePreconditionRange(
+  value: unknown,
+  fieldPrefix: string,
+  errors: ValidationError[]
+): void {
+  if (value === undefined) {
+    return;
+  }
+  if (!isRecord(value) || !isAnchor(value.start)) {
+    errors.push({
+      field: `${fieldPrefix}.range`,
+      message: "range.start must be an anchor with {anchor,bias}",
+    });
+    return;
+  }
+  if (value.end !== undefined && !isAnchor(value.end)) {
+    errors.push({
+      field: `${fieldPrefix}.range.end`,
+      message: "range.end must be an anchor with {anchor,bias} if provided",
+    });
+  }
+}
+
+function validatePreconditionMismatch(
+  value: unknown,
+  fieldPrefix: string,
+  errors: ValidationError[],
+  requireMismatch?: boolean
+): void {
+  if (requireMismatch && value === undefined) {
+    errors.push({
+      field: `${fieldPrefix}.on_mismatch`,
+      message: "on_mismatch is required for weak preconditions",
+    });
+    return;
+  }
+  if (value !== undefined && typeof value !== "string") {
+    errors.push({
+      field: `${fieldPrefix}.on_mismatch`,
+      message: "on_mismatch must be a string if provided",
+    });
+  }
+}
+
+function isAnchor(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return typeof value.anchor === "string" && (value.bias === "left" || value.bias === "right");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: validation logic is inherently complex

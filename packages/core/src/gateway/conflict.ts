@@ -17,6 +17,7 @@ import type {
   FrontierComparison,
   GatewayDocumentProvider,
   SpanState,
+  TargetPreconditionV1,
   TargetSpan,
 } from "./types.js";
 
@@ -124,6 +125,125 @@ export function checkAllPreconditions(
   return failures;
 }
 
+/**
+ * Check a single targeting v1 precondition against a span state.
+ */
+export function checkSpanPreconditionV1(
+  precondition: TargetPreconditionV1,
+  spanState: SpanState | null
+): FailedPrecondition | null {
+  const spanId = precondition.span_id ?? "unknown";
+
+  if (spanState === null) {
+    return {
+      span_id: spanId,
+      annotation_id: "unknown",
+      reason: "span_missing",
+      detail: "Target span does not exist",
+    };
+  }
+
+  if (precondition.block_id && spanState.block_id !== precondition.block_id) {
+    return {
+      span_id: spanId,
+      annotation_id: spanState.annotation_id,
+      reason: "span_missing",
+      detail: `Span belongs to different block: ${spanState.block_id}`,
+    };
+  }
+
+  if (!spanState.is_verified) {
+    return {
+      span_id: spanId,
+      annotation_id: spanState.annotation_id,
+      reason: "unverified_target",
+      detail: "Target span is in unverified state",
+    };
+  }
+
+  const hard = precondition.hard ?? {};
+  if (hard.context_hash && spanState.context_hash !== hard.context_hash) {
+    return {
+      span_id: spanId,
+      annotation_id: spanState.annotation_id,
+      reason: "hash_mismatch",
+      expected_hash: hard.context_hash,
+      actual_hash: spanState.context_hash,
+      detail: "Context hash does not match",
+    };
+  }
+  if (hard.window_hash && spanState.window_hash !== hard.window_hash) {
+    return {
+      span_id: spanId,
+      annotation_id: spanState.annotation_id,
+      reason: "hash_mismatch",
+      expected_hash: hard.window_hash,
+      actual_hash: spanState.window_hash,
+      detail: "Window hash does not match",
+    };
+  }
+  if (hard.structure_hash && spanState.structure_hash !== hard.structure_hash) {
+    return {
+      span_id: spanId,
+      annotation_id: spanState.annotation_id,
+      reason: "hash_mismatch",
+      expected_hash: hard.structure_hash,
+      actual_hash: spanState.structure_hash,
+      detail: "Structure hash does not match",
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Check all targeting v1 preconditions.
+ */
+export function checkAllPreconditionsV1(
+  preconditions: TargetPreconditionV1[],
+  provider: GatewayDocumentProvider
+): FailedPrecondition[] {
+  const spanIds = preconditions
+    .map((precondition) => precondition.span_id)
+    .filter((spanId): spanId is string => typeof spanId === "string");
+  const spanStates = provider.getSpanStates(spanIds);
+  const failures: FailedPrecondition[] = [];
+
+  for (const precondition of preconditions) {
+    const spanId = precondition.span_id;
+    if (!spanId) {
+      failures.push({
+        span_id: "unknown",
+        annotation_id: "unknown",
+        reason: "span_missing",
+        detail: "span_id is required for targeting v1 preconditions",
+      });
+      continue;
+    }
+    const state = spanStates.get(spanId) ?? null;
+    const failure = checkSpanPreconditionV1(precondition, state);
+    if (failure) {
+      failures.push(failure);
+    }
+  }
+
+  return failures;
+}
+
+function resolveTargetingPreconditions(
+  request: AIGatewayRequest
+):
+  | { mode: "legacy"; targets: TargetSpan[] }
+  | { mode: "v1"; preconditions: TargetPreconditionV1[] } {
+  if (Array.isArray(request.preconditions)) {
+    return { mode: "v1", preconditions: request.preconditions };
+  }
+  if (request.layered_preconditions && Array.isArray(request.layered_preconditions.strong)) {
+    return { mode: "v1", preconditions: request.layered_preconditions.strong };
+  }
+  return { mode: "legacy", targets: request.target_spans };
+}
+
 // ============================================================================
 // Main Conflict Check
 // ============================================================================
@@ -177,7 +297,11 @@ export function checkConflicts(
   }
 
   // Check all preconditions
-  const failures = checkAllPreconditions(request.target_spans, provider);
+  const resolved = resolveTargetingPreconditions(request);
+  const failures =
+    resolved.mode === "v1"
+      ? checkAllPreconditionsV1(resolved.preconditions, provider)
+      : checkAllPreconditions(resolved.targets, provider);
   if (failures.length > 0) {
     // Determine primary reason from failures
     const primaryReason = determinePrimaryReason(failures);

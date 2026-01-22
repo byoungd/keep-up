@@ -31,6 +31,59 @@ export type TargetSpan = {
   if_match_context_hash: string;
 };
 
+export type TargetingRelocatePolicy =
+  | "exact_span_only"
+  | "same_block"
+  | "sibling_blocks"
+  | "document_scan";
+
+export type TargetingRequestV1 = {
+  version: "v1";
+  relocate_policy?: TargetingRelocatePolicy;
+  auto_retarget?: boolean;
+  allow_trim?: boolean;
+};
+
+export type TargetRangeAnchor = {
+  anchor: string;
+  bias: "left" | "right";
+};
+
+export type TargetRange = {
+  start: TargetRangeAnchor;
+  end?: TargetRangeAnchor;
+};
+
+export type TargetPreconditionV1 = {
+  v: 1;
+  span_id?: string;
+  block_id: string;
+  range?: TargetRange;
+  hard: {
+    context_hash?: string;
+    window_hash?: string;
+    structure_hash?: string;
+  };
+  soft?: {
+    neighbor_hash?: {
+      left?: string;
+      right?: string;
+    };
+    window_hash?: string;
+    structure_hash?: string;
+  };
+};
+
+export type WeakTargetPreconditionV1 = TargetPreconditionV1 & {
+  on_mismatch: "relocate" | "trim_range" | "skip";
+  max_relocate_distance?: number;
+};
+
+export type LayeredPreconditionsV1 = {
+  strong: TargetPreconditionV1[];
+  weak: WeakTargetPreconditionV1[];
+};
+
 /** AI request format */
 export type AIRequestFormat = "canonical_tree" | "canonical_fragment" | "html" | "markdown";
 
@@ -52,6 +105,12 @@ export type AIGatewayRequest = {
   ai_meta?: import("../kernel/ai/opcodes.js").AIOperationMeta;
   /** Target spans with preconditions */
   target_spans: TargetSpan[];
+  /** Targeting extension controls (v0.9.4) */
+  targeting?: TargetingRequestV1;
+  /** Targeting preconditions (v0.9.4) */
+  preconditions?: TargetPreconditionV1[];
+  /** Layered preconditions (v0.9.4) */
+  layered_preconditions?: LayeredPreconditionsV1;
   /** User instructions / prompt */
   instructions: string;
   /** Selected LLM model */
@@ -260,8 +319,16 @@ export type SpanState = {
   span_id: string;
   annotation_id: string;
   block_id: string;
+  block_type?: string;
+  parent_block_id?: string | null;
+  parent_path?: string | null;
+  span_start?: number;
+  span_end?: number;
   text: string;
   context_hash: string;
+  window_hash?: string;
+  structure_hash?: string;
+  neighbor_hash?: { left?: string; right?: string };
   is_verified: boolean;
 };
 

@@ -16,8 +16,16 @@ type GatewayDocumentProvider = gateway.GatewayDocumentProvider;
 type DocFrontierTag = gateway.DocFrontierTag;
 type FrontierComparison = gateway.FrontierComparison;
 type SpanState = gateway.SpanState;
+type TargetingHashConfig = {
+  windowSize: { left: number; right: number };
+  neighborWindow: { left: number; right: number };
+};
 
 const SELECTION_SPAN_PREFIX = "selection";
+const DEFAULT_TARGETING_CONFIG: TargetingHashConfig = {
+  windowSize: { left: 50, right: 50 },
+  neighborWindow: { left: 20, right: 20 },
+};
 
 // ============================================================================
 // Frontier Helpers
@@ -106,6 +114,52 @@ function buildBlockTextMap(blocks: BlockNode[]): Map<string, string> {
     }
   }
   return map;
+}
+
+type BlockMeta = {
+  blockType: string;
+  parentBlockId: string | null;
+  parentPath: string | null;
+};
+
+function buildBlockMetaMap(blocks: BlockNode[]): Map<string, BlockMeta> {
+  const map = new Map<string, BlockMeta>();
+  const stack: Array<{ block: BlockNode; parentBlockId: string | null }> = blocks.map((block) => ({
+    block,
+    parentBlockId: null,
+  }));
+
+  while (stack.length > 0) {
+    const entry = stack.pop();
+    if (!entry) {
+      continue;
+    }
+    map.set(entry.block.id, {
+      blockType: entry.block.type,
+      parentBlockId: entry.parentBlockId,
+      parentPath: null,
+    });
+    if (entry.block.children.length > 0) {
+      for (const child of entry.block.children) {
+        stack.push({ block: child, parentBlockId: entry.block.id });
+      }
+    }
+  }
+
+  return map;
+}
+
+function resolveTargetingConfig(config?: Partial<TargetingHashConfig>): TargetingHashConfig {
+  return {
+    windowSize: {
+      left: config?.windowSize?.left ?? DEFAULT_TARGETING_CONFIG.windowSize.left,
+      right: config?.windowSize?.right ?? DEFAULT_TARGETING_CONFIG.windowSize.right,
+    },
+    neighborWindow: {
+      left: config?.neighborWindow?.left ?? DEFAULT_TARGETING_CONFIG.neighborWindow.left,
+      right: config?.neighborWindow?.right ?? DEFAULT_TARGETING_CONFIG.neighborWindow.right,
+    },
+  };
 }
 
 function isValidSpanRange(start: number, end: number, length: number): boolean {
@@ -322,9 +376,104 @@ function parseSelectionSpanId(spanId: string): SelectionSpanDescriptor | null {
   };
 }
 
+type SpanSignalBundle = {
+  blockType: string;
+  parentBlockId: string | null;
+  parentPath: string | null;
+  windowHash: string;
+  neighborHash: { left?: string; right?: string };
+  structureHash: string;
+};
+
+function computeSpanSignals(
+  blockId: string,
+  text: string,
+  start: number,
+  end: number,
+  blockMeta: BlockMeta | undefined,
+  targetingConfig: TargetingHashConfig
+): SpanSignalBundle {
+  const blockType = blockMeta?.blockType ?? "unknown";
+  const parentBlockId = blockMeta?.parentBlockId ?? null;
+  const parentPath = blockMeta?.parentPath ?? null;
+  return {
+    blockType,
+    parentBlockId,
+    parentPath,
+    windowHash: gateway.computeSpanWindowHash({
+      blockId,
+      spanStart: start,
+      spanEnd: end,
+      blockText: text,
+      windowSize: targetingConfig.windowSize,
+    }),
+    neighborHash: gateway.computeNeighborHash({
+      blockId,
+      spanStart: start,
+      spanEnd: end,
+      blockText: text,
+      neighborWindow: targetingConfig.neighborWindow,
+    }),
+    structureHash: gateway.computeStructureHash({
+      blockId,
+      blockType,
+      parentBlockId,
+      parentPath,
+    }),
+  };
+}
+
+function buildSpanBaseState(input: {
+  annotationId: string;
+  blockId: string;
+  start: number;
+  end: number;
+  isVerified: boolean;
+  blockTextMap: Map<string, string>;
+  blockMetaMap: Map<string, BlockMeta>;
+  targetingConfig: TargetingHashConfig;
+}): Omit<SpanState, "span_id"> | null {
+  const text = input.blockTextMap.get(input.blockId);
+  if (text === undefined) {
+    return null;
+  }
+  if (!isValidSpanRange(input.start, input.end, text.length)) {
+    return null;
+  }
+  const spanText = text.slice(input.start, input.end);
+  const contextHash = computeContextHash(input.blockId, spanText);
+  const blockMeta = input.blockMetaMap.get(input.blockId);
+  const signals = computeSpanSignals(
+    input.blockId,
+    text,
+    input.start,
+    input.end,
+    blockMeta,
+    input.targetingConfig
+  );
+
+  return {
+    annotation_id: input.annotationId,
+    block_id: input.blockId,
+    block_type: signals.blockType,
+    parent_block_id: signals.parentBlockId,
+    parent_path: signals.parentPath,
+    span_start: input.start,
+    span_end: input.end,
+    text: spanText,
+    context_hash: contextHash,
+    window_hash: signals.windowHash,
+    neighbor_hash: signals.neighborHash,
+    structure_hash: signals.structureHash,
+    is_verified: input.isVerified,
+  };
+}
+
 function buildSpanStateIndex(
   blockTextMap: Map<string, string>,
-  runtime: LoroRuntime
+  blockMetaMap: Map<string, BlockMeta>,
+  runtime: LoroRuntime,
+  targetingConfig: TargetingHashConfig
 ): Map<string, SpanState> {
   const blockExists = (blockId: string) => blockTextMap.has(blockId);
   const annotations = readAllAnnotations(runtime.doc);
@@ -338,22 +487,19 @@ function buildSpanStateIndex(
 
     for (let i = 0; i < annotation.spans.length; i += 1) {
       const span = annotation.spans[i];
-      const text = blockTextMap.get(span.blockId);
-      if (text === undefined) {
+      const baseState = buildSpanBaseState({
+        annotationId: annotation.id,
+        blockId: span.blockId,
+        start: span.start,
+        end: span.end,
+        isVerified,
+        blockTextMap,
+        blockMetaMap,
+        targetingConfig,
+      });
+      if (!baseState) {
         continue;
       }
-      if (!isValidSpanRange(span.start, span.end, text.length)) {
-        continue;
-      }
-      const spanText = text.slice(span.start, span.end);
-      const contextHash = computeContextHash(span.blockId, spanText);
-      const baseState: Omit<SpanState, "span_id"> = {
-        annotation_id: annotation.id,
-        block_id: span.blockId,
-        text: spanText,
-        context_hash: contextHash,
-        is_verified: isVerified,
-      };
       const candidates = buildSpanIdCandidates(
         annotation.id,
         i,
@@ -371,7 +517,9 @@ function buildSpanStateIndex(
 
 function buildSelectionSpanState(
   spanId: string,
-  blockTextMap: Map<string, string>
+  blockTextMap: Map<string, string>,
+  blockMetaMap: Map<string, BlockMeta>,
+  targetingConfig: TargetingHashConfig
 ): SpanState | null {
   const descriptor = parseSelectionSpanId(spanId);
   if (!descriptor) {
@@ -385,12 +533,41 @@ function buildSelectionSpanState(
     return null;
   }
   const spanText = text.slice(descriptor.start, descriptor.end);
+  const blockMeta = blockMetaMap.get(descriptor.blockId);
+  const windowHash = gateway.computeSpanWindowHash({
+    blockId: descriptor.blockId,
+    spanStart: descriptor.start,
+    spanEnd: descriptor.end,
+    blockText: text,
+    windowSize: targetingConfig.windowSize,
+  });
+  const neighborHash = gateway.computeNeighborHash({
+    blockId: descriptor.blockId,
+    spanStart: descriptor.start,
+    spanEnd: descriptor.end,
+    blockText: text,
+    neighborWindow: targetingConfig.neighborWindow,
+  });
+  const structureHash = gateway.computeStructureHash({
+    blockId: descriptor.blockId,
+    blockType: blockMeta?.blockType ?? "unknown",
+    parentBlockId: blockMeta?.parentBlockId ?? null,
+    parentPath: blockMeta?.parentPath ?? null,
+  });
   return {
     span_id: spanId,
     annotation_id: descriptor.annotationId,
     block_id: descriptor.blockId,
+    block_type: blockMeta?.blockType ?? "unknown",
+    parent_block_id: blockMeta?.parentBlockId ?? null,
+    parent_path: blockMeta?.parentPath ?? null,
+    span_start: descriptor.start,
+    span_end: descriptor.end,
     text: spanText,
     context_hash: computeContextHash(descriptor.blockId, spanText),
+    window_hash: windowHash,
+    neighbor_hash: neighborHash,
+    structure_hash: structureHash,
     is_verified: true,
   };
 }
@@ -438,8 +615,10 @@ function findBestFuzzySpan(
  */
 export function createLoroDocumentProvider(
   facade: DocumentFacade,
-  runtime: LoroRuntime
+  runtime: LoroRuntime,
+  options?: { targeting?: Partial<TargetingHashConfig> }
 ): GatewayDocumentProvider {
+  const targetingConfig = resolveTargetingConfig(options?.targeting);
   return {
     getFrontierTag(): DocFrontierTag {
       const frontiers = runtime.doc.frontiers();
@@ -471,18 +650,22 @@ export function createLoroDocumentProvider(
     },
 
     getSpanState(spanId: string): SpanState | null {
-      const blockTextMap = buildBlockTextMap(facade.getBlocks());
-      const spanStates = buildSpanStateIndex(blockTextMap, runtime);
+      const blocks = facade.getBlocks();
+      const blockTextMap = buildBlockTextMap(blocks);
+      const blockMetaMap = buildBlockMetaMap(blocks);
+      const spanStates = buildSpanStateIndex(blockTextMap, blockMetaMap, runtime, targetingConfig);
       const direct = spanStates.get(spanId);
       if (direct) {
         return direct;
       }
-      return buildSelectionSpanState(spanId, blockTextMap);
+      return buildSelectionSpanState(spanId, blockTextMap, blockMetaMap, targetingConfig);
     },
 
     getSpanStates(spanIds: string[]): Map<string, SpanState> {
-      const blockTextMap = buildBlockTextMap(facade.getBlocks());
-      const spanStates = buildSpanStateIndex(blockTextMap, runtime);
+      const blocks = facade.getBlocks();
+      const blockTextMap = buildBlockTextMap(blocks);
+      const blockMetaMap = buildBlockMetaMap(blocks);
+      const spanStates = buildSpanStateIndex(blockTextMap, blockMetaMap, runtime, targetingConfig);
       const result = new Map<string, SpanState>();
       for (const spanId of spanIds) {
         const state = spanStates.get(spanId);
@@ -490,7 +673,12 @@ export function createLoroDocumentProvider(
           result.set(spanId, state);
           continue;
         }
-        const derived = buildSelectionSpanState(spanId, blockTextMap);
+        const derived = buildSelectionSpanState(
+          spanId,
+          blockTextMap,
+          blockMetaMap,
+          targetingConfig
+        );
         if (derived) {
           result.set(spanId, derived);
         }
@@ -506,12 +694,14 @@ export function createLoroDocumentProvider(
 
 export function createLoroGatewayRetryProviders(
   facade: DocumentFacade,
-  runtime: LoroRuntime
+  runtime: LoroRuntime,
+  options?: { targeting?: Partial<TargetingHashConfig> }
 ): {
   rebaseProvider: gateway.RebaseProvider;
   relocationProvider: gateway.RelocationProvider;
 } {
-  const provider = createLoroDocumentProvider(facade, runtime);
+  const provider = createLoroDocumentProvider(facade, runtime, options);
+  const targetingConfig = resolveTargetingConfig(options?.targeting);
 
   return {
     rebaseProvider: {
@@ -535,8 +725,15 @@ export function createLoroGatewayRetryProviders(
         if (docId !== facade.docId) {
           return null;
         }
-        const blockTextMap = buildBlockTextMap(facade.getBlocks());
-        const spanStates = buildSpanStateIndex(blockTextMap, runtime);
+        const blocks = facade.getBlocks();
+        const blockTextMap = buildBlockTextMap(blocks);
+        const blockMetaMap = buildBlockMetaMap(blocks);
+        const spanStates = buildSpanStateIndex(
+          blockTextMap,
+          blockMetaMap,
+          runtime,
+          targetingConfig
+        );
         const entries = [...spanStates.entries()].sort((a, b) => a[0].localeCompare(b[0]));
         for (const [, state] of entries) {
           if (state.context_hash === contextHash) {
@@ -550,8 +747,15 @@ export function createLoroGatewayRetryProviders(
           return null;
         }
 
-        const blockTextMap = buildBlockTextMap(facade.getBlocks());
-        const spanStates = buildSpanStateIndex(blockTextMap, runtime);
+        const blocks = facade.getBlocks();
+        const blockTextMap = buildBlockTextMap(blocks);
+        const blockMetaMap = buildBlockMetaMap(blocks);
+        const spanStates = buildSpanStateIndex(
+          blockTextMap,
+          blockMetaMap,
+          runtime,
+          targetingConfig
+        );
         return findBestFuzzySpan(spanStates, text, threshold);
       },
     },
@@ -563,8 +767,9 @@ export function createLoroGatewayRetryProviders(
  */
 export function createLoroAIGateway(
   facade: DocumentFacade,
-  runtime: LoroRuntime
+  runtime: LoroRuntime,
+  options?: { targeting?: Partial<TargetingHashConfig> }
 ): gateway.AIGateway {
-  const provider = createLoroDocumentProvider(facade, runtime);
+  const provider = createLoroDocumentProvider(facade, runtime, options);
   return gateway.createAIGatewayWithDefaults(provider);
 }

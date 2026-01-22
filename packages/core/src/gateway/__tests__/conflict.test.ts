@@ -361,6 +361,90 @@ describe("AI Gateway Conflict Safety", () => {
     });
   });
 
+  describe("checkConflicts (targeting v1)", () => {
+    it("accepts matching hard signals", () => {
+      const spans = new Map<string, SpanState>([
+        [
+          "s1",
+          {
+            span_id: "s1",
+            annotation_id: "a1",
+            block_id: "b1",
+            text: "Hello",
+            context_hash: "h1",
+            window_hash: "w1",
+            structure_hash: "s1",
+            is_verified: true,
+          },
+        ],
+      ]);
+      const provider = createProvider({ frontier: "frontier:v1", spans });
+      const request: AIGatewayRequest = {
+        doc_id: "doc123",
+        doc_frontier_tag: "frontier:v1",
+        target_spans: [],
+        targeting: { version: "v1" },
+        preconditions: [
+          {
+            v: 1,
+            span_id: "s1",
+            block_id: "b1",
+            hard: { context_hash: "h1", window_hash: "w1", structure_hash: "s1" },
+          },
+        ],
+        instructions: "Test",
+        format: "html",
+        request_id: "req-123",
+      };
+
+      const result = checkConflicts(request, provider);
+      expect(result.ok).toBe(true);
+    });
+
+    it("reports hash_mismatch for window hash mismatch", () => {
+      const spans = new Map<string, SpanState>([
+        [
+          "s1",
+          {
+            span_id: "s1",
+            annotation_id: "a1",
+            block_id: "b1",
+            text: "Hello",
+            context_hash: "h1",
+            window_hash: "w1",
+            is_verified: true,
+          },
+        ],
+      ]);
+      const provider = createProvider({ frontier: "frontier:v1", spans });
+      const request: AIGatewayRequest = {
+        doc_id: "doc123",
+        doc_frontier_tag: "frontier:v1",
+        target_spans: [],
+        targeting: { version: "v1" },
+        preconditions: [
+          {
+            v: 1,
+            span_id: "s1",
+            block_id: "b1",
+            hard: { window_hash: "w2" },
+          },
+        ],
+        instructions: "Test",
+        format: "html",
+        request_id: "req-123",
+      };
+
+      const result = checkConflicts(request, provider);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.response.reason).toBe("hash_mismatch");
+        expect(result.response.failed_preconditions[0]?.expected_hash).toBe("w2");
+        expect(result.response.failed_preconditions[0]?.actual_hash).toBe("w1");
+      }
+    });
+  });
+
   describe("createConflictMiddleware", () => {
     it("creates reusable middleware function", () => {
       const spans = new Map<string, SpanState>([
