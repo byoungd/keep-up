@@ -120,30 +120,27 @@ type BlockMeta = {
   blockType: string;
   parentBlockId: string | null;
   parentPath: string | null;
+  blockIndex: number;
 };
 
 function buildBlockMetaMap(blocks: BlockNode[]): Map<string, BlockMeta> {
   const map = new Map<string, BlockMeta>();
-  const stack: Array<{ block: BlockNode; parentBlockId: string | null }> = blocks.map((block) => ({
-    block,
-    parentBlockId: null,
-  }));
-
-  while (stack.length > 0) {
-    const entry = stack.pop();
-    if (!entry) {
-      continue;
-    }
-    map.set(entry.block.id, {
-      blockType: entry.block.type,
-      parentBlockId: entry.parentBlockId,
-      parentPath: null,
+  const walk = (block: BlockNode, parentPath: string[], parentBlockId: string | null): void => {
+    const nextIndex = map.size;
+    map.set(block.id, {
+      blockType: block.type,
+      parentBlockId,
+      parentPath: parentPath.length > 0 ? parentPath.join("/") : null,
+      blockIndex: nextIndex,
     });
-    if (entry.block.children.length > 0) {
-      for (const child of entry.block.children) {
-        stack.push({ block: child, parentBlockId: entry.block.id });
-      }
+    const nextPath = [...parentPath, block.id];
+    for (const child of block.children) {
+      walk(child, nextPath, block.id);
     }
+  };
+
+  for (const block of blocks) {
+    walk(block, [], null);
   }
 
   return map;
@@ -458,6 +455,7 @@ function buildSpanBaseState(input: {
     block_type: signals.blockType,
     parent_block_id: signals.parentBlockId,
     parent_path: signals.parentPath,
+    block_index: blockMeta?.blockIndex,
     span_start: input.start,
     span_end: input.end,
     text: spanText,
@@ -561,6 +559,7 @@ function buildSelectionSpanState(
     block_type: blockMeta?.blockType ?? "unknown",
     parent_block_id: blockMeta?.parentBlockId ?? null,
     parent_path: blockMeta?.parentPath ?? null,
+    block_index: blockMeta?.blockIndex,
     span_start: descriptor.start,
     span_end: descriptor.end,
     text: spanText,
@@ -684,6 +683,13 @@ export function createLoroDocumentProvider(
         }
       }
       return result;
+    },
+
+    getAllSpanStates(): Map<string, SpanState> {
+      const blocks = facade.getBlocks();
+      const blockTextMap = buildBlockTextMap(blocks);
+      const blockMetaMap = buildBlockMetaMap(blocks);
+      return buildSpanStateIndex(blockTextMap, blockMetaMap, runtime, targetingConfig);
     },
 
     documentExists(docId: string): boolean {

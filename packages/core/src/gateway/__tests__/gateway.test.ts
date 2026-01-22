@@ -332,6 +332,45 @@ describe("AI Gateway Controller", () => {
         }
       });
 
+      it("returns delta response when requested", async () => {
+        const spans = new Map<string, SpanState>([
+          [
+            "s1",
+            {
+              span_id: "s1",
+              annotation_id: "a1",
+              block_id: "b1",
+              span_start: 0,
+              span_end: 1,
+              text: "A",
+              context_hash: "h1",
+              is_verified: true,
+            },
+          ],
+        ]);
+        const provider = createTestProvider({ frontier: "frontier:v1", spans });
+        const gateway = createAIGatewayWithDefaults(provider);
+
+        const request: AIGatewayRequest = {
+          doc_id: "doc123",
+          doc_frontier_tag: "frontier:v1",
+          target_spans: [{ annotation_id: "a1", span_id: "s1", if_match_context_hash: "h1" }],
+          instructions: "Test",
+          format: "html",
+          request_id: "req-123",
+          options: { return_delta: true },
+        };
+
+        const result = await gateway.processRequest(request);
+
+        expect(result.status).toBe(200);
+        if (result.status === 200) {
+          expect(result.delta?.frontier_delta.from_frontier).toBe("frontier:v1");
+          expect(result.delta?.frontier_delta.to_frontier).toBe("frontier:v1");
+          expect(result.delta?.affected_spans[0]?.span_id).toBe("s1");
+        }
+      });
+
       it("echoes client_request_id", async () => {
         const provider = createTestProvider();
         const gateway = createAIGatewayWithDefaults(provider);
