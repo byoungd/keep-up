@@ -12,6 +12,8 @@
  * - Control characters stripped (C0/C1 except Tab/LF)
  */
 
+import { stableStringify } from "@ku0/json-accel-rs";
+import { nativeFlagStore } from "@ku0/native-bindings/flags";
 import type { Node as PMNode } from "prosemirror-model";
 
 import { parseAttrs } from "../crdt/crdtSchema";
@@ -202,6 +204,25 @@ export function canonicalizeDocument(doc: PMNode): CanonNode {
  * @returns Deterministic JSON string
  */
 export function serializeCanonNode(node: CanonNode): string {
+  if (isNativeSerializationEnabled()) {
+    try {
+      return stableStringify(node);
+    } catch {
+      // Fall back to JS serialization if native bindings fail.
+    }
+  }
+
+  return serializeCanonNodeFallback(node);
+}
+
+function isNativeSerializationEnabled(): boolean {
+  if (process.env.KU0_CANONICALIZER_SERIALIZATION_DISABLE_NATIVE === "1") {
+    return false;
+  }
+  return nativeFlagStore.getFlag("native_accelerators_enabled");
+}
+
+function serializeCanonNodeFallback(node: CanonNode): string {
   // Use replacer to ensure consistent key order
   return JSON.stringify(node, (_key, value) => {
     if (value && typeof value === "object" && !Array.isArray(value)) {
