@@ -129,6 +129,44 @@ export class PlanningEngine {
   }
 
   /**
+   * Register an externally created plan (keeps provided IDs).
+   */
+  registerPlan(plan: ExecutionPlan): ExecutionPlan {
+    const normalizedPlan: ExecutionPlan = {
+      ...plan,
+      id: plan.id && plan.id.length > 0 ? plan.id : crypto.randomUUID(),
+      createdAt: plan.createdAt > 0 ? plan.createdAt : Date.now(),
+      status: plan.status ?? "draft",
+      requiresApproval:
+        typeof plan.requiresApproval === "boolean"
+          ? plan.requiresApproval
+          : this.shouldRequireApproval({
+              goal: plan.goal,
+              steps: plan.steps,
+              estimatedDuration: plan.estimatedDuration,
+              riskAssessment: plan.riskAssessment,
+              toolsNeeded: plan.toolsNeeded,
+              contextRequired: plan.contextRequired,
+              successCriteria: plan.successCriteria,
+              requiresApproval: false,
+            }),
+    };
+
+    this.plans.set(normalizedPlan.id, normalizedPlan);
+    if (!this.refinements.has(normalizedPlan.id)) {
+      this.refinements.set(normalizedPlan.id, []);
+    }
+
+    if (this.persistence) {
+      this.persistence.saveCurrent(normalizedPlan).catch(() => {
+        // Ignore persistence errors - memory is source of truth
+      });
+    }
+
+    return normalizedPlan;
+  }
+
+  /**
    * Refine an existing plan based on feedback.
    */
   refinePlan(refinement: PlanRefinement): ExecutionPlan | null {
