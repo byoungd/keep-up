@@ -36,6 +36,7 @@
     "dev": "tsc -w",
     "prepack": "pnpm run build",
     "test": "vitest run --config vitest.config.ts",
+    "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "lint:fix": "biome check --write ."
   },

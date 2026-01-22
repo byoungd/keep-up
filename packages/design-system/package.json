@@ -9,6 +9,10 @@
     "./tailwind.config": "./src/tailwind.config.ts",
     "./tokens": "./src/tokens.ts"
   },
+  "scripts": {
+    "lint": "biome check .",
+    "lint:fix": "biome check --write ."
+  },
   "devDependencies": {
     "tailwindcss": "^4.1.18"
   }
