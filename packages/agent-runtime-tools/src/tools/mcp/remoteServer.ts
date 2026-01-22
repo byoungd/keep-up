@@ -104,8 +104,9 @@ export class McpRemoteToolServer implements MCPToolServer {
     const clientInfo = config.clientInfo ?? { name: "keepup-agent-runtime", version: "1.0.0" };
     this.client = new Client(clientInfo);
 
+    const authConfig = config.auth;
     const transportConfig = this.resolveTransportConfig(config);
-    const authProvider = resolveAuthProvider(config.auth);
+    const authProvider = resolveAuthProvider(authConfig);
     const transportInstance = createMcpTransport(transportConfig, authProvider);
     this.transport = transportInstance.transport;
     this.transportType = transportInstance.type;
@@ -129,7 +130,7 @@ export class McpRemoteToolServer implements MCPToolServer {
       const sessionConfig: McpOAuthSessionConfig = {
         provider: authProvider,
         serverUrl: this.serverUrl,
-        authorizationCode: config.auth.authorizationCode,
+        authorizationCode: authConfig?.authorizationCode,
       };
       this.authSession = new McpOAuthSession(sessionConfig);
     }
