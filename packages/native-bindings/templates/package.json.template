@@ -1,0 +1,33 @@
+{
+  "name": "@ku0/{{PACKAGE_NAME}}",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Rust {{DESCRIPTION}} bindings",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "development": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "*.node"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsx scripts/build-native.ts --release && tsc",
+    "build:debug": "tsx scripts/build-native.ts && tsc",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write ."
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.3"
+  }
+}
