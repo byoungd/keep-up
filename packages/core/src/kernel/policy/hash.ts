@@ -4,8 +4,13 @@
  * Deterministic hash for PolicyManifestV09 using stable serialization.
  */
 
+import { getNativePolicyHash, type NativePolicyHashBinding } from "@ku0/policy-hash-rs";
 import { stableStringify } from "./stableStringify.js";
 import type { PolicyManifestV09 } from "./types.js";
+
+function resolveNativePolicyHash(): NativePolicyHashBinding | null {
+  return getNativePolicyHash();
+}
 
 function bufferToHex(buffer: ArrayBuffer): string {
   return Array.from(new Uint8Array(buffer))
@@ -33,6 +38,15 @@ function simpleHash256(str: string): string {
 async function sha256(text: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(text);
+
+  const native = resolveNativePolicyHash();
+  if (native) {
+    try {
+      return native.sha256Hex(text);
+    } catch {
+      // Fall back to WebCrypto if native hashing fails.
+    }
+  }
 
   if (typeof crypto !== "undefined" && crypto.subtle) {
     const hashBuffer = await crypto.subtle.digest("SHA-256", data);

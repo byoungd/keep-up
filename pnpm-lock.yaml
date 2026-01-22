@@ -664,6 +664,9 @@ importers:
       '@ku0/canonicalizer-rs':
         specifier: workspace:*
         version: link:../canonicalizer-rs
+      '@ku0/policy-hash-rs':
+        specifier: workspace:*
+        version: link:../policy-hash-rs
       zod:
         specifier: ^4.3.5
         version: 4.3.5
@@ -855,6 +858,22 @@ importers:
       '@ku0/core':
         specifier: workspace:*
         version: link:../core
+
+  packages/policy-hash-rs:
+    dependencies:
+      '@ku0/native-bindings':
+        specifier: workspace:*
+        version: link:../native-bindings
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.19.3
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
 
   packages/project-context:
     devDependencies:
