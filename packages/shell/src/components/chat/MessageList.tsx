@@ -184,7 +184,11 @@ export function MessageList({
   // Virtualized rendering
   if (shouldVirtualize) {
     return (
-      <div className={virtualizedContainerClass} ref={listRef} onScroll={handleScroll}>
+      <Conversation
+        scrollRef={listRef}
+        className={virtualizedContainerClass}
+        onScroll={handleScroll}
+      >
         <div
           style={{
             height: `${rowVirtualizer.getTotalSize()}px`,
@@ -229,7 +233,7 @@ export function MessageList({
           })}
         </div>
         {showLoadingStatus ? <AILoadingStatus state={loadingState} className="mt-2" /> : null}
-      </div>
+      </Conversation>
     );
   }
 
