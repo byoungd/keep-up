@@ -24,7 +24,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc
           cache: pnpm
 
       - name: Install dependencies
@@ -58,7 +58,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc
           cache: pnpm
 
       - name: Install dependencies
@@ -69,7 +69,7 @@ jobs:
 
       - name: Archive build artifacts
         run: |
-          zip -r build-output.zip packages/*/dist apps/collab-server/dist
+          zip -r build-output.zip packages/*/dist apps/cowork/dist
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -92,7 +92,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc
           cache: pnpm
 
       - name: Install dependencies
@@ -145,7 +145,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc
           cache: pnpm
 
       - name: Install Rust toolchain
@@ -196,7 +196,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc
           cache: pnpm
 
       - name: Install dependencies
@@ -234,7 +234,7 @@ jobs:
   # UI gate - downloads build artifacts and shares Playwright cache
   ui_gate:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     needs: [build]
     steps:
       - uses: actions/checkout@v4
@@ -245,31 +245,29 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc
           cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
         with:
-          name: build-output
-          path: .
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
 
-      - name: Unarchive build artifacts
-        run: |
-          unzip build-output.zip
-          rm build-output.zip
+      - name: Install Playwright browsers
+        run: pnpm -C tests/e2e exec playwright install --with-deps
 
-      # - name: Cache Playwright browsers
-      #   uses: actions/cache@v4
-      #   with:
-      #     path: ~/.cache/ms-playwright
-      #     key: playwright-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+      - name: E2E Smoke Gate
+        run: pnpm test:e2e:smoke
 
-      # - name: Install Playwright browsers
-      #   run: pnpm exec playwright install --with-deps
-
-      # - name: UI Integration Gate
-      #   run: bash scripts/ui-gate.sh
+      - name: Upload E2E artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-smoke-artifacts
+          path: |
+            tests/e2e/test-results/
+            tests/e2e/playwright-report/

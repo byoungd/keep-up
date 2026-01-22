@@ -29,15 +29,15 @@ fi
 
 # 2. Install Dependencies
 echo "[STEP 2] Installing dependencies..."
-npm ci
+pnpm install --frozen-lockfile
 if [ $? -ne 0 ]; then
-  echo "FAILED: npm ci failed"
+  echo "FAILED: pnpm install failed"
   exit 1
 fi
 
 # 3. Build
 echo "[STEP 3] Building project..."
-npm run build
+pnpm build
 if [ $? -ne 0 ]; then
   echo "FAILED: Build failed"
   # Attempt to cleanup/checkout main before exit?
@@ -47,11 +47,11 @@ fi
 
 # 4. Lint & Format (Attempt Fix)
 echo "[STEP 4] Linting (with auto-fix)..."
-npm run lint:fix 2>/dev/null || npm run fix 2>/dev/null || npm run lint -- --fix
+pnpm lint:fix 2>/dev/null || pnpm lint -- --fix
 # Note: command names might vary, trying common ones or fallback to just lint
 if [ $? -ne 0 ]; then
     echo "WARNING: Lint fix had issues or not defined. Running strict lint..."
-    npm run lint
+    pnpm lint
     if [ $? -ne 0 ]; then
         echo "FAILED: Lint checks failed"
         exit 1
@@ -74,7 +74,7 @@ fi
 
 # 5. Test
 echo "[STEP 5] Running Tests..."
-npm run test
+pnpm test
 if [ $? -ne 0 ]; then
   echo "FAILED: Tests failed"
   exit 1
