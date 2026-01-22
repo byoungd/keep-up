@@ -305,6 +305,8 @@ export class ParallelPlanReviewer {
       return profiles.map((profile) => this.createMockReview(plan, profile));
     }
 
+    const executor = this.executor;
+
     const reviewPromises = profiles.map(async (profile) => {
       const startTime = Date.now();
       try {
@@ -312,7 +314,7 @@ export class ParallelPlanReviewer {
           setTimeout(() => reject(new Error("Review timeout")), timeoutMs);
         });
 
-        const reviewPromise = this.executor?.executeReview(plan, profile);
+        const reviewPromise = executor.executeReview(plan, profile);
         return await Promise.race([reviewPromise, timeoutPromise]);
       } catch (error) {
         // Return a failed review
