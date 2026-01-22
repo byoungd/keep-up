@@ -300,7 +300,8 @@ export class ParallelPlanReviewer {
     profiles: ReviewerProfile[],
     timeoutMs: number
   ): Promise<PlanReview[]> {
-    if (!this.executor) {
+    const executor = this.executor;
+    if (!executor) {
       // Return mock reviews if no executor (for testing)
       return profiles.map((profile) => this.createMockReview(plan, profile));
     }
@@ -312,7 +313,7 @@ export class ParallelPlanReviewer {
           setTimeout(() => reject(new Error("Review timeout")), timeoutMs);
         });
 
-        const reviewPromise = this.executor?.executeReview(plan, profile);
+        const reviewPromise = executor.executeReview(plan, profile);
         return await Promise.race([reviewPromise, timeoutPromise]);
       } catch (error) {
         // Return a failed review
