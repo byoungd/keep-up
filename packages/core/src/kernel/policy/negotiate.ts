@@ -12,6 +12,9 @@ import type {
   ChainPolicy,
   ChainPolicyEntry,
   IntegrityPolicy,
+  MarkdownBlockType,
+  MarkdownMark,
+  MarkdownPolicyV1,
   PartialBehavior,
   PolicyManifestV09,
   RelocationPolicy,
@@ -252,6 +255,19 @@ export function negotiate(manifests: PolicyManifestV09[]): NegotiationResult {
     sortedManifests.map((m) => m.ai_sanitization_policy)
   );
 
+  // 6.5) Compute effective markdown policy (if present for all participants)
+  const markdownPolicies = sortedManifests
+    .map((m) => m.markdown_policy)
+    .filter((policy): policy is MarkdownPolicyV1 => policy !== undefined);
+  const hasMarkdownPolicy = markdownPolicies.length === sortedManifests.length;
+  const markdownResult = hasMarkdownPolicy ? negotiateMarkdownPolicy(markdownPolicies) : null;
+  if (markdownResult && !markdownResult.ok) {
+    errors.push(...markdownResult.errors);
+  }
+  if (errors.length > 0) {
+    return { success: false, errors };
+  }
+
   // 7) Compute effective relocation policy (most restrictive)
   const effectiveRelocationPolicy = restrictRelocationPolicies(
     sortedManifests.map((m) => m.relocation_policy)
@@ -277,6 +293,7 @@ export function negotiate(manifests: PolicyManifestV09[]): NegotiationResult {
     integrity_policy: effectiveIntegrityPolicy,
     ai_sanitization_policy: effectiveAISanitizationPolicy,
     ai_native_policy: effectiveAiNativePolicy,
+    markdown_policy: markdownResult?.ok ? markdownResult.policy : undefined,
     relocation_policy: effectiveRelocationPolicy,
   };
 
@@ -327,7 +344,202 @@ function intersectCapabilities(caps: Capabilities[]): Capabilities {
     ai_provenance: caps.every((c) => c.ai_provenance),
     semantic_merge: caps.every((c) => c.semantic_merge),
     ai_transactions: caps.every((c) => c.ai_transactions),
+    markdown_content_mode: caps.every((c) => c.markdown_content_mode === true),
+    markdown_frontmatter: caps.every((c) => c.markdown_frontmatter === true),
+    markdown_frontmatter_json: caps.every((c) => c.markdown_frontmatter_json === true),
+    markdown_code_fence_syntax: caps.every((c) => c.markdown_code_fence_syntax === true),
+    markdown_line_targeting: caps.every((c) => c.markdown_line_targeting === true),
+    markdown_semantic_targeting: caps.every((c) => c.markdown_semantic_targeting === true),
+    markdown_gfm_tables: caps.every((c) => c.markdown_gfm_tables === true),
+    markdown_gfm_task_lists: caps.every((c) => c.markdown_gfm_task_lists === true),
+    markdown_gfm_strikethrough: caps.every((c) => c.markdown_gfm_strikethrough === true),
+    markdown_gfm_autolink: caps.every((c) => c.markdown_gfm_autolink === true),
+    markdown_footnotes: caps.every((c) => c.markdown_footnotes === true),
+    markdown_wikilinks: caps.every((c) => c.markdown_wikilinks === true),
+    markdown_math: caps.every((c) => c.markdown_math === true),
   };
+}
+
+type MarkdownPolicyNegotiationResult =
+  | { ok: true; policy: MarkdownPolicyV1 }
+  | { ok: false; errors: NegotiationError[] };
+
+function negotiateMarkdownPolicy(policies: MarkdownPolicyV1[]): MarkdownPolicyNegotiationResult {
+  const errors: NegotiationError[] = [];
+
+  const versions = policies.map((p) => p.version);
+  if (!allEqual(versions)) {
+    errors.push({
+      field: "markdown_policy.version",
+      message: "Markdown policy version mismatch",
+      values: versions,
+    });
+  }
+
+  const parserProfiles = policies.map((p) => p.parser.profile);
+  if (!allEqual(parserProfiles)) {
+    errors.push({
+      field: "markdown_policy.parser.profile",
+      message: "Markdown parser profile mismatch",
+      values: parserProfiles,
+    });
+  }
+
+  const canonicalizers = policies.map((p) => stableStringify(p.canonicalizer));
+  if (!allEqual(canonicalizers)) {
+    errors.push({
+      field: "markdown_policy.canonicalizer",
+      message: "Markdown canonicalizer policy mismatch",
+      values: canonicalizers,
+    });
+  }
+
+  const sanitizationVersions = policies.map((p) => p.sanitization.version);
+  if (!allEqual(sanitizationVersions)) {
+    errors.push({
+      field: "markdown_policy.sanitization.version",
+      message: "Markdown sanitization policy version mismatch",
+      values: sanitizationVersions,
+    });
+  }
+
+  if (errors.length > 0) {
+    return { ok: false, errors };
+  }
+
+  const enabled = policies.every((p) => p.enabled);
+  const base = policies[0];
+  const parser = {
+    profile: base.parser.profile,
+    extensions: {
+      gfm_tables: policies.every((p) => p.parser.extensions.gfm_tables),
+      gfm_task_lists: policies.every((p) => p.parser.extensions.gfm_task_lists),
+      gfm_strikethrough: policies.every((p) => p.parser.extensions.gfm_strikethrough),
+      gfm_autolink: policies.every((p) => p.parser.extensions.gfm_autolink),
+      footnotes: policies.every((p) => p.parser.extensions.footnotes),
+      wikilinks: policies.every((p) => p.parser.extensions.wikilinks),
+      math: policies.every((p) => p.parser.extensions.math),
+    },
+    frontmatter_formats: intersectStringArrays(
+      policies.map((p) => p.parser.frontmatter_formats)
+    ) as Array<"yaml" | "toml" | "json">,
+  };
+
+  const sanitizationAllowedLanguages = intersectOptionalStringArrays(
+    policies.map((p) => p.sanitization.allowed_languages)
+  );
+  const sanitizationBlockedLanguages = unionOptionalStringArrays(
+    policies.map((p) => p.sanitization.blocked_languages)
+  );
+
+  const sanitization = {
+    version: base.sanitization.version,
+    allowed_block_types: intersectStringArrays(
+      policies.map((p) => p.sanitization.allowed_block_types)
+    ) as MarkdownBlockType[],
+    allowed_mark_types: intersectStringArrays(
+      policies.map((p) => p.sanitization.allowed_mark_types)
+    ) as MarkdownMark[],
+    allow_html_blocks: policies.every((p) => p.sanitization.allow_html_blocks),
+    allow_frontmatter: policies.every((p) => p.sanitization.allow_frontmatter),
+    reject_unknown_structure: policies.every((p) => p.sanitization.reject_unknown_structure),
+    allowed_languages: sanitizationAllowedLanguages,
+    blocked_languages: sanitizationBlockedLanguages,
+    max_code_fence_lines: Math.min(...policies.map((p) => p.sanitization.max_code_fence_lines)),
+    link_url_policy: restrictUrlPolicy(policies.map((p) => p.sanitization.link_url_policy)),
+    image_url_policy: restrictUrlPolicy(policies.map((p) => p.sanitization.image_url_policy)),
+    max_file_lines: Math.min(...policies.map((p) => p.sanitization.max_file_lines)),
+    max_line_length: Math.min(...policies.map((p) => p.sanitization.max_line_length)),
+    max_heading_depth: Math.min(...policies.map((p) => p.sanitization.max_heading_depth)),
+    max_list_depth: Math.min(...policies.map((p) => p.sanitization.max_list_depth)),
+    max_frontmatter_bytes: Math.min(...policies.map((p) => p.sanitization.max_frontmatter_bytes)),
+  };
+
+  const targeting = {
+    require_content_hash: policies.some((p) => p.targeting.require_content_hash),
+    require_context: policies.some((p) => p.targeting.require_context),
+    max_semantic_search_lines: Math.min(
+      ...policies.map((p) => p.targeting.max_semantic_search_lines)
+    ),
+    max_context_prefix_chars: Math.min(
+      ...policies.map((p) => p.targeting.max_context_prefix_chars)
+    ),
+  };
+
+  const policy: MarkdownPolicyV1 = {
+    version: base.version,
+    enabled,
+    parser,
+    canonicalizer: base.canonicalizer,
+    sanitization,
+    targeting,
+  };
+
+  if (policy.sanitization.allow_frontmatter && policy.parser.frontmatter_formats.length === 0) {
+    return {
+      ok: false,
+      errors: [
+        {
+          field: "markdown_policy.parser.frontmatter_formats",
+          message: "Frontmatter formats empty while frontmatter is allowed",
+          values: [],
+        },
+      ],
+    };
+  }
+
+  return { ok: true, policy };
+}
+
+function intersectStringArrays(arrays: string[][]): string[] {
+  if (arrays.length === 0) {
+    return [];
+  }
+  let intersection = new Set(arrays[0]);
+  for (const list of arrays.slice(1)) {
+    intersection = new Set(list.filter((value) => intersection.has(value)));
+  }
+  return [...intersection].sort();
+}
+
+function intersectOptionalStringArrays(arrays: Array<string[] | undefined>): string[] | undefined {
+  let intersection: Set<string> | null = null;
+  for (const list of arrays) {
+    if (!list) {
+      continue;
+    }
+    if (intersection === null) {
+      intersection = new Set(list);
+      continue;
+    }
+    intersection = new Set(list.filter((value) => intersection?.has(value)));
+  }
+  return intersection ? [...intersection].sort() : undefined;
+}
+
+function unionOptionalStringArrays(arrays: Array<string[] | undefined>): string[] | undefined {
+  const union = new Set<string>();
+  for (const list of arrays) {
+    if (!list) {
+      continue;
+    }
+    for (const value of list) {
+      union.add(value);
+    }
+  }
+  return union.size > 0 ? [...union].sort() : undefined;
+}
+
+function restrictUrlPolicy(
+  policies: Array<"strict" | "moderate" | "permissive">
+): "strict" | "moderate" | "permissive" {
+  if (policies.includes("strict")) {
+    return "strict";
+  }
+  if (policies.includes("moderate")) {
+    return "moderate";
+  }
+  return "permissive";
 }
 
 /**

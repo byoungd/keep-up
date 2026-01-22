@@ -1,8 +1,71 @@
 import { describe, expect, it } from "vitest";
 import { negotiate } from "../negotiate.js";
-import { DEFAULT_POLICY_MANIFEST } from "../types.js";
+import { DEFAULT_POLICY_MANIFEST, type MarkdownPolicyV1 } from "../types.js";
 
 describe("Policy Negotiation", () => {
+  const createMarkdownPolicy = (overrides?: Partial<MarkdownPolicyV1>): MarkdownPolicyV1 => ({
+    version: "v1",
+    enabled: true,
+    parser: {
+      profile: "commonmark_0_30",
+      extensions: {
+        gfm_tables: true,
+        gfm_task_lists: true,
+        gfm_strikethrough: true,
+        gfm_autolink: true,
+        footnotes: true,
+        wikilinks: true,
+        math: true,
+      },
+      frontmatter_formats: ["yaml", "toml"],
+    },
+    canonicalizer: {
+      version: "v1",
+      mode: "source_preserving",
+      line_ending: "lf",
+      preserve: {
+        trailing_whitespace: true,
+        multiple_blank_lines: true,
+        heading_style: true,
+        list_marker_style: true,
+        emphasis_style: true,
+        fence_style: true,
+      },
+      normalize: {
+        heading_style: "atx",
+        list_marker: "-",
+        emphasis_char: "*",
+        fence_char: "`",
+        fence_length: 3,
+      },
+    },
+    sanitization: {
+      version: "v1",
+      allowed_block_types: ["md_heading", "md_paragraph"],
+      allowed_mark_types: ["md_strong", "md_emphasis"],
+      allow_html_blocks: true,
+      allow_frontmatter: true,
+      reject_unknown_structure: true,
+      allowed_languages: undefined,
+      blocked_languages: ["mermaid"],
+      max_code_fence_lines: 200,
+      link_url_policy: "moderate",
+      image_url_policy: "permissive",
+      max_file_lines: 2000,
+      max_line_length: 400,
+      max_heading_depth: 6,
+      max_list_depth: 6,
+      max_frontmatter_bytes: 8192,
+    },
+    targeting: {
+      require_content_hash: false,
+      require_context: false,
+      max_semantic_search_lines: 400,
+      max_context_prefix_chars: 200,
+    },
+    ...overrides,
+  });
+
   it("should return success for single manifest", () => {
     const result = negotiate([DEFAULT_POLICY_MANIFEST]);
     expect(result.success).toBe(true);
@@ -147,6 +210,79 @@ describe("Policy Negotiation", () => {
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.errors[0].field).toBe("integrity_policy.document_checksum.algorithm");
+    }
+  });
+
+  it("should negotiate markdown policy when present", () => {
+    const m1 = structuredClone(DEFAULT_POLICY_MANIFEST);
+    const m2 = structuredClone(DEFAULT_POLICY_MANIFEST);
+
+    m1.markdown_policy = createMarkdownPolicy({
+      targeting: {
+        require_content_hash: false,
+        require_context: false,
+        max_semantic_search_lines: 200,
+        max_context_prefix_chars: 120,
+      },
+    });
+
+    m2.markdown_policy = createMarkdownPolicy({
+      parser: {
+        profile: "commonmark_0_30",
+        extensions: {
+          gfm_tables: false,
+          gfm_task_lists: true,
+          gfm_strikethrough: true,
+          gfm_autolink: true,
+          footnotes: true,
+          wikilinks: true,
+          math: true,
+        },
+        frontmatter_formats: ["yaml"],
+      },
+      sanitization: {
+        version: "v1",
+        allowed_block_types: ["md_heading"],
+        allowed_mark_types: ["md_strong", "md_emphasis"],
+        allow_html_blocks: false,
+        allow_frontmatter: true,
+        reject_unknown_structure: true,
+        allowed_languages: ["ts"],
+        blocked_languages: ["plantuml"],
+        max_code_fence_lines: 120,
+        link_url_policy: "strict",
+        image_url_policy: "moderate",
+        max_file_lines: 1500,
+        max_line_length: 300,
+        max_heading_depth: 6,
+        max_list_depth: 4,
+        max_frontmatter_bytes: 4096,
+      },
+      targeting: {
+        require_content_hash: true,
+        require_context: false,
+        max_semantic_search_lines: 180,
+        max_context_prefix_chars: 100,
+      },
+    });
+
+    const result = negotiate([m1, m2]);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      const policy = result.manifest.markdown_policy;
+      expect(policy).toBeDefined();
+      expect(policy?.enabled).toBe(true);
+      expect(policy?.parser.extensions.gfm_tables).toBe(false);
+      expect(policy?.parser.frontmatter_formats).toEqual(["yaml"]);
+      expect(policy?.sanitization.allowed_block_types).toEqual(["md_heading"]);
+      expect(policy?.sanitization.allow_html_blocks).toBe(false);
+      expect(policy?.sanitization.allowed_languages).toEqual(["ts"]);
+      expect(policy?.sanitization.blocked_languages).toEqual(["mermaid", "plantuml"]);
+      expect(policy?.sanitization.max_code_fence_lines).toBe(120);
+      expect(policy?.sanitization.link_url_policy).toBe("strict");
+      expect(policy?.targeting.require_content_hash).toBe(true);
+      expect(policy?.targeting.max_semantic_search_lines).toBe(180);
+      expect(policy?.targeting.max_context_prefix_chars).toBe(100);
     }
   });
 });
