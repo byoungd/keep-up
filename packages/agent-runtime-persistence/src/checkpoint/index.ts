@@ -19,7 +19,7 @@ export * from "./shadow";
 export type { SQLiteCheckpointSaverConfig } from "./sqliteSaver";
 export { SQLiteCheckpointSaver } from "./sqliteSaver";
 export type {
-  Checkpoint,
+  Checkpoint as ThreadCheckpoint,
   CheckpointFrequencyConfig,
   CheckpointListOptions,
   CheckpointMetadata,

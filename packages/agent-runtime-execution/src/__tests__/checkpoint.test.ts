@@ -2,8 +2,8 @@
  * Checkpoint Manager Tests
  */
 
+import type { Checkpoint } from "@ku0/agent-runtime-core";
 import {
-  type Checkpoint,
   type CheckpointManager,
   createCheckpointManager,
   InMemoryCheckpointStorage,
