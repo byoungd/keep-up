@@ -3,18 +3,25 @@
  * @see docs/product/LFCC_v0.9_RC_Engineering_Docs/11_Dirty_Region_and_Neighbor_Expansion.md
  */
 
-/**
- * Compute a stable context hash for optimistic locking.
- * Uses SHA-256 via Web Crypto API (available in modern browsers and Node 18+).
- *
- * @param text The text content to hash
- * @returns Hex string of the hash
- */
-export async function computeOptimisticHash(text: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(normalizeText(text));
+import { getNativeAiContextHash, type NativeAiContextHashBinding } from "@ku0/ai-context-hash-rs";
 
-  // Use SubtleCrypto
+function resolveNativeAiContextHash(): NativeAiContextHashBinding | null {
+  return getNativeAiContextHash();
+}
+
+async function hashNormalizedText(text: string): Promise<string> {
+  const native = resolveNativeAiContextHash();
+  if (native) {
+    try {
+      return native.sha256Hex(text);
+    } catch {
+      // Fall back to WebCrypto if native hashing fails.
+    }
+  }
+
+  const encoder = new TextEncoder();
+  const data = encoder.encode(text);
+
   if (typeof crypto !== "undefined" && crypto.subtle) {
     const hashBuffer = await crypto.subtle.digest("SHA-256", data);
     return bufferToHex(hashBuffer);
@@ -23,6 +30,34 @@ export async function computeOptimisticHash(text: string): Promise<string> {
   // Fallback for non-secure contexts or old Node (using simple hash for demo)
   // In production, ensure crypto is available or use a polyfill
   return simpleHash(text);
+}
+
+/**
+ * Compute a stable context hash for optimistic locking.
+ * Uses SHA-256 via Web Crypto API (available in modern browsers and Node 18+).
+ *
+ * @param text The text content to hash
+ * @returns Hex string of the hash
+ */
+export async function computeOptimisticHash(text: string): Promise<string> {
+  return hashNormalizedText(normalizeText(text));
+}
+
+/**
+ * Compute context hashes for multiple inputs, preferring native batch APIs when available.
+ */
+export async function computeOptimisticHashBatch(texts: string[]): Promise<string[]> {
+  const normalized = texts.map((text) => normalizeText(text));
+  const native = resolveNativeAiContextHash();
+  if (native?.sha256HexBatch) {
+    try {
+      return native.sha256HexBatch(normalized);
+    } catch {
+      // Fall back to per-input hashing if native batch fails.
+    }
+  }
+
+  return Promise.all(normalized.map((text) => hashNormalizedText(text)));
 }
 
 /**
