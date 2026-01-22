@@ -6,6 +6,8 @@
  * Supports versioned format with integrity (legacy CRC32 + new HMAC-SHA256).
  */
 
+import { getNativeAnchorCodec, type NativeAnchorCodecBinding } from "@ku0/anchor-codec-rs";
+
 // ============================================================================
 // Constants
 // ============================================================================
@@ -47,6 +49,17 @@ export type EncodedAnchor = {
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
+
+function resolveNativeAnchorCodec(): NativeAnchorCodecBinding | null {
+  return getNativeAnchorCodec();
+}
+
+function toNativeBytes(bytes: Uint8Array): Uint8Array {
+  if (typeof Buffer !== "undefined") {
+    return Buffer.from(bytes);
+  }
+  return bytes;
+}
 
 function utf8Encode(str: string): Uint8Array {
   return textEncoder.encode(str);
@@ -189,6 +202,18 @@ function hmacSha256(key: Uint8Array, msg: Uint8Array): Uint8Array {
   return outer;
 }
 
+function computeHmacSha256(key: Uint8Array, msg: Uint8Array): Uint8Array {
+  const native = resolveNativeAnchorCodec();
+  if (native) {
+    try {
+      return native.hmacSha256(toNativeBytes(key), toNativeBytes(msg));
+    } catch {
+      // Fall back to JS HMAC if native fails.
+    }
+  }
+  return hmacSha256(key, msg);
+}
+
 function defaultHmacKey(): Uint8Array {
   return utf8Encode(DEFAULT_HMAC_KEY);
 }
@@ -202,6 +227,15 @@ function defaultHmacKey(): Uint8Array {
  * Uses standard polynomial 0xEDB88320
  */
 export function computeCRC32(data: Uint8Array): Uint8Array {
+  const native = resolveNativeAnchorCodec();
+  if (native) {
+    try {
+      return native.crc32(toNativeBytes(data));
+    } catch {
+      // Fall back to JS CRC32 if native fails.
+    }
+  }
+
   let crc = 0xffffffff;
   for (let i = 0; i < data.length; i++) {
     const byte = data[i];
@@ -227,6 +261,15 @@ export function computeCRC32(data: Uint8Array): Uint8Array {
  * Verify CRC32 checksum
  */
 export function verifyCRC32(data: Uint8Array, expected: Uint8Array): boolean {
+  const native = resolveNativeAnchorCodec();
+  if (native) {
+    try {
+      return native.verifyCrc32(toNativeBytes(data), toNativeBytes(expected));
+    } catch {
+      // Fall back to JS CRC32 verification if native fails.
+    }
+  }
+
   const computed = computeCRC32(data);
   if (computed.length !== expected.length) {
     return false;
@@ -247,6 +290,15 @@ export function verifyCRC32(data: Uint8Array, expected: Uint8Array): boolean {
  * Compute Adler32-like checksum (legacy core format)
  */
 function computeAdler32(str: string): string {
+  const native = resolveNativeAnchorCodec();
+  if (native) {
+    try {
+      return native.adler32(str);
+    } catch {
+      // Fall back to JS Adler32 if native fails.
+    }
+  }
+
   let a = 1;
   let b = 0;
   const MOD = 65521;
@@ -307,7 +359,7 @@ export function encodeAnchorV2(data: AnchorData): EncodedAnchor {
 
   // Compute HMAC over data portion (excluding tag)
   const dataBytes = buffer.slice(0, pos);
-  const hmac = hmacSha256(defaultHmacKey(), dataBytes).slice(0, HMAC_TAG_LENGTH);
+  const hmac = computeHmacSha256(defaultHmacKey(), dataBytes).slice(0, HMAC_TAG_LENGTH);
   buffer.set(hmac, pos);
 
   // Generate base64 string
@@ -387,7 +439,7 @@ function decodeCurrentFormat(bytes: Uint8Array): AnchorData | null {
     return null;
   }
 
-  const expected = hmacSha256(defaultHmacKey(), dataBytes).slice(0, HMAC_TAG_LENGTH);
+  const expected = computeHmacSha256(defaultHmacKey(), dataBytes).slice(0, HMAC_TAG_LENGTH);
   for (let i = 0; i < HMAC_TAG_LENGTH; i++) {
     if (storedTag[i] !== expected[i]) {
       return null;

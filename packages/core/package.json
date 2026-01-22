@@ -47,6 +47,7 @@
     "access": "public"
   },
   "dependencies": {
+    "@ku0/anchor-codec-rs": "workspace:*",
     "@ku0/anchor-relocation-rs": "workspace:*",
     "@ku0/ai-sanitizer-rs": "workspace:*",
     "@ku0/canonicalizer-rs": "workspace:*",
