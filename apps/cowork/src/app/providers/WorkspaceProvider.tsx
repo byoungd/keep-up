@@ -1,4 +1,4 @@
-import type { CoworkProject, CoworkSession } from "@ku0/agent-runtime";
+import type { CoworkProject, CoworkSession, CoworkWorkspace } from "@ku0/agent-runtime";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import React from "react";
 import {
@@ -6,6 +6,7 @@ import {
   createSession as createSessionApi,
   listProjects,
   listSessions,
+  listWorkspaces,
   updateSession,
 } from "../../api/coworkApi";
 import type { Project, Session, Workspace } from "../../features/workspace/types";
@@ -75,10 +76,11 @@ function resolveSessionTitle(session: CoworkSession): string {
 }
 
 function mapSession(session: CoworkSession): Session {
-  const rootPath = session.grants[0]?.rootPath ?? "unknown";
+  const fallbackRoot = session.grants[0]?.rootPath ?? "unknown";
+  const workspaceId = session.workspaceId ?? fallbackRoot;
   return {
     id: session.sessionId,
-    workspaceId: rootPath,
+    workspaceId,
     title: resolveSessionTitle(session),
     createdAt: session.createdAt,
     projectId: session.projectId,
@@ -92,6 +94,16 @@ function mapProject(project: CoworkProject): Project {
     description: project.description,
     createdAt: project.createdAt,
     instructions: (project.metadata as { instructions?: string } | undefined)?.instructions,
+  };
+}
+
+function mapWorkspace(workspace: CoworkWorkspace): Workspace {
+  return {
+    id: workspace.workspaceId,
+    name: workspace.name,
+    pathHint: workspace.pathHint,
+    createdAt: workspace.createdAt,
+    lastOpenedAt: workspace.lastOpenedAt,
   };
 }
 
@@ -140,9 +152,18 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     queryFn: listProjects,
   });
 
+  const { data: workspacesRaw = [] } = useQuery({
+    queryKey: ["cowork", "workspaces"],
+    queryFn: listWorkspaces,
+    refetchInterval: config.sessionPollInterval,
+  });
+
   const rawSessions = sessions as CoworkSession[];
   const sessionItems = React.useMemo(() => rawSessions.map(mapSession), [rawSessions]);
-  const workspaces = React.useMemo(() => buildWorkspaces(rawSessions), [rawSessions]);
+  const workspaces = React.useMemo(() => {
+    const mapped = (workspacesRaw as CoworkWorkspace[]).map(mapWorkspace);
+    return mapped.length > 0 ? mapped : buildWorkspaces(rawSessions);
+  }, [rawSessions, workspacesRaw]);
   const projects = React.useMemo(() => projectsRaw.map(mapProject), [projectsRaw]);
 
   const pushSession = React.useCallback(

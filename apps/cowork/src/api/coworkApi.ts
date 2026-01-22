@@ -4,6 +4,7 @@ import type {
   CoworkRiskTag,
   CoworkSession,
   CoworkTask,
+  CoworkWorkspace,
   Lesson,
   LessonProfile,
   LessonScope,
@@ -23,6 +24,8 @@ export type ApiResult<T> = {
   approval?: CoworkApproval;
   projects?: CoworkProject[];
   project?: CoworkProject;
+  workspaces?: CoworkWorkspace[];
+  workspace?: CoworkWorkspace;
   settings?: CoworkSettings;
   gymReport?: GymReport | null;
   providers?: CoworkProvider[];
@@ -777,6 +780,11 @@ export async function checkTool(
 export async function listProjects(): Promise<CoworkProject[]> {
   const data = await fetchJson<ApiResult<unknown>>("/api/projects");
   return data.projects ?? [];
+}
+
+export async function listWorkspaces(): Promise<CoworkWorkspace[]> {
+  const data = await fetchJson<ApiResult<unknown>>("/api/workspaces");
+  return data.workspaces ?? [];
 }
 
 export async function createProject(payload: {

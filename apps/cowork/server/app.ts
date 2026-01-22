@@ -21,6 +21,7 @@ import { createSessionRoutes } from "./routes/sessions";
 import { createSettingsRoutes } from "./routes/settings";
 import { createStreamRoutes } from "./routes/stream";
 import { createWorkflowRoutes } from "./routes/workflows";
+import { createWorkspaceRoutes } from "./routes/workspaces";
 import { CoworkRuntimeBridge } from "./runtime/coworkRuntime";
 import type { CoworkTaskRuntime } from "./runtime/coworkTaskRuntime";
 import type { ContextIndexManager } from "./services/contextIndexManager";
@@ -143,6 +144,13 @@ export function createCoworkApp(deps: CoworkAppDeps) {
     "/api",
     createProjectRoutes({
       projectStore: deps.storage.projectStore,
+    })
+  );
+
+  app.route(
+    "/api",
+    createWorkspaceRoutes({
+      sessionStore: deps.storage.sessionStore,
     })
   );
 

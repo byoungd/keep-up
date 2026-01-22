@@ -28,6 +28,7 @@ export interface CoworkSession {
   endedAt?: number;
   title?: string;
   projectId?: string;
+  workspaceId?: string;
   /** Agent mode: 'plan' for read-only analysis, 'build' for full development access */
   agentMode?: AgentMode;
   /** Cumulative token usage for this session */
@@ -126,6 +127,15 @@ export interface CoworkProject {
   pathHint?: string;
   createdAt: number;
   updatedAt: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface CoworkWorkspace {
+  workspaceId: string;
+  name: string;
+  pathHint?: string;
+  createdAt: number;
+  lastOpenedAt: number;
   metadata?: Record<string, unknown>;
 }
 
