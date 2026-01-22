@@ -3,6 +3,7 @@
 import { cn } from "@ku0/shared/utils";
 import { Check, Copy, Edit3, GitBranch, Quote, RefreshCcw } from "lucide-react";
 import * as React from "react";
+import { MessageAction as AiMessageAction } from "../ai-elements/message";
 
 export interface MessageActionsTranslations {
   actionEdit: string;
@@ -104,19 +105,15 @@ const ActionButton = React.memo(function ActionButton({
   active = false,
 }: ActionButtonProps) {
   return (
-    <button
-      type="button"
+    <AiMessageAction
+      label={label}
       onClick={onClick}
       className={cn(
-        "h-6 w-6 inline-flex items-center justify-center rounded-sm transition-colors duration-200",
-        active
-          ? "text-success"
-          : "text-muted-foreground hover:text-foreground hover:bg-surface-2/50"
+        "h-6 w-6 rounded-sm",
+        active ? "text-success" : "text-muted-foreground hover:bg-surface-2/50"
       )}
-      aria-label={label}
-      title={label}
     >
       {icon}
-    </button>
+    </AiMessageAction>
   );
 });

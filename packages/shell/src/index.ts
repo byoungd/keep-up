@@ -1,6 +1,56 @@
 // Components
 
 export { ApprovalCard } from "./components/ai/ApprovalCard";
+// AI Elements-inspired primitives
+export {
+  Conversation,
+  ConversationContent,
+  ConversationEmptyState,
+  ConversationScrollButton,
+} from "./components/ai-elements/conversation";
+export { Loader } from "./components/ai-elements/loader";
+export type { MessageRole } from "./components/ai-elements/message";
+export {
+  Message as AiMessage,
+  MessageAction,
+  MessageActions,
+  MessageContent,
+  MessageResponse,
+} from "./components/ai-elements/message";
+export type { PromptInputStatus } from "./components/ai-elements/prompt-input";
+export {
+  PromptInput,
+  PromptInputBody,
+  PromptInputFooter,
+  PromptInputSubmit,
+  PromptInputTextarea,
+  PromptInputTools,
+} from "./components/ai-elements/prompt-input";
+export {
+  Reasoning,
+  ReasoningContent,
+  ReasoningTrigger,
+  useReasoning,
+} from "./components/ai-elements/reasoning";
+export { Shimmer } from "./components/ai-elements/shimmer";
+export { Source, Sources, SourcesContent, SourcesTrigger } from "./components/ai-elements/sources";
+export { Suggestion, Suggestions } from "./components/ai-elements/suggestion";
+export {
+  Task,
+  TaskContent,
+  TaskItem,
+  TaskItemFile,
+  TaskTrigger,
+} from "./components/ai-elements/task";
+export type { ToolState } from "./components/ai-elements/tool";
+export {
+  getStatusBadge,
+  Tool,
+  ToolContent,
+  ToolHeader,
+  ToolInput,
+  ToolOutput,
+} from "./components/ai-elements/tool";
 export { AIPanel } from "./components/chat/AIPanel";
 export { BackgroundTaskIndicator } from "./components/chat/BackgroundTaskIndicator";
 export type { PanelPosition } from "./components/chat/ModelSelector";
@@ -37,7 +87,6 @@ export { ObservabilityDashboard } from "./components/observability/Observability
 export type { ArtifactPreviewPaneProps } from "./components/ui/ArtifactPreviewPane";
 export { ArtifactPreviewPane } from "./components/ui/ArtifactPreviewPane";
 export type { AvatarProps } from "./components/ui/Avatar";
-
 // UI Components
 export { Avatar, avatarVariants } from "./components/ui/Avatar";
 export type { BadgeProps } from "./components/ui/Badge";
