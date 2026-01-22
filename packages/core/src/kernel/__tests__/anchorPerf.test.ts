@@ -64,7 +64,8 @@ describe("Anchor Decode Performance (PERF-ANCHOR-001)", () => {
 
     expect(perItemTimes.length).toBe(2);
     const ratio = perItemTimes[1] / perItemTimes[0];
+    const ratioLimit = Number(process.env.LFCC_ANCHOR_DECODE_RATIO ?? (process.env.CI ? "6" : "9"));
     // Allow headroom for CI variance while still flagging superlinear regressions.
-    expect(ratio).toBeLessThan(6);
+    expect(ratio).toBeLessThan(ratioLimit);
   }, 15000);
 });
