@@ -24,12 +24,12 @@ Before running tests, determine which area of the code was changed:
 
 // turbo
 ```bash
-pnpm --filter cowork-e2e test:e2e
+pnpm --filter @ku0/e2e-tests test:e2e
 ```
 
 Or run from the directory:
 ```bash
-cd apps/cowork-e2e
+cd tests/e2e
 pnpm test:e2e
 ```
 
@@ -44,7 +44,7 @@ Timeouts are usually load-related, not logic bugs. Re-run with:
 
 // turbo
 ```bash
-pnpm playwright test <specific-file.spec.ts> --timeout=90000
+pnpm -C tests/e2e playwright test <specific-file.spec.ts> --timeout=90000
 ```
 
 ## Step 4: Run full suite only for releases

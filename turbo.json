@@ -10,17 +10,17 @@
       "outputs": [".next/**", "!.next/cache/**", "dist/**"]
     },
     "lint": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^lint"],
       "inputs": ["$TURBO_DEFAULT$"],
       "outputs": []
     },
     "typecheck": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^typecheck"],
       "inputs": ["$TURBO_DEFAULT$"],
       "outputs": []
     },
     "test": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^test"],
       "inputs": ["$TURBO_DEFAULT$"],
       "outputs": ["coverage/**"]
     },
