@@ -3,6 +3,7 @@
 import { cn } from "@ku0/shared/utils";
 import * as React from "react";
 import type { ReferenceAnchor, ReferenceRange } from "../../lib/ai/referenceAnchors";
+import { Sources, SourcesContent, SourcesTrigger } from "../ai-elements/sources";
 
 export interface MessageReferencesLabels {
   label: string;
@@ -40,25 +41,25 @@ export const MessageReferences = React.memo(function MessageReferences({
   }, [references, resolveReference]);
 
   return (
-    <div className="mt-3 flex flex-col gap-2">
-      <div className="text-micro uppercase tracking-wider text-muted-foreground/70">
-        {labels.label}
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        {resolvedReferences.map((entry) => (
-          <ReferenceChip
-            key={entry.anchor.id}
-            entry={entry}
-            resolveAvailable={Boolean(resolveReference)}
-            labels={labels}
-            onSelect={() => onReferenceSelect?.(entry.anchor)}
-          />
-        ))}
-      </div>
-      {!resolveReference && (
-        <div className="text-micro text-muted-foreground">{labels.unavailable}</div>
-      )}
-    </div>
+    <Sources className="mt-3">
+      <SourcesTrigger count={resolvedReferences.length} label={labels.label} />
+      <SourcesContent className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {resolvedReferences.map((entry) => (
+            <ReferenceChip
+              key={entry.anchor.id}
+              entry={entry}
+              resolveAvailable={Boolean(resolveReference)}
+              labels={labels}
+              onSelect={() => onReferenceSelect?.(entry.anchor)}
+            />
+          ))}
+        </div>
+        {!resolveReference && (
+          <div className="text-micro text-muted-foreground">{labels.unavailable}</div>
+        )}
+      </SourcesContent>
+    </Sources>
   );
 });
 

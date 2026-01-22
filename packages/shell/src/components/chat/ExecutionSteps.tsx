@@ -1,8 +1,16 @@
 "use client";
 
 import { cn } from "@ku0/shared/utils";
-import { AlertCircle, CheckCircle2, ChevronRight, Clock, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, ChevronRight, Loader2 } from "lucide-react";
 import * as React from "react";
+import {
+  Tool,
+  ToolContent,
+  ToolHeader,
+  ToolInput,
+  ToolOutput,
+  type ToolState,
+} from "../ai-elements/tool";
 
 export interface ExecutionStep {
   id: string;
@@ -111,96 +119,66 @@ function StepsSummary({ steps }: { steps: ExecutionStep[] }) {
  * Individual step item.
  */
 function StepItem({ step }: { step: ExecutionStep }) {
-  const [showDetails, setShowDetails] = React.useState(false);
+  const toolState = STEP_STATUS_TO_TOOL_STATE[step.status];
+  const errorText = step.result?.error
+    ? step.result.error.code
+      ? `${step.result.error.code}: ${step.result.error.message}`
+      : step.result.error.message
+    : undefined;
 
-  const status = step.status;
-  const StatusIcon = (
-    {
-      pending: Clock,
-      executing: Loader2,
-      success: CheckCircle2,
-      error: AlertCircle,
-    } as const
-  )[status];
+  const outputText = React.useMemo(() => {
+    if (!step.result?.content?.length) {
+      return undefined;
+    }
+    const parts = step.result.content
+      .map((entry) => {
+        if (entry.type === "text") {
+          return entry.text ?? "";
+        }
+        try {
+          return JSON.stringify(entry);
+        } catch {
+          return "";
+        }
+      })
+      .filter((value) => value);
+    return parts.length > 0 ? parts.join("\n") : undefined;
+  }, [step.result?.content]);
 
-  const statusColor = (
-    {
-      pending: "text-muted-foreground",
-      executing: "text-primary",
-      success: "text-success",
-      error: "text-destructive",
-    } as const
-  )[status];
+  const metaItems = React.useMemo(() => {
+    const items: string[] = [];
+    if (step.durationMs !== undefined) {
+      items.push(`${step.durationMs}ms`);
+    }
+    if (step.parallel) {
+      items.push("parallel");
+    }
+    return items;
+  }, [step.durationMs, step.parallel]);
 
   return (
-    <div
+    <Tool
+      defaultOpen={step.status === "executing" || step.status === "error"}
       className={cn(
-        "rounded-md px-2 py-1.5 text-xs transition-colors duration-fast hover:bg-surface-2/40 border border-transparent hover:border-border/30",
-        status === "executing" && "bg-primary/5 border-primary/10"
+        "border-border/30 bg-surface-1/50",
+        step.status === "executing" && "border-primary/20 bg-primary/5"
       )}
     >
-      {/* Step Header */}
-      <button
-        type="button"
-        onClick={() => setShowDetails(!showDetails)}
-        className="flex w-full items-center justify-between text-left"
-      >
-        <div className="flex items-center gap-2">
-          <StatusIcon
-            className={cn(
-              "h-3.5 w-3.5",
-              statusColor,
-              step.status === "executing" && "animate-spin"
-            )}
-            aria-hidden="true"
-          />
-          <span className="font-medium">{step.toolName}</span>
-          {step.parallel && (
-            <span className="rounded bg-primary/20 px-1 py-0.5 text-tiny text-primary">
-              parallel
-            </span>
-          )}
-        </div>
-        {step.durationMs !== undefined && (
-          <span className="text-muted-foreground text-micro">{step.durationMs}ms</span>
-        )}
-      </button>
-
-      {/* Step Details */}
-      {showDetails && (
-        <div className="mt-2 space-y-2 text-fine">
-          {/* Arguments */}
-          {Object.keys(step.arguments).length > 0 && (
-            <div>
-              <div className="font-medium text-muted-foreground mb-1">Arguments:</div>
-              <pre className="rounded bg-surface-3/50 p-1.5 overflow-x-auto">
-                {JSON.stringify(step.arguments, null, 2)}
-              </pre>
-            </div>
-          )}
-
-          {/* Result */}
-          {step.result && (
-            <div>
-              <div className="font-medium text-muted-foreground mb-1">Result:</div>
-              <div className="rounded bg-surface-3/50 p-1.5 space-y-1">
-                {step.result.content.map(
-                  (content: { type: string; text?: string }, idx: number) => (
-                    <div key={`${step.id}-result-${idx}-${content.type}`}>
-                      {content.type === "text" && (
-                        <div className="text-foreground">{content.text}</div>
-                      )}
-                    </div>
-                  )
-                )}
-                {step.result.error && (
-                  <div className="text-destructive">Error: {step.result.error.message}</div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+      <ToolHeader type="dynamic-tool" toolName={step.toolName} state={toolState} />
+      {metaItems.length > 0 && (
+        <div className="mt-2 text-micro text-muted-foreground/80">{metaItems.join(" • ")}</div>
       )}
-    </div>
+      <ToolContent>
+        <ToolInput input={step.arguments} />
+        <ToolOutput output={outputText} errorText={errorText} />
+      </ToolContent>
+    </Tool>
   );
 }
+
+const STEP_STATUS_TO_TOOL_STATE: Record<ExecutionStep["status"], ToolState> = {
+  pending: "input-streaming",
+  executing: "input-available",
+  success: "output-available",
+  error: "output-error",
+};
