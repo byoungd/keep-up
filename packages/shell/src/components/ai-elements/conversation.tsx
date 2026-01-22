@@ -28,6 +28,8 @@ type ConversationChildren =
 
 export interface ConversationProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "children"> {
   children: ConversationChildren;
+  scrollRef?: React.RefObject<HTMLDivElement | null>;
+  contentRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 const SCROLL_BOTTOM_THRESHOLD = 24;
@@ -38,9 +40,18 @@ function prefersReducedMotion() {
   );
 }
 
-export function Conversation({ children, className, onScroll, ...props }: ConversationProps) {
-  const scrollRef = React.useRef<HTMLDivElement>(null);
-  const contentRef = React.useRef<HTMLDivElement>(null);
+export function Conversation({
+  children,
+  className,
+  onScroll,
+  scrollRef: providedScrollRef,
+  contentRef: providedContentRef,
+  ...props
+}: ConversationProps) {
+  const localScrollRef = React.useRef<HTMLDivElement>(null);
+  const localContentRef = React.useRef<HTMLDivElement>(null);
+  const scrollRef = providedScrollRef ?? localScrollRef;
+  const contentRef = providedContentRef ?? localContentRef;
   const [isAtBottom, setIsAtBottom] = React.useState(true);
   const isAtBottomRef = React.useRef(isAtBottom);
 

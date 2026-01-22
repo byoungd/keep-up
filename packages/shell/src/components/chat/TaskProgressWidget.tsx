@@ -14,7 +14,7 @@ import {
   Target,
 } from "lucide-react";
 import * as React from "react";
-import { TextShimmer } from "../ui/TextShimmer";
+import { Shimmer } from "../ai-elements/shimmer";
 import type { AgentTask, ArtifactItem, TaskPhase } from "./types";
 import { groupArtifactsByType } from "./types";
 
@@ -158,7 +158,7 @@ function TaskDetails({
                     isPending && "text-muted-foreground"
                   )}
                 >
-                  {isRunning ? <TextShimmer>{step.label}</TextShimmer> : step.label}
+                  {isRunning ? <Shimmer as="span">{step.label}</Shimmer> : step.label}
                 </span>
               </div>
 

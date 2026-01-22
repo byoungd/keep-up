@@ -4,6 +4,7 @@ import { cn } from "@ku0/shared/utils";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import * as React from "react";
 import type { ReferenceAnchor, ReferenceRange } from "../../lib/ai/referenceAnchors";
+import { Conversation, ConversationContent } from "../ai-elements/conversation";
 import { type AILoadingState, AILoadingStatus } from "./AILoadingStatus";
 import { MessageItem } from "./MessageItem";
 import { StartupView } from "./StartupView";
@@ -137,10 +138,16 @@ export function MessageList({
     ]
   );
 
-  const containerClass = cn(
-    "flex-1 overflow-y-auto overflow-x-hidden px-6 py-6 space-y-6 scrollbar-auto-hide",
-    !isStreaming && "scroll-smooth",
-    isMain && "px-0" // Remove global padding in main mode to allow full-width scrollbar area (though padding usually inside scrollbar?)
+  const scrollContainerClass = cn(
+    "flex-1 overflow-y-auto overflow-x-hidden scrollbar-auto-hide",
+    !isStreaming && "scroll-smooth"
+  );
+  const contentClass = cn("px-6 py-6", isMain && "px-0");
+  const virtualizedContainerClass = cn(
+    scrollContainerClass,
+    "px-6 py-6 space-y-6",
+    isMain && "px-0"
+    // Remove global padding in main mode to allow full-width scrollbar area (though padding usually inside scrollbar?)
     // Actually, distinct padding logic for items?
     // If I keep px-6, the scrollbar is at the edge of the container (which has padding).
     // So keeping px-6 is fine for scrollbar position.
@@ -161,21 +168,23 @@ export function MessageList({
   // Empty state
   if (messages.length === 0) {
     return (
-      <div className={containerClass} ref={listRef} onScroll={handleScroll}>
-        <StartupView
-          title={translations.emptyTitle}
-          description={translations.emptyDescription}
-          suggestions={suggestions}
-          onSuggestionClick={onSuggestionClick}
-        />
-      </div>
+      <Conversation scrollRef={listRef} className={scrollContainerClass} onScroll={handleScroll}>
+        <ConversationContent className={contentClass}>
+          <StartupView
+            title={translations.emptyTitle}
+            description={translations.emptyDescription}
+            suggestions={suggestions}
+            onSuggestionClick={onSuggestionClick}
+          />
+        </ConversationContent>
+      </Conversation>
     );
   }
 
   // Virtualized rendering
   if (shouldVirtualize) {
     return (
-      <div className={containerClass} ref={listRef} onScroll={handleScroll}>
+      <div className={virtualizedContainerClass} ref={listRef} onScroll={handleScroll}>
         <div
           style={{
             height: `${rowVirtualizer.getTotalSize()}px`,
@@ -225,10 +234,12 @@ export function MessageList({
   }
 
   return (
-    <div className={cn(containerClass, "space-y-5")} ref={listRef} onScroll={handleScroll}>
-      {messages.map(renderMessage)}
-      {showLoadingStatus ? <AILoadingStatus state={loadingState} className="mt-2" /> : null}
-    </div>
+    <Conversation scrollRef={listRef} className={scrollContainerClass} onScroll={handleScroll}>
+      <ConversationContent className={cn(contentClass, "gap-5")}>
+        {messages.map(renderMessage)}
+        {showLoadingStatus ? <AILoadingStatus state={loadingState} className="mt-2" /> : null}
+      </ConversationContent>
+    </Conversation>
   );
 }
 
