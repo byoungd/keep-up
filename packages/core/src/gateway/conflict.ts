@@ -436,6 +436,9 @@ export function createMockDocumentProvider(config: MockProviderConfig): GatewayD
       }
       return result;
     },
+    getAllSpanStates(): Map<string, SpanState> {
+      return new Map(config.spans);
+    },
 
     documentExists(docId: string): boolean {
       return config.documents.has(docId);
