@@ -403,13 +403,20 @@ export class PlanModeController {
     this.transitionPhase("clarifying", "starting clarification");
     this.state.clarificationRound++;
 
-    if (this.clarifyingEngine) {
-      const questions = await this.clarifyingEngine.generateQuestions(this.state.userRequest);
-      this.state.clarifyingQuestions = questions;
+    if (!this.clarifyingEngine) {
+      await this.advanceAfterClarification();
+      return;
+    }
 
-      for (const q of questions) {
-        this.emitEvent("question_generated", q);
-      }
+    const questions = await this.clarifyingEngine.generateQuestions(this.state.userRequest);
+    this.state.clarifyingQuestions = questions;
+
+    for (const q of questions) {
+      this.emitEvent("question_generated", q);
+    }
+
+    if (questions.length === 0) {
+      await this.advanceAfterClarification();
     }
   }
 
@@ -441,12 +448,7 @@ export class PlanModeController {
     );
 
     if (!hasBlockingUnanswered) {
-      // Move to next phase
-      if (this.config.requireCodebaseResearch) {
-        await this.startResearchPhase();
-      } else {
-        await this.startDraftingPhase();
-      }
+      await this.advanceAfterClarification();
     }
   }
 
@@ -458,11 +460,7 @@ export class PlanModeController {
       throw new Error("Not in clarifying phase");
     }
 
-    if (this.config.requireCodebaseResearch) {
-      await this.startResearchPhase();
-    } else {
-      await this.startDraftingPhase();
-    }
+    await this.advanceAfterClarification();
   }
 
   /**
@@ -481,7 +479,9 @@ export class PlanModeController {
     }
 
     const answered = this.state.clarifyingQuestions.filter((q) => q.answer);
-    if (answered.length === 0) return "";
+    if (answered.length === 0) {
+      return "";
+    }
 
     return answered.map((q) => `Q: ${q.question}\nA: ${q.answer}`).join("\n\n");
   }
@@ -556,7 +556,7 @@ export class PlanModeController {
     this.state.draftPlan = plan;
 
     if (this.planningEngine) {
-      this.planningEngine.createPlan(plan);
+      this.planningEngine.registerPlan(plan);
     }
 
     this.emitEvent("plan_drafted", { planId: plan.id });
@@ -584,6 +584,10 @@ export class PlanModeController {
     this.transitionPhase("reviewing", "awaiting plan approval");
 
     // Auto-approve if configured
+    if (this.state.draftPlan?.requiresApproval) {
+      return;
+    }
+
     if (this.config.planApprovalMode === "auto") {
       this.approvePlan();
     } else if (
@@ -594,6 +598,14 @@ export class PlanModeController {
       this.approvePlan();
     }
     // Otherwise wait for manual approval
+  }
+
+  private async advanceAfterClarification(): Promise<void> {
+    if (this.config.requireCodebaseResearch) {
+      await this.startResearchPhase();
+    } else {
+      await this.startDraftingPhase();
+    }
   }
 
   /**

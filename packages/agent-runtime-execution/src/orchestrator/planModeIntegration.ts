@@ -289,7 +289,11 @@ export class PlanModeIntegration {
     this.controller.submitDraftPlan(plan);
 
     // Trigger parallel review if enabled
-    if (this.config.enableParallelReview && this.parallelReviewer) {
+    if (
+      this.config.enableParallelReview &&
+      this.parallelReviewer &&
+      this.controller.getPhase() === "reviewing"
+    ) {
       const result = await this.parallelReviewer.submitForReview({
         plan,
         reviewerProfiles: [],
@@ -300,7 +304,7 @@ export class PlanModeIntegration {
       this.emitEvent("plan_mode:plan_reviewed", result);
 
       // Auto-approve if recommendation is approve
-      if (result.recommendation === "approve") {
+      if (result.recommendation === "approve" && this.controller.getPhase() === "reviewing") {
         this.controller.approvePlan(result.consolidatedFeedback);
       }
     }
@@ -421,7 +425,7 @@ Report progress and update step status as you complete each step.
       case "researching":
         return ["grep_search", "find_by_name", "view_file", "view_file_outline"];
       case "drafting":
-        return ["write_to_file"]; // For writing plan artifacts
+        return ["write_file"]; // For writing plan artifacts
       case "executing": {
         const plan = this.controller.getDraftPlan();
         return plan?.toolsNeeded ?? [];

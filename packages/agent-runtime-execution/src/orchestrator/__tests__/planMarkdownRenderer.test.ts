@@ -77,8 +77,8 @@ describe("PlanMarkdownRenderer", () => {
       const markdown = renderer.render(samplePlan);
       expect(markdown).toContain("```mermaid");
       expect(markdown).toContain("flowchart TD");
-      expect(markdown).toContain("step-1");
-      expect(markdown).toContain("step-2");
+      expect(markdown).toContain("step_1");
+      expect(markdown).toContain("step_2");
     });
 
     it("should render success criteria", () => {
@@ -187,7 +187,7 @@ describe("PlanMarkdownRenderer", () => {
 
     it("should include dependency edges", () => {
       const flowchart = renderer.renderFlowchart(samplePlan);
-      expect(flowchart).toContain("step-1 --> step-2");
+      expect(flowchart).toContain("step_1 --> step_2");
     });
   });
 

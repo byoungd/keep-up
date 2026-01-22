@@ -254,17 +254,24 @@ export class PlanMarkdownRenderer {
     lines.push("```mermaid");
     lines.push("flowchart TD");
 
+    const idMap = this.buildMermaidIdMap(plan.steps);
+
     // Add nodes
     for (const step of plan.steps) {
       const safeDesc = step.description.replace(/"/g, "'").slice(0, 40);
       const statusClass = this.getStepStatusClass(step.status);
-      lines.push(`    ${step.id}["Step ${step.order}: ${safeDesc}"]${statusClass}`);
+      const nodeId = idMap.get(step.id) ?? `step_${step.order}`;
+      lines.push(`    ${nodeId}["Step ${step.order}: ${safeDesc}"]${statusClass}`);
     }
 
     // Add edges for dependencies
     for (const step of plan.steps) {
+      const nodeId = idMap.get(step.id) ?? `step_${step.order}`;
       for (const dep of step.dependencies) {
-        lines.push(`    ${dep} --> ${step.id}`);
+        const depId = idMap.get(dep);
+        if (depId) {
+          lines.push(`    ${depId} --> ${nodeId}`);
+        }
       }
     }
 
@@ -273,7 +280,9 @@ export class PlanMarkdownRenderer {
     if (stepsWithNoDeps.length === plan.steps.length && plan.steps.length > 1) {
       const sorted = [...plan.steps].sort((a, b) => a.order - b.order);
       for (let i = 0; i < sorted.length - 1; i++) {
-        lines.push(`    ${sorted[i].id} --> ${sorted[i + 1].id}`);
+        const fromId = idMap.get(sorted[i].id) ?? `step_${sorted[i].order}`;
+        const toId = idMap.get(sorted[i + 1].id) ?? `step_${sorted[i + 1].order}`;
+        lines.push(`    ${fromId} --> ${toId}`);
       }
     }
 
@@ -451,6 +460,31 @@ export class PlanMarkdownRenderer {
       skipped: "",
     };
     return classes[status ?? "pending"] ?? "";
+  }
+
+  private buildMermaidIdMap(steps: PlanStep[]): Map<string, string> {
+    const map = new Map<string, string>();
+    const used = new Set<string>();
+
+    const toSafeId = (raw: string, fallback: string): string => {
+      const base = raw.replace(/[^a-zA-Z0-9_]/g, "_");
+      const seed = base.length > 0 ? base : fallback;
+      let candidate = seed;
+      let counter = 1;
+      while (used.has(candidate)) {
+        candidate = `${seed}_${counter}`;
+        counter += 1;
+      }
+      used.add(candidate);
+      return candidate;
+    };
+
+    for (const [index, step] of steps.entries()) {
+      const fallback = `step_${index + 1}`;
+      map.set(step.id, toSafeId(step.id, fallback));
+    }
+
+    return map;
   }
 }
 
