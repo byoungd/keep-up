@@ -264,3 +264,5 @@ packages/policy-hash-rs/*.node
 packages/streaming-markdown-rs/target/
 packages/streaming-markdown-rs/Cargo.lock
 packages/streaming-markdown-rs/*.node
+packages/keepup-tui/target/
+packages/keepup-tui/Cargo.lock

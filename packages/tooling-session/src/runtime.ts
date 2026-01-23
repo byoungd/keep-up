@@ -2,13 +2,14 @@ import {
   type AICoreProvider,
   createAICoreAdapter,
   createCompletionToolServer,
-  createEventBus,
   createRuntime,
   createSessionState,
+  createStreamWriter,
   createToolRegistry,
-  type RuntimeEventBus,
   type RuntimeInstance,
+  type StreamWriter,
 } from "@ku0/agent-runtime";
+import { createEventBus, type RuntimeEventBus } from "@ku0/agent-runtime-control";
 import type { AgentMessage, AgentState } from "@ku0/agent-runtime-core";
 import {
   type CompletionRequest,
@@ -34,6 +35,7 @@ export interface RuntimeConfigOptions {
 export interface RuntimeResources {
   runtime: RuntimeInstance;
   eventBus: RuntimeEventBus;
+  stream: StreamWriter;
 }
 
 export async function createRuntimeResources(
@@ -50,6 +52,7 @@ export async function createRuntimeResources(
   const eventBus = createEventBus();
   const registry = createToolRegistry();
   await registry.register(createCompletionToolServer());
+  const stream = createStreamWriter(options.sessionId ? `tui_${options.sessionId}` : undefined);
   const sessionState = createSessionState({
     id: options.sessionId,
     initialState: buildInitialAgentState(options.initialMessages ?? []),
@@ -62,9 +65,14 @@ export async function createRuntimeResources(
       eventBus,
       sessionState,
     },
+    orchestrator: {
+      components: {
+        streamBridge: { stream },
+      },
+    },
   });
 
-  return { runtime, eventBus };
+  return { runtime, eventBus, stream };
 }
 
 export function resolveProviderSelection(providerOverride?: string) {
