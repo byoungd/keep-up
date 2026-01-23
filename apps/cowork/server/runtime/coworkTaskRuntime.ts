@@ -547,7 +547,9 @@ export class CoworkTaskRuntime {
   ): Promise<RuntimeBuildResult> {
     if (this.runtimeFactory) {
       const runtime = await this.runtimeFactory(session, settings);
-      const contextPackKey = await this.projectContextManager.getContextPackKey(session);
+      const contextPackKey = await this.projectContextManager.getContextPackKey(session, {
+        tokenModel: settings.defaultModel ?? undefined,
+      });
       const checkpointStorage = this.createCheckpointStorage(session.sessionId);
       return {
         runtime,
@@ -631,7 +633,9 @@ export class CoworkTaskRuntime {
     });
     const subagentManager = new SubagentManager(agentManager);
     await toolRegistry.register(createSubagentToolServer(agentManager));
-    const prompt = await this.buildSystemPromptAddition(session, modeManager);
+    const prompt = await this.buildSystemPromptAddition(session, modeManager, {
+      tokenModel: modelId ?? settings.defaultModel ?? undefined,
+    });
     const checkpointStorage = this.createCheckpointStorage(session.sessionId);
     const checkpointManager = checkpointStorage
       ? createCheckpointManager({ storage: checkpointStorage })
@@ -788,7 +792,8 @@ export class CoworkTaskRuntime {
 
   private async buildSystemPromptAddition(
     session: CoworkSession,
-    modeManager: AgentModeManager
+    modeManager: AgentModeManager,
+    options?: { tokenModel?: string; respectGitignore?: boolean }
   ): Promise<{ addition?: string; contextPackKey: string | null }> {
     const totalBudget = DEFAULT_PROJECT_CONTEXT_TOKEN_BUDGET + DEFAULT_CONTEXT_PACK_TOKEN_BUDGET;
     const rawProjectContext = await this.projectContextManager.getContext(
@@ -801,6 +806,8 @@ export class CoworkTaskRuntime {
 
     const packPrompt = await this.projectContextManager.getContextPackPrompt(session, {
       tokenBudget: packBudget,
+      tokenModel: options?.tokenModel,
+      respectGitignore: options?.respectGitignore,
     });
     const packTokens = packPrompt.prompt ? estimateTokens(packPrompt.prompt) : 0;
     const projectBudget = Math.min(projectTokens, Math.max(totalBudget - packTokens, 0));

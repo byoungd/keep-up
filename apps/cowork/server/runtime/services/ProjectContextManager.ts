@@ -120,14 +120,14 @@ export class ProjectContextManager {
   }>;
   async getContextPackPrompt(
     session: CoworkSession,
-    options: { tokenBudget?: number }
+    options: { tokenBudget?: number; tokenModel?: string; respectGitignore?: boolean }
   ): Promise<{
     prompt?: string;
     packKey: string | null;
   }>;
   async getContextPackPrompt(
     session: CoworkSession,
-    options?: { tokenBudget?: number }
+    options?: { tokenBudget?: number; tokenModel?: string; respectGitignore?: boolean }
   ): Promise<{
     prompt?: string;
     packKey: string | null;
@@ -138,7 +138,10 @@ export class ProjectContextManager {
     }
 
     try {
-      const index = this.contextIndexManager.getIndex(rootPath);
+      const index = this.contextIndexManager.getIndex(rootPath, {
+        tokenModel: options?.tokenModel,
+        respectGitignore: options?.respectGitignore,
+      });
       const pins = await index.getPins(session.sessionId);
       if (!pins || pins.packIds.length === 0) {
         return { prompt: undefined, packKey: null };
@@ -160,14 +163,20 @@ export class ProjectContextManager {
     }
   }
 
-  async getContextPackKey(session: CoworkSession): Promise<string | null> {
+  async getContextPackKey(
+    session: CoworkSession,
+    options?: { tokenModel?: string; respectGitignore?: boolean }
+  ): Promise<string | null> {
     const rootPath = resolveRootPath(session);
     if (!rootPath || !this.contextIndexManager) {
       return null;
     }
 
     try {
-      const index = this.contextIndexManager.getIndex(rootPath);
+      const index = this.contextIndexManager.getIndex(rootPath, {
+        tokenModel: options?.tokenModel,
+        respectGitignore: options?.respectGitignore,
+      });
       const pins = await index.getPins(session.sessionId);
       if (!pins || pins.packIds.length === 0) {
         return null;

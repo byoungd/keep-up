@@ -78,7 +78,7 @@ const DEFAULT_CONFIG: Required<Omit<ContextIndexConfig, "rootPath">> = {
 export class ContextIndex {
   private readonly store: ContextIndexStore;
   private readonly embeddingProvider: EmbeddingProvider;
-  private readonly config: Required<ContextIndexConfig>;
+  private config: Required<ContextIndexConfig>;
   private indexingPromise: Promise<ContextIndexReport> | null = null;
   private lastIndexedAt: number | null = null;
 
@@ -93,6 +93,27 @@ export class ContextIndex {
     this.store = store;
     this.config = resolvedConfig;
     this.embeddingProvider = embeddingProvider ?? createHashEmbeddingProvider();
+  }
+
+  updateConfig(patch: Partial<Omit<ContextIndexConfig, "rootPath">>): void {
+    if (Object.keys(patch).length === 0) {
+      return;
+    }
+
+    const nextConfig = { ...this.config, ...patch };
+    const shouldReindex =
+      nextConfig.maxFileBytes !== this.config.maxFileBytes ||
+      nextConfig.maxChunkTokens !== this.config.maxChunkTokens ||
+      nextConfig.chunkOverlapTokens !== this.config.chunkOverlapTokens ||
+      nextConfig.tokenModel !== this.config.tokenModel ||
+      nextConfig.respectGitignore !== this.config.respectGitignore ||
+      !arraysEqual(nextConfig.includeExtensions, this.config.includeExtensions) ||
+      !arraysEqual(nextConfig.excludeDirs, this.config.excludeDirs);
+
+    this.config = nextConfig;
+    if (shouldReindex) {
+      this.lastIndexedAt = null;
+    }
   }
 
   async indexProject(): Promise<ContextIndexReport> {
@@ -403,6 +424,18 @@ export class ContextIndex {
 
 export function createContextIndex(options: ContextIndexOptions): ContextIndex {
   return new ContextIndex(options);
+}
+
+function arraysEqual(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function hashContent(content: string): string {

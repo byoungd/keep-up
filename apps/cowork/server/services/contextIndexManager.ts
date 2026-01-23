@@ -18,10 +18,21 @@ export class ContextIndexManager {
     this.embeddingProvider = options.embeddingProvider ?? createHashEmbeddingProvider();
   }
 
-  getIndex(rootPath: string): ContextIndex {
+  getIndex(
+    rootPath: string,
+    options?: { tokenModel?: string; respectGitignore?: boolean }
+  ): ContextIndex {
     const normalized = normalizePath(rootPath);
     const existing = this.indexes.get(normalized);
     if (existing) {
+      if (options) {
+        existing.updateConfig({
+          ...(options.tokenModel ? { tokenModel: options.tokenModel } : {}),
+          ...(options.respectGitignore !== undefined
+            ? { respectGitignore: options.respectGitignore }
+            : {}),
+        });
+      }
       return existing;
     }
 
@@ -31,6 +42,10 @@ export class ContextIndexManager {
       rootPath: normalized,
       store,
       embeddingProvider: this.embeddingProvider,
+      ...(options?.tokenModel ? { tokenModel: options.tokenModel } : {}),
+      ...(options?.respectGitignore !== undefined
+        ? { respectGitignore: options.respectGitignore }
+        : {}),
     });
     this.indexes.set(normalized, index);
     return index;
