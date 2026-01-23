@@ -5,22 +5,22 @@
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "types": "./src/index.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
+      "types": "./src/index.ts",
       "default": "./dist/index.js"
     },
     "./sync": {
-      "types": "./dist/sync/index.d.ts",
+      "types": "./src/sync/index.ts",
       "default": "./dist/sync/index.js"
     },
     "./sync/server": {
-      "types": "./dist/sync/server.d.ts",
+      "types": "./src/sync/server.ts",
       "default": "./dist/sync/server.js"
     },
     "./security": {
-      "types": "./dist/security/index.d.ts",
+      "types": "./src/security/index.ts",
       "import": "./dist/security/index.js",
       "default": "./dist/security/index.js"
     }

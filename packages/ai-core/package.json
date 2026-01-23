@@ -4,30 +4,30 @@
   "version": "0.0.0",
   "type": "module",
   "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "types": "./src/index.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
+      "types": "./src/index.ts",
       "default": "./dist/index.js"
     },
     "./providers": {
-      "types": "./dist/providers/index.d.ts",
+      "types": "./src/providers/index.ts",
       "default": "./dist/providers/index.js"
     },
     "./context": {
-      "types": "./dist/context/index.d.ts",
+      "types": "./src/context/index.ts",
       "default": "./dist/context/index.js"
     },
     "./resilience": {
-      "types": "./dist/resilience/index.d.ts",
+      "types": "./src/resilience/index.ts",
       "default": "./dist/resilience/index.js"
     },
     "./performance": {
-      "types": "./dist/performance/index.d.ts",
+      "types": "./src/performance/index.ts",
       "default": "./dist/performance/index.js"
     },
     "./types": {
-      "types": "./dist/types/index.d.ts",
+      "types": "./src/types/index.ts",
       "default": "./dist/types/index.js"
     }
   },
@@ -41,6 +41,7 @@
     "typescript": "^5.7.3"
   },
   "dependencies": {
+    "@ku0/tokenizer-rs": "workspace:*",
     "@ai-sdk/anthropic": "^3.0.15",
     "@ai-sdk/google": "^3.0.10",
     "@ai-sdk/openai": "^3.0.12",
