@@ -1,4 +1,5 @@
 import type { MarkdownTargetingPolicyV1 } from "../kernel/policy/types.js";
+import { applyFrontmatterUpdates } from "./frontmatter.js";
 import { computeMarkdownLineHash, normalizeMarkdownText, splitMarkdownLines } from "./hash.js";
 import { buildMarkdownSemanticIndex, resolveMarkdownSemanticTarget } from "./semantic.js";
 import type {
@@ -367,6 +368,16 @@ function resolveOperation(
       return resolveDeleteLines(op, resolvedRange, lineCount, opIndex);
     case "md_insert_lines":
       return resolveInsertLines(op, resolvedRange, lineCount, opIndex);
+    case "md_update_frontmatter":
+      // Frontmatter update operations use the frontmatter range from semantic index
+      return {
+        ok: true,
+        resolved: {
+          op_index: opIndex,
+          op,
+          resolved_range: resolvedRange,
+        },
+      };
     default: {
       const exhaustiveCheck: never = op;
       return {
@@ -508,27 +519,54 @@ function applyResolvedOperations(lines: string[], ops: ResolvedOperation[]): str
   });
 
   for (const resolved of applyOrder) {
-    if (resolved.op.op === "md_replace_lines") {
+    applyResolvedOp(lines, resolved);
+  }
+
+  return lines;
+}
+
+function applyResolvedOp(lines: string[], resolved: ResolvedOperation): void {
+  switch (resolved.op.op) {
+    case "md_replace_lines": {
       const replacement = splitMarkdownLines(resolved.op.content);
       applyReplace(lines, resolved.resolved_range, replacement);
-      continue;
+      break;
     }
-
-    if (resolved.op.op === "md_delete_lines") {
+    case "md_delete_lines": {
       applyDelete(lines, resolved.resolved_range);
       if (lines.length === 0) {
         lines.push("");
       }
-      continue;
+      break;
     }
-
-    if (resolved.op.op === "md_insert_lines") {
+    case "md_insert_lines": {
       const insertion = splitMarkdownLines(resolved.op.content);
       applyInsert(lines, resolved.insert_index ?? 0, insertion);
+      break;
+    }
+    case "md_update_frontmatter": {
+      applyFrontmatterOp(lines, resolved);
+      break;
     }
   }
+}
 
-  return lines;
+function applyFrontmatterOp(lines: string[], resolved: ResolvedOperation): void {
+  if (resolved.op.op !== "md_update_frontmatter") {
+    return;
+  }
+  const result = applyFrontmatterUpdates(
+    lines,
+    resolved.resolved_range,
+    resolved.op.updates,
+    resolved.op.format,
+    resolved.op.create_if_missing
+  );
+  if (!result.ok) {
+    return;
+  }
+  // Replace lines in-place
+  lines.splice(0, lines.length, ...result.lines);
 }
 
 function isValidLineRange(range: LineRange, lineCount: number): boolean {
