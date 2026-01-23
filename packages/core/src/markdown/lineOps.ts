@@ -332,16 +332,18 @@ function resolveOperation(
       return resolveInsertLines(op, precondition, lineCount, opIndex);
     case "md_update_frontmatter":
       return resolveFrontmatterUpdate(op, precondition, opIndex, frontmatterRange);
-    default:
+    default: {
+      const exhaustiveCheck: never = op;
       return {
         ok: false,
         error: {
           code: "MCM_OPERATION_UNSUPPORTED",
-          message: `Unsupported operation ${op.op}`,
+          message: `Unsupported operation ${(exhaustiveCheck as MarkdownOperation).op}`,
           op_index: opIndex,
-          precondition_id: op.precondition_id,
+          precondition_id: (exhaustiveCheck as MarkdownOperation).precondition_id,
         },
       };
+    }
   }
 }
 
@@ -548,12 +550,13 @@ function applyResolvedOperation(
     return applyFrontmatterUpdate(lines, resolved.op, options.frontmatterPolicy);
   }
 
+  const exhaustiveOp: never = resolved.op;
   return {
     ok: false,
     error: {
       code: "MCM_OPERATION_UNSUPPORTED",
-      message: `Unsupported operation ${resolved.op.op}`,
-      precondition_id: resolved.op.precondition_id,
+      message: `Unsupported operation ${(exhaustiveOp as MarkdownOperation).op}`,
+      precondition_id: (exhaustiveOp as MarkdownOperation).precondition_id,
     },
   };
 }

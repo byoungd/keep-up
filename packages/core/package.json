@@ -42,6 +42,7 @@
   },
   "devDependencies": {
     "@ku0/native-bindings": "workspace:*",
+    "@types/iarna__toml": "^2.0.5",
     "fast-check": "^4.5.3"
   },
   "publishConfig": {
@@ -50,11 +51,11 @@
   "dependencies": {
     "@iarna/toml": "^2.2.5",
     "@ku0/ai-context-hash-rs": "workspace:*",
+    "@ku0/ai-sanitizer-rs": "workspace:*",
     "@ku0/anchor-codec-rs": "workspace:*",
     "@ku0/anchor-relocation-rs": "workspace:*",
-    "@ku0/policy-hash-rs": "workspace:*",
-    "@ku0/ai-sanitizer-rs": "workspace:*",
     "@ku0/canonicalizer-rs": "workspace:*",
+    "@ku0/policy-hash-rs": "workspace:*",
     "@ku0/text-normalization-rs": "workspace:*",
     "yaml": "^2.4.5",
     "zod": "^4.3.5"
