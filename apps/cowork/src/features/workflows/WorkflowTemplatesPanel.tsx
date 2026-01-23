@@ -699,7 +699,7 @@ export function WorkflowTemplatesPanel({
   }, [importPayload]);
 
   return (
-    <div className="flex flex-col h-full bg-surface-0 border-l border-border shadow-xl w-[720px] animate-in slide-in-from-right duration-300">
+    <div className="flex flex-col h-full bg-surface-0 border-l border-border shadow-soft w-[720px] animate-in slide-in-from-right duration-200">
       <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-surface-1">
         <div>
           <h2 className="text-lg font-semibold text-foreground">Workflow Templates</h2>
