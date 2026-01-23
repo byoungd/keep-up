@@ -134,7 +134,7 @@ export function MinimalTaskView({ task, content }: { task: AgentTask; content?: 
 // --- Specialized Node Displays ---
 
 const BASE_NODE_CLASSES =
-  "relative animate-in fade-in slide-in-from-left-4 duration-500 fill-mode-both px-3 py-2 rounded-xl text-xs shadow-sm overflow-hidden border border-border/20";
+  "relative animate-in fade-in slide-in-from-left-4 duration-500 fill-mode-both px-4 py-3 rounded-xl text-xs shadow-sm overflow-hidden border border-border/20";
 
 function ThinkingNodeDisplay({ node }: { node: TaskNode & { type: "thinking" } }) {
   return (

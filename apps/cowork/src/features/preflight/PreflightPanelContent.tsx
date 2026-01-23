@@ -110,7 +110,8 @@ export function PreflightPanelContent() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-y-auto scrollbar-auto-hide p-4 space-y-4">
+      {/* biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access. */}
+      <div className="flex-1 overflow-y-auto scrollbar-auto-hide p-4 space-y-4" tabIndex={0}>
         {errorMessage ? (
           <div className="text-xs text-destructive bg-destructive/5 border border-destructive/10 px-3 py-2 rounded-md">
             {errorMessage}

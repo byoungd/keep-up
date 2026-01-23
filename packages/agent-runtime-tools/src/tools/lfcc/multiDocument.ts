@@ -190,6 +190,10 @@ export function countOpsFromXml(xml: string): number {
     const matches = trimmed.match(/<\s*span\b[^>]*\bspan_id\s*=\s*["'][^"']+["']/g);
     return matches?.length ?? 1;
   }
+  if (rootTag.startsWith("md_")) {
+    const matches = trimmed.match(/<\s*md_[a-zA-Z0-9_-]+\b/g);
+    return matches?.length ?? 1;
+  }
   const opMatches = trimmed.match(/<\s*op\b/g);
   return opMatches?.length ?? 1;
 }

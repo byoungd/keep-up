@@ -53,6 +53,7 @@
     "@ku0/core": "workspace:*",
     "@ku0/db": "workspace:*",
     "@ku0/diff-rs": "workspace:*",
+    "@ku0/sandbox-rs": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.25.2",
     "diff": "^8.0.3",
     "gray-matter": "^4.0.3",

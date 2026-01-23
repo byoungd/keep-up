@@ -50,14 +50,14 @@ export function TaskTimeline({ graph, isConnected, approveTool, rejectTool }: Ta
   return (
     <div className="flex flex-col h-full bg-surface-0/70 relative rounded-2xl border border-border/40 shadow-sm overflow-hidden">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-border/40 bg-surface-0/90 backdrop-blur-md sticky top-0 z-20 flex justify-between items-center shadow-sm">
-        <h2 className="font-bold text-foreground text-sm tracking-tight flex items-center gap-2">
+      <div className="px-5 py-3 border-b border-border/40 bg-surface-0/90 sticky top-0 z-20 flex justify-between items-center shadow-sm">
+        <h2 className="text-sm font-semibold text-foreground tracking-tight flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-primary/20 flex items-center justify-center">
             <div className="w-1 h-1 rounded-full bg-primary animate-pulse" />
           </div>
           Execution Flow
         </h2>
-        <div className="flex items-center gap-2 bg-surface-2 rounded-full px-2 py-1 border border-border/40">
+        <div className="flex items-center gap-2 bg-surface-1/70 rounded-full px-2.5 py-1 border border-border/30">
           <span
             className={`w-1.5 h-1.5 rounded-full ${
               isConnected
@@ -65,16 +65,19 @@ export function TaskTimeline({ graph, isConnected, approveTool, rejectTool }: Ta
                 : "bg-muted-foreground"
             }`}
           />
-          <span className="text-micro text-muted-foreground font-black uppercase tracking-widest">
+          <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-[0.2em]">
             {graph.status.replace("_", " ")}
           </span>
         </div>
       </div>
 
       {/* List */}
-      <div
+      <section
         ref={containerRef}
-        className="flex-1 overflow-y-auto scrollbar-auto-hide p-4 space-y-6 scroll-smooth"
+        className="flex-1 overflow-y-auto scrollbar-auto-hide p-5 space-y-5 scroll-smooth"
+        aria-label="Task timeline"
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+        tabIndex={0}
         onScroll={(e) => {
           const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
           setShowScrollButton(scrollHeight - scrollTop - clientHeight > 150);
@@ -106,7 +109,7 @@ export function TaskTimeline({ graph, isConnected, approveTool, rejectTool }: Ta
             </div>
           </div>
         ) : (
-          <div className="relative pl-4 space-y-6 before:absolute before:left-[19px] before:top-2 before:bottom-2 before:w-[1px] before:bg-gradient-to-b before:from-border/10 before:via-border/40 before:to-border/10">
+          <div className="relative pl-4 space-y-5 before:absolute before:left-[19px] before:top-2 before:bottom-2 before:w-[1px] before:bg-border/30">
             {graph.nodes.map((node, index) => {
               let durationStr: string | undefined;
               if (index < graph.nodes.length - 1) {
@@ -129,7 +132,7 @@ export function TaskTimeline({ graph, isConnected, approveTool, rejectTool }: Ta
 
         {/* Render Pending Approval Card at the bottom if active */}
         {pendingNode && pendingNode.type === "tool_call" && (
-          <div className="sticky bottom-4 z-10 animate-in slide-in-from-bottom-6 fade-in duration-slow shadow-2xl rounded-2xl border border-accent-indigo/20">
+          <div className="sticky bottom-4 z-10 animate-in slide-in-from-bottom-6 fade-in duration-slow shadow-xl rounded-2xl border border-accent-indigo/20">
             <PendingApprovalCard
               toolName={pendingNode.toolName}
               args={pendingNode.args}
@@ -141,7 +144,7 @@ export function TaskTimeline({ graph, isConnected, approveTool, rejectTool }: Ta
         )}
 
         <div ref={bottomRef} className="h-4" />
-      </div>
+      </section>
 
       {/* Scroll to Bottom Button */}
       {showScrollButton && (

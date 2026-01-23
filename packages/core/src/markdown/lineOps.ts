@@ -6,6 +6,7 @@ import {
   updateFrontmatterValue,
 } from "./frontmatter.js";
 import { computeMarkdownLineHash, normalizeMarkdownText, splitMarkdownLines } from "./hash.js";
+import { resolveNativeMarkdownContent } from "./native.js";
 import { buildMarkdownSemanticIndex, resolveMarkdownSemanticTarget } from "./semantic.js";
 import type {
   LineRange,
@@ -51,6 +52,14 @@ export async function applyMarkdownLineOperations(
   envelope: MarkdownOperationEnvelope,
   options: ApplyOptions = {}
 ): Promise<MarkdownLineApplyResult> {
+  const native = resolveNativeMarkdownContent();
+  if (native) {
+    try {
+      return native.applyMarkdownLineOperations(content, envelope, options);
+    } catch {
+      // fall back to JS operations
+    }
+  }
   const envelopeError = validateEnvelope(envelope);
   if (envelopeError) {
     return { ok: false, error: envelopeError };

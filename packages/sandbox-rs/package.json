@@ -19,6 +19,7 @@
   "sideEffects": false,
   "scripts": {
     "build": "tsc",
+    "build:native": "cargo build --release && cp target/release/libsandbox_rs.dylib sandbox_rs.node 2>/dev/null || cp target/release/sandbox_rs.dll sandbox_rs.node 2>/dev/null || cp target/release/libsandbox_rs.so sandbox_rs.node 2>/dev/null || true",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "lint:fix": "biome check --write ."
