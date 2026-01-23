@@ -8,7 +8,10 @@ export * from "@ku0/agent-runtime-sandbox";
 
 import {
   createSandbox as createRustSandbox,
+  SandboxManager as RustSandboxManager,
   type SandboxPolicy as RustSandboxPolicy,
+  type SandboxPolicyConfig as RustSandboxPolicyConfig,
+  WORKSPACE_POLICY,
 } from "@ku0/sandbox-rs";
 import { type CoworkFileIntent, CoworkSandboxAdapter } from "../cowork/sandbox";
 import type { MCPToolCall, MCPToolResult, SandboxConfig, ToolContext } from "../types";
@@ -127,6 +130,54 @@ export function createSandbox(config: SandboxConfig): RustSandboxPolicy | null {
     return null;
   }
   return createRustSandbox(config);
+}
+
+export function createRustSandboxManager(config: SandboxConfig): RustSandboxManager | null {
+  if (config.type !== "rust") {
+    return null;
+  }
+  const workingDirectory = config.workingDirectory ?? process.cwd();
+  const policy = buildRustSandboxPolicy(config, workingDirectory);
+
+  try {
+    return new RustSandboxManager(policy, workingDirectory);
+  } catch {
+    return null;
+  }
+}
+
+export type { RustSandboxPolicyConfig };
+export { RustSandboxManager };
+
+function buildRustSandboxPolicy(
+  config: SandboxConfig,
+  workingDirectory: string
+): RustSandboxPolicyConfig {
+  const allowlist = config.networkAccess === "allowlist";
+  const fullAccess = config.networkAccess === "full";
+  const filesystemMode =
+    config.fsIsolation === "workspace" || config.fsIsolation === "temp"
+      ? "workspace"
+      : "permissive";
+  const allowedDomains = allowlist ? (config.allowedHosts ?? []) : undefined;
+
+  return {
+    ...WORKSPACE_POLICY,
+    name: filesystemMode,
+    filesystem: {
+      ...WORKSPACE_POLICY.filesystem,
+      mode: filesystemMode,
+      allowedPaths: workingDirectory ? [workingDirectory] : [],
+    },
+    network: {
+      ...WORKSPACE_POLICY.network,
+      enabled: config.networkAccess !== "none",
+      allowedDomains,
+      allowLocalhost: fullAccess,
+      allowHttps: fullAccess || allowlist,
+      allowHttp: fullAccess,
+    },
+  };
 }
 
 function parseOperation(name: string): string {

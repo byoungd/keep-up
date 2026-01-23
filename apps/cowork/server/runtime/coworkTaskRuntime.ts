@@ -37,6 +37,7 @@ import {
   createLessonStore,
   createLFCCToolServer,
   createMem0MemoryAdapter,
+  createRustSandboxManager,
   createSandboxToolServer,
   createSecurityPolicy,
   createSkillRegistry,
@@ -567,6 +568,10 @@ export class CoworkTaskRuntime {
     });
     const caseInsensitivePaths = settings.caseInsensitivePaths ?? false;
     const securityPolicy = this.buildRuntimeSecurityPolicy(toolRegistryResult.dockerAvailable);
+    const fileSandbox = securityPolicy ? createRustSandboxManager(securityPolicy.sandbox) : null;
+    await toolRegistry.register(
+      fileSandbox ? createFileToolServer({ sandbox: fileSandbox }) : createFileToolServer()
+    );
     const auditLogger = new CoworkAuditLogger({
       auditLogStore: this.auditLogStore,
       onEntry: (entry, mapped) => {
@@ -678,7 +683,6 @@ export class CoworkTaskRuntime {
   }> {
     const toolRegistry = createToolRegistry();
     await toolRegistry.register(createCompletionToolServer());
-    await toolRegistry.register(createFileToolServer());
     await this.registerLfccTools(toolRegistry, session);
     const workspacePath = process.cwd();
     const assetManager = this.getRuntimeAssetManager();
