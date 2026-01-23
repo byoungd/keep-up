@@ -41,6 +41,7 @@
     "typescript": "^5.7.3"
   },
   "dependencies": {
+    "@ku0/tokenizer-rs": "workspace:*",
     "@ai-sdk/anthropic": "^3.0.15",
     "@ai-sdk/google": "^3.0.10",
     "@ai-sdk/openai": "^3.0.12",

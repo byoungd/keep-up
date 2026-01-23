@@ -8,6 +8,7 @@ import { execFile } from "node:child_process";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { promisify } from "node:util";
+import { hasNativeSupport, listFiles as listFilesWithGitignoreNative } from "@ku0/gitignore-rs";
 
 const execFileAsync = promisify(execFile);
 
@@ -117,6 +118,19 @@ export async function listFiles(
   const maxDepth = options.maxDepth ?? Infinity;
   const includeHidden = options.includeHidden ?? false;
   const respectGitignore = options.respectGitignore ?? true;
+
+  if (hasNativeSupport()) {
+    try {
+      const nativeMaxDepth = Number.isFinite(maxDepth) ? maxDepth : undefined;
+      return listFilesWithGitignoreNative(absolutePath, {
+        maxDepth: nativeMaxDepth,
+        includeHidden,
+        respectGitignore,
+      });
+    } catch {
+      // Fall back to git/JS implementations if native binding fails.
+    }
+  }
 
   // Try to use `git ls-files` for gitignore-aware listing
   if (respectGitignore) {

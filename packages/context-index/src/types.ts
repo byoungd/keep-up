@@ -36,6 +36,8 @@ export interface ContextIndexConfig {
   maxFileBytes?: number;
   maxChunkTokens?: number;
   chunkOverlapTokens?: number;
+  tokenModel?: string;
+  respectGitignore?: boolean;
   promptTokenBudget?: number;
   minSearchScore?: number;
   reindexIntervalMs?: number;

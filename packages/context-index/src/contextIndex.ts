@@ -68,6 +68,8 @@ const DEFAULT_CONFIG: Required<Omit<ContextIndexConfig, "rootPath">> = {
   maxFileBytes: 512 * 1024,
   maxChunkTokens: 400,
   chunkOverlapTokens: 40,
+  tokenModel: "cl100k_base",
+  respectGitignore: true,
   promptTokenBudget: 1500,
   minSearchScore: 0.15,
   reindexIntervalMs: 60_000,
@@ -106,6 +108,7 @@ export class ContextIndex {
       includeExtensions: this.config.includeExtensions,
       excludeDirs: this.config.excludeDirs,
       maxFileBytes: this.config.maxFileBytes,
+      respectGitignore: this.config.respectGitignore,
     });
 
     report.totalFiles = files.length;
@@ -137,6 +140,7 @@ export class ContextIndex {
         const chunks = chunkText(content, {
           maxTokens: this.config.maxChunkTokens,
           overlapTokens: this.config.chunkOverlapTokens,
+          tokenModel: this.config.tokenModel,
         });
         const embeddings = await this.embeddingProvider.embed(chunks.map((chunk) => chunk.content));
         const chunkIds: string[] = [];

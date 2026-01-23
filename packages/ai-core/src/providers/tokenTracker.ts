@@ -5,6 +5,7 @@
  * Supports rate limiting and budget enforcement.
  */
 
+import { getNativeTokenizer, type NativeTokenizer } from "@ku0/tokenizer-rs";
 import { getEncoding, type Tiktoken, type TiktokenEncoding } from "js-tiktoken";
 import { getDefaultModelId, getModelCapability, type ModelPricing } from "../catalog/models";
 import type { TokenUsage } from "./types";
@@ -105,6 +106,7 @@ export class TokenTracker {
   private readonly rateLimitState = new Map<string, RateLimitState>();
   private readonly customPricing: Record<string, ModelPricing>;
   private readonly encodings = new Map<TiktokenEncoding, Tiktoken>();
+  private nativeTokenizer: NativeTokenizer | null | undefined;
 
   constructor(
     options: {
@@ -116,10 +118,30 @@ export class TokenTracker {
     this.customPricing = options.customPricing ?? {};
   }
 
+  private resolveNativeTokenizer(): NativeTokenizer | null {
+    if (this.nativeTokenizer === undefined) {
+      this.nativeTokenizer = getNativeTokenizer();
+    }
+    return this.nativeTokenizer;
+  }
+
   /**
    * Count tokens in a string for a specific model using Tiktoken.
    */
   countTokens(text: string, model = DEFAULT_MODEL_ID): number {
+    if (!text) {
+      return 0;
+    }
+
+    const native = this.resolveNativeTokenizer();
+    if (native) {
+      try {
+        return native.countTokens(text, model);
+      } catch {
+        // Fall back to JS token counter if native binding fails.
+      }
+    }
+
     const encodingName = this.getEncodingNameForModel(model);
     let encoding = this.encodings.get(encodingName);
 

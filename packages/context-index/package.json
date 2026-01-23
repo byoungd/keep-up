@@ -13,6 +13,8 @@
   },
   "dependencies": {
     "@ku0/token": "workspace:*",
+    "@ku0/tokenizer-rs": "workspace:*",
+    "@ku0/gitignore-rs": "workspace:*",
     "@ku0/vector-similarity-rs": "workspace:*"
   },
   "devDependencies": {

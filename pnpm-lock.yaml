@@ -474,6 +474,9 @@ importers:
       '@ku0/diff-rs':
         specifier: workspace:*
         version: link:../diff-rs
+      '@ku0/gitignore-rs':
+        specifier: workspace:*
+        version: link:../gitignore-rs
       '@ku0/sandbox-rs':
         specifier: workspace:*
         version: link:../sandbox-rs
@@ -546,6 +549,9 @@ importers:
       '@ai-sdk/openai':
         specifier: ^3.0.12
         version: 3.0.12(zod@4.3.5)
+      '@ku0/tokenizer-rs':
+        specifier: workspace:*
+        version: link:../tokenizer-rs
       ai:
         specifier: ^6.0.39
         version: 6.0.39(zod@4.3.5)
@@ -723,9 +729,15 @@ importers:
 
   packages/context-index:
     dependencies:
+      '@ku0/gitignore-rs':
+        specifier: workspace:*
+        version: link:../gitignore-rs
       '@ku0/token':
         specifier: workspace:*
         version: link:../token
+      '@ku0/tokenizer-rs':
+        specifier: workspace:*
+        version: link:../tokenizer-rs
       '@ku0/vector-similarity-rs':
         specifier: workspace:*
         version: link:../vector-similarity-rs
