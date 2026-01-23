@@ -97,6 +97,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+function isClarificationRequest(value: unknown): value is ClarificationRequest {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return typeof value.id === "string" && typeof value.question === "string";
+}
+
 function formatStatus(value: string): string {
   return value.replace(/_/g, " ");
 }
@@ -911,8 +918,8 @@ function handleClarificationRequested(
   if (!isRecord(data) || !isRecord(data.request)) {
     return prev;
   }
-  const request = data.request as ClarificationRequest;
-  if (!request.id) {
+  const request = data.request;
+  if (!isClarificationRequest(request)) {
     return prev;
   }
   if (prev.clarifications.some((entry) => entry.id === request.id)) {
