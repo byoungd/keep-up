@@ -7,7 +7,7 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-napi = { version = "2", features = ["async"] }
+napi = { version = "2", features = ["async", "dyn-symbols"] }
 napi-derive = "2"
 libc = "0.2"
 regex = "1.10"
