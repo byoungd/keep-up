@@ -65,9 +65,9 @@ export type MdDeleteLines = {
 export type MdUpdateFrontmatter = {
   op: "md_update_frontmatter";
   precondition_id: string;
-  updates: Record<string, unknown>;
+  target: { key_path: string[] };
+  value: unknown;
   create_if_missing?: boolean;
-  format?: "yaml" | "toml" | "json";
 };
 
 export type MarkdownOperation =
@@ -85,6 +85,7 @@ export type MarkdownOperationErrorCode =
   | "MCM_OPERATION_OVERLAP"
   | "MCM_OPERATION_UNSUPPORTED"
   | "MCM_FRONTMATTER_INVALID"
+  | "MCM_LINE_LIMIT_EXCEEDED"
   | "MCM_TARGETING_AMBIGUOUS"
   | "MCM_TARGETING_NOT_FOUND"
   | "MCM_TARGETING_SCOPE_EXCEEDED";

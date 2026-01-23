@@ -1,5 +1,10 @@
 import type { MarkdownTargetingPolicyV1 } from "../kernel/policy/types.js";
-import { applyFrontmatterUpdates } from "./frontmatter.js";
+import {
+  buildFrontmatterLines,
+  parseFrontmatter,
+  stringifyFrontmatter,
+  updateFrontmatterValue,
+} from "./frontmatter.js";
 import { computeMarkdownLineHash, normalizeMarkdownText, splitMarkdownLines } from "./hash.js";
 import { buildMarkdownSemanticIndex, resolveMarkdownSemanticTarget } from "./semantic.js";
 import type {
@@ -21,6 +26,11 @@ type ResolvedOperation = {
 
 type ApplyOptions = {
   targetingPolicy?: MarkdownTargetingPolicyV1;
+  frontmatterPolicy?: {
+    allow_frontmatter: boolean;
+    frontmatter_formats: Array<"yaml" | "toml" | "json">;
+    max_frontmatter_bytes?: number;
+  };
 };
 
 type PreconditionMapResult =
@@ -69,7 +79,8 @@ export async function applyMarkdownLineOperations(
     envelope.ops,
     preconditionsResult.map,
     preconditionResolution.ranges,
-    lineCount
+    lineCount,
+    semanticIndex.frontmatter?.line_range
   );
   if (!resolvedResult.ok) {
     return { ok: false, error: resolvedResult.error };
@@ -80,7 +91,11 @@ export async function applyMarkdownLineOperations(
     return { ok: false, error: overlapError };
   }
 
-  lines = applyResolvedOperations(lines, resolvedResult.resolvedOps);
+  const applyResult = applyResolvedOperations(lines, resolvedResult.resolvedOps, options);
+  if (!applyResult.ok) {
+    return applyResult;
+  }
+  lines = applyResult.lines;
 
   const applied: MarkdownAppliedOperation[] = resolvedResult.resolvedOps.map((resolved) => ({
     op_index: resolved.op_index,
@@ -299,7 +314,8 @@ function resolveOperations(
   ops: MarkdownOperation[],
   preconditionsById: Map<string, MarkdownPreconditionV1>,
   resolvedRanges: Map<string, LineRange>,
-  lineCount: number
+  lineCount: number,
+  frontmatterRange?: LineRange
 ): ResolveOpsResult {
   const resolvedOps: ResolvedOperation[] = [];
   const usedPreconditionIds = new Set<string>();
@@ -345,7 +361,7 @@ function resolveOperations(
       };
     }
 
-    const resolved = resolveOperation(op, resolvedRange, lineCount, i);
+    const resolved = resolveOperation(op, resolvedRange, lineCount, i, frontmatterRange);
     if (!resolved.ok) {
       return resolved;
     }
@@ -359,7 +375,8 @@ function resolveOperation(
   op: MarkdownOperation,
   resolvedRange: LineRange,
   lineCount: number,
-  opIndex: number
+  opIndex: number,
+  frontmatterRange?: LineRange
 ): { ok: true; resolved: ResolvedOperation } | { ok: false; error: MarkdownOperationError } {
   switch (op.op) {
     case "md_replace_lines":
@@ -369,15 +386,7 @@ function resolveOperation(
     case "md_insert_lines":
       return resolveInsertLines(op, resolvedRange, lineCount, opIndex);
     case "md_update_frontmatter":
-      // Frontmatter update operations use the frontmatter range from semantic index
-      return {
-        ok: true,
-        resolved: {
-          op_index: opIndex,
-          op,
-          resolved_range: resolvedRange,
-        },
-      };
+      return resolveFrontmatterUpdate(op, resolvedRange, opIndex, frontmatterRange);
     default: {
       const exhaustiveCheck: never = op;
       return {
@@ -510,7 +519,31 @@ function resolveInsertLines(
   };
 }
 
-function applyResolvedOperations(lines: string[], ops: ResolvedOperation[]): string[] {
+function resolveFrontmatterUpdate(
+  op: Extract<MarkdownOperation, { op: "md_update_frontmatter" }>,
+  resolvedRange: LineRange,
+  opIndex: number,
+  frontmatterRange?: LineRange
+): { ok: true; resolved: ResolvedOperation } | { ok: false; error: MarkdownOperationError } {
+  if (frontmatterRange && !rangesEqual(frontmatterRange, resolvedRange)) {
+    return {
+      ok: false,
+      error: {
+        code: "MCM_PRECONDITION_FAILED",
+        message: "Frontmatter update requires frontmatter precondition range",
+        op_index: opIndex,
+        precondition_id: op.precondition_id,
+      },
+    };
+  }
+  return { ok: true, resolved: { op_index: opIndex, op, resolved_range: resolvedRange } };
+}
+
+function applyResolvedOperations(
+  lines: string[],
+  ops: ResolvedOperation[],
+  options: ApplyOptions
+): { ok: true; lines: string[] } | { ok: false; error: MarkdownOperationError } {
   const applyOrder = [...ops].sort((a, b) => {
     if (a.resolved_range.start !== b.resolved_range.start) {
       return b.resolved_range.start - a.resolved_range.start;
@@ -519,54 +552,219 @@ function applyResolvedOperations(lines: string[], ops: ResolvedOperation[]): str
   });
 
   for (const resolved of applyOrder) {
-    applyResolvedOp(lines, resolved);
+    const result = applyResolvedOperation(lines, resolved, options);
+    if (!result.ok) {
+      return result;
+    }
+    lines = result.lines;
   }
 
-  return lines;
+  return { ok: true, lines };
 }
 
-function applyResolvedOp(lines: string[], resolved: ResolvedOperation): void {
-  switch (resolved.op.op) {
-    case "md_replace_lines": {
-      const replacement = splitMarkdownLines(resolved.op.content);
-      applyReplace(lines, resolved.resolved_range, replacement);
-      break;
-    }
-    case "md_delete_lines": {
-      applyDelete(lines, resolved.resolved_range);
-      if (lines.length === 0) {
-        lines.push("");
-      }
-      break;
-    }
-    case "md_insert_lines": {
-      const insertion = splitMarkdownLines(resolved.op.content);
-      applyInsert(lines, resolved.insert_index ?? 0, insertion);
-      break;
-    }
-    case "md_update_frontmatter": {
-      applyFrontmatterOp(lines, resolved);
-      break;
-    }
+function applyResolvedOperation(
+  lines: string[],
+  resolved: ResolvedOperation,
+  options: ApplyOptions
+): { ok: true; lines: string[] } | { ok: false; error: MarkdownOperationError } {
+  if (resolved.op.op === "md_replace_lines") {
+    const replacement = splitMarkdownLines(resolved.op.content);
+    applyReplace(lines, resolved.resolved_range, replacement);
+    return { ok: true, lines };
   }
+
+  if (resolved.op.op === "md_delete_lines") {
+    applyDelete(lines, resolved.resolved_range);
+    if (lines.length === 0) {
+      lines.push("");
+    }
+    return { ok: true, lines };
+  }
+
+  if (resolved.op.op === "md_insert_lines") {
+    const insertion = splitMarkdownLines(resolved.op.content);
+    applyInsert(lines, resolved.insert_index ?? 0, insertion);
+    return { ok: true, lines };
+  }
+
+  if (resolved.op.op === "md_update_frontmatter") {
+    return applyFrontmatterUpdate(lines, resolved.op, options.frontmatterPolicy);
+  }
+
+  const exhaustiveOp: never = resolved.op;
+  return {
+    ok: false,
+    error: {
+      code: "MCM_OPERATION_UNSUPPORTED",
+      message: `Unsupported operation ${(exhaustiveOp as MarkdownOperation).op}`,
+      precondition_id: (exhaustiveOp as MarkdownOperation).precondition_id,
+    },
+  };
 }
 
-function applyFrontmatterOp(lines: string[], resolved: ResolvedOperation): void {
-  if (resolved.op.op !== "md_update_frontmatter") {
-    return;
+function applyFrontmatterUpdate(
+  lines: string[],
+  op: Extract<MarkdownOperation, { op: "md_update_frontmatter" }>,
+  policy?: ApplyOptions["frontmatterPolicy"]
+): { ok: true; lines: string[] } | { ok: false; error: MarkdownOperationError } {
+  const contextResult = resolveFrontmatterContext(lines, op, policy);
+  if (!contextResult.ok) {
+    return contextResult;
   }
-  const result = applyFrontmatterUpdates(
-    lines,
-    resolved.resolved_range,
-    resolved.op.updates,
-    resolved.op.format,
-    resolved.op.create_if_missing
+
+  const updateResult = updateFrontmatterValue(
+    contextResult.context.data,
+    op.target.key_path,
+    op.value,
+    op.create_if_missing ?? false
   );
-  if (!result.ok) {
-    return;
+  if (!updateResult.ok) {
+    return { ok: false, error: updateResult.error };
   }
-  // Replace lines in-place
-  lines.splice(0, lines.length, ...result.lines);
+
+  const serialized = stringifyFrontmatter(updateResult.data, contextResult.context.syntax);
+  if (!serialized.ok) {
+    return { ok: false, error: serialized.error };
+  }
+
+  const frontmatterLines = buildFrontmatterLines(contextResult.context.syntax, serialized.content);
+  const sizeError = enforceFrontmatterSize(
+    frontmatterLines.join("\n"),
+    policy?.max_frontmatter_bytes,
+    op.precondition_id
+  );
+  if (sizeError) {
+    return { ok: false, error: sizeError };
+  }
+
+  return replaceOrInsertFrontmatter(lines, frontmatterLines, contextResult.context.existingRange);
+}
+
+type FrontmatterContext = {
+  syntax: "yaml" | "toml" | "json";
+  data: unknown;
+  existingRange: LineRange | null;
+};
+
+function resolveFrontmatterContext(
+  lines: string[],
+  op: Extract<MarkdownOperation, { op: "md_update_frontmatter" }>,
+  policy?: ApplyOptions["frontmatterPolicy"]
+): { ok: true; context: FrontmatterContext } | { ok: false; error: MarkdownOperationError } {
+  if (!policy || !policy.allow_frontmatter) {
+    return {
+      ok: false,
+      error: {
+        code: "MCM_FRONTMATTER_INVALID",
+        message: "Frontmatter updates are not allowed",
+        precondition_id: op.precondition_id,
+      },
+    };
+  }
+
+  const parseResult = parseFrontmatter(lines);
+  if (parseResult.found) {
+    if (!parseResult.ok) {
+      return { ok: false, error: parseResult.error };
+    }
+    const syntax = parseResult.value.block.syntax;
+    const formatError = validateFrontmatterFormat(policy, syntax, op.precondition_id);
+    if (formatError) {
+      return { ok: false, error: formatError };
+    }
+    return {
+      ok: true,
+      context: {
+        syntax,
+        data: parseResult.value.data,
+        existingRange: parseResult.value.block.line_range,
+      },
+    };
+  }
+
+  if (!op.create_if_missing) {
+    return {
+      ok: false,
+      error: {
+        code: "MCM_TARGETING_NOT_FOUND",
+        message: "Frontmatter not found",
+        precondition_id: op.precondition_id,
+      },
+    };
+  }
+
+  const defaultFormat = policy.frontmatter_formats[0];
+  if (!defaultFormat) {
+    return {
+      ok: false,
+      error: {
+        code: "MCM_FRONTMATTER_INVALID",
+        message: "No frontmatter formats available",
+        precondition_id: op.precondition_id,
+      },
+    };
+  }
+  const formatError = validateFrontmatterFormat(policy, defaultFormat, op.precondition_id);
+  if (formatError) {
+    return { ok: false, error: formatError };
+  }
+  return {
+    ok: true,
+    context: {
+      syntax: defaultFormat,
+      data: {},
+      existingRange: null,
+    },
+  };
+}
+
+function validateFrontmatterFormat(
+  policy: NonNullable<ApplyOptions["frontmatterPolicy"]>,
+  syntax: "yaml" | "toml" | "json",
+  preconditionId: string
+): MarkdownOperationError | null {
+  if (!policy.frontmatter_formats.includes(syntax)) {
+    return {
+      code: "MCM_FRONTMATTER_INVALID",
+      message: "Frontmatter format is not allowed",
+      precondition_id: preconditionId,
+    };
+  }
+  return null;
+}
+
+function enforceFrontmatterSize(
+  content: string,
+  maxBytes: number | undefined,
+  preconditionId: string
+): MarkdownOperationError | null {
+  if (maxBytes === undefined) {
+    return null;
+  }
+  const byteLength = new TextEncoder().encode(content).length;
+  if (byteLength <= maxBytes) {
+    return null;
+  }
+  return {
+    code: "MCM_LINE_LIMIT_EXCEEDED",
+    message: "Frontmatter size exceeds policy limit",
+    precondition_id: preconditionId,
+  };
+}
+
+function replaceOrInsertFrontmatter(
+  lines: string[],
+  frontmatterLines: string[],
+  existingRange: LineRange | null
+): { ok: true; lines: string[] } {
+  if (existingRange) {
+    const startIndex = existingRange.start - 1;
+    const deleteCount = existingRange.end - existingRange.start + 1;
+    lines.splice(startIndex, deleteCount, ...frontmatterLines);
+    return { ok: true, lines };
+  }
+  lines.splice(0, 0, ...frontmatterLines);
+  return { ok: true, lines };
 }
 
 function isValidLineRange(range: LineRange, lineCount: number): boolean {
