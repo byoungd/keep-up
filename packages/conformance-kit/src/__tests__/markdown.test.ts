@@ -106,8 +106,16 @@ describe("Markdown content mode conformance", () => {
       };
 
       const policy = vector.create_if_missing
-        ? { allow_frontmatter: true, frontmatter_formats: ["json"], max_frontmatter_bytes: 1024 }
-        : { allow_frontmatter: true, frontmatter_formats: ["yaml"], max_frontmatter_bytes: 1024 };
+        ? {
+            allow_frontmatter: true,
+            frontmatter_formats: ["json"] as ("yaml" | "toml" | "json")[],
+            max_frontmatter_bytes: 1024,
+          }
+        : {
+            allow_frontmatter: true,
+            frontmatter_formats: ["yaml"] as ("yaml" | "toml" | "json")[],
+            max_frontmatter_bytes: 1024,
+          };
 
       const result = await applyMarkdownLineOperations(vector.content, envelope, {
         frontmatterPolicy: policy,
