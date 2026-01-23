@@ -11,6 +11,7 @@ import { ArtifactsList } from "../artifacts/components/ArtifactsList";
 import { PreflightPanelContent } from "../preflight/PreflightPanelContent";
 import { useTaskStream } from "../tasks/hooks/useTaskStream";
 import { WorkflowTemplatesPanelContent } from "../workflows/WorkflowTemplatesPanelContent";
+import { CheckpointsPanelContent } from "./CheckpointsPanelContent";
 import { ContextPacksPanelContent } from "./ContextPacksPanelContent";
 import { ProjectContextPanelContent } from "./ProjectContextPanelContent";
 
@@ -19,6 +20,7 @@ export type ContextPanelTab =
   | "packs"
   | "workflows"
   | "preflight"
+  | "checkpoints"
   | "artifacts"
   | "notes"
   | "preview";
@@ -50,6 +52,7 @@ const TAB_CONFIG: { id: ContextPanelTab; label: string }[] = [
   { id: "packs", label: "Packs" },
   { id: "workflows", label: "Workflows" },
   { id: "preflight", label: "Preflight" },
+  { id: "checkpoints", label: "Checkpoints" },
   { id: "artifacts", label: "Artifacts" },
   { id: "notes", label: "Notes" },
 ];
@@ -174,6 +177,8 @@ export function ContextPanel({
         )}
 
         {resolvedTab === "preflight" && <PreflightPanelContent />}
+
+        {resolvedTab === "checkpoints" && <CheckpointsPanelContent />}
 
         {resolvedTab === "artifacts" && (
           <div className="h-full">
