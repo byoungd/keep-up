@@ -56,6 +56,15 @@ cowork initiatives. Use this index to navigate the active tracks and supporting 
 ## Phase 6: Rust Native Integration (Q1 2027)
 - docs/roadmap/phase-6-rust-native/README.md
 
+## Phase 8: Rust-First Agent Capabilities (Q4 2027)
+- docs/roadmap/phase-8-rust-agent-capabilities/README.md
+- docs/roadmap/phase-8-rust-agent-capabilities/track-ap-workforce-orchestrator.md
+- docs/roadmap/phase-8-rust-agent-capabilities/track-aq-tool-mcp-gateway.md
+- docs/roadmap/phase-8-rust-agent-capabilities/track-ar-workspaces-human-loop.md
+- docs/roadmap/phase-8-rust-agent-capabilities/track-as-model-fabric.md
+- docs/roadmap/phase-8-rust-agent-capabilities/track-at-agent-toolkits.md
+- docs/roadmap/phase-8-rust-agent-capabilities/track-au-local-first-data.md
+
 ## Parallel Product Tracks (UI & Cowork)
 - docs/roadmap/ui-cowork-cowork/README.md
 - docs/roadmap/ui-cowork-cowork/track-1-foundation.md
