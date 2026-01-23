@@ -10,7 +10,7 @@ export const COWORK_SIDEBAR_GROUPS: SidebarGroupDefinition[] = [
     items: [
       {
         id: "new-session",
-        label: "New task",
+        label: "New session",
         icon: SquarePen,
         route: "/new-session",
         defaultVisibility: "ALWAYS",

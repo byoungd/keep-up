@@ -14,6 +14,8 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
   Input,
+  Select,
+  SelectOption,
   Tooltip,
   useShellComponents,
   useShellRouter,
@@ -28,7 +30,6 @@ import {
   LayoutGrid,
   ListFilter,
   ListTodo,
-  Loader2,
   MoreHorizontal,
   PencilLine,
   Pin,
@@ -106,7 +107,6 @@ export function CoworkSidebarSections() {
     moveSessionToProject,
     renameSession,
     deleteSession,
-    getSessionsForProject,
     getSessionsForWorkspace,
   } = useWorkspace();
 
@@ -121,10 +121,11 @@ export function CoworkSidebarSections() {
       />
       <ProjectsSection
         projects={projects}
+        workspaces={workspaces}
+        activeWorkspaceId={activeWorkspaceId}
         activeProjectId={activeProjectId}
         setActiveProject={setActiveProject}
         createProject={createProject}
-        getSessionsForProject={getSessionsForProject}
       />
       <TasksSection
         sessions={sessions}
@@ -183,11 +184,11 @@ function SpacesSection({
         <button
           type="button"
           className="flex flex-1 items-center gap-2 text-left text-fine font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors duration-fast cursor-pointer"
-          aria-label="Spaces section"
+          aria-label="Workspaces section"
           aria-expanded={isExpanded}
           onClick={() => setIsExpanded((prev) => !prev)}
         >
-          <span>Spaces</span>
+          <span>Workspaces</span>
           <ChevronDown
             className={cn(
               "h-3 w-3 opacity-0 group-hover:opacity-100 transition-all duration-fast",
@@ -195,12 +196,12 @@ function SpacesSection({
             )}
           />
         </button>
-        <Tooltip content="New space" side="top">
+        <Tooltip content="New workspace" side="top">
           <Button
             variant="ghost"
             size="icon"
             className="h-6 w-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-surface-hover"
-            aria-label="New space"
+            aria-label="New workspace"
             onClick={handleNewSpace}
           >
             <Plus className="h-4 w-4" />
@@ -218,7 +219,7 @@ function SpacesSection({
         aria-hidden={!isExpanded}
       >
         <SpaceRow
-          label="All Spaces"
+          label="All Workspaces"
           isActive={!activeWorkspaceId}
           count={totalSessions}
           onSelect={() => setActiveWorkspace(null)}
@@ -272,41 +273,65 @@ function SpaceRow({ label, title, isActive, count, icon, onSelect }: SpaceRowPro
 
 type ProjectsSectionProps = {
   projects: Project[];
+  workspaces: Workspace[];
+  activeWorkspaceId: string | null;
   activeProjectId: string | null;
   setActiveProject: (projectId: string | null) => void;
-  createProject: (name: string, instructions?: string) => Promise<Project>;
-  getSessionsForProject: (projectId: string) => Session[];
+  createProject: (
+    name: string,
+    options?: { instructions?: string; workspaceId?: string | null }
+  ) => Promise<Project>;
 };
 
 function ProjectsSection({
   projects,
+  workspaces,
+  activeWorkspaceId,
   activeProjectId,
   setActiveProject,
   createProject,
-  getSessionsForProject,
 }: ProjectsSectionProps) {
-  const router = useShellRouter();
-  const components = useShellComponents();
-  const { Link } = components;
-
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [projectName, setProjectName] = React.useState("");
   const [projectInstructions, setProjectInstructions] = React.useState("");
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = React.useState("");
   const [isProjectsExpanded, setIsProjectsExpanded] = React.useState(true);
   const [pinnedProjectIds, setPinnedProjectIds] = React.useState<Set<string>>(new Set());
-  const [expandedProjectIds, setExpandedProjectIds] = React.useState<Set<string>>(new Set());
-
-  const activeSessionId = React.useMemo(() => {
-    const match = router.pathname.match(/^\/sessions\/([^/]+)/);
-    return match?.[1] ?? null;
-  }, [router.pathname]);
+  const sortedWorkspaces = React.useMemo(
+    () => [...workspaces].sort((a, b) => b.lastOpenedAt - a.lastOpenedAt),
+    [workspaces]
+  );
+  const workspaceLabelMap = React.useMemo(
+    () => new Map(workspaces.map((workspace) => [workspace.id, workspace.name])),
+    [workspaces]
+  );
 
   React.useEffect(() => {
     setPinnedProjectIds(readStorageSet(PINNED_PROJECTS_STORAGE_KEY));
   }, []);
 
+  React.useEffect(() => {
+    if (!isDialogOpen) {
+      return;
+    }
+    if (activeWorkspaceId) {
+      setSelectedWorkspaceId(activeWorkspaceId);
+      return;
+    }
+    setSelectedWorkspaceId(sortedWorkspaces[0]?.id ?? "");
+  }, [activeWorkspaceId, isDialogOpen, sortedWorkspaces]);
+
+  const scopedProjects = React.useMemo(() => {
+    if (!activeWorkspaceId) {
+      return projects;
+    }
+    return projects.filter(
+      (project) => project.workspaceId === activeWorkspaceId || !project.workspaceId
+    );
+  }, [projects, activeWorkspaceId]);
+
   const sortedProjects = React.useMemo(() => {
-    return [...projects].sort((a, b) => {
+    return [...scopedProjects].sort((a, b) => {
       const aPinned = pinnedProjectIds.has(a.id);
       const bPinned = pinnedProjectIds.has(b.id);
       if (aPinned && !bPinned) {
@@ -317,7 +342,17 @@ function ProjectsSection({
       }
       return b.createdAt - a.createdAt;
     });
-  }, [projects, pinnedProjectIds]);
+  }, [scopedProjects, pinnedProjectIds]);
+  const workspaceProjects = React.useMemo(() => {
+    if (!activeWorkspaceId) {
+      return [];
+    }
+    return sortedProjects.filter((project) => project.workspaceId === activeWorkspaceId);
+  }, [sortedProjects, activeWorkspaceId]);
+  const unassignedProjects = React.useMemo(
+    () => sortedProjects.filter((project) => !project.workspaceId),
+    [sortedProjects]
+  );
 
   const handleSelectProject = React.useCallback(
     (projectId: string) => {
@@ -332,19 +367,22 @@ function ProjectsSection({
 
   const handleCreateProject = React.useCallback(async () => {
     const trimmedName = projectName.trim();
-    if (!trimmedName) {
+    if (!trimmedName || !selectedWorkspaceId) {
       return;
     }
 
     try {
-      await createProject(trimmedName, projectInstructions.trim() || undefined);
+      await createProject(trimmedName, {
+        instructions: projectInstructions.trim() || undefined,
+        workspaceId: selectedWorkspaceId,
+      });
       setProjectName("");
       setProjectInstructions("");
       setIsDialogOpen(false);
     } catch (_err) {
       void _err;
     }
-  }, [projectInstructions, projectName, createProject]);
+  }, [projectInstructions, projectName, selectedWorkspaceId, createProject]);
 
   const togglePinProject = React.useCallback((projectId: string) => {
     setPinnedProjectIds((prev) => {
@@ -355,18 +393,6 @@ function ProjectsSection({
         next.add(projectId);
       }
       writeStorageSet(PINNED_PROJECTS_STORAGE_KEY, next);
-      return next;
-    });
-  }, []);
-
-  const toggleExpandProject = React.useCallback((projectId: string) => {
-    setExpandedProjectIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(projectId)) {
-        next.delete(projectId);
-      } else {
-        next.add(projectId);
-      }
       return next;
     });
   }, []);
@@ -412,35 +438,81 @@ function ProjectsSection({
           )}
           aria-hidden={!isProjectsExpanded}
         >
-          {projects.length === 0 ? (
-            <button
-              type="button"
-              className="flex items-center gap-2.5 w-full rounded-md px-3 py-1.5 text-[13px] text-muted-foreground hover:text-foreground hover:bg-surface-hover transition-colors duration-fast cursor-pointer group"
-              onClick={() => setIsDialogOpen(true)}
-            >
-              <FolderPlus
-                className="h-4 w-4 text-muted-foreground opacity-70 group-hover:opacity-100 group-hover:text-foreground transition-all duration-fast"
-                aria-hidden="true"
-              />
-              <span>New project</span>
-            </button>
-          ) : null}
+          {activeWorkspaceId ? (
+            <>
+              {workspaceProjects.length === 0 && unassignedProjects.length === 0 ? (
+                <button
+                  type="button"
+                  className="flex items-center gap-2.5 w-full rounded-md px-3 py-1.5 text-[13px] text-muted-foreground hover:text-foreground hover:bg-surface-hover transition-colors duration-fast cursor-pointer group"
+                  onClick={() => setIsDialogOpen(true)}
+                >
+                  <FolderPlus
+                    className="h-4 w-4 text-muted-foreground opacity-70 group-hover:opacity-100 group-hover:text-foreground transition-all duration-fast"
+                    aria-hidden="true"
+                  />
+                  <span>New project</span>
+                </button>
+              ) : null}
 
-          {sortedProjects.map((project) => (
-            <ProjectRow
-              key={project.id}
-              project={project}
-              isActive={activeProjectId === project.id}
-              isPinned={pinnedProjectIds.has(project.id)}
-              isExpanded={expandedProjectIds.has(project.id)}
-              tasks={getSessionsForProject(project.id)}
-              activeSessionId={activeSessionId}
-              linkComponent={Link}
-              onSelect={() => handleSelectProject(project.id)}
-              onToggleExpand={() => toggleExpandProject(project.id)}
-              onTogglePin={() => togglePinProject(project.id)}
-            />
-          ))}
+              {workspaceProjects.map((project) => (
+                <ProjectRow
+                  key={project.id}
+                  project={project}
+                  isActive={activeProjectId === project.id}
+                  isPinned={pinnedProjectIds.has(project.id)}
+                  onSelect={() => handleSelectProject(project.id)}
+                  onTogglePin={() => togglePinProject(project.id)}
+                />
+              ))}
+
+              {unassignedProjects.length > 0 ? (
+                <div className="px-3 pt-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground/70">
+                  Unassigned
+                </div>
+              ) : null}
+              {unassignedProjects.map((project) => (
+                <ProjectRow
+                  key={project.id}
+                  project={project}
+                  isActive={activeProjectId === project.id}
+                  isPinned={pinnedProjectIds.has(project.id)}
+                  workspaceLabel="Unassigned"
+                  onSelect={() => handleSelectProject(project.id)}
+                  onTogglePin={() => togglePinProject(project.id)}
+                />
+              ))}
+            </>
+          ) : (
+            <>
+              {sortedProjects.length === 0 ? (
+                <button
+                  type="button"
+                  className="flex items-center gap-2.5 w-full rounded-md px-3 py-1.5 text-[13px] text-muted-foreground hover:text-foreground hover:bg-surface-hover transition-colors duration-fast cursor-pointer group"
+                  onClick={() => setIsDialogOpen(true)}
+                >
+                  <FolderPlus
+                    className="h-4 w-4 text-muted-foreground opacity-70 group-hover:opacity-100 group-hover:text-foreground transition-all duration-fast"
+                    aria-hidden="true"
+                  />
+                  <span>New project</span>
+                </button>
+              ) : null}
+
+              {sortedProjects.map((project) => (
+                <ProjectRow
+                  key={project.id}
+                  project={project}
+                  isActive={activeProjectId === project.id}
+                  isPinned={pinnedProjectIds.has(project.id)}
+                  workspaceLabel={
+                    project.workspaceId ? workspaceLabelMap.get(project.workspaceId) : "Unassigned"
+                  }
+                  onSelect={() => handleSelectProject(project.id)}
+                  onTogglePin={() => togglePinProject(project.id)}
+                />
+              ))}
+            </>
+          )}
         </div>
       </section>
 
@@ -468,6 +540,33 @@ function ProjectsSection({
               onChange={(event) => setProjectName(event.target.value)}
               aria-label="Project name"
             />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-foreground" htmlFor="project-workspace">
+              Workspace
+            </label>
+            <Select
+              id="project-workspace"
+              value={selectedWorkspaceId}
+              onChange={(event) => setSelectedWorkspaceId(event.target.value)}
+              aria-label="Project workspace"
+              fullWidth
+            >
+              <SelectOption value="" disabled>
+                Select a workspace
+              </SelectOption>
+              {sortedWorkspaces.map((workspace) => (
+                <SelectOption key={workspace.id} value={workspace.id}>
+                  {workspace.name}
+                </SelectOption>
+              ))}
+            </Select>
+            {sortedWorkspaces.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Start a session to create your first workspace.
+              </p>
+            ) : null}
           </div>
 
           <div className="space-y-2">
@@ -500,7 +599,7 @@ function ProjectsSection({
           <Button
             onClick={handleCreateProject}
             type="button"
-            disabled={!projectName.trim()}
+            disabled={!projectName.trim() || !selectedWorkspaceId}
             className="min-w-[96px]"
           >
             Create
@@ -515,17 +614,8 @@ type ProjectRowProps = {
   project: Project;
   isActive: boolean;
   isPinned: boolean;
-  isExpanded: boolean;
-  tasks: Session[];
-  activeSessionId: string | null;
-  linkComponent: React.ComponentType<{
-    href: string;
-    className?: string;
-    title?: string;
-    children: React.ReactNode;
-  }>;
+  workspaceLabel?: string;
   onSelect: () => void;
-  onToggleExpand: () => void;
   onTogglePin: () => void;
 };
 
@@ -533,16 +623,10 @@ function ProjectRow({
   project,
   isActive,
   isPinned,
-  isExpanded,
-  tasks,
-  activeSessionId,
-  linkComponent: LinkComponent,
+  workspaceLabel,
   onSelect,
-  onToggleExpand,
   onTogglePin,
 }: ProjectRowProps) {
-  const hasTasks = tasks.length > 0;
-
   return (
     <div className="space-y-0.5">
       <div
@@ -568,22 +652,14 @@ function ProjectRow({
             aria-hidden="true"
           />
           <span className="truncate flex-1">{project.name}</span>
+          {workspaceLabel ? (
+            <span className="text-[10px] font-semibold text-muted-foreground/60 shrink-0">
+              {workspaceLabel}
+            </span>
+          ) : null}
           {isPinned ? (
             <Pin className="h-3 w-3 text-muted-foreground/60" aria-hidden="true" />
           ) : null}
-        </button>
-        <button
-          type="button"
-          onClick={onToggleExpand}
-          className={cn(
-            "flex items-center justify-center h-5 w-5 rounded hover:bg-surface-hover transition-colors duration-fast cursor-pointer text-muted-foreground hover:text-foreground mr-7",
-            hasTasks ? "opacity-0 group-hover:opacity-100" : "opacity-0 pointer-events-none"
-          )}
-          aria-label={isExpanded ? "Collapse project" : "Expand project"}
-        >
-          <ChevronDown
-            className={cn("h-3 w-3 transition-transform", !isExpanded && "-rotate-90")}
-          />
         </button>
 
         <DropdownMenu modal={false}>
@@ -638,42 +714,6 @@ function ProjectRow({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-
-      {isExpanded && hasTasks ? (
-        <div className="ml-2 pl-2 border-l border-border/20 space-y-0.5 mb-1">
-          {tasks.map((session) => {
-            const isActiveSession = activeSessionId === session.id;
-            const isRunning = session.status === "running";
-            return (
-              <div
-                key={session.id}
-                className={cn(
-                  "relative flex items-center rounded-md px-3 py-1.5 transition-colors duration-fast group",
-                  isActiveSession
-                    ? "bg-foreground/[0.08] text-foreground font-medium"
-                    : "text-muted-foreground hover:bg-surface-hover hover:text-foreground"
-                )}
-              >
-                <LinkComponent
-                  href={`/sessions/${session.id}`}
-                  className="flex items-center gap-2.5 flex-1 min-w-0 text-[13px] cursor-pointer"
-                  title={session.title}
-                >
-                  {isRunning ? (
-                    <Loader2 className="h-4 w-4 shrink-0 text-primary animate-spin" />
-                  ) : (
-                    <Brain
-                      className="h-4 w-4 shrink-0 opacity-70 group-hover:opacity-100 group-hover:text-foreground transition-all duration-fast"
-                      aria-hidden="true"
-                    />
-                  )}
-                  <span className="truncate">{session.title}</span>
-                </LinkComponent>
-              </div>
-            );
-          })}
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -908,8 +948,11 @@ function TasksSection({
     (session: Session) => {
       const isActive = activeSessionId === session.id;
       const isFavorite = favoriteIds.has(session.id);
-      const favoriteLabel = isFavorite ? "Remove from favorites" : "Add to favorites";
+      const favoriteLabel = isFavorite ? "Unpin session" : "Pin session";
       const shareLabel = shareFeedback[session.id];
+      const availableProjects = sortedProjects.filter(
+        (project) => !project.workspaceId || project.workspaceId === session.workspaceId
+      );
       return (
         <SidebarSessionRow
           key={session.id}
@@ -918,7 +961,7 @@ function TasksSection({
           isFavorite={isFavorite}
           favoriteLabel={favoriteLabel}
           shareLabel={shareLabel}
-          projects={sortedProjects}
+          projects={availableProjects}
           linkComponent={Link}
           onShare={() => void handleShareSession(session.id, session.title)}
           onRename={() => openRenameDialog(session.id)}
@@ -990,9 +1033,9 @@ function TasksSection({
               {activeWorkspace ? (
                 <FilterPill
                   icon={<LayoutGrid className="h-3.5 w-3.5" aria-hidden="true" />}
-                  label={`Space: ${activeWorkspace.name}`}
+                  label={`Workspace: ${activeWorkspace.name}`}
                   onClear={() => setActiveWorkspace(null)}
-                  ariaLabel="Clear space filter"
+                  ariaLabel="Clear workspace filter"
                 />
               ) : null}
               {activeProject ? (
@@ -1171,11 +1214,11 @@ function TasksHeader({
       <button
         type="button"
         className="flex flex-1 items-center gap-2 text-left text-fine font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors duration-fast cursor-pointer"
-        aria-label="All tasks section"
+        aria-label="Sessions section"
         aria-expanded={isExpanded}
         onClick={onToggleExpanded}
       >
-        <span>{taskFilter === "favorites" ? "Favorites" : "Tasks"}</span>
+        <span>{taskFilter === "favorites" ? "Pinned" : "Sessions"}</span>
         <span className="text-[10px] font-semibold text-muted-foreground/70">
           {taskFilter === "favorites" ? favoritesCount : totalCount}
         </span>
@@ -1193,7 +1236,7 @@ function TasksHeader({
             variant="ghost"
             size="icon"
             className="h-6 w-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-surface-hover data-[state=open]:bg-foreground/[0.08] data-[state=open]:text-foreground"
-            aria-label="Task filters"
+            aria-label="Session filters"
           >
             <ListFilter className="h-4 w-4" />
           </Button>
@@ -1209,7 +1252,7 @@ function TasksHeader({
             )}
           >
             <ListTodo className="h-4 w-4" />
-            Tasks
+            Sessions
             {taskFilter === "all" ? <Check className="ml-auto h-3 w-3" /> : null}
           </DropdownMenuItem>
           <DropdownMenuItem
@@ -1222,7 +1265,7 @@ function TasksHeader({
             )}
           >
             <Star className="h-4 w-4" />
-            Favorites
+            Pinned
             {taskFilter === "favorites" ? <Check className="ml-auto h-3 w-3" /> : null}
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -1372,7 +1415,7 @@ function SessionGroupsList({
       )}
       {taskFilter === "favorites" && favoriteSessions.length === 0 ? (
         <div className="px-3 text-xs text-muted-foreground">
-          No favorites yet. Star a session to pin it here.
+          No pinned sessions yet. Star a session to pin it here.
         </div>
       ) : null}
     </div>
@@ -1390,7 +1433,7 @@ function TasksEmptyState({
       <div className="rounded-md border border-border/20 bg-surface-2/40 px-3 py-2 text-xs text-muted-foreground">
         {sessionQuery
           ? "No sessions match this filter."
-          : "No sessions yet. Start a new task to begin."}
+          : "No sessions yet. Start a new session to begin."}
       </div>
       <button
         type="button"
@@ -1401,7 +1444,7 @@ function TasksEmptyState({
           className="h-4 w-4 text-muted-foreground opacity-70 group-hover:opacity-100 group-hover:text-foreground transition-all duration-fast"
           aria-hidden="true"
         />
-        <span>{activeProjectId ? "New task in project" : "New task"}</span>
+        <span>{activeProjectId ? "New session in project" : "New session"}</span>
       </button>
       {sessionQuery ? (
         <Button
@@ -1583,31 +1626,29 @@ function SidebarSessionRow({
             <DropdownMenuSubContent className="w-56 rounded-lg p-1">
               {projects.length === 0 ? (
                 <DropdownMenuItem disabled>
-                  <span className="text-muted-foreground">No projects</span>
+                  <span className="text-muted-foreground">No projects for this workspace</span>
                 </DropdownMenuItem>
               ) : (
+                projects.map((project) => (
+                  <DropdownMenuItem
+                    key={project.id}
+                    onSelect={() => onMoveToProject(project.id)}
+                    className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none"
+                  >
+                    <span>{project.name}</span>
+                    {session.projectId === project.id && <Check className="ml-auto h-4 w-4" />}
+                  </DropdownMenuItem>
+                ))
+              )}
+              {session.projectId && (
                 <>
-                  {projects.map((project) => (
-                    <DropdownMenuItem
-                      key={project.id}
-                      onSelect={() => onMoveToProject(project.id)}
-                      className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none"
-                    >
-                      <span>{project.name}</span>
-                      {session.projectId === project.id && <Check className="ml-auto h-4 w-4" />}
-                    </DropdownMenuItem>
-                  ))}
-                  {session.projectId && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onSelect={() => onMoveToProject(null)}
-                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none"
-                      >
-                        <span>Remove from project</span>
-                      </DropdownMenuItem>
-                    </>
-                  )}
+                  {projects.length > 0 ? <DropdownMenuSeparator /> : null}
+                  <DropdownMenuItem
+                    onSelect={() => onMoveToProject(null)}
+                    className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none"
+                  >
+                    <span>Remove from project</span>
+                  </DropdownMenuItem>
                 </>
               )}
             </DropdownMenuSubContent>
