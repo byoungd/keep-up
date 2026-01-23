@@ -725,7 +725,7 @@ function parseLineRange(
 function parseInsertAnchor(
   attrs: Record<string, string>
 ):
-  | { ok: true; target: { after_line?: number; before_line?: number } }
+  | { ok: true; target: { after_line: number } | { before_line: number } }
   | { ok: false; error: MarkdownOperationError } {
   const after = attrs.after ? parseRequiredInt(attrs.after, "after") : null;
   if (after && !after.ok) {
@@ -753,15 +753,17 @@ function parseInsertAnchor(
       },
     };
   }
-  return {
-    ok: true,
-    target:
-      after?.value !== undefined ? { after_line: after.value } : { before_line: before?.value },
-  };
+  if (after?.value !== undefined) {
+    return { ok: true, target: { after_line: after.value } };
+  }
+  return { ok: true, target: { before_line: (before as { ok: true; value: number }).value } };
 }
 
 type BlockTargetParseResult =
-  | { ok: true; target: { block_id?: string; semantic?: MarkdownPreconditionV1["semantic"] } }
+  | {
+      ok: true;
+      target: { block_id: string } | { semantic: NonNullable<MarkdownPreconditionV1["semantic"]> };
+    }
   | { ok: false; error: MarkdownOperationError };
 
 function parseBlockTarget(opName: string, attrs: Record<string, string>): BlockTargetParseResult {
@@ -814,7 +816,7 @@ function parseHeadingTarget(
       semantic: {
         kind: "heading",
         heading_text: normalized,
-        heading_text_mode: headingMode,
+        heading_text_mode: headingMode as "exact" | "prefix" | undefined,
         heading_level: levelResult.value ?? inferredLevel,
         nth: nthResult.value,
       },
@@ -839,7 +841,7 @@ function parseCodeFenceTarget(attrs: Record<string, string>): BlockTargetParseRe
         after_heading: attrs.after_heading
           ? normalizeHeadingAttribute(attrs.after_heading)
           : undefined,
-        after_heading_mode: attrs.after_heading_mode,
+        after_heading_mode: attrs.after_heading_mode as "exact" | "prefix" | undefined,
         nth: nthResult.value,
       },
     },

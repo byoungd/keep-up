@@ -65,7 +65,7 @@ export type MdDeleteLines = {
 export type MdReplaceBlock = {
   op: "md_replace_block";
   precondition_id: string;
-  target: { block_id: string } | { semantic: MarkdownPreconditionV1["semantic"] };
+  target: { block_id: string } | { semantic: NonNullable<MarkdownPreconditionV1["semantic"]> };
   content: string;
 };
 
@@ -80,21 +80,21 @@ export type MdUpdateFrontmatter = {
 export type MdInsertAfter = {
   op: "md_insert_after";
   precondition_id: string;
-  target: { block_id: string } | { semantic: MarkdownPreconditionV1["semantic"] };
+  target: { block_id: string } | { semantic: NonNullable<MarkdownPreconditionV1["semantic"]> };
   content: string;
 };
 
 export type MdInsertBefore = {
   op: "md_insert_before";
   precondition_id: string;
-  target: { block_id: string } | { semantic: MarkdownPreconditionV1["semantic"] };
+  target: { block_id: string } | { semantic: NonNullable<MarkdownPreconditionV1["semantic"]> };
   content: string;
 };
 
 export type MdInsertCodeFence = {
   op: "md_insert_code_fence";
   precondition_id: string;
-  target: { block_id: string } | { semantic: MarkdownPreconditionV1["semantic"] };
+  target: { block_id: string } | { semantic: NonNullable<MarkdownPreconditionV1["semantic"]> };
   language?: string;
   content: string;
   fence_char?: "`" | "~";
