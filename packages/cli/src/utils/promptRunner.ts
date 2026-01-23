@@ -1,4 +1,5 @@
-import type { RuntimeEvent, RuntimeInstance } from "@ku0/agent-runtime";
+import type { RuntimeInstance } from "@ku0/agent-runtime";
+import type { RuntimeEvent } from "@ku0/agent-runtime-control";
 import type { AgentState, MCPToolResult } from "@ku0/agent-runtime-core";
 import type { ToolCallRecord } from "@ku0/tooling-session";
 import { writeStderr, writeStdout } from "./terminal";
@@ -11,12 +12,15 @@ export interface PromptRunnerOptions {
 }
 
 export async function runPromptWithStreaming(options: PromptRunnerOptions): Promise<AgentState> {
-  const staleSubscription = options.runtime.eventBus?.subscribe("context:file-stale", (event) => {
-    if (options.quiet) {
-      return;
+  const staleSubscription = options.runtime.eventBus?.subscribe(
+    "context:file-stale",
+    (event: RuntimeEvent) => {
+      if (options.quiet) {
+        return;
+      }
+      writeStderr(formatStaleWarning(event.payload));
     }
-    writeStderr(formatStaleWarning(event.payload));
-  });
+  );
 
   const iterator = options.runtime.kernel.runStream(options.prompt)[Symbol.asyncIterator]();
   let finalState: AgentState | undefined;

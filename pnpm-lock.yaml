@@ -657,6 +657,9 @@ importers:
       '@ku0/agent-runtime':
         specifier: workspace:*
         version: link:../agent-runtime
+      '@ku0/agent-runtime-control':
+        specifier: workspace:*
+        version: link:../agent-runtime-control
       '@ku0/agent-runtime-core':
         specifier: workspace:*
         version: link:../agent-runtime-core
@@ -1229,6 +1232,9 @@ importers:
       '@ku0/agent-runtime':
         specifier: workspace:*
         version: link:../agent-runtime
+      '@ku0/agent-runtime-control':
+        specifier: workspace:*
+        version: link:../agent-runtime-control
       '@ku0/agent-runtime-core':
         specifier: workspace:*
         version: link:../agent-runtime-core

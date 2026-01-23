@@ -103,6 +103,7 @@ export interface KernelRunOptions {
 export interface Kernel {
   run(input: string, options?: KernelRunOptions): Promise<AgentState>;
   runStream(input: string, options?: KernelRunOptions): AsyncIterable<RuntimeEvent>;
+  stop(): void;
   emitArtifact(
     artifact: Parameters<ArtifactPipeline["emit"]>[0],
     context?: ArtifactEmissionContext
@@ -187,6 +188,10 @@ export class RuntimeKernel implements Kernel {
     for await (const event of this.orchestrator.runStream(input)) {
       yield this.wrapOrchestratorEvent(event);
     }
+  }
+
+  stop(): void {
+    this.orchestrator.stop();
   }
 
   emitArtifact(
