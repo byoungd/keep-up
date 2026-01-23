@@ -1,5 +1,6 @@
 "use client";
 
+import { Dialog } from "@ku0/shell";
 import { useParams } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -35,6 +36,8 @@ export function CheckpointsPanelContent() {
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [lastRestore, setLastRestore] = useState<CoworkCheckpointRestoreResult | null>(null);
+  const [pendingRestore, setPendingRestore] = useState<CoworkCheckpointSummary | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<CoworkCheckpointSummary | null>(null);
 
   const canLoad = Boolean(resolvedSessionId);
   const isBusy = isLoading || Boolean(restoringId) || Boolean(deletingId);
@@ -112,6 +115,22 @@ export function CheckpointsPanelContent() {
     [resolvedSessionId]
   );
 
+  const openRestoreDialog = useCallback((checkpoint: CoworkCheckpointSummary) => {
+    setPendingRestore(checkpoint);
+  }, []);
+
+  const openDeleteDialog = useCallback((checkpoint: CoworkCheckpointSummary) => {
+    setPendingDelete(checkpoint);
+  }, []);
+
+  const closeRestoreDialog = useCallback(() => {
+    setPendingRestore(null);
+  }, []);
+
+  const closeDeleteDialog = useCallback(() => {
+    setPendingDelete(null);
+  }, []);
+
   const lastRestoreLabel = useMemo(() => {
     if (!lastRestore) {
       return null;
@@ -135,7 +154,7 @@ export function CheckpointsPanelContent() {
             <button
               type="button"
               className="px-3 py-2 text-xs font-medium text-primary-foreground bg-primary rounded-md hover:bg-primary/90 transition-colors duration-fast disabled:opacity-60"
-              onClick={() => handleRestore(latestCheckpoint.id)}
+              onClick={() => openRestoreDialog(latestCheckpoint)}
               disabled={!canLoad || isBusy}
             >
               Restore latest
@@ -162,6 +181,10 @@ export function CheckpointsPanelContent() {
       {errorMessage ? <div className="text-xs text-destructive">{errorMessage}</div> : null}
 
       {lastRestoreLabel ? <div className="text-xs text-success">{lastRestoreLabel}</div> : null}
+
+      {!isLoading && !canLoad ? (
+        <div className="text-xs text-muted-foreground">Open a session to manage checkpoints.</div>
+      ) : null}
 
       {!isLoading && canLoad && sortedCheckpoints.length === 0 ? (
         <div className="text-xs text-muted-foreground">No checkpoints yet.</div>
@@ -204,7 +227,7 @@ export function CheckpointsPanelContent() {
                 <button
                   type="button"
                   className="px-2 py-1 text-xs font-medium text-primary-foreground bg-primary rounded-md hover:bg-primary/90 transition-colors duration-fast disabled:opacity-60"
-                  onClick={() => handleRestore(checkpoint.id)}
+                  onClick={() => openRestoreDialog(checkpoint)}
                   disabled={isLoading || isRestoring || isDeleting}
                 >
                   {isRestoring ? "Restoring..." : "Restore"}
@@ -212,7 +235,7 @@ export function CheckpointsPanelContent() {
                 <button
                   type="button"
                   className="px-2 py-1 text-xs font-medium text-muted-foreground border border-border rounded-md hover:text-foreground hover:bg-surface-2 transition-colors duration-fast disabled:opacity-60"
-                  onClick={() => handleDelete(checkpoint.id)}
+                  onClick={() => openDeleteDialog(checkpoint)}
                   disabled={isLoading || isDeleting || isRestoring}
                 >
                   {isDeleting ? "Deleting..." : "Delete"}
@@ -222,6 +245,86 @@ export function CheckpointsPanelContent() {
           );
         })}
       </div>
+
+      <Dialog
+        open={pendingRestore !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeRestoreDialog();
+          }
+        }}
+        title="Restore checkpoint"
+        description={
+          pendingRestore
+            ? `Restore checkpoint "${pendingRestore.task}" from ${new Date(
+                pendingRestore.createdAt
+              ).toLocaleString()}? This resets the agent state for this session.`
+            : "Restore this checkpoint? This resets the agent state for this session."
+        }
+        className="rounded-2xl bg-surface-1/95 border-border/30"
+      >
+        <div className="flex justify-end gap-2 mt-6">
+          <button
+            type="button"
+            className="px-3 py-2 text-xs font-medium text-muted-foreground border border-border rounded-md hover:text-foreground hover:bg-surface-2 transition-colors duration-fast disabled:opacity-60"
+            onClick={closeRestoreDialog}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="px-3 py-2 text-xs font-medium text-primary-foreground bg-primary rounded-md hover:bg-primary/90 transition-colors duration-fast disabled:opacity-60"
+            onClick={() => {
+              if (pendingRestore) {
+                void handleRestore(pendingRestore.id);
+              }
+              closeRestoreDialog();
+            }}
+            disabled={isBusy}
+          >
+            Restore
+          </button>
+        </div>
+      </Dialog>
+
+      <Dialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeDeleteDialog();
+          }
+        }}
+        title="Delete checkpoint"
+        description={
+          pendingDelete
+            ? `Delete checkpoint "${pendingDelete.task}"? This action cannot be undone.`
+            : "Delete this checkpoint? This action cannot be undone."
+        }
+        className="rounded-2xl bg-surface-1/95 border-border/30"
+      >
+        <div className="flex justify-end gap-2 mt-6">
+          <button
+            type="button"
+            className="px-3 py-2 text-xs font-medium text-muted-foreground border border-border rounded-md hover:text-foreground hover:bg-surface-2 transition-colors duration-fast disabled:opacity-60"
+            onClick={closeDeleteDialog}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="px-3 py-2 text-xs font-medium text-error-foreground bg-error rounded-md hover:bg-error/90 transition-colors duration-fast disabled:opacity-60"
+            onClick={() => {
+              if (pendingDelete) {
+                void handleDelete(pendingDelete.id);
+              }
+              closeDeleteDialog();
+            }}
+            disabled={isBusy}
+          >
+            Delete
+          </button>
+        </div>
+      </Dialog>
     </div>
   );
 }
