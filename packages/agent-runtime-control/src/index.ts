@@ -6,3 +6,4 @@
 
 export * from "./events";
 export * from "./workforce";
+export * from "./workspaceSessions";

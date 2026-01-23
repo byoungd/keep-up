@@ -27,7 +27,8 @@
   "dependencies": {
     "@ku0/agent-workforce-rs": "workspace:*",
     "@ku0/agent-runtime-core": "workspace:*",
-    "@ku0/agent-runtime-telemetry": "workspace:*"
+    "@ku0/agent-runtime-telemetry": "workspace:*",
+    "@ku0/workspace-session-rs": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
