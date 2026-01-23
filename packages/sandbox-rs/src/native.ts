@@ -14,6 +14,7 @@ export interface NativeSandboxBinding {
 export interface NativeSandboxConfig {
   networkAccess: string;
   allowedHosts?: string[];
+  allowedRoots?: string[];
   fsIsolation: string;
   workingDirectory?: string;
 }

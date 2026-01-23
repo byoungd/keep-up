@@ -8,8 +8,10 @@ import { AnimatePresence, motion } from "framer-motion";
 import * as React from "react";
 import type { AgentMode } from "../../api/coworkApi";
 import { ArtifactsList } from "../artifacts/components/ArtifactsList";
+import { MemoryPanelContent } from "../memory/components/MemoryPanelContent";
 import { PreflightPanelContent } from "../preflight/PreflightPanelContent";
 import { useTaskStream } from "../tasks/hooks/useTaskStream";
+import type { EnrichedArtifact } from "../tasks/types";
 import { WorkflowTemplatesPanelContent } from "../workflows/WorkflowTemplatesPanelContent";
 import { CheckpointsPanelContent } from "./CheckpointsPanelContent";
 import { ContextPacksPanelContent } from "./ContextPacksPanelContent";
@@ -17,6 +19,7 @@ import { ProjectContextPanelContent } from "./ProjectContextPanelContent";
 
 export type ContextPanelTab =
   | "context"
+  | "memory"
   | "packs"
   | "workflows"
   | "preflight"
@@ -29,6 +32,22 @@ type ContextNote = {
   id: string;
   content: string;
   createdAt: number;
+};
+
+type ContextPanelContentProps = {
+  resolvedTab: ContextPanelTab;
+  notes: ContextNote[];
+  draft: string;
+  onDraftChange: (value: string) => void;
+  onAddNote: () => void;
+  previewArtifact: ArtifactItem | null;
+  onClosePreview: () => void;
+  artifacts: Record<string, EnrichedArtifact>;
+  onRunTemplate?: (
+    prompt: string,
+    mode: AgentMode,
+    metadata?: Record<string, unknown>
+  ) => Promise<void>;
 };
 
 interface ContextPanelProps {
@@ -49,6 +68,7 @@ interface ContextPanelProps {
 
 const TAB_CONFIG: { id: ContextPanelTab; label: string }[] = [
   { id: "context", label: "Context" },
+  { id: "memory", label: "Memory" },
   { id: "packs", label: "Packs" },
   { id: "workflows", label: "Workflows" },
   { id: "preflight", label: "Preflight" },
@@ -82,6 +102,139 @@ function persistNotes(key: string, notes: ContextNote[]): void {
     return;
   }
   localStorage.setItem(key, JSON.stringify(notes));
+}
+
+function NotesPanel({
+  notes,
+  draft,
+  onDraftChange,
+  onAddNote,
+}: {
+  notes: ContextNote[];
+  draft: string;
+  onDraftChange: (value: string) => void;
+  onAddNote: () => void;
+}) {
+  return (
+    <div className="h-full flex flex-col">
+      {/* biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access. */}
+      <div className="flex-1 overflow-y-auto scrollbar-auto-hide p-4 space-y-3" tabIndex={0}>
+        {notes.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No notes yet.</p>
+        ) : (
+          notes.map((note) => (
+            <div
+              key={note.id}
+              className="rounded-lg border border-border/30 bg-surface-2/40 p-3 text-sm text-foreground"
+            >
+              <p className="whitespace-pre-wrap">{note.content}</p>
+              <p className="mt-2 text-micro text-muted-foreground">
+                {new Date(note.createdAt).toLocaleString()}
+              </p>
+            </div>
+          ))
+        )}
+      </div>
+      <div className="border-t border-border/20 p-3 space-y-2">
+        <textarea
+          value={draft}
+          onChange={(event) => onDraftChange(event.target.value)}
+          rows={3}
+          className="w-full rounded-lg border border-border/40 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/40"
+          placeholder="Add a note to this session..."
+          aria-label="Add a note"
+        />
+        <button
+          type="button"
+          onClick={onAddNote}
+          className="w-full rounded-lg bg-foreground text-background text-sm font-semibold py-2 disabled:opacity-50"
+          disabled={!draft.trim()}
+          aria-label="Save note"
+        >
+          Save Note
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function PreviewPanel({
+  previewArtifact,
+  onClosePreview,
+}: {
+  previewArtifact: ArtifactItem | null;
+  onClosePreview: () => void;
+}) {
+  return (
+    <div className="h-full">
+      <AnimatePresence mode="sync">
+        {previewArtifact ? (
+          <ArtifactPreviewPane
+            key={previewArtifact.id}
+            item={previewArtifact}
+            onClose={onClosePreview}
+          />
+        ) : (
+          <motion.div
+            key="empty"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="p-4 text-sm text-muted-foreground"
+          >
+            No preview selected.
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function ContextPanelContent({
+  resolvedTab,
+  notes,
+  draft,
+  onDraftChange,
+  onAddNote,
+  previewArtifact,
+  onClosePreview,
+  artifacts,
+  onRunTemplate,
+}: ContextPanelContentProps) {
+  switch (resolvedTab) {
+    case "context":
+      return <ProjectContextPanelContent />;
+    case "memory":
+      return <MemoryPanelContent />;
+    case "packs":
+      return <ContextPacksPanelContent />;
+    case "workflows":
+      return <WorkflowTemplatesPanelContent onRunTemplate={onRunTemplate} />;
+    case "preflight":
+      return <PreflightPanelContent />;
+    case "checkpoints":
+      return <CheckpointsPanelContent />;
+    case "artifacts":
+      return (
+        <div className="h-full">
+          <ArtifactsList artifacts={artifacts} />
+        </div>
+      );
+    case "notes":
+      return (
+        <NotesPanel
+          notes={notes}
+          draft={draft}
+          onDraftChange={onDraftChange}
+          onAddNote={onAddNote}
+        />
+      );
+    case "preview":
+      return <PreviewPanel previewArtifact={previewArtifact} onClosePreview={onClosePreview} />;
+    default:
+      return null;
+  }
 }
 
 export function ContextPanel({
@@ -173,90 +326,17 @@ export function ContextPanel({
         // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
         tabIndex={0}
       >
-        {resolvedTab === "context" && <ProjectContextPanelContent />}
-
-        {resolvedTab === "packs" && <ContextPacksPanelContent />}
-
-        {resolvedTab === "workflows" && (
-          <WorkflowTemplatesPanelContent onRunTemplate={onRunTemplate} />
-        )}
-
-        {resolvedTab === "preflight" && <PreflightPanelContent />}
-
-        {resolvedTab === "checkpoints" && <CheckpointsPanelContent />}
-
-        {resolvedTab === "artifacts" && (
-          <div className="h-full">
-            <ArtifactsList artifacts={graph.artifacts} />
-          </div>
-        )}
-
-        {resolvedTab === "notes" && (
-          <div className="h-full flex flex-col">
-            {/* biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access. */}
-            <div className="flex-1 overflow-y-auto scrollbar-auto-hide p-4 space-y-3" tabIndex={0}>
-              {notes.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No notes yet.</p>
-              ) : (
-                notes.map((note) => (
-                  <div
-                    key={note.id}
-                    className="rounded-lg border border-border/30 bg-surface-2/40 p-3 text-sm text-foreground"
-                  >
-                    <p className="whitespace-pre-wrap">{note.content}</p>
-                    <p className="mt-2 text-micro text-muted-foreground">
-                      {new Date(note.createdAt).toLocaleString()}
-                    </p>
-                  </div>
-                ))
-              )}
-            </div>
-            <div className="border-t border-border/20 p-3 space-y-2">
-              <textarea
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                rows={3}
-                className="w-full rounded-lg border border-border/40 bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/40"
-                placeholder="Add a note to this session..."
-                aria-label="Add a note"
-              />
-              <button
-                type="button"
-                onClick={handleAddNote}
-                className="w-full rounded-lg bg-foreground text-background text-sm font-semibold py-2 disabled:opacity-50"
-                disabled={!draft.trim()}
-                aria-label="Save note"
-              >
-                Save Note
-              </button>
-            </div>
-          </div>
-        )}
-
-        {resolvedTab === "preview" && (
-          <div className="h-full">
-            <AnimatePresence mode="sync">
-              {previewArtifact ? (
-                <ArtifactPreviewPane
-                  key={previewArtifact.id}
-                  item={previewArtifact}
-                  onClose={onClosePreview}
-                />
-              ) : (
-                <motion.div
-                  key="empty"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.2, ease: "easeOut" }}
-                  className="p-4 text-sm text-muted-foreground"
-                >
-                  No preview selected.
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        )}
+        <ContextPanelContent
+          resolvedTab={resolvedTab}
+          notes={notes}
+          draft={draft}
+          onDraftChange={setDraft}
+          onAddNote={handleAddNote}
+          previewArtifact={previewArtifact}
+          onClosePreview={onClosePreview}
+          artifacts={graph.artifacts}
+          onRunTemplate={onRunTemplate}
+        />
       </section>
     </section>
   );

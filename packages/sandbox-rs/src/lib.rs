@@ -53,6 +53,8 @@ pub struct SandboxConfig {
     pub network_access: String,
     #[napi(js_name = "allowedHosts")]
     pub allowed_hosts: Option<Vec<String>>,
+    #[napi(js_name = "allowedRoots")]
+    pub allowed_roots: Option<Vec<String>>,
     #[napi(js_name = "fsIsolation")]
     pub fs_isolation: String,
     #[napi(js_name = "workingDirectory")]
@@ -226,7 +228,20 @@ impl Sandbox {
             .working_directory
             .as_ref()
             .map(PathBuf::from);
-        let allowed_roots = compute_allowed_roots(fs_isolation, working_directory.as_ref())?;
+        let explicit_roots = config
+            .allowed_roots
+            .as_ref()
+            .filter(|roots| !roots.is_empty());
+        let allowed_roots = if let Some(roots) = explicit_roots {
+            normalize_allowed_roots(roots)?
+        } else {
+            compute_allowed_roots(fs_isolation, working_directory.as_ref())?
+        };
+        let fs_isolation = if explicit_roots.is_some() {
+            FsIsolation::None
+        } else {
+            fs_isolation
+        };
 
         let policy = SandboxPolicy {
             allowed_roots,
@@ -403,6 +418,22 @@ fn compute_allowed_roots(
             Ok(roots)
         }
     }
+}
+
+fn normalize_allowed_roots(roots: &[String]) -> Result<Vec<PathBuf>, SandboxError> {
+    let mut normalized = Vec::new();
+    for root in roots {
+        if root.trim().is_empty() {
+            continue;
+        }
+        let path = PathBuf::from(root);
+        let resolved = path_security::normalize_path(&path)?;
+        normalized.push(resolved);
+    }
+
+    normalized.sort();
+    normalized.dedup();
+    Ok(normalized)
 }
 
 fn parse_network_access(value: &str) -> Result<NetworkAccess, SandboxError> {

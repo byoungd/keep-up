@@ -17,7 +17,7 @@ export type ActionIntent = "read" | "write" | "create" | "delete" | "rename" | "
 export type SandboxConfig = Pick<
   RuntimeSandboxConfig,
   "networkAccess" | "allowedHosts" | "fsIsolation" | "workingDirectory"
->;
+> & { allowedRoots?: string[] };
 
 export interface ExecOptions {
   cwd?: string;
@@ -109,6 +109,7 @@ function normalizeConfig(config: SandboxConfig | RuntimeSandboxConfig): NativeSa
   return {
     networkAccess: config.networkAccess,
     allowedHosts: config.allowedHosts,
+    allowedRoots: "allowedRoots" in config ? config.allowedRoots : undefined,
     fsIsolation: config.fsIsolation,
     workingDirectory: config.workingDirectory,
   };

@@ -25,6 +25,7 @@ import {
 import { useTheme } from "../../app/providers/ThemeProvider";
 import { cn } from "../../lib/cn";
 import { config } from "../../lib/config";
+import { LocalVectorStoreSection } from "../memory/components/LocalVectorStoreSection";
 
 type SettingsState = {
   data: CoworkSettings;
@@ -1316,6 +1317,8 @@ export function SettingsPage() {
           <option value="creative-prototyper">Creative Prototyper</option>
         </select>
       </section>
+
+      <LocalVectorStoreSection />
 
       <ThemeSection theme={theme} onChange={handleThemeChange} disabled={state.isSaving} />
 

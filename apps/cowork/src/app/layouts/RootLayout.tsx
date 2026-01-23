@@ -7,6 +7,8 @@ import {
   TooltipProvider,
 } from "@ku0/shell";
 import { Link, Outlet, useLocation, useParams, useRouter } from "@tanstack/react-router";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
 import React from "react";
@@ -18,6 +20,7 @@ import { AIControlProvider } from "../../features/chat/AIControlContext";
 import { CoworkAIPanel } from "../../features/chat/CoworkAIPanel";
 import { generateTaskTitle } from "../../features/chat/utils/textUtils";
 import { ContextPanel, type ContextPanelTab } from "../../features/context/ContextPanel";
+import { isTauriRuntime } from "../../lib/tauriRuntime";
 
 function resolveI18nArgs(
   defaultValueOrValues?: string | Record<string, string | number>,
@@ -45,6 +48,92 @@ function interpolate(template: string, values?: Record<string, string | number>)
   return template.replace(/\{(\w+)\}/g, (_, key: string) => String(values[key] ?? ""));
 }
 
+type RouterType = ReturnType<typeof useRouter>;
+
+const STATIC_DEEPLINKS: Record<string, string> = {
+  new: "/new-session",
+  "new-session": "/new-session",
+  search: "/search",
+  settings: "/settings",
+  library: "/library",
+  lessons: "/lessons",
+};
+
+function normalizeDeepLinkPath(url: URL): string {
+  const combined = `${url.host}${url.pathname}`.replace(/\/+$/, "");
+  const trimmed = combined.startsWith("/") ? combined.slice(1) : combined;
+  return trimmed.trim();
+}
+
+function resolveSessionRoute(path: string, params: URLSearchParams): string | null {
+  if (path.startsWith("sessions/")) {
+    const [, sessionId] = path.split("/");
+    return sessionId ? `/sessions/${sessionId}` : "/";
+  }
+
+  if (path === "session") {
+    const sessionId = params.get("id") ?? params.get("sessionId");
+    return sessionId ? `/sessions/${sessionId}` : "/";
+  }
+
+  return null;
+}
+
+function resolveStaticRoute(path: string): string | null {
+  const head = path.split("/")[0] ?? "";
+  return STATIC_DEEPLINKS[head] ?? null;
+}
+
+function mapDeepLinkToRoute(raw: string): string | null {
+  try {
+    const url = new URL(raw);
+    const path = normalizeDeepLinkPath(url);
+    if (!path) {
+      return "/";
+    }
+
+    const sessionRoute = resolveSessionRoute(path, url.searchParams);
+    if (sessionRoute) {
+      return sessionRoute;
+    }
+
+    return resolveStaticRoute(path) ?? "/";
+  } catch {
+    return null;
+  }
+}
+
+function useDeepLinkNavigation(routerRef: React.MutableRefObject<RouterType>) {
+  React.useEffect(() => {
+    if (!isTauriRuntime()) {
+      return undefined;
+    }
+
+    let active = true;
+    const handleLink = (url: string) => {
+      const route = mapDeepLinkToRoute(url);
+      if (route) {
+        void routerRef.current.navigate({ to: route });
+      }
+    };
+
+    const unlistenPromise = listen<string>("deep-link", (event) => {
+      handleLink(event.payload);
+    });
+
+    void invoke<string | null>("get_pending_deep_link").then((pending) => {
+      if (active && pending) {
+        handleLink(pending);
+      }
+    });
+
+    return () => {
+      active = false;
+      void unlistenPromise.then((unlisten) => unlisten());
+    };
+  }, [routerRef]);
+}
+
 export function RootLayout() {
   const router = useRouter();
   const location = useLocation();
@@ -54,6 +143,7 @@ export function RootLayout() {
   // Use ref for router to avoid useMemo dependency changes
   const routerRef = React.useRef(router);
   routerRef.current = router;
+  useDeepLinkNavigation(routerRef);
 
   // Sidebar State (Physical Layout)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(() => {
