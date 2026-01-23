@@ -1,5 +1,6 @@
 import type { MarkdownTargetingPolicyV1 } from "../kernel/policy/types.js";
 import { detectFrontmatter, parseFrontmatter } from "./frontmatter.js";
+import { resolveNativeMarkdownContent } from "./native.js";
 import type {
   LineRange,
   MarkdownCodeFenceBlock,
@@ -23,6 +24,14 @@ const SETEXT_HEADING_PATTERN = /^\s{0,3}(=+|-+)\s*$/;
 const CODE_FENCE_PATTERN = /^\s{0,3}(`{3,}|~{3,})(.*)$/;
 
 export function buildMarkdownSemanticIndex(lines: string[]): MarkdownSemanticIndex {
+  const native = resolveNativeMarkdownContent();
+  if (native) {
+    try {
+      return native.buildMarkdownSemanticIndex(lines);
+    } catch {
+      // fall back to JS parsing
+    }
+  }
   const headings: MarkdownHeadingBlock[] = [];
   const codeFences: MarkdownCodeFenceBlock[] = [];
 
@@ -78,6 +87,16 @@ export function resolveMarkdownSemanticTarget(
   index: MarkdownSemanticIndex,
   policy?: MarkdownTargetingPolicyV1
 ): SemanticResolution {
+  if (semantic) {
+    const native = resolveNativeMarkdownContent();
+    if (native) {
+      try {
+        return native.resolveMarkdownSemanticTarget(semantic, index, policy);
+      } catch {
+        // fall back to JS resolution
+      }
+    }
+  }
   if (!semantic) {
     return {
       ok: false,

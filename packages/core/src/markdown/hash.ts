@@ -1,3 +1,4 @@
+import { resolveNativeMarkdownContent } from "./native.js";
 import type { LineRange } from "./types.js";
 
 type FrontmatterDelimiter = "---" | "+++" | ";;;";
@@ -117,14 +118,38 @@ function stripFrontmatterLines(lines: string[]): string[] {
 }
 
 export function normalizeMarkdownText(text: string): string {
+  const native = resolveNativeMarkdownContent();
+  if (native) {
+    try {
+      return native.normalizeMarkdownText(text);
+    } catch {
+      // fall back to JS normalization
+    }
+  }
   return normalizeLineEndings(text);
 }
 
 export function splitMarkdownLines(text: string): string[] {
+  const native = resolveNativeMarkdownContent();
+  if (native) {
+    try {
+      return native.splitMarkdownLines(text);
+    } catch {
+      // fall back to JS split
+    }
+  }
   return normalizeMarkdownText(text).split("\n");
 }
 
 export async function computeMarkdownLineHash(lines: string[], range: LineRange): Promise<string> {
+  const native = resolveNativeMarkdownContent();
+  if (native) {
+    try {
+      return native.computeMarkdownLineHash(lines, range);
+    } catch {
+      // fall back to JS hashing
+    }
+  }
   const startIndex = range.start - 1;
   const endIndex = range.end - 1;
   const slice = lines.slice(startIndex, endIndex + 1).join("\n");
@@ -137,6 +162,14 @@ export async function computeMarkdownContentHash(
   content: string,
   options: { ignore_frontmatter?: boolean } = {}
 ): Promise<string> {
+  const native = resolveNativeMarkdownContent();
+  if (native) {
+    try {
+      return native.computeMarkdownContentHash(content, options);
+    } catch {
+      // fall back to JS hashing
+    }
+  }
   const normalized = normalizeMarkdownText(content);
   const lines = normalized.split("\n");
   const strippedLines = options.ignore_frontmatter ? stripFrontmatterLines(lines) : lines;

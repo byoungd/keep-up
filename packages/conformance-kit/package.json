@@ -19,6 +19,8 @@
     "@ku0/lfcc-bridge": "workspace:*"
   },
   "devDependencies": {
+    "@ku0/markdown-content-rs": "workspace:*",
+    "@ku0/native-bindings": "workspace:*",
     "vitest": "^4.0.0",
     "tsx": "^4.0.0"
   },
