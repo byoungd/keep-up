@@ -6,6 +6,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 mod path_security;
+mod policy;
+mod guards;
 
 #[cfg(target_os = "macos")]
 mod macos;
@@ -27,6 +29,8 @@ use windows::PlatformExecutor;
 #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
 use windows::PlatformExecutor;
 
+use guards::{command::CommandValidator, filesystem::FileSystemGuard, network::NetworkGuard};
+use guards::filesystem::ViolationResult;
 use path_security::PathSecurityError;
 
 #[derive(Debug, thiserror::Error)]
@@ -169,9 +173,48 @@ pub struct Sandbox {
     state: Arc<SandboxState>,
 }
 
+#[napi]
+pub struct SandboxManager {
+    fs_guard: FileSystemGuard,
+    net_guard: NetworkGuard,
+    cmd_validator: CommandValidator,
+}
+
+#[napi]
+impl SandboxManager {
+    #[napi(constructor)]
+    pub fn new(policy: policy::SandboxPolicy, workspace_root: String) -> Self {
+        let workspace = PathBuf::from(&workspace_root);
+        let fs_guard = FileSystemGuard::new(policy.filesystem.clone(), workspace);
+        let net_guard = NetworkGuard::new(policy.network.clone());
+        let cmd_validator = CommandValidator::new(policy.commands.clone());
+
+        Self {
+            fs_guard,
+            net_guard,
+            cmd_validator,
+        }
+    }
+
+    #[napi(js_name = "checkFileAccess")]
+    pub fn check_file_access(&self, path: String, operation: String) -> ViolationResult {
+        self.fs_guard.check_access(&path, &operation)
+    }
+
+    #[napi(js_name = "checkNetworkRequest")]
+    pub fn check_network_request(&self, url: String, method: String) -> ViolationResult {
+        self.net_guard.check_request(&url, &method)
+    }
+
+    #[napi(js_name = "checkCommand")]
+    pub fn check_command(&self, command: String) -> ViolationResult {
+        self.cmd_validator.validate_command(&command)
+    }
+}
+
 #[napi(js_name = "createSandbox")]
 pub fn create_sandbox(config: SandboxConfig) -> NapiResult<Sandbox> {
-  Sandbox::new(config).map_err(to_napi_error)
+    Sandbox::new(config).map_err(to_napi_error)
 }
 
 #[napi]
