@@ -59,11 +59,13 @@ export function ProjectContextPanel({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="flex flex-col h-full bg-surface-0 border-l border-border shadow-soft w-[600px] animate-in slide-in-from-right duration-200">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-surface-1">
+    <div className="flex flex-col h-full bg-surface-0 border-l border-border/40 shadow-soft w-[600px] animate-in slide-in-from-right duration-200">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-border/40 bg-surface-1">
         <div>
-          <h2 className="text-lg font-semibold text-foreground">Project Context (AGENTS.md)</h2>
-          <p className="text-xs text-muted-foreground">
+          <h2 className="text-base font-semibold text-foreground tracking-tight">
+            Project Context (AGENTS.md)
+          </h2>
+          <p className="text-xs text-muted-foreground/90 leading-relaxed">
             {lastUpdated
               ? `Last updated: ${new Date(lastUpdated).toLocaleString()}`
               : "No context generated yet"}
@@ -90,7 +92,7 @@ export function ProjectContextPanel({ onClose }: { onClose: () => void }) {
 
         <textarea
           className={cn(
-            "w-full h-full p-6 bg-surface-0 text-sm font-mono leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-primary/20",
+            "w-full h-full p-5 bg-surface-0 text-sm font-mono leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-primary/20",
             mode === "view" ? "readonly" : ""
           )}
           value={content}
@@ -100,7 +102,7 @@ export function ProjectContextPanel({ onClose }: { onClose: () => void }) {
         />
       </div>
 
-      <div className="px-6 py-4 border-t border-border bg-surface-1 flex items-center justify-between gap-4">
+      <div className="px-5 py-3 border-t border-border/40 bg-surface-1 flex items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           {mode === "view" ? (
             <button

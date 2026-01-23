@@ -112,11 +112,11 @@ export function PreflightPanel({ onClose }: { onClose: () => void }) {
   }, [allowlist.length]);
 
   return (
-    <div className="flex flex-col h-full bg-surface-0 border-l border-border shadow-soft w-[520px] animate-in slide-in-from-right duration-200">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-surface-1">
+    <div className="flex flex-col h-full bg-surface-0 border-l border-border/40 shadow-soft w-[520px] animate-in slide-in-from-right duration-200">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-border/40 bg-surface-1">
         <div>
-          <h2 className="text-lg font-semibold text-foreground">Preflight QA</h2>
-          <p className="text-xs text-muted-foreground">
+          <h2 className="text-base font-semibold text-foreground tracking-tight">Preflight QA</h2>
+          <p className="text-xs text-muted-foreground/90 leading-relaxed">
             Run targeted lint, typecheck, and test validation.
           </p>
         </div>
@@ -126,12 +126,12 @@ export function PreflightPanel({ onClose }: { onClose: () => void }) {
           className="p-2 hover:bg-surface-2 rounded-md text-muted-foreground hover:text-foreground transition-colors duration-fast"
           aria-label="Close preflight panel"
         >
-          X
+          ✕
         </button>
       </div>
 
       {/* biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access. */}
-      <div className="flex-1 overflow-y-auto scrollbar-auto-hide p-6 space-y-6" tabIndex={0}>
+      <div className="flex-1 overflow-y-auto scrollbar-auto-hide p-5 space-y-5" tabIndex={0}>
         {errorMessage ? (
           <div className="text-xs text-destructive bg-destructive/5 border border-destructive/10 px-3 py-2 rounded-md">
             {errorMessage}
