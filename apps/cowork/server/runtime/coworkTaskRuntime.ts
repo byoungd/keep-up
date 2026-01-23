@@ -581,7 +581,6 @@ export class CoworkTaskRuntime {
           toolName: mapped.toolName,
           decision: mapped.policyDecision,
           policyRuleId: mapped.policyRuleId,
-          policyAction: typeof entry.policyAction === "string" ? entry.policyAction : undefined,
           riskTags: mapped.riskTags ?? undefined,
           riskScore: mapped.riskScore,
           reason: mapped.reason,
