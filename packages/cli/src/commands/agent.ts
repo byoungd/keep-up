@@ -1,4 +1,8 @@
+import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { Command } from "commander";
 import { ConfigStore } from "../utils/configStore";
 import { runInteractiveSession } from "../utils/interactiveSession";
@@ -93,6 +97,29 @@ function tuiCommand(): Command {
       );
 
       try {
+        const tuiBinary = resolveTuiBinary();
+        const tuiHost = resolveTuiHost();
+        if (tuiBinary && tuiHost) {
+          await launchRustTui({
+            tuiBinary,
+            tuiHost,
+            model,
+            provider,
+            sessionId: options.session,
+          });
+          return;
+        }
+
+        if (!tuiBinary) {
+          writeStderr(
+            "Rust TUI binary not found. Build packages/keepup-tui or set KEEPUP_TUI_BIN."
+          );
+        } else {
+          writeStderr(
+            "Rust TUI host not found. Run pnpm --filter @ku0/cli build before using tui."
+          );
+        }
+
         await runInteractiveSession({
           sessionId: options.session,
           model,
@@ -142,4 +169,66 @@ function createMessageLog(userPrompt: string, assistantReply: string): SessionMe
     { role: "user", content: userPrompt, timestamp: now },
     { role: "assistant", content: assistantReply, timestamp: now + 1 },
   ];
+}
+
+type LaunchTuiOptions = {
+  tuiBinary: string;
+  tuiHost: string;
+  model?: string;
+  provider?: string;
+  sessionId?: string;
+};
+
+const TUI_BIN_ENV = "KEEPUP_TUI_BIN";
+const TUI_HOST_ENV = "KEEPUP_TUI_HOST";
+const TUI_MODEL_ENV = "KEEPUP_TUI_MODEL";
+const TUI_PROVIDER_ENV = "KEEPUP_TUI_PROVIDER";
+const TUI_SESSION_ENV = "KEEPUP_TUI_SESSION";
+
+function resolveTuiBinary(): string | undefined {
+  const override = process.env[TUI_BIN_ENV];
+  if (override && existsSync(override)) {
+    return override;
+  }
+
+  const suffix = process.platform === "win32" ? ".exe" : "";
+  const candidates = [
+    path.resolve(process.cwd(), `packages/keepup-tui/target/release/keepup-tui${suffix}`),
+    path.resolve(process.cwd(), `packages/keepup-tui/target/debug/keepup-tui${suffix}`),
+  ];
+
+  return candidates.find((candidate) => existsSync(candidate));
+}
+
+function resolveTuiHost(): string | undefined {
+  const override = process.env[TUI_HOST_ENV];
+  if (override && existsSync(override)) {
+    return override;
+  }
+
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const hostPath = path.resolve(__dirname, "../tui/host.js");
+  return existsSync(hostPath) ? hostPath : undefined;
+}
+
+async function launchRustTui(options: LaunchTuiOptions): Promise<void> {
+  await new Promise<void>((_resolve, reject) => {
+    const env = {
+      ...process.env,
+      [TUI_HOST_ENV]: options.tuiHost,
+      [TUI_MODEL_ENV]: options.model ?? "",
+      [TUI_PROVIDER_ENV]: options.provider ?? "",
+      [TUI_SESSION_ENV]: options.sessionId ?? "",
+    };
+
+    const child = spawn(options.tuiBinary, [], { stdio: "inherit", env });
+
+    child.on("error", (error) => reject(error));
+    child.on("exit", (code, signal) => {
+      if (typeof code === "number") {
+        process.exit(code);
+      }
+      process.exit(signal ? 1 : 0);
+    });
+  });
 }

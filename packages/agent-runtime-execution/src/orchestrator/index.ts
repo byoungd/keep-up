@@ -35,6 +35,13 @@ export {
   createMockLLM,
   MockAgentLLM,
 } from "./aiCoreAdapter";
+// Clarification Manager
+export {
+  type ClarificationEvent,
+  type ClarificationEventHandler,
+  ClarificationManager,
+  type ClarificationRecord,
+} from "./clarificationManager";
 // Clarifying Questions Engine
 export {
   type ClarifyingQuestion,
@@ -141,6 +148,7 @@ export {
   type OrchestratorEvent,
   type OrchestratorEventHandler,
   type OrchestratorEventType,
+  type SubagentAutomationConfig,
 } from "./orchestrator";
 // Parallel Plan Reviewer (Multi-Agent Review)
 export {

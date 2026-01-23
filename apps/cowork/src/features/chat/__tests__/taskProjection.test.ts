@@ -16,6 +16,7 @@ function buildBaseGraph(nodes: TaskGraph["nodes"]): TaskGraph {
     status: TaskStatus.RUNNING,
     nodes,
     artifacts: {},
+    clarifications: [],
   };
 }
 
@@ -211,6 +212,7 @@ describe("projectGraphToMessages", () => {
           contentHash: "hash-1",
         },
       },
+      clarifications: [],
     };
 
     const result = projectGraphToMessages(graph, []);

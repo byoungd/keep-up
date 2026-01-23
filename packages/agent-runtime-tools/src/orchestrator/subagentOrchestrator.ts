@@ -28,6 +28,8 @@ function createSecurityPolicy(preset: SecurityPreset): SecurityPolicy {
  * Configuration for subagent spawning.
  */
 export interface SubagentTask {
+  /** Optional unique ID for dependency tracking */
+  id?: string;
   /** Subagent type */
   type: AgentType;
   /** Task description for this subagent */
@@ -38,6 +40,8 @@ export interface SubagentTask {
   context?: Record<string, unknown>;
   /** Priority (higher = earlier execution) */
   priority?: number;
+  /** Dependencies that must complete before running */
+  dependencies?: string[];
   /** Scoped permissions for the subagent */
   scope?: SubagentScope;
 }
@@ -79,6 +83,14 @@ export interface AggregatedResults {
   totalDurationMs: number;
 }
 
+type NormalizedSubagentTask = SubagentTask & { id: string; _index: number };
+
+type DependencyGraph = {
+  taskById: Map<string, NormalizedSubagentTask>;
+  indegree: Map<string, number>;
+  adjacency: Map<string, string[]>;
+};
+
 /**
  * Subagent orchestrator for managing multi-agent workflows.
  */
@@ -105,34 +117,45 @@ export class SubagentOrchestrator {
   ): Promise<AggregatedResults> {
     const startTime = Date.now();
 
-    // Sort by priority
-    const sortedTasks = [...tasks].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+    const { tasks: normalizedTasks, order: taskOrder } = this.normalizeTasks(tasks);
+    const batches = this.createDependencyBatches(normalizedTasks);
+    const resultsById = new Map<string, AgentResult>();
 
-    // Convert to spawn options
-    const spawnOptions: SpawnAgentOptions[] = sortedTasks.map((task) =>
-      this.buildSpawnOptions(
-        task,
-        options.signal,
-        options.baseSecurity,
+    for (const batch of batches) {
+      // Convert to spawn options
+      const spawnOptions: SpawnAgentOptions[] = batch.map((task) =>
+        this.buildSpawnOptions(
+          task,
+          options.signal,
+          options.baseSecurity,
+          parentId,
+          options.contextId
+        )
+      );
+
+      const results =
+        options.maxConcurrent && options.maxConcurrent > 0
+          ? await this.spawnWithConcurrency(spawnOptions, options.maxConcurrent)
+          : await this.manager.spawnParallel(spawnOptions);
+
+      batch.forEach((task, index) => {
+        resultsById.set(task.id, results[index]);
+      });
+
+      // Track relationships
+      this.relationships.set(parentId, {
         parentId,
-        options.contextId
-      )
-    );
+        childIds: results.map((r) => r.agentId),
+        level: this.getParentLevel(parentId) + 1,
+      });
+    }
 
-    const results =
-      options.maxConcurrent && options.maxConcurrent > 0
-        ? await this.spawnWithConcurrency(spawnOptions, options.maxConcurrent)
-        : await this.manager.spawnParallel(spawnOptions);
-
-    // Track relationships
-    this.relationships.set(parentId, {
-      parentId,
-      childIds: results.map((r) => r.agentId),
-      level: this.getParentLevel(parentId) + 1,
-    });
+    const orderedResults = taskOrder
+      .map((taskId) => resultsById.get(taskId))
+      .filter((result): result is AgentResult => Boolean(result));
 
     // Aggregate results
-    return this.aggregateResults(results, Date.now() - startTime);
+    return this.aggregateResults(orderedResults, Date.now() - startTime);
   }
 
   /**
@@ -400,6 +423,118 @@ export class SubagentOrchestrator {
     }
 
     return this.mergeContext(base, Object.keys(additions).length > 0 ? additions : undefined);
+  }
+
+  private normalizeTasks(tasks: SubagentTask[]): {
+    tasks: NormalizedSubagentTask[];
+    order: string[];
+  } {
+    const normalized = tasks.map((task, index) => ({
+      ...task,
+      id: task.id ?? `task-${index + 1}`,
+      _index: index,
+    }));
+
+    const seen = new Set<string>();
+    for (const task of normalized) {
+      if (seen.has(task.id)) {
+        throw new Error(`Duplicate subagent task id "${task.id}"`);
+      }
+      seen.add(task.id);
+    }
+
+    return { tasks: normalized, order: normalized.map((task) => task.id) };
+  }
+
+  private createDependencyBatches(tasks: NormalizedSubagentTask[]): NormalizedSubagentTask[][] {
+    if (tasks.length === 0) {
+      return [];
+    }
+
+    const graph = this.buildDependencyGraph(tasks);
+    const batches: NormalizedSubagentTask[][] = [];
+    let ready = this.collectReadyTasks(tasks, graph.indegree);
+    let processed = 0;
+
+    while (ready.length > 0) {
+      batches.push(ready);
+      processed += ready.length;
+
+      ready = this.collectNextBatch(ready, graph);
+    }
+
+    this.assertNoCycles(tasks.length, processed);
+    return batches;
+  }
+
+  private buildDependencyGraph(tasks: NormalizedSubagentTask[]): DependencyGraph {
+    const taskById = new Map<string, NormalizedSubagentTask>();
+    const indegree = new Map<string, number>();
+    const adjacency = new Map<string, string[]>();
+
+    for (const task of tasks) {
+      taskById.set(task.id, task);
+      indegree.set(task.id, 0);
+      adjacency.set(task.id, []);
+    }
+
+    const graph = { taskById, indegree, adjacency };
+    for (const task of tasks) {
+      this.registerDependencies(task, graph);
+    }
+
+    return graph;
+  }
+
+  private registerDependencies(task: NormalizedSubagentTask, graph: DependencyGraph): void {
+    const dependencies = task.dependencies ?? [];
+    for (const dep of dependencies) {
+      const parent = graph.taskById.get(dep);
+      if (!parent) {
+        throw new Error(`Unknown dependency "${dep}" for subagent task "${task.id}"`);
+      }
+      graph.adjacency.get(parent.id)?.push(task.id);
+      graph.indegree.set(task.id, (graph.indegree.get(task.id) ?? 0) + 1);
+    }
+  }
+
+  private collectReadyTasks(
+    tasks: NormalizedSubagentTask[],
+    indegree: Map<string, number>
+  ): NormalizedSubagentTask[] {
+    return tasks.filter((task) => (indegree.get(task.id) ?? 0) === 0).sort(this.sortByPriority);
+  }
+
+  private collectNextBatch(
+    current: NormalizedSubagentTask[],
+    graph: DependencyGraph
+  ): NormalizedSubagentTask[] {
+    const next: NormalizedSubagentTask[] = [];
+    for (const task of current) {
+      const children = graph.adjacency.get(task.id) ?? [];
+      for (const childId of children) {
+        const nextDegree = (graph.indegree.get(childId) ?? 0) - 1;
+        graph.indegree.set(childId, nextDegree);
+        if (nextDegree === 0) {
+          const childTask = graph.taskById.get(childId);
+          if (childTask) {
+            next.push(childTask);
+          }
+        }
+      }
+    }
+
+    return next.sort(this.sortByPriority);
+  }
+
+  private assertNoCycles(total: number, processed: number): void {
+    if (processed !== total) {
+      throw new Error("Subagent dependency cycle detected");
+    }
+  }
+
+  private sortByPriority(a: NormalizedSubagentTask, b: NormalizedSubagentTask): number {
+    return (b.priority ?? 0) - (a.priority ?? 0) || a._index - b._index;
   }
 
   private async spawnWithConcurrency(

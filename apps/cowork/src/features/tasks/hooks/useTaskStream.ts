@@ -1,4 +1,10 @@
-import type { CoworkRiskTag, CoworkTask, CoworkTaskStatus, ToolActivity } from "@ku0/agent-runtime";
+import type {
+  ClarificationRequest,
+  CoworkRiskTag,
+  CoworkTask,
+  CoworkTaskStatus,
+  ToolActivity,
+} from "@ku0/agent-runtime";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   applyArtifact as applyArtifactRequest,
@@ -6,10 +12,12 @@ import {
   type CoworkArtifact,
   getSession,
   listApprovals,
+  listClarifications,
   listSessionArtifacts,
   listTasks,
   resolveApproval,
   revertArtifact as revertArtifactRequest,
+  submitClarification,
 } from "../../../api/coworkApi";
 import { apiUrl, config } from "../../../lib/config";
 import {
@@ -76,6 +84,7 @@ function loadGraphFromStorage(sessionId: string): TaskGraph | null {
       status: parsed.status ?? TaskStatus.PLANNING,
       nodes: parsed.nodes,
       artifacts: parsed.artifacts ?? {},
+      clarifications: parsed.clarifications ?? [],
       pendingApprovalId: parsed.pendingApprovalId,
       messageUsage: parsed.messageUsage ?? {},
     };
@@ -180,6 +189,7 @@ export function useTaskStream(sessionId: string) {
     status: TaskStatus.PLANNING,
     nodes: [],
     artifacts: {},
+    clarifications: [],
     messageUsage: {},
   });
 
@@ -222,6 +232,8 @@ export function useTaskStream(sessionId: string) {
         status: TaskStatus.PLANNING,
         nodes: [],
         artifacts: {},
+        clarifications: [],
+        messageUsage: {},
       });
       seenEventIdsRef.current = new Set();
     }
@@ -244,11 +256,12 @@ export function useTaskStream(sessionId: string) {
         return;
       }
       try {
-        const [session, tasks, approvals, artifacts] = await Promise.all([
+        const [session, tasks, approvals, artifacts, clarifications] = await Promise.all([
           getSession(sessionId),
           listTasks(sessionId),
           listApprovals(sessionId),
           listSessionArtifacts(sessionId),
+          listClarifications(sessionId),
         ]);
         if (isActiveRef && !isActiveRef.current) {
           return;
@@ -259,7 +272,14 @@ export function useTaskStream(sessionId: string) {
 
         setGraph((prev) => {
           const base = isCacheStale
-            ? { sessionId, status: TaskStatus.PLANNING, nodes: [], artifacts: {} }
+            ? {
+                sessionId,
+                status: TaskStatus.PLANNING,
+                nodes: [],
+                artifacts: {},
+                clarifications: [],
+                messageUsage: {},
+              }
             : prev;
           const normalizedMode =
             session.agentMode === "plan" ||
@@ -272,6 +292,7 @@ export function useTaskStream(sessionId: string) {
             tasks,
             approvals,
             artifacts,
+            clarifications,
             normalizedMode,
             taskTitleRef.current,
             taskPromptRef.current,
@@ -550,7 +571,40 @@ export function useTaskStream(sessionId: string) {
     [refreshSessionState, updateArtifactRecord]
   );
 
-  return { graph, isConnected, isLive, approveTool, rejectTool, applyArtifact, revertArtifact };
+  const answerClarification = useCallback(
+    async (input: { requestId: string; answer: string; selectedOption?: number }) => {
+      const answer = input.answer.trim();
+      if (!answer) {
+        return;
+      }
+      try {
+        await submitClarification(input.requestId, {
+          answer,
+          selectedOption: input.selectedOption,
+        });
+        setGraph((prev) => ({
+          ...prev,
+          clarifications: prev.clarifications.filter((request) => request.id !== input.requestId),
+        }));
+      } catch (error) {
+        // biome-ignore lint/suspicious/noConsole: Expected error logging
+        console.error("Failed to submit clarification", error);
+        void refreshSessionState();
+      }
+    },
+    [refreshSessionState]
+  );
+
+  return {
+    graph,
+    isConnected,
+    isLive,
+    approveTool,
+    rejectTool,
+    applyArtifact,
+    revertArtifact,
+    answerClarification,
+  };
 }
 
 function setupAbortController(
@@ -666,6 +720,8 @@ const EVENT_HANDLERS: Record<string, EventHandler> = {
   "task.updated": handleTaskUpdate,
   "approval.required": handleApprovalRequired,
   "approval.resolved": handleApprovalResolved,
+  "clarification.requested": handleClarificationRequested,
+  "clarification.answered": handleClarificationAnswered,
   "agent.think": handleAgentThink,
   "agent.tool.call": handleToolCall,
   "agent.tool.result": handleToolResult,
@@ -840,6 +896,53 @@ function handleApprovalResolved(
       taskId,
       timestamp: now,
     }),
+  };
+}
+
+function handleClarificationRequested(
+  prev: TaskGraph,
+  _id: string,
+  data: unknown,
+  _now: string,
+  _taskTitles: Map<string, string>,
+  _taskPrompts: Map<string, string>,
+  _taskMetadata: Map<string, Record<string, unknown>>
+): TaskGraph {
+  if (!isRecord(data) || !isRecord(data.request)) {
+    return prev;
+  }
+  const request = data.request as ClarificationRequest;
+  if (!request.id) {
+    return prev;
+  }
+  if (prev.clarifications.some((entry) => entry.id === request.id)) {
+    return prev;
+  }
+  return {
+    ...prev,
+    clarifications: [...prev.clarifications, request],
+  };
+}
+
+function handleClarificationAnswered(
+  prev: TaskGraph,
+  _id: string,
+  data: unknown,
+  _now: string,
+  _taskTitles: Map<string, string>,
+  _taskPrompts: Map<string, string>,
+  _taskMetadata: Map<string, Record<string, unknown>>
+): TaskGraph {
+  if (!isRecord(data) || !isRecord(data.response)) {
+    return prev;
+  }
+  const response = data.response as { requestId?: string };
+  if (!response.requestId) {
+    return prev;
+  }
+  return {
+    ...prev,
+    clarifications: prev.clarifications.filter((entry) => entry.id !== response.requestId),
   };
 }
 
@@ -1368,6 +1471,7 @@ function deriveInitialState(
   tasks: CoworkTask[],
   approvals: CoworkApproval[],
   artifacts: CoworkArtifact[],
+  clarifications: ClarificationRequest[],
   agentMode: "plan" | "build" | "review" | undefined,
   taskTitles: Map<string, string>,
   taskPrompts: Map<string, string>,
@@ -1410,6 +1514,7 @@ function deriveInitialState(
     ...prev,
     status: mappedStatus ?? prev.status,
     artifacts: nextArtifacts,
+    clarifications,
     nodes: approvalNodes.reduce<TaskNode[]>(
       (acc, node) => appendNode(acc, node),
       mergedStatusNodes

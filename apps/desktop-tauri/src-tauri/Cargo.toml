@@ -22,29 +22,9 @@ tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-portable-pty = "0.8"
-notify = "6.1"
-tracing = "0.1"
-tracing-subscriber = "0.3"
 
 [workspace]
 resolver = "2"
 members = [
   ".",
-  "../../../packages/ai-context-hash-rs",
-  "../../../packages/ai-sanitizer-rs/native",
-  "../../../packages/anchor-codec-rs",
-  "../../../packages/anchor-relocation-rs",
-  "../../../packages/canonicalizer-rs",
-  "../../../packages/diff-rs",
-  "../../../packages/gitignore-rs",
-  "../../../packages/json-accel-rs/native",
-  "../../../packages/policy-hash-rs",
-  "../../../packages/sandbox-rs",
-  "../../../packages/storage-engine-rs",
-  "../../../packages/streaming-markdown-rs",
-  "../../../packages/symbol-index-rs",
-  "../../../packages/text-normalization-rs",
-  "../../../packages/tokenizer-rs/native",
-  "../../../packages/vector-similarity-rs",
 ]

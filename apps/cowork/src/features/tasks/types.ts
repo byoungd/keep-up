@@ -1,4 +1,5 @@
 import type {
+  ClarificationRequest,
   CoworkRiskTag,
   CoworkTaskStatus,
   TokenUsageStats,
@@ -342,6 +343,7 @@ export interface TaskGraph {
   status: TaskStatus;
   nodes: TaskNode[];
   artifacts: Record<string, EnrichedArtifact>; // Properly typed artifact map
+  clarifications: ClarificationRequest[];
   pendingApprovalId?: string;
   savedAt?: number;
   agentMode?: "plan" | "build" | "review";

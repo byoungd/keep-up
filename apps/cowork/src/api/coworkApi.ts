@@ -2,6 +2,8 @@ import type {
   Checkpoint,
   CheckpointStatus,
   CheckpointSummary,
+  ClarificationRequest,
+  ClarificationResponse,
   CoworkPolicyConfig,
   CoworkProject,
   CoworkRiskTag,
@@ -25,6 +27,8 @@ export type ApiResult<T> = {
   tasks?: CoworkTask[];
   approvals?: CoworkApproval[];
   approval?: CoworkApproval;
+  clarifications?: CoworkClarification[];
+  response?: CoworkClarificationResponse;
   checkpoints?: CheckpointSummary[];
   checkpoint?: Checkpoint;
   removed?: boolean;
@@ -59,6 +63,9 @@ export type CoworkApproval = {
   createdAt: number;
   resolvedAt?: number;
 };
+
+export type CoworkClarification = ClarificationRequest;
+export type CoworkClarificationResponse = ClarificationResponse;
 
 export type CoworkSettings = {
   defaultModel?: string;
@@ -745,6 +752,11 @@ export async function listApprovals(sessionId: string): Promise<CoworkApproval[]
   return data.approvals ?? [];
 }
 
+export async function listClarifications(sessionId: string): Promise<CoworkClarification[]> {
+  const data = await fetchJson<ApiResult<unknown>>(`/api/sessions/${sessionId}/clarifications`);
+  return data.clarifications ?? [];
+}
+
 export async function listSessionArtifacts(sessionId: string): Promise<CoworkArtifact[]> {
   const data = await fetchJson<ApiResult<unknown>>(`/api/sessions/${sessionId}/artifacts`);
   return data.artifacts ?? [];
@@ -785,6 +797,21 @@ export async function resolveApproval(approvalId: string, status: "approved" | "
     throw new Error("Approval not returned");
   }
   return data.approval;
+}
+
+export async function submitClarification(
+  clarificationId: string,
+  input: { answer: string; selectedOption?: number }
+): Promise<CoworkClarificationResponse> {
+  const data = await fetchJson<ApiResult<unknown>>(`/api/clarifications/${clarificationId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!data.response) {
+    throw new Error("Clarification response not returned");
+  }
+  return data.response;
 }
 
 export async function getSettings(): Promise<CoworkSettings> {

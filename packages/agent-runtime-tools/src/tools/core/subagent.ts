@@ -94,6 +94,7 @@ export class SubagentToolServer extends BaseToolServer {
               items: {
                 type: "object",
                 properties: {
+                  id: { type: "string", description: "Optional task ID for dependencies" },
                   type: {
                     type: "string",
                     description: "Agent type to spawn",
@@ -104,6 +105,11 @@ export class SubagentToolServer extends BaseToolServer {
                   context: {
                     type: "object",
                     description: "Optional context to pass to the subagent",
+                  },
+                  dependencies: {
+                    type: "array",
+                    description: "Optional dependencies by task ID",
+                    items: { type: "string" },
                   },
                   scope: {
                     type: "object",
@@ -234,29 +240,12 @@ export class SubagentToolServer extends BaseToolServer {
       return errorResult("INVALID_ARGUMENTS", "Provide a non-empty 'tasks' array.");
     }
 
-    const subagentTasks: SubagentTask[] = [];
-
-    for (const entry of tasks) {
-      if (!entry || typeof entry !== "object") {
-        return errorResult("INVALID_ARGUMENTS", "Each task must be an object.");
-      }
-
-      const entryRecord = entry as Record<string, unknown>;
-      const type = this.parseAgentType(entryRecord.type);
-      const task = this.parseTask(entryRecord.task);
-
-      if (!type || !task) {
-        return errorResult(
-          "INVALID_ARGUMENTS",
-          "Each task must include a valid 'type' and non-empty 'task'."
-        );
-      }
-
-      const maxTurns = this.parseMaxTurns(entryRecord.maxTurns);
-      const context = this.parseContext(entryRecord.context);
-      const scope = this.parseScope(entryRecord.scope);
-      subagentTasks.push({ type, task, maxTurns, context, scope });
+    const parsed = this.parseParallelTasks(tasks);
+    if (parsed.error) {
+      return errorResult("INVALID_ARGUMENTS", parsed.error);
     }
+
+    const subagentTasks = parsed.tasks;
 
     try {
       const maxConcurrent = this.parseMaxConcurrent(args.maxConcurrent);
@@ -287,6 +276,55 @@ export class SubagentToolServer extends BaseToolServer {
         error instanceof Error ? error.message : String(error)
       );
     }
+  }
+
+  private parseParallelTasks(tasks: unknown[]): { tasks: SubagentTask[]; error?: string } {
+    const subagentTasks: SubagentTask[] = [];
+
+    for (const entry of tasks) {
+      const parsed = this.parseParallelTaskEntry(entry);
+      if (parsed.error) {
+        return { tasks: [], error: parsed.error };
+      }
+      if (parsed.task) {
+        subagentTasks.push(parsed.task);
+      }
+    }
+
+    return { tasks: subagentTasks };
+  }
+
+  private parseParallelTaskEntry(entry: unknown): { task?: SubagentTask; error?: string } {
+    if (!entry || typeof entry !== "object") {
+      return { error: "Each task must be an object." };
+    }
+
+    const entryRecord = entry as Record<string, unknown>;
+    const type = this.parseAgentType(entryRecord.type);
+    const task = this.parseTask(entryRecord.task);
+
+    if (!type || !task) {
+      return {
+        error: "Each task must include a valid 'type' and non-empty 'task'.",
+      };
+    }
+
+    const maxTurns = this.parseMaxTurns(entryRecord.maxTurns);
+    const context = this.parseContext(entryRecord.context);
+    const scope = this.parseScope(entryRecord.scope);
+    const id =
+      typeof entryRecord.id === "string" && entryRecord.id.length > 0 ? entryRecord.id : undefined;
+    const dependencies =
+      Array.isArray(entryRecord.dependencies) &&
+      entryRecord.dependencies.every((dep) => typeof dep === "string" && dep.length > 0)
+        ? (entryRecord.dependencies as string[])
+        : undefined;
+
+    if (dependencies && !id) {
+      return { error: "Tasks with dependencies must include a non-empty 'id'." };
+    }
+
+    return { task: { id, type, task, maxTurns, context, scope, dependencies } };
   }
 
   private async handleWorkflow(

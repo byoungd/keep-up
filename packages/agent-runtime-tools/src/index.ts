@@ -22,7 +22,17 @@ export type { HookConfig, HookInput, HookResult } from "./hooks";
 // Hooks exports - but not HookType as it conflicts with plugins
 export { HookExecutor } from "./hooks";
 export * from "./orchestrator/planPersistence";
+export { SubagentManager } from "./orchestrator/subagentManager";
 export * from "./orchestrator/subagentOrchestrator";
+export { CodebaseResearchSubagent } from "./orchestrator/subagents/codebaseResearch";
+export { ParallelWorkSubagent, type WorkTask } from "./orchestrator/subagents/parallelWork";
+export { TerminalExecutorSubagent } from "./orchestrator/subagents/terminalExecutor";
+export type {
+  SubagentConfig,
+  SubagentResult,
+  SubagentType,
+  SubagentWorkItem,
+} from "./orchestrator/subagents/types";
 export * from "./plugins";
 export * from "./skills";
 export * from "./tools";

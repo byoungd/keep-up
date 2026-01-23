@@ -3,7 +3,13 @@
  * Handles task lifecycle, event processing, and orchestration coordination
  */
 
-import type { CoworkTask, CoworkTaskStatus, TokenUsageStats } from "@ku0/agent-runtime";
+import type {
+  ClarificationRequest,
+  ClarificationResponse,
+  CoworkTask,
+  CoworkTaskStatus,
+  TokenUsageStats,
+} from "@ku0/agent-runtime";
 import {
   formatToolActivityLabel as formatActivity,
   resolveToolActivity as resolveActivity,
@@ -190,6 +196,20 @@ export class TaskOrchestrator {
         break;
       case "tool:result":
         this.handleToolResultEvent(sessionId, activeTaskId, event.data);
+        break;
+      case "clarification:requested":
+        this.eventPublisher.publishClarificationRequested({
+          sessionId,
+          request: event.data as ClarificationRequest,
+          taskId: activeTaskId ?? undefined,
+        });
+        break;
+      case "clarification:answered":
+        this.eventPublisher.publishClarificationAnswered({
+          sessionId,
+          response: event.data as ClarificationResponse,
+          taskId: activeTaskId ?? undefined,
+        });
         break;
       case "usage:update":
         await this.handleUsageUpdate(

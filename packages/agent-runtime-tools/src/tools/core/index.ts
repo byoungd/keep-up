@@ -11,6 +11,11 @@ export {
   ProcessBashExecutor,
 } from "./bash";
 export {
+  type ClarificationHandler,
+  ClarificationToolServer,
+  createClarificationToolServer,
+} from "./clarification";
+export {
   type CodeExecuteOptions,
   type CodeExecuteResult,
   CodeToolServer,

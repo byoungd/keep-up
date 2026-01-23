@@ -1,4 +1,8 @@
-import type { MarkdownTargetingPolicyV1 } from "../kernel/policy/types.js";
+import type {
+  MarkdownCanonicalizerPolicyV1,
+  MarkdownSanitizationPolicyV1,
+  MarkdownTargetingPolicyV1,
+} from "../kernel/policy/types.js";
 import {
   buildFrontmatterLines,
   parseFrontmatter,
@@ -28,6 +32,8 @@ type ResolvedOperation = {
 
 type ApplyOptions = {
   targetingPolicy?: MarkdownTargetingPolicyV1;
+  canonicalizerPolicy?: MarkdownCanonicalizerPolicyV1;
+  sanitizationPolicy?: MarkdownSanitizationPolicyV1;
   frontmatterPolicy?: {
     allow_frontmatter: boolean;
     frontmatter_formats: Array<"yaml" | "toml" | "json">;
@@ -92,6 +98,7 @@ export async function applyMarkdownLineOperations(
     lineCount,
     semanticIndex,
     options.targetingPolicy,
+    options.canonicalizerPolicy,
     semanticIndex.frontmatter?.line_range
   );
   if (!resolvedResult.ok) {
@@ -108,6 +115,11 @@ export async function applyMarkdownLineOperations(
     return applyResult;
   }
   lines = applyResult.lines;
+
+  const postApplyError = validatePostApply(lines, envelope.options, options);
+  if (postApplyError) {
+    return { ok: false, error: postApplyError };
+  }
 
   const applied: MarkdownAppliedOperation[] = resolvedResult.resolvedOps.map((resolved) => ({
     op_index: resolved.op_index,
@@ -329,6 +341,7 @@ function resolveOperations(
   lineCount: number,
   semanticIndex: MarkdownSemanticIndex,
   policy?: MarkdownTargetingPolicyV1,
+  canonicalizerPolicy?: MarkdownCanonicalizerPolicyV1,
   frontmatterRange?: LineRange
 ): ResolveOpsResult {
   const resolvedOps: ResolvedOperation[] = [];
@@ -381,6 +394,7 @@ function resolveOperations(
       lineCount,
       semanticIndex,
       policy,
+      canonicalizerPolicy,
       i,
       frontmatterRange
     );
@@ -399,6 +413,7 @@ function resolveOperation(
   lineCount: number,
   semanticIndex: MarkdownSemanticIndex,
   policy: MarkdownTargetingPolicyV1 | undefined,
+  canonicalizerPolicy: MarkdownCanonicalizerPolicyV1 | undefined,
   opIndex: number,
   frontmatterRange?: LineRange
 ): { ok: true; resolved: ResolvedOperation } | { ok: false; error: MarkdownOperationError } {
@@ -416,7 +431,14 @@ function resolveOperation(
     case "md_insert_before":
       return resolveInsertBefore(op, resolvedRange, semanticIndex, policy, opIndex);
     case "md_insert_code_fence":
-      return resolveInsertCodeFence(op, resolvedRange, semanticIndex, policy, opIndex);
+      return resolveInsertCodeFence(
+        op,
+        resolvedRange,
+        semanticIndex,
+        policy,
+        canonicalizerPolicy,
+        opIndex
+      );
     case "md_update_frontmatter":
       return resolveFrontmatterUpdate(op, resolvedRange, opIndex, frontmatterRange);
     default: {
@@ -665,6 +687,7 @@ function resolveInsertCodeFence(
   resolvedRange: LineRange,
   semanticIndex: MarkdownSemanticIndex,
   policy: MarkdownTargetingPolicyV1 | undefined,
+  canonicalizerPolicy: MarkdownCanonicalizerPolicyV1 | undefined,
   opIndex: number
 ): { ok: true; resolved: ResolvedOperation } | { ok: false; error: MarkdownOperationError } {
   const targetResult = resolveBlockTargetRange(
@@ -688,7 +711,7 @@ function resolveInsertCodeFence(
       },
     };
   }
-  const fenceOptions = resolveCodeFenceOptions(op, opIndex);
+  const fenceOptions = resolveCodeFenceOptions(op, opIndex, canonicalizerPolicy);
   if (!fenceOptions.ok) {
     return fenceOptions;
   }
@@ -751,11 +774,13 @@ function resolveBlockTargetRange(
 
 function resolveCodeFenceOptions(
   op: Extract<MarkdownOperation, { op: "md_insert_code_fence" }>,
-  opIndex: number
+  opIndex: number,
+  canonicalizerPolicy?: MarkdownCanonicalizerPolicyV1
 ):
   | { ok: true; fenceChar: "`" | "~"; fenceLength: number }
   | { ok: false; error: MarkdownOperationError } {
-  const fenceChar = op.fence_char ?? "`";
+  const defaults = resolveFenceDefaults(canonicalizerPolicy);
+  const fenceChar = op.fence_char ?? defaults.fenceChar;
   if (fenceChar !== "`" && fenceChar !== "~") {
     return {
       ok: false,
@@ -768,7 +793,7 @@ function resolveCodeFenceOptions(
     };
   }
 
-  const fenceLength = op.fence_length ?? 3;
+  const fenceLength = op.fence_length ?? defaults.fenceLength;
   if (!Number.isInteger(fenceLength) || fenceLength < 3) {
     return {
       ok: false,
@@ -782,6 +807,16 @@ function resolveCodeFenceOptions(
   }
 
   return { ok: true, fenceChar, fenceLength };
+}
+
+function resolveFenceDefaults(canonicalizerPolicy?: MarkdownCanonicalizerPolicyV1): {
+  fenceChar: "`" | "~";
+  fenceLength: number;
+} {
+  const normalized = canonicalizerPolicy?.normalize;
+  const fenceChar = normalized?.fence_char ?? "`";
+  const fenceLength = normalized?.fence_length ?? 3;
+  return { fenceChar, fenceLength };
 }
 
 function resolveFrontmatterUpdate(
@@ -865,7 +900,11 @@ function applyResolvedOperation(
   }
 
   if (resolved.op.op === "md_insert_code_fence") {
-    const fenceResult = buildCodeFenceLines(resolved.op, resolved.op_index);
+    const fenceResult = buildCodeFenceLines(
+      resolved.op,
+      resolved.op_index,
+      options.canonicalizerPolicy
+    );
     if (!fenceResult.ok) {
       return { ok: false, error: fenceResult.error };
     }
@@ -888,11 +927,54 @@ function applyResolvedOperation(
   };
 }
 
+function validatePostApply(
+  lines: string[],
+  envelopeOptions: MarkdownOperationEnvelope["options"] | undefined,
+  options: ApplyOptions
+): MarkdownOperationError | null {
+  const sanitizationPolicy = options.sanitizationPolicy;
+  const frontmatterConfig = resolveFrontmatterValidationConfig(envelopeOptions, options);
+  const needsSemanticIndex =
+    Boolean(sanitizationPolicy) ||
+    frontmatterConfig.validateFrontmatter ||
+    frontmatterConfig.frontmatterLimit !== undefined;
+  if (!needsSemanticIndex) {
+    return null;
+  }
+
+  const semanticIndex = buildMarkdownSemanticIndex(lines);
+
+  const frontmatterError = validateFrontmatterState(
+    lines,
+    semanticIndex,
+    frontmatterConfig,
+    sanitizationPolicy
+  );
+  if (frontmatterError) {
+    return frontmatterError;
+  }
+
+  if (sanitizationPolicy) {
+    const lineLimitError = validateLineLimits(lines, sanitizationPolicy);
+    if (lineLimitError) {
+      return lineLimitError;
+    }
+
+    const fenceError = validateCodeFenceLimits(semanticIndex, sanitizationPolicy);
+    if (fenceError) {
+      return fenceError;
+    }
+  }
+
+  return null;
+}
+
 function buildCodeFenceLines(
   op: Extract<MarkdownOperation, { op: "md_insert_code_fence" }>,
-  opIndex: number
+  opIndex: number,
+  canonicalizerPolicy?: MarkdownCanonicalizerPolicyV1
 ): { ok: true; lines: string[] } | { ok: false; error: MarkdownOperationError } {
-  const options = resolveCodeFenceOptions(op, opIndex);
+  const options = resolveCodeFenceOptions(op, opIndex, canonicalizerPolicy);
   if (!options.ok) {
     return { ok: false, error: options.error };
   }
@@ -941,6 +1023,128 @@ function applyFrontmatterUpdate(
   }
 
   return replaceOrInsertFrontmatter(lines, frontmatterLines, contextResult.context.existingRange);
+}
+
+type FrontmatterValidationConfig = {
+  validateFrontmatter: boolean;
+  frontmatterLimit?: number;
+};
+
+function resolveFrontmatterValidationConfig(
+  envelopeOptions: MarkdownOperationEnvelope["options"] | undefined,
+  options: ApplyOptions
+): FrontmatterValidationConfig {
+  const sanitizationPolicy = options.sanitizationPolicy;
+  const frontmatterPolicy = options.frontmatterPolicy;
+  const validateFrontmatter =
+    envelopeOptions?.validate_frontmatter ??
+    sanitizationPolicy?.allow_frontmatter ??
+    frontmatterPolicy?.allow_frontmatter ??
+    false;
+
+  return {
+    validateFrontmatter,
+    frontmatterLimit:
+      sanitizationPolicy?.max_frontmatter_bytes ?? frontmatterPolicy?.max_frontmatter_bytes,
+  };
+}
+
+function validateFrontmatterState(
+  lines: string[],
+  index: MarkdownSemanticIndex,
+  config: FrontmatterValidationConfig,
+  sanitizationPolicy: MarkdownSanitizationPolicyV1 | undefined
+): MarkdownOperationError | null {
+  if (config.validateFrontmatter && index.frontmatter_error) {
+    return index.frontmatter_error;
+  }
+
+  if (sanitizationPolicy && !sanitizationPolicy.allow_frontmatter && index.frontmatter) {
+    return {
+      code: "MCM_BLOCK_TYPE_DISALLOWED",
+      message: "Frontmatter blocks are not allowed",
+    };
+  }
+
+  if (config.frontmatterLimit !== undefined && index.frontmatter) {
+    return validateFrontmatterSize(lines, index.frontmatter.line_range, config.frontmatterLimit);
+  }
+
+  return null;
+}
+
+function validateLineLimits(
+  lines: string[],
+  policy: MarkdownSanitizationPolicyV1
+): MarkdownOperationError | null {
+  if (lines.length > policy.max_file_lines) {
+    return {
+      code: "MCM_LINE_LIMIT_EXCEEDED",
+      message: "File exceeds max line count",
+    };
+  }
+
+  for (let i = 0; i < lines.length; i += 1) {
+    if (lines[i].length > policy.max_line_length) {
+      return {
+        code: "MCM_LINE_LIMIT_EXCEEDED",
+        message: `Line ${i + 1} exceeds max line length`,
+      };
+    }
+  }
+
+  return null;
+}
+
+function validateCodeFenceLimits(
+  index: MarkdownSemanticIndex,
+  policy: MarkdownSanitizationPolicyV1
+): MarkdownOperationError | null {
+  const allowedLanguages = policy.allowed_languages;
+  const blockedLanguages = policy.blocked_languages ?? [];
+
+  for (const fence of index.code_fences) {
+    const contentLineCount = Math.max(0, fence.line_range.end - fence.line_range.start - 1);
+    if (contentLineCount > policy.max_code_fence_lines) {
+      return {
+        code: "MCM_LINE_LIMIT_EXCEEDED",
+        message: "Code fence exceeds max line count",
+      };
+    }
+
+    const language = fence.language;
+    if (allowedLanguages && allowedLanguages.length > 0) {
+      if (!language || !allowedLanguages.includes(language)) {
+        return {
+          code: "MCM_LANGUAGE_DISALLOWED",
+          message: "Code fence language is not allowed",
+        };
+      }
+    } else if (language && blockedLanguages.includes(language)) {
+      return {
+        code: "MCM_LANGUAGE_DISALLOWED",
+        message: "Code fence language is blocked",
+      };
+    }
+  }
+
+  return null;
+}
+
+function validateFrontmatterSize(
+  lines: string[],
+  range: LineRange,
+  maxBytes: number
+): MarkdownOperationError | null {
+  const text = lines.slice(range.start - 1, range.end).join("\n");
+  const byteLength = new TextEncoder().encode(text).length;
+  if (byteLength <= maxBytes) {
+    return null;
+  }
+  return {
+    code: "MCM_LINE_LIMIT_EXCEEDED",
+    message: "Frontmatter size exceeds policy limit",
+  };
 }
 
 type FrontmatterContext = {

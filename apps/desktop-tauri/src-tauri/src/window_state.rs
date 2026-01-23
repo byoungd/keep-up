@@ -1,7 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
-use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize, Runtime, Window, WindowEvent};
+use tauri::{
+    AppHandle, Manager, Monitor, PhysicalPosition, PhysicalSize, Runtime, WebviewWindow, Window,
+    WindowEvent,
+};
 
 const STATE_FILE_NAME: &str = "window-state.json";
 
@@ -26,9 +29,19 @@ pub fn restore<R: Runtime>(app: &AppHandle<R>) {
         None => return,
     };
 
-    if !state.maximized && !state.fullscreen {
-        let _ = window.set_position(PhysicalPosition::new(state.x, state.y));
-        let _ = window.set_size(PhysicalSize::new(state.width, state.height));
+    if state.width == 0 || state.height == 0 {
+        return;
+    }
+
+    let should_restore_bounds = !state.maximized && !state.fullscreen;
+    if should_restore_bounds {
+        let monitors = window.available_monitors().unwrap_or_default();
+        if is_state_visible(&state, &monitors) {
+            let _ = window.set_position(PhysicalPosition::new(state.x, state.y));
+            let _ = window.set_size(PhysicalSize::new(state.width, state.height));
+        } else {
+            center_window(&window, &state);
+        }
     } else {
         let _ = window.set_size(PhysicalSize::new(state.width, state.height));
     }
@@ -40,6 +53,52 @@ pub fn restore<R: Runtime>(app: &AppHandle<R>) {
     if state.fullscreen {
         let _ = window.set_fullscreen(true);
     }
+}
+
+fn is_state_visible(state: &StoredWindowState, monitors: &[Monitor]) -> bool {
+    const MIN_VISIBLE_PX: i32 = 48;
+    let win_left = state.x;
+    let win_top = state.y;
+    let win_right = state.x + state.width as i32;
+    let win_bottom = state.y + state.height as i32;
+
+    for monitor in monitors {
+        let pos = monitor.position();
+        let size = monitor.size();
+        let mon_left = pos.x;
+        let mon_top = pos.y;
+        let mon_right = pos.x + size.width as i32;
+        let mon_bottom = pos.y + size.height as i32;
+
+        let visible_width = (win_right.min(mon_right) - win_left.max(mon_left)).max(0);
+        let visible_height = (win_bottom.min(mon_bottom) - win_top.max(mon_top)).max(0);
+
+        if visible_width >= MIN_VISIBLE_PX && visible_height >= MIN_VISIBLE_PX {
+            return true;
+        }
+    }
+
+    false
+}
+
+fn center_window<R: Runtime>(window: &WebviewWindow<R>, state: &StoredWindowState) {
+    let monitor = match window.primary_monitor().ok().flatten() {
+        Some(monitor) => monitor,
+        None => return,
+    };
+
+    let monitor_size = monitor.size();
+    let monitor_pos = monitor.position();
+    let width = state.width.min(monitor_size.width);
+    let height = state.height.min(monitor_size.height);
+    let offset_x = ((monitor_size.width.saturating_sub(width)) / 2) as i32;
+    let offset_y = ((monitor_size.height.saturating_sub(height)) / 2) as i32;
+
+    let _ = window.set_size(PhysicalSize::new(width, height));
+    let _ = window.set_position(PhysicalPosition::new(
+        monitor_pos.x + offset_x,
+        monitor_pos.y + offset_y,
+    ));
 }
 
 pub fn handle_window_event<R: Runtime>(window: &Window<R>, event: &WindowEvent) {
@@ -55,22 +114,24 @@ pub fn handle_window_event<R: Runtime>(window: &Window<R>, event: &WindowEvent) 
 }
 
 fn persist_state<R: Runtime>(window: &Window<R>) {
-    let app = window.app_handle();
-    let path = match state_path(&app) {
-        Some(path) => path,
-        None => return,
-    };
-
+    let app = window.app_handle().clone();
     let state = match capture_state(window) {
         Some(state) => state,
         None => return,
     };
 
-    let Ok(serialized) = serde_json::to_string(&state) else {
-        return;
-    };
+    tauri::async_runtime::spawn(async move {
+        let path = match state_path(&app) {
+            Some(path) => path,
+            None => return,
+        };
 
-    let _ = fs::write(path, serialized);
+        let Ok(serialized) = serde_json::to_string(&state) else {
+            return;
+        };
+
+        let _ = fs::write(path, serialized);
+    });
 }
 
 fn capture_state<R: Runtime>(window: &Window<R>) -> Option<StoredWindowState> {

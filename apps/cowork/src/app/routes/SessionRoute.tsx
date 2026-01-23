@@ -11,7 +11,7 @@ export function SessionRoute() {
   const { getSession } = useWorkspace();
   const session = getSession(sessionId);
 
-  const { graph, applyArtifact, revertArtifact } = useTaskStream(sessionId);
+  const { graph, applyArtifact, revertArtifact, answerClarification } = useTaskStream(sessionId);
 
   useKeyboardShortcuts({
     onSend: () => {
@@ -48,6 +48,7 @@ export function SessionRoute() {
         graph={graph}
         onApplyArtifact={applyArtifact}
         onRevertArtifact={revertArtifact}
+        onAnswerClarification={answerClarification}
       />
     </div>
   );

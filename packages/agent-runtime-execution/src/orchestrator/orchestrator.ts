@@ -40,6 +40,10 @@ import {
   type SkillPromptAdapter,
   type SkillRegistry,
   type SkillSession,
+  type SubagentConfig,
+  type SubagentManager,
+  type SubagentResult,
+  type SubagentWorkItem,
   type ToolDiscoveryEngine,
   validateCompletionInput,
 } from "@ku0/agent-runtime-tools";
@@ -108,6 +112,7 @@ import {
   type ThinkingResult,
   type ToolDecision,
 } from "./agentLoop";
+import type { ClarificationManager, ClarificationRecord } from "./clarificationManager";
 import { createDependencyAnalyzer, type DependencyAnalyzer } from "./dependencyAnalyzer";
 import { createErrorRecoveryEngine, type ErrorRecoveryEngine } from "./errorRecovery";
 import { BackpressureEventStream } from "./eventStream";
@@ -145,6 +150,8 @@ export type OrchestratorEventType =
   | "thinking"
   | "tool:calling"
   | "tool:result"
+  | "clarification:requested"
+  | "clarification:answered"
   | "confirmation:required"
   | "confirmation:received"
   | "plan:created"
@@ -178,6 +185,11 @@ export type AgentControlSignal =
   | { type: "RESUME"; reason?: string }
   | { type: "STEP"; reason?: string }
   | { type: "INJECT_THOUGHT"; thought: string; reason?: string };
+
+export interface SubagentAutomationConfig {
+  enabled?: boolean;
+  maxConcurrent?: number;
+}
 
 export interface ControlStateSnapshot {
   paused: boolean;
@@ -222,6 +234,12 @@ export interface OrchestratorComponents {
   toolResultCache?: ToolResultCache;
   /** Optional node-level result cache */
   nodeResultCache?: NodeResultCache;
+  /** Optional subagent manager for orchestrator automation */
+  subagentManager?: SubagentManager;
+  /** Optional subagent automation settings */
+  subagentAutomation?: SubagentAutomationConfig;
+  /** Optional clarification manager for interactive questions */
+  clarificationManager?: ClarificationManager;
   /** Optional approval manager */
   approvalManager?: ApprovalManager;
   /** Optional runtime event stream bridge */
@@ -281,6 +299,9 @@ export class AgentOrchestrator {
   private readonly planningEngine: PlanningEngine;
   private readonly turnExecutor: ITurnExecutor;
   private readonly toolExecutor?: ToolExecutor;
+  private readonly subagentManager?: SubagentManager;
+  private readonly subagentAutomation: SubagentAutomationConfig;
+  private readonly clarificationManager?: ClarificationManager;
   private readonly approvalManager?: ApprovalManager;
   private readonly eventBus?: RuntimeEventBus;
   private readonly sessionState?: SessionState;
@@ -317,6 +338,7 @@ export class AgentOrchestrator {
   private controlGate?: { promise: Promise<void>; resolve: () => void };
   private recoveryState: RecoveryState = { active: false, warned: false };
   private forceCompletionToolsOnly = false;
+  private subagentPreludeExecuted = false;
 
   private state: AgentState;
 
@@ -379,6 +401,9 @@ export class AgentOrchestrator {
     this.toolDiscovery = this.resolveToolDiscovery(config, components);
     this.fileContextTracker = components.fileContextTracker;
     this.auditLogger = components.auditLogger;
+    this.subagentManager = components.subagentManager;
+    this.subagentAutomation = components.subagentAutomation ?? { enabled: false };
+    this.clarificationManager = components.clarificationManager;
 
     // Initialize performance optimizations
     this.messageCompressor = this.resolveMessageCompressor(components);
@@ -417,6 +442,7 @@ export class AgentOrchestrator {
     });
 
     this.loopStateMachine = createAgentLoopStateMachine({ enableCycleLogging: false });
+    this.attachClarificationManager();
   }
 
   private resolveApprovalManager(components: OrchestratorComponents): ApprovalManager {
@@ -605,6 +631,7 @@ export class AgentOrchestrator {
     this.recoveryState = { active: false, warned: false };
     this.forceCompletionToolsOnly = false;
     this.planArtifactEmitted = false;
+    this.subagentPreludeExecuted = false;
     this.taskGraph?.setEventContext({ correlationId: runId, source: this.config.name });
     this.currentPlanNodeId = this.createPlanNode(userMessage);
     const detachStreamBridge = this.attachStreamBridge(runId);
@@ -615,6 +642,7 @@ export class AgentOrchestrator {
     const userMsg: AgentMessage = { role: "user", content: userMessage };
     this.state.messages.push(userMsg);
     this.recordMessage(userMsg);
+    await this.maybeRunSubagentPrelude(userMessage);
     this.metrics?.gauge(AGENT_METRICS.activeAgents.name, 1, {});
     this.loopStateMachine.stop();
 
@@ -655,6 +683,208 @@ export class AgentOrchestrator {
 
     await this.finalizeCheckpointStatus();
     return this.state;
+  }
+
+  private async maybeRunSubagentPrelude(userMessage: string): Promise<void> {
+    if (!this.subagentManager || this.subagentPreludeExecuted) {
+      return;
+    }
+
+    if (!this.subagentAutomation.enabled) {
+      return;
+    }
+
+    const tasks = this.identifySubagentTasks(userMessage);
+    if (tasks.length === 0) {
+      return;
+    }
+
+    this.subagentPreludeExecuted = true;
+
+    try {
+      const results = await this.subagentManager.executeParallel(tasks);
+      this.integrateSubagentResults(tasks, results);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const failureMsg: AgentMessage = {
+        role: "system",
+        content: `Subagent prelude failed: ${message}`,
+      };
+      this.state.messages.push(failureMsg);
+      this.recordMessage(failureMsg);
+    }
+  }
+
+  private identifySubagentTasks(task: string): SubagentWorkItem[] {
+    const tasks: SubagentWorkItem[] = [];
+    const normalized = task.toLowerCase();
+    const maxConcurrency = this.subagentAutomation.maxConcurrent;
+
+    if (/(search|find|locate|where is|look for)\b/.test(normalized)) {
+      tasks.push(
+        this.buildSubagentTask(
+          {
+            type: "codebase-research",
+            name: "Codebase Research",
+            prompt: "Search the codebase for relevant files and summarize key findings.",
+            tools: ["file:read", "file:list", "file:info"],
+            maxConcurrency,
+          },
+          { query: task }
+        )
+      );
+    }
+
+    if (/(run tests|test suite|tests|verify)/.test(normalized)) {
+      tasks.push(
+        this.buildSubagentTask(
+          {
+            type: "terminal-executor",
+            name: "Terminal Executor",
+            prompt: "Determine and run the relevant validation commands.",
+            tools: ["bash:execute", "file:read", "file:list"],
+            maxConcurrency,
+          },
+          { request: task }
+        )
+      );
+    }
+
+    const parallelTargets = this.extractParallelTargets(task);
+    if (parallelTargets.length > 1) {
+      for (const target of parallelTargets) {
+        tasks.push(
+          this.buildSubagentTask(
+            {
+              type: "parallel-work",
+              name: "Parallel Work",
+              prompt: "Implement the assigned workstream and report progress.",
+              tools: ["file:*", "code:*", "bash:execute"],
+              maxConcurrency,
+            },
+            { task: target }
+          )
+        );
+      }
+    }
+
+    return tasks;
+  }
+
+  private extractParallelTargets(task: string): string[] {
+    const match = /(?:implement|build|create|add)\s+(.+)/i.exec(task);
+    if (!match?.[1]) {
+      return [];
+    }
+
+    return match[1]
+      .split(/\s+and\s+/i)
+      .map((segment) => segment.trim())
+      .filter((segment) => segment.length > 0);
+  }
+
+  private buildSubagentTask(config: SubagentConfig, input: unknown): SubagentWorkItem {
+    return {
+      id: crypto.randomUUID(),
+      config,
+      input,
+    };
+  }
+
+  private integrateSubagentResults(
+    tasks: SubagentWorkItem[],
+    results: SubagentResult<unknown>[]
+  ): void {
+    const summaryLines = tasks.map((task, index) => {
+      const result = results[index];
+      if (!result) {
+        return `- ${task.config.name}: No result`;
+      }
+      if (!result.success) {
+        return `- ${task.config.name} (failed): ${result.error?.message ?? "Unknown error"}`;
+      }
+      return `- ${task.config.name}: ${this.formatSubagentOutput(result.output)}`;
+    });
+
+    const summaryMessage: AgentMessage = {
+      role: "system",
+      content: `Subagent results:\n${summaryLines.join("\n")}`,
+    };
+
+    this.state.messages.push(summaryMessage);
+    this.recordMessage(summaryMessage);
+  }
+
+  private formatSubagentOutput(output: unknown): string {
+    if (typeof output === "string") {
+      return output;
+    }
+
+    try {
+      return JSON.stringify(output, null, 2);
+    } catch {
+      return String(output);
+    }
+  }
+
+  private attachClarificationManager(): void {
+    if (!this.clarificationManager) {
+      return;
+    }
+
+    this.clarificationManager.onEvent((event) => {
+      const eventType =
+        event.type === "requested" ? "clarification:requested" : "clarification:answered";
+      const data = event.type === "requested" ? event.request : event.response;
+      this.emit(eventType as OrchestratorEventType, data);
+      this.eventBus?.emit(eventType, data, {
+        source: "orchestrator",
+        correlationId: this.currentRunId,
+        priority: "normal",
+      });
+    });
+  }
+
+  private applyClarificationResponses(): void {
+    if (!this.clarificationManager) {
+      return;
+    }
+
+    const resolved = this.clarificationManager.consumeResolved();
+    if (resolved.length === 0) {
+      return;
+    }
+
+    for (const record of resolved) {
+      const message: AgentMessage = {
+        role: "user",
+        content: this.formatClarificationMessage(record),
+      };
+      this.state.messages.push(message);
+      this.recordMessage(message);
+    }
+  }
+
+  private formatClarificationMessage(record: ClarificationRecord): string {
+    const options =
+      record.request.options && record.request.options.length > 0
+        ? `Options: ${record.request.options.join(", ")}`
+        : "";
+    const selected =
+      typeof record.response.selectedOption === "number" &&
+      record.request.options?.[record.response.selectedOption]
+        ? `Selected option: ${record.request.options[record.response.selectedOption]}`
+        : "";
+
+    return [
+      "Clarification response received.",
+      `Question: ${record.request.question}`,
+      `Answer: ${record.response.answer}`,
+      selected,
+      options,
+    ]
+      .filter((line) => line.length > 0)
+      .join("\n");
   }
 
   private attachStreamBridge(runId: string): (() => void) | undefined {
@@ -1475,6 +1705,7 @@ export class AgentOrchestrator {
   }
 
   private async executeTurn(): Promise<void> {
+    this.applyClarificationResponses();
     this.state.turn++;
     this.statusController.setStatus(this.state, "thinking");
     this.emit("turn:start", { turn: this.state.turn });
