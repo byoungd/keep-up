@@ -55,22 +55,24 @@ pub fn handle_window_event(window: &WebviewWindow, event: &WindowEvent) {
 }
 
 fn persist_state(window: &WebviewWindow) {
-    let app = window.app_handle();
-    let path = match state_path(&app) {
-        Some(path) => path,
-        None => return,
-    };
-
+    let app = window.app_handle().clone();
     let state = match capture_state(window) {
         Some(state) => state,
         None => return,
     };
 
-    let Ok(serialized) = serde_json::to_string(&state) else {
-        return;
-    };
+    tauri::async_runtime::spawn(async move {
+        let path = match state_path(&app) {
+            Some(path) => path,
+            None => return,
+        };
 
-    let _ = fs::write(path, serialized);
+        let Ok(serialized) = serde_json::to_string(&state) else {
+            return;
+        };
+
+        let _ = fs::write(path, serialized);
+    });
 }
 
 fn capture_state(window: &WebviewWindow) -> Option<StoredWindowState> {

@@ -27,20 +27,4 @@ serde_json = "1"
 resolver = "2"
 members = [
   ".",
-  "../../../packages/ai-context-hash-rs",
-  "../../../packages/ai-sanitizer-rs/native",
-  "../../../packages/anchor-codec-rs",
-  "../../../packages/anchor-relocation-rs",
-  "../../../packages/canonicalizer-rs",
-  "../../../packages/diff-rs",
-  "../../../packages/gitignore-rs",
-  "../../../packages/json-accel-rs/native",
-  "../../../packages/policy-hash-rs",
-  "../../../packages/sandbox-rs",
-  "../../../packages/storage-engine-rs",
-  "../../../packages/streaming-markdown-rs",
-  "../../../packages/symbol-index-rs",
-  "../../../packages/text-normalization-rs",
-  "../../../packages/tokenizer-rs/native",
-  "../../../packages/vector-similarity-rs",
 ]
