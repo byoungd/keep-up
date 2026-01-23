@@ -119,6 +119,75 @@ describe("Markdown line-based operations", () => {
     }
   });
 
+  it("updates frontmatter keys", async () => {
+    const content = "---\nname: Example\n---\nBody";
+    const lines = splitMarkdownLines(content);
+    const range = { start: 1, end: 3 };
+    const hash = await computeMarkdownLineHash(lines, range);
+
+    const envelope: MarkdownOperationEnvelope = {
+      mode: "markdown",
+      doc_id: docId,
+      doc_frontier: frontier,
+      preconditions: [{ v: 1, mode: "markdown", id: "p1", line_range: range, content_hash: hash }],
+      ops: [
+        {
+          op: "md_update_frontmatter",
+          precondition_id: "p1",
+          target: { key_path: ["name"] },
+          value: "Updated",
+        },
+      ],
+    };
+
+    const result = await applyMarkdownLineOperations(content, envelope, {
+      frontmatterPolicy: {
+        allow_frontmatter: true,
+        frontmatter_formats: ["yaml"],
+        max_frontmatter_bytes: 1024,
+      },
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.content).toContain("name: Updated");
+    }
+  });
+
+  it("creates frontmatter when missing", async () => {
+    const content = "Body";
+    const range = { start: 1, end: 1 };
+
+    const envelope: MarkdownOperationEnvelope = {
+      mode: "markdown",
+      doc_id: docId,
+      doc_frontier: frontier,
+      preconditions: [{ v: 1, mode: "markdown", id: "p1", line_range: range }],
+      ops: [
+        {
+          op: "md_update_frontmatter",
+          precondition_id: "p1",
+          target: { key_path: ["title"] },
+          value: "Created",
+          create_if_missing: true,
+        },
+      ],
+    };
+
+    const result = await applyMarkdownLineOperations(content, envelope, {
+      frontmatterPolicy: {
+        allow_frontmatter: true,
+        frontmatter_formats: ["json"],
+        max_frontmatter_bytes: 1024,
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.content.startsWith(";;;\n")).toBe(true);
+      expect(result.content).toContain('"title": "Created"');
+    }
+  });
+
   it("resolves frontmatter key preconditions for line ops", async () => {
     const content = "---\nname: Example\n---\nBody";
     const lines = splitMarkdownLines(content);
