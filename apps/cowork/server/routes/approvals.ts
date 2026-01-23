@@ -1,6 +1,7 @@
+import { computeCoworkRiskScore } from "@ku0/agent-runtime";
 import { Hono } from "hono";
 import { formatZodError, jsonError, readJsonBody } from "../http";
-import type { CoworkRuntimeBridge } from "../runtime/coworkRuntime";
+import type { CoworkRuntimeBridge, ToolCheckRequest } from "../runtime/coworkRuntime";
 import type { CoworkTaskRuntime } from "../runtime/coworkTaskRuntime";
 import { approvalDecisionSchema, toolCheckSchema } from "../schemas";
 import type { ApprovalStoreLike, SessionStoreLike } from "../storage/contracts";
@@ -36,7 +37,18 @@ export function createApprovalRoutes(deps: ApprovalRouteDeps) {
       return jsonError(c, 404, "Session not found");
     }
 
-    const result = await deps.runtime.checkAction(session, parsed.data);
+    const request = parsed.data as ToolCheckRequest;
+    const result = await deps.runtime.checkAction(session, request);
+    const policyMeta = describeToolCheck(request);
+    deps.events.publish(sessionId, COWORK_EVENTS.POLICY_DECISION, {
+      toolName: policyMeta.toolName,
+      decision: result.decision.decision,
+      policyRuleId: result.decision.ruleId,
+      policyAction: policyMeta.policyAction,
+      riskTags: result.decision.riskTags,
+      riskScore: computeCoworkRiskScore(result.decision.riskTags, result.decision.decision),
+      reason: result.decision.reason,
+    });
     if (result.status === "approval_required") {
       deps.events.publish(sessionId, COWORK_EVENTS.APPROVAL_REQUIRED, {
         approvalId: result.approval.approvalId,
@@ -80,4 +92,23 @@ export function createApprovalRoutes(deps: ApprovalRouteDeps) {
   });
 
   return app;
+}
+
+function describeToolCheck(request: ToolCheckRequest): {
+  toolName: string;
+  policyAction: string;
+} {
+  if (request.kind === "file") {
+    return {
+      toolName: `file.${request.intent}:${request.path}`,
+      policyAction: `file.${request.intent}`,
+    };
+  }
+  if (request.kind === "network") {
+    return { toolName: `network.request:${request.host}`, policyAction: "network.request" };
+  }
+  return {
+    toolName: `connector.action:${request.connectorScopeAllowed ? "allowed" : "blocked"}`,
+    policyAction: "connector.action",
+  };
 }
