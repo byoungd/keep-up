@@ -37,6 +37,12 @@ export function CheckpointsPanelContent() {
   const [lastRestore, setLastRestore] = useState<CoworkCheckpointRestoreResult | null>(null);
 
   const canLoad = Boolean(resolvedSessionId);
+  const isBusy = isLoading || Boolean(restoringId) || Boolean(deletingId);
+  const sortedCheckpoints = useMemo(
+    () => [...checkpoints].sort((a, b) => b.createdAt - a.createdAt),
+    [checkpoints]
+  );
+  const latestCheckpoint = sortedCheckpoints[0];
 
   const loadCheckpoints = useCallback(async () => {
     if (!resolvedSessionId) {
@@ -124,14 +130,26 @@ export function CheckpointsPanelContent() {
             Restore or clean up the latest runtime snapshots.
           </p>
         </div>
-        <button
-          type="button"
-          className="px-3 py-2 text-xs font-medium text-muted-foreground border border-border rounded-md hover:text-foreground hover:bg-surface-2 transition-colors duration-fast disabled:opacity-60"
-          onClick={loadCheckpoints}
-          disabled={!canLoad || isLoading}
-        >
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          {latestCheckpoint ? (
+            <button
+              type="button"
+              className="px-3 py-2 text-xs font-medium text-primary-foreground bg-primary rounded-md hover:bg-primary/90 transition-colors duration-fast disabled:opacity-60"
+              onClick={() => handleRestore(latestCheckpoint.id)}
+              disabled={!canLoad || isBusy}
+            >
+              Restore latest
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="px-3 py-2 text-xs font-medium text-muted-foreground border border-border rounded-md hover:text-foreground hover:bg-surface-2 transition-colors duration-fast disabled:opacity-60"
+            onClick={loadCheckpoints}
+            disabled={!canLoad || isLoading}
+          >
+            Refresh
+          </button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -145,12 +163,12 @@ export function CheckpointsPanelContent() {
 
       {lastRestoreLabel ? <div className="text-xs text-success">{lastRestoreLabel}</div> : null}
 
-      {!isLoading && checkpoints.length === 0 ? (
+      {!isLoading && canLoad && sortedCheckpoints.length === 0 ? (
         <div className="text-xs text-muted-foreground">No checkpoints yet.</div>
       ) : null}
 
       <div className="space-y-2">
-        {checkpoints.map((checkpoint) => {
+        {sortedCheckpoints.map((checkpoint, index) => {
           const statusClass = resolveStatusClass(checkpoint.status);
           const isRestoring = restoringId === checkpoint.id;
           const isDeleting = deletingId === checkpoint.id;
@@ -164,11 +182,18 @@ export function CheckpointsPanelContent() {
                 <span className="text-[11px] text-muted-foreground">
                   {new Date(checkpoint.createdAt).toLocaleString()}
                 </span>
-                <span
-                  className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${statusClass}`}
-                >
-                  {checkpoint.status}
-                </span>
+                <div className="flex items-center gap-2">
+                  {index === 0 ? (
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Latest
+                    </span>
+                  ) : null}
+                  <span
+                    className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${statusClass}`}
+                  >
+                    {checkpoint.status}
+                  </span>
+                </div>
               </div>
               <div className="text-xs text-foreground line-clamp-2">{checkpoint.task}</div>
               <div className="text-[11px] text-muted-foreground">
