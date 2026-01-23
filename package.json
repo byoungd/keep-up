@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "concurrently -k -n cowork,cowork-server -c blue,green \"pnpm dev:cowork\" \"pnpm -C apps/cowork/server dev\"",
     "dev:cowork": "turbo run dev --filter=@ku0/cowork",
+    "dev:desktop": "concurrently -k -n cowork,tauri -c blue,yellow \"pnpm dev:cowork\" \"pnpm --filter @ku0/desktop-tauri tauri dev\"",
     "cowork:serve": "pnpm -C apps/cowork build && pnpm -C apps/cowork/server start",
     "build": "turbo run build",
     "test": "pnpm test:unit",
