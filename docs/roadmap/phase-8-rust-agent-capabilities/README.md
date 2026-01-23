@@ -45,6 +45,27 @@ Primary sources used for capability extraction:
 - All tools execute under explicit capability grants and sandbox policy.
 - Local-first data storage is default; outbound calls are opt-in and audited.
 
+## Executable Specs
+
+Each track document includes an **Implementation Spec (Executable)** section that is the
+single source of truth for implementation. Agents should follow those specs directly and
+avoid assumptions beyond what is written.
+
+Required sections per track doc:
+- Architecture Context
+- Out of Scope
+- Implementation Spec (Executable)
+- Validation Commands
+- Definition of Done
+
+## Cross-Track Conventions
+
+- JSON fields are `camelCase`; enums are `snake_case`.
+- Deterministic ordering is mandatory for registries and event logs.
+- Hashing uses SHA-256 hex (reuse `@ku0/policy-hash-rs` when available).
+- N-API bindings use `@ku0/native-bindings` with `node.ts` loaders and browser-safe `index.ts` fallbacks.
+- Environment flags follow `KU0_<FEATURE>_NATIVE_PATH` and `KU0_<FEATURE>_DISABLE_NATIVE=1`.
+
 ## Track Index (Parallelizable)
 
 | Track | Focus | Priority | Est. Effort | Dependencies | Document |
