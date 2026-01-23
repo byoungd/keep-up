@@ -306,16 +306,18 @@ function resolveOperation(
       return resolveDeleteLines(op, precondition, lineCount, opIndex);
     case "md_insert_lines":
       return resolveInsertLines(op, precondition, lineCount, opIndex);
-    default:
+    default: {
+      const exhaustiveCheck: never = op;
       return {
         ok: false,
         error: {
           code: "MCM_OPERATION_UNSUPPORTED",
-          message: `Unsupported operation ${op.op}`,
+          message: `Unsupported operation ${(exhaustiveCheck as MarkdownOperation).op}`,
           op_index: opIndex,
-          precondition_id: op.precondition_id,
+          precondition_id: (exhaustiveCheck as MarkdownOperation).precondition_id,
         },
       };
+    }
   }
 }
 
