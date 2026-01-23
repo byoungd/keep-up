@@ -1,0 +1,26 @@
+{
+  "rustc": 2629586073275287932,
+  "features": "[]",
+  "declared_features": "[]",
+  "target": 14672843957833403715,
+  "profile": 3033921117576893,
+  "path": 5850145727851774324,
+  "deps": [
+    [4289358735036141001, "proc_macro2", false, 17271567976063926592],
+    [6100504282945712449, "quote", false, 4171581551688718193],
+    [6490058671768129134, "syn", false, 13110116021574766948],
+    [13077543566650298139, "heck", false, 3619308031204324505],
+    [14156967978702956262, "rustversion", false, 325595052783546968]
+  ],
+  "local": [
+    {
+      "CheckDepInfo": {
+        "dep_info": "debug/.fingerprint/strum_macros-6ef59d407170f509/dep-lib-strum_macros",
+        "checksum": false
+      }
+    }
+  ],
+  "rustflags": [],
+  "config": 2069994364910194474,
+  "compile_kind": 0
+}

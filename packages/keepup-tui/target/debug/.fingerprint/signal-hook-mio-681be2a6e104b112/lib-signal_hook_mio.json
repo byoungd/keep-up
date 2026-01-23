@@ -1,0 +1,24 @@
+{
+  "rustc": 2629586073275287932,
+  "features": "[\"mio-0_8\", \"support-v0_8\"]",
+  "declared_features": "[\"mio-0_6\", \"mio-0_7\", \"mio-0_8\", \"mio-1_0\", \"mio-uds\", \"support-v0_6\", \"support-v0_7\", \"support-v0_8\", \"support-v1_0\"]",
+  "target": 12462439415559432985,
+  "profile": 8276155916380437441,
+  "path": 13745885719411970393,
+  "deps": [
+    [203594543813181569, "libc", false, 13034818346045158525],
+    [10703860158168350592, "mio_0_8", false, 15354093534611064029],
+    [17154765528929363175, "signal_hook", false, 13903345701136301013]
+  ],
+  "local": [
+    {
+      "CheckDepInfo": {
+        "dep_info": "debug/.fingerprint/signal-hook-mio-681be2a6e104b112/dep-lib-signal_hook_mio",
+        "checksum": false
+      }
+    }
+  ],
+  "rustflags": [],
+  "config": 2069994364910194474,
+  "compile_kind": 0
+}

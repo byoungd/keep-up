@@ -1,0 +1,26 @@
+{
+  "rustc": 2629586073275287932,
+  "features": "[]",
+  "declared_features": "[\"arbitrary\", \"bytes\", \"markup\", \"proptest\", \"quickcheck\", \"rkyv\", \"serde\", \"smallvec\"]",
+  "target": 12681387934967326413,
+  "profile": 8276155916380437441,
+  "path": 10797775231878673504,
+  "deps": [
+    [1127187624154154345, "castaway", false, 7230639705774937920],
+    [7101181952280297532, "ryu", false, 8329000759419702821],
+    [7667230146095136825, "cfg_if", false, 7401161766510460502],
+    [9938278000850417404, "itoa", false, 5068601667318794289],
+    [13785866025199020095, "static_assertions", false, 1633633303182909887]
+  ],
+  "local": [
+    {
+      "CheckDepInfo": {
+        "dep_info": "debug/.fingerprint/compact_str-fbd9f70288961cfc/dep-lib-compact_str",
+        "checksum": false
+      }
+    }
+  ],
+  "rustflags": [],
+  "config": 2069994364910194474,
+  "compile_kind": 0
+}
