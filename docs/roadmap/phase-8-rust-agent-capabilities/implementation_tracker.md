@@ -10,6 +10,13 @@
 - [x] **Phase 7: Desktop Sovereignty**: Required for Track AR (Tauri Shell).
   - *Note: Tracks AP, AQ, AS, AT, AU can proceed in parallel with Phase 7.*
 
+## Execution Requirements
+
+- Track documents must include an **Implementation Spec (Executable)** section.
+- JSON fields are `camelCase`; enums are `snake_case` across Rust/TS boundaries.
+- Native bindings follow the `@ku0/native-bindings` loader pattern with node/browser entrypoints.
+- Validation commands in each track doc must be runnable without manual edits.
+
 ## Track Checklist
 
 ### Track AP: Workforce Orchestrator (Rust) [P0]
