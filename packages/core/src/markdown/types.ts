@@ -71,7 +71,10 @@ export type MarkdownOperationErrorCode =
   | "MCM_PRECONDITION_FAILED"
   | "MCM_CONTENT_HASH_MISMATCH"
   | "MCM_OPERATION_OVERLAP"
-  | "MCM_OPERATION_UNSUPPORTED";
+  | "MCM_OPERATION_UNSUPPORTED"
+  | "MCM_TARGETING_AMBIGUOUS"
+  | "MCM_TARGETING_NOT_FOUND"
+  | "MCM_TARGETING_SCOPE_EXCEEDED";
 
 export type MarkdownOperationError = {
   code: MarkdownOperationErrorCode;
@@ -84,6 +87,33 @@ export type MarkdownAppliedOperation = {
   op_index: number;
   op: MarkdownOperation;
   resolved_range: LineRange;
+};
+
+export type MarkdownHeadingBlock = {
+  kind: "heading";
+  line_range: LineRange;
+  level: number;
+  text: string;
+};
+
+export type MarkdownCodeFenceBlock = {
+  kind: "code_fence";
+  line_range: LineRange;
+  language?: string;
+  info_string?: string;
+};
+
+export type MarkdownFrontmatterBlock = {
+  kind: "frontmatter";
+  line_range: LineRange;
+  syntax: "yaml" | "toml" | "json";
+};
+
+export type MarkdownSemanticIndex = {
+  line_count: number;
+  headings: MarkdownHeadingBlock[];
+  code_fences: MarkdownCodeFenceBlock[];
+  frontmatter?: MarkdownFrontmatterBlock;
 };
 
 export type MarkdownLineApplyResult =
