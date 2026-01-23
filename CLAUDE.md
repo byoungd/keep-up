@@ -1,10 +1,11 @@
-# Keep-Up - Claude Code Configuration
+# Open Wrap - Claude Code Configuration
 
 ## Project Overview
 
-**Name**: Keep-Up
+**Name**: Open Wrap (legacy docs may say "Keep-Up" or "Reader")
 **Stack**: TypeScript, React 19, pnpm monorepo, Turbo, Vite (Cowork), Rust (native accelerators)
-**Core**: LFCC (Local-First Collaboration Contract) editor with Loro CRDT
+**Core App**: `apps/cowork` (server + UI)
+**LFCC Stack**: LFCC (Local-First Collaboration Contract) editor with Loro CRDT
 **Namespace**: `@ku0/*` (TS), `ku0-*` (Rust crates)
 
 ## Quick Commands
@@ -48,7 +49,7 @@
 
 ```
 apps/
-├── cowork/              # Vite React collaboration app
+├── cowork/              # Core app (server + UI)
 └── desktop/             # Desktop app (Tauri/Electron wrapper)
 
 packages/
@@ -68,13 +69,6 @@ packages/
 ├── ingest-youtube/      # YouTube caption ingestion
 ├── bench/               # Performance benchmarks
 └── compat/              # Compatibility tests (IME, mobile)
-
-crates/                  # Rust native accelerators (Phase 6)
-├── sandbox-rs/          # OS-level sandbox (Seatbelt/Landlock/AppContainer)
-├── storage-engine-rs/   # Event log + checkpoint engine
-├── tokenizer-rs/        # tiktoken + Zstd compression
-└── symbol-index-rs/     # Inverted/trigram symbol index
-
 docs/                    # Product specs & documentation
 ```
 
@@ -98,5 +92,5 @@ docs/                    # Product specs & documentation
 
 ## E2E Testing Strategy
 
-**Targeted tests only.** Full E2E suite is currently migrated to `apps/reader` branch.
-Use unit and integration tests (Vitest) for verification.
+Follow `.agent/workflows/e2e-test.md` when E2E applies.  
+If a change is limited to docs or non-E2E areas, use unit/integration tests (Vitest) or note "Not run (docs-only)".
