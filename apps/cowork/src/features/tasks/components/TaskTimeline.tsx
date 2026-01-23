@@ -50,7 +50,7 @@ export function TaskTimeline({ graph, isConnected, approveTool, rejectTool }: Ta
   return (
     <div className="flex flex-col h-full bg-surface-0/70 relative rounded-2xl border border-border/40 shadow-sm overflow-hidden">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-border/40 bg-surface-0/90 backdrop-blur-md sticky top-0 z-20 flex justify-between items-center shadow-sm">
+      <div className="px-4 py-3 border-b border-border/40 bg-surface-0 sticky top-0 z-20 flex justify-between items-center shadow-sm">
         <h2 className="font-bold text-foreground text-sm tracking-tight flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-primary/20 flex items-center justify-center">
             <div className="w-1 h-1 rounded-full bg-primary animate-pulse" />

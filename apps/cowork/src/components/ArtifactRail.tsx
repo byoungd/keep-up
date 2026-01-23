@@ -17,7 +17,7 @@ export function ArtifactRail({
   return (
     <aside className="artifact-rail" aria-label="Artifact rail">
       <div className="card-panel h-full flex flex-col p-0 overflow-hidden">
-        <div className="p-3 border-b border-border/40 bg-surface-0/90 backdrop-blur-md">
+        <div className="p-3 border-b border-border/40 bg-surface-0">
           <p className="text-sm font-semibold text-foreground">Artifact Rail</p>
           <p className="text-xs text-muted-foreground">Session {sessionId.slice(0, 8)}...</p>
         </div>
