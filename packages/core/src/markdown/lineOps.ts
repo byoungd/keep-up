@@ -15,6 +15,7 @@ import type {
   MarkdownOperationEnvelope,
   MarkdownOperationError,
   MarkdownPreconditionV1,
+  MarkdownSemanticIndex,
 } from "./types.js";
 
 type ResolvedOperation = {
@@ -80,6 +81,8 @@ export async function applyMarkdownLineOperations(
     preconditionsResult.map,
     preconditionResolution.ranges,
     lineCount,
+    semanticIndex,
+    options.targetingPolicy,
     semanticIndex.frontmatter?.line_range
   );
   if (!resolvedResult.ok) {
@@ -315,6 +318,8 @@ function resolveOperations(
   preconditionsById: Map<string, MarkdownPreconditionV1>,
   resolvedRanges: Map<string, LineRange>,
   lineCount: number,
+  semanticIndex: MarkdownSemanticIndex,
+  policy?: MarkdownTargetingPolicyV1,
   frontmatterRange?: LineRange
 ): ResolveOpsResult {
   const resolvedOps: ResolvedOperation[] = [];
@@ -361,7 +366,15 @@ function resolveOperations(
       };
     }
 
-    const resolved = resolveOperation(op, resolvedRange, lineCount, i, frontmatterRange);
+    const resolved = resolveOperation(
+      op,
+      resolvedRange,
+      lineCount,
+      semanticIndex,
+      policy,
+      i,
+      frontmatterRange
+    );
     if (!resolved.ok) {
       return resolved;
     }
@@ -375,6 +388,8 @@ function resolveOperation(
   op: MarkdownOperation,
   resolvedRange: LineRange,
   lineCount: number,
+  semanticIndex: MarkdownSemanticIndex,
+  policy: MarkdownTargetingPolicyV1 | undefined,
   opIndex: number,
   frontmatterRange?: LineRange
 ): { ok: true; resolved: ResolvedOperation } | { ok: false; error: MarkdownOperationError } {
@@ -385,6 +400,14 @@ function resolveOperation(
       return resolveDeleteLines(op, resolvedRange, lineCount, opIndex);
     case "md_insert_lines":
       return resolveInsertLines(op, resolvedRange, lineCount, opIndex);
+    case "md_replace_block":
+      return resolveReplaceBlock(op, resolvedRange, semanticIndex, policy, opIndex);
+    case "md_insert_after":
+      return resolveInsertAfter(op, resolvedRange, semanticIndex, policy, opIndex);
+    case "md_insert_before":
+      return resolveInsertBefore(op, resolvedRange, semanticIndex, policy, opIndex);
+    case "md_insert_code_fence":
+      return resolveInsertCodeFence(op, resolvedRange, semanticIndex, policy, opIndex);
     case "md_update_frontmatter":
       return resolveFrontmatterUpdate(op, resolvedRange, opIndex, frontmatterRange);
     default: {
@@ -519,6 +542,239 @@ function resolveInsertLines(
   };
 }
 
+function resolveReplaceBlock(
+  op: Extract<MarkdownOperation, { op: "md_replace_block" }>,
+  resolvedRange: LineRange,
+  semanticIndex: MarkdownSemanticIndex,
+  policy: MarkdownTargetingPolicyV1 | undefined,
+  opIndex: number
+): { ok: true; resolved: ResolvedOperation } | { ok: false; error: MarkdownOperationError } {
+  const targetResult = resolveBlockTargetRange(
+    op.target,
+    semanticIndex,
+    policy,
+    opIndex,
+    op.precondition_id
+  );
+  if (!targetResult.ok) {
+    return targetResult;
+  }
+  if (!rangesEqual(resolvedRange, targetResult.range)) {
+    return {
+      ok: false,
+      error: {
+        code: "MCM_PRECONDITION_FAILED",
+        message: "Operation target does not match precondition range",
+        op_index: opIndex,
+        precondition_id: op.precondition_id,
+      },
+    };
+  }
+  return { ok: true, resolved: { op_index: opIndex, op, resolved_range: targetResult.range } };
+}
+
+function resolveInsertAfter(
+  op: Extract<MarkdownOperation, { op: "md_insert_after" }>,
+  resolvedRange: LineRange,
+  semanticIndex: MarkdownSemanticIndex,
+  policy: MarkdownTargetingPolicyV1 | undefined,
+  opIndex: number
+): { ok: true; resolved: ResolvedOperation } | { ok: false; error: MarkdownOperationError } {
+  const targetResult = resolveBlockTargetRange(
+    op.target,
+    semanticIndex,
+    policy,
+    opIndex,
+    op.precondition_id
+  );
+  if (!targetResult.ok) {
+    return targetResult;
+  }
+  if (!rangesEqual(resolvedRange, targetResult.range)) {
+    return {
+      ok: false,
+      error: {
+        code: "MCM_PRECONDITION_FAILED",
+        message: "Operation target does not match precondition range",
+        op_index: opIndex,
+        precondition_id: op.precondition_id,
+      },
+    };
+  }
+  return {
+    ok: true,
+    resolved: {
+      op_index: opIndex,
+      op,
+      resolved_range: targetResult.range,
+      insert_index: targetResult.range.end,
+    },
+  };
+}
+
+function resolveInsertBefore(
+  op: Extract<MarkdownOperation, { op: "md_insert_before" }>,
+  resolvedRange: LineRange,
+  semanticIndex: MarkdownSemanticIndex,
+  policy: MarkdownTargetingPolicyV1 | undefined,
+  opIndex: number
+): { ok: true; resolved: ResolvedOperation } | { ok: false; error: MarkdownOperationError } {
+  const targetResult = resolveBlockTargetRange(
+    op.target,
+    semanticIndex,
+    policy,
+    opIndex,
+    op.precondition_id
+  );
+  if (!targetResult.ok) {
+    return targetResult;
+  }
+  if (!rangesEqual(resolvedRange, targetResult.range)) {
+    return {
+      ok: false,
+      error: {
+        code: "MCM_PRECONDITION_FAILED",
+        message: "Operation target does not match precondition range",
+        op_index: opIndex,
+        precondition_id: op.precondition_id,
+      },
+    };
+  }
+  return {
+    ok: true,
+    resolved: {
+      op_index: opIndex,
+      op,
+      resolved_range: targetResult.range,
+      insert_index: targetResult.range.start - 1,
+    },
+  };
+}
+
+function resolveInsertCodeFence(
+  op: Extract<MarkdownOperation, { op: "md_insert_code_fence" }>,
+  resolvedRange: LineRange,
+  semanticIndex: MarkdownSemanticIndex,
+  policy: MarkdownTargetingPolicyV1 | undefined,
+  opIndex: number
+): { ok: true; resolved: ResolvedOperation } | { ok: false; error: MarkdownOperationError } {
+  const targetResult = resolveBlockTargetRange(
+    op.target,
+    semanticIndex,
+    policy,
+    opIndex,
+    op.precondition_id
+  );
+  if (!targetResult.ok) {
+    return targetResult;
+  }
+  if (!rangesEqual(resolvedRange, targetResult.range)) {
+    return {
+      ok: false,
+      error: {
+        code: "MCM_PRECONDITION_FAILED",
+        message: "Operation target does not match precondition range",
+        op_index: opIndex,
+        precondition_id: op.precondition_id,
+      },
+    };
+  }
+  const fenceOptions = resolveCodeFenceOptions(op, opIndex);
+  if (!fenceOptions.ok) {
+    return fenceOptions;
+  }
+  return {
+    ok: true,
+    resolved: {
+      op_index: opIndex,
+      op,
+      resolved_range: targetResult.range,
+      insert_index: targetResult.range.end,
+    },
+  };
+}
+
+function resolveBlockTargetRange(
+  target: { block_id: string } | { semantic: MarkdownPreconditionV1["semantic"] },
+  semanticIndex: MarkdownSemanticIndex,
+  policy: MarkdownTargetingPolicyV1 | undefined,
+  opIndex: number,
+  preconditionId: string
+): { ok: true; range: LineRange } | { ok: false; error: MarkdownOperationError } {
+  if ("block_id" in target) {
+    return {
+      ok: false,
+      error: {
+        code: "MCM_INVALID_TARGET",
+        message: "block_id targeting is not supported for markdown operations",
+        op_index: opIndex,
+        precondition_id: preconditionId,
+      },
+    };
+  }
+
+  if (!target.semantic) {
+    return {
+      ok: false,
+      error: {
+        code: "MCM_INVALID_TARGET",
+        message: "Semantic target is required",
+        op_index: opIndex,
+        precondition_id: preconditionId,
+      },
+    };
+  }
+
+  const semanticResult = resolveMarkdownSemanticTarget(target.semantic, semanticIndex, policy);
+  if (!semanticResult.ok) {
+    return {
+      ok: false,
+      error: {
+        ...semanticResult.error,
+        op_index: opIndex,
+        precondition_id: preconditionId,
+      },
+    };
+  }
+
+  return { ok: true, range: semanticResult.range };
+}
+
+function resolveCodeFenceOptions(
+  op: Extract<MarkdownOperation, { op: "md_insert_code_fence" }>,
+  opIndex: number
+):
+  | { ok: true; fenceChar: "`" | "~"; fenceLength: number }
+  | { ok: false; error: MarkdownOperationError } {
+  const fenceChar = op.fence_char ?? "`";
+  if (fenceChar !== "`" && fenceChar !== "~") {
+    return {
+      ok: false,
+      error: {
+        code: "MCM_INVALID_REQUEST",
+        message: "Fence character must be ` or ~",
+        op_index: opIndex,
+        precondition_id: op.precondition_id,
+      },
+    };
+  }
+
+  const fenceLength = op.fence_length ?? 3;
+  if (!Number.isInteger(fenceLength) || fenceLength < 3) {
+    return {
+      ok: false,
+      error: {
+        code: "MCM_INVALID_REQUEST",
+        message: "Fence length must be an integer of at least 3",
+        op_index: opIndex,
+        precondition_id: op.precondition_id,
+      },
+    };
+  }
+
+  return { ok: true, fenceChar, fenceLength };
+}
+
 function resolveFrontmatterUpdate(
   op: Extract<MarkdownOperation, { op: "md_update_frontmatter" }>,
   resolvedRange: LineRange,
@@ -587,6 +843,27 @@ function applyResolvedOperation(
     return { ok: true, lines };
   }
 
+  if (resolved.op.op === "md_replace_block") {
+    const replacement = splitMarkdownLines(resolved.op.content);
+    applyReplace(lines, resolved.resolved_range, replacement);
+    return { ok: true, lines };
+  }
+
+  if (resolved.op.op === "md_insert_after" || resolved.op.op === "md_insert_before") {
+    const insertion = splitMarkdownLines(resolved.op.content);
+    applyInsert(lines, resolved.insert_index ?? 0, insertion);
+    return { ok: true, lines };
+  }
+
+  if (resolved.op.op === "md_insert_code_fence") {
+    const fenceResult = buildCodeFenceLines(resolved.op, resolved.op_index);
+    if (!fenceResult.ok) {
+      return { ok: false, error: fenceResult.error };
+    }
+    applyInsert(lines, resolved.insert_index ?? 0, fenceResult.lines);
+    return { ok: true, lines };
+  }
+
   if (resolved.op.op === "md_update_frontmatter") {
     return applyFrontmatterUpdate(lines, resolved.op, options.frontmatterPolicy);
   }
@@ -600,6 +877,23 @@ function applyResolvedOperation(
       precondition_id: (exhaustiveOp as MarkdownOperation).precondition_id,
     },
   };
+}
+
+function buildCodeFenceLines(
+  op: Extract<MarkdownOperation, { op: "md_insert_code_fence" }>,
+  opIndex: number
+): { ok: true; lines: string[] } | { ok: false; error: MarkdownOperationError } {
+  const options = resolveCodeFenceOptions(op, opIndex);
+  if (!options.ok) {
+    return { ok: false, error: options.error };
+  }
+
+  const language = op.language?.trim();
+  const fence = options.fenceChar.repeat(options.fenceLength);
+  const opening = language ? `${fence}${language}` : fence;
+  const contentLines = splitMarkdownLines(op.content);
+
+  return { ok: true, lines: [opening, ...contentLines, fence] };
 }
 
 function applyFrontmatterUpdate(

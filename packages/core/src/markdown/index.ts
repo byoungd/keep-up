@@ -20,6 +20,11 @@ export type {
   MarkdownPreconditionV1,
   MarkdownSemanticIndex,
   MdDeleteLines,
+  MdInsertAfter,
+  MdInsertBefore,
+  MdInsertCodeFence,
   MdInsertLines,
+  MdReplaceBlock,
   MdReplaceLines,
+  MdUpdateFrontmatter,
 } from "./types.js";

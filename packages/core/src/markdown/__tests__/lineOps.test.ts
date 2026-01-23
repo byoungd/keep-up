@@ -119,6 +119,189 @@ describe("Markdown line-based operations", () => {
     }
   });
 
+  it("replaces semantic blocks", async () => {
+    const content = "# Intro\nBody";
+    const lines = splitMarkdownLines(content);
+    const range = { start: 1, end: 1 };
+    const hash = await computeMarkdownLineHash(lines, range);
+
+    const envelope: MarkdownOperationEnvelope = {
+      mode: "markdown",
+      doc_id: docId,
+      doc_frontier: frontier,
+      preconditions: [
+        {
+          v: 1,
+          mode: "markdown",
+          id: "p1",
+          semantic: { kind: "heading", heading_text: "Intro" },
+          content_hash: hash,
+        },
+      ],
+      ops: [
+        {
+          op: "md_replace_block",
+          precondition_id: "p1",
+          target: { semantic: { kind: "heading", heading_text: "Intro" } },
+          content: "# Introduction",
+        },
+      ],
+    };
+
+    const result = await applyMarkdownLineOperations(content, envelope);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.content).toBe("# Introduction\nBody");
+    }
+  });
+
+  it("inserts after semantic blocks", async () => {
+    const content = "# Intro\nBody";
+    const lines = splitMarkdownLines(content);
+    const range = { start: 1, end: 1 };
+    const hash = await computeMarkdownLineHash(lines, range);
+
+    const envelope: MarkdownOperationEnvelope = {
+      mode: "markdown",
+      doc_id: docId,
+      doc_frontier: frontier,
+      preconditions: [
+        {
+          v: 1,
+          mode: "markdown",
+          id: "p1",
+          semantic: { kind: "heading", heading_text: "Intro" },
+          content_hash: hash,
+        },
+      ],
+      ops: [
+        {
+          op: "md_insert_after",
+          precondition_id: "p1",
+          target: { semantic: { kind: "heading", heading_text: "Intro" } },
+          content: "Inserted",
+        },
+      ],
+    };
+
+    const result = await applyMarkdownLineOperations(content, envelope);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.content).toBe("# Intro\nInserted\nBody");
+    }
+  });
+
+  it("inserts before semantic blocks", async () => {
+    const content = "# Intro\nBody";
+    const lines = splitMarkdownLines(content);
+    const range = { start: 1, end: 1 };
+    const hash = await computeMarkdownLineHash(lines, range);
+
+    const envelope: MarkdownOperationEnvelope = {
+      mode: "markdown",
+      doc_id: docId,
+      doc_frontier: frontier,
+      preconditions: [
+        {
+          v: 1,
+          mode: "markdown",
+          id: "p1",
+          semantic: { kind: "heading", heading_text: "Intro" },
+          content_hash: hash,
+        },
+      ],
+      ops: [
+        {
+          op: "md_insert_before",
+          precondition_id: "p1",
+          target: { semantic: { kind: "heading", heading_text: "Intro" } },
+          content: "Inserted",
+        },
+      ],
+    };
+
+    const result = await applyMarkdownLineOperations(content, envelope);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.content).toBe("Inserted\n# Intro\nBody");
+    }
+  });
+
+  it("inserts code fences after semantic blocks", async () => {
+    const content = "# Intro\nBody";
+    const lines = splitMarkdownLines(content);
+    const range = { start: 1, end: 1 };
+    const hash = await computeMarkdownLineHash(lines, range);
+
+    const envelope: MarkdownOperationEnvelope = {
+      mode: "markdown",
+      doc_id: docId,
+      doc_frontier: frontier,
+      preconditions: [
+        {
+          v: 1,
+          mode: "markdown",
+          id: "p1",
+          semantic: { kind: "heading", heading_text: "Intro" },
+          content_hash: hash,
+        },
+      ],
+      ops: [
+        {
+          op: "md_insert_code_fence",
+          precondition_id: "p1",
+          target: { semantic: { kind: "heading", heading_text: "Intro" } },
+          language: "ts",
+          content: 'console.log("hi");',
+        },
+      ],
+    };
+
+    const result = await applyMarkdownLineOperations(content, envelope);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const expected = ["# Intro", "```ts", 'console.log("hi");', "```", "Body"].join("\n");
+      expect(result.content).toBe(expected);
+    }
+  });
+
+  it("rejects invalid code fence length", async () => {
+    const content = "# Intro\nBody";
+    const lines = splitMarkdownLines(content);
+    const range = { start: 1, end: 1 };
+    const hash = await computeMarkdownLineHash(lines, range);
+
+    const envelope: MarkdownOperationEnvelope = {
+      mode: "markdown",
+      doc_id: docId,
+      doc_frontier: frontier,
+      preconditions: [
+        {
+          v: 1,
+          mode: "markdown",
+          id: "p1",
+          semantic: { kind: "heading", heading_text: "Intro" },
+          content_hash: hash,
+        },
+      ],
+      ops: [
+        {
+          op: "md_insert_code_fence",
+          precondition_id: "p1",
+          target: { semantic: { kind: "heading", heading_text: "Intro" } },
+          content: 'console.log("hi");',
+          fence_length: 2,
+        },
+      ],
+    };
+
+    const result = await applyMarkdownLineOperations(content, envelope);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("MCM_INVALID_REQUEST");
+    }
+  });
+
   it("updates frontmatter keys", async () => {
     const content = "---\nname: Example\n---\nBody";
     const lines = splitMarkdownLines(content);

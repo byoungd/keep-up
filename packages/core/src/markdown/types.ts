@@ -62,6 +62,13 @@ export type MdDeleteLines = {
   target: { line_range: LineRange };
 };
 
+export type MdReplaceBlock = {
+  op: "md_replace_block";
+  precondition_id: string;
+  target: { block_id: string } | { semantic: MarkdownPreconditionV1["semantic"] };
+  content: string;
+};
+
 export type MdUpdateFrontmatter = {
   op: "md_update_frontmatter";
   precondition_id: string;
@@ -70,11 +77,39 @@ export type MdUpdateFrontmatter = {
   create_if_missing?: boolean;
 };
 
+export type MdInsertAfter = {
+  op: "md_insert_after";
+  precondition_id: string;
+  target: { block_id: string } | { semantic: MarkdownPreconditionV1["semantic"] };
+  content: string;
+};
+
+export type MdInsertBefore = {
+  op: "md_insert_before";
+  precondition_id: string;
+  target: { block_id: string } | { semantic: MarkdownPreconditionV1["semantic"] };
+  content: string;
+};
+
+export type MdInsertCodeFence = {
+  op: "md_insert_code_fence";
+  precondition_id: string;
+  target: { block_id: string } | { semantic: MarkdownPreconditionV1["semantic"] };
+  language?: string;
+  content: string;
+  fence_char?: "`" | "~";
+  fence_length?: number;
+};
+
 export type MarkdownOperation =
   | MdReplaceLines
   | MdInsertLines
   | MdDeleteLines
-  | MdUpdateFrontmatter;
+  | MdReplaceBlock
+  | MdUpdateFrontmatter
+  | MdInsertAfter
+  | MdInsertBefore
+  | MdInsertCodeFence;
 
 export type MarkdownOperationErrorCode =
   | "MCM_INVALID_REQUEST"
