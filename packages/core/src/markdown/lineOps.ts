@@ -591,12 +591,13 @@ function applyResolvedOperation(
     return applyFrontmatterUpdate(lines, resolved.op, options.frontmatterPolicy);
   }
 
+  const exhaustiveOp: never = resolved.op;
   return {
     ok: false,
     error: {
       code: "MCM_OPERATION_UNSUPPORTED",
-      message: `Unsupported operation ${resolved.op.op}`,
-      precondition_id: resolved.op.precondition_id,
+      message: `Unsupported operation ${(exhaustiveOp as MarkdownOperation).op}`,
+      precondition_id: (exhaustiveOp as MarkdownOperation).precondition_id,
     },
   };
 }
