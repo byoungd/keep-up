@@ -72,6 +72,7 @@ export type MarkdownOperationErrorCode =
   | "MCM_CONTENT_HASH_MISMATCH"
   | "MCM_OPERATION_OVERLAP"
   | "MCM_OPERATION_UNSUPPORTED"
+  | "MCM_FRONTMATTER_INVALID"
   | "MCM_TARGETING_AMBIGUOUS"
   | "MCM_TARGETING_NOT_FOUND"
   | "MCM_TARGETING_SCOPE_EXCEEDED";
@@ -114,6 +115,8 @@ export type MarkdownSemanticIndex = {
   headings: MarkdownHeadingBlock[];
   code_fences: MarkdownCodeFenceBlock[];
   frontmatter?: MarkdownFrontmatterBlock;
+  frontmatter_data?: unknown;
+  frontmatter_error?: MarkdownOperationError;
 };
 
 export type MarkdownLineApplyResult =

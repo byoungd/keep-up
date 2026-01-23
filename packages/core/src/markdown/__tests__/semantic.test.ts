@@ -68,6 +68,30 @@ describe("Markdown semantic targeting", () => {
     }
   });
 
+  it("resolves frontmatter key paths", () => {
+    const content = ["---", "title: Example", "nested:", "  value: ok", "---", "Body"].join("\n");
+
+    const result = resolveSemantic(content, {
+      kind: "frontmatter_key",
+      key_path: ["nested", "value"],
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.range).toEqual({ start: 1, end: 5 });
+    }
+  });
+
+  it("fails on invalid frontmatter in key targeting", () => {
+    const content = ["---", "title: [", "---", "Body"].join("\n");
+    const result = resolveSemantic(content, { kind: "frontmatter_key", key_path: ["title"] });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("MCM_FRONTMATTER_INVALID");
+    }
+  });
+
   it("fails on ambiguous heading matches", () => {
     const content = "# Intro\ntext\n# Intro";
     const result = resolveSemantic(content, { kind: "heading", heading_text: "Intro" });
