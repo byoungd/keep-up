@@ -8,6 +8,42 @@ import {
 
 const docId = "doc-1";
 const frontier = "frontier:1";
+const baseCanonicalizerPolicy = {
+  version: "v1",
+  mode: "normalized",
+  line_ending: "lf",
+  preserve: {
+    trailing_whitespace: true,
+    multiple_blank_lines: true,
+    heading_style: true,
+    list_marker_style: true,
+    emphasis_style: true,
+    fence_style: true,
+  },
+  normalize: {
+    heading_style: "atx",
+    list_marker: "-",
+    emphasis_char: "*",
+    fence_char: "~",
+    fence_length: 4,
+  },
+};
+const baseSanitizationPolicy = {
+  version: "v1",
+  allowed_block_types: [],
+  allowed_mark_types: [],
+  allow_html_blocks: true,
+  allow_frontmatter: true,
+  reject_unknown_structure: false,
+  max_code_fence_lines: 100,
+  link_url_policy: "strict",
+  image_url_policy: "strict",
+  max_file_lines: 1000,
+  max_line_length: 1000,
+  max_heading_depth: 6,
+  max_list_depth: 6,
+  max_frontmatter_bytes: 1024,
+};
 
 describe("Markdown line-based operations", () => {
   it("applies replace and insert operations", async () => {
@@ -299,6 +335,121 @@ describe("Markdown line-based operations", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("MCM_INVALID_REQUEST");
+    }
+  });
+
+  it("uses canonicalizer defaults for code fences", async () => {
+    const content = "# Intro\nBody";
+    const lines = splitMarkdownLines(content);
+    const range = { start: 1, end: 1 };
+    const hash = await computeMarkdownLineHash(lines, range);
+
+    const envelope: MarkdownOperationEnvelope = {
+      mode: "markdown",
+      doc_id: docId,
+      doc_frontier: frontier,
+      preconditions: [
+        {
+          v: 1,
+          mode: "markdown",
+          id: "p1",
+          semantic: { kind: "heading", heading_text: "Intro" },
+          content_hash: hash,
+        },
+      ],
+      ops: [
+        {
+          op: "md_insert_code_fence",
+          precondition_id: "p1",
+          target: { semantic: { kind: "heading", heading_text: "Intro" } },
+          language: "ts",
+          content: 'console.log("hi");',
+        },
+      ],
+    };
+
+    const result = await applyMarkdownLineOperations(content, envelope, {
+      canonicalizerPolicy: baseCanonicalizerPolicy,
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const expected = ["# Intro", "~~~~ts", 'console.log("hi");', "~~~~", "Body"].join("\n");
+      expect(result.content).toBe(expected);
+    }
+  });
+
+  it("rejects disallowed code fence languages", async () => {
+    const content = "# Intro\nBody";
+    const lines = splitMarkdownLines(content);
+    const range = { start: 1, end: 1 };
+    const hash = await computeMarkdownLineHash(lines, range);
+
+    const envelope: MarkdownOperationEnvelope = {
+      mode: "markdown",
+      doc_id: docId,
+      doc_frontier: frontier,
+      preconditions: [
+        {
+          v: 1,
+          mode: "markdown",
+          id: "p1",
+          semantic: { kind: "heading", heading_text: "Intro" },
+          content_hash: hash,
+        },
+      ],
+      ops: [
+        {
+          op: "md_insert_code_fence",
+          precondition_id: "p1",
+          target: { semantic: { kind: "heading", heading_text: "Intro" } },
+          language: "python",
+          content: "print('hi')",
+        },
+      ],
+    };
+
+    const result = await applyMarkdownLineOperations(content, envelope, {
+      sanitizationPolicy: {
+        ...baseSanitizationPolicy,
+        allowed_languages: ["ts"],
+      },
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("MCM_LANGUAGE_DISALLOWED");
+    }
+  });
+
+  it("rejects frontmatter when disallowed", async () => {
+    const content = "---\nname: Example\n---\nBody";
+    const lines = splitMarkdownLines(content);
+    const range = { start: 1, end: 3 };
+    const hash = await computeMarkdownLineHash(lines, range);
+
+    const envelope: MarkdownOperationEnvelope = {
+      mode: "markdown",
+      doc_id: docId,
+      doc_frontier: frontier,
+      preconditions: [{ v: 1, mode: "markdown", id: "p1", line_range: range, content_hash: hash }],
+      ops: [
+        {
+          op: "md_replace_lines",
+          precondition_id: "p1",
+          target: { line_range: range },
+          content: "---\nname: Updated\n---",
+        },
+      ],
+    };
+
+    const result = await applyMarkdownLineOperations(content, envelope, {
+      sanitizationPolicy: {
+        ...baseSanitizationPolicy,
+        allow_frontmatter: false,
+      },
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("MCM_BLOCK_TYPE_DISALLOWED");
     }
   });
 
