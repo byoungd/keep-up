@@ -13,6 +13,7 @@ cowork initiatives. Use this index to navigate the active tracks and supporting 
 ## Progress Updates
 - docs/roadmap/progress/README.md
 - docs/roadmap/progress/progress-2026-01-21.md
+- docs/roadmap/progress/progress-2026-01-23.md
 
 ## Phase 1: Foundation (The Core Runtime)
 - **Core**: docs/roadmap/phase-1-foundation/core/README.md

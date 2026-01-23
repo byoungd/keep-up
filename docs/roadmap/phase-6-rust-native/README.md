@@ -46,23 +46,23 @@ These are parallelizable accelerators for `@ku0/core` and `@ku0/lfcc-bridge` tha
 Phase 6 principles (TS control plane, Rust hot paths). Tracking doc:
 `.agent/workflows/implement-lfcc-core-accelerators.md`.
 
-- Canonicalizer accelerator (deterministic tree normalization).
-- AI sanitizer + dry-run parser (HTML allowlist and validation).
-- Anchor relocation + text similarity engine.
-- Integrity hashing (context/chain hash batching).
-- Bridge anchor HMAC encoding.
-- Streaming markdown parser.
-- Stable JSON serialization via `@ku0/json-accel-rs`.
+- [x] Canonicalizer accelerator (`@ku0/canonicalizer-rs`).
+- [x] AI sanitizer + dry-run parser (`@ku0/ai-sanitizer-rs`).
+- [x] Anchor relocation + text similarity engine (`@ku0/anchor-relocation-rs`).
+- [x] Integrity hashing (`@ku0/policy-hash-rs`, `@ku0/ai-context-hash-rs`).
+- [x] Bridge anchor HMAC encoding (`@ku0/anchor-codec-rs`).
+- [x] Streaming markdown parser (`@ku0/streaming-markdown-rs`).
+- [x] Stable JSON serialization (`@ku0/json-accel-rs`).
 
 ## Parallelizable LFCC/Core Workstreams (Medium Yield)
 
 Tracking doc: `.agent/workflows/implement-lfcc-core-accelerators-medium.md`.
 
-- Core anchor codec + checksums (HMAC/CRC32/Adler32).
-- Policy hash utilities (deterministic SHA-256).
-- AI context hash utilities (optimistic hash + batch).
-- Text normalization + canonical hash (ingest).
-- Bridge canonicalizer serialization for checksums.
+- [x] Core anchor codec + checksums (`@ku0/anchor-codec-rs`).
+- [x] Policy hash utilities (`@ku0/policy-hash-rs`).
+- [x] AI context hash utilities (`@ku0/ai-context-hash-rs`).
+- [x] Text normalization + canonical hash (`@ku0/text-normalization-rs`).
+- [ ] Bridge canonicalizer serialization for checksums.
 
 ---
 
