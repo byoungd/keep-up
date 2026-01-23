@@ -167,7 +167,12 @@ export function ContextPanel({
       </div>
 
       {/* Tab Content */}
-      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-auto-hide">
+      <section
+        className="flex-1 min-h-0 overflow-y-auto scrollbar-auto-hide"
+        aria-label="Context panel content"
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+        tabIndex={0}
+      >
         {resolvedTab === "context" && <ProjectContextPanelContent />}
 
         {resolvedTab === "packs" && <ContextPacksPanelContent />}
@@ -188,7 +193,8 @@ export function ContextPanel({
 
         {resolvedTab === "notes" && (
           <div className="h-full flex flex-col">
-            <div className="flex-1 overflow-y-auto scrollbar-auto-hide p-4 space-y-3">
+            {/* biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access. */}
+            <div className="flex-1 overflow-y-auto scrollbar-auto-hide p-4 space-y-3" tabIndex={0}>
               {notes.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No notes yet.</p>
               ) : (
@@ -251,7 +257,7 @@ export function ContextPanel({
             </AnimatePresence>
           </div>
         )}
-      </div>
+      </section>
     </section>
   );
 }
