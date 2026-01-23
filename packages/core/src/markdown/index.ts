@@ -1,4 +1,13 @@
 export {
+  buildFrontmatterLines,
+  detectFrontmatter,
+  parseFrontmatter,
+  parseFrontmatterContent,
+  resolveDelimiterForSyntax,
+  stringifyFrontmatter,
+  updateFrontmatterValue,
+} from "./frontmatter.js";
+export {
   computeMarkdownContentHash,
   computeMarkdownLineHash,
   normalizeMarkdownText,
@@ -8,6 +17,7 @@ export { applyMarkdownLineOperations } from "./lineOps.js";
 export type {
   LineRange,
   MarkdownAppliedOperation,
+  MarkdownFrontmatterBlock,
   MarkdownLineApplyResult,
   MarkdownOperation,
   MarkdownOperationEnvelope,
@@ -17,4 +27,5 @@ export type {
   MdDeleteLines,
   MdInsertLines,
   MdReplaceLines,
+  MdUpdateFrontmatter,
 } from "./types.js";

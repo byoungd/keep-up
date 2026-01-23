@@ -62,7 +62,19 @@ export type MdDeleteLines = {
   target: { line_range: LineRange };
 };
 
-export type MarkdownOperation = MdReplaceLines | MdInsertLines | MdDeleteLines;
+export type MdUpdateFrontmatter = {
+  op: "md_update_frontmatter";
+  precondition_id: string;
+  target: { key_path: string[] };
+  value: unknown;
+  create_if_missing?: boolean;
+};
+
+export type MarkdownOperation =
+  | MdReplaceLines
+  | MdInsertLines
+  | MdDeleteLines
+  | MdUpdateFrontmatter;
 
 export type MarkdownOperationErrorCode =
   | "MCM_INVALID_REQUEST"
@@ -71,7 +83,10 @@ export type MarkdownOperationErrorCode =
   | "MCM_PRECONDITION_FAILED"
   | "MCM_CONTENT_HASH_MISMATCH"
   | "MCM_OPERATION_OVERLAP"
-  | "MCM_OPERATION_UNSUPPORTED";
+  | "MCM_OPERATION_UNSUPPORTED"
+  | "MCM_FRONTMATTER_INVALID"
+  | "MCM_TARGETING_NOT_FOUND"
+  | "MCM_LINE_LIMIT_EXCEEDED";
 
 export type MarkdownOperationError = {
   code: MarkdownOperationErrorCode;
@@ -84,6 +99,12 @@ export type MarkdownAppliedOperation = {
   op_index: number;
   op: MarkdownOperation;
   resolved_range: LineRange;
+};
+
+export type MarkdownFrontmatterBlock = {
+  kind: "frontmatter";
+  line_range: LineRange;
+  syntax: "yaml" | "toml" | "json";
 };
 
 export type MarkdownLineApplyResult =
