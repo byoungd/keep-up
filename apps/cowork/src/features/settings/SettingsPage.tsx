@@ -2,17 +2,23 @@ import React from "react";
 import {
   type CoworkAuditAction,
   type CoworkAuditEntry,
+  type CoworkCheckpointFilter,
+  type CoworkCheckpointRestoreResult,
+  type CoworkCheckpointSummary,
   type CoworkPolicySource,
   type CoworkProvider,
   type CoworkSettings,
+  deleteCheckpoint,
   deleteProviderKey,
   exportPolicyToRepo,
   type GymReport,
   getGymReport,
   getPolicyResolution,
   getSettings,
+  listCheckpoints,
   listProviders,
   queryAuditLogs,
+  restoreCheckpoint,
   setProviderKey,
   updateSettings,
 } from "../../api/coworkApi";
@@ -61,6 +67,16 @@ type AuditLogState = {
   action: CoworkAuditAction | "all";
   isLoading: boolean;
   error: string | null;
+};
+
+type CheckpointState = {
+  checkpoints: CoworkCheckpointSummary[];
+  sessionId: string;
+  isLoading: boolean;
+  error: string | null;
+  restoringId?: string;
+  deletingId?: string;
+  lastRestore?: CoworkCheckpointRestoreResult | null;
 };
 
 type ProviderKeyCardProps = {
@@ -118,6 +134,14 @@ type AuditLogSectionProps = {
   onSessionChange: (value: string) => void;
   onActionChange: (value: CoworkAuditAction | "all") => void;
   onRefresh: () => void;
+};
+
+type CheckpointSectionProps = {
+  checkpointState: CheckpointState;
+  onSessionChange: (value: string) => void;
+  onRefresh: () => void;
+  onRestore: (checkpointId: string) => void;
+  onDelete: (checkpointId: string) => void;
 };
 
 function ProviderKeyCard({
@@ -517,6 +541,146 @@ function AuditLogSection({
         ))}
       </div>
     </section>
+  );
+}
+
+function CheckpointSection({
+  checkpointState,
+  onSessionChange,
+  onRefresh,
+  onRestore,
+  onDelete,
+}: CheckpointSectionProps) {
+  return (
+    <section className="card-panel space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-foreground">Checkpoints</p>
+          <p className="text-xs text-muted-foreground">
+            Review and restore runtime checkpoints for a session.
+          </p>
+        </div>
+        <button
+          type="button"
+          className="px-3 py-2 text-xs font-medium text-muted-foreground border border-border rounded-md hover:text-foreground hover:bg-surface-2 transition-colors duration-fast disabled:opacity-60"
+          onClick={onRefresh}
+          disabled={checkpointState.isLoading}
+        >
+          Refresh
+        </button>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <input
+          aria-label="Checkpoint session id"
+          type="text"
+          className="text-input min-w-[220px]"
+          placeholder="Session ID"
+          value={checkpointState.sessionId}
+          onChange={(event) => onSessionChange(event.target.value)}
+          disabled={checkpointState.isLoading}
+        />
+      </div>
+
+      {checkpointState.isLoading ? (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="h-4 w-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+          Loading checkpoints…
+        </div>
+      ) : null}
+
+      {checkpointState.error ? (
+        <div className="text-xs text-destructive">{checkpointState.error}</div>
+      ) : null}
+
+      {checkpointState.lastRestore ? (
+        <div className="text-xs text-success">
+          Restored checkpoint {checkpointState.lastRestore.checkpointId.slice(0, 8)} at{" "}
+          {new Date(checkpointState.lastRestore.restoredAt).toLocaleString()}.
+        </div>
+      ) : null}
+
+      {!checkpointState.isLoading && checkpointState.checkpoints.length === 0 ? (
+        <div className="text-xs text-muted-foreground">No checkpoints found.</div>
+      ) : null}
+
+      <div className="space-y-2">
+        {checkpointState.checkpoints.map((checkpoint) => (
+          <CheckpointCard
+            key={checkpoint.id}
+            checkpoint={checkpoint}
+            isBusy={checkpointState.isLoading}
+            restoringId={checkpointState.restoringId}
+            deletingId={checkpointState.deletingId}
+            onRestore={onRestore}
+            onDelete={onDelete}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function CheckpointCard({
+  checkpoint,
+  isBusy,
+  restoringId,
+  deletingId,
+  onRestore,
+  onDelete,
+}: {
+  checkpoint: CoworkCheckpointSummary;
+  isBusy: boolean;
+  restoringId?: string;
+  deletingId?: string;
+  onRestore: (checkpointId: string) => void;
+  onDelete: (checkpointId: string) => void;
+}) {
+  const statusClass =
+    checkpoint.status === "completed"
+      ? "bg-success/10 text-success"
+      : checkpoint.status === "failed"
+        ? "bg-error/10 text-error"
+        : checkpoint.status === "cancelled"
+          ? "bg-muted/40 text-muted-foreground"
+          : "bg-info/10 text-info";
+  const isRestoring = restoringId === checkpoint.id;
+  const isDeleting = deletingId === checkpoint.id;
+
+  return (
+    <div className="rounded-md border border-border/60 bg-surface-0 px-3 py-2 space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-[11px] text-muted-foreground">
+          {new Date(checkpoint.createdAt).toLocaleString()}
+        </span>
+        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${statusClass}`}>
+          {checkpoint.status}
+        </span>
+      </div>
+      <div className="text-xs text-foreground line-clamp-2">{checkpoint.task}</div>
+      <div className="text-[11px] text-muted-foreground">
+        Step {checkpoint.currentStep} / {checkpoint.maxSteps}
+        {checkpoint.hasError ? " · error" : ""}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          className="px-2 py-1 text-xs font-medium text-primary-foreground bg-primary rounded-md hover:bg-primary/90 transition-colors duration-fast disabled:opacity-60"
+          onClick={() => onRestore(checkpoint.id)}
+          disabled={isBusy || isRestoring || isDeleting}
+        >
+          {isRestoring ? "Restoring…" : "Restore"}
+        </button>
+        <button
+          type="button"
+          className="px-2 py-1 text-xs font-medium text-muted-foreground border border-border rounded-md hover:text-foreground hover:bg-surface-2 transition-colors duration-fast disabled:opacity-60"
+          onClick={() => onDelete(checkpoint.id)}
+          disabled={isBusy || isDeleting || isRestoring}
+        >
+          {isDeleting ? "Deleting…" : "Delete"}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -947,6 +1111,120 @@ function useAuditLogState() {
   return { auditState, refresh, updateSessionId, updateAction };
 }
 
+const DEFAULT_CHECKPOINT_FILTER: CoworkCheckpointFilter = {
+  limit: 50,
+  sortBy: "createdAt",
+  sortOrder: "desc",
+};
+
+function useCheckpointState() {
+  const [checkpointState, setCheckpointState] = React.useState<CheckpointState>({
+    checkpoints: [],
+    sessionId: "",
+    isLoading: false,
+    error: null,
+    lastRestore: null,
+  });
+
+  const refresh = React.useCallback(async () => {
+    const sessionId = checkpointState.sessionId.trim();
+    if (!sessionId) {
+      setCheckpointState((prev) => ({
+        ...prev,
+        isLoading: false,
+        error: "Session ID is required to list checkpoints.",
+        checkpoints: [],
+      }));
+      return;
+    }
+
+    setCheckpointState((prev) => ({ ...prev, isLoading: true, error: null }));
+    try {
+      const checkpoints = await listCheckpoints(sessionId, DEFAULT_CHECKPOINT_FILTER);
+      setCheckpointState((prev) => ({ ...prev, checkpoints, isLoading: false }));
+    } catch (err) {
+      setCheckpointState((prev) => ({
+        ...prev,
+        isLoading: false,
+        error: err instanceof Error ? err.message : "Failed to load checkpoints",
+      }));
+    }
+  }, [checkpointState.sessionId]);
+
+  const restore = React.useCallback(
+    async (checkpointId: string) => {
+      const sessionId = checkpointState.sessionId.trim();
+      if (!sessionId) {
+        setCheckpointState((prev) => ({
+          ...prev,
+          error: "Session ID is required to restore checkpoints.",
+        }));
+        return;
+      }
+
+      setCheckpointState((prev) => ({
+        ...prev,
+        restoringId: checkpointId,
+        error: null,
+        lastRestore: null,
+      }));
+
+      try {
+        const result = await restoreCheckpoint(sessionId, checkpointId);
+        setCheckpointState((prev) => ({
+          ...prev,
+          restoringId: undefined,
+          lastRestore: result,
+        }));
+        void refresh();
+      } catch (err) {
+        setCheckpointState((prev) => ({
+          ...prev,
+          restoringId: undefined,
+          error: err instanceof Error ? err.message : "Failed to restore checkpoint",
+        }));
+      }
+    },
+    [checkpointState.sessionId, refresh]
+  );
+
+  const remove = React.useCallback(
+    async (checkpointId: string) => {
+      const sessionId = checkpointState.sessionId.trim();
+      if (!sessionId) {
+        setCheckpointState((prev) => ({
+          ...prev,
+          error: "Session ID is required to delete checkpoints.",
+        }));
+        return;
+      }
+
+      setCheckpointState((prev) => ({ ...prev, deletingId: checkpointId, error: null }));
+      try {
+        await deleteCheckpoint(sessionId, checkpointId);
+        setCheckpointState((prev) => ({
+          ...prev,
+          deletingId: undefined,
+          checkpoints: prev.checkpoints.filter((checkpoint) => checkpoint.id !== checkpointId),
+        }));
+      } catch (err) {
+        setCheckpointState((prev) => ({
+          ...prev,
+          deletingId: undefined,
+          error: err instanceof Error ? err.message : "Failed to delete checkpoint",
+        }));
+      }
+    },
+    [checkpointState.sessionId]
+  );
+
+  const updateSessionId = React.useCallback((value: string) => {
+    setCheckpointState((prev) => ({ ...prev, sessionId: value }));
+  }, []);
+
+  return { checkpointState, refresh, updateSessionId, restore, remove };
+}
+
 export function SettingsPage() {
   const { state, theme, handleUpdate, handleThemeChange } = useSettingsState();
   const { providerState, handleProviderInputChange, handleProviderSave, handleProviderDelete } =
@@ -956,6 +1234,13 @@ export function SettingsPage() {
     state.data.policy
   );
   const { auditState, refresh: refreshAudit, updateSessionId, updateAction } = useAuditLogState();
+  const {
+    checkpointState,
+    refresh: refreshCheckpoints,
+    updateSessionId: updateCheckpointSessionId,
+    restore: restoreCheckpointById,
+    remove: deleteCheckpointById,
+  } = useCheckpointState();
   const [policyEditorError, setPolicyEditorError] = React.useState<string | null>(null);
 
   const handlePolicySave = React.useCallback(async () => {
@@ -1051,6 +1336,14 @@ export function SettingsPage() {
         onSessionChange={updateSessionId}
         onActionChange={updateAction}
         onRefresh={refreshAudit}
+      />
+
+      <CheckpointSection
+        checkpointState={checkpointState}
+        onSessionChange={updateCheckpointSessionId}
+        onRefresh={refreshCheckpoints}
+        onRestore={restoreCheckpointById}
+        onDelete={deleteCheckpointById}
       />
 
       <GymReportSection gymState={gymState} />

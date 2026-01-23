@@ -1,4 +1,7 @@
 import type {
+  Checkpoint,
+  CheckpointStatus,
+  CheckpointSummary,
   CoworkPolicyConfig,
   CoworkProject,
   CoworkRiskTag,
@@ -22,6 +25,12 @@ export type ApiResult<T> = {
   tasks?: CoworkTask[];
   approvals?: CoworkApproval[];
   approval?: CoworkApproval;
+  checkpoints?: CheckpointSummary[];
+  checkpoint?: Checkpoint;
+  removed?: boolean;
+  taskId?: string;
+  restoredAt?: number;
+  currentStep?: number;
   projects?: CoworkProject[];
   project?: CoworkProject;
   workspaces?: CoworkWorkspace[];
@@ -92,6 +101,25 @@ export type CoworkAuditEntry = {
   reason?: string;
   durationMs?: number;
   outcome?: "success" | "error" | "denied";
+};
+
+export type CoworkCheckpointFilter = {
+  status?: CheckpointStatus | CheckpointStatus[];
+  createdAfter?: number;
+  createdBefore?: number;
+  limit?: number;
+  sortBy?: "createdAt" | "status";
+  sortOrder?: "asc" | "desc";
+  agentType?: string;
+};
+
+export type CoworkCheckpointSummary = CheckpointSummary;
+
+export type CoworkCheckpointRestoreResult = {
+  checkpointId: string;
+  taskId?: string;
+  restoredAt: number;
+  currentStep: number;
 };
 
 export type CoworkLesson = Omit<Lesson, "embedding">;
@@ -464,6 +492,82 @@ export async function createTask(
     throw new Error("Task not returned");
   }
   return data.task;
+}
+
+export async function listCheckpoints(
+  sessionId: string,
+  filter: CoworkCheckpointFilter = {}
+): Promise<CheckpointSummary[]> {
+  const params = new URLSearchParams();
+  if (filter.status) {
+    const value = Array.isArray(filter.status) ? filter.status.join(",") : filter.status;
+    params.set("status", value);
+  }
+  if (typeof filter.createdAfter === "number") {
+    params.set("createdAfter", String(filter.createdAfter));
+  }
+  if (typeof filter.createdBefore === "number") {
+    params.set("createdBefore", String(filter.createdBefore));
+  }
+  if (typeof filter.limit === "number") {
+    params.set("limit", String(filter.limit));
+  }
+  if (filter.sortBy) {
+    params.set("sortBy", filter.sortBy);
+  }
+  if (filter.sortOrder) {
+    params.set("sortOrder", filter.sortOrder);
+  }
+  if (filter.agentType) {
+    params.set("agentType", filter.agentType);
+  }
+
+  const qs = params.toString();
+  const data = await fetchJson<ApiResult<unknown>>(
+    `/api/sessions/${sessionId}/checkpoints${qs ? `?${qs}` : ""}`
+  );
+  return data.checkpoints ?? [];
+}
+
+export async function getCheckpoint(sessionId: string, checkpointId: string): Promise<Checkpoint> {
+  const data = await fetchJson<ApiResult<unknown>>(
+    `/api/sessions/${sessionId}/checkpoints/${checkpointId}`
+  );
+  if (!data.checkpoint) {
+    throw new Error("Checkpoint not found");
+  }
+  return data.checkpoint;
+}
+
+export async function restoreCheckpoint(
+  sessionId: string,
+  checkpointId: string
+): Promise<CoworkCheckpointRestoreResult> {
+  const data = await fetchJson<ApiResult<unknown>>(
+    `/api/sessions/${sessionId}/checkpoints/${checkpointId}/restore`,
+    {
+      method: "POST",
+    }
+  );
+  return {
+    checkpointId,
+    taskId: typeof data.taskId === "string" ? data.taskId : undefined,
+    restoredAt: typeof data.restoredAt === "number" ? data.restoredAt : Date.now(),
+    currentStep: typeof data.currentStep === "number" ? data.currentStep : 0,
+  };
+}
+
+export async function deleteCheckpoint(
+  sessionId: string,
+  checkpointId: string
+): Promise<{ removed: boolean }> {
+  const data = await fetchJson<ApiResult<unknown>>(
+    `/api/sessions/${sessionId}/checkpoints/${checkpointId}`,
+    {
+      method: "DELETE",
+    }
+  );
+  return { removed: Boolean(data.removed) };
 }
 
 export type ChatMessage = {

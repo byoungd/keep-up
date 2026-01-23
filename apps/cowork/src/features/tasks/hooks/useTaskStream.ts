@@ -671,6 +671,11 @@ const EVENT_HANDLERS: Record<string, EventHandler> = {
   "agent.tool.result": handleToolResult,
   "agent.plan": handlePlanUpdate,
   "agent.artifact": handleArtifactUpdate,
+  "agent.turn.start": handleTurnStart,
+  "agent.turn.end": handleTurnEnd,
+  "policy.decision": handlePolicyDecision,
+  "checkpoint.created": handleCheckpointCreated,
+  "checkpoint.restored": handleCheckpointRestored,
   "session.usage.updated": handleUsageUpdated,
   "token.usage": handleTokenUsage,
 };
@@ -863,6 +868,58 @@ function handleAgentThink(
   };
 }
 
+function handleTurnStart(
+  prev: TaskGraph,
+  id: string,
+  data: unknown,
+  now: string,
+  _taskTitles: Map<string, string>,
+  _taskPrompts: Map<string, string>,
+  _taskMetadata: Map<string, Record<string, unknown>>
+): TaskGraph {
+  if (!isRecord(data) || typeof data.turn !== "number") {
+    return prev;
+  }
+  const taskId = typeof data.taskId === "string" ? data.taskId : undefined;
+  return {
+    ...prev,
+    nodes: appendNode(prev.nodes, {
+      id: `turn-start-${data.turn}-${id}`,
+      type: "turn_marker",
+      turn: data.turn,
+      phase: "start",
+      taskId,
+      timestamp: now,
+    }),
+  };
+}
+
+function handleTurnEnd(
+  prev: TaskGraph,
+  id: string,
+  data: unknown,
+  now: string,
+  _taskTitles: Map<string, string>,
+  _taskPrompts: Map<string, string>,
+  _taskMetadata: Map<string, Record<string, unknown>>
+): TaskGraph {
+  if (!isRecord(data) || typeof data.turn !== "number") {
+    return prev;
+  }
+  const taskId = typeof data.taskId === "string" ? data.taskId : undefined;
+  return {
+    ...prev,
+    nodes: appendNode(prev.nodes, {
+      id: `turn-end-${data.turn}-${id}`,
+      type: "turn_marker",
+      turn: data.turn,
+      phase: "end",
+      taskId,
+      timestamp: now,
+    }),
+  };
+}
+
 function handleToolCall(
   prev: TaskGraph,
   id: string,
@@ -928,6 +985,108 @@ function handleToolResult(
       activityLabel,
       taskId,
       timestamp: now,
+    }),
+  };
+}
+
+function handlePolicyDecision(
+  prev: TaskGraph,
+  id: string,
+  data: unknown,
+  now: string,
+  _taskTitles: Map<string, string>,
+  _taskPrompts: Map<string, string>,
+  _taskMetadata: Map<string, Record<string, unknown>>
+): TaskGraph {
+  if (!isRecord(data)) {
+    return prev;
+  }
+
+  const decision =
+    typeof data.decision === "string" &&
+    ["allow", "allow_with_confirm", "deny"].includes(data.decision)
+      ? (data.decision as "allow" | "allow_with_confirm" | "deny")
+      : undefined;
+  const taskId = typeof data.taskId === "string" ? data.taskId : undefined;
+  const riskTags = extractRiskTags(data.riskTags);
+
+  return {
+    ...prev,
+    nodes: appendNode(prev.nodes, {
+      id: `policy-${id}`,
+      type: "policy_decision",
+      toolName: typeof data.toolName === "string" ? data.toolName : undefined,
+      decision,
+      policyRuleId: typeof data.policyRuleId === "string" ? data.policyRuleId : undefined,
+      policyAction: typeof data.policyAction === "string" ? data.policyAction : undefined,
+      riskTags,
+      riskScore: typeof data.riskScore === "number" ? data.riskScore : undefined,
+      reason: typeof data.reason === "string" ? data.reason : undefined,
+      taskId,
+      timestamp: now,
+    }),
+  };
+}
+
+function handleCheckpointCreated(
+  prev: TaskGraph,
+  id: string,
+  data: unknown,
+  now: string,
+  _taskTitles: Map<string, string>,
+  _taskPrompts: Map<string, string>,
+  _taskMetadata: Map<string, Record<string, unknown>>
+): TaskGraph {
+  if (!isRecord(data) || typeof data.checkpointId !== "string") {
+    return prev;
+  }
+  const taskId = typeof data.taskId === "string" ? data.taskId : undefined;
+  const createdAt =
+    typeof data.createdAt === "number" ? new Date(data.createdAt).toISOString() : now;
+  const currentStep = typeof data.currentStep === "number" ? data.currentStep : 0;
+
+  return {
+    ...prev,
+    nodes: appendNode(prev.nodes, {
+      id: `checkpoint-created-${data.checkpointId}-${id}`,
+      type: "checkpoint",
+      checkpointId: data.checkpointId,
+      status: typeof data.status === "string" ? data.status : undefined,
+      currentStep,
+      action: "created",
+      taskId,
+      timestamp: createdAt,
+    }),
+  };
+}
+
+function handleCheckpointRestored(
+  prev: TaskGraph,
+  id: string,
+  data: unknown,
+  now: string,
+  _taskTitles: Map<string, string>,
+  _taskPrompts: Map<string, string>,
+  _taskMetadata: Map<string, Record<string, unknown>>
+): TaskGraph {
+  if (!isRecord(data) || typeof data.checkpointId !== "string") {
+    return prev;
+  }
+  const taskId = typeof data.taskId === "string" ? data.taskId : undefined;
+  const restoredAt =
+    typeof data.restoredAt === "number" ? new Date(data.restoredAt).toISOString() : now;
+  const currentStep = typeof data.currentStep === "number" ? data.currentStep : 0;
+
+  return {
+    ...prev,
+    nodes: appendNode(prev.nodes, {
+      id: `checkpoint-restored-${data.checkpointId}-${id}`,
+      type: "checkpoint",
+      checkpointId: data.checkpointId,
+      currentStep,
+      action: "restored",
+      taskId,
+      timestamp: restoredAt,
     }),
   };
 }

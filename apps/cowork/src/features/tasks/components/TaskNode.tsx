@@ -311,6 +311,84 @@ function ErrorNodeDisplay({ node }: { node: TaskNode & { type: "error" } }) {
   );
 }
 
+function TurnMarkerDisplay({ node }: { node: TaskNode & { type: "turn_marker" } }) {
+  return (
+    <div className="flex items-center gap-3 px-3 py-2 text-muted-foreground">
+      <div className="flex-1 h-px bg-border/50" />
+      <span className="text-micro font-black uppercase tracking-widest">
+        Turn {node.turn} {node.phase === "start" ? "Start" : "End"}
+      </span>
+      <div className="flex-1 h-px bg-border/50" />
+    </div>
+  );
+}
+
+function PolicyDecisionDisplay({ node }: { node: TaskNode & { type: "policy_decision" } }) {
+  const decisionLabel =
+    node.decision === "allow"
+      ? "Allowed"
+      : node.decision === "allow_with_confirm"
+        ? "Allow w/ Confirm"
+        : node.decision === "deny"
+          ? "Denied"
+          : "Decision";
+  const tone =
+    node.decision === "deny"
+      ? "bg-error/5 border-error/30 text-error"
+      : node.decision === "allow_with_confirm"
+        ? "bg-warning/10 border-warning/30 text-warning"
+        : "bg-success/5 border-success/30 text-success";
+
+  return (
+    <div className={`${BASE_NODE_CLASSES} ${tone}`}>
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="font-black uppercase tracking-widest text-micro">
+          Policy {decisionLabel}
+        </span>
+        {node.riskScore !== undefined ? (
+          <span className="text-nano font-mono opacity-70">risk {node.riskScore}</span>
+        ) : null}
+      </div>
+      <div className="text-micro opacity-80">
+        {node.toolName ? `Tool: ${node.toolName}` : "Tool: —"}
+        {node.policyRuleId ? ` · Rule ${node.policyRuleId}` : ""}
+      </div>
+      {node.reason ? <div className="text-micro mt-1">{node.reason}</div> : null}
+      {node.riskTags && node.riskTags.length > 0 ? (
+        <div className="flex flex-wrap gap-1 mt-2">
+          {node.riskTags.map((tag) => (
+            <span
+              key={tag}
+              className="text-nano px-2 py-0.5 rounded-full bg-surface-2 text-muted-foreground uppercase font-semibold"
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function CheckpointNodeDisplay({ node }: { node: TaskNode & { type: "checkpoint" } }) {
+  const label = node.action === "restored" ? "Checkpoint Restored" : "Checkpoint Saved";
+
+  return (
+    <div
+      className={`${BASE_NODE_CLASSES} bg-accent-indigo/10 border-accent-indigo/30 text-accent-indigo`}
+    >
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="font-black uppercase tracking-widest text-micro">{label}</span>
+        <span className="text-nano font-mono opacity-70">step {node.currentStep}</span>
+      </div>
+      <div className="text-micro opacity-80">
+        {node.checkpointId.slice(0, 8)}
+        {node.status ? ` · ${node.status}` : ""}
+      </div>
+    </div>
+  );
+}
+
 // --- Main Entry ---
 
 export function TaskNodeDisplay({ node, duration }: { node: TaskNode; duration?: string }) {
@@ -325,6 +403,12 @@ export function TaskNodeDisplay({ node, duration }: { node: TaskNode; duration?:
       return <StatusNodeDisplay node={node} duration={duration} />;
     case "error":
       return <ErrorNodeDisplay node={node} />;
+    case "turn_marker":
+      return <TurnMarkerDisplay node={node} />;
+    case "policy_decision":
+      return <PolicyDecisionDisplay node={node} />;
+    case "checkpoint":
+      return <CheckpointNodeDisplay node={node} />;
     default:
       return null;
   }

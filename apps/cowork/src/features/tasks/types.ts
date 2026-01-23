@@ -1,4 +1,9 @@
-import type { CoworkTaskStatus, TokenUsageStats, ToolActivity } from "@ku0/agent-runtime";
+import type {
+  CoworkRiskTag,
+  CoworkTaskStatus,
+  TokenUsageStats,
+  ToolActivity,
+} from "@ku0/agent-runtime";
 import { z } from "zod";
 
 export enum TaskStatus {
@@ -230,7 +235,10 @@ export type TaskNodeType =
   | "tool_output"
   | "error"
   | "plan_update"
-  | "task_status";
+  | "task_status"
+  | "turn_marker"
+  | "policy_decision"
+  | "checkpoint";
 
 export interface BaseNode {
   id: string;
@@ -293,13 +301,41 @@ export interface TaskStatusNode extends BaseNode {
   metadata?: Record<string, unknown>;
 }
 
+export interface TurnMarkerNode extends BaseNode {
+  type: "turn_marker";
+  turn: number;
+  phase: "start" | "end";
+}
+
+export interface PolicyDecisionNode extends BaseNode {
+  type: "policy_decision";
+  toolName?: string;
+  decision?: "allow" | "allow_with_confirm" | "deny";
+  policyRuleId?: string;
+  policyAction?: string;
+  riskTags?: CoworkRiskTag[];
+  riskScore?: number;
+  reason?: string;
+}
+
+export interface CheckpointNode extends BaseNode {
+  type: "checkpoint";
+  checkpointId: string;
+  status?: string;
+  currentStep: number;
+  action: "created" | "restored";
+}
+
 export type TaskNode =
   | ThinkingNode
   | ToolCallNode
   | ToolOutputNode
   | ErrorNode
   | PlanUpdateNode
-  | TaskStatusNode;
+  | TaskStatusNode
+  | TurnMarkerNode
+  | PolicyDecisionNode
+  | CheckpointNode;
 
 export interface TaskGraph {
   sessionId: string;

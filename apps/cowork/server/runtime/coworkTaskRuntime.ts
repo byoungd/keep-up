@@ -6,11 +6,14 @@ import type {
   ArtifactEnvelope,
   ArtifactEvents,
   Checkpoint,
+  CheckpointFilter,
   CheckpointStatus,
+  CheckpointSummary,
   ConfirmationRequest,
   CoworkPolicyConfig,
   CoworkSession,
   CoworkTask,
+  ICheckpointManager,
   ICheckpointStorage,
   RuntimeEventBus,
   TaskGraphStore,
@@ -22,6 +25,7 @@ import {
   createAICoreAdapter,
   createBashToolServer,
   createBrowserToolServer,
+  createCheckpointManager,
   createCodeToolServer,
   createCompletionToolServer,
   createCoworkRuntime,
@@ -122,6 +126,7 @@ type SessionRuntime = {
   unsubscribeOrchestrator: () => void;
   unsubscribeEventBus: () => void;
   checkpointStorage?: ICheckpointStorage;
+  checkpointManager?: ICheckpointManager;
   ghostAgent?: GhostAgent;
 };
 
@@ -143,6 +148,14 @@ type RuntimeBuildResult = {
   contextPackKey: string | null;
   eventBus?: RuntimeEventBus;
   checkpointStorage?: ICheckpointStorage;
+  checkpointManager?: ICheckpointManager;
+};
+
+type CheckpointRestoreResult = {
+  checkpointId: string;
+  taskId?: string;
+  restoredAt: number;
+  currentStep: number;
 };
 
 const noop = () => undefined;
@@ -535,6 +548,7 @@ export class CoworkTaskRuntime {
         contextPackKey,
         eventBus: undefined,
         checkpointStorage,
+        checkpointManager: undefined,
       };
     }
 
@@ -553,7 +567,28 @@ export class CoworkTaskRuntime {
     });
     const caseInsensitivePaths = settings.caseInsensitivePaths ?? false;
     const securityPolicy = this.buildRuntimeSecurityPolicy(toolRegistryResult.dockerAvailable);
-    const auditLogger = new CoworkAuditLogger({ auditLogStore: this.auditLogStore });
+    const auditLogger = new CoworkAuditLogger({
+      auditLogStore: this.auditLogStore,
+      onEntry: (entry, mapped) => {
+        if (entry.action !== "policy") {
+          return;
+        }
+        if (!mapped.sessionId) {
+          return;
+        }
+        this.eventPublisher.publishPolicyDecision({
+          sessionId: mapped.sessionId,
+          toolName: mapped.toolName,
+          decision: mapped.policyDecision,
+          policyRuleId: mapped.policyRuleId,
+          policyAction: typeof entry.policyAction === "string" ? entry.policyAction : undefined,
+          riskTags: mapped.riskTags ?? undefined,
+          riskScore: mapped.riskScore,
+          reason: mapped.reason,
+          taskId: mapped.taskId,
+        });
+      },
+    });
     const skillComponents = await this.buildSkillComponents(session, auditLogger);
     await this.registerSkillTools({
       registry: toolRegistry,
@@ -570,8 +605,11 @@ export class CoworkTaskRuntime {
     });
     const prompt = await this.buildSystemPromptAddition(session, modeManager);
     const checkpointStorage = this.createCheckpointStorage(session.sessionId);
+    const checkpointManager = checkpointStorage
+      ? createCheckpointManager({ storage: checkpointStorage })
+      : undefined;
     const taskGraph = this.createTaskGraphStoreForSession(session.sessionId);
-    const components = this.buildOrchestratorComponents(taskGraph);
+    const components = this.buildOrchestratorComponents(taskGraph, checkpointManager);
     const runtime = createCoworkRuntime({
       llm: adapter,
       registry: toolRegistry,
@@ -610,6 +648,7 @@ export class CoworkTaskRuntime {
       contextPackKey: prompt.contextPackKey,
       eventBus,
       checkpointStorage,
+      checkpointManager,
     };
   }
 
@@ -771,6 +810,7 @@ export class CoworkTaskRuntime {
       unsubscribeOrchestrator: noop,
       unsubscribeEventBus: noop,
       checkpointStorage: runtimeResult.checkpointStorage,
+      checkpointManager: runtimeResult.checkpointManager,
       ghostAgent: undefined,
     };
   }
@@ -927,6 +967,14 @@ export class CoworkTaskRuntime {
     });
 
     await storage.save(checkpoint);
+    this.eventPublisher.publishCheckpointCreated({
+      sessionId: runtimeState.sessionId,
+      checkpointId: checkpoint.id,
+      taskId,
+      status: checkpoint.status,
+      currentStep: checkpoint.currentStep,
+      createdAt: checkpoint.createdAt,
+    });
   }
 
   private async ensureRuntimeForTask(
@@ -1077,14 +1125,18 @@ export class CoworkTaskRuntime {
     );
   }
 
-  private buildOrchestratorComponents(taskGraph?: TaskGraphStore) {
-    if (!this.toolResultCache && !taskGraph) {
+  private buildOrchestratorComponents(
+    taskGraph?: TaskGraphStore,
+    checkpointManager?: ICheckpointManager
+  ) {
+    if (!this.toolResultCache && !taskGraph && !checkpointManager) {
       return undefined;
     }
 
     return {
       ...(this.toolResultCache ? { toolResultCache: this.toolResultCache } : {}),
       ...(taskGraph ? { taskGraph } : {}),
+      ...(checkpointManager ? { checkpointManager } : {}),
     };
   }
 
@@ -1102,6 +1154,14 @@ export class CoworkTaskRuntime {
       );
       return new MessagePackCheckpointStorage({ rootDir });
     }
+  }
+
+  private resolveCheckpointStorage(sessionId: string): ICheckpointStorage | undefined {
+    const runtime = this.runtimes.get(sessionId);
+    if (runtime?.checkpointStorage) {
+      return runtime.checkpointStorage;
+    }
+    return this.createCheckpointStorage(sessionId);
   }
 
   private createTaskGraphStoreForSession(sessionId: string): TaskGraphStore | undefined {
@@ -1154,6 +1214,91 @@ export class CoworkTaskRuntime {
 
   async saveProjectContext(session: CoworkSession, content: string) {
     return this.projectContextManager.saveContext(session, content);
+  }
+
+  async listCheckpoints(
+    sessionId: string,
+    filter?: CheckpointFilter
+  ): Promise<CheckpointSummary[]> {
+    const storage = this.resolveCheckpointStorage(sessionId);
+    if (!storage) {
+      return [];
+    }
+    return storage.list(filter);
+  }
+
+  async getCheckpoint(sessionId: string, checkpointId: string): Promise<Checkpoint | null> {
+    const storage = this.resolveCheckpointStorage(sessionId);
+    if (!storage) {
+      return null;
+    }
+    const checkpoint = await storage.load(checkpointId);
+    if (!checkpoint || !isCheckpointForSession(checkpoint, sessionId)) {
+      return null;
+    }
+    return checkpoint;
+  }
+
+  async deleteCheckpoint(sessionId: string, checkpointId: string): Promise<boolean> {
+    const storage = this.resolveCheckpointStorage(sessionId);
+    if (!storage) {
+      return false;
+    }
+    const checkpoint = await storage.load(checkpointId);
+    if (!checkpoint || !isCheckpointForSession(checkpoint, sessionId)) {
+      return false;
+    }
+    return storage.delete(checkpointId);
+  }
+
+  async restoreCheckpoint(
+    sessionId: string,
+    checkpointId: string
+  ): Promise<CheckpointRestoreResult> {
+    const existingRuntime = this.runtimes.get(sessionId);
+    if (existingRuntime?.activeTaskId) {
+      throw new Error("Cannot restore checkpoint while a task is running.");
+    }
+
+    const session = await this.getSessionOrThrow(sessionId);
+    const settings = await this.configStore.get();
+    const requestedModel = normalizeModelId(settings.defaultModel ?? undefined) ?? null;
+    const runtimeState = await this.ensureRuntimeForTask(
+      sessionId,
+      session,
+      settings,
+      requestedModel
+    );
+    if (runtimeState.activeTaskId) {
+      throw new Error("Cannot restore checkpoint while a task is running.");
+    }
+    if (!runtimeState.checkpointManager) {
+      throw new Error("Checkpoint manager not configured.");
+    }
+
+    const checkpoint = await runtimeState.checkpointManager.load(checkpointId);
+    if (!checkpoint || !isCheckpointForSession(checkpoint, sessionId)) {
+      throw new Error("Checkpoint not found.");
+    }
+
+    const restoredState = await runtimeState.runtime.orchestrator.restoreCheckpoint(checkpointId);
+    const taskId = resolveCheckpointTaskId(checkpoint);
+
+    const restoredAt = Date.now();
+    this.eventPublisher.publishCheckpointRestored({
+      sessionId,
+      checkpointId,
+      taskId,
+      restoredAt,
+      currentStep: restoredState.turn,
+    });
+
+    return {
+      checkpointId,
+      taskId,
+      restoredAt,
+      currentStep: restoredState.turn,
+    };
   }
 
   async requestApproval(sessionId: string, request: ConfirmationRequest) {
@@ -1216,6 +1361,25 @@ function resolveTaskLabel(state: AgentState): string | null {
     }
   }
   return null;
+}
+
+function isCheckpointForSession(checkpoint: Checkpoint, sessionId: string): boolean {
+  if (!isRecord(checkpoint.metadata)) {
+    return true;
+  }
+  const metadataSessionId = checkpoint.metadata.sessionId;
+  if (typeof metadataSessionId === "string") {
+    return metadataSessionId === sessionId;
+  }
+  return true;
+}
+
+function resolveCheckpointTaskId(checkpoint: Checkpoint): string | undefined {
+  if (!isRecord(checkpoint.metadata)) {
+    return undefined;
+  }
+  const taskId = checkpoint.metadata.taskId;
+  return typeof taskId === "string" ? taskId : undefined;
 }
 
 function mapCheckpointMessages(state: AgentState, timestamp: number): Checkpoint["messages"] {
