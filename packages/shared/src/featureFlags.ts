@@ -15,6 +15,22 @@ function readBooleanFlag(value: string | undefined, fallback: boolean): boolean 
   return value === "true" || value === "1";
 }
 
+export type DesktopShell = "tauri" | "electron";
+
+function readDesktopShell(value: string | undefined, fallback: DesktopShell): DesktopShell {
+  if (value === "tauri" || value === "electron") {
+    return value;
+  }
+  return fallback;
+}
+
+function readEnvValue(key: string): string | undefined {
+  if (typeof process === "undefined") {
+    return undefined;
+  }
+  return process.env[key];
+}
+
 /**
  * Feature flag definitions.
  * Default values are set here; can be overridden via environment variables.
@@ -28,6 +44,14 @@ export const FEATURE_FLAGS = {
   collab_enabled: readBooleanFlag(
     typeof process !== "undefined" ? process.env.NEXT_PUBLIC_COLLAB_ENABLED : undefined,
     false
+  ),
+  /**
+   * Select the desktop shell implementation.
+   * Default: electron (legacy)
+   */
+  desktop_shell: readDesktopShell(
+    readEnvValue("DESKTOP_SHELL") ?? readEnvValue("NEXT_PUBLIC_DESKTOP_SHELL"),
+    "electron"
   ),
 } as const;
 
@@ -45,6 +69,13 @@ export const FEATURE_FLAGS = {
  */
 export function isCollabEnabled(): boolean {
   return FEATURE_FLAGS.collab_enabled;
+}
+
+/**
+ * Get the configured desktop shell.
+ */
+export function getDesktopShell(): DesktopShell {
+  return FEATURE_FLAGS.desktop_shell;
 }
 
 /**
