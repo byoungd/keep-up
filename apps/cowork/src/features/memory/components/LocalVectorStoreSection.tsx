@@ -1,4 +1,4 @@
-import { open } from "@tauri-apps/api/dialog";
+import { open } from "@tauri-apps/plugin-dialog";
 import React from "react";
 import { cn } from "../../../lib/cn";
 import { isTauriRuntime } from "../../../lib/tauriRuntime";
@@ -42,7 +42,6 @@ type SearchState = {
 };
 
 type RecentState = {
-  recent: VectorChunk[];
   handleDelete: (id: number) => Promise<void>;
   handleClearAll: () => Promise<void>;
 };

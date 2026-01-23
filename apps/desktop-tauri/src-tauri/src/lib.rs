@@ -42,6 +42,7 @@ pub fn run() {
                 deeplink::store_and_emit(app, url);
             }
         }))
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             deeplink::get_pending_deep_link,

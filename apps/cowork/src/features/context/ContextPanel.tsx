@@ -11,6 +11,7 @@ import { ArtifactsList } from "../artifacts/components/ArtifactsList";
 import { MemoryPanelContent } from "../memory/components/MemoryPanelContent";
 import { PreflightPanelContent } from "../preflight/PreflightPanelContent";
 import { useTaskStream } from "../tasks/hooks/useTaskStream";
+import type { EnrichedArtifact } from "../tasks/types";
 import { WorkflowTemplatesPanelContent } from "../workflows/WorkflowTemplatesPanelContent";
 import { CheckpointsPanelContent } from "./CheckpointsPanelContent";
 import { ContextPacksPanelContent } from "./ContextPacksPanelContent";
@@ -41,7 +42,7 @@ type ContextPanelContentProps = {
   onAddNote: () => void;
   previewArtifact: ArtifactItem | null;
   onClosePreview: () => void;
-  artifacts: ArtifactItem[];
+  artifacts: Record<string, EnrichedArtifact>;
   onRunTemplate?: (
     prompt: string,
     mode: AgentMode,
