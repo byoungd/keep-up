@@ -1,4 +1,5 @@
 import { ArtifactsList } from "../features/artifacts/components/ArtifactsList";
+import { ClarificationPanel } from "../features/clarifications/components/ClarificationPanel";
 import type { TaskGraph } from "../features/tasks/types";
 
 interface ArtifactRailProps {
@@ -6,6 +7,11 @@ interface ArtifactRailProps {
   graph: TaskGraph;
   onApplyArtifact?: (artifactId: string) => void;
   onRevertArtifact?: (artifactId: string) => void;
+  onAnswerClarification?: (input: {
+    requestId: string;
+    answer: string;
+    selectedOption?: number;
+  }) => Promise<void>;
 }
 
 export function ArtifactRail({
@@ -13,6 +19,7 @@ export function ArtifactRail({
   graph,
   onApplyArtifact,
   onRevertArtifact,
+  onAnswerClarification,
 }: ArtifactRailProps) {
   return (
     <aside className="artifact-rail" aria-label="Artifact rail">
@@ -27,6 +34,12 @@ export function ArtifactRail({
           // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
           tabIndex={0}
         >
+          {graph.clarifications.length > 0 && onAnswerClarification && (
+            <ClarificationPanel
+              clarifications={graph.clarifications}
+              onAnswer={onAnswerClarification}
+            />
+          )}
           <ArtifactsList
             artifacts={graph.artifacts}
             onApply={onApplyArtifact}

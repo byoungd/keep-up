@@ -3,7 +3,11 @@
  * Handles publishing events to session event hub
  */
 
-import type { TokenUsageStats } from "@ku0/agent-runtime";
+import type {
+  ClarificationRequest,
+  ClarificationResponse,
+  TokenUsageStats,
+} from "@ku0/agent-runtime";
 import { COWORK_EVENTS, type SessionEventHub } from "../../streaming/eventHub";
 
 export class EventStreamPublisher {
@@ -200,6 +204,28 @@ export class EventStreamPublisher {
       taskId: data.taskId,
       restoredAt: data.restoredAt,
       currentStep: data.currentStep,
+    });
+  }
+
+  publishClarificationRequested(data: {
+    sessionId: string;
+    request: ClarificationRequest;
+    taskId?: string;
+  }) {
+    this.events.publish(data.sessionId, COWORK_EVENTS.CLARIFICATION_REQUESTED, {
+      request: data.request,
+      taskId: data.taskId,
+    });
+  }
+
+  publishClarificationAnswered(data: {
+    sessionId: string;
+    response: ClarificationResponse;
+    taskId?: string;
+  }) {
+    this.events.publish(data.sessionId, COWORK_EVENTS.CLARIFICATION_ANSWERED, {
+      response: data.response,
+      taskId: data.taskId,
     });
   }
 

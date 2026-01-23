@@ -85,18 +85,27 @@ export type {
   ScriptContext,
   ScriptExecutorConfig,
   ScriptResult,
+  SubagentConfig,
+  SubagentResult,
   SubagentTask,
+  SubagentType,
+  SubagentWorkItem,
   ToolSearchCriteria,
   ToolSearchResult,
+  WorkTask,
 } from "@ku0/agent-runtime-tools";
 // Subagent Orchestration
 // Script Executor
 // Tool Discovery
 export {
+  CodebaseResearchSubagent,
   createScriptExecutor,
   createSubagentOrchestrator,
   createToolDiscoveryEngine,
+  ParallelWorkSubagent,
   SCRIPT_TEMPLATES,
+  SubagentManager,
+  TerminalExecutorSubagent,
 } from "@ku0/agent-runtime-tools";
 // ============================================================================
 // Agents
@@ -299,6 +308,7 @@ export { BUILT_IN_WORKFLOWS, createWorkflowTemplateManager } from "./workflows";
 // Quick access to commonly used factories
 export {
   type AIEnvelopeGateway,
+  ClarificationToolServer,
   COMPLETION_TOOL_DEFINITION,
   COMPLETION_TOOL_NAME,
   COMPLETION_TOOL_SCHEMA,
@@ -307,6 +317,7 @@ export {
   CompletionToolServer,
   type CompletionValidationResult,
   createBashToolServer,
+  createClarificationToolServer,
   createCodeInteractionServer,
   createCodeToolServer,
   createCompletionToolServer,

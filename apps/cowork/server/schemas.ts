@@ -61,6 +61,11 @@ export const approvalDecisionSchema = z.object({
   status: z.enum(["approved", "rejected"]),
 });
 
+export const clarificationAnswerSchema = z.object({
+  answer: z.string().min(1),
+  selectedOption: z.number().int().nonnegative().optional(),
+});
+
 export const settingsPatchSchema = z
   .object({
     openAiKey: z.string().min(1).optional(),

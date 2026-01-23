@@ -19,13 +19,17 @@ import type {
   TaskGraphStore,
 } from "@ku0/agent-runtime";
 import {
+  AgentManager,
   AgentModeManager,
   BrowserManager,
   CHECKPOINT_VERSION,
+  ClarificationManager,
+  ContextManager,
   createAICoreAdapter,
   createBashToolServer,
   createBrowserToolServer,
   createCheckpointManager,
+  createClarificationToolServer,
   createCodeToolServer,
   createCompletionToolServer,
   createCoworkRuntime,
@@ -42,6 +46,7 @@ import {
   createSkillRegistry,
   createSkillSession,
   createSkillToolServer,
+  createSubagentToolServer,
   createTaskGraphStore,
   createToolRegistry,
   createWebSearchToolServer,
@@ -59,6 +64,7 @@ import {
   type SkillDirectoryConfig,
   type SkillRegistry,
   type SkillSession,
+  SubagentManager,
   ToolResultCache,
 } from "@ku0/agent-runtime";
 import { normalizeModelId } from "@ku0/ai-core";
@@ -115,6 +121,7 @@ type SessionRuntime = {
   sessionId: string;
   runtime: ReturnType<typeof createCoworkRuntime>;
   modeManager: AgentModeManager;
+  clarificationManager?: ClarificationManager;
   eventBus?: RuntimeEventBus;
   activeTaskId: string | null;
   modelId: string | null;
@@ -147,6 +154,7 @@ type RuntimeBuildResult = {
   fallbackNotice: string | null;
   contextPackKey: string | null;
   eventBus?: RuntimeEventBus;
+  clarificationManager?: ClarificationManager;
   checkpointStorage?: ICheckpointStorage;
   checkpointManager?: ICheckpointManager;
 };
@@ -547,6 +555,7 @@ export class CoworkTaskRuntime {
         fallbackNotice: null,
         contextPackKey,
         eventBus: undefined,
+        clarificationManager: undefined,
         checkpointStorage,
         checkpointManager: undefined,
       };
@@ -557,8 +566,14 @@ export class CoworkTaskRuntime {
     });
     const modelId = resolved.model ?? requestedModel;
     const eventBus = createEventBus();
+    const clarificationManager = new ClarificationManager();
     const toolRegistryResult = await this.buildToolRegistry(session);
     const toolRegistry = toolRegistryResult.registry;
+    await toolRegistry.register(
+      createClarificationToolServer({
+        requestClarification: clarificationManager.ask.bind(clarificationManager),
+      })
+    );
     const policyResolution = await resolveCoworkPolicyConfig({
       repoRoot: this.resolvePolicyRoot(session),
       settings,
@@ -602,13 +617,25 @@ export class CoworkTaskRuntime {
     const adapter = createAICoreAdapter(resolved.provider, {
       model: modelId || undefined,
     });
+    const contextManager = new ContextManager();
+    const agentManager = new AgentManager({
+      llm: adapter,
+      registry: toolRegistry,
+      eventBus,
+      contextManager,
+    });
+    const subagentManager = new SubagentManager(agentManager);
+    await toolRegistry.register(createSubagentToolServer(agentManager));
     const prompt = await this.buildSystemPromptAddition(session, modeManager);
     const checkpointStorage = this.createCheckpointStorage(session.sessionId);
     const checkpointManager = checkpointStorage
       ? createCheckpointManager({ storage: checkpointStorage })
       : undefined;
     const taskGraph = this.createTaskGraphStoreForSession(session.sessionId);
-    const components = this.buildOrchestratorComponents(taskGraph, checkpointManager);
+    const components = this.buildOrchestratorComponents(taskGraph, checkpointManager, {
+      clarificationManager,
+      subagentManager,
+    });
     const runtime = createCoworkRuntime({
       llm: adapter,
       registry: toolRegistry,
@@ -646,6 +673,7 @@ export class CoworkTaskRuntime {
       fallbackNotice: resolved.fallbackNotice ?? null,
       contextPackKey: prompt.contextPackKey,
       eventBus,
+      clarificationManager,
       checkpointStorage,
       checkpointManager,
     };
@@ -798,6 +826,7 @@ export class CoworkTaskRuntime {
       sessionId,
       runtime: runtimeResult.runtime,
       modeManager,
+      clarificationManager: runtimeResult.clarificationManager,
       eventBus: runtimeResult.eventBus,
       activeTaskId: null,
       modelId: runtimeResult.modelId,
@@ -1126,9 +1155,13 @@ export class CoworkTaskRuntime {
 
   private buildOrchestratorComponents(
     taskGraph?: TaskGraphStore,
-    checkpointManager?: ICheckpointManager
+    checkpointManager?: ICheckpointManager,
+    extras?: {
+      clarificationManager?: ClarificationManager;
+      subagentManager?: SubagentManager;
+    }
   ) {
-    if (!this.toolResultCache && !taskGraph && !checkpointManager) {
+    if (!this.toolResultCache && !taskGraph && !checkpointManager && !extras) {
       return undefined;
     }
 
@@ -1136,6 +1169,13 @@ export class CoworkTaskRuntime {
       ...(this.toolResultCache ? { toolResultCache: this.toolResultCache } : {}),
       ...(taskGraph ? { taskGraph } : {}),
       ...(checkpointManager ? { checkpointManager } : {}),
+      ...(extras?.clarificationManager
+        ? { clarificationManager: extras.clarificationManager }
+        : {}),
+      ...(extras?.subagentManager ? { subagentManager: extras.subagentManager } : {}),
+      ...(extras?.subagentManager
+        ? { subagentAutomation: { enabled: true, maxConcurrent: 2 } }
+        : {}),
     };
   }
 
@@ -1298,6 +1338,29 @@ export class CoworkTaskRuntime {
       restoredAt,
       currentStep: restoredState.turn,
     };
+  }
+
+  listClarifications(sessionId: string) {
+    const runtimeState = this.runtimes.get(sessionId);
+    return runtimeState?.clarificationManager?.getPending(sessionId) ?? [];
+  }
+
+  submitClarification(input: { requestId: string; answer: string; selectedOption?: number }) {
+    for (const runtimeState of this.runtimes.values()) {
+      const manager = runtimeState.clarificationManager;
+      if (!manager) {
+        continue;
+      }
+      const pending = manager.getPending();
+      if (pending.some((request) => request.id === input.requestId)) {
+        return manager.submitAnswer({
+          requestId: input.requestId,
+          answer: input.answer,
+          selectedOption: input.selectedOption,
+        });
+      }
+    }
+    return null;
   }
 
   async requestApproval(sessionId: string, request: ConfirmationRequest) {

@@ -16,6 +16,7 @@ export {
 export {
   type AgentEvents,
   type ArtifactEvents,
+  type ClarificationEvents,
   createEventBus,
   EventBus,
   type EventBusConfig,
