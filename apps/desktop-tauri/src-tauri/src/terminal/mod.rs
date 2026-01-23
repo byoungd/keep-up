@@ -2,7 +2,9 @@ use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 use serde::Deserialize;
 use std::{
     collections::HashMap,
+    env,
     io::{Read, Write},
+    path::PathBuf,
     sync::{Arc, Mutex},
     thread,
 };
@@ -32,8 +34,8 @@ struct PtySession {
 #[derive(Deserialize)]
 pub struct SpawnTerminalArgs {
     pub id: String,
-    pub cmd: String,
-    pub args: Vec<String>,
+    pub cmd: Option<String>,
+    pub args: Option<Vec<String>>,
     pub cwd: Option<String>,
     pub cols: Option<u16>,
     pub rows: Option<u16>,
@@ -67,10 +69,16 @@ pub async fn spawn_terminal(
         .openpty(size)
         .map_err(|e| format!("Failed to open PTY: {e}"))?;
 
-    let mut command = CommandBuilder::new(&args.cmd);
-    command.args(&args.args);
-    if let Some(cwd) = &args.cwd {
+    let (command_path, command_args) = resolve_command(args.cmd.clone(), args.args.clone());
+    let mut command = CommandBuilder::new(&command_path);
+    if !command_args.is_empty() {
+        command.args(&command_args);
+    }
+    if let Some(cwd) = resolve_cwd(args.cwd.as_deref()) {
         command.cwd(cwd);
+    }
+    if cfg!(unix) && env::var_os("TERM").is_none() {
+        command.env("TERM", "xterm-256color");
     }
 
     let child = pair
@@ -123,6 +131,79 @@ pub async fn spawn_terminal(
     );
 
     Ok(())
+}
+
+fn resolve_command(cmd: Option<String>, args: Option<Vec<String>>) -> (String, Vec<String>) {
+    if let Some(cmd) = cmd {
+        return (cmd, args.unwrap_or_default());
+    }
+
+    let (default_cmd, default_args) = default_shell();
+    let args = args.unwrap_or(default_args);
+    (default_cmd, args)
+}
+
+fn resolve_cwd(cwd: Option<&str>) -> Option<PathBuf> {
+    if let Some(cwd) = cwd {
+        let path = PathBuf::from(cwd);
+        if path.is_dir() {
+            return Some(path);
+        }
+    }
+
+    if let Some(home) = tauri::path::home_dir() {
+        if home.is_dir() {
+            return Some(home);
+        }
+    }
+
+    env::current_dir().ok().filter(|path| path.is_dir())
+}
+
+fn default_shell() -> (String, Vec<String>) {
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(path) = find_in_path("pwsh.exe") {
+            return (path, vec!["-NoLogo".to_string()]);
+        }
+        if let Some(path) = find_in_path("powershell.exe") {
+            return (path, vec!["-NoLogo".to_string()]);
+        }
+        if let Ok(comspec) = env::var("ComSpec") {
+            if !comspec.trim().is_empty() {
+                return (comspec, Vec::new());
+            }
+        }
+        return ("cmd.exe".to_string(), Vec::new());
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        if let Ok(shell) = env::var("SHELL") {
+            if !shell.trim().is_empty() {
+                return (shell, Vec::new());
+            }
+        }
+
+        for candidate in ["/bin/zsh", "/bin/bash", "/bin/sh"] {
+            if PathBuf::from(candidate).exists() {
+                return (candidate.to_string(), Vec::new());
+            }
+        }
+
+        ("sh".to_string(), Vec::new())
+    }
+}
+
+fn find_in_path(binary: &str) -> Option<String> {
+    let path_var = env::var_os("PATH")?;
+    for dir in env::split_paths(&path_var) {
+        let candidate = dir.join(binary);
+        if candidate.is_file() {
+            return Some(candidate.to_string_lossy().to_string());
+        }
+    }
+    None
 }
 
 #[tauri::command]

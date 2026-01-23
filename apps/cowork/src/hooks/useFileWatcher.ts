@@ -5,6 +5,7 @@ import { isTauriRuntime } from "../lib/tauriRuntime";
 
 export type FileWatcherEvent = {
   kind: string;
+  raw_kind: string;
   paths: string[];
   timestamp_ms: number;
   error?: string;

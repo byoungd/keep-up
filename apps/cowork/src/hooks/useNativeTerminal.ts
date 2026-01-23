@@ -15,7 +15,7 @@ export type TerminalAdapter = {
 
 export type NativeTerminalOptions = {
   terminalRef: RefObject<TerminalAdapter | null>;
-  command: string;
+  command?: string;
   args?: string[];
   cwd?: string;
   cols?: number;
@@ -28,8 +28,8 @@ type TerminalEventPayload = number[] | Uint8Array | ArrayBuffer;
 
 type SpawnTerminalPayload = {
   id: string;
-  cmd: string;
-  args: string[];
+  cmd?: string;
+  args?: string[];
   cwd?: string;
   cols?: number;
   rows?: number;
@@ -79,14 +79,22 @@ export function useNativeTerminal(options: NativeTerminalOptions) {
       void invoke("write_terminal", { id, data: Array.from(bytes) });
     });
 
-    const payload: SpawnTerminalPayload = {
-      id,
-      cmd: command,
-      args: args ?? [],
-      cwd: cwd || undefined,
-      cols: typeof cols === "number" ? cols : undefined,
-      rows: typeof rows === "number" ? rows : undefined,
-    };
+    const payload: SpawnTerminalPayload = { id };
+    if (command) {
+      payload.cmd = command;
+    }
+    if (args) {
+      payload.args = args;
+    }
+    if (cwd) {
+      payload.cwd = cwd;
+    }
+    if (typeof cols === "number") {
+      payload.cols = cols;
+    }
+    if (typeof rows === "number") {
+      payload.rows = rows;
+    }
 
     void invoke("spawn_terminal", payload);
 

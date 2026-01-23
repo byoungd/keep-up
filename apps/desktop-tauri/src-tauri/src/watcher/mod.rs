@@ -1,4 +1,7 @@
-use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{
+    event::{EventKind, ModifyKind},
+    Event, RecommendedWatcher, RecursiveMode, Watcher,
+};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -45,6 +48,7 @@ pub struct FileWatcherBatch {
 #[derive(Serialize)]
 pub struct FileWatcherEvent {
     pub kind: String,
+    pub raw_kind: String,
     pub paths: Vec<String>,
     pub timestamp_ms: u64,
     pub error: Option<String>,
@@ -163,7 +167,8 @@ fn spawn_watcher_worker(
 fn map_event(event: notify::Result<Event>) -> FileWatcherEvent {
     match event {
         Ok(event) => FileWatcherEvent {
-            kind: format!("{:?}", event.kind),
+            kind: normalize_kind(&event.kind),
+            raw_kind: format!("{:?}", event.kind),
             paths: event
                 .paths
                 .into_iter()
@@ -174,10 +179,23 @@ fn map_event(event: notify::Result<Event>) -> FileWatcherEvent {
         },
         Err(error) => FileWatcherEvent {
             kind: "error".to_string(),
+            raw_kind: "error".to_string(),
             paths: Vec::new(),
             timestamp_ms: now_ms(),
             error: Some(error.to_string()),
         },
+    }
+}
+
+fn normalize_kind(kind: &EventKind) -> String {
+    match kind {
+        EventKind::Create(_) => "created".to_string(),
+        EventKind::Remove(_) => "removed".to_string(),
+        EventKind::Modify(ModifyKind::Name(_)) => "renamed".to_string(),
+        EventKind::Modify(_) => "modified".to_string(),
+        EventKind::Access(_) => "accessed".to_string(),
+        EventKind::Any => "changed".to_string(),
+        EventKind::Other => "other".to_string(),
     }
 }
 
