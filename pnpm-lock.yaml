@@ -471,6 +471,9 @@ importers:
       '@ku0/diff-rs':
         specifier: workspace:*
         version: link:../diff-rs
+      '@ku0/sandbox-rs':
+        specifier: workspace:*
+        version: link:../sandbox-rs
       '@modelcontextprotocol/sdk':
         specifier: ^1.25.2
         version: 1.25.2(@cfworker/json-schema@4.1.1)(hono@4.11.4)(zod@4.3.5)
