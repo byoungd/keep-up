@@ -1,7 +1,10 @@
-use tauri::menu::{Menu, MenuEvent, MenuItem, SubmenuBuilder};
-use tauri::{AppHandle, Manager, Result};
+use tauri::menu::{Menu, MenuEvent, SubmenuBuilder};
+use tauri::{AppHandle, Result, Runtime};
 
-pub fn build_menu(app: &AppHandle) -> Result<Menu> {
+#[cfg(not(target_os = "macos"))]
+use tauri::menu::MenuItem;
+
+pub fn build_menu<R: Runtime>(app: &AppHandle<R>) -> Result<Menu<R>> {
     let menu = Menu::new(app)?;
 
     #[cfg(target_os = "macos")]
@@ -63,7 +66,7 @@ pub fn build_menu(app: &AppHandle) -> Result<Menu> {
     Ok(menu)
 }
 
-pub fn handle_menu_event(app: &AppHandle, event: MenuEvent) {
+pub fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
     if event.id() == "quit" {
         app.exit(0);
     }

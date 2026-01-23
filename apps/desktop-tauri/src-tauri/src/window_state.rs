@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
-use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize, WebviewWindow, WindowEvent};
+use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize, Runtime, Window, WindowEvent};
 
 const STATE_FILE_NAME: &str = "window-state.json";
 
@@ -15,7 +15,7 @@ struct StoredWindowState {
     fullscreen: bool,
 }
 
-pub fn restore(app: &AppHandle) {
+pub fn restore<R: Runtime>(app: &AppHandle<R>) {
     let window = match app.get_webview_window("main") {
         Some(window) => window,
         None => return,
@@ -42,7 +42,7 @@ pub fn restore(app: &AppHandle) {
     }
 }
 
-pub fn handle_window_event(window: &WebviewWindow, event: &WindowEvent) {
+pub fn handle_window_event<R: Runtime>(window: &Window<R>, event: &WindowEvent) {
     match event {
         WindowEvent::Moved(_)
         | WindowEvent::Resized(_)
@@ -54,7 +54,7 @@ pub fn handle_window_event(window: &WebviewWindow, event: &WindowEvent) {
     }
 }
 
-fn persist_state(window: &WebviewWindow) {
+fn persist_state<R: Runtime>(window: &Window<R>) {
     let app = window.app_handle();
     let path = match state_path(&app) {
         Some(path) => path,
@@ -73,7 +73,7 @@ fn persist_state(window: &WebviewWindow) {
     let _ = fs::write(path, serialized);
 }
 
-fn capture_state(window: &WebviewWindow) -> Option<StoredWindowState> {
+fn capture_state<R: Runtime>(window: &Window<R>) -> Option<StoredWindowState> {
     let size = window.outer_size().ok()?;
     let position = window.outer_position().ok()?;
     let maximized = window.is_maximized().ok().unwrap_or(false);
@@ -89,13 +89,13 @@ fn capture_state(window: &WebviewWindow) -> Option<StoredWindowState> {
     })
 }
 
-fn read_state(app: &AppHandle) -> Option<StoredWindowState> {
+fn read_state<R: Runtime>(app: &AppHandle<R>) -> Option<StoredWindowState> {
     let path = state_path(app)?;
     let contents = fs::read_to_string(path).ok()?;
     serde_json::from_str(&contents).ok()
 }
 
-fn state_path(app: &AppHandle) -> Option<PathBuf> {
+fn state_path<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
     let dir = app.path().app_config_dir().ok()?;
     if fs::create_dir_all(&dir).is_err() {
         return None;

@@ -10,7 +10,7 @@ mod window_state;
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
-            window_state::restore(app);
+            window_state::restore(app.handle());
             let app_handle = app.handle().clone();
             let logs_state = logs::init(app_handle.clone());
             app.manage(logs_state);
