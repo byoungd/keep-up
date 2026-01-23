@@ -124,3 +124,84 @@ function resolveFrontmatterSyntax(delimiter: string): MarkdownFrontmatterBlock["
   }
   return null;
 }
+
+export function stringifyFrontmatter(
+  data: Record<string, unknown>,
+  syntax: MarkdownFrontmatterBlock["syntax"]
+): string {
+  if (syntax === "json") {
+    return JSON.stringify(data, null, 2);
+  }
+  if (syntax === "toml") {
+    return Toml.stringify(data as Toml.JsonMap);
+  }
+  // Default to YAML - import stringify from yaml package
+  // biome-ignore lint/suspicious/noExplicitAny: yaml stringify accepts any
+  const { stringify } = require("yaml") as { stringify: (data: any) => string };
+  return stringify(data).trim();
+}
+
+export function getDelimiter(syntax: MarkdownFrontmatterBlock["syntax"]): string {
+  if (syntax === "json") {
+    return JSON_DELIMITER;
+  }
+  if (syntax === "toml") {
+    return TOML_DELIMITER;
+  }
+  return YAML_DELIMITER;
+}
+
+export type ApplyFrontmatterResult =
+  | { ok: true; lines: string[] }
+  | { ok: false; error: MarkdownOperationError };
+
+export function applyFrontmatterUpdates(
+  lines: string[],
+  frontmatterRange: { start: number; end: number },
+  updates: Record<string, unknown>,
+  format?: "yaml" | "toml" | "json",
+  createIfMissing?: boolean
+): ApplyFrontmatterResult {
+  // Parse existing frontmatter
+  const parseResult = parseFrontmatter(lines);
+
+  let existingData: Record<string, unknown> = {};
+  let syntax: MarkdownFrontmatterBlock["syntax"] = format ?? "yaml";
+  let startLine = frontmatterRange.start;
+  let endLine = frontmatterRange.end;
+
+  if (parseResult.found && parseResult.ok) {
+    existingData = (parseResult.value.data as Record<string, unknown>) ?? {};
+    syntax = format ?? parseResult.value.block.syntax;
+    startLine = parseResult.value.block.line_range.start;
+    endLine = parseResult.value.block.line_range.end;
+  } else if (!parseResult.found && !createIfMissing) {
+    return {
+      ok: false,
+      error: {
+        code: "MCM_FRONTMATTER_INVALID",
+        message: "No frontmatter found and create_if_missing is not set",
+      },
+    };
+  }
+
+  // Merge updates into existing data
+  const mergedData = { ...existingData, ...updates };
+
+  // Serialize back
+  const delimiter = getDelimiter(syntax);
+  const serialized = stringifyFrontmatter(mergedData, syntax);
+  const newFrontmatterLines = [delimiter, ...serialized.split("\n"), delimiter];
+
+  // Replace the lines
+  const resultLines = [...lines];
+  if (parseResult.found) {
+    // Replace existing frontmatter
+    resultLines.splice(startLine - 1, endLine - startLine + 1, ...newFrontmatterLines);
+  } else {
+    // Insert at beginning
+    resultLines.unshift(...newFrontmatterLines);
+  }
+
+  return { ok: true, lines: resultLines };
+}

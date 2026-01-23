@@ -62,7 +62,19 @@ export type MdDeleteLines = {
   target: { line_range: LineRange };
 };
 
-export type MarkdownOperation = MdReplaceLines | MdInsertLines | MdDeleteLines;
+export type MdUpdateFrontmatter = {
+  op: "md_update_frontmatter";
+  precondition_id: string;
+  updates: Record<string, unknown>;
+  create_if_missing?: boolean;
+  format?: "yaml" | "toml" | "json";
+};
+
+export type MarkdownOperation =
+  | MdReplaceLines
+  | MdInsertLines
+  | MdDeleteLines
+  | MdUpdateFrontmatter;
 
 export type MarkdownOperationErrorCode =
   | "MCM_INVALID_REQUEST"
