@@ -14,19 +14,19 @@
 
 ### Track AP: Workforce Orchestrator (Rust) [P0]
 **Goal**: `packages/agent-workforce-rs`
-- [ ] **Week 1: Core Data Model**
-  - [ ] Scaffold `packages/agent-workforce-rs` crate.
-  - [ ] Define `TaskGraph` struct (nodes, edges, dependencies).
-  - [ ] Define `TaskStatus` state machine enum.
-  - [ ] Implement `EventLog` struct for deterministic history.
-- [ ] **Week 2: Scheduling**
-  - [ ] Implement `Planner` trait and mock implementation.
-  - [ ] Implement `Coordinator` struct for capability matching.
-  - [ ] Add `Scheduler` logic for topological sort of tasks.
-- [ ] **Week 3: Reliability**
-  - [ ] Implement `FailurePolicy` (retry, backoff).
-  - [ ] Add Dead Letter Queue (DLQ) for permanently failed tasks.
-  - [ ] Integrate with `agent-runtime-control` (FFI).
+- [x] **Week 1: Core Data Model**
+  - [x] Scaffold `packages/agent-workforce-rs` crate.
+  - [x] Define `TaskGraph` struct (nodes, edges, dependencies).
+  - [x] Define `TaskStatus` state machine enum.
+  - [x] Implement `EventLog` struct for deterministic history.
+- [x] **Week 2: Scheduling**
+  - [x] Implement `Planner` trait and mock implementation.
+  - [x] Implement `Coordinator` struct for capability matching.
+  - [x] Add `Scheduler` logic for topological sort of tasks.
+- [x] **Week 3: Reliability**
+  - [x] Implement `FailurePolicy` (retry, backoff).
+  - [x] Add Dead Letter Queue (DLQ) for permanently failed tasks.
+  - [x] Integrate with `agent-runtime-control` (FFI).
 
 ### Track AQ: Tool and MCP Gateway (Rust) [P0]
 **Goal**: `packages/tool-gateway-rs`

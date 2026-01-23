@@ -1,7 +1,7 @@
 # Track AP: Workforce Orchestrator (Rust)
 
 > Priority: P0
-> Status: Proposed
+> Status: In Progress (prototype implemented)
 > Owner: Agent Runtime Team
 > Dependencies: Track AQ tool contracts, Track AU storage, Phase 6 sandbox
 > Estimated Effort: 3 weeks
@@ -26,6 +26,12 @@ roles, a task graph, a shared task channel, and deterministic scheduling for par
 - FFI bridge in `packages/agent-runtime-control/` for TypeScript to Rust calls.
 - Deterministic event log schema in `packages/agent-runtime-core/`.
 - Simulator CLI for multi-agent regression runs.
+
+## Current Implementation
+
+- Rust core engine with deterministic scheduler, failure policy, and task channel.
+- N-API binding exposed via `@ku0/agent-workforce-rs` with Node loader.
+- Control-plane wrapper in `packages/agent-runtime-control/src/workforce`.
 
 ## Technical Design
 

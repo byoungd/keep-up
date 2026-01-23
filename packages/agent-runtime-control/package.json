@@ -25,6 +25,7 @@
     "lint:fix": "biome check --write ."
   },
   "dependencies": {
+    "@ku0/agent-workforce-rs": "workspace:*",
     "@ku0/agent-runtime-core": "workspace:*",
     "@ku0/agent-runtime-telemetry": "workspace:*"
   },

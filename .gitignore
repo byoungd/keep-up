@@ -253,6 +253,10 @@ packages/ai-context-hash-rs/target/
 packages/ai-context-hash-rs/Cargo.lock
 packages/ai-context-hash-rs/*.node
 
+packages/agent-workforce-rs/target/
+packages/agent-workforce-rs/Cargo.lock
+packages/agent-workforce-rs/*.node
+
 packages/anchor-codec-rs/target/
 packages/anchor-codec-rs/Cargo.lock
 packages/anchor-codec-rs/*.node
