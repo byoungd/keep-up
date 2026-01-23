@@ -1,6 +1,7 @@
 # Architecture Documentation
 
-This directory contains architectural designs, RFCs, and technical specifications for the Keep-Up platform.
+This directory contains architectural designs, RFCs, and technical specifications for the Open Wrap platform.
+Core application context is `apps/cowork` unless a doc explicitly targets the LFCC editor stack.
 
 ---
 
