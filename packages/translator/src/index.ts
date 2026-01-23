@@ -525,7 +525,7 @@ export class TranslationService {
     if (!response.ok) {
       throw new Error(`Google failed: ${response.status}`);
     }
-    const data = await response.json();
+    const data = (await response.json()) as { sentences?: GoogleSentence[] };
     if (!data?.sentences || !Array.isArray(data.sentences)) {
       throw new Error("Invalid Google response");
     }
@@ -553,7 +553,9 @@ export class TranslationService {
     if (!response.ok) {
       throw new Error(`Google API error: ${response.status}`);
     }
-    const data = await response.json();
+    const data = (await response.json()) as {
+      data: { translations: Array<{ translatedText: string }> };
+    };
     return data.data.translations[0].translatedText;
   }
 
@@ -581,7 +583,9 @@ export class TranslationService {
     if (!response.ok) {
       throw new Error(`Microsoft error: ${response.status}`);
     }
-    const data = await response.json();
+    const data = (await response.json()) as Array<{
+      translations: Array<{ text: string }>;
+    }>;
     return data[0].translations[0].text;
   }
 
@@ -609,7 +613,7 @@ export class TranslationService {
     if (!response.ok) {
       throw new Error(`DeepL error: ${response.status}`);
     }
-    const data = await response.json();
+    const data = (await response.json()) as { translations: Array<{ text: string }> };
     return data.translations[0].text;
   }
 
@@ -651,7 +655,9 @@ export class TranslationService {
     if (!response.ok) {
       throw new Error(`${provider.name} LLM error: ${response.status}`);
     }
-    const data = await response.json();
+    const data = (await response.json()) as {
+      choices: Array<{ message: { content: string } }>;
+    };
     return data.choices[0].message.content.trim();
   }
 
