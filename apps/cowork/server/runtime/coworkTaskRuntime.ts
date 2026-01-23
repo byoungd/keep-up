@@ -1283,9 +1283,6 @@ export class CoworkTaskRuntime {
 
     const restoredState = await runtimeState.runtime.orchestrator.restoreCheckpoint(checkpointId);
     const taskId = resolveCheckpointTaskId(checkpoint);
-    if (taskId) {
-      runtimeState.activeTaskId = taskId;
-    }
 
     const restoredAt = Date.now();
     this.eventPublisher.publishCheckpointRestored({
