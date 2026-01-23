@@ -1,0 +1,20 @@
+{
+  "rustc": 2629586073275287932,
+  "features": "[]",
+  "declared_features": "[\"no_std\"]",
+  "target": 14369684853076716314,
+  "profile": 8276155916380437441,
+  "path": 17600447522074874277,
+  "deps": [],
+  "local": [
+    {
+      "CheckDepInfo": {
+        "dep_info": "debug/.fingerprint/unicode-segmentation-740e46a3c4820267/dep-lib-unicode_segmentation",
+        "checksum": false
+      }
+    }
+  ],
+  "rustflags": [],
+  "config": 2069994364910194474,
+  "compile_kind": 0
+}
