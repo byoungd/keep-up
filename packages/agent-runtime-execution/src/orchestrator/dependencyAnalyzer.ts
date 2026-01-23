@@ -483,9 +483,13 @@ function extractFilePaths(call: MCPToolCall): string[] {
 
   addPath(args.path);
   addPath(args.srcPath);
+  addPath(args.sourcePath);
   addPath(args.destPath);
+  addPath(args.targetPath);
   addPath(args.from);
   addPath(args.to);
+  addPath(args.imagePath);
+  addPath(args.audioPath);
 
   if (Array.isArray(args.paths)) {
     for (const entry of args.paths) {

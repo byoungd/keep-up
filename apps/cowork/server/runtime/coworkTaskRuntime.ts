@@ -25,7 +25,10 @@ import {
   CHECKPOINT_VERSION,
   ClarificationManager,
   ContextManager,
+  createAgentToolkitToolServer,
   createAICoreAdapter,
+  createArtifactPipeline,
+  createArtifactRegistry,
   createBashToolServer,
   createBrowserToolServer,
   createCheckpointManager,
@@ -641,10 +644,28 @@ export class CoworkTaskRuntime {
       ? createCheckpointManager({ storage: checkpointStorage })
       : undefined;
     const taskGraph = this.createTaskGraphStoreForSession(session.sessionId);
+    const artifactRegistry = createArtifactRegistry();
+    const artifactPipeline = createArtifactPipeline({
+      registry: artifactRegistry,
+      taskGraph,
+      eventBus,
+      eventSource: "cowork-runtime",
+    });
     const components = this.buildOrchestratorComponents(taskGraph, checkpointManager, {
       clarificationManager,
       subagentManager,
     });
+    const orchestratorComponents = {
+      ...(components ?? {}),
+      artifactPipeline,
+    };
+
+    const toolkitServer = createAgentToolkitToolServer({ artifactEmitter: artifactPipeline });
+    if (toolkitServer) {
+      await toolRegistry.register(toolkitServer);
+    } else {
+      this.logger.warn("Agent toolkit native binding unavailable; toolkit tools disabled.");
+    }
     const runtime = createCoworkRuntime({
       llm: adapter,
       registry: toolRegistry,
@@ -665,7 +686,7 @@ export class CoworkTaskRuntime {
           enabled: modeManager.isPlanMode(),
           autoExecuteLowRisk: false,
         },
-        components,
+        components: orchestratorComponents,
         eventBus,
         skills: {
           registry: skillComponents.registry,

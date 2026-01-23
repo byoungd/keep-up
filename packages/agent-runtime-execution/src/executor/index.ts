@@ -1286,6 +1286,18 @@ export class ToolExecutionPipeline
     if (typeof args.path === "string") {
       return args.path;
     }
+    if (typeof args.sourcePath === "string") {
+      return args.sourcePath;
+    }
+    if (typeof args.targetPath === "string") {
+      return args.targetPath;
+    }
+    if (typeof args.imagePath === "string") {
+      return args.imagePath;
+    }
+    if (typeof args.audioPath === "string") {
+      return args.audioPath;
+    }
     if (typeof args.docId === "string") {
       return args.docId;
     }
