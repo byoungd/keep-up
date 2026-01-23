@@ -59,8 +59,8 @@ export function ProjectContextPanel({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="flex flex-col h-full bg-surface-0 border-l border-border shadow-xl w-[600px] animate-in slide-in-from-right duration-300">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-surface-1/50 backdrop-blur-sm">
+    <div className="flex flex-col h-full bg-surface-0 border-l border-border shadow-soft w-[600px] animate-in slide-in-from-right duration-200">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-surface-1">
         <div>
           <h2 className="text-lg font-semibold text-foreground">Project Context (AGENTS.md)</h2>
           <p className="text-xs text-muted-foreground">
@@ -74,6 +74,7 @@ export function ProjectContextPanel({ onClose }: { onClose: () => void }) {
             type="button"
             onClick={onClose}
             className="p-2 hover:bg-surface-2 rounded-md text-muted-foreground hover:text-foreground transition-colors duration-fast"
+            aria-label="Close project context panel"
           >
             ✕
           </button>

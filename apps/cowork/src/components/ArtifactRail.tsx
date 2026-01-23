@@ -17,17 +17,22 @@ export function ArtifactRail({
   return (
     <aside className="artifact-rail" aria-label="Artifact rail">
       <div className="card-panel h-full flex flex-col p-0 overflow-hidden">
-        <div className="p-3 border-b border-border/40 bg-surface-0/90 backdrop-blur-md">
+        <div className="p-3 border-b border-border/40 bg-surface-0">
           <p className="text-sm font-semibold text-foreground">Artifact Rail</p>
           <p className="text-xs text-muted-foreground">Session {sessionId.slice(0, 8)}...</p>
         </div>
-        <div className="flex-1 overflow-y-auto scrollbar-auto-hide">
+        <section
+          className="flex-1 overflow-y-auto scrollbar-auto-hide"
+          aria-label="Artifacts list"
+          // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+          tabIndex={0}
+        >
           <ArtifactsList
             artifacts={graph.artifacts}
             onApply={onApplyArtifact}
             onRevert={onRevertArtifact}
           />
-        </div>
+        </section>
       </div>
     </aside>
   );

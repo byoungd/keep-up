@@ -46,7 +46,7 @@ export function PlanCard({ steps }: PlanCardProps) {
         {steps.map((step) => (
           <div key={step.id} className="flex items-start gap-3 group">
             <div
-              className={`mt-0.5 w-5 h-5 rounded-md border flex items-center justify-center transition-colors duration-300
+              className={`mt-0.5 w-5 h-5 rounded-md border flex items-center justify-center transition-colors duration-150
                ${step.status === "completed" ? "bg-info border-info" : "border-border group-hover:border-foreground/50"}
              `}
             >

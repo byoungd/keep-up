@@ -50,7 +50,7 @@ export function TaskTimeline({ graph, isConnected, approveTool, rejectTool }: Ta
   return (
     <div className="flex flex-col h-full bg-surface-0/70 relative rounded-2xl border border-border/40 shadow-sm overflow-hidden">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-border/40 bg-surface-0/90 backdrop-blur-md sticky top-0 z-20 flex justify-between items-center shadow-sm">
+      <div className="px-4 py-3 border-b border-border/40 bg-surface-0 sticky top-0 z-20 flex justify-between items-center shadow-sm">
         <h2 className="font-bold text-foreground text-sm tracking-tight flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-primary/20 flex items-center justify-center">
             <div className="w-1 h-1 rounded-full bg-primary animate-pulse" />
@@ -72,9 +72,12 @@ export function TaskTimeline({ graph, isConnected, approveTool, rejectTool }: Ta
       </div>
 
       {/* List */}
-      <div
+      <section
         ref={containerRef}
         className="flex-1 overflow-y-auto scrollbar-auto-hide p-4 space-y-6 scroll-smooth"
+        aria-label="Task timeline"
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+        tabIndex={0}
         onScroll={(e) => {
           const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
           setShowScrollButton(scrollHeight - scrollTop - clientHeight > 150);
@@ -106,7 +109,7 @@ export function TaskTimeline({ graph, isConnected, approveTool, rejectTool }: Ta
             </div>
           </div>
         ) : (
-          <div className="relative pl-4 space-y-6 before:absolute before:left-[19px] before:top-2 before:bottom-2 before:w-[1px] before:bg-gradient-to-b before:from-border/10 before:via-border/40 before:to-border/10">
+          <div className="relative pl-4 space-y-6 before:absolute before:left-[19px] before:top-2 before:bottom-2 before:w-[1px] before:bg-border/30">
             {graph.nodes.map((node, index) => {
               let durationStr: string | undefined;
               if (index < graph.nodes.length - 1) {
@@ -141,7 +144,7 @@ export function TaskTimeline({ graph, isConnected, approveTool, rejectTool }: Ta
         )}
 
         <div ref={bottomRef} className="h-4" />
-      </div>
+      </section>
 
       {/* Scroll to Bottom Button */}
       {showScrollButton && (

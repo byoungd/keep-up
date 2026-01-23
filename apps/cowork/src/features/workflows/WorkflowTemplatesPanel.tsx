@@ -699,8 +699,8 @@ export function WorkflowTemplatesPanel({
   }, [importPayload]);
 
   return (
-    <div className="flex flex-col h-full bg-surface-0 border-l border-border shadow-xl w-[720px] animate-in slide-in-from-right duration-300">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-surface-1/50 backdrop-blur-sm">
+    <div className="flex flex-col h-full bg-surface-0 border-l border-border shadow-soft w-[720px] animate-in slide-in-from-right duration-200">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-surface-1">
         <div>
           <h2 className="text-lg font-semibold text-foreground">Workflow Templates</h2>
           <p className="text-xs text-muted-foreground">
@@ -717,7 +717,8 @@ export function WorkflowTemplatesPanel({
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto scrollbar-auto-hide p-6 space-y-6">
+      {/* biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access. */}
+      <div className="flex-1 overflow-y-auto scrollbar-auto-hide p-6 space-y-6" tabIndex={0}>
         {errorMessage ? (
           <div className="text-xs text-destructive bg-destructive/5 border border-destructive/10 px-3 py-2 rounded-md">
             {errorMessage}
