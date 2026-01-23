@@ -101,9 +101,12 @@ export function SessionHeaderActions({ className }: SessionHeaderActionsProps) {
   }
 
   const isFavorite = favoriteIds.has(session.id);
-  const favoriteLabel = isFavorite ? "Remove from favorites" : "Add to favorites";
+  const favoriteLabel = isFavorite ? "Unpin session" : "Pin session";
 
   const sortedProjects = [...projects].sort((a, b) => b.createdAt - a.createdAt);
+  const scopedProjects = sortedProjects.filter(
+    (project) => !project.workspaceId || project.workspaceId === session.workspaceId
+  );
 
   const toggleFavorite = () => {
     setFavoriteIds((prev) => {
@@ -269,33 +272,31 @@ export function SessionHeaderActions({ className }: SessionHeaderActionsProps) {
               <span>Move to project</span>
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent className="w-56 rounded-lg p-1">
-              {sortedProjects.length === 0 ? (
+              {scopedProjects.length === 0 ? (
                 <DropdownMenuItem disabled>
-                  <span className="text-muted-foreground">No projects</span>
+                  <span className="text-muted-foreground">No projects for this workspace</span>
                 </DropdownMenuItem>
               ) : (
+                scopedProjects.map((project) => (
+                  <DropdownMenuItem
+                    key={project.id}
+                    onSelect={() => handleMoveToProject(project.id)}
+                    className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none"
+                  >
+                    <span>{project.name}</span>
+                    {session.projectId === project.id && <Check className="ml-auto h-4 w-4" />}
+                  </DropdownMenuItem>
+                ))
+              )}
+              {session.projectId && (
                 <>
-                  {sortedProjects.map((project) => (
-                    <DropdownMenuItem
-                      key={project.id}
-                      onSelect={() => handleMoveToProject(project.id)}
-                      className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none"
-                    >
-                      <span>{project.name}</span>
-                      {session.projectId === project.id && <Check className="ml-auto h-4 w-4" />}
-                    </DropdownMenuItem>
-                  ))}
-                  {session.projectId && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onSelect={() => handleMoveToProject(null)}
-                        className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none"
-                      >
-                        <span>Remove from project</span>
-                      </DropdownMenuItem>
-                    </>
-                  )}
+                  {scopedProjects.length > 0 ? <DropdownMenuSeparator /> : null}
+                  <DropdownMenuItem
+                    onSelect={() => handleMoveToProject(null)}
+                    className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none"
+                  >
+                    <span>Remove from project</span>
+                  </DropdownMenuItem>
                 </>
               )}
             </DropdownMenuSubContent>

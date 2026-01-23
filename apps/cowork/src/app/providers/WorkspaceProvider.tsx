@@ -27,7 +27,10 @@ type WorkspaceContextValue = {
   setActiveProject: (projectId: string | null) => void;
   createSessionForPath: (path: string, title?: string) => Promise<Session>;
   createSessionWithoutGrant: (title?: string) => Promise<Session>;
-  createProject: (name: string, instructions?: string) => Promise<Project>;
+  createProject: (
+    name: string,
+    options?: { instructions?: string; workspaceId?: string | null }
+  ) => Promise<Project>;
   moveSessionToProject: (sessionId: string, projectId: string | null) => Promise<void>;
   renameSession: (sessionId: string, newTitle: string) => Promise<void>;
   deleteSession: (sessionId: string) => Promise<void>;
@@ -87,13 +90,25 @@ function mapSession(session: CoworkSession): Session {
   };
 }
 
-function mapProject(project: CoworkProject): Project {
+function mapProject(project: CoworkProject, workspaces: Workspace[]): Project {
+  const metadata = project.metadata;
+  const record =
+    metadata && typeof metadata === "object" ? (metadata as Record<string, unknown>) : {};
+  const workspaceId = typeof record.workspaceId === "string" ? record.workspaceId : undefined;
+  const instructions = typeof record.instructions === "string" ? record.instructions : undefined;
+  const inferredWorkspaceId =
+    workspaceId ??
+    (project.pathHint
+      ? workspaces.find((workspace) => workspace.id === project.pathHint)?.id
+      : undefined);
+
   return {
     id: project.projectId,
     name: project.name,
+    workspaceId: inferredWorkspaceId,
     description: project.description,
     createdAt: project.createdAt,
-    instructions: (project.metadata as { instructions?: string } | undefined)?.instructions,
+    instructions,
   };
 }
 
@@ -147,7 +162,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     refetchInterval: config.sessionPollInterval,
   });
 
-  const { data: projectsRaw = [] } = useQuery({
+  const { data: projectsRaw = [], isFetched: projectsFetched } = useQuery({
     queryKey: ["cowork", "projects"],
     queryFn: listProjects,
   });
@@ -164,7 +179,10 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     const mapped = (workspacesRaw as CoworkWorkspace[]).map(mapWorkspace);
     return mapped.length > 0 ? mapped : buildWorkspaces(rawSessions);
   }, [rawSessions, workspacesRaw]);
-  const projects = React.useMemo(() => projectsRaw.map(mapProject), [projectsRaw]);
+  const projects = React.useMemo(
+    () => projectsRaw.map((project) => mapProject(project, workspaces)),
+    [projectsRaw, workspaces]
+  );
 
   const pushSession = React.useCallback(
     (session: CoworkSession) => {
@@ -189,6 +207,30 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     writeStorage(STORAGE_KEYS.activeProject, activeProjectId);
   }, [activeProjectId]);
 
+  const hydratedProjectWorkspaceRef = React.useRef(false);
+
+  React.useEffect(() => {
+    if (hydratedProjectWorkspaceRef.current || !projectsFetched) {
+      return;
+    }
+    if (!activeProjectId) {
+      hydratedProjectWorkspaceRef.current = true;
+      return;
+    }
+    const project = projects.find((item) => item.id === activeProjectId);
+    if (!project) {
+      setActiveProjectId(null);
+      hydratedProjectWorkspaceRef.current = true;
+      return;
+    }
+    if (project.workspaceId) {
+      setActiveWorkspaceId(project.workspaceId);
+    } else {
+      setActiveWorkspaceId(null);
+    }
+    hydratedProjectWorkspaceRef.current = true;
+  }, [activeProjectId, projects, projectsFetched]);
+
   const createSessionForPath = React.useCallback(
     async (path: string, title?: string) => {
       const session = await createSessionApi({
@@ -202,32 +244,33 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
           },
         ],
       });
-      // Assuming new sessions don't technically belong to a project immediately unless specified
-      // But if we have an active project, maybe we should associate it?
-      // User didn't explicitly ask for this, but it's good UX.
-      // For now, I'll stick to basic implementation.
-      pushSession(session);
-      const mapped = mapSession(session);
+
+      let updatedSession = session;
+      if (activeProjectId) {
+        const activeProject = projects.find((project) => project.id === activeProjectId);
+        if (activeProject?.workspaceId === path) {
+          updatedSession = await updateSession(session.sessionId, { projectId: activeProjectId });
+        }
+      }
+
+      pushSession(updatedSession);
+      const mapped = mapSession(updatedSession);
       if (title) {
         mapped.title = title;
       }
       setActiveWorkspaceId(mapped.workspaceId);
       return mapped;
     },
-    [pushSession]
+    [activeProjectId, projects, pushSession]
   );
 
   const createSessionWithoutGrant = React.useCallback(
     async (title?: string) => {
       const session = await createSessionApi({ title });
-      // If there is an active project, auto-assign it?
-      // Let's implement auto-assign if activeProjectId is set.
-      if (activeProjectId) {
-        // This would require a second call or updating API to accept projectId on create.
-        // createSessionApi doesn't support projectId yet in schema/types.
-        // Let's verify `createSessionSchema` in backend.
-        // It didn't include projectId. I should have added it.
-        // I'll do it later if needed.
+      const activeProject = activeProjectId
+        ? projects.find((project) => project.id === activeProjectId)
+        : undefined;
+      if (activeProject && !activeProject.workspaceId) {
         await updateSession(session.sessionId, { projectId: activeProjectId });
         session.projectId = activeProjectId;
       }
@@ -235,20 +278,32 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       pushSession(session);
       return mapSession(session);
     },
-    [pushSession, activeProjectId]
-  ); // Added activeProjectId dep
+    [activeProjectId, projects, pushSession]
+  );
 
   const createProject = React.useCallback(
-    async (name: string, instructions?: string) => {
+    async (name: string, options?: { instructions?: string; workspaceId?: string | null }) => {
+      const metadata: Record<string, unknown> = {};
+      const instructions = options?.instructions?.trim();
+      if (instructions) {
+        metadata.instructions = instructions;
+      }
+      if (options?.workspaceId) {
+        metadata.workspaceId = options.workspaceId;
+      }
+
       const project = await createProjectApi({
         name,
-        metadata: instructions ? { instructions } : undefined,
+        metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
       });
       queryClient.invalidateQueries({ queryKey: ["cowork", "projects"] });
       setActiveProjectId(project.projectId);
-      return mapProject(project);
+      if (options?.workspaceId) {
+        setActiveWorkspaceId(options.workspaceId);
+      }
+      return mapProject(project, workspaces);
     },
-    [queryClient]
+    [queryClient, workspaces]
   );
 
   const moveSessionToProject = React.useCallback(
@@ -306,6 +361,39 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     queryClient.invalidateQueries({ queryKey: ["cowork", "projects"] });
   }, [queryClient]);
 
+  const setActiveWorkspace = React.useCallback(
+    (workspaceId: string | null) => {
+      setActiveWorkspaceId(workspaceId);
+      if (!workspaceId || !activeProjectId) {
+        return;
+      }
+      const project = projects.find((item) => item.id === activeProjectId);
+      if (!project || project.workspaceId !== workspaceId) {
+        setActiveProjectId(null);
+      }
+    },
+    [activeProjectId, projects]
+  );
+
+  const setActiveProject = React.useCallback(
+    (projectId: string | null) => {
+      setActiveProjectId(projectId);
+      if (!projectId) {
+        return;
+      }
+      const project = projects.find((item) => item.id === projectId);
+      if (!project) {
+        return;
+      }
+      if (project.workspaceId) {
+        setActiveWorkspaceId(project.workspaceId);
+      } else {
+        setActiveWorkspaceId(null);
+      }
+    },
+    [projects]
+  );
+
   const value = React.useMemo<WorkspaceContextValue>(
     () => ({
       workspaces,
@@ -313,8 +401,8 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       projects,
       activeWorkspaceId,
       activeProjectId,
-      setActiveWorkspace: setActiveWorkspaceId,
-      setActiveProject: setActiveProjectId,
+      setActiveWorkspace,
+      setActiveProject,
       createSessionForPath,
       createSessionWithoutGrant,
       createProject,
@@ -334,6 +422,8 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       projects,
       activeWorkspaceId,
       activeProjectId,
+      setActiveWorkspace,
+      setActiveProject,
       createSessionForPath,
       createSessionWithoutGrant,
       createProject,

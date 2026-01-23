@@ -18,6 +18,7 @@ export type Session = {
 export type Project = {
   id: string;
   name: string;
+  workspaceId?: string;
   description?: string;
   instructions?: string;
   createdAt: number;
