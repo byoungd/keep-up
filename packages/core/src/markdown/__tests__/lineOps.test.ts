@@ -119,6 +119,42 @@ describe("Markdown line-based operations", () => {
     }
   });
 
+  it("resolves frontmatter key preconditions for line ops", async () => {
+    const content = "---\nname: Example\n---\nBody";
+    const lines = splitMarkdownLines(content);
+    const range = { start: 1, end: 3 };
+    const hash = await computeMarkdownLineHash(lines, range);
+
+    const envelope: MarkdownOperationEnvelope = {
+      mode: "markdown",
+      doc_id: docId,
+      doc_frontier: frontier,
+      preconditions: [
+        {
+          v: 1,
+          mode: "markdown",
+          id: "p1",
+          semantic: { kind: "frontmatter_key", key_path: ["name"] },
+          content_hash: hash,
+        },
+      ],
+      ops: [
+        {
+          op: "md_replace_lines",
+          precondition_id: "p1",
+          target: { line_range: range },
+          content: "---\nname: Updated\n---",
+        },
+      ],
+    };
+
+    const result = await applyMarkdownLineOperations(content, envelope);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.content).toContain("name: Updated");
+    }
+  });
+
   it("rejects content hash mismatches", async () => {
     const content = "red\nblue\ncyan";
     const range = { start: 2, end: 2 };

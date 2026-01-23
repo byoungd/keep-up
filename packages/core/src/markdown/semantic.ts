@@ -1,8 +1,8 @@
 import type { MarkdownTargetingPolicyV1 } from "../kernel/policy/types.js";
+import { detectFrontmatter, parseFrontmatter } from "./frontmatter.js";
 import type {
   LineRange,
   MarkdownCodeFenceBlock,
-  MarkdownFrontmatterBlock,
   MarkdownHeadingBlock,
   MarkdownOperationError,
   MarkdownPreconditionV1,
@@ -26,7 +26,9 @@ export function buildMarkdownSemanticIndex(lines: string[]): MarkdownSemanticInd
   const headings: MarkdownHeadingBlock[] = [];
   const codeFences: MarkdownCodeFenceBlock[] = [];
 
-  const frontmatter = parseFrontmatter(lines);
+  const detection = detectFrontmatter(lines);
+  const parsedFrontmatter = parseFrontmatter(lines);
+  const frontmatter = detection?.block;
   const frontmatterRange = frontmatter?.line_range;
 
   let i = 0;
@@ -64,6 +66,10 @@ export function buildMarkdownSemanticIndex(lines: string[]): MarkdownSemanticInd
     headings,
     code_fences: codeFences,
     frontmatter,
+    frontmatter_data:
+      parsedFrontmatter.found && parsedFrontmatter.ok ? parsedFrontmatter.value.data : undefined,
+    frontmatter_error:
+      parsedFrontmatter.found && !parsedFrontmatter.ok ? parsedFrontmatter.error : undefined,
   };
 }
 
@@ -97,13 +103,7 @@ export function resolveMarkdownSemanticTarget(
   }
 
   if (semantic.kind === "frontmatter_key") {
-    return {
-      ok: false,
-      error: {
-        code: "MCM_OPERATION_UNSUPPORTED",
-        message: "frontmatter_key targeting is not implemented",
-      },
-    };
+    return resolveFrontmatterKeyTarget(semantic, index, maxLines);
   }
 
   return {
@@ -219,6 +219,58 @@ function resolveFrontmatterTarget(
   return { ok: true, range: index.frontmatter.line_range };
 }
 
+function resolveFrontmatterKeyTarget(
+  semantic: NonNullable<MarkdownPreconditionV1["semantic"]>,
+  index: MarkdownSemanticIndex,
+  maxLines?: number
+): SemanticResolution {
+  if (!index.frontmatter) {
+    return {
+      ok: false,
+      error: {
+        code: "MCM_TARGETING_NOT_FOUND",
+        message: "Frontmatter not found",
+      },
+    };
+  }
+
+  const scopeError = ensureSearchWithinLimit(
+    { startLine: index.frontmatter.line_range.start, endLine: index.frontmatter.line_range.end },
+    maxLines
+  );
+  if (scopeError) {
+    return scopeError;
+  }
+
+  if (!semantic.key_path || semantic.key_path.length === 0) {
+    return {
+      ok: false,
+      error: {
+        code: "MCM_INVALID_TARGET",
+        message: "key_path is required",
+      },
+    };
+  }
+
+  const parseResult = parseFrontmatterFromIndex(index);
+  if (!parseResult.ok) {
+    return { ok: false, error: parseResult.error };
+  }
+
+  const hasPath = hasFrontmatterPath(parseResult.data, semantic.key_path);
+  if (!hasPath) {
+    return {
+      ok: false,
+      error: {
+        code: "MCM_TARGETING_NOT_FOUND",
+        message: "Frontmatter key not found",
+      },
+    };
+  }
+
+  return { ok: true, range: index.frontmatter.line_range };
+}
+
 function finalizeSemanticMatches(
   matches: Array<{ line_range: LineRange }>,
   nth?: number
@@ -280,49 +332,46 @@ function ensureSearchWithinLimit(
   };
 }
 
-function parseFrontmatter(lines: string[]): MarkdownFrontmatterBlock | undefined {
-  let firstContentIndex = -1;
-  for (let i = 0; i < lines.length; i += 1) {
-    if (lines[i].trim().length === 0) {
-      continue;
-    }
-    firstContentIndex = i;
-    break;
+function parseFrontmatterFromIndex(
+  index: MarkdownSemanticIndex
+): { ok: true; data: unknown } | { ok: false; error: MarkdownOperationError } {
+  if (index.frontmatter_error) {
+    return { ok: false, error: index.frontmatter_error };
   }
-  if (firstContentIndex === -1) {
-    return undefined;
+  if (!index.frontmatter || index.frontmatter_data === undefined) {
+    return {
+      ok: false,
+      error: { code: "MCM_TARGETING_NOT_FOUND", message: "Frontmatter not found" },
+    };
   }
-
-  const delimiterLine = lines[firstContentIndex];
-  const syntax = resolveFrontmatterSyntax(delimiterLine);
-  if (!syntax) {
-    return undefined;
-  }
-
-  for (let i = firstContentIndex + 1; i < lines.length; i += 1) {
-    if (lines[i] === delimiterLine) {
-      return {
-        kind: "frontmatter",
-        line_range: { start: firstContentIndex + 1, end: i + 1 },
-        syntax,
-      };
-    }
-  }
-
-  return undefined;
+  return { ok: true, data: index.frontmatter_data };
 }
 
-function resolveFrontmatterSyntax(delimiter: string): MarkdownFrontmatterBlock["syntax"] | null {
-  if (delimiter === "---") {
-    return "yaml";
+function hasFrontmatterPath(data: unknown, path: string[]): boolean {
+  let current: unknown = data;
+  for (const segment of path) {
+    if (current === null || current === undefined) {
+      return false;
+    }
+    const isIndex = /^\d+$/.test(segment);
+    if (isIndex) {
+      if (!Array.isArray(current)) {
+        return false;
+      }
+      const index = Number.parseInt(segment, 10);
+      current = current[index];
+      continue;
+    }
+    if (typeof current !== "object" || Array.isArray(current)) {
+      return false;
+    }
+    const record = current as Record<string, unknown>;
+    if (!(segment in record)) {
+      return false;
+    }
+    current = record[segment];
   }
-  if (delimiter === "+++") {
-    return "toml";
-  }
-  if (delimiter === ";;;") {
-    return "json";
-  }
-  return null;
+  return true;
 }
 
 function parseHeading(
