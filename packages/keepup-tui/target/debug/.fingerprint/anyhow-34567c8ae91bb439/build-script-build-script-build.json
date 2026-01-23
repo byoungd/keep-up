@@ -1,0 +1,20 @@
+{
+  "rustc": 2629586073275287932,
+  "features": "[\"default\", \"std\"]",
+  "declared_features": "[\"backtrace\", \"default\", \"std\"]",
+  "target": 17883862002600103897,
+  "profile": 3033921117576893,
+  "path": 3323846429557596044,
+  "deps": [],
+  "local": [
+    {
+      "CheckDepInfo": {
+        "dep_info": "debug/.fingerprint/anyhow-34567c8ae91bb439/dep-build-script-build-script-build",
+        "checksum": false
+      }
+    }
+  ],
+  "rustflags": [],
+  "config": 2069994364910194474,
+  "compile_kind": 0
+}

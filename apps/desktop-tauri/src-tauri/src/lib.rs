@@ -1,6 +1,7 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 mod enclave;
 mod logs;
+mod menu;
 mod terminal;
 mod watcher;
 mod window_state;
@@ -20,6 +21,8 @@ pub fn run() {
         .on_window_event(|window, event| {
             window_state::handle_window_event(window, event);
         })
+        .menu(menu::build_menu)
+        .on_menu_event(menu::handle_menu_event)
         .plugin(tauri_plugin_opener::init())
         .manage(enclave::EnclaveState::new())
         .invoke_handler(tauri::generate_handler![

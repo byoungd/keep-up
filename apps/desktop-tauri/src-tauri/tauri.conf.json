@@ -6,7 +6,7 @@
   "build": {
     "beforeDevCommand": "pnpm -C ../cowork dev",
     "devUrl": "http://localhost:5177",
-    "beforeBuildCommand": "pnpm -C ../cowork build",
+    "beforeBuildCommand": "pnpm -w turbo run build --filter @ku0/cowork",
     "frontendDist": "../../cowork/dist"
   },
   "app": {
