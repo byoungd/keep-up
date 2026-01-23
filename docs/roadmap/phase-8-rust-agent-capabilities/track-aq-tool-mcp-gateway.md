@@ -12,7 +12,8 @@
 
 Build a Rust-first tool gateway that hosts MCP servers, validates tool manifests, and
 executes tool calls under explicit capability grants. This track delivers the secure
-integration layer for both built-in tools and custom MCP servers.
+integration layer for both built-in tools and custom MCP servers while aligning with
+existing MCP types in `packages/agent-runtime-core`.
 
 ## Architecture Context
 
@@ -22,45 +23,109 @@ integration layer for both built-in tools and custom MCP servers.
 
 ## Scope
 
-- MCP manifest ingestion and validation.
-- Tool registry with capability metadata and permissions.
-- Secure credential storage and redaction.
-- Execution sandbox integration for tool calls.
-- Audit events for every tool invocation.
+- MCP manifest ingestion, normalization, and validation.
+- Tool registry with capability metadata, policy actions, and name qualification.
+- Secure credential references and redaction hooks (storage in Track AU).
+- Sandbox integration for tool execution and isolation.
+- Audit events for tool invocations, policy decisions, and approvals.
+- Tool output spooling and artifact pointers for large results.
 
 ## Out of Scope
 
 - UI approvals in `apps/cowork` (only hooks and events are produced here).
+- UI redesigns in `apps/cowork`.
 - LFCC document mutations.
 - Provider/model routing (Track AS).
+- Replacing existing TypeScript MCP registries before the Rust gateway is stable.
+- Inventing a non-MCP protocol or diverging from MCP SDK behaviors.
 
-## Deliverables
+## Architecture Overview
 
-- `packages/tool-gateway-rs/` crate implementing MCP hosting and tool routing.
-- `packages/agent-runtime-tools/` adapters to call Rust tool gateway.
-- Configuration schema for MCP servers and per-tool capability grants.
-- Policy hooks for allow, deny, and approval-required actions.
+1. Load MCP server configs and manifests.
+2. Validate tool specs and policy annotations, then register tools.
+3. Evaluate policy and capability grants for each tool call.
+4. Execute tool calls via sandbox (local) or MCP transport (remote).
+5. Emit audit records with redacted payloads and hashes.
+
+## Configuration and Inputs
+
+### MCP Server Config
+
+- `name`, `description`
+- `transport`: `stdio`, `sse`, or `streamableHttp`
+- `auth` (optional): OAuth client info and token store reference
+- `enabled`: allow disabling a server without deleting config
+
+Transport options should mirror current TypeScript config in
+`packages/agent-runtime-tools/src/tools/mcp/transport.ts`.
+
+### Capability Grants
+
+- `grant_id`, `scope`, `expires_at`
+- `policy_action` mapping for tool names
+- `approval_mode`: `allow`, `allow_with_confirm`, `deny`
+
+Grants are ephemeral and stored in Track AU; the gateway only caches them
+in memory with TTLs.
+
+### Execution Limits
+
+- `timeout_ms`
+- `max_output_bytes`
+- `max_output_lines`
+- `sandbox_profile` (Phase 6 sandbox presets)
 
 ## Technical Design
 
-### Core Types
+### Core Types (Rust)
 
-- `ToolSpec`: name, description, inputs, outputs, capability_tags.
-- `ToolInvocation`: tool_id, args, workspace_id, approval_mode.
-- `CapabilityGrant`: scope, expiry, audit_id.
-- `ToolResult`: status, payload, artifacts.
+- `McpToolSpec` (mirrors `MCPTool`)
+- `McpManifest` (server metadata + tool list)
+- `ToolRegistryEntry` (qualified name, server, spec, policy action)
+- `ToolInvocation` (mirrors `MCPToolCall` + context)
+- `ToolResult` (mirrors `MCPToolResult` + artifacts)
+- `CapabilityGrant` (scope, expiry, approval state)
+- `PolicyDecision` (allow/confirm/deny + reason + risk tags)
+- `AuditEvent` (input/output hashes, policy decision id, tool metadata)
 
-### Execution Flow
+### Manifest Validation
 
-1. Load MCP server manifest and register tools.
-2. Validate tool spec against policy and config center.
-3. Acquire capability grant, then execute inside sandbox.
-4. Emit audit event with input and output hashes.
+- Validate required fields: name, description, `inputSchema`.
+- Enforce `annotations.policyAction` and validate against Cowork policy actions.
+- Reject tools with invalid JSON schema or unsupported annotations.
+- Normalize tool names and ensure deterministic ordering on registration.
+
+### Tool Registry and Lifecycle
+
+- Register MCP servers with qualified tool names (`server:tool`).
+- Detect unqualified name collisions and require qualification when ambiguous.
+- Allow server initialization and cleanup hooks.
+- Provide registry events for UI and telemetry subscribers.
+
+### Policy and Capability Grants
+
+- Evaluate against security policy using tool `policyAction` and context.
+- Combine policy decisions with capability grants and approval requirements.
+- Support interactive approvals by emitting `approval_required` audit events.
+
+### Execution Pipeline
+
+1. Resolve tool server and normalize call arguments.
+2. Evaluate policy and grant constraints.
+3. Execute via sandbox (local) or MCP transport (remote).
+4. Apply output spooling and artifact persistence rules.
+5. Return structured `ToolResult` with metadata and errors.
+
+### Audit and Redaction
+
+- Emit audit entries for each tool call and policy decision.
+- Store payload hashes, output artifact URIs, and timing metrics.
+- Redact secrets and OAuth tokens before persistence.
 
 ### Rust-First Boundary
 
-- Rust owns tool execution, permission checks, and audit logging.
-- TypeScript configures policies and renders approval UI.
+- Rust owns manifest validation, policy enforcement, execution, and audit logging.
+- TypeScript owns configuration UI, approval prompts, and result presentation.
 
 ## Implementation Spec (Executable)
 
@@ -170,9 +235,9 @@ TypeScript validation:
 
 | Week | Focus | Outcomes |
 | :--- | :--- | :--- |
-| 1 | Registry and manifest loader | tool specs, validation, persistence |
-| 2 | Execution pipeline | sandbox integration, result handling |
-| 3 | Policy and audit | grants, approval gates, audit log export |
+| 1 | Registry + manifests | Scaffold `packages/tool-gateway-rs`, parse manifest JSON, align MCP types, registry events, tests for validation and name collisions |
+| 2 | Execution pipeline | Sandbox integration, MCP transports (stdio/sse/streamableHttp), timeouts, output spooling, structured errors |
+| 3 | Policy + audit | Capability grants, approval workflow hooks, audit event sink to Track AU, redaction and hashing |
 
 ## Affected Code
 
@@ -183,18 +248,23 @@ TypeScript validation:
 
 ## Acceptance Criteria
 
-- Import and register MCP servers from manifest JSON.
-- Execute a tool with capability gating and audit logging.
-- Reject tools with missing or invalid capability grants.
-- Redact secrets in logs and event payloads.
+- Import and register MCP servers from manifest JSON with deterministic ordering.
+- Reject tools without valid `policyAction` annotations or invalid schemas.
+- Enforce capability grants and approval gates for tool invocations.
+- Execute tools in sandbox or via MCP transport with timeout enforcement.
+- Emit audit records with redacted payloads and output hashes.
+- Provide artifact pointers for spooled tool outputs.
 
 ## Risks
 
-- MCP server compatibility drift.
-- Tool execution latency if sandbox cold start is slow.
+- MCP server compatibility drift across SDK versions (mitigation: version pinning + adapter tests).
+- Policy divergence between Rust and TypeScript layers (mitigation: shared schema + conformance tests).
+- Sandbox cold start latency (mitigation: warm pools + caching policies).
 
 ## References
 
 - `.tmp/analysis/eigent/docs/core/tools.md`
 - `.tmp/analysis/eigent/docs/core/workers.md`
 - `.tmp/analysis/eigent/server/README_EN.md`
+- `packages/agent-runtime-core/src/index.ts`
+- `packages/agent-runtime-tools/src/tools/mcp/transport.ts`
