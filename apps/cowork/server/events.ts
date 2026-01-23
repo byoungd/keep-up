@@ -3,7 +3,7 @@
  * Eliminates magic strings and provides compile-time safety.
  */
 
-import type { ToolActivity } from "@ku0/agent-runtime";
+import type { ClarificationRequest, ClarificationResponse, ToolActivity } from "@ku0/agent-runtime";
 
 export const COWORK_EVENTS = {
   // Session lifecycle
@@ -36,6 +36,8 @@ export const COWORK_EVENTS = {
   POLICY_DECISION: "policy.decision",
   CHECKPOINT_CREATED: "checkpoint.created",
   CHECKPOINT_RESTORED: "checkpoint.restored",
+  CLARIFICATION_REQUESTED: "clarification.requested",
+  CLARIFICATION_ANSWERED: "clarification.answered",
 
   // System events
   SYSTEM_HEARTBEAT: "system.heartbeat",
@@ -194,6 +196,14 @@ export interface CoworkEventPayloads {
     taskId?: string;
     restoredAt: number;
     currentStep: number;
+  };
+  [COWORK_EVENTS.CLARIFICATION_REQUESTED]: {
+    request: ClarificationRequest;
+    taskId?: string;
+  };
+  [COWORK_EVENTS.CLARIFICATION_ANSWERED]: {
+    response: ClarificationResponse;
+    taskId?: string;
   };
   [COWORK_EVENTS.SYSTEM_HEARTBEAT]: {
     timestamp: number;

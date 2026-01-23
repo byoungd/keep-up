@@ -9,6 +9,8 @@ import type {
   ArtifactEnvelope,
   AuditEntry,
   CheckpointEvent,
+  ClarificationRequest,
+  ClarificationResponse,
   ExecutionDecision,
   ExecutionQueueClass,
   MessageEnvelope,
@@ -243,6 +245,12 @@ export interface SubagentEvents {
   "subagent:event": SubagentEventPayload;
 }
 
+/** Clarification workflow events */
+export interface ClarificationEvents {
+  "clarification:requested": ClarificationRequest;
+  "clarification:answered": ClarificationResponse;
+}
+
 /** Artifact lifecycle events */
 export interface ArtifactEvents {
   "artifact:emitted": {
@@ -276,6 +284,7 @@ export interface RuntimeEventMap
     TaskEvents,
     CheckpointEvents,
     SubagentEvents,
+    ClarificationEvents,
     ArtifactEvents {
   // Allow custom events with string index
   [key: string]: unknown;

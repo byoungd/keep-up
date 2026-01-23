@@ -11,6 +11,7 @@ import { createArtifactRoutes } from "./routes/artifacts";
 import { createAuditLogRoutes } from "./routes/auditLogs";
 import { createChatRoutes } from "./routes/chat";
 import { createCheckpointRoutes } from "./routes/checkpoints";
+import { createClarificationRoutes } from "./routes/clarifications";
 import { createContextRoutes } from "./routes/context";
 import { createCostRoutes } from "./routes/cost";
 import { createLessonRoutes } from "./routes/lessons";
@@ -189,6 +190,13 @@ export function createCoworkApp(deps: CoworkAppDeps) {
       sessions: deps.storage.sessionStore,
       events: eventHub,
       runtime,
+      taskRuntime,
+    })
+  );
+
+  app.route(
+    "/api",
+    createClarificationRoutes({
       taskRuntime,
     })
   );

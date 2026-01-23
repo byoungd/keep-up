@@ -980,6 +980,37 @@ export interface ConfirmationRequest {
 export type ConfirmationHandler = (request: ConfirmationRequest) => Promise<boolean>;
 
 // ============================================================================
+// Clarification Types
+// ============================================================================
+
+export type ClarificationPriority = "low" | "medium" | "high" | "blocking";
+
+export interface ClarificationContext {
+  taskId?: string;
+  sessionId?: string;
+  relatedFiles?: string[];
+  codeSnippet?: string;
+}
+
+export interface ClarificationRequest {
+  id: string;
+  question: string;
+  context?: ClarificationContext;
+  options?: string[];
+  timeoutMs?: number;
+  continueWorkWhileWaiting?: boolean;
+  priority?: ClarificationPriority;
+}
+
+export interface ClarificationResponse {
+  requestId: string;
+  answer: string;
+  selectedOption?: number;
+  timestamp: number;
+  responseTime: number;
+}
+
+// ============================================================================
 // Execution Metadata Types (for visualization)
 // ============================================================================
 
