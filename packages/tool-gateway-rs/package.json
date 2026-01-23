@@ -1,0 +1,44 @@
+{
+  "name": "@ku0/tool-gateway-rs",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Rust MCP tool gateway bindings for the agent runtime.",
+  "main": "./dist/node.js",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "development": "./src/index.ts",
+      "node": "./dist/node.js",
+      "default": "./src/index.ts"
+    },
+    "./node": {
+      "types": "./src/node.ts",
+      "import": "./src/node.ts",
+      "development": "./src/node.ts",
+      "node": "./dist/node.js",
+      "default": "./src/node.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "*.node"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsx scripts/build-native.ts --release && tsc",
+    "build:debug": "tsx scripts/build-native.ts && tsc",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write ."
+  },
+  "dependencies": {
+    "@ku0/agent-runtime-core": "workspace:*",
+    "@ku0/native-bindings": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.3"
+  }
+}

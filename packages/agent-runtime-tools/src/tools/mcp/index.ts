@@ -52,4 +52,15 @@ export {
   toSdkResult,
   toSdkTool,
 } from "./sdkAdapter";
+export type {
+  CapabilityGrant,
+  McpManifest,
+  McpServerConfig,
+  ToolAuditEvent,
+  ToolGateway,
+  ToolGatewaySnapshot,
+  ToolInvocation,
+  ToolRegistryEntry,
+} from "./toolGateway";
+export { createToolGatewayAdapter, ToolGatewayAdapter } from "./toolGateway";
 export { createMcpTransport, type McpTransportConfig } from "./transport";

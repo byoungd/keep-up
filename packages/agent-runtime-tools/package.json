@@ -55,6 +55,7 @@
     "@ku0/diff-rs": "workspace:*",
     "@ku0/gitignore-rs": "workspace:*",
     "@ku0/sandbox-rs": "workspace:*",
+    "@ku0/tool-gateway-rs": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.25.2",
     "diff": "^8.0.3",
     "gray-matter": "^4.0.3",

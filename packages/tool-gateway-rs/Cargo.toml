@@ -1,0 +1,28 @@
+[package]
+name = "tool-gateway-rs"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Rust MCP tool gateway bindings for the agent runtime."
+publish = false
+build = "build.rs"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+napi = { version = "2", features = ["async", "napi6", "serde-json"] }
+napi-derive = "2"
+reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+uuid = { version = "1", features = ["v4"] }
+
+sandbox-rs = { path = "../sandbox-rs" }
+
+[build-dependencies]
+napi-build = "2"
+
+[dev-dependencies]
+serde_json = "1.0"

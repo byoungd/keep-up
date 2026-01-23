@@ -261,6 +261,9 @@ packages/policy-hash-rs/target/
 packages/policy-hash-rs/Cargo.lock
 packages/policy-hash-rs/*.node
 
+packages/tool-gateway-rs/target/
+packages/tool-gateway-rs/*.node
+
 packages/streaming-markdown-rs/target/
 packages/streaming-markdown-rs/Cargo.lock
 packages/streaming-markdown-rs/*.node
