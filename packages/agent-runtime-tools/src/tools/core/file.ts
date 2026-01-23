@@ -14,6 +14,7 @@ import type {
   MCPToolResult,
   ToolContext,
 } from "@ku0/agent-runtime-core";
+import type { SandboxManager } from "@ku0/sandbox-rs";
 import { BaseToolServer, errorResult, textResult } from "../mcp/baseServer";
 
 // ============================================================================
@@ -178,10 +179,14 @@ export class FileToolServer extends BaseToolServer {
   readonly description = "Read, write, and manage files within the workspace";
 
   private readonly fileSystem: IFileSystem;
+  private readonly sandbox?: SandboxManager;
 
-  constructor(options: { fileSystem?: IFileSystem; validator?: PathValidator } = {}) {
+  constructor(
+    options: { fileSystem?: IFileSystem; validator?: PathValidator; sandbox?: SandboxManager } = {}
+  ) {
     super();
     this.fileSystem = options.fileSystem ?? new NodeFileSystem();
+    this.sandbox = options.sandbox;
 
     this.registerTools();
   }
@@ -527,6 +532,16 @@ export class FileToolServer extends BaseToolServer {
       return coworkDecision;
     }
 
+    if (this.sandbox) {
+      const allowed = await this.sandbox.checkFileAccess(targetPath, intent);
+      if (!allowed) {
+        return {
+          valid: false,
+          reason: `Sandbox policy prevents ${intent} on ${targetPath}`,
+        };
+      }
+    }
+
     const allowedPaths = this.getAllowedPaths(context);
     if (!allowedPaths) {
       return { valid: false, reason: "File access not permitted" };
@@ -667,6 +682,7 @@ export class FileToolServer extends BaseToolServer {
 export function createFileToolServer(options?: {
   fileSystem?: IFileSystem;
   validator?: PathValidator;
+  sandbox?: SandboxManager;
 }): FileToolServer {
   return new FileToolServer(options);
 }

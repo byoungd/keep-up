@@ -10,7 +10,10 @@ crate-type = ["cdylib"]
 napi = { version = "2", features = ["async"] }
 napi-derive = "2"
 libc = "0.2"
+regex = "1.10"
+serde = { version = "1.0", features = ["derive"] }
 thiserror = "1"
+url = "2.5"
 
 [build-dependencies]
 napi-build = "2"

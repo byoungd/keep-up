@@ -7,6 +7,9 @@ import {
   type NativeExecResult,
   type NativeSandbox,
   type NativeSandboxConfig,
+  type NativeSandboxManager,
+  type NativeSandboxPolicy,
+  type ViolationResult,
 } from "./native";
 
 export type ActionIntent = "read" | "write" | "create" | "delete" | "rename" | "move";
@@ -33,6 +36,68 @@ export interface SandboxPolicy {
   write(path: string, data: Buffer): void;
   list(path: string): string[];
 }
+
+export type SandboxPolicyConfig = NativeSandboxPolicy;
+
+export interface SandboxViolation {
+  type: "filesystem" | "network" | "command";
+  action: string;
+  reason: string;
+  timestamp: number;
+}
+
+export class SandboxManager {
+  private readonly native: NativeSandboxManager;
+  private violations: SandboxViolation[] = [];
+
+  constructor(policy: SandboxPolicyConfig, workspaceRoot: string) {
+    const native = getNativeBinding();
+    this.native = new native.SandboxManager(policy, workspaceRoot);
+  }
+
+  async checkFileAccess(path: string, operation: ActionIntent): Promise<boolean> {
+    const result = this.native.checkFileAccess(path, operation);
+    this.recordViolation("filesystem", `${operation} ${path}`, result);
+    return result.allowed;
+  }
+
+  async checkNetworkRequest(url: string, method: string): Promise<boolean> {
+    const result = this.native.checkNetworkRequest(url, method);
+    this.recordViolation("network", `${method} ${url}`, result);
+    return result.allowed;
+  }
+
+  async checkCommand(command: string): Promise<boolean> {
+    const result = this.native.checkCommand(command);
+    this.recordViolation("command", command, result);
+    return result.allowed;
+  }
+
+  getViolations(): SandboxViolation[] {
+    return [...this.violations];
+  }
+
+  clearViolations(): void {
+    this.violations = [];
+  }
+
+  private recordViolation(
+    type: SandboxViolation["type"],
+    action: string,
+    result: ViolationResult
+  ): void {
+    if (!result.allowed && result.reason) {
+      this.violations.push({
+        type,
+        action,
+        reason: result.reason,
+        timestamp: Date.now(),
+      });
+    }
+  }
+}
+
+export { STRICT_POLICY, WORKSPACE_POLICY } from "./policies";
 
 export function createSandbox(config: SandboxConfig | RuntimeSandboxConfig): SandboxPolicy {
   const native = getNativeBinding();
