@@ -211,6 +211,7 @@ export async function applyMarkdownOpsXml(
     return { ok: false, error: policyError };
   }
 
+  const appliedEnvelope = applyMarkdownPolicyDefaults(envelopeResult.envelope, context.policy);
   const options = context.policy
     ? {
         targetingPolicy: context.policy.targeting,
@@ -222,7 +223,7 @@ export async function applyMarkdownOpsXml(
       }
     : undefined;
 
-  return applyMarkdownLineOperations(content, envelopeResult.envelope, options);
+  return applyMarkdownLineOperations(content, appliedEnvelope, options);
 }
 
 export function mapMarkdownErrorToEnvelope(
@@ -420,6 +421,56 @@ function validateMarkdownExtensions(
   }
 
   return null;
+}
+
+function applyMarkdownPolicyDefaults(
+  envelope: MarkdownOperationEnvelope,
+  policy?: MarkdownPolicyV1
+): MarkdownOperationEnvelope {
+  if (!policy) {
+    return envelope;
+  }
+  const defaults = resolveFenceDefaults(policy);
+  if (!defaults) {
+    return envelope;
+  }
+
+  let changed = false;
+  const nextOps = envelope.ops.map((op) => {
+    if (op.op !== "md_insert_code_fence") {
+      return op;
+    }
+    const next: typeof op = { ...op };
+    if (op.fence_char === undefined && defaults.fenceChar) {
+      next.fence_char = defaults.fenceChar;
+      changed = true;
+    }
+    if (op.fence_length === undefined && defaults.fenceLength) {
+      next.fence_length = defaults.fenceLength;
+      changed = true;
+    }
+    return next;
+  });
+
+  return changed ? { ...envelope, ops: nextOps } : envelope;
+}
+
+function resolveFenceDefaults(
+  policy: MarkdownPolicyV1
+): { fenceChar?: "`" | "~"; fenceLength?: number } | null {
+  const fenceChar = policy.canonicalizer.normalize.fence_char;
+  const fenceLength = policy.canonicalizer.normalize.fence_length;
+  const result: { fenceChar?: "`" | "~"; fenceLength?: number } = {};
+
+  if (fenceChar === "`" || fenceChar === "~") {
+    result.fenceChar = fenceChar;
+  }
+
+  if (Number.isInteger(fenceLength) && fenceLength > 0) {
+    result.fenceLength = fenceLength;
+  }
+
+  return result.fenceChar || result.fenceLength ? result : null;
 }
 
 function isFrontmatterSemantic(kind: string): boolean {

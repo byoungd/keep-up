@@ -145,6 +145,55 @@ describe("Markdown ops_xml gateway helpers", () => {
     }
   });
 
+  it("uses policy fence defaults when missing", async () => {
+    const policy = createMarkdownPolicy({
+      canonicalizer: {
+        version: "v1",
+        mode: "source_preserving",
+        line_ending: "lf",
+        preserve: {
+          trailing_whitespace: true,
+          multiple_blank_lines: true,
+          heading_style: true,
+          list_marker_style: true,
+          emphasis_style: true,
+          fence_style: true,
+        },
+        normalize: {
+          heading_style: "atx",
+          list_marker: "-",
+          emphasis_char: "*",
+          fence_char: "~",
+          fence_length: 4,
+        },
+      },
+    });
+
+    const result = await applyMarkdownOpsXml(
+      "# Intro\nBody",
+      {
+        doc_id: "doc-1",
+        doc_frontier: "frontier-1",
+        ops_xml:
+          '<md_insert_code_fence precondition="p1" heading="# Intro">console.log(1)</md_insert_code_fence>',
+        preconditions: [
+          {
+            v: 1,
+            mode: "markdown",
+            id: "p1",
+            semantic: { kind: "heading", heading_text: "Intro" },
+          },
+        ],
+      },
+      { policy, capabilities: baseCapabilities }
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.content).toBe("# Intro\n~~~~\nconsole.log(1)\n~~~~\nBody");
+    }
+  });
+
   it("rejects frontmatter ops when frontmatter capability is disabled", async () => {
     const policy = createMarkdownPolicy();
     const capabilities = { ...baseCapabilities, markdown_frontmatter: false };
