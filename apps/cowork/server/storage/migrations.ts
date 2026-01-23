@@ -20,6 +20,8 @@ import type {
   CoworkWorkflowTemplateRecord,
 } from "./types";
 import { WorkflowTemplateStore } from "./workflowTemplateStore";
+import { WorkspaceEventStore } from "./workspaceEventStore";
+import { WorkspaceSessionStore } from "./workspaceSessionStore";
 
 export interface MigrationResult {
   sessions: number;
@@ -28,6 +30,8 @@ export interface MigrationResult {
   artifacts: number;
   chatMessages: number;
   approvals: number;
+  workspaceSessions: number;
+  workspaceEvents: number;
   agentStateCheckpoints: number;
   settings: number;
   workflowTemplates: number;
@@ -57,6 +61,10 @@ export async function migrateJsonToSqlite(
   const artifactStore = new ArtifactStore(join(stateDir, "artifacts.json"));
   const chatMessageStore = new ChatMessageStore(join(stateDir, "chat_messages.json"));
   const approvalStore = new ApprovalStore(join(stateDir, "approvals.json"));
+  const workspaceSessionStore = new WorkspaceSessionStore(
+    join(stateDir, "workspace_sessions.json")
+  );
+  const workspaceEventStore = new WorkspaceEventStore(join(stateDir, "workspace_events.json"));
   const agentStateStore = new AgentStateCheckpointStore(
     join(stateDir, "agent_state_checkpoints.json")
   );
@@ -72,6 +80,8 @@ export async function migrateJsonToSqlite(
     artifacts,
     chatMessages,
     approvals,
+    workspaceSessions,
+    workspaceEvents,
     checkpoints,
     settings,
     templates,
@@ -82,6 +92,8 @@ export async function migrateJsonToSqlite(
     artifactStore.getAll(),
     chatMessageStore.getAll(),
     approvalStore.getAll(),
+    workspaceSessionStore.getAll(),
+    workspaceEventStore.getAll(),
     agentStateStore.getAll(),
     configStore.get(),
     workflowTemplateStore.getAll(),
@@ -94,6 +106,8 @@ export async function migrateJsonToSqlite(
     artifacts: artifacts.length,
     chatMessages: chatMessages.length,
     approvals: approvals.length,
+    workspaceSessions: workspaceSessions.length,
+    workspaceEvents: workspaceEvents.length,
     agentStateCheckpoints: checkpoints.length,
     settings: Object.keys(settings).length,
     workflowTemplates: templates.length,
@@ -126,6 +140,18 @@ export async function migrateJsonToSqlite(
     INSERT OR REPLACE INTO approvals
     (approval_id, session_id, task_id, action, risk_tags, reason, status, created_at, resolved_at)
     VALUES ($approvalId, $sessionId, $taskId, $action, $riskTags, $reason, $status, $createdAt, $resolvedAt)
+  `);
+
+  const insertWorkspaceSession = db.prepare(`
+    INSERT OR REPLACE INTO workspace_sessions
+    (workspace_session_id, session_id, workspace_id, kind, status, owner_agent_id, controller, controller_id, metadata, created_at, updated_at, ended_at)
+    VALUES ($workspaceSessionId, $sessionId, $workspaceId, $kind, $status, $ownerAgentId, $controller, $controllerId, $metadata, $createdAt, $updatedAt, $endedAt)
+  `);
+
+  const insertWorkspaceEvent = db.prepare(`
+    INSERT OR REPLACE INTO workspace_events
+    (event_id, workspace_session_id, session_id, sequence, timestamp, kind, payload, source)
+    VALUES ($eventId, $workspaceSessionId, $sessionId, $sequence, $timestamp, $kind, $payload, $source)
   `);
 
   const insertChatMessage = db.prepare(`
@@ -166,6 +192,8 @@ export async function migrateJsonToSqlite(
     insertChatMessages(insertChatMessage, chatMessages);
     insertCheckpoints(insertCheckpoint, checkpoints);
     insertApprovals(insertApproval, approvals);
+    insertWorkspaceSessions(insertWorkspaceSession, workspaceSessions);
+    insertWorkspaceEvents(insertWorkspaceEvent, workspaceEvents);
     insertSettings(insertSetting, settings);
     insertWorkflowTemplates(insertWorkflowTemplate, templates);
 
@@ -389,6 +417,68 @@ function insertApprovals(
       $status: approval.status,
       $createdAt: approval.createdAt,
       $resolvedAt: approval.resolvedAt ?? null,
+    });
+  }
+}
+
+function insertWorkspaceSessions(
+  stmt: { run: (params: Record<string, unknown>) => void },
+  sessions: Array<{
+    workspaceSessionId: string;
+    sessionId: string;
+    workspaceId?: string;
+    kind: string;
+    status: string;
+    ownerAgentId?: string;
+    controller: string;
+    controllerId?: string;
+    metadata?: Record<string, unknown>;
+    createdAt: number;
+    updatedAt: number;
+    endedAt?: number;
+  }>
+): void {
+  for (const session of sessions) {
+    stmt.run({
+      $workspaceSessionId: session.workspaceSessionId,
+      $sessionId: session.sessionId,
+      $workspaceId: session.workspaceId ?? null,
+      $kind: session.kind,
+      $status: session.status,
+      $ownerAgentId: session.ownerAgentId ?? null,
+      $controller: session.controller,
+      $controllerId: session.controllerId ?? null,
+      $metadata: JSON.stringify(session.metadata ?? {}),
+      $createdAt: session.createdAt,
+      $updatedAt: session.updatedAt,
+      $endedAt: session.endedAt ?? null,
+    });
+  }
+}
+
+function insertWorkspaceEvents(
+  stmt: { run: (params: Record<string, unknown>) => void },
+  events: Array<{
+    eventId: string;
+    workspaceSessionId: string;
+    sessionId: string;
+    sequence: number;
+    timestamp: number;
+    kind: string;
+    payload: Record<string, unknown>;
+    source?: string;
+  }>
+): void {
+  for (const event of events) {
+    stmt.run({
+      $eventId: event.eventId,
+      $workspaceSessionId: event.workspaceSessionId,
+      $sessionId: event.sessionId,
+      $sequence: event.sequence,
+      $timestamp: event.timestamp,
+      $kind: event.kind,
+      $payload: JSON.stringify(event.payload ?? {}),
+      $source: event.source ?? null,
     });
   }
 }

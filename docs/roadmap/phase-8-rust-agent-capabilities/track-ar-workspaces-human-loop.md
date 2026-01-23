@@ -3,7 +3,7 @@
 > Priority: P1
 > Status: Proposed
 > Owner: Desktop Platform Team
-> Dependencies: Phase 7 Tauri shell, Track AQ gateway
+> Dependencies: Phase 7 Tauri shell, Track AQ gateway, Track AU storage
 > Estimated Effort: 3 weeks
 
 ---
@@ -12,7 +12,8 @@
 
 Deliver Rust-native workspace sessions for browser, terminal, and file views with
 human-in-the-loop approvals. This track provides the live execution surfaces that
-agents and users share while tasks are running.
+agents and users share while tasks are running, with reliable streaming, control
+handoff, and auditable decisions.
 
 ## Architecture Context
 
@@ -22,10 +23,11 @@ agents and users share while tasks are running.
 
 ## Scope
 
-- Workspace session types: terminal, browser, file viewer.
-- Live stream of UI state and logs to `apps/cowork`.
-- Take control and handoff between agent and user.
-- Approval prompts for sensitive actions and script execution.
+- Workspace session types: terminal (PTY), browser automation, file viewer.
+- Ordered event stream of UI state and logs to `apps/cowork` with backfill support.
+- Exclusive control handoff between agent and user (input gating while blocked).
+- Approval prompts for sensitive actions, with edit/deny and timeout handling.
+- Local persistence of session events for replay and audit.
 
 ## Out of Scope
 
@@ -35,31 +37,56 @@ agents and users share while tasks are running.
 
 ## Deliverables
 
-- `packages/workspace-session-rs/` crate for session lifecycle and streaming.
+- `packages/workspace-session-rs/` crate for session lifecycle, event streaming,
+  and backfill.
 - PTY and browser automation bindings secured by sandbox policy.
-- Approval workflow API for human-in-the-loop events.
-- UI bridge for session attach, detach, and replay.
+- Approval workflow API and policy hooks for human-in-the-loop events.
+- Event persistence and replay integration with local-first storage.
+- UI bridge for session attach, detach, control transfer, and replay.
 
 ## Technical Design
 
 ### Core Types
 
-- `WorkspaceSession`: id, kind, status, owner_agent_id.
-- `WorkspaceEvent`: stdout, dom_snapshot, screenshot, log_line.
-- `ApprovalRequest`: action, risk_level, context_hash.
-- `ApprovalDecision`: approve | deny | edit.
+- `WorkspaceSession`: id, workspace_id, kind, status, owner_agent_id, controller_id.
+- `WorkspaceSessionKind`: terminal | browser | file.
+- `WorkspaceSessionStatus`: requested | running | paused | blocked | ended | errored.
+- `WorkspaceEvent`: seq, ts, session_id, kind, payload, source.
+- `WorkspaceEventKind`: terminal_stdout | terminal_stderr | terminal_exit
+  | dom_snapshot | screenshot | file_snapshot | file_diff | log_line
+  | control_handoff | approval_request | approval_decision.
+- `ApprovalRequest`: id, session_id, action, risk_level, context_hash, expires_at.
+- `ApprovalDecision`: approve | deny | edit, resolved_by, resolved_at.
+
+### Streaming and Replay
+
+- Event stream is ordered with a monotonic `seq` and supports backfill by cursor.
+- High-frequency updates (terminal output, screenshots) are batched and throttled.
+- Replay is driven by persisted events with bounded retention policies.
+
+### Control Model
+
+- A single controller holds input focus at a time (agent or user).
+- Control handoff emits events and pauses agent execution while user controls.
+- Resume requires explicit handback and audit logging.
+
+### Approval Pipeline
+
+- Risk classification gates actions (auto, ask, deny).
+- Requests include context hashes and expire to avoid stuck sessions.
+- Decisions are persisted and replayable alongside session events.
 
 ### Execution Flow
 
-1. Agent requests a workspace session from Rust runtime.
-2. Runtime streams updates to UI via event channel.
-3. Risky actions emit approval requests to UI.
-4. Approved actions resume execution and persist audit events.
+1. Agent requests a workspace session from the Rust runtime.
+2. Runtime streams ordered events to UI with backfill support.
+3. Risky actions emit approval requests and block execution.
+4. Decisions and control handoff are applied, logged, and replayable.
 
 ### Rust-First Boundary
 
-- Rust owns session state, streaming, and approval gating.
-- TypeScript renders workspace UI and posts user decisions.
+- Rust owns session state, streaming, gating, and audit persistence.
+- TypeScript renders workspace UI and posts user decisions and control actions.
 
 ## Implementation Spec (Executable)
 
@@ -156,29 +183,33 @@ TypeScript validation:
 
 | Week | Focus | Outcomes |
 | :--- | :--- | :--- |
-| 1 | Session lifecycle | terminal and file sessions, streaming format |
-| 2 | Browser automation | automation hooks, screenshot pipeline |
-| 3 | Human loop | approval API, replay and audit events |
+| 1 | Session lifecycle | session manager, event schema, terminal + file sessions, backfill |
+| 2 | Automation | PTY bridge, browser automation adapter, snapshot/screenshot pipeline |
+| 3 | Human loop | approval API, control handoff, audit + replay integration |
 
 ## Affected Code
 
 - `packages/tooling-session/`
 - `packages/shell/`
 - `packages/agent-runtime-control/`
+- `packages/agent-runtime-persistence/`
 - `packages/workspace-session-rs/` (new)
 - `apps/cowork/`
 
 ## Acceptance Criteria
 
-- Launch terminal and browser sessions with live streaming.
-- User can take control and return control to agent.
-- Approval requests block risky actions until resolved.
-- Session logs and approvals are persisted locally.
+- Launch terminal, browser, and file sessions with ordered streaming.
+- Event streams support backfill and resume after UI reconnect.
+- User can take control and return control with exclusive input gating.
+- Approval requests block risky actions until resolved or timed out.
+- Session logs and approvals are persisted locally and replayable.
 
 ## Risks
 
 - Cross-platform PTY edge cases on Windows.
 - Browser automation stability and performance.
+- High-volume streaming can overwhelm UI without throttling.
+- Sensitive data leakage if redaction and policy are incomplete.
 
 ## References
 

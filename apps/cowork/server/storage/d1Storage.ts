@@ -5,6 +5,8 @@ import type {
   CoworkSession,
   CoworkTask,
   CoworkWorkflowTemplate,
+  CoworkWorkspaceEvent,
+  CoworkWorkspaceSession,
 } from "@ku0/agent-runtime";
 import { parseCoworkPolicyConfig } from "@ku0/agent-runtime";
 import type {
@@ -14,12 +16,15 @@ import type {
   AuditLogStoreLike,
   ChatMessageStoreLike,
   ConfigStoreLike,
+  CoworkWorkspaceEventInput,
   ProjectStoreLike,
   SessionStoreLike,
   StepStoreLike,
   StorageLayer,
   TaskStoreLike,
   WorkflowTemplateStoreLike,
+  WorkspaceEventStoreLike,
+  WorkspaceSessionStoreLike,
 } from "./contracts";
 import type {
   AgentStateCheckpointRecord,
@@ -141,6 +146,46 @@ async function ensureSchema(db: D1Database): Promise<void> {
     `,
     `
       CREATE INDEX IF NOT EXISTS idx_approvals_task ON approvals(task_id)
+    `,
+    `
+      CREATE TABLE IF NOT EXISTS workspace_sessions (
+        workspace_session_id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        workspace_id TEXT,
+        kind TEXT NOT NULL,
+        status TEXT NOT NULL,
+        owner_agent_id TEXT,
+        controller TEXT NOT NULL,
+        controller_id TEXT,
+        metadata TEXT NOT NULL DEFAULT '{}',
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        ended_at INTEGER
+      )
+    `,
+    `
+      CREATE INDEX IF NOT EXISTS idx_workspace_sessions_session
+      ON workspace_sessions(session_id)
+    `,
+    `
+      CREATE TABLE IF NOT EXISTS workspace_events (
+        event_id TEXT PRIMARY KEY,
+        workspace_session_id TEXT NOT NULL,
+        session_id TEXT NOT NULL,
+        sequence INTEGER NOT NULL,
+        timestamp INTEGER NOT NULL,
+        kind TEXT NOT NULL,
+        payload TEXT NOT NULL,
+        source TEXT
+      )
+    `,
+    `
+      CREATE INDEX IF NOT EXISTS idx_workspace_events_session
+      ON workspace_events(workspace_session_id)
+    `,
+    `
+      CREATE INDEX IF NOT EXISTS idx_workspace_events_sequence
+      ON workspace_events(workspace_session_id, sequence)
     `,
     `
       CREATE TABLE IF NOT EXISTS audit_logs (
@@ -454,6 +499,36 @@ function rowToApproval(row: Record<string, unknown>): CoworkApproval {
     status: row.status as CoworkApproval["status"],
     createdAt: Number(row.created_at),
     resolvedAt: row.resolved_at ? Number(row.resolved_at) : undefined,
+  };
+}
+
+function rowToWorkspaceSession(row: Record<string, unknown>): CoworkWorkspaceSession {
+  return {
+    workspaceSessionId: String(row.workspace_session_id),
+    sessionId: String(row.session_id),
+    workspaceId: row.workspace_id ? String(row.workspace_id) : undefined,
+    kind: row.kind as CoworkWorkspaceSession["kind"],
+    status: row.status as CoworkWorkspaceSession["status"],
+    ownerAgentId: row.owner_agent_id ? String(row.owner_agent_id) : undefined,
+    controller: row.controller as CoworkWorkspaceSession["controller"],
+    controllerId: row.controller_id ? String(row.controller_id) : undefined,
+    metadata: parseJsonObject(row.metadata),
+    createdAt: Number(row.created_at),
+    updatedAt: Number(row.updated_at),
+    endedAt: row.ended_at ? Number(row.ended_at) : undefined,
+  };
+}
+
+function rowToWorkspaceEvent(row: Record<string, unknown>): CoworkWorkspaceEvent {
+  return {
+    eventId: String(row.event_id),
+    workspaceSessionId: String(row.workspace_session_id),
+    sessionId: String(row.session_id),
+    sequence: Number(row.sequence),
+    timestamp: Number(row.timestamp),
+    kind: row.kind as CoworkWorkspaceEvent["kind"],
+    payload: parseJsonObject(row.payload),
+    source: row.source ? (String(row.source) as CoworkWorkspaceEvent["source"]) : undefined,
   };
 }
 
@@ -1036,6 +1111,198 @@ async function createD1ApprovalStore(db: D1Database): Promise<ApprovalStoreLike>
   };
 }
 
+async function createD1WorkspaceSessionStore(db: D1Database): Promise<WorkspaceSessionStoreLike> {
+  return {
+    async getAll(): Promise<CoworkWorkspaceSession[]> {
+      const result = await prepare(
+        db,
+        "SELECT * FROM workspace_sessions ORDER BY created_at DESC"
+      ).all();
+      return result.results.map(rowToWorkspaceSession);
+    },
+
+    async getById(workspaceSessionId: string): Promise<CoworkWorkspaceSession | null> {
+      const row = await prepare(
+        db,
+        "SELECT * FROM workspace_sessions WHERE workspace_session_id = ?",
+        [workspaceSessionId]
+      ).first();
+      return row ? rowToWorkspaceSession(row) : null;
+    },
+
+    async getBySession(sessionId: string): Promise<CoworkWorkspaceSession[]> {
+      const result = await prepare(
+        db,
+        "SELECT * FROM workspace_sessions WHERE session_id = ? ORDER BY created_at DESC",
+        [sessionId]
+      ).all();
+      return result.results.map(rowToWorkspaceSession);
+    },
+
+    async create(session: CoworkWorkspaceSession): Promise<CoworkWorkspaceSession> {
+      await prepare(
+        db,
+        `INSERT OR REPLACE INTO workspace_sessions
+          (workspace_session_id, session_id, workspace_id, kind, status, owner_agent_id, controller, controller_id, metadata, created_at, updated_at, ended_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          session.workspaceSessionId,
+          session.sessionId,
+          session.workspaceId ?? null,
+          session.kind,
+          session.status,
+          session.ownerAgentId ?? null,
+          session.controller,
+          session.controllerId ?? null,
+          JSON.stringify(session.metadata ?? {}),
+          session.createdAt,
+          session.updatedAt ?? session.createdAt,
+          session.endedAt ?? null,
+        ]
+      ).run();
+      return session;
+    },
+
+    async update(
+      workspaceSessionId: string,
+      updater: (session: CoworkWorkspaceSession) => CoworkWorkspaceSession
+    ): Promise<CoworkWorkspaceSession | null> {
+      const existing = await prepare(
+        db,
+        "SELECT * FROM workspace_sessions WHERE workspace_session_id = ?",
+        [workspaceSessionId]
+      ).first();
+      if (!existing) {
+        return null;
+      }
+      const updated = updater(rowToWorkspaceSession(existing));
+      await prepare(
+        db,
+        `UPDATE workspace_sessions
+          SET session_id = ?, workspace_id = ?, kind = ?, status = ?, owner_agent_id = ?, controller = ?, controller_id = ?, metadata = ?, updated_at = ?, ended_at = ?
+          WHERE workspace_session_id = ?`,
+        [
+          updated.sessionId,
+          updated.workspaceId ?? null,
+          updated.kind,
+          updated.status,
+          updated.ownerAgentId ?? null,
+          updated.controller,
+          updated.controllerId ?? null,
+          JSON.stringify(updated.metadata ?? {}),
+          updated.updatedAt ?? Date.now(),
+          updated.endedAt ?? null,
+          updated.workspaceSessionId,
+        ]
+      ).run();
+      return updated;
+    },
+
+    async delete(workspaceSessionId: string): Promise<boolean> {
+      const result = await prepare(
+        db,
+        "DELETE FROM workspace_sessions WHERE workspace_session_id = ?",
+        [workspaceSessionId]
+      ).run();
+      return Boolean(result.changes && result.changes > 0);
+    },
+  };
+}
+
+async function createD1WorkspaceEventStore(db: D1Database): Promise<WorkspaceEventStoreLike> {
+  async function getMaxSequence(workspaceSessionId: string): Promise<number> {
+    const row = await prepare(
+      db,
+      "SELECT MAX(sequence) as max_sequence FROM workspace_events WHERE workspace_session_id = ?",
+      [workspaceSessionId]
+    ).first<{ max_sequence: number | null }>();
+    return row?.max_sequence ?? 0;
+  }
+
+  async function appendMany(events: CoworkWorkspaceEventInput[]): Promise<CoworkWorkspaceEvent[]> {
+    if (events.length === 0) {
+      return [];
+    }
+    const { workspaceSessionId } = events[0];
+    for (const event of events) {
+      if (event.workspaceSessionId !== workspaceSessionId) {
+        throw new Error("Workspace event batch must share the same workspaceSessionId.");
+      }
+    }
+
+    const maxSequence = await getMaxSequence(workspaceSessionId);
+    const now = Date.now();
+    const stored: CoworkWorkspaceEvent[] = events.map((event, index) => ({
+      eventId: event.eventId ?? crypto.randomUUID(),
+      workspaceSessionId: event.workspaceSessionId,
+      sessionId: event.sessionId,
+      sequence: maxSequence + index + 1,
+      timestamp: event.timestamp ?? now,
+      kind: event.kind,
+      payload: event.payload,
+      source: event.source,
+    }));
+
+    for (const entry of stored) {
+      await prepare(
+        db,
+        `INSERT OR REPLACE INTO workspace_events
+            (event_id, workspace_session_id, session_id, sequence, timestamp, kind, payload, source)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          entry.eventId,
+          entry.workspaceSessionId,
+          entry.sessionId,
+          entry.sequence,
+          entry.timestamp,
+          entry.kind,
+          JSON.stringify(entry.payload ?? {}),
+          entry.source ?? null,
+        ]
+      ).run();
+    }
+
+    return stored;
+  }
+
+  async function append(event: CoworkWorkspaceEventInput): Promise<CoworkWorkspaceEvent> {
+    const [stored] = await appendMany([event]);
+    return stored;
+  }
+
+  return {
+    async getByWorkspaceSession(
+      workspaceSessionId: string,
+      options: { afterSequence?: number; limit?: number } = {}
+    ): Promise<CoworkWorkspaceEvent[]> {
+      const clauses: string[] = [];
+      const params: unknown[] = [workspaceSessionId];
+
+      if (options.afterSequence !== undefined) {
+        clauses.push("sequence > ?");
+        params.push(options.afterSequence);
+      }
+
+      let sql = "SELECT * FROM workspace_events WHERE workspace_session_id = ?";
+      if (clauses.length > 0) {
+        sql += ` AND ${clauses.join(" AND ")}`;
+      }
+      sql += " ORDER BY sequence ASC";
+
+      if (options.limit !== undefined) {
+        sql += " LIMIT ?";
+        params.push(options.limit);
+      }
+
+      const result = await prepare(db, sql, params).all();
+      return result.results.map(rowToWorkspaceEvent);
+    },
+
+    append,
+    appendMany,
+  };
+}
+
 async function createD1ConfigStore(db: D1Database): Promise<ConfigStoreLike> {
   async function readAll(): Promise<CoworkSettings> {
     const result = await prepare(db, "SELECT key, value FROM settings").all<{
@@ -1458,6 +1725,8 @@ export async function createD1StorageLayer(db: D1Database): Promise<StorageLayer
     artifactStore,
     chatMessageStore,
     approvalStore,
+    workspaceSessionStore,
+    workspaceEventStore,
     agentStateStore,
     configStore,
     projectStore,
@@ -1470,6 +1739,8 @@ export async function createD1StorageLayer(db: D1Database): Promise<StorageLayer
     createD1ArtifactStore(db),
     createD1ChatMessageStore(db),
     createD1ApprovalStore(db),
+    createD1WorkspaceSessionStore(db),
+    createD1WorkspaceEventStore(db),
     createD1AgentStateStore(db),
     createD1ConfigStore(db),
     createD1ProjectStore(db),
@@ -1484,6 +1755,8 @@ export async function createD1StorageLayer(db: D1Database): Promise<StorageLayer
     artifactStore,
     chatMessageStore,
     approvalStore,
+    workspaceSessionStore,
+    workspaceEventStore,
     agentStateStore,
     configStore,
     projectStore,
