@@ -17,7 +17,14 @@
 
 // Re-export pricing type from models catalog
 export type { ModelPricing } from "../catalog/models";
-
+// ============================================================================
+// Model Fabric Provider (Rust)
+// ============================================================================
+export {
+  createModelFabricProvider,
+  ModelFabricProvider,
+  type ModelFabricProviderConfig,
+} from "./modelFabricProvider";
 // ============================================================================
 // Vercel AI SDK Adapters (Recommended)
 // ============================================================================
