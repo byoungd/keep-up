@@ -1,6 +1,19 @@
-# Tauri + Vanilla TS
+# Desktop Tauri Shell
 
-This template should help get you started developing with Tauri in vanilla HTML, CSS and Typescript.
+Tauri shell for the Cowork desktop app. The UI is served from `apps/cowork` in dev and built from
+`apps/cowork/dist` for production.
+
+## Development
+
+```bash
+# From repo root
+pnpm dev:desktop
+```
+
+This starts:
+- A lightweight build step for agent-runtime packages (needed by the Cowork server)
+- Cowork API server (`apps/cowork/server`)
+- Tauri shell (which boots the Cowork Vite dev server via `beforeDevCommand`)
 
 ## Recommended IDE Setup
 
