@@ -272,7 +272,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
         : undefined;
       if (activeProject && !activeProject.workspaceId) {
         await updateSession(session.sessionId, { projectId: activeProjectId });
-        session.projectId = activeProjectId;
+        session.projectId = activeProjectId ?? undefined;
       }
 
       pushSession(session);
