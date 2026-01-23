@@ -23,6 +23,8 @@ import { createSessionStore } from "../storage/sessionStore";
 import { createStepStore } from "../storage/stepStore";
 import { createTaskStore } from "../storage/taskStore";
 import { createWorkflowTemplateStore } from "../storage/workflowTemplateStore";
+import { createWorkspaceEventStore } from "../storage/workspaceEventStore";
+import { createWorkspaceSessionStore } from "../storage/workspaceSessionStore";
 import { SessionEventHub } from "../streaming/eventHub";
 
 async function cleanupDir(dir: string) {
@@ -38,6 +40,8 @@ async function createStorageLayer() {
     artifactStore: createArtifactStore(join(dir, "artifacts.json")),
     chatMessageStore: createChatMessageStore(join(dir, "chat_messages.json")),
     approvalStore: createApprovalStore(join(dir, "approvals.json")),
+    workspaceSessionStore: createWorkspaceSessionStore(join(dir, "workspace_sessions.json")),
+    workspaceEventStore: createWorkspaceEventStore(join(dir, "workspace_events.json")),
     agentStateStore: createAgentStateCheckpointStore(join(dir, "agent_state.json")),
     configStore: createConfigStore(join(dir, "settings.json")),
     projectStore: createProjectStore(join(dir, "projects.json")),

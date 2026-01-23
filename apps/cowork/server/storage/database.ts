@@ -158,6 +158,53 @@ function initSchema(database: DatabaseInstance): void {
   `);
 
   database.exec(`
+    CREATE TABLE IF NOT EXISTS workspace_sessions (
+      workspace_session_id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      workspace_id TEXT,
+      kind TEXT NOT NULL,
+      status TEXT NOT NULL,
+      owner_agent_id TEXT,
+      controller TEXT NOT NULL,
+      controller_id TEXT,
+      metadata TEXT NOT NULL DEFAULT '{}',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      ended_at INTEGER,
+      FOREIGN KEY (session_id) REFERENCES sessions(session_id)
+    )
+  `);
+
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_workspace_sessions_session
+      ON workspace_sessions(session_id)
+  `);
+
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS workspace_events (
+      event_id TEXT PRIMARY KEY,
+      workspace_session_id TEXT NOT NULL,
+      session_id TEXT NOT NULL,
+      sequence INTEGER NOT NULL,
+      timestamp INTEGER NOT NULL,
+      kind TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      source TEXT,
+      FOREIGN KEY (workspace_session_id) REFERENCES workspace_sessions(workspace_session_id)
+    )
+  `);
+
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_workspace_events_session
+      ON workspace_events(workspace_session_id)
+  `);
+
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_workspace_events_sequence
+      ON workspace_events(workspace_session_id, sequence)
+  `);
+
+  database.exec(`
     CREATE TABLE IF NOT EXISTS audit_logs (
       entry_id TEXT PRIMARY KEY,
       session_id TEXT NOT NULL,

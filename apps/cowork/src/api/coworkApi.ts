@@ -10,6 +10,8 @@ import type {
   CoworkSession,
   CoworkTask,
   CoworkWorkspace,
+  CoworkWorkspaceEvent,
+  CoworkWorkspaceSession,
   Lesson,
   LessonProfile,
   LessonScope,
@@ -23,6 +25,8 @@ export type ApiResult<T> = {
   ok: boolean;
   session?: CoworkSession;
   sessions?: CoworkSession[];
+  workspaceSessions?: CoworkWorkspaceSession[];
+  workspaceSession?: CoworkWorkspaceSession;
   task?: CoworkTask;
   tasks?: CoworkTask[];
   approvals?: CoworkApproval[];
@@ -39,6 +43,7 @@ export type ApiResult<T> = {
   project?: CoworkProject;
   workspaces?: CoworkWorkspace[];
   workspace?: CoworkWorkspace;
+  workspaceEvents?: CoworkWorkspaceEvent[];
   settings?: CoworkSettings;
   gymReport?: GymReport | null;
   providers?: CoworkProvider[];
@@ -62,6 +67,30 @@ export type CoworkApproval = {
   status: CoworkApprovalStatus;
   createdAt: number;
   resolvedAt?: number;
+};
+
+export type CoworkWorkspaceSessionCreate = {
+  kind: CoworkWorkspaceSession["kind"];
+  workspaceId?: string;
+  ownerAgentId?: string;
+  controller?: CoworkWorkspaceSession["controller"];
+  controllerId?: string;
+  metadata?: Record<string, unknown>;
+};
+
+export type CoworkWorkspaceSessionUpdate = {
+  status?: CoworkWorkspaceSession["status"];
+  controller?: CoworkWorkspaceSession["controller"];
+  controllerId?: string;
+  endedAt?: number;
+  metadata?: Record<string, unknown>;
+};
+
+export type CoworkWorkspaceEventInput = {
+  kind: CoworkWorkspaceEvent["kind"];
+  payload: Record<string, unknown>;
+  source?: CoworkWorkspaceEvent["source"];
+  timestamp?: number;
 };
 
 export type CoworkClarification = ClarificationRequest;
@@ -479,6 +508,115 @@ export async function getSession(sessionId: string): Promise<CoworkSession> {
     throw new Error("Session not found");
   }
   return data.session;
+}
+
+export async function listWorkspaceSessions(sessionId: string): Promise<CoworkWorkspaceSession[]> {
+  const data = await fetchJson<ApiResult<unknown>>(`/api/sessions/${sessionId}/workspace-sessions`);
+  return data.workspaceSessions ?? [];
+}
+
+export async function createWorkspaceSession(
+  sessionId: string,
+  payload: CoworkWorkspaceSessionCreate
+): Promise<CoworkWorkspaceSession> {
+  const data = await fetchJson<ApiResult<unknown>>(
+    `/api/sessions/${sessionId}/workspace-sessions`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }
+  );
+  if (!data.workspaceSession) {
+    throw new Error("Workspace session not returned");
+  }
+  return data.workspaceSession;
+}
+
+export async function getWorkspaceSession(
+  workspaceSessionId: string
+): Promise<CoworkWorkspaceSession> {
+  const data = await fetchJson<ApiResult<unknown>>(`/api/workspace-sessions/${workspaceSessionId}`);
+  if (!data.workspaceSession) {
+    throw new Error("Workspace session not found");
+  }
+  return data.workspaceSession;
+}
+
+export async function updateWorkspaceSession(
+  workspaceSessionId: string,
+  payload: CoworkWorkspaceSessionUpdate
+): Promise<CoworkWorkspaceSession> {
+  const data = await fetchJson<ApiResult<unknown>>(
+    `/api/workspace-sessions/${workspaceSessionId}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }
+  );
+  if (!data.workspaceSession) {
+    throw new Error("Workspace session not returned");
+  }
+  return data.workspaceSession;
+}
+
+export async function deleteWorkspaceSession(workspaceSessionId: string): Promise<void> {
+  await fetchJson<ApiResult<unknown>>(`/api/workspace-sessions/${workspaceSessionId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function listWorkspaceSessionEvents(
+  workspaceSessionId: string,
+  options: { afterSequence?: number; limit?: number } = {}
+): Promise<CoworkWorkspaceEvent[]> {
+  const params = new URLSearchParams();
+  if (options.afterSequence !== undefined) {
+    params.set("afterSequence", String(options.afterSequence));
+  }
+  if (options.limit !== undefined) {
+    params.set("limit", String(options.limit));
+  }
+  const query = params.toString();
+  const data = await fetchJson<ApiResult<unknown>>(
+    `/api/workspace-sessions/${workspaceSessionId}/events${query ? `?${query}` : ""}`
+  );
+  return data.workspaceEvents ?? [];
+}
+
+export async function appendWorkspaceSessionEvent(
+  workspaceSessionId: string,
+  event: CoworkWorkspaceEventInput
+): Promise<CoworkWorkspaceEvent> {
+  const data = await fetchJson<ApiResult<unknown>>(
+    `/api/workspace-sessions/${workspaceSessionId}/events`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event }),
+    }
+  );
+  const stored = data.workspaceEvents?.[0];
+  if (!stored) {
+    throw new Error("Workspace event not returned");
+  }
+  return stored;
+}
+
+export async function appendWorkspaceSessionEvents(
+  workspaceSessionId: string,
+  events: CoworkWorkspaceEventInput[]
+): Promise<CoworkWorkspaceEvent[]> {
+  const data = await fetchJson<ApiResult<unknown>>(
+    `/api/workspace-sessions/${workspaceSessionId}/events`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ events }),
+    }
+  );
+  return data.workspaceEvents ?? [];
 }
 
 export async function listTasks(sessionId: string): Promise<CoworkTask[]> {

@@ -6,6 +6,8 @@
 import type {
   ClarificationRequest,
   ClarificationResponse,
+  CoworkWorkspaceEvent,
+  CoworkWorkspaceSession,
   TokenUsageStats,
 } from "@ku0/agent-runtime";
 import { COWORK_EVENTS, type SessionEventHub } from "../../streaming/eventHub";
@@ -288,6 +290,50 @@ export class EventStreamPublisher {
       providerId: data.providerId,
       contextWindow: data.usage.contextWindow,
       utilization: data.usage.utilization,
+    });
+  }
+
+  publishWorkspaceSessionCreated(data: {
+    sessionId: string;
+    workspaceSession: CoworkWorkspaceSession;
+  }) {
+    this.events.publish(data.sessionId, COWORK_EVENTS.WORKSPACE_SESSION_CREATED, {
+      sessionId: data.sessionId,
+      workspaceSession: data.workspaceSession,
+    });
+  }
+
+  publishWorkspaceSessionUpdated(data: {
+    sessionId: string;
+    workspaceSession: CoworkWorkspaceSession;
+  }) {
+    this.events.publish(data.sessionId, COWORK_EVENTS.WORKSPACE_SESSION_UPDATED, {
+      sessionId: data.sessionId,
+      workspaceSession: data.workspaceSession,
+    });
+  }
+
+  publishWorkspaceSessionEnded(data: {
+    sessionId: string;
+    workspaceSessionId: string;
+    endedAt: number;
+  }) {
+    this.events.publish(data.sessionId, COWORK_EVENTS.WORKSPACE_SESSION_ENDED, {
+      sessionId: data.sessionId,
+      workspaceSessionId: data.workspaceSessionId,
+      endedAt: data.endedAt,
+    });
+  }
+
+  publishWorkspaceSessionEvent(data: {
+    sessionId: string;
+    workspaceSessionId: string;
+    event: CoworkWorkspaceEvent;
+  }) {
+    this.events.publish(data.sessionId, COWORK_EVENTS.WORKSPACE_SESSION_EVENT, {
+      sessionId: data.sessionId,
+      workspaceSessionId: data.workspaceSessionId,
+      event: data.event,
     });
   }
 }
