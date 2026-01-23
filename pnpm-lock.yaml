@@ -699,6 +699,12 @@ importers:
         specifier: workspace:*
         version: link:../lfcc-bridge
     devDependencies:
+      '@ku0/markdown-content-rs':
+        specifier: workspace:*
+        version: link:../markdown-content-rs
+      '@ku0/native-bindings':
+        specifier: workspace:*
+        version: link:../native-bindings
       tsx:
         specifier: ^4.0.0
         version: 4.21.0
@@ -745,6 +751,9 @@ importers:
       '@ku0/canonicalizer-rs':
         specifier: workspace:*
         version: link:../canonicalizer-rs
+      '@ku0/markdown-content-rs':
+        specifier: workspace:*
+        version: link:../markdown-content-rs
       '@ku0/policy-hash-rs':
         specifier: workspace:*
         version: link:../policy-hash-rs
@@ -936,6 +945,22 @@ importers:
       prosemirror-view:
         specifier: ^1.41.4
         version: 1.41.4
+
+  packages/markdown-content-rs:
+    dependencies:
+      '@ku0/native-bindings':
+        specifier: workspace:*
+        version: link:../native-bindings
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.19.3
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
 
   packages/native-bindings:
     devDependencies:
