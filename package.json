@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "concurrently -k -n cowork,cowork-server -c blue,green \"pnpm dev:cowork\" \"pnpm -C apps/cowork/server dev\"",
     "dev:cowork": "turbo run dev --filter=@ku0/cowork",
+    "predev:desktop": "pnpm -C packages/agent-runtime-persistence build && pnpm -C packages/agent-runtime-execution build && pnpm -C packages/agent-runtime build",
     "dev:desktop": "concurrently -k -n cowork-server,tauri -c green,yellow \"pnpm -C apps/cowork/server dev\" \"pnpm --filter @ku0/desktop-tauri tauri dev\"",
+    "pretauri:dev": "pnpm -C packages/agent-runtime-persistence build && pnpm -C packages/agent-runtime-execution build && pnpm -C packages/agent-runtime build",
     "tauri:dev": "pnpm --filter @ku0/desktop-tauri tauri dev",
     "tauri:build": "pnpm --filter @ku0/desktop-tauri tauri build",
     "cowork:serve": "pnpm -C apps/cowork build && pnpm -C apps/cowork/server start",

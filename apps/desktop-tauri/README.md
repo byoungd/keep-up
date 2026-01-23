@@ -11,6 +11,7 @@ pnpm dev:desktop
 ```
 
 This starts:
+- A lightweight build step for agent-runtime packages (needed by the Cowork server)
 - Cowork API server (`apps/cowork/server`)
 - Tauri shell (which boots the Cowork Vite dev server via `beforeDevCommand`)
 
