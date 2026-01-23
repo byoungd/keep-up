@@ -1,0 +1,19 @@
+[package]
+name = "workspace-session-rs"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Rust workspace session manager for Open Wrap."
+publish = false
+build = "build.rs"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+napi = { version = "3.5.1", features = ["napi8", "serde-json"] }
+napi-derive = "3.5.1"
+serde_json = "1"
+
+[build-dependencies]
+napi-build = "2.1.3"
