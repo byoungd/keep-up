@@ -102,7 +102,7 @@ Phase 4: LSP Indexer (Track AG)
 
 ## Readiness Checklist
 
-- [ ] Baseline benchmarks captured for current TS paths.
+- [x] Baseline benchmarks captured for current TS paths.
 - [ ] N-API binding strategy agreed (per track).
 - [ ] Cross-platform sandbox policy matrix approved.
 - [ ] Rollout plan with feature flags defined.
