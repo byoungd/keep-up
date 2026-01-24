@@ -187,6 +187,10 @@ export const aliases: AliasEntry[] = [
     find: "@ku0/workspace-session-rs/node",
     replacement: path.resolve(__dirname, "packages/workspace-session-rs/src/node.ts"),
   },
+  {
+    find: "@ku0/agent-workforce-rs/node",
+    replacement: path.resolve(__dirname, "packages/agent-workforce-rs/src/node.ts"),
+  },
 
   // ============================================
   // Main packages (alphabetical order)

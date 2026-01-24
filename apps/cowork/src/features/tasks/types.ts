@@ -2,6 +2,8 @@ import type {
   ClarificationRequest,
   CoworkRiskTag,
   CoworkTaskStatus,
+  CoworkWorkspaceEvent,
+  CoworkWorkspaceSession,
   TokenUsageStats,
   ToolActivity,
 } from "@ku0/agent-runtime";
@@ -349,6 +351,8 @@ export interface TaskGraph {
   agentMode?: "plan" | "build" | "review";
   usage?: TokenUsageStats;
   messageUsage?: Record<string, MessageUsage>;
+  workspaceSessions?: Record<string, CoworkWorkspaceSession>;
+  workspaceEvents?: Record<string, CoworkWorkspaceEvent[]>;
 }
 
 export type MessageUsage = TokenUsageStats & {

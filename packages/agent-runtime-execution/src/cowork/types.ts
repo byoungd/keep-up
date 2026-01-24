@@ -141,13 +141,7 @@ export interface CoworkWorkspace {
 
 export type CoworkWorkspaceSessionKind = "terminal" | "browser" | "file";
 
-export type CoworkWorkspaceSessionStatus =
-  | "requested"
-  | "running"
-  | "paused"
-  | "blocked"
-  | "ended"
-  | "errored";
+export type CoworkWorkspaceSessionStatus = "created" | "active" | "paused" | "closed";
 
 export type CoworkWorkspaceSessionController = "agent" | "user";
 
@@ -167,17 +161,14 @@ export interface CoworkWorkspaceSession {
 }
 
 export type CoworkWorkspaceEventKind =
-  | "terminal_stdout"
-  | "terminal_stderr"
-  | "terminal_exit"
-  | "dom_snapshot"
+  | "stdout"
+  | "stderr"
+  | "prompt"
   | "screenshot"
-  | "file_snapshot"
-  | "file_diff"
+  | "dom_snapshot"
+  | "file_view"
   | "log_line"
-  | "control_handoff"
-  | "approval_request"
-  | "approval_decision";
+  | "status";
 
 export type CoworkWorkspaceEventSource = "agent" | "user" | "system";
 

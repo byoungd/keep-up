@@ -71,6 +71,9 @@ importers:
       '@ku0/agent-runtime':
         specifier: workspace:*
         version: link:../../packages/agent-runtime
+      '@ku0/agent-runtime-control':
+        specifier: workspace:*
+        version: link:../../packages/agent-runtime-control
       '@ku0/ai-core':
         specifier: workspace:*
         version: link:../../packages/ai-core
