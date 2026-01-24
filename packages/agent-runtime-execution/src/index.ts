@@ -47,19 +47,103 @@
  * ```
  */
 
-export type { RuntimeMessageBus } from "@ku0/agent-runtime-control";
+export type {
+  A2AAdapterOptions,
+  A2AEnvelope,
+  A2AMessageType,
+  A2ARequestHandler,
+  AgentEvents,
+  ApprovalDecision,
+  ApprovalDecisionInput,
+  ApprovalRequest,
+  ApprovalRequestInput,
+  ApprovalStatus,
+  ArtifactEvents,
+  AuditSummary,
+  ClarificationEvents,
+  EventBusConfig,
+  EventBusStats,
+  EventHandler,
+  EventMeta,
+  EventPriority,
+  ExecutionEvents,
+  MessageEnvelope,
+  MessageHandler,
+  MessageSubscription,
+  ModelFabricConfigStore,
+  PersistenceStoreLike,
+  PluginEvents,
+  RuntimeEvent,
+  RuntimeEventBus,
+  RuntimeEventMap,
+  RuntimeEventOptions,
+  ScopedEventBus,
+  ScopedEventBusOptions,
+  SubagentEventPayload,
+  SubagentEvents,
+  Subscription,
+  SubscriptionOptions,
+  SystemEvents,
+  ToolEvents,
+  WorkspaceEvent as ControlWorkspaceEvent,
+  WorkspaceEventType,
+  WorkspaceSession,
+  WorkspaceSessionConfig,
+  WorkspaceSnapshot,
+} from "@ku0/agent-runtime-control";
 // ============================================================================
 // Events
 // ============================================================================
-export * from "@ku0/agent-runtime-control";
+export {
+  A2ACapabilityRegistry,
+  A2AMessageBusAdapter,
+  buildAuditSummary,
+  createAuditExportService,
+  createEventBus,
+  createInMemoryModelFabricConfigStore,
+  createMessageBus,
+  createScopedEventBus,
+  EventBus,
+  getGlobalEventBus,
+  InMemoryModelFabricConfigStore,
+  RuntimeMessageBusImpl,
+  resetGlobalEventBus,
+  WorkforceOrchestrator,
+  WorkspaceSessionManager,
+} from "@ku0/agent-runtime-control";
 // ============================================================================
 // Memory (Cross-Session Knowledge)
 // ============================================================================
 export * from "@ku0/agent-runtime-memory";
+export type {
+  ArtifactEmissionContext,
+  ArtifactEmissionResult,
+  ArtifactEnvelope,
+  ArtifactPipelineConfig,
+  ArtifactSchema,
+  ArtifactStoreResult,
+  ArtifactTaskGraph,
+  ArtifactTaskNodeStatus,
+  ArtifactType,
+  ArtifactValidationResult,
+  ImageArtifactInput,
+  ImageArtifactPolicy,
+  ImageArtifactStoreOptions,
+  ImageArtifactStoreResult,
+  QuarantinedArtifact,
+} from "@ku0/agent-runtime-persistence/artifacts";
 // ============================================================================
 // Artifacts
 // ============================================================================
-export * from "@ku0/agent-runtime-persistence/artifacts";
+export {
+  ArtifactPipeline,
+  ArtifactRegistry,
+  createArtifactPipeline,
+  createArtifactRegistry,
+  createImageArtifactStore,
+  DEFAULT_IMAGE_ARTIFACT_POLICY,
+  ImageArtifactStore,
+} from "@ku0/agent-runtime-persistence/artifacts";
 // ============================================================================
 // Checkpoint
 // ============================================================================
