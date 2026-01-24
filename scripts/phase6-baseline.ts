@@ -311,6 +311,7 @@ async function measureEventLog(): Promise<MetricResult> {
 async function measureCheckpointStorage(): Promise<{
   save: MetricResult;
   load: MetricResult;
+  loadCold: MetricResult;
   backend: string;
   checkpointCount: number;
   messagesPerCheckpoint: number;
@@ -330,6 +331,11 @@ async function measureCheckpointStorage(): Promise<{
     backend = "messagepack";
     storage = new MessagePackCheckpointStorage({ rootDir });
   }
+
+  const createStorage = () =>
+    backend === "native"
+      ? new RustCheckpointStorage({ rootDir })
+      : new MessagePackCheckpointStorage({ rootDir });
 
   const saveSamples = samples;
   let saveIndex = 0;
@@ -361,9 +367,27 @@ async function measureCheckpointStorage(): Promise<{
     warmup
   );
 
+  const coldIterations = 30;
+  const coldWarmup = 5;
+  let coldIndex = 0;
+  const loadColdStats = await measureAsync(
+    async () => {
+      const id = ids[coldIndex % ids.length];
+      coldIndex += 1;
+      if (!id) {
+        return;
+      }
+      const coldStorage = createStorage();
+      await coldStorage.load(id);
+    },
+    coldIterations,
+    coldWarmup
+  );
+
   return {
     save: saveStats,
     load: loadStats,
+    loadCold: loadColdStats,
     backend,
     checkpointCount: iterations,
     messagesPerCheckpoint,
@@ -554,6 +578,12 @@ async function main() {
       },
       checkpointLoad: {
         ...checkpointStorage.load,
+        backend: checkpointStorage.backend,
+        checkpointCount: checkpointStorage.checkpointCount,
+        messagesPerCheckpoint: checkpointStorage.messagesPerCheckpoint,
+      },
+      checkpointLoadCold: {
+        ...checkpointStorage.loadCold,
         backend: checkpointStorage.backend,
         checkpointCount: checkpointStorage.checkpointCount,
         messagesPerCheckpoint: checkpointStorage.messagesPerCheckpoint,
