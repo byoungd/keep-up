@@ -1,0 +1,57 @@
+{
+  "generatedAt": "2026-01-24T03:45:55.104Z",
+  "environment": {
+    "hostname": "hans-Mac-Pro.local",
+    "platform": "darwin",
+    "release": "25.2.0",
+    "arch": "x64",
+    "nodeVersion": "v22.21.1",
+    "cpuCount": 8,
+    "totalMemoryGb": 48
+  },
+  "metrics": {
+    "sandboxStartup": {
+      "available": true,
+      "avgMs": 0.4704417000000194,
+      "p50Ms": 0.3199779999999919,
+      "p95Ms": 1.0967669999999998,
+      "p99Ms": 2.6316679999999906,
+      "minMs": 0.29943199999979697,
+      "maxMs": 2.6316679999999906,
+      "iterations": 50
+    },
+    "eventLogAppend": {
+      "avgMs": 1.3644116740000065,
+      "p50Ms": 0.8860110000000532,
+      "p95Ms": 2.6488319999998566,
+      "p99Ms": 9.175835000000006,
+      "minMs": 0.7027160000002368,
+      "maxMs": 92.37222899999983,
+      "iterations": 1000
+    },
+    "tokenCounting": {
+      "avgMs": 13.674869350000003,
+      "p50Ms": 11.312944000000243,
+      "p95Ms": 24.013554999999997,
+      "p99Ms": 46.90973699999995,
+      "minMs": 7.392902999999933,
+      "maxMs": 118.99451700000009,
+      "iterations": 200,
+      "tokensPerSample": 10000,
+      "avgMsPer10kTokens": 13.6749,
+      "p99MsPer10kTokens": 46.9097,
+      "backend": "js"
+    },
+    "symbolQuery": {
+      "avgMs": 11.614131325999985,
+      "p50Ms": 0.014370999999300693,
+      "p95Ms": 67.21988000000056,
+      "p99Ms": 116.21760100000029,
+      "minMs": 0.007701000000452041,
+      "maxMs": 219.84105400000044,
+      "iterations": 500,
+      "backend": "native",
+      "symbolCount": 10000
+    }
+  }
+}
