@@ -699,10 +699,19 @@ export interface ToolOutputSpoolMetadata {
   error?: string;
 }
 
+export interface ToolOutputSpoolCompression {
+  encoding: "zstd";
+  uri: string;
+  originalBytes: number;
+  compressedBytes: number;
+  compressionRatio: number;
+}
+
 export interface ToolOutputSpoolRecord {
   version: 1;
   metadata: ToolOutputSpoolMetadata;
   content: ToolContent[];
+  compressed?: ToolOutputSpoolCompression;
 }
 
 export interface ToolOutputSpoolRequest {

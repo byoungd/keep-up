@@ -12,6 +12,7 @@ import {
   DEFAULT_AGENT_SPOOL_DIR,
   DEFAULT_TOOL_OUTPUT_SPOOL_POLICY,
   type ToolContent,
+  type ToolOutputSpoolCompression,
   type ToolOutputSpooler,
   type ToolOutputSpoolMetadata,
   type ToolOutputSpoolPolicy,
@@ -20,10 +21,18 @@ import {
   type ToolOutputSpoolResult,
 } from "../types";
 import { stableJsonStringify } from "../utils/json";
+import { compressPayloadZstd } from "../utils/tokenCounter";
 
 export interface FileToolOutputSpoolerConfig {
   rootDir?: string;
   policy?: ToolOutputSpoolPolicy;
+  compression?: ToolOutputSpoolerCompressionConfig;
+}
+
+export interface ToolOutputSpoolerCompressionConfig {
+  enabled?: boolean;
+  minBytes?: number;
+  level?: number;
 }
 
 type ContentStats = {
@@ -52,15 +61,20 @@ type AppendOutcome = {
 };
 
 const SPOOL_RECORD_VERSION = 1;
+const DEFAULT_COMPRESSION_MIN_BYTES = 256 * 1024;
+const DEFAULT_COMPRESSION_LEVEL = 3;
+const DEFAULT_COMPRESSION_ENABLED = true;
 
 export class FileToolOutputSpooler implements ToolOutputSpooler {
   private readonly rootDir: string;
   private readonly policy: ToolOutputSpoolPolicy;
+  private readonly compression: Required<ToolOutputSpoolerCompressionConfig>;
 
   constructor(config: FileToolOutputSpoolerConfig = {}) {
     const rootDir = config.rootDir ?? DEFAULT_AGENT_SPOOL_DIR;
     this.rootDir = resolve(rootDir);
     this.policy = normalizePolicy(config.policy ?? DEFAULT_TOOL_OUTPUT_SPOOL_POLICY);
+    this.compression = normalizeCompression(config.compression);
   }
 
   async spool(request: ToolOutputSpoolRequest): Promise<ToolOutputSpoolResult> {
@@ -109,6 +123,11 @@ export class FileToolOutputSpooler implements ToolOutputSpooler {
       content: storedContent,
     };
 
+    const compression = await this.maybeCompressRecord(record, spoolPath);
+    if (compression) {
+      record.compressed = compression;
+    }
+
     try {
       await mkdir(dirname(spoolPath), { recursive: true });
       await writeFile(spoolPath, stableJsonStringify(record));
@@ -137,6 +156,40 @@ export class FileToolOutputSpooler implements ToolOutputSpooler {
   private resolveSpoolPath(toolName: string, spoolId: string): string {
     const safeTool = sanitizeSegment(toolName);
     return join(this.rootDir, safeTool, `${spoolId}.json`);
+  }
+
+  private async maybeCompressRecord(
+    record: ToolOutputSpoolRecord,
+    spoolPath: string
+  ): Promise<ToolOutputSpoolCompression | undefined> {
+    if (!this.compression.enabled || this.compression.minBytes <= 0) {
+      return undefined;
+    }
+
+    const compressed = compressPayloadZstd(
+      { metadata: record.metadata, content: record.content },
+      this.compression.minBytes,
+      this.compression.level
+    );
+
+    if (!compressed) {
+      return undefined;
+    }
+
+    const compressedPath = spoolPath.replace(/\\.json$/, ".zst");
+    try {
+      await writeFile(compressedPath, Buffer.from(compressed.data));
+    } catch {
+      return undefined;
+    }
+
+    return {
+      encoding: compressed.encoding,
+      uri: compressedPath,
+      originalBytes: compressed.originalBytes,
+      compressedBytes: compressed.compressedBytes,
+      compressionRatio: compressed.compressionRatio,
+    };
   }
 
   private async persistBinarySegments(
@@ -222,6 +275,28 @@ function normalizePolicy(policy: ToolOutputSpoolPolicy): ToolOutputSpoolPolicy {
     : DEFAULT_TOOL_OUTPUT_SPOOL_POLICY.maxLines;
 
   return { maxBytes, maxLines };
+}
+
+function normalizeCompression(
+  config: ToolOutputSpoolerCompressionConfig | undefined
+): Required<ToolOutputSpoolerCompressionConfig> {
+  if (!config) {
+    return {
+      enabled: DEFAULT_COMPRESSION_ENABLED,
+      minBytes: DEFAULT_COMPRESSION_MIN_BYTES,
+      level: DEFAULT_COMPRESSION_LEVEL,
+    };
+  }
+
+  const enabled = config.enabled ?? DEFAULT_COMPRESSION_ENABLED;
+  const minBytes = Number.isFinite(config.minBytes)
+    ? Math.max(0, Math.floor(config.minBytes ?? DEFAULT_COMPRESSION_MIN_BYTES))
+    : DEFAULT_COMPRESSION_MIN_BYTES;
+  const level = Number.isFinite(config.level)
+    ? Math.max(1, Math.floor(config.level ?? DEFAULT_COMPRESSION_LEVEL))
+    : DEFAULT_COMPRESSION_LEVEL;
+
+  return { enabled, minBytes, level };
 }
 
 function buildContentStats(content: ToolContent[]): ContentStats {

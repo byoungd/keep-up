@@ -35,7 +35,7 @@ These are already delivered and should not be re-implemented:
 | --- | --- | --- | --- |
 | AD | Implemented (Cowork runtime) | `packages/sandbox-rs`, `apps/cowork/server/runtime/coworkTaskRuntime.ts` | OS parity + policy matrix still needed. |
 | AE | Implemented | `packages/storage-engine-rs`, `packages/agent-runtime-persistence/src/checkpoint/rustCheckpointStorage.ts` | P99 targets not met yet (see baseline). |
-| AF | Partially implemented | `packages/tokenizer-rs`, `packages/agent-runtime-execution/src/orchestrator/messageCompression.ts` | `compressPayloadZstd` not wired; perf targets unmet. |
+| AF | Partially implemented | `packages/tokenizer-rs`, `packages/agent-runtime-execution/src/orchestrator/messageCompression.ts` | Zstd payload compression wired for spooling; context compression targets unmet. |
 | AG | Implemented | `packages/symbol-index-rs`, `packages/agent-runtime-execution/src/lsp/lspService.ts` | P99 target unmet. |
 | AH | Implemented | `packages/diff-rs`, `packages/agent-runtime-tools/src/tools/code/editor.ts` | P99 target unmet. |
 | AI | Implemented | `packages/vector-similarity-rs`, `packages/context-index/src/contextIndex.ts` | Perf tuning pending. |
@@ -45,19 +45,16 @@ These are already delivered and should not be re-implemented:
 ## Scope (Remaining)
 
 - Close performance gaps to Phase 6 targets (AE/AF/AG/AH/AI).
-- Wire Zstd payload compression + thresholds (`compressPayloadZstd`) in hot paths.
-- Finalize cross-platform sandbox policy matrix + approvals.
-- Document N-API packaging strategy for all rust crates (macOS/Linux/Windows).
-- Rollout plan and feature flags for progressive enablement.
+- Close remaining performance gaps to Phase 6 targets (AE/AF/AG/AH/AI).
 
 ---
 
 ## Readiness Checklist (Phase 6)
 
-- Baseline benchmarks captured for TS paths.
-- N-API binding strategy agreed.
-- Cross-platform sandbox policy matrix approved.
-- Rollout plan with feature flags defined.
+- [x] Baseline benchmarks captured for TS paths.
+- [x] N-API binding strategy agreed. (see `docs/roadmap/phase-6-rust-native/native-binding-strategy.md`)
+- [x] Cross-platform sandbox policy matrix approved. (see `docs/roadmap/phase-6-rust-native/sandbox-policy-matrix.md`)
+- [x] Rollout plan with feature flags defined. (see `docs/roadmap/phase-6-rust-native/rollout-plan.md`)
 
 ---
 

@@ -103,9 +103,9 @@ Phase 4: LSP Indexer (Track AG)
 ## Readiness Checklist
 
 - [x] Baseline benchmarks captured for current TS paths.
-- [ ] N-API binding strategy agreed (per track).
-- [ ] Cross-platform sandbox policy matrix approved.
-- [ ] Rollout plan with feature flags defined.
+- [x] N-API binding strategy agreed (per track).
+- [x] Cross-platform sandbox policy matrix approved.
+- [x] Rollout plan with feature flags defined.
 
 ---
 
@@ -132,4 +132,7 @@ The following modules are not migrated to Rust:
 
 - [Rust Accelerator Roadmap](../../architecture/rust-accelerator-roadmap.md)
 - [TypeScript vs Rust Analysis](../../architecture/typescript-vs-rust-analysis.md)
+- [Native Binding Strategy](./native-binding-strategy.md)
+- [Sandbox Policy Matrix](./sandbox-policy-matrix.md)
+- [Rollout Plan](./rollout-plan.md)
 - Codex Rust reference: `.tmp/analysis/codex/codex-rs/`

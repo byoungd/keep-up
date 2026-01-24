@@ -132,4 +132,5 @@ Decision: Rust sidecar for OS-native enforcement.
 - Codex Seatbelt: `.tmp/analysis/codex/codex-rs/core/src/seatbelt.rs`
 - Codex Landlock: `.tmp/analysis/codex/codex-rs/core/src/landlock.rs`
 - Current impl: `packages/agent-runtime/src/sandbox/`
-- Spec: `docs/specs/cowork/cowork-sandbox-design.md`
+- Policy matrix: `docs/roadmap/phase-6-rust-native/sandbox-policy-matrix.md`
+- Spec: `docs/specs/cowork/cowork-safety-spec.md`

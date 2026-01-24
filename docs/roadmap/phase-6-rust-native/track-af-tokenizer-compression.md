@@ -111,3 +111,10 @@ pub fn compress_context(
 - Current impl: `packages/agent-runtime/src/context/ContextCompactor.ts`
 - Message compression: `packages/agent-runtime/src/orchestrator/messageCompression.ts`
 - tiktoken-rs: https://github.com/zurawiki/tiktoken-rs
+
+---
+
+## Implementation Status (2026-01-24)
+
+- Zstd payload compression is wired into tool output spooling (`FileToolOutputSpooler`) with configurable thresholds.
+- Native tokenizer bindings are active for token counting and message compression when available.
