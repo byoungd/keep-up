@@ -40,6 +40,10 @@ All tracks must support macOS, Linux, and Windows with explicit fallbacks:
 | AJ | JSON Acceleration | P2 | Planning | [track-aj-json-acceleration.md](./track-aj-json-acceleration.md) |
 | AK | Gitignore Matcher | P3 | Planning | [track-ak-gitignore-matcher.md](./track-ak-gitignore-matcher.md) |
 
+## Progress Logs
+
+- docs/roadmap/phase-6-rust-native/progress/README.md
+
 ## Parallelizable LFCC/Core Workstreams (High Yield)
 
 These are parallelizable accelerators for `@ku0/core` and `@ku0/lfcc-bridge` that align with
@@ -98,7 +102,7 @@ Phase 4: LSP Indexer (Track AG)
 
 ## Readiness Checklist
 
-- [ ] Baseline benchmarks captured for current TS paths.
+- [x] Baseline benchmarks captured for current TS paths.
 - [ ] N-API binding strategy agreed (per track).
 - [ ] Cross-platform sandbox policy matrix approved.
 - [ ] Rollout plan with feature flags defined.

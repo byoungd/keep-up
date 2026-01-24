@@ -9,6 +9,7 @@ export {
   createBashToolServer,
   type IBashExecutor,
   ProcessBashExecutor,
+  RustBashExecutor,
 } from "./bash";
 export {
   type ClarificationHandler,

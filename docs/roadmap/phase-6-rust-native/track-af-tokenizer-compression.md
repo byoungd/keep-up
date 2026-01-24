@@ -46,6 +46,7 @@ into Rust to reduce CPU and GC overhead.
 
 - Provide prebuilt binaries for macOS/Linux/Windows.
 - WASM fallback when native bindings unavailable.
+- Support env override `TOKENIZER_RS_DISABLE_NATIVE=1` to force JS fallback when needed.
 
 ---
 

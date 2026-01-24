@@ -33,6 +33,15 @@ export type {
 let cachedTokenizer: NativeTokenizer | null | undefined;
 let cachedBindingError: Error | null = null;
 
+function isNativeDisabled(): boolean {
+  const raw = process.env.TOKENIZER_RS_DISABLE_NATIVE;
+  if (!raw) {
+    return false;
+  }
+  const normalized = raw.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes";
+}
+
 function loadNativeBinding(): NativeBinding | null {
   const require = createRequire(import.meta.url);
   const baseDir = dirname(fileURLToPath(import.meta.url));
@@ -65,6 +74,8 @@ function buildCandidatePaths(packageRoot: string): string[] {
   return [
     join(packageRoot, "tokenizer_rs.node"),
     join(packageRoot, "index.node"),
+    join(packageRoot, `tokenizer_rs.${platformArch}.node`),
+    join(packageRoot, `index.${platformArch}.node`),
     join(packageRoot, "native", "tokenizer_rs.node"),
     join(packageRoot, "native", "index.node"),
     join(packageRoot, "native", "target", "release", "tokenizer_rs.node"),
@@ -76,6 +87,12 @@ function buildCandidatePaths(packageRoot: string): string[] {
 
 export function getNativeTokenizer(): NativeTokenizer | null {
   if (cachedTokenizer !== undefined) {
+    return cachedTokenizer;
+  }
+
+  if (isNativeDisabled()) {
+    cachedTokenizer = null;
+    cachedBindingError = new Error("Native tokenizer disabled by TOKENIZER_RS_DISABLE_NATIVE.");
     return cachedTokenizer;
   }
 

@@ -35,6 +35,7 @@
     "test:nightly": "pnpm test:unit:ci",
     "perf:gate": "node scripts/perf-gate.mjs --baseline artifacts/perf-baseline.json --metrics artifacts/perf-metrics.json",
     "perf:baseline": "node scripts/lfcc-perf-baseline.mjs",
+    "perf:metrics": "tsx scripts/phase6-baseline.ts",
     "bench:cache": "tsx packages/agent-runtime/bench/cache.bench.ts",
     "lint": "turbo run lint && biome check .",
     "lint:fix": "biome check --write .",
