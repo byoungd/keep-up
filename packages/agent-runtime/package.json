@@ -5,30 +5,30 @@
   "type": "module",
   "description": "Agent Runtime with MCP tools, bash execution, and orchestration",
   "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "types": "./src/index.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
+      "types": "./src/index.ts",
       "default": "./dist/index.js"
     },
     "./tools": {
-      "types": "./dist/tools/index.d.ts",
+      "types": "./src/tools/index.ts",
       "default": "./dist/tools/index.js"
     },
     "./orchestrator": {
-      "types": "./dist/orchestrator/index.d.ts",
+      "types": "./src/orchestrator/index.ts",
       "default": "./dist/orchestrator/index.js"
     },
     "./orchestrator/edge": {
-      "types": "./dist/orchestrator/edge.d.ts",
+      "types": "./src/orchestrator/edge.ts",
       "default": "./dist/orchestrator/edge.js"
     },
     "./security": {
-      "types": "./dist/security/index.d.ts",
+      "types": "./src/security/index.ts",
       "default": "./dist/security/index.js"
     },
     "./types": {
-      "types": "./dist/types/index.d.ts",
+      "types": "./src/types/index.ts",
       "default": "./dist/types/index.js"
     }
   },
