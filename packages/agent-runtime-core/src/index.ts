@@ -4,6 +4,8 @@
  * MCP-compatible tool protocol types and agent runtime interfaces.
  */
 
+import { stableStringify } from "@ku0/core";
+
 // ============================================================================
 // MCP Tool Protocol Types
 // ============================================================================
@@ -253,10 +255,26 @@ export const COWORK_POLICY_ACTIONS = [
 
 export type CoworkPolicyActionLike = (typeof COWORK_POLICY_ACTIONS)[number];
 
+export const COWORK_POLICY_DECISIONS = ["allow", "allow_with_confirm", "deny"] as const;
+export type CoworkPolicyDecisionType = (typeof COWORK_POLICY_DECISIONS)[number];
+
+export const COWORK_RISK_TAGS = ["delete", "overwrite", "network", "connector", "batch"] as const;
+export type CoworkRiskTag = (typeof COWORK_RISK_TAGS)[number];
+
 const COWORK_POLICY_ACTION_SET = new Set<string>(COWORK_POLICY_ACTIONS);
+const COWORK_POLICY_DECISION_SET = new Set<string>(COWORK_POLICY_DECISIONS);
+const COWORK_RISK_TAG_SET = new Set<string>(COWORK_RISK_TAGS);
 
 export function isCoworkPolicyAction(action: string): action is CoworkPolicyActionLike {
   return COWORK_POLICY_ACTION_SET.has(action);
+}
+
+export function isCoworkPolicyDecision(decision: string): decision is CoworkPolicyDecisionType {
+  return COWORK_POLICY_DECISION_SET.has(decision);
+}
+
+export function isCoworkRiskTag(tag: string): tag is CoworkRiskTag {
+  return COWORK_RISK_TAG_SET.has(tag);
 }
 
 export interface CoworkPolicyInputLike {
@@ -272,10 +290,10 @@ export interface CoworkPolicyInputLike {
 }
 
 export interface CoworkPolicyDecisionLike {
-  decision: "allow" | "allow_with_confirm" | "deny";
+  decision: CoworkPolicyDecisionType;
   requiresConfirmation: boolean;
   reason: string;
-  riskTags: string[];
+  riskTags: CoworkRiskTag[];
   ruleId?: string;
 }
 
@@ -283,10 +301,335 @@ export interface CoworkPolicyEngineLike {
   evaluate(input: CoworkPolicyInputLike): CoworkPolicyDecisionLike;
 }
 
+export interface CoworkPolicyConditions {
+  pathWithinGrant?: boolean;
+  pathWithinOutputRoot?: boolean;
+  matchesPattern?: string[];
+  fileSizeGreaterThan?: number;
+  hostInAllowlist?: boolean;
+  connectorScopeAllowed?: boolean;
+}
+
+export interface CoworkPolicyRule {
+  id: string;
+  action: CoworkPolicyActionLike;
+  when?: CoworkPolicyConditions;
+  decision: CoworkPolicyDecisionType;
+  riskTags?: CoworkRiskTag[];
+  reason?: string;
+}
+
+export interface CoworkPolicyConfig {
+  version: "1.0";
+  defaults: {
+    fallback: CoworkPolicyDecisionType;
+  };
+  rules: CoworkPolicyRule[];
+}
+
 export interface CoworkToolContext {
   session: CoworkSessionLike;
   policyEngine: CoworkPolicyEngineLike;
   caseInsensitivePaths?: boolean;
+}
+
+// ============================================================================
+// Cowork Policy Schema & Hashing
+// ============================================================================
+
+export type CoworkPolicyValidationError = {
+  path: string;
+  message: string;
+};
+
+export const COWORK_POLICY_SCHEMA = {
+  $schema: "https://json-schema.org/draft/2020-12/schema",
+  title: "CoworkPolicyConfig",
+  type: "object",
+  additionalProperties: false,
+  required: ["version", "defaults", "rules"],
+  properties: {
+    version: { const: "1.0" },
+    defaults: {
+      type: "object",
+      additionalProperties: false,
+      required: ["fallback"],
+      properties: {
+        fallback: { enum: COWORK_POLICY_DECISIONS },
+      },
+    },
+    rules: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["id", "action", "decision"],
+        properties: {
+          id: { type: "string", minLength: 1 },
+          action: { enum: COWORK_POLICY_ACTIONS },
+          when: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              pathWithinGrant: { type: "boolean" },
+              pathWithinOutputRoot: { type: "boolean" },
+              matchesPattern: {
+                type: "array",
+                items: { type: "string" },
+              },
+              fileSizeGreaterThan: { type: "number" },
+              hostInAllowlist: { type: "boolean" },
+              connectorScopeAllowed: { type: "boolean" },
+            },
+          },
+          decision: { enum: COWORK_POLICY_DECISIONS },
+          riskTags: {
+            type: "array",
+            items: { enum: COWORK_RISK_TAGS },
+          },
+          reason: { type: "string" },
+        },
+      },
+    },
+  },
+} as const;
+
+export function validateCoworkPolicyConfig(input: unknown): CoworkPolicyValidationError[] {
+  const errors: CoworkPolicyValidationError[] = [];
+  const addError = (path: string, message: string) => {
+    errors.push({ path, message });
+  };
+
+  if (!isRecord(input)) {
+    addError("", "Expected an object.");
+    return errors;
+  }
+
+  validateKeys(input, ["version", "defaults", "rules"], "", addError);
+
+  if (input.version !== "1.0") {
+    addError("version", 'Expected "1.0".');
+  }
+
+  if (!isRecord(input.defaults)) {
+    addError("defaults", "Expected an object.");
+  } else {
+    validateCoworkPolicyDefaults(input.defaults, addError);
+  }
+
+  if (!Array.isArray(input.rules)) {
+    addError("rules", "Expected an array.");
+  } else {
+    input.rules.forEach((rule, index) => {
+      const path = `rules[${index}]`;
+      if (!isRecord(rule)) {
+        addError(path, "Expected an object.");
+        return;
+      }
+      validateCoworkPolicyRule(rule, path, addError);
+    });
+  }
+
+  return errors;
+}
+
+function validateCoworkPolicyDefaults(
+  defaults: Record<string, unknown>,
+  addError: (path: string, message: string) => void
+): void {
+  validateKeys(defaults, ["fallback"], "defaults", addError);
+  const fallback = defaults.fallback;
+  if (typeof fallback !== "string" || !isCoworkPolicyDecision(fallback)) {
+    addError("defaults.fallback", "Expected a valid policy decision.");
+  }
+}
+
+function validateCoworkPolicyRule(
+  rule: Record<string, unknown>,
+  path: string,
+  addError: (path: string, message: string) => void
+): void {
+  validateKeys(rule, ["id", "action", "when", "decision", "riskTags", "reason"], path, addError);
+
+  if (typeof rule.id !== "string" || rule.id.trim().length === 0) {
+    addError(`${path}.id`, "Expected a non-empty string.");
+  }
+  if (typeof rule.action !== "string" || !isCoworkPolicyAction(rule.action)) {
+    addError(`${path}.action`, "Expected a valid policy action.");
+  }
+  if (typeof rule.decision !== "string" || !isCoworkPolicyDecision(rule.decision)) {
+    addError(`${path}.decision`, "Expected a valid policy decision.");
+  }
+  if (rule.reason !== undefined && typeof rule.reason !== "string") {
+    addError(`${path}.reason`, "Expected a string.");
+  }
+  validateCoworkPolicyRiskTags(rule.riskTags, `${path}.riskTags`, addError);
+  validateCoworkPolicyConditions(rule.when, `${path}.when`, addError);
+}
+
+function validateCoworkPolicyRiskTags(
+  value: unknown,
+  path: string,
+  addError: (path: string, message: string) => void
+): void {
+  if (value === undefined) {
+    return;
+  }
+  if (!Array.isArray(value)) {
+    addError(path, "Expected an array.");
+    return;
+  }
+  value.forEach((tag, index) => {
+    if (typeof tag !== "string" || !isCoworkRiskTag(tag)) {
+      addError(`${path}[${index}]`, "Expected a valid risk tag.");
+    }
+  });
+}
+
+function validateCoworkPolicyConditions(
+  value: unknown,
+  path: string,
+  addError: (path: string, message: string) => void
+): void {
+  if (value === undefined) {
+    return;
+  }
+  if (!isRecord(value)) {
+    addError(path, "Expected an object.");
+    return;
+  }
+
+  validateKeys(
+    value,
+    [
+      "pathWithinGrant",
+      "pathWithinOutputRoot",
+      "matchesPattern",
+      "fileSizeGreaterThan",
+      "hostInAllowlist",
+      "connectorScopeAllowed",
+    ],
+    path,
+    addError
+  );
+
+  validateOptionalBoolean(value.pathWithinGrant, `${path}.pathWithinGrant`, addError);
+  validateOptionalBoolean(value.pathWithinOutputRoot, `${path}.pathWithinOutputRoot`, addError);
+  validateOptionalStringArray(value.matchesPattern, `${path}.matchesPattern`, addError);
+  validateOptionalNumber(value.fileSizeGreaterThan, `${path}.fileSizeGreaterThan`, addError);
+  validateOptionalBoolean(value.hostInAllowlist, `${path}.hostInAllowlist`, addError);
+  validateOptionalBoolean(value.connectorScopeAllowed, `${path}.connectorScopeAllowed`, addError);
+}
+
+function validateOptionalBoolean(
+  value: unknown,
+  path: string,
+  addError: (path: string, message: string) => void
+): void {
+  if (value !== undefined && typeof value !== "boolean") {
+    addError(path, "Expected a boolean.");
+  }
+}
+
+function validateOptionalNumber(
+  value: unknown,
+  path: string,
+  addError: (path: string, message: string) => void
+): void {
+  if (value !== undefined && typeof value !== "number") {
+    addError(path, "Expected a number.");
+  }
+}
+
+function validateOptionalStringArray(
+  value: unknown,
+  path: string,
+  addError: (path: string, message: string) => void
+): void {
+  if (value === undefined) {
+    return;
+  }
+  if (!Array.isArray(value)) {
+    addError(path, "Expected an array of strings.");
+    return;
+  }
+  value.forEach((entry, index) => {
+    if (typeof entry !== "string") {
+      addError(`${path}[${index}]`, "Expected a string.");
+    }
+  });
+}
+
+export function parseCoworkPolicyConfig(input: unknown): CoworkPolicyConfig | null {
+  return validateCoworkPolicyConfig(input).length === 0 ? (input as CoworkPolicyConfig) : null;
+}
+
+export function normalizeCoworkPolicyConfig(config: CoworkPolicyConfig): CoworkPolicyConfig {
+  return JSON.parse(JSON.stringify(config)) as CoworkPolicyConfig;
+}
+
+export async function computeCoworkPolicyHash(config: CoworkPolicyConfig): Promise<string> {
+  const serialized = stableStringify(normalizeCoworkPolicyConfig(config));
+  return sha256(serialized);
+}
+
+function validateKeys(
+  record: Record<string, unknown>,
+  allowedKeys: string[],
+  basePath: string,
+  addError: (path: string, message: string) => void
+): void {
+  const allowed = new Set(allowedKeys);
+  for (const key of Object.keys(record)) {
+    if (!allowed.has(key)) {
+      const path = basePath ? `${basePath}.${key}` : key;
+      addError(path, "Unexpected property.");
+    }
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function bufferToHex(buffer: ArrayBuffer): string {
+  return Array.from(new Uint8Array(buffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function simpleHash(str: string): string {
+  let hash = 5381;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) + hash + str.charCodeAt(i);
+  }
+  return (hash >>> 0).toString(16);
+}
+
+function simpleHash256(str: string): string {
+  const parts: string[] = [];
+  for (let i = 0; i < 4; i++) {
+    const part = simpleHash(`${i}:${str}`).padStart(16, "0");
+    parts.push(part);
+  }
+  return parts.join("");
+}
+
+async function sha256(text: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(text);
+
+  const cryptoImpl = globalThis.crypto;
+  if (cryptoImpl?.subtle) {
+    try {
+      const hashBuffer = await cryptoImpl.subtle.digest("SHA-256", data);
+      return bufferToHex(hashBuffer);
+    } catch {
+      // Fall back to deterministic non-crypto hash.
+    }
+  }
+
+  return simpleHash256(text);
 }
 
 // ============================================================================
@@ -691,6 +1034,29 @@ export interface ExportBundle {
   toolEvents: ToolEvent[];
   modelEvents: ModelEvent[];
   workspaceEvents: WorkspaceEvent[];
+}
+
+export function normalizeAuditBundleForChecksum(bundle: ExportBundle): ExportBundle {
+  return {
+    taskRuns: [...bundle.taskRuns].sort((a, b) => a.runId.localeCompare(b.runId)),
+    toolEvents: [...bundle.toolEvents].sort((a, b) => a.eventId.localeCompare(b.eventId)),
+    modelEvents: [...bundle.modelEvents].sort((a, b) => a.eventId.localeCompare(b.eventId)),
+    workspaceEvents: [...bundle.workspaceEvents].sort((a, b) => a.eventId.localeCompare(b.eventId)),
+  };
+}
+
+export async function computeAuditBundleChecksum(bundle: ExportBundle): Promise<string> {
+  const normalized = normalizeAuditBundleForChecksum(bundle);
+  const serialized = stableStringify(normalized);
+  return sha256(serialized);
+}
+
+export async function validateAuditBundleChecksum(
+  bundle: ExportBundle,
+  checksum: string
+): Promise<boolean> {
+  const computed = await computeAuditBundleChecksum(bundle);
+  return computed === checksum;
 }
 
 export interface PersistenceConfig {

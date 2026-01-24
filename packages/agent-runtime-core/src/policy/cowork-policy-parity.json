@@ -1,0 +1,276 @@
+{
+  "version": "1",
+  "policies": [
+    {
+      "id": "baseline",
+      "config": {
+        "version": "1.0",
+        "defaults": { "fallback": "deny" },
+        "rules": [
+          {
+            "id": "wildcard-allow",
+            "action": "file.*",
+            "decision": "allow",
+            "reason": "wildcard"
+          },
+          {
+            "id": "deny-secrets",
+            "action": "file.read",
+            "when": { "matchesPattern": ["**/.env*"] },
+            "decision": "deny",
+            "reason": "sensitive"
+          },
+          {
+            "id": "allow-read",
+            "action": "file.read",
+            "when": { "pathWithinGrant": true },
+            "decision": "allow"
+          },
+          {
+            "id": "allow-write-output",
+            "action": "file.write",
+            "when": { "pathWithinGrant": true, "pathWithinOutputRoot": true },
+            "decision": "allow",
+            "riskTags": ["overwrite"]
+          },
+          {
+            "id": "confirm-write",
+            "action": "file.write",
+            "when": { "pathWithinGrant": true, "pathWithinOutputRoot": false },
+            "decision": "allow_with_confirm",
+            "riskTags": ["overwrite"]
+          },
+          {
+            "id": "allow-network",
+            "action": "network.request",
+            "when": { "hostInAllowlist": true },
+            "decision": "allow",
+            "riskTags": ["network"]
+          },
+          {
+            "id": "deny-network",
+            "action": "network.request",
+            "decision": "deny",
+            "reason": "network disabled"
+          },
+          {
+            "id": "allow-connector-read",
+            "action": "connector.read",
+            "when": { "connectorScopeAllowed": true },
+            "decision": "allow",
+            "riskTags": ["connector"]
+          },
+          {
+            "id": "confirm-connector-action",
+            "action": "connector.action",
+            "when": { "connectorScopeAllowed": true },
+            "decision": "allow_with_confirm",
+            "riskTags": ["connector"]
+          }
+        ]
+      },
+      "cases": [
+        {
+          "name": "denies sensitive paths",
+          "input": {
+            "action": "file.read",
+            "path": "/workspace/.env",
+            "grantRoots": ["/workspace"]
+          },
+          "expected": {
+            "decision": "deny",
+            "requiresConfirmation": false,
+            "ruleId": "deny-secrets",
+            "reason": "sensitive"
+          }
+        },
+        {
+          "name": "allows read within grant",
+          "input": {
+            "action": "file.read",
+            "path": "/workspace/docs/readme.md",
+            "grantRoots": ["/workspace"]
+          },
+          "expected": {
+            "decision": "allow",
+            "requiresConfirmation": false,
+            "ruleId": "allow-read"
+          }
+        },
+        {
+          "name": "falls back to wildcard when no exact rule matches",
+          "input": {
+            "action": "file.read",
+            "path": "/outside/file.txt",
+            "grantRoots": []
+          },
+          "expected": {
+            "decision": "allow",
+            "requiresConfirmation": false,
+            "ruleId": "wildcard-allow",
+            "reason": "wildcard"
+          }
+        },
+        {
+          "name": "requires confirmation for writes outside output roots",
+          "input": {
+            "action": "file.write",
+            "path": "/workspace/docs/readme.md",
+            "grantRoots": ["/workspace"],
+            "outputRoots": ["/workspace/output"]
+          },
+          "expected": {
+            "decision": "allow_with_confirm",
+            "requiresConfirmation": true,
+            "ruleId": "confirm-write",
+            "riskTags": ["overwrite"]
+          }
+        },
+        {
+          "name": "allows writes in output roots",
+          "input": {
+            "action": "file.write",
+            "path": "/workspace/output/report.md",
+            "grantRoots": ["/workspace"],
+            "outputRoots": ["/workspace/output"]
+          },
+          "expected": {
+            "decision": "allow",
+            "requiresConfirmation": false,
+            "ruleId": "allow-write-output",
+            "riskTags": ["overwrite"]
+          }
+        },
+        {
+          "name": "denies network without allowlist",
+          "input": {
+            "action": "network.request",
+            "host": "example.com",
+            "hostAllowlist": []
+          },
+          "expected": {
+            "decision": "deny",
+            "requiresConfirmation": false,
+            "ruleId": "deny-network",
+            "reason": "network disabled"
+          }
+        },
+        {
+          "name": "allows network with allowlist",
+          "input": {
+            "action": "network.request",
+            "host": "example.com",
+            "hostAllowlist": ["example.com"]
+          },
+          "expected": {
+            "decision": "allow",
+            "requiresConfirmation": false,
+            "ruleId": "allow-network",
+            "riskTags": ["network"]
+          }
+        },
+        {
+          "name": "allows connector read when scoped",
+          "input": {
+            "action": "connector.read",
+            "connectorScopeAllowed": true
+          },
+          "expected": {
+            "decision": "allow",
+            "requiresConfirmation": false,
+            "ruleId": "allow-connector-read",
+            "riskTags": ["connector"]
+          }
+        },
+        {
+          "name": "confirms connector action when scoped",
+          "input": {
+            "action": "connector.action",
+            "connectorScopeAllowed": true
+          },
+          "expected": {
+            "decision": "allow_with_confirm",
+            "requiresConfirmation": true,
+            "ruleId": "confirm-connector-action",
+            "riskTags": ["connector"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "case-insensitive",
+      "config": {
+        "version": "1.0",
+        "defaults": { "fallback": "deny" },
+        "rules": [
+          {
+            "id": "deny-large",
+            "action": "file.read",
+            "when": { "fileSizeGreaterThan": 10 },
+            "decision": "deny",
+            "reason": "too large"
+          },
+          {
+            "id": "allow-read",
+            "action": "file.read",
+            "when": { "pathWithinGrant": true },
+            "decision": "allow"
+          },
+          {
+            "id": "deny-outside",
+            "action": "file.read",
+            "when": { "pathWithinGrant": false },
+            "decision": "deny",
+            "reason": "outside"
+          }
+        ]
+      },
+      "cases": [
+        {
+          "name": "allows case-insensitive paths",
+          "input": {
+            "action": "file.read",
+            "path": "/Workspace/Docs/Readme.md",
+            "grantRoots": ["/workspace"],
+            "caseInsensitivePaths": true
+          },
+          "expected": {
+            "decision": "allow",
+            "requiresConfirmation": false,
+            "ruleId": "allow-read"
+          }
+        },
+        {
+          "name": "denies when case sensitivity prevents match",
+          "input": {
+            "action": "file.read",
+            "path": "/Workspace/Docs/Readme.md",
+            "grantRoots": ["/workspace"],
+            "caseInsensitivePaths": false
+          },
+          "expected": {
+            "decision": "deny",
+            "requiresConfirmation": false,
+            "ruleId": "deny-outside",
+            "reason": "outside"
+          }
+        },
+        {
+          "name": "denies when file size exceeds threshold",
+          "input": {
+            "action": "file.read",
+            "path": "/workspace/docs/large.txt",
+            "grantRoots": ["/workspace"],
+            "fileSizeBytes": 11
+          },
+          "expected": {
+            "decision": "deny",
+            "requiresConfirmation": false,
+            "ruleId": "deny-large",
+            "reason": "too large"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,4 +1,10 @@
-import type { ExportBundle, ExportFilter, TaskRun, TaskRunFilter } from "@ku0/agent-runtime-core";
+import {
+  computeAuditBundleChecksum,
+  type ExportBundle,
+  type ExportFilter,
+  type TaskRun,
+  type TaskRunFilter,
+} from "@ku0/agent-runtime-core";
 
 export type PersistenceStoreLike = {
   listTaskRuns: (filter?: TaskRunFilter) => TaskRun[];
@@ -19,6 +25,13 @@ export function createAuditExportService(store: PersistenceStoreLike) {
     listTaskRuns: (filter?: TaskRunFilter) => store.listTaskRuns(filter),
     exportBundle: (filter?: ExportFilter) => store.exportBundle(filter),
     getSummary: (filter?: ExportFilter) => buildAuditSummary(store.exportBundle(filter)),
+    getChecksum: async (filter?: ExportFilter) =>
+      computeAuditBundleChecksum(store.exportBundle(filter)),
+    exportBundleWithChecksum: async (filter?: ExportFilter) => {
+      const bundle = store.exportBundle(filter);
+      const checksum = await computeAuditBundleChecksum(bundle);
+      return { bundle, checksum };
+    },
   };
 }
 

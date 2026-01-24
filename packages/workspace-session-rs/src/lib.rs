@@ -93,6 +93,7 @@ pub struct ApprovalDecision {
 #[derive(Clone)]
 struct ApprovalRecord {
     status: String,
+    expires_at: Option<i64>,
 }
 
 struct WorkspaceState {
@@ -158,6 +159,31 @@ impl WorkspaceState {
     fn event_cursor(&self) -> u32 {
         self.next_sequence.saturating_sub(1)
     }
+
+    fn expire_approvals(&mut self, now: i64) {
+        let expired: Vec<String> = self
+            .approvals
+            .iter()
+            .filter_map(|(request_id, record)| {
+                if record.status != "pending" {
+                    return None;
+                }
+                let expires_at = record.expires_at?;
+                if expires_at <= now {
+                    Some(request_id.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        for request_id in expired {
+            self.approvals.remove(&request_id);
+            if self.pending_approvals > 0 {
+                self.pending_approvals -= 1;
+            }
+        }
+    }
 }
 
 #[napi]
@@ -218,6 +244,7 @@ impl WorkspaceSessionManager {
     #[napi(js_name = "sendInput")]
     pub fn send_input(&self, session_id: String, payload: Value) -> NapiResult<()> {
         let mut state = self.lock_state()?;
+        state.expire_approvals(now_ms());
         if state.pending_approvals > 0 {
             return Err(napi_error("Workspace sessions are blocked pending approval"));
         }
@@ -272,11 +299,13 @@ impl WorkspaceSessionManager {
             return Err(napi_error("Approval request already exists"));
         }
 
+        let requested_at = now_ms();
+        let expires_at = request.timeout_ms.map(|timeout| requested_at + timeout);
         let approval = ApprovalRequest {
             request_id: request_id.clone(),
             kind: request.kind,
             payload: normalize_payload(request.payload),
-            requested_at: now_ms(),
+            requested_at,
             timeout_ms: request.timeout_ms,
         };
 
@@ -284,6 +313,7 @@ impl WorkspaceSessionManager {
             request_id.clone(),
             ApprovalRecord {
                 status: "pending".to_string(),
+                expires_at,
             },
         );
         state.pending_approvals += 1;
@@ -297,6 +327,25 @@ impl WorkspaceSessionManager {
             .approvals
             .remove(&decision.request_id)
             .ok_or_else(|| napi_error("Approval request not found"))?;
+
+        let now = now_ms();
+        if record
+            .expires_at
+            .map(|expires_at| expires_at <= now)
+            .unwrap_or(false)
+        {
+            if record.status == "pending" && state.pending_approvals > 0 {
+                state.pending_approvals -= 1;
+            }
+            return Ok(ApprovalDecision {
+                request_id: decision.request_id,
+                status: "expired".to_string(),
+                approved: false,
+                reason: decision
+                    .reason
+                    .or_else(|| Some("Approval timed out".to_string())),
+            });
+        }
 
         let resolved_status = resolve_approval_status(&decision)?;
         let approved = decision.approved.unwrap_or(resolved_status == "approved");
@@ -477,5 +526,50 @@ mod tests {
 
         let unblocked = manager.send_input(created.session_id, json!({ "input": "ok" }));
         assert!(unblocked.is_ok());
+    }
+
+    #[test]
+    fn approvals_expire_and_unblock() {
+        let manager = create_manager();
+        let created = manager
+            .create_session(WorkspaceSessionConfig {
+                session_id: None,
+                kind: "terminal".to_string(),
+                owner_agent_id: None,
+            })
+            .unwrap();
+
+        manager
+            .request_approval(ApprovalRequestInput {
+                request_id: None,
+                kind: "tool".to_string(),
+                payload: json!({ "action": "write" }),
+                timeout_ms: Some(0),
+            })
+            .unwrap();
+
+        let unblocked = manager.send_input(created.session_id.clone(), json!({ "input": "ok" }));
+        assert!(unblocked.is_ok());
+
+        let request = manager
+            .request_approval(ApprovalRequestInput {
+                request_id: None,
+                kind: "tool".to_string(),
+                payload: json!({ "action": "read" }),
+                timeout_ms: Some(0),
+            })
+            .unwrap();
+
+        let decision = manager
+            .resolve_approval(ApprovalDecisionInput {
+                request_id: request.request_id,
+                status: None,
+                approved: None,
+                reason: None,
+            })
+            .unwrap();
+
+        assert_eq!(decision.status, "expired");
+        assert!(!decision.approved);
     }
 }

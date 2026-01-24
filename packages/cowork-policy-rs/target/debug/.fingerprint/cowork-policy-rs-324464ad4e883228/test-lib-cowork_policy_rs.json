@@ -1,0 +1,25 @@
+{
+  "rustc": 2629586073275287932,
+  "features": "[]",
+  "declared_features": "[]",
+  "target": 11035564047832088964,
+  "profile": 15057526963834790232,
+  "path": 10763286916239946207,
+  "deps": [
+    [3056178850035811329, "regex", false, 17235354399104566407],
+    [9857275760291862238, "sha2", false, 6820304221867316553],
+    [13548984313718623784, "serde", false, 18074448892853895857],
+    [13795362694956882968, "serde_json", false, 10948396615565021174]
+  ],
+  "local": [
+    {
+      "CheckDepInfo": {
+        "dep_info": "debug/.fingerprint/cowork-policy-rs-324464ad4e883228/dep-test-lib-cowork_policy_rs",
+        "checksum": false
+      }
+    }
+  ],
+  "rustflags": [],
+  "config": 2069994364910194474,
+  "compile_kind": 0
+}
