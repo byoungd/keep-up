@@ -1,7 +1,7 @@
 # Track AW: Rust Native Completion and Readiness
 
 > Priority: P0
-> Status: Proposed
+> Status: Active
 > Owner: Agent Runtime Team
 > Dependencies: Phase 6 Rust Native baseline
 > Source: docs/roadmap/phase-6-rust-native/README.md
@@ -29,16 +29,26 @@ These are already delivered and should not be re-implemented:
 
 ---
 
+## Implementation Status (Verified 2026-01-24)
+
+| Track | Status | Evidence | Notes |
+| --- | --- | --- | --- |
+| AD | Implemented (Cowork runtime) | `packages/sandbox-rs`, `apps/cowork/server/runtime/coworkTaskRuntime.ts` | OS parity + policy matrix still needed. |
+| AE | Implemented | `packages/storage-engine-rs`, `packages/agent-runtime-persistence/src/checkpoint/rustCheckpointStorage.ts` | P99 targets not met yet (see baseline). |
+| AF | Partially implemented | `packages/tokenizer-rs`, `packages/agent-runtime-execution/src/orchestrator/messageCompression.ts` | `compressPayloadZstd` not wired; perf targets unmet. |
+| AG | Implemented | `packages/symbol-index-rs`, `packages/agent-runtime-execution/src/lsp/lspService.ts` | P99 target unmet. |
+| AH | Implemented | `packages/diff-rs`, `packages/agent-runtime-tools/src/tools/code/editor.ts` | P99 target unmet. |
+| AI | Implemented | `packages/vector-similarity-rs`, `packages/context-index/src/contextIndex.ts` | Perf tuning pending. |
+| AJ | Implemented | `packages/json-accel-rs`, `packages/agent-runtime-execution/src/utils/json.ts` | Verify parity + coverage. |
+| AK | Implemented | `packages/gitignore-rs`, `packages/context-index/src/scanner.ts` | Consider broader adoption beyond context index. |
+
 ## Scope (Remaining)
 
-- Track AD: Sandbox Sidecar (Rust daemon + policy enforcement).
-- Track AE: Storage Engine (event log + checkpoint replay).
-- Track AF: Tokenizer and Compression (tiktoken + zstd).
-- Track AG: LSP Indexer (inverted/trigram index).
-- Track AH: Diff Engine (fast diff + patch).
-- Track AI: Vector Similarity (search + ranking).
-- Track AJ: JSON Acceleration (if any gaps remain after integration).
-- Track AK: Gitignore Matcher.
+- Close performance gaps to Phase 6 targets (AE/AF/AG/AH/AI).
+- Wire Zstd payload compression + thresholds (`compressPayloadZstd`) in hot paths.
+- Finalize cross-platform sandbox policy matrix + approvals.
+- Document N-API packaging strategy for all rust crates (macOS/Linux/Windows).
+- Rollout plan and feature flags for progressive enablement.
 
 ---
 
