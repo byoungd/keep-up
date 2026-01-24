@@ -1,0 +1,63 @@
+{
+  "generatedAt": "2026-01-24T03:16:30.905Z",
+  "bench": {
+    "cache": [
+      {
+        "name": "utils/LRUCache :: insert",
+        "iterations": 20,
+        "avgMs": 6.368,
+        "opsPerSec": 157.05,
+        "memDeltaMb": 0.59
+      },
+      {
+        "name": "utils/LRUCache :: read (50% hit)",
+        "iterations": 20,
+        "avgMs": 0.852,
+        "opsPerSec": 1174.04
+      },
+      {
+        "name": "utils/LRUCache :: evict",
+        "iterations": 20,
+        "avgMs": 0.707,
+        "opsPerSec": 1415.1
+      },
+      {
+        "name": "naive Map :: insert",
+        "iterations": 20,
+        "avgMs": 6.872,
+        "opsPerSec": 145.53
+      },
+      {
+        "name": "naive Map :: read (50% hit)",
+        "iterations": 20,
+        "avgMs": 0.332,
+        "opsPerSec": 3015.22
+      },
+      {
+        "name": "naive Map :: evict",
+        "iterations": 20,
+        "avgMs": 0.511,
+        "opsPerSec": 1958.25
+      },
+      {
+        "name": "lru-cache :: insert",
+        "iterations": 20,
+        "avgMs": 2.614,
+        "opsPerSec": 382.63,
+        "memDeltaMb": 1.08
+      },
+      {
+        "name": "lru-cache :: read (50% hit)",
+        "iterations": 20,
+        "avgMs": 1.12,
+        "opsPerSec": 893.11
+      },
+      {
+        "name": "lru-cache :: evict",
+        "iterations": 20,
+        "avgMs": 0.5,
+        "opsPerSec": 2000.43
+      }
+    ]
+  }
+}

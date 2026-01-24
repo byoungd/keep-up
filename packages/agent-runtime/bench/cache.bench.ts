@@ -1,6 +1,6 @@
 import { performance } from "node:perf_hooks";
 
-import { LRUCache } from "../src/utils/cache";
+import { LRUCache } from "../../agent-runtime-execution/src/utils/cache";
 
 type CacheLike<T> = {
   get(key: string): T | undefined;
