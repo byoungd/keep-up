@@ -13,7 +13,7 @@
  */
 
 import { getGlobalEventBus, type RuntimeEventBus } from "@ku0/agent-runtime-control";
-import type { PersistenceStore } from "@ku0/agent-runtime-persistence";
+import { hashPayload, type PersistenceStore } from "@ku0/agent-runtime-persistence";
 import type {
   ArtifactEmissionContext,
   ArtifactEmissionResult,
@@ -71,6 +71,7 @@ import { AGENTS_GUIDE_PROMPT } from "../prompts/agentGuidelines";
 import type { ModelRouter, ModelRoutingDecision } from "../routing/modelRouter";
 import { resolveRuntimeCacheConfig } from "../runtimeConfig";
 import {
+  type ApprovalAuditLogger,
   ApprovalManager,
   createAuditLogger,
   createPermissionChecker,
@@ -109,6 +110,8 @@ import type {
   ToolContext,
   ToolError,
   ToolExecutionContext,
+  WorkspaceEvent,
+  WorkspaceEventKind,
 } from "../types";
 import { ToolResultCache, type ToolResultCacheOptions } from "../utils/cache";
 import { countTokens } from "../utils/tokenCounter";
@@ -407,6 +410,7 @@ export class AgentOrchestrator {
       allowZeroToolCalls: true,
     });
     this.toolExecutor = components.toolExecutor;
+    this.persistenceStore = components.persistenceStore;
     this.approvalManager = this.resolveApprovalManager(components);
     this.eventBus = components.eventBus;
     this.errorRecoveryEngine = this.resolveErrorRecoveryEngine(config, components);
@@ -438,7 +442,6 @@ export class AgentOrchestrator {
     this.artifactPipeline = components.artifactPipeline;
     this.sopExecutor = components.sopExecutor;
     this.modelRouter = components.modelRouter;
-    this.persistenceStore = components.persistenceStore;
 
     this.turnExecutor = createTurnExecutor({
       llm: this.llm,
@@ -462,7 +465,67 @@ export class AgentOrchestrator {
     if (components.approvalManager) {
       return components.approvalManager;
     }
-    return new ApprovalManager();
+    const auditLogger = this.persistenceStore ? this.createApprovalAuditLogger() : undefined;
+    return new ApprovalManager(auditLogger ? { auditLogger } : undefined);
+  }
+
+  private createApprovalAuditLogger(): ApprovalAuditLogger {
+    return {
+      logRequest: (record) => {
+        this.persistWorkspaceEvent(
+          "approval_requested",
+          {
+            approvalId: record.id,
+            kind: record.kind,
+            request: record.request,
+            requestedAt: record.requestedAt,
+            expiresAt: record.expiresAt,
+          },
+          record.requestedAt
+        );
+      },
+      logResolution: (record, decision) => {
+        this.persistWorkspaceEvent(
+          "approval_resolved",
+          {
+            approvalId: record.id,
+            kind: record.kind,
+            status: decision.status,
+            approved: decision.approved,
+            reason: decision.reason,
+            resolvedAt: record.resolvedAt ?? Date.now(),
+          },
+          record.resolvedAt ?? Date.now()
+        );
+      },
+    };
+  }
+
+  private persistWorkspaceEvent(
+    kind: WorkspaceEventKind,
+    payload: Record<string, unknown>,
+    createdAt: number,
+    sessionId?: string
+  ): void {
+    if (!this.persistenceStore) {
+      return;
+    }
+    const resolvedSessionId =
+      sessionId ?? this.currentRunId ?? this.sessionState?.id ?? this.config.name;
+    const event: WorkspaceEvent = {
+      eventId: `ws_${resolvedSessionId}_${Date.now().toString(36)}_${Math.random()
+        .toString(36)
+        .slice(2, 8)}`,
+      sessionId: resolvedSessionId,
+      kind,
+      payloadHash: hashPayload(payload),
+      createdAt,
+    };
+    try {
+      this.persistenceStore.saveWorkspaceEvent(event);
+    } catch {
+      // Fail-open: workspace event persistence should not block execution.
+    }
   }
 
   private resolveErrorRecoveryEngine(
@@ -650,6 +713,12 @@ export class AgentOrchestrator {
     const detachStreamBridge = this.attachStreamBridge(runId);
     const runStartedAt = Date.now();
     this.recordTaskRunStart(runId, userMessage, runStartedAt);
+    this.persistWorkspaceEvent(
+      "session_started",
+      { runId, goal: userMessage },
+      runStartedAt,
+      runId
+    );
 
     try {
       await this.initializeCheckpoint(userMessage);
@@ -701,6 +770,12 @@ export class AgentOrchestrator {
       return this.state;
     } finally {
       this.persistTaskRunStatus(runId);
+      this.persistWorkspaceEvent(
+        "session_ended",
+        { runId, status: this.state.status },
+        Date.now(),
+        runId
+      );
     }
   }
 
