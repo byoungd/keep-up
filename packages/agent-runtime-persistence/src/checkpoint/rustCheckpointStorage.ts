@@ -87,6 +87,7 @@ export class RustCheckpointStorage implements ICheckpointStorage {
   private readonly index = new Map<string, CheckpointIndexEntry>();
   private readonly latestByAgent = new Map<string, string>();
   private readonly latestCheckpointByAgent = new Map<string, Checkpoint>();
+  private readonly checkpointCache = new Map<string, Checkpoint>();
   private readonly chainLengthById = new Map<string, number>();
   private loaded = false;
 
@@ -226,6 +227,7 @@ export class RustCheckpointStorage implements ICheckpointStorage {
       this.latestCheckpointByAgent.delete(entry.agentId);
       this.rebuildLatestForAgent(entry.agentId);
     }
+    this.checkpointCache.delete(id);
 
     await this.persistIndex();
     return true;
@@ -244,6 +246,11 @@ export class RustCheckpointStorage implements ICheckpointStorage {
   }
 
   private async loadInternal(id: string, seen: Set<string>): Promise<Checkpoint | null> {
+    const cached = this.getCachedCheckpoint(id);
+    if (cached) {
+      return cached;
+    }
+
     if (seen.has(id)) {
       throw new Error(`Checkpoint cycle detected for ${id}`);
     }
@@ -256,6 +263,7 @@ export class RustCheckpointStorage implements ICheckpointStorage {
 
     const record = await this.readRecord(entry.fileName);
     if (record.kind === "full") {
+      this.rememberCheckpoint(id, record.checkpoint);
       return record.checkpoint;
     }
 
@@ -264,7 +272,9 @@ export class RustCheckpointStorage implements ICheckpointStorage {
       return null;
     }
 
-    return applyCheckpointDelta(base, record.delta);
+    const merged = applyCheckpointDelta(base, record.delta);
+    this.rememberCheckpoint(id, merged);
+    return merged;
   }
 
   private async writeRecord(
@@ -305,6 +315,7 @@ export class RustCheckpointStorage implements ICheckpointStorage {
       this.latestCheckpointByAgent.set(entry.agentId, summary);
     }
     this.chainLengthById.set(id, chainLength);
+    this.rememberCheckpoint(id, summary);
     await this.persistIndex();
   }
 
@@ -367,6 +378,29 @@ export class RustCheckpointStorage implements ICheckpointStorage {
     candidates.sort((a, b) => b.createdAt - a.createdAt);
     this.latestByAgent.set(agentId, candidates[0].id);
     this.latestCheckpointByAgent.delete(agentId);
+  }
+
+  private getCachedCheckpoint(id: string): Checkpoint | null {
+    const cached = this.checkpointCache.get(id);
+    if (!cached) {
+      return null;
+    }
+    this.checkpointCache.delete(id);
+    this.checkpointCache.set(id, cached);
+    return cached;
+  }
+
+  private rememberCheckpoint(id: string, checkpoint: Checkpoint): void {
+    if (this.checkpointCache.has(id)) {
+      this.checkpointCache.delete(id);
+    }
+    this.checkpointCache.set(id, checkpoint);
+    if (this.checkpointCache.size > 200) {
+      const oldest = this.checkpointCache.keys().next().value;
+      if (oldest) {
+        this.checkpointCache.delete(oldest);
+      }
+    }
   }
 }
 
