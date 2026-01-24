@@ -15,6 +15,8 @@ import {
   type RouteRule,
 } from "@ku0/model-fabric-rs";
 
+import { MODEL_CATALOG } from "../catalog/models";
+
 import type {
   CompletionRequest,
   CompletionResponse,
@@ -217,11 +219,29 @@ export class ModelFabricProvider implements LLMProvider {
     }
     const events = this.fabric.drainUsageEvents(undefined, this.config.usageDrainLimit);
     if (events.length > 0) {
-      this.config.onUsageEvents(events);
+      this.config.onUsageEvents(events.map((event) => this.withCost(event)));
     }
+  }
+
+  private withCost(event: ModelUsageEvent): ModelUsageEvent {
+    if (event.costUsd !== undefined) {
+      return event;
+    }
+    const pricing = PRICING_BY_MODEL.get(event.modelId);
+    if (!pricing) {
+      return event;
+    }
+    const inputCost = (event.inputTokens / 1_000_000) * pricing.inputTokensPer1M;
+    const outputCost = (event.outputTokens / 1_000_000) * pricing.outputTokensPer1M;
+    const costUsd = Number((inputCost + outputCost).toFixed(6));
+    return { ...event, costUsd };
   }
 }
 
 export function createModelFabricProvider(config: ModelFabricProviderConfig): ModelFabricProvider {
   return new ModelFabricProvider(config);
 }
+
+const PRICING_BY_MODEL = new Map(
+  MODEL_CATALOG.flatMap((model) => (model.pricing ? ([[model.id, model.pricing]] as const) : []))
+);

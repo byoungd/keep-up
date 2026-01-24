@@ -303,9 +303,15 @@ impl ModelFabric {
     let request = parse_completion_request(request)?;
     let context = parse_context(context)?;
 
+    let preferred_model = if request.model.trim().is_empty() {
+      None
+    } else {
+      Some(request.model.as_str())
+    };
     let (candidates, provider_map, providers_by_id) = {
       let state = self.state.lock().map_err(to_napi_error)?;
-      let candidates = resolve_candidates(&state, context.as_ref()).map_err(to_napi_error)?;
+      let candidates =
+        resolve_candidates(&state, context.as_ref(), preferred_model).map_err(to_napi_error)?;
       (candidates, state.model_to_provider.clone(), state.provider_by_id.clone())
     };
 
@@ -355,9 +361,15 @@ impl ModelFabric {
     let request = parse_completion_request(request)?;
     let context = parse_context(context)?;
 
+    let preferred_model = if request.model.trim().is_empty() {
+      None
+    } else {
+      Some(request.model.as_str())
+    };
     let (candidate, provider_map, providers_by_id) = {
       let state = self.state.lock().map_err(to_napi_error)?;
-      let candidates = resolve_candidates(&state, context.as_ref()).map_err(to_napi_error)?;
+      let candidates =
+        resolve_candidates(&state, context.as_ref(), preferred_model).map_err(to_napi_error)?;
       let primary = candidates.first().cloned().ok_or_else(|| {
         NapiError::from_reason("No available model route".to_string())
       })?;
@@ -513,6 +525,7 @@ fn validate_provider_configs(records: &[ProviderConfigRecord]) -> FabricResult<(
 fn resolve_candidates(
   state: &ModelFabricState,
   context: Option<&ModelRequestContext>,
+  preferred_model: Option<&str>,
 ) -> FabricResult<Vec<String>> {
   if let Some(route) = resolve_route(&state.routes, context) {
     let mut candidates = vec![route.model_id];
@@ -520,6 +533,12 @@ fn resolve_candidates(
       candidates.extend(fallbacks);
     }
     return Ok(candidates);
+  }
+
+  if let Some(model_id) = preferred_model {
+    if !model_id.trim().is_empty() && state.model_to_provider.contains_key(model_id) {
+      return Ok(vec![model_id.to_string()]);
+    }
   }
 
   for provider in &state.providers {
@@ -927,8 +946,14 @@ async fn stream_openai_compatible(
   if let Some(temperature) = request.temperature {
     body["temperature"] = json!(temperature);
   }
+  if let Some(top_p) = request.top_p {
+    body["top_p"] = json!(top_p);
+  }
   if let Some(max_tokens) = request.max_tokens {
     body["max_tokens"] = json!(max_tokens);
+  }
+  if let Some(stop_sequences) = &request.stop_sequences {
+    body["stop"] = json!(stop_sequences);
   }
 
   let client = reqwest::Client::builder()
@@ -1023,6 +1048,15 @@ async fn stream_anthropic(
   }
   if let Some(temperature) = request.temperature {
     body["temperature"] = json!(temperature);
+  }
+  if let Some(top_p) = request.top_p {
+    body["top_p"] = json!(top_p);
+  }
+  if let Some(stop_sequences) = &request.stop_sequences {
+    body["stop_sequences"] = json!(stop_sequences);
+  }
+  if let Some(tools) = &request.tools {
+    body["tools"] = json!(format_anthropic_tools(tools));
   }
 
   let client = reqwest::Client::builder()
@@ -1509,5 +1543,26 @@ mod tests {
     assert_eq!(event.output_tokens, 20);
     assert_eq!(event.total_tokens, 30);
     assert_eq!(event.latency_ms, 123);
+  }
+
+  #[test]
+  fn preferred_model_used_when_no_route_matches() {
+    let provider = ProviderConfigRecord {
+      provider_id: "openai".to_string(),
+      kind: ProviderKind::Openai,
+      auth_ref: "key".to_string(),
+      base_url: None,
+      timeout_ms: None,
+      max_retries: None,
+      organization_id: None,
+      model_ids: vec!["model-preferred".to_string()],
+      default_model_id: None,
+    };
+
+    let mut state = ModelFabricState::default();
+    state.update_providers(vec![provider]).unwrap();
+
+    let candidates = resolve_candidates(&state, None, Some("model-preferred")).unwrap();
+    assert_eq!(candidates, vec!["model-preferred".to_string()]);
   }
 }
