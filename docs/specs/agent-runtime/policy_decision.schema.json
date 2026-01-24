@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ToolPolicyDecision",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["allowed", "requiresConfirmation"],
+  "properties": {
+    "allowed": { "type": "boolean" },
+    "requiresConfirmation": { "type": "boolean" },
+    "reason": { "type": "string" },
+    "reasonCode": { "type": "string" },
+    "riskTags": { "type": "array", "items": { "type": "string" } },
+    "escalation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["permission", "level"],
+      "properties": {
+        "permission": { "type": "string" },
+        "level": { "type": "string" },
+        "resource": { "type": "string" },
+        "reason": { "type": "string" }
+      }
+    },
+    "policyDecision": {
+      "type": "string",
+      "enum": ["allow", "allow_with_confirm", "deny"]
+    },
+    "policyRuleId": { "type": "string" },
+    "policyAction": { "type": "string" }
+  }
+}

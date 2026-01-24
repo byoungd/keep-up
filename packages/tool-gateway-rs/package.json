@@ -1,9 +1,9 @@
 {
-  "name": "@ku0/model-fabric-rs",
+  "name": "@ku0/tool-gateway-rs",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Rust model fabric bindings",
+  "description": "Rust tool gateway bindings",
   "main": "./dist/index.js",
   "types": "./src/index.ts",
   "exports": {

@@ -52,4 +52,5 @@ export {
   toSdkResult,
   toSdkTool,
 } from "./sdkAdapter";
+export { ToolGateway, type ToolGatewayOptions } from "./toolGateway";
 export { createMcpTransport, type McpTransportConfig } from "./transport";

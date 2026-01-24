@@ -495,6 +495,9 @@ importers:
       '@ku0/agent-runtime-core':
         specifier: workspace:*
         version: link:../agent-runtime-core
+      '@ku0/agent-runtime-persistence':
+        specifier: workspace:*
+        version: link:../agent-runtime-persistence
       '@ku0/agent-runtime-sandbox':
         specifier: workspace:*
         version: link:../agent-runtime-sandbox
@@ -522,6 +525,9 @@ importers:
       '@ku0/sandbox-rs':
         specifier: workspace:*
         version: link:../sandbox-rs
+      '@ku0/tool-gateway-rs':
+        specifier: workspace:*
+        version: link:../tool-gateway-rs
       '@modelcontextprotocol/sdk':
         specifier: ^1.25.2
         version: 1.25.2(@cfworker/json-schema@4.1.1)(hono@4.11.4)(zod@4.3.5)
@@ -1062,6 +1068,9 @@ importers:
 
   packages/model-fabric-rs:
     dependencies:
+      '@ku0/agent-runtime-core':
+        specifier: workspace:*
+        version: link:../agent-runtime-core
       '@ku0/native-bindings':
         specifier: workspace:*
         version: link:../native-bindings
@@ -1313,6 +1322,25 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
+  packages/tool-gateway-rs:
+    dependencies:
+      '@ku0/agent-runtime-core':
+        specifier: workspace:*
+        version: link:../agent-runtime-core
+      '@ku0/native-bindings':
+        specifier: workspace:*
+        version: link:../native-bindings
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.19.3
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
   packages/tool-lsp:
     dependencies:
       typescript-language-server:
@@ -1414,6 +1442,9 @@ importers:
 
   packages/workspace-session-rs:
     dependencies:
+      '@ku0/agent-runtime-core':
+        specifier: workspace:*
+        version: link:../agent-runtime-core
       '@ku0/native-bindings':
         specifier: workspace:*
         version: link:../native-bindings
