@@ -22,13 +22,16 @@ struct WorkforceScenario {
 #[serde(tag = "type", rename_all = "snake_case")]
 enum ScenarioAction {
     Schedule {
+        #[serde(rename = "nowMs")]
         now_ms: Option<u64>,
     },
     Result {
         result: WorkforceResultEnvelope,
+        #[serde(rename = "nowMs")]
         now_ms: Option<u64>,
     },
     Cancel {
+        #[serde(rename = "taskId")]
         task_id: String,
         reason: Option<String>,
     },

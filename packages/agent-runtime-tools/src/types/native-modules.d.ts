@@ -14,9 +14,3 @@ declare module "@ku0/gitignore-rs" {
   export function hasNativeSupport(): boolean;
   export function listFiles(path: string, options?: ListFilesOptions): FileEntry[];
 }
-
-declare module "@ku0/sandbox-rs" {
-  export type SandboxManager = {
-    checkFileAccess: (targetPath: string, intent: string) => Promise<boolean>;
-  };
-}

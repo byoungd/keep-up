@@ -1,77 +1,32 @@
-export type WorkspaceKind = "terminal" | "browser" | "file";
+import type {
+  WorkspaceApprovalDecision as CoreWorkspaceApprovalDecision,
+  WorkspaceApprovalDecisionInput as CoreWorkspaceApprovalDecisionInput,
+  WorkspaceApprovalKind as CoreWorkspaceApprovalKind,
+  WorkspaceApprovalRequest as CoreWorkspaceApprovalRequest,
+  WorkspaceApprovalRequestInput as CoreWorkspaceApprovalRequestInput,
+  WorkspaceApprovalStatus as CoreWorkspaceApprovalStatus,
+  WorkspaceSession as CoreWorkspaceSession,
+  WorkspaceSessionConfig as CoreWorkspaceSessionConfig,
+  WorkspaceSessionEvent as CoreWorkspaceSessionEvent,
+  WorkspaceSessionEventType as CoreWorkspaceSessionEventType,
+  WorkspaceSessionKind as CoreWorkspaceSessionKind,
+  WorkspaceSessionSnapshot as CoreWorkspaceSessionSnapshot,
+  WorkspaceSessionStatus as CoreWorkspaceSessionStatus,
+} from "@ku0/agent-runtime-core";
 
-export type WorkspaceStatus = "created" | "active" | "paused" | "closed";
-
-export type WorkspaceEventType =
-  | "stdout"
-  | "stderr"
-  | "prompt"
-  | "screenshot"
-  | "dom_snapshot"
-  | "file_view"
-  | "log_line"
-  | "status";
-
-export type ApprovalKind = "tool" | "plan" | "escalation";
-
-export type ApprovalStatus = "pending" | "approved" | "rejected" | "expired";
-
-export type WorkspaceSessionConfig = {
-  sessionId?: string;
-  kind: WorkspaceKind;
-  ownerAgentId?: string;
-};
-
-export type WorkspaceSession = {
-  sessionId: string;
-  kind: WorkspaceKind;
-  status: WorkspaceStatus;
-  ownerAgentId?: string;
-  createdAt: number;
-  updatedAt: number;
-};
-
-export type WorkspaceEvent = {
-  sequence: number;
-  sessionId: string;
-  type: WorkspaceEventType;
-  timestamp: number;
-  payload: Record<string, unknown>;
-};
-
-export type WorkspaceSnapshot = {
-  sessions: WorkspaceSession[];
-  eventCursor: number;
-};
-
-export type ApprovalRequestInput = {
-  requestId?: string;
-  kind: ApprovalKind;
-  payload: Record<string, unknown>;
-  timeoutMs?: number;
-};
-
-export type ApprovalRequest = {
-  requestId: string;
-  kind: ApprovalKind;
-  payload: Record<string, unknown>;
-  requestedAt: number;
-  timeoutMs?: number;
-};
-
-export type ApprovalDecisionInput = {
-  requestId: string;
-  status?: ApprovalStatus;
-  approved?: boolean;
-  reason?: string;
-};
-
-export type ApprovalDecision = {
-  requestId: string;
-  status: ApprovalStatus;
-  approved: boolean;
-  reason?: string;
-};
+export type WorkspaceKind = CoreWorkspaceSessionKind;
+export type WorkspaceStatus = CoreWorkspaceSessionStatus;
+export type WorkspaceEventType = CoreWorkspaceSessionEventType;
+export type ApprovalKind = CoreWorkspaceApprovalKind;
+export type ApprovalStatus = CoreWorkspaceApprovalStatus;
+export type WorkspaceSessionConfig = CoreWorkspaceSessionConfig;
+export type WorkspaceSession = CoreWorkspaceSession;
+export type WorkspaceEvent = CoreWorkspaceSessionEvent;
+export type WorkspaceSnapshot = CoreWorkspaceSessionSnapshot;
+export type ApprovalRequestInput = CoreWorkspaceApprovalRequestInput;
+export type ApprovalRequest = CoreWorkspaceApprovalRequest;
+export type ApprovalDecisionInput = CoreWorkspaceApprovalDecisionInput;
+export type ApprovalDecision = CoreWorkspaceApprovalDecision;
 
 export type NativeWorkspaceSessionManager = {
   createSession: (config: WorkspaceSessionConfig) => WorkspaceSession;

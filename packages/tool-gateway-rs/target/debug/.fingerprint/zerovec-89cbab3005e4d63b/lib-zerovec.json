@@ -1,0 +1,24 @@
+{
+  "rustc": 2629586073275287932,
+  "features": "[\"derive\", \"yoke\"]",
+  "declared_features": "[\"alloc\", \"databake\", \"derive\", \"hashmap\", \"serde\", \"std\", \"yoke\"]",
+  "target": 1825474209729987087,
+  "profile": 5347358027863023418,
+  "path": 7016058062057815949,
+  "deps": [
+    [697207654067905947, "yoke", false, 985814813710997041],
+    [6522303474648583265, "zerovec_derive", false, 4874275370136097093],
+    [17046516144589451410, "zerofrom", false, 17845354416040227699]
+  ],
+  "local": [
+    {
+      "CheckDepInfo": {
+        "dep_info": "debug/.fingerprint/zerovec-89cbab3005e4d63b/dep-lib-zerovec",
+        "checksum": false
+      }
+    }
+  ],
+  "rustflags": [],
+  "config": 2069994364910194474,
+  "compile_kind": 0
+}

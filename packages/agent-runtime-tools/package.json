@@ -47,10 +47,12 @@
   "dependencies": {
     "@ku0/agent-runtime-control": "workspace:*",
     "@ku0/agent-runtime-core": "workspace:*",
+    "@ku0/agent-runtime-persistence": "workspace:*",
     "@ku0/agent-runtime-sandbox": "workspace:*",
     "@ku0/agent-runtime-telemetry": "workspace:*",
     "@ku0/agent-runtime-vision": "workspace:*",
     "@ku0/agent-toolkit-rs": "workspace:*",
+    "@ku0/tool-gateway-rs": "workspace:*",
     "@ku0/core": "workspace:*",
     "@ku0/db": "workspace:*",
     "@ku0/diff-rs": "workspace:*",

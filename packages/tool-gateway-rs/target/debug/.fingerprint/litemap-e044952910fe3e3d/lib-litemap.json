@@ -1,0 +1,20 @@
+{
+  "rustc": 2629586073275287932,
+  "features": "[]",
+  "declared_features": "[\"alloc\", \"databake\", \"default\", \"serde\", \"testing\", \"yoke\"]",
+  "target": 6548088149557820361,
+  "profile": 5347358027863023418,
+  "path": 3272435122671139412,
+  "deps": [],
+  "local": [
+    {
+      "CheckDepInfo": {
+        "dep_info": "debug/.fingerprint/litemap-e044952910fe3e3d/dep-lib-litemap",
+        "checksum": false
+      }
+    }
+  ],
+  "rustflags": [],
+  "config": 2069994364910194474,
+  "compile_kind": 0
+}

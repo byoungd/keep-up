@@ -7,5 +7,6 @@
 export * from "./events";
 export * from "./modelFabricConfig";
 export * from "./persistenceExports";
+export * from "./toolGatewayConfig";
 export * from "./workforce";
 export * from "./workspaceSessions";

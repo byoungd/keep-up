@@ -1,0 +1,31 @@
+{
+  "rustc": 2629586073275287932,
+  "features": "[\"follow-redirect\", \"futures-util\", \"iri-string\", \"tower\"]",
+  "declared_features": "[\"add-extension\", \"async-compression\", \"auth\", \"base64\", \"catch-panic\", \"compression-br\", \"compression-deflate\", \"compression-full\", \"compression-gzip\", \"compression-zstd\", \"cors\", \"decompression-br\", \"decompression-deflate\", \"decompression-full\", \"decompression-gzip\", \"decompression-zstd\", \"default\", \"follow-redirect\", \"fs\", \"full\", \"futures-core\", \"futures-util\", \"httpdate\", \"iri-string\", \"limit\", \"map-request-body\", \"map-response-body\", \"metrics\", \"mime\", \"mime_guess\", \"normalize-path\", \"percent-encoding\", \"propagate-header\", \"redirect\", \"request-id\", \"sensitive-headers\", \"set-header\", \"set-status\", \"timeout\", \"tokio\", \"tokio-util\", \"tower\", \"trace\", \"tracing\", \"util\", \"uuid\", \"validate-request\"]",
+  "target": 17577061573142048237,
+  "profile": 5347358027863023418,
+  "path": 8711226065392934808,
+  "deps": [
+    [784494742817713399, "tower_service", false, 12139347863796801257],
+    [1906322745568073236, "pin_project_lite", false, 4229572658624137042],
+    [2620434475832828286, "http", false, 14611054819364664144],
+    [3632162862999675140, "tower", false, 6061206303464304777],
+    [6355489020061627772, "bytes", false, 12532877380445523366],
+    [7712452662827335977, "tower_layer", false, 1140617093294321647],
+    [9001817693037665195, "bitflags", false, 7324552983408830904],
+    [10629569228670356391, "futures_util", false, 2946820818806108491],
+    [10678500899971835392, "iri_string", false, 11938894499675761726],
+    [14084095096285906100, "http_body", false, 15590673332610567952]
+  ],
+  "local": [
+    {
+      "CheckDepInfo": {
+        "dep_info": "debug/.fingerprint/tower-http-05f6e16d48d55f7b/dep-lib-tower_http",
+        "checksum": false
+      }
+    }
+  ],
+  "rustflags": [],
+  "config": 2069994364910194474,
+  "compile_kind": 0
+}

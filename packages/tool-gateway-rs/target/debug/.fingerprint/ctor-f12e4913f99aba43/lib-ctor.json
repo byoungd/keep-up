@@ -1,0 +1,23 @@
+{
+  "rustc": 2629586073275287932,
+  "features": "[]",
+  "declared_features": "[\"used_linker\"]",
+  "target": 16767752466166802488,
+  "profile": 3033921117576893,
+  "path": 17875212504562133562,
+  "deps": [
+    [6100504282945712449, "quote", false, 4171581551688718193],
+    [6490058671768129134, "syn", false, 18065045804348743545]
+  ],
+  "local": [
+    {
+      "CheckDepInfo": {
+        "dep_info": "debug/.fingerprint/ctor-f12e4913f99aba43/dep-lib-ctor",
+        "checksum": false
+      }
+    }
+  ],
+  "rustflags": [],
+  "config": 2069994364910194474,
+  "compile_kind": 0
+}

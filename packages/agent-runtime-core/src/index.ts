@@ -444,6 +444,8 @@ export interface SandboxConfig {
   networkAccess: "none" | "allowlist" | "full";
   /** Allowed hosts for network access */
   allowedHosts?: string[];
+  /** Explicitly allowed filesystem roots */
+  allowedRoots?: string[];
   /** Filesystem isolation */
   fsIsolation: "none" | "workspace" | "temp" | "full";
   /** Working directory for sandboxed execution */
@@ -696,6 +698,265 @@ export interface ExportBundle {
 export interface PersistenceConfig {
   dbPath: string;
   encryptionKeyRef?: string;
+}
+
+// ============================================================================
+// Tool Gateway Types (Track AQ)
+// ============================================================================
+
+export type McpTransport = "stdio" | "http" | "websocket";
+
+export interface McpManifest {
+  serverId: string;
+  name: string;
+  version: string;
+  description?: string;
+  tools: MCPTool[];
+}
+
+export interface McpServerConfig {
+  serverId: string;
+  transport: McpTransport;
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  url?: string;
+  manifest?: McpManifest;
+  sandbox?: SandboxConfig;
+}
+
+export interface ToolRegistryEntry {
+  toolId: string;
+  serverId: string;
+  tool: MCPTool;
+}
+
+export interface CapabilityGrant {
+  grantId?: string;
+  capability: string;
+  issuedAt?: number;
+  expiresAt?: number;
+  scope?: string;
+  approvalId?: string;
+}
+
+export interface ToolInvocation {
+  toolId: string;
+  requestId: string;
+  runId?: string;
+  arguments: Record<string, unknown>;
+  grantIds: string[];
+  redactKeys?: string[];
+  timeoutMs?: number;
+}
+
+export interface ToolAuditEvent {
+  sequence: number;
+  toolId: string;
+  requestId: string;
+  grantIds: string[];
+  inputHash: string;
+  outputHash: string;
+  success: boolean;
+  durationMs: number;
+  createdAt: number;
+}
+
+export interface ToolGatewaySnapshot {
+  tools: ToolRegistryEntry[];
+  grants: CapabilityGrant[];
+  auditCursor: number;
+}
+
+// ============================================================================
+// Model Fabric Types (Track AS)
+// ============================================================================
+
+export type MessageRole = "system" | "user" | "assistant";
+
+export interface Message {
+  role: MessageRole;
+  content: string;
+}
+
+export interface Tool {
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>;
+}
+
+export interface ToolCall {
+  id: string;
+  name: string;
+  arguments: string;
+}
+
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+}
+
+export interface CompletionRequest {
+  model: string;
+  messages: Message[];
+  temperature?: number;
+  maxTokens?: number;
+  stopSequences?: string[];
+  tools?: Tool[];
+  topP?: number;
+  timeoutMs?: number;
+}
+
+export type FinishReason = "stop" | "length" | "tool_calls" | "content_filter" | "error";
+
+export interface CompletionResponse {
+  content: string;
+  toolCalls?: ToolCall[];
+  usage: TokenUsage;
+  finishReason: FinishReason;
+  model: string;
+  latencyMs: number;
+}
+
+export type StreamChunkType = "content" | "tool_call" | "usage" | "done" | "error";
+
+export interface StreamChunk {
+  type: StreamChunkType;
+  content?: string;
+  toolCall?: ToolCall;
+  usage?: TokenUsage;
+  error?: string;
+  finishReason?: FinishReason;
+}
+
+export type ProviderKind = "openai" | "anthropic" | "gemini" | "local";
+
+export interface ProviderConfigRecord {
+  providerId: string;
+  kind: ProviderKind;
+  authRef: string;
+  baseUrl?: string;
+  timeoutMs?: number;
+  maxRetries?: number;
+  organizationId?: string;
+  modelIds: string[];
+  defaultModelId?: string;
+}
+
+export interface RouteRule {
+  ruleId: string;
+  priority: number;
+  workerId?: string;
+  taskType?: string;
+  modelId: string;
+  fallbackModelIds?: string[];
+}
+
+export interface ModelUsageEvent {
+  eventId: string;
+  providerId: string;
+  modelId: string;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  latencyMs: number;
+  costUsd?: number;
+  createdAt: number;
+}
+
+export interface ModelFabricSnapshot {
+  providers: ProviderConfigRecord[];
+  routes: RouteRule[];
+  usageCursor: number;
+}
+
+export interface ModelFabricContext {
+  workerId?: string;
+  taskType?: string;
+}
+
+export interface ModelStreamHandle {
+  next(): Promise<StreamChunk | null>;
+}
+
+// ============================================================================
+// Workspace Session Types (Track AR)
+// ============================================================================
+
+export type WorkspaceSessionKind = "terminal" | "browser" | "file";
+
+export type WorkspaceSessionStatus = "created" | "active" | "paused" | "closed";
+
+export type WorkspaceSessionEventType =
+  | "stdout"
+  | "stderr"
+  | "prompt"
+  | "screenshot"
+  | "dom_snapshot"
+  | "file_view"
+  | "log_line"
+  | "status";
+
+export type WorkspaceApprovalKind = "tool" | "plan" | "escalation";
+
+export type WorkspaceApprovalStatus = "pending" | "approved" | "rejected" | "expired";
+
+export interface WorkspaceSessionConfig {
+  sessionId?: string;
+  kind: WorkspaceSessionKind;
+  ownerAgentId?: string;
+}
+
+export interface WorkspaceSession {
+  sessionId: string;
+  kind: WorkspaceSessionKind;
+  status: WorkspaceSessionStatus;
+  ownerAgentId?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface WorkspaceSessionEvent {
+  sequence: number;
+  sessionId: string;
+  type: WorkspaceSessionEventType;
+  timestamp: number;
+  payload: Record<string, unknown>;
+}
+
+export interface WorkspaceSessionSnapshot {
+  sessions: WorkspaceSession[];
+  eventCursor: number;
+}
+
+export interface WorkspaceApprovalRequestInput {
+  requestId?: string;
+  kind: WorkspaceApprovalKind;
+  payload: Record<string, unknown>;
+  timeoutMs?: number;
+}
+
+export interface WorkspaceApprovalRequest {
+  requestId: string;
+  kind: WorkspaceApprovalKind;
+  payload: Record<string, unknown>;
+  requestedAt: number;
+  timeoutMs?: number;
+}
+
+export interface WorkspaceApprovalDecisionInput {
+  requestId: string;
+  status?: WorkspaceApprovalStatus;
+  approved?: boolean;
+  reason?: string;
+}
+
+export interface WorkspaceApprovalDecision {
+  requestId: string;
+  status: WorkspaceApprovalStatus;
+  approved: boolean;
+  reason?: string;
 }
 
 export interface TaskRunFilter {

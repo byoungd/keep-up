@@ -1,0 +1,20 @@
+{
+  "rustc": 2629586073275287932,
+  "features": "[\"derive\"]",
+  "declared_features": "[\"alloc\", \"default\", \"derive\"]",
+  "target": 723370850876025358,
+  "profile": 5347358027863023418,
+  "path": 3224698754655751,
+  "deps": [[4022439902832367970, "zerofrom_derive", false, 825733428209365181]],
+  "local": [
+    {
+      "CheckDepInfo": {
+        "dep_info": "debug/.fingerprint/zerofrom-754f9777f08141c8/dep-lib-zerofrom",
+        "checksum": false
+      }
+    }
+  ],
+  "rustflags": [],
+  "config": 2069994364910194474,
+  "compile_kind": 0
+}

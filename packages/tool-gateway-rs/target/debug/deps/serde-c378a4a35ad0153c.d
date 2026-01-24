@@ -1,0 +1,14 @@
+/Users/han/Documents/Code/A-keep-up/packages/tool-gateway-rs/target/debug/deps/serde-c378a4a35ad0153c.d: /Users/han/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /Users/han/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /Users/han/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /Users/han/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /Users/han/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /Users/han/Documents/Code/A-keep-up/packages/tool-gateway-rs/target/debug/build/serde-00a329bc414d19fd/out/private.rs
+
+/Users/han/Documents/Code/A-keep-up/packages/tool-gateway-rs/target/debug/deps/libserde-c378a4a35ad0153c.rlib: /Users/han/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /Users/han/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /Users/han/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /Users/han/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /Users/han/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /Users/han/Documents/Code/A-keep-up/packages/tool-gateway-rs/target/debug/build/serde-00a329bc414d19fd/out/private.rs
+
+/Users/han/Documents/Code/A-keep-up/packages/tool-gateway-rs/target/debug/deps/libserde-c378a4a35ad0153c.rmeta: /Users/han/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /Users/han/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /Users/han/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /Users/han/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /Users/han/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /Users/han/Documents/Code/A-keep-up/packages/tool-gateway-rs/target/debug/build/serde-00a329bc414d19fd/out/private.rs
+
+/Users/han/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs:
+/Users/han/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs:
+/Users/han/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs:
+/Users/han/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs:
+/Users/han/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs:
+/Users/han/Documents/Code/A-keep-up/packages/tool-gateway-rs/target/debug/build/serde-00a329bc414d19fd/out/private.rs:
+
+# env-dep:OUT_DIR=/Users/han/Documents/Code/A-keep-up/packages/tool-gateway-rs/target/debug/build/serde-00a329bc414d19fd/out
