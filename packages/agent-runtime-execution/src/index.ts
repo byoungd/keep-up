@@ -316,6 +316,7 @@ export {
   type CompletionEvent,
   CompletionToolServer,
   type CompletionValidationResult,
+  createAgentToolkitToolServer,
   createBashToolServer,
   createClarificationToolServer,
   createCodeInteractionServer,

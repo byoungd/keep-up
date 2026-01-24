@@ -303,14 +303,26 @@ function extractAffectedPaths(args: Record<string, unknown>): string[] {
   if (typeof args.srcPath === "string") {
     paths.push(args.srcPath);
   }
+  if (typeof args.sourcePath === "string") {
+    paths.push(args.sourcePath);
+  }
   if (typeof args.destPath === "string") {
     paths.push(args.destPath);
+  }
+  if (typeof args.targetPath === "string") {
+    paths.push(args.targetPath);
   }
   if (typeof args.from === "string") {
     paths.push(args.from);
   }
   if (typeof args.to === "string") {
     paths.push(args.to);
+  }
+  if (typeof args.imagePath === "string") {
+    paths.push(args.imagePath);
+  }
+  if (typeof args.audioPath === "string") {
+    paths.push(args.audioPath);
   }
   return paths;
 }

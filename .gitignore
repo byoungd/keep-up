@@ -257,6 +257,10 @@ packages/agent-workforce-rs/target/
 packages/agent-workforce-rs/Cargo.lock
 packages/agent-workforce-rs/*.node
 
+packages/agent-toolkit-rs/target/
+packages/agent-toolkit-rs/Cargo.lock
+packages/agent-toolkit-rs/*.node
+
 packages/anchor-codec-rs/target/
 packages/anchor-codec-rs/Cargo.lock
 packages/anchor-codec-rs/*.node
