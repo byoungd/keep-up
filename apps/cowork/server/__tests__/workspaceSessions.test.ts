@@ -95,8 +95,9 @@ class MockWorkspaceEventStore implements WorkspaceEventStoreLike {
     options: { afterSequence?: number; limit?: number } = {}
   ): Promise<CoworkWorkspaceEvent[]> {
     let filtered = this.events.filter((event) => event.workspaceSessionId === workspaceSessionId);
-    if (options.afterSequence !== undefined) {
-      filtered = filtered.filter((event) => event.sequence > options.afterSequence);
+    const afterSequence = options.afterSequence;
+    if (afterSequence !== undefined) {
+      filtered = filtered.filter((event) => event.sequence > afterSequence);
     }
     filtered.sort((a, b) => a.sequence - b.sequence);
     if (options.limit !== undefined) {

@@ -23,8 +23,9 @@ export class WorkspaceEventStore {
   ): Promise<CoworkWorkspaceEvent[]> {
     const events = await this.store.getAll();
     let filtered = events.filter((event) => event.workspaceSessionId === workspaceSessionId);
-    if (options.afterSequence !== undefined) {
-      filtered = filtered.filter((event) => event.sequence > options.afterSequence);
+    const afterSequence = options.afterSequence;
+    if (afterSequence !== undefined) {
+      filtered = filtered.filter((event) => event.sequence > afterSequence);
     }
     filtered.sort((a, b) => a.sequence - b.sequence);
     if (options.limit !== undefined) {
