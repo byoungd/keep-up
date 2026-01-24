@@ -5,30 +5,30 @@
   "type": "module",
   "description": "Agent Runtime tool registry, tool servers, and integrations",
   "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "types": "./src/index.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
+      "types": "./src/index.ts",
       "default": "./dist/index.js"
     },
     "./tools": {
-      "types": "./dist/tools/index.d.ts",
+      "types": "./src/tools/index.ts",
       "default": "./dist/tools/index.js"
     },
     "./tools/computer": {
-      "types": "./dist/tools/computer/index.d.ts",
+      "types": "./src/tools/computer/index.ts",
       "default": "./dist/tools/computer/index.js"
     },
     "./browser": {
-      "types": "./dist/browser/index.d.ts",
+      "types": "./src/browser/index.ts",
       "default": "./dist/browser/index.js"
     },
     "./plugins": {
-      "types": "./dist/plugins/index.d.ts",
+      "types": "./src/plugins/index.ts",
       "default": "./dist/plugins/index.js"
     },
     "./skills": {
-      "types": "./dist/skills/index.d.ts",
+      "types": "./src/skills/index.ts",
       "default": "./dist/skills/index.js"
     }
   },
