@@ -57,6 +57,42 @@ export const updateTaskStatusSchema = z.object({
   ]),
 });
 
+export const workspaceSessionCreateSchema = z.object({
+  kind: z.enum(["terminal", "browser", "file"]),
+  workspaceId: z.string().min(1).optional(),
+  ownerAgentId: z.string().min(1).optional(),
+  controller: z.enum(["agent", "user"]).optional(),
+  controllerId: z.string().min(1).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const workspaceSessionUpdateSchema = z.object({
+  status: z.enum(["requested", "running", "paused", "blocked", "ended", "errored"]).optional(),
+  controller: z.enum(["agent", "user"]).optional(),
+  controllerId: z.string().min(1).optional(),
+  endedAt: z.number().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const workspaceSessionEventSchema = z.object({
+  kind: z.enum([
+    "terminal_stdout",
+    "terminal_stderr",
+    "terminal_exit",
+    "dom_snapshot",
+    "screenshot",
+    "file_snapshot",
+    "file_diff",
+    "log_line",
+    "control_handoff",
+    "approval_request",
+    "approval_decision",
+  ]),
+  payload: z.record(z.string(), z.unknown()),
+  source: z.enum(["agent", "user", "system"]).optional(),
+  timestamp: z.number().optional(),
+});
+
 export const approvalDecisionSchema = z.object({
   status: z.enum(["approved", "rejected"]),
 });

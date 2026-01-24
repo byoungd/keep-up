@@ -24,10 +24,14 @@ import { createSqliteSessionStore } from "./sqliteSessionStore";
 import { createSqliteStepStore } from "./sqliteStepStore";
 import { createSqliteTaskStore } from "./sqliteTaskStore";
 import { createSqliteWorkflowTemplateStore } from "./sqliteWorkflowTemplateStore";
+import { createSqliteWorkspaceEventStore } from "./sqliteWorkspaceEventStore";
+import { createSqliteWorkspaceSessionStore } from "./sqliteWorkspaceSessionStore";
 import { ensureStateDir } from "./statePaths";
 import { createStepStore } from "./stepStore";
 import { createTaskStore } from "./taskStore";
 import { createWorkflowTemplateStore } from "./workflowTemplateStore";
+import { createWorkspaceEventStore } from "./workspaceEventStore";
+import { createWorkspaceSessionStore } from "./workspaceSessionStore";
 
 export {
   type AgentStateCheckpointStore,
@@ -51,6 +55,8 @@ export type {
   StorageLayer,
   TaskStoreLike,
   WorkflowTemplateStoreLike,
+  WorkspaceEventStoreLike,
+  WorkspaceSessionStoreLike,
 } from "./contracts";
 // SQLite-based stores (production-ready)
 export { closeDatabase, getDatabase } from "./database";
@@ -79,11 +85,21 @@ export {
   createSqliteWorkflowTemplateStore,
   type SqliteWorkflowTemplateStore,
 } from "./sqliteWorkflowTemplateStore";
+export {
+  createSqliteWorkspaceEventStore,
+  type SqliteWorkspaceEventStore,
+} from "./sqliteWorkspaceEventStore";
+export {
+  createSqliteWorkspaceSessionStore,
+  type SqliteWorkspaceSessionStore,
+} from "./sqliteWorkspaceSessionStore";
 // Utilities
 export { ensureStateDir, resolveStateDir } from "./statePaths";
 export { createStepStore, type StepStore } from "./stepStore";
 export { createTaskStore, type TaskStore } from "./taskStore";
 export { createWorkflowTemplateStore, type WorkflowTemplateStore } from "./workflowTemplateStore";
+export { createWorkspaceEventStore, type WorkspaceEventStore } from "./workspaceEventStore";
+export { createWorkspaceSessionStore, type WorkspaceSessionStore } from "./workspaceSessionStore";
 
 export type StorageMode = "json" | "sqlite" | "d1";
 
@@ -99,6 +115,8 @@ export async function createStorageLayer(mode: StorageMode = "json"): Promise<St
       artifactStore,
       chatMessageStore,
       approvalStore,
+      workspaceSessionStore,
+      workspaceEventStore,
       agentStateStore,
       configStore,
       projectStore,
@@ -111,6 +129,8 @@ export async function createStorageLayer(mode: StorageMode = "json"): Promise<St
       createSqliteArtifactStore(),
       createSqliteChatMessageStore(),
       createSqliteApprovalStore(),
+      createSqliteWorkspaceSessionStore(),
+      createSqliteWorkspaceEventStore(),
       createSqliteAgentStateStore(),
       createSqliteConfigStore(),
       createSqliteProjectStore(),
@@ -125,6 +145,8 @@ export async function createStorageLayer(mode: StorageMode = "json"): Promise<St
       artifactStore,
       chatMessageStore,
       approvalStore,
+      workspaceSessionStore,
+      workspaceEventStore,
       agentStateStore,
       configStore,
       projectStore,
@@ -141,6 +163,8 @@ export async function createStorageLayer(mode: StorageMode = "json"): Promise<St
     artifactStore: createArtifactStore(join(stateDir, "artifacts.json")),
     chatMessageStore: createChatMessageStore(join(stateDir, "chat_messages.json")),
     approvalStore: createApprovalStore(join(stateDir, "approvals.json")),
+    workspaceSessionStore: createWorkspaceSessionStore(join(stateDir, "workspace_sessions.json")),
+    workspaceEventStore: createWorkspaceEventStore(join(stateDir, "workspace_events.json")),
     agentStateStore: createAgentStateCheckpointStore(
       join(stateDir, "agent_state_checkpoints.json")
     ),
