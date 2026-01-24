@@ -52,6 +52,12 @@ export interface CoworkAppDeps {
 export function createCoworkApp(deps: CoworkAppDeps) {
   const eventHub = deps.events ?? new SessionEventHub();
   const logger = deps.logger ?? serverLogger;
+  const workspaceLogger = {
+    info: (message: string, meta?: Record<string, unknown>) => logger.info(message, meta),
+    warn: (message: string, meta?: Record<string, unknown>) => logger.warn(message, meta),
+    error: (message: string, meta?: Record<string, unknown>) =>
+      logger.error(message, undefined, meta),
+  };
   const runtime =
     deps.runtime ??
     new CoworkRuntimeBridge(deps.storage.approvalStore, undefined, deps.storage.auditLogStore, {
@@ -64,7 +70,7 @@ export function createCoworkApp(deps: CoworkAppDeps) {
       workspaceSessions: deps.storage.workspaceSessionStore,
       workspaceEvents: deps.storage.workspaceEventStore,
       events: eventHub,
-      logger,
+      logger: workspaceLogger,
     });
   const taskRuntime = deps.taskRuntime;
   const providerKeys =
