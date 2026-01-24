@@ -27,6 +27,10 @@
       "types": "./src/security/index.ts",
       "default": "./dist/security/index.js"
     },
+    "./lsp": {
+      "types": "./src/lsp/index.ts",
+      "default": "./dist/lsp/index.js"
+    },
     "./types": {
       "types": "./src/types/index.ts",
       "default": "./dist/types/index.js"

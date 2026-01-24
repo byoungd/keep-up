@@ -58,13 +58,14 @@ export {
 export type {
   EmbeddingProvider,
   InMemoryVectorStoreConfig,
+  SqliteVectorStoreConfig,
   VectorSearchOptions,
   VectorSearchResult as VectorStoreSearchResult,
   VectorStore,
   VectorStoreEntry,
 } from "./semantic/vectorStore";
 // Vector store
-export { InMemoryVectorStore } from "./semantic/vectorStore";
+export { InMemoryVectorStore, SqliteVectorStore } from "./semantic/vectorStore";
 
 // Types
 export type {

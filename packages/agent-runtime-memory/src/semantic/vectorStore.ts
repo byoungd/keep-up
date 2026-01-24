@@ -126,3 +126,6 @@ function textScore(content: string, query: string): number {
   }
   return 0;
 }
+
+export type { SqliteVectorStoreConfig } from "./sqliteVectorStore";
+export { SqliteVectorStore } from "./sqliteVectorStore";
