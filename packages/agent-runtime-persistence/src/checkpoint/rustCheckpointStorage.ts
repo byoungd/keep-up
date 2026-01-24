@@ -101,21 +101,25 @@ export class RustCheckpointStorage implements ICheckpointStorage {
     await this.ensureLoaded();
     await mkdir(this.rootDir, { recursive: true });
 
+    const fullRecord: StoredCheckpointRecord = { kind: "full", checkpoint };
+    const fullPayload = encode(fullRecord);
+
     const existing = this.index.get(checkpoint.id);
     if (existing) {
       await this.writeRecord(
         checkpoint.id,
-        { kind: "full", checkpoint },
+        fullRecord,
         0,
         existing.baseId,
-        checkpoint
+        checkpoint,
+        fullPayload
       );
       return;
     }
 
     const previousId = this.latestByAgent.get(checkpoint.agentId);
     if (!previousId) {
-      await this.writeRecord(checkpoint.id, { kind: "full", checkpoint }, 0, undefined, checkpoint);
+      await this.writeRecord(checkpoint.id, fullRecord, 0, undefined, checkpoint, fullPayload);
       return;
     }
 
@@ -123,21 +127,29 @@ export class RustCheckpointStorage implements ICheckpointStorage {
     const previousChain = this.chainLengthById.get(previousId) ?? 0;
 
     if (!previous || previousChain >= this.maxDeltaChain) {
-      await this.writeRecord(checkpoint.id, { kind: "full", checkpoint }, 0, undefined, checkpoint);
+      await this.writeRecord(checkpoint.id, fullRecord, 0, undefined, checkpoint, fullPayload);
       return;
     }
 
     const delta = createCheckpointDelta(previous, checkpoint);
     const deltaRecord: StoredCheckpointRecord = { kind: "delta", baseId: previousId, delta };
-    const deltaSize = encode(deltaRecord).byteLength;
-    const fullSize = encode({ kind: "full", checkpoint }).byteLength;
+    const deltaPayload = encode(deltaRecord);
+    const deltaSize = deltaPayload.byteLength;
+    const fullSize = fullPayload.byteLength;
 
     if (deltaSize >= fullSize * this.minDeltaSavingsRatio) {
-      await this.writeRecord(checkpoint.id, { kind: "full", checkpoint }, 0, undefined, checkpoint);
+      await this.writeRecord(checkpoint.id, fullRecord, 0, undefined, checkpoint, fullPayload);
       return;
     }
 
-    await this.writeRecord(checkpoint.id, deltaRecord, previousChain + 1, previousId, checkpoint);
+    await this.writeRecord(
+      checkpoint.id,
+      deltaRecord,
+      previousChain + 1,
+      previousId,
+      checkpoint,
+      deltaPayload
+    );
   }
 
   async load(id: string): Promise<Checkpoint | null> {
@@ -254,11 +266,11 @@ export class RustCheckpointStorage implements ICheckpointStorage {
     record: StoredCheckpointRecord,
     chainLength: number,
     baseId: string | undefined,
-    checkpoint?: Checkpoint
+    checkpoint?: Checkpoint,
+    payload?: Uint8Array
   ): Promise<void> {
     const fileName = `${id}.${record.kind}.msgpack`;
-    const payload = encode(record);
-    this.engine.saveCheckpoint(fileName, payload);
+    this.engine.saveCheckpoint(fileName, payload ?? encode(record));
 
     const summary = checkpoint ?? (record.kind === "full" ? record.checkpoint : undefined);
     if (!summary) {
@@ -336,7 +348,7 @@ export class RustCheckpointStorage implements ICheckpointStorage {
   private async persistIndex(): Promise<void> {
     const entries = Array.from(this.index.values());
     const tempPath = `${this.indexPath}.tmp`;
-    await writeFile(tempPath, JSON.stringify({ entries }, null, 2), "utf-8");
+    await writeFile(tempPath, JSON.stringify({ entries }), "utf-8");
     await rename(tempPath, this.indexPath);
   }
 
