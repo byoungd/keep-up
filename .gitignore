@@ -274,6 +274,7 @@ packages/policy-hash-rs/*.node
 packages/workspace-session-rs/target/
 packages/workspace-session-rs/Cargo.lock
 packages/cowork-policy-rs/Cargo.lock
+packages/cowork-policy-rs/target/
 packages/workspace-session-rs/*.node
 
 packages/streaming-markdown-rs/target/
