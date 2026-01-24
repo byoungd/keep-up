@@ -202,12 +202,15 @@ importers:
 
   packages/agent-gym:
     dependencies:
-      '@ku0/agent-runtime':
-        specifier: workspace:*
-        version: link:../agent-runtime
       '@ku0/agent-runtime-core':
         specifier: workspace:*
         version: link:../agent-runtime-core
+      '@ku0/agent-runtime-execution':
+        specifier: workspace:*
+        version: link:../agent-runtime-execution
+      '@ku0/agent-runtime-tools':
+        specifier: workspace:*
+        version: link:../agent-runtime-tools
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
@@ -224,15 +227,27 @@ importers:
 
   packages/agent-runtime:
     dependencies:
+      '@ku0/agent-runtime-control':
+        specifier: workspace:*
+        version: link:../agent-runtime-control
       '@ku0/agent-runtime-core':
         specifier: workspace:*
         version: link:../agent-runtime-core
       '@ku0/agent-runtime-execution':
         specifier: workspace:*
         version: link:../agent-runtime-execution
+      '@ku0/agent-runtime-memory':
+        specifier: workspace:*
+        version: link:../agent-runtime-memory
       '@ku0/agent-runtime-persistence':
         specifier: workspace:*
         version: link:../agent-runtime-persistence
+      '@ku0/agent-runtime-telemetry':
+        specifier: workspace:*
+        version: link:../agent-runtime-telemetry
+      '@ku0/agent-runtime-tools':
+        specifier: workspace:*
+        version: link:../agent-runtime-tools
     devDependencies:
       '@types/node':
         specifier: ^22.10.2

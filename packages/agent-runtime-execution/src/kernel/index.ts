@@ -25,12 +25,11 @@ import {
   createSkillPolicyGuard,
   createSkillPromptAdapter,
   createSkillSession,
-  errorResult,
-  type IToolRegistry,
   type SkillPromptAdapter,
   type SkillRegistry,
   type SkillSession,
-} from "@ku0/agent-runtime-tools";
+} from "@ku0/agent-runtime-tools/skills";
+import { errorResult, type IToolRegistry } from "@ku0/agent-runtime-tools/tools/mcp";
 import type { FileContextTracker } from "../context";
 import type {
   ToolConfirmationDetailsProvider,

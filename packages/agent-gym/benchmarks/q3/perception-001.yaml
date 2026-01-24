@@ -1,0 +1,47 @@
+{
+  "id": "q3-perception-001",
+  "title": "Perception accuracy: identify login method",
+  "category": "perception-accuracy",
+  "difficulty": "easy",
+  "prompt": "Read src/auth.ts and name the method that authenticates a user.",
+  "setup": {
+    "files": [
+      {
+        "path": "src/auth.ts",
+        "content": "export class AuthService {\n  login(email: string, password: string): boolean {\n    return email.length > 0 && password.length > 0;\n  }\n}\n"
+      }
+    ]
+  },
+  "expectations": [
+    { "type": "tool_called", "name": "file:read" },
+    { "type": "assistant_contains", "content": "login" }
+  ],
+  "script": {
+    "responses": [
+      {
+        "content": "Checking the auth service.",
+        "finishReason": "tool_use",
+        "toolCalls": [
+          {
+            "name": "file:read",
+            "arguments": {
+              "path": "src/auth.ts"
+            }
+          }
+        ]
+      },
+      {
+        "content": "The AuthService method is login.",
+        "finishReason": "tool_use",
+        "toolCalls": [
+          {
+            "name": "completion:complete_task",
+            "arguments": {
+              "summary": "Identified the login method."
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

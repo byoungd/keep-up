@@ -13,6 +13,7 @@ import * as fileSystem from "./fileSystem";
 import {
   createLSPClient,
   type Diagnostic,
+  type DocumentSymbol,
   detectLanguageServerForPath,
   isServerAvailable,
   type Location,
@@ -81,6 +82,7 @@ export class CodeInteractionServer extends BaseToolServer {
     this.registerTool(this.createFindReferencesTool(), this.handleFindReferences.bind(this));
     this.registerTool(this.createNavDefTool(), this.handleGoToDefinition.bind(this));
     this.registerTool(this.createNavRefsTool(), this.handleFindReferences.bind(this));
+    this.registerTool(this.createNavSymbolsTool(), this.handleNavSymbols.bind(this));
     this.registerTool(this.createRenameSymbolTool(), this.handleRenameSymbol.bind(this));
     this.registerTool(this.createDiagnosticsTool(), this.handleDiagnostics.bind(this));
   }
@@ -827,6 +829,28 @@ export class CodeInteractionServer extends BaseToolServer {
     };
   }
 
+  private createNavSymbolsTool(): MCPTool {
+    return {
+      name: "nav_symbols",
+      description: "List document symbols (classes, functions, etc.) for a file using LSP.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          path: {
+            type: "string",
+            description: "Path to the source file",
+          },
+        },
+        required: ["path"],
+      },
+      annotations: {
+        requiresConfirmation: false,
+        readOnly: true,
+        policyAction: "file.read",
+      },
+    };
+  }
+
   private createRenameSymbolTool(): MCPTool {
     return {
       name: "rename_sym",
@@ -1021,6 +1045,38 @@ export class CodeInteractionServer extends BaseToolServer {
       return textResult(
         formatRenameResult(filePath, position, newName, result, warmup ?? undefined)
       );
+    } catch (err) {
+      return this.formatLspError(err);
+    }
+  }
+
+  private async handleNavSymbols(
+    args: Record<string, unknown>,
+    context: ToolContext
+  ): Promise<MCPToolResult> {
+    const filePath = args.path as string | undefined;
+    if (!filePath) {
+      return errorResult("INVALID_ARGUMENTS", "path is required");
+    }
+
+    const filePermission = context.security?.permissions?.file;
+    if (filePermission === "none") {
+      return errorResult("PERMISSION_DENIED", "File system access is disabled");
+    }
+
+    try {
+      const absolutePath = path.resolve(filePath);
+      const session = await this.getLspSession(absolutePath);
+      await this.ensureWorkspaceWarmup(session);
+      const symbols = await session.client.getDocumentSymbols(absolutePath);
+
+      this.markRead(absolutePath, context);
+
+      if (symbols.length === 0) {
+        return textResult("No symbols found.");
+      }
+
+      return textResult(formatDocumentSymbols(absolutePath, symbols));
     } catch (err) {
       return this.formatLspError(err);
     }
@@ -1269,12 +1325,121 @@ function parsePosition(
 }
 
 function formatLocations(title: string, locations: Location[]): string {
-  const lines: string[] = [`## ${title} (${locations.length})`, ""];
-  for (const loc of locations) {
+  const sorted = sortLocations(locations);
+  const lines: string[] = [`## ${title} (${sorted.length})`, ""];
+  for (const loc of sorted) {
     const filePath = lspLocationToPath(loc);
     lines.push(`- ${filePath}:${loc.range.start.line + 1}:${loc.range.start.character + 1}`);
   }
   return lines.join("\n");
+}
+
+function formatDocumentSymbols(filePath: string, symbols: DocumentSymbol[]): string {
+  const sorted = sortDocumentSymbols(symbols);
+  const total = countDocumentSymbols(sorted);
+  const lines: string[] = [`## Symbols for ${filePath} (${total})`, ""];
+  appendSymbolLines(lines, sorted, 0);
+  return lines.join("\n");
+}
+
+function appendSymbolLines(lines: string[], symbols: DocumentSymbol[], depth: number): void {
+  const indent = "  ".repeat(depth);
+  for (const symbol of symbols) {
+    const kind = symbolKindName(symbol.kind);
+    const start = symbol.range.start;
+    const end = symbol.range.end;
+    lines.push(
+      `${indent}- ${kind} ${symbol.name} (L${start.line + 1}:C${start.character + 1}-L${
+        end.line + 1
+      }:C${end.character + 1})`
+    );
+    if (symbol.children && symbol.children.length > 0) {
+      appendSymbolLines(lines, symbol.children, depth + 1);
+    }
+  }
+}
+
+function countDocumentSymbols(symbols: DocumentSymbol[]): number {
+  let count = 0;
+  for (const symbol of symbols) {
+    count += 1;
+    if (symbol.children && symbol.children.length > 0) {
+      count += countDocumentSymbols(symbol.children);
+    }
+  }
+  return count;
+}
+
+function sortDocumentSymbols(symbols: DocumentSymbol[]): DocumentSymbol[] {
+  return symbols
+    .map((symbol) => ({
+      ...symbol,
+      children: symbol.children ? sortDocumentSymbols(symbol.children) : undefined,
+    }))
+    .sort((a, b) => {
+      const lineDelta = a.range.start.line - b.range.start.line;
+      if (lineDelta !== 0) {
+        return lineDelta;
+      }
+      const charDelta = a.range.start.character - b.range.start.character;
+      if (charDelta !== 0) {
+        return charDelta;
+      }
+      const nameDelta = a.name.localeCompare(b.name);
+      if (nameDelta !== 0) {
+        return nameDelta;
+      }
+      return a.kind - b.kind;
+    });
+}
+
+function sortLocations(locations: Location[]): Location[] {
+  return locations
+    .map((loc) => ({ loc, path: lspLocationToPath(loc) }))
+    .sort((a, b) => {
+      const pathDelta = a.path.localeCompare(b.path);
+      if (pathDelta !== 0) {
+        return pathDelta;
+      }
+      const lineDelta = a.loc.range.start.line - b.loc.range.start.line;
+      if (lineDelta !== 0) {
+        return lineDelta;
+      }
+      return a.loc.range.start.character - b.loc.range.start.character;
+    })
+    .map(({ loc }) => loc);
+}
+
+function symbolKindName(kind: number): string {
+  const kinds: Record<number, string> = {
+    1: "File",
+    2: "Module",
+    3: "Namespace",
+    4: "Package",
+    5: "Class",
+    6: "Method",
+    7: "Property",
+    8: "Field",
+    9: "Constructor",
+    10: "Enum",
+    11: "Interface",
+    12: "Function",
+    13: "Variable",
+    14: "Constant",
+    15: "String",
+    16: "Number",
+    17: "Boolean",
+    18: "Array",
+    19: "Object",
+    20: "Key",
+    21: "Null",
+    22: "EnumMember",
+    23: "Struct",
+    24: "Event",
+    25: "Operator",
+    26: "TypeParameter",
+  };
+  return kinds[kind] ?? "Unknown";
 }
 
 function formatDiagnostics(filePath: string, diagnostics: Diagnostic[]): string {

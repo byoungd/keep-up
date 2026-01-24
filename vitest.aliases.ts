@@ -161,6 +161,29 @@ export const aliases: AliasEntry[] = [
     ),
   },
   {
+    find: "@ku0/agent-runtime-tools/tools/core/bash",
+    replacement: path.resolve(__dirname, "packages/agent-runtime-tools/src/tools/core/bash.ts"),
+  },
+  {
+    find: "@ku0/agent-runtime-tools/tools/core/completion",
+    replacement: path.resolve(
+      __dirname,
+      "packages/agent-runtime-tools/src/tools/core/completion.ts"
+    ),
+  },
+  {
+    find: "@ku0/agent-runtime-tools/tools/core/file",
+    replacement: path.resolve(__dirname, "packages/agent-runtime-tools/src/tools/core/file.ts"),
+  },
+  {
+    find: "@ku0/agent-runtime-tools/tools/core",
+    replacement: path.resolve(__dirname, "packages/agent-runtime-tools/src/tools/core/index.ts"),
+  },
+  {
+    find: "@ku0/agent-runtime-tools/tools/mcp",
+    replacement: path.resolve(__dirname, "packages/agent-runtime-tools/src/tools/mcp/index.ts"),
+  },
+  {
     find: "@ku0/agent-runtime-tools/tools",
     replacement: path.resolve(__dirname, "packages/agent-runtime-tools/src/tools/index.ts"),
   },
@@ -318,6 +341,10 @@ export const aliases: AliasEntry[] = [
   {
     find: "@ku0/lfcc-bridge",
     replacement: path.resolve(__dirname, "packages/lfcc-bridge/src/index.ts"),
+  },
+  {
+    find: "@ku0/model-fabric-rs",
+    replacement: path.resolve(__dirname, "packages/model-fabric-rs/src/index.ts"),
   },
   {
     find: "@ku0/native-bindings",

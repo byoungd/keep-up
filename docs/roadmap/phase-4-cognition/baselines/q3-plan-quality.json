@@ -1,0 +1,136 @@
+{
+  "runId": "5da970a4-6d85-4602-8e2b-2279f26ac423",
+  "startedAt": "2026-01-24T08:23:17.719Z",
+  "finishedAt": "2026-01-24T08:23:18.321Z",
+  "durationMs": 602,
+  "suite": {
+    "difficulties": ["easy"],
+    "categories": ["plan-quality"]
+  },
+  "summary": {
+    "total": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "passRate": 1,
+      "durationMs": 593,
+      "avgTurns": 1,
+      "avgToolCalls": 1,
+      "iqScore": 100
+    },
+    "byDifficulty": {
+      "easy": {
+        "total": 1,
+        "passed": 1,
+        "failed": 0,
+        "passRate": 1
+      },
+      "medium": {
+        "total": 0,
+        "passed": 0,
+        "failed": 0,
+        "passRate": 0
+      },
+      "hard": {
+        "total": 0,
+        "passed": 0,
+        "failed": 0,
+        "passRate": 0
+      }
+    },
+    "byCategory": {
+      "syntax-repair": {
+        "total": 0,
+        "passed": 0,
+        "failed": 0,
+        "passRate": 0
+      },
+      "refactor": {
+        "total": 0,
+        "passed": 0,
+        "failed": 0,
+        "passRate": 0
+      },
+      "feature-add": {
+        "total": 0,
+        "passed": 0,
+        "failed": 0,
+        "passRate": 0
+      },
+      "cross-file": {
+        "total": 0,
+        "passed": 0,
+        "failed": 0,
+        "passRate": 0
+      },
+      "perception-accuracy": {
+        "total": 0,
+        "passed": 0,
+        "failed": 0,
+        "passRate": 0
+      },
+      "memory-recall": {
+        "total": 0,
+        "passed": 0,
+        "failed": 0,
+        "passRate": 0
+      },
+      "plan-quality": {
+        "total": 1,
+        "passed": 1,
+        "failed": 0,
+        "passRate": 1
+      },
+      "execution-scale": {
+        "total": 0,
+        "passed": 0,
+        "failed": 0,
+        "passRate": 0
+      },
+      "visual-layout": {
+        "total": 0,
+        "passed": 0,
+        "failed": 0,
+        "passRate": 0
+      },
+      "visual-diff": {
+        "total": 0,
+        "passed": 0,
+        "failed": 0,
+        "passRate": 0
+      },
+      "policy-safety": {
+        "total": 0,
+        "passed": 0,
+        "failed": 0,
+        "passRate": 0
+      }
+    }
+  },
+  "scenarios": [
+    {
+      "id": "q3-plan-001",
+      "title": "Plan quality: structured steps",
+      "category": "plan-quality",
+      "difficulty": "easy",
+      "pass": true,
+      "durationMs": 593,
+      "turns": 1,
+      "toolCalls": 1,
+      "expectations": [
+        {
+          "type": "assistant_contains",
+          "pass": true
+        },
+        {
+          "type": "assistant_regex",
+          "pass": true
+        },
+        {
+          "type": "assistant_contains",
+          "pass": true
+        }
+      ]
+    }
+  ]
+}

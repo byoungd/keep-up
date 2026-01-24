@@ -87,6 +87,39 @@ export type ToolContent =
 // File Context Tracking
 // ============================================================================
 
+// ============================================================================
+// Code Knowledge Graph
+// ============================================================================
+
+export interface CodeSymbolDescriptor {
+  name: string;
+  kind: string;
+  file: string;
+  line: number;
+  column: number;
+  endLine: number;
+  endColumn: number;
+  container?: string;
+  detail?: string;
+}
+
+export interface CodeSymbolQueryOptions {
+  limit?: number;
+  kinds?: string[];
+}
+
+export interface CodeSymbolQueryResult {
+  symbol: CodeSymbolDescriptor;
+  score: number;
+}
+
+export interface CodeKnowledgeGraph {
+  querySymbols(query: string, options?: CodeSymbolQueryOptions): CodeSymbolQueryResult[];
+  getSymbolStats?(): { symbolCount: number; fileCount: number };
+  getImports?(filePath: string): string[];
+  getDependents?(filePath: string, transitive?: boolean): string[];
+}
+
 /** File context status */
 export type FileContextStatus = "active" | "stale";
 

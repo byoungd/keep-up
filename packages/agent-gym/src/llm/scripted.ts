@@ -1,4 +1,8 @@
-import type { AgentLLMRequest, AgentLLMResponse, IAgentLLM } from "@ku0/agent-runtime";
+import type {
+  AgentLLMRequest,
+  AgentLLMResponse,
+  IAgentLLM,
+} from "@ku0/agent-runtime-execution/orchestrator";
 import type { GymScenario, GymScriptedResponse, GymToolCallRecord } from "../types";
 import { resolveWorkspacePath } from "../utils/files";
 

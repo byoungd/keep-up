@@ -61,6 +61,7 @@ import {
   type LessonStore,
   type Mem0MemoryAdapter,
   MessagePackCheckpointStorage,
+  mergeSemanticMemoryRecords,
   NativeTaskGraphEventLog,
   ProcessCodeExecutor,
   RuntimeAssetManager,
@@ -71,6 +72,7 @@ import {
   type SkillSession,
   SubagentManager,
   ToolResultCache,
+  toSemanticMemoryRecord,
 } from "@ku0/agent-runtime";
 import { normalizeModelId } from "@ku0/ai-core";
 import {
@@ -458,11 +460,28 @@ export class CoworkTaskRuntime {
       if (results.length === 0) {
         return;
       }
-      const lines = results.map((result) => {
-        const confidence = Math.round(result.lesson.confidence * 100);
-        return `- (${confidence}%) ${result.lesson.rule}`;
+      const records = results.map((result) => toSemanticMemoryRecord(result.lesson));
+      const merged = mergeSemanticMemoryRecords(records, {
+        hardLimit: 3,
+        softLimit: 3,
+        limit: 6,
       });
-      const context = `<LessonContext profile="${profile}">\n${lines.join("\n")}\n</LessonContext>`;
+      const sections: string[] = [];
+      if (merged.hard.length > 0) {
+        const hardLines = merged.hard.map((record) => {
+          const confidence = Math.round(record.confidence * 100);
+          return `- (${confidence}%) ${record.rule}`;
+        });
+        sections.push(`Hard constraints:\n${hardLines.join("\n")}`);
+      }
+      if (merged.soft.length > 0) {
+        const softLines = merged.soft.map((record) => {
+          const confidence = Math.round(record.confidence * 100);
+          return `- (${confidence}%) ${record.rule}`;
+        });
+        sections.push(`Preferences:\n${softLines.join("\n")}`);
+      }
+      const context = `<LessonContext profile="${profile}">\n${sections.join("\n\n")}\n</LessonContext>`;
       params.apply(context);
       this.logger.info("Injected lesson context", { count: results.length, profile });
     } catch (error) {
