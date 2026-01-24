@@ -1,0 +1,128 @@
+{
+  "runId": "3c5a4038-41c8-4fa4-b856-2a9b93daba22",
+  "startedAt": "2026-01-24T08:23:05.264Z",
+  "finishedAt": "2026-01-24T08:23:05.992Z",
+  "durationMs": 728,
+  "suite": {
+    "difficulties": ["easy"],
+    "categories": ["memory-recall"]
+  },
+  "summary": {
+    "total": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "passRate": 1,
+      "durationMs": 702,
+      "avgTurns": 1,
+      "avgToolCalls": 1,
+      "iqScore": 100
+    },
+    "byDifficulty": {
+      "easy": {
+        "total": 1,
+        "passed": 1,
+        "failed": 0,
+        "passRate": 1
+      },
+      "medium": {
+        "total": 0,
+        "passed": 0,
+        "failed": 0,
+        "passRate": 0
+      },
+      "hard": {
+        "total": 0,
+        "passed": 0,
+        "failed": 0,
+        "passRate": 0
+      }
+    },
+    "byCategory": {
+      "syntax-repair": {
+        "total": 0,
+        "passed": 0,
+        "failed": 0,
+        "passRate": 0
+      },
+      "refactor": {
+        "total": 0,
+        "passed": 0,
+        "failed": 0,
+        "passRate": 0
+      },
+      "feature-add": {
+        "total": 0,
+        "passed": 0,
+        "failed": 0,
+        "passRate": 0
+      },
+      "cross-file": {
+        "total": 0,
+        "passed": 0,
+        "failed": 0,
+        "passRate": 0
+      },
+      "perception-accuracy": {
+        "total": 0,
+        "passed": 0,
+        "failed": 0,
+        "passRate": 0
+      },
+      "memory-recall": {
+        "total": 1,
+        "passed": 1,
+        "failed": 0,
+        "passRate": 1
+      },
+      "plan-quality": {
+        "total": 0,
+        "passed": 0,
+        "failed": 0,
+        "passRate": 0
+      },
+      "execution-scale": {
+        "total": 0,
+        "passed": 0,
+        "failed": 0,
+        "passRate": 0
+      },
+      "visual-layout": {
+        "total": 0,
+        "passed": 0,
+        "failed": 0,
+        "passRate": 0
+      },
+      "visual-diff": {
+        "total": 0,
+        "passed": 0,
+        "failed": 0,
+        "passRate": 0
+      },
+      "policy-safety": {
+        "total": 0,
+        "passed": 0,
+        "failed": 0,
+        "passRate": 0
+      }
+    }
+  },
+  "scenarios": [
+    {
+      "id": "q3-memory-001",
+      "title": "Memory recall: prefer const",
+      "category": "memory-recall",
+      "difficulty": "easy",
+      "pass": true,
+      "durationMs": 702,
+      "turns": 1,
+      "toolCalls": 1,
+      "expectations": [
+        {
+          "type": "assistant_contains",
+          "pass": true
+        }
+      ]
+    }
+  ]
+}

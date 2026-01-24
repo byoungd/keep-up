@@ -49,16 +49,23 @@ export {
 } from "./memoryManager";
 // Memory Store
 export { createInMemoryStore, InMemoryStore } from "./memoryStore";
+export {
+  createSemanticMemoryStore,
+  mergeSemanticMemoryRecords,
+  SemanticMemoryStore,
+  toSemanticMemoryRecord,
+} from "./semantic/semanticMemoryStore";
 export type {
   EmbeddingProvider,
   InMemoryVectorStoreConfig,
+  SqliteVectorStoreConfig,
   VectorSearchOptions,
   VectorSearchResult as VectorStoreSearchResult,
   VectorStore,
   VectorStoreEntry,
 } from "./semantic/vectorStore";
 // Vector store
-export { InMemoryVectorStore } from "./semantic/vectorStore";
+export { InMemoryVectorStore, SqliteVectorStore } from "./semantic/vectorStore";
 
 // Types
 export type {
@@ -81,6 +88,10 @@ export type {
   MemoryType,
   RecallOptions,
   RememberOptions,
+  SemanticMemoryPolicy,
+  SemanticMemoryQuery,
+  SemanticMemoryRecord,
+  SemanticMemorySearchResult,
 } from "./types";
 export { cosineSimilarity, DEFAULT_MEMORY_CONFIG } from "./types";
 

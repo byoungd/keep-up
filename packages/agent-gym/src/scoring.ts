@@ -53,6 +53,10 @@ async function evaluateExpectation(
       return evaluateToolCalled(expectation.name, context);
     case "tool_result_error":
       return evaluateToolResultError(expectation, context);
+    case "assistant_contains":
+      return evaluateAssistantContains(expectation.content, context);
+    case "assistant_regex":
+      return evaluateAssistantRegex(expectation.pattern, context);
     case "max_turns":
       return evaluateMaxTurns(expectation.count, context);
     default:
@@ -187,6 +191,33 @@ function evaluateToolResultError(
   return { type: "tool_result_error", pass: true };
 }
 
+function evaluateAssistantContains(
+  content: string,
+  context: GymEvaluationContext
+): GymExpectationResult {
+  const combined = collectAssistantContent(context.state);
+  const pass = combined.includes(content);
+  return {
+    type: "assistant_contains",
+    pass,
+    reason: pass ? undefined : "assistant_content_missing",
+  };
+}
+
+function evaluateAssistantRegex(
+  pattern: string,
+  context: GymEvaluationContext
+): GymExpectationResult {
+  const combined = collectAssistantContent(context.state);
+  const regex = new RegExp(pattern, "m");
+  const pass = regex.test(combined);
+  return {
+    type: "assistant_regex",
+    pass,
+    reason: pass ? undefined : "assistant_pattern_missing",
+  };
+}
+
 function evaluateMaxTurns(count: number, context: GymEvaluationContext): GymExpectationResult {
   const pass = context.state.turn <= count;
   return {
@@ -209,4 +240,14 @@ async function readWorkspaceFile(
     }
     throw error;
   }
+}
+
+function collectAssistantContent(state: AgentState): string {
+  return state.messages
+    .filter(
+      (message): message is Extract<AgentState["messages"][number], { role: "assistant" }> =>
+        message.role === "assistant"
+    )
+    .map((message) => message.content)
+    .join("\n");
 }

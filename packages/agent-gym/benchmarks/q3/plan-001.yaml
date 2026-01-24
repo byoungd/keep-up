@@ -1,0 +1,28 @@
+{
+  "id": "q3-plan-001",
+  "title": "Plan quality: structured steps",
+  "category": "plan-quality",
+  "difficulty": "easy",
+  "prompt": "Provide a short plan to refactor the module.",
+  "expectations": [
+    { "type": "assistant_contains", "content": "Plan:" },
+    { "type": "assistant_regex", "pattern": "^Plan:" },
+    { "type": "assistant_contains", "content": "1." }
+  ],
+  "script": {
+    "responses": [
+      {
+        "content": "Plan:\n1. Inspect the current module structure.\n2. Extract shared helpers.\n3. Update tests for the new layout.",
+        "finishReason": "tool_use",
+        "toolCalls": [
+          {
+            "name": "completion:complete_task",
+            "arguments": {
+              "summary": "Provided a refactor plan."
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

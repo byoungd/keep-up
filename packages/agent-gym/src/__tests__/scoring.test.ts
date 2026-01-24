@@ -38,4 +38,36 @@ describe("KeepUpGym scoring", () => {
 
     await rm(workspace, { recursive: true, force: true });
   });
+
+  it("scores assistant content expectations", async () => {
+    const workspace = await mkdtemp(path.join(os.tmpdir(), "keepup-gym-test-"));
+    const assistantState: AgentState = {
+      turn: 1,
+      messages: [{ role: "assistant", content: "Plan:\\n1. Read docs\\n2. Update code" }],
+      pendingToolCalls: [],
+      status: "complete",
+    };
+
+    const contentScenario: GymScenario = {
+      id: "Z-AC-2B",
+      title: "Assistant content scoring",
+      category: "plan-quality",
+      difficulty: "easy",
+      prompt: "Provide a plan.",
+      expectations: [
+        { type: "assistant_contains", content: "Plan:" },
+        { type: "assistant_regex", pattern: "^Plan:" },
+      ],
+    };
+
+    const result = await evaluateScenario(contentScenario, {
+      workspacePath: workspace,
+      state: assistantState,
+      toolCalls: [],
+    });
+
+    expect(result.pass).toBe(true);
+
+    await rm(workspace, { recursive: true, force: true });
+  });
 });

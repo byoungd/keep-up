@@ -6,3 +6,4 @@
 
 export * from "@ku0/agent-runtime-execution";
 export * from "@ku0/agent-runtime-persistence";
+export * from "./lsp";

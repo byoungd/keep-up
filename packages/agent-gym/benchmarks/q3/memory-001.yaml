@@ -1,0 +1,26 @@
+{
+  "id": "q3-memory-001",
+  "title": "Memory recall: prefer const",
+  "category": "memory-recall",
+  "difficulty": "easy",
+  "prompt": "Recall the user preference about const usage and state it.",
+  "expectations": [
+    { "type": "assistant_contains", "content": "Prefer const" }
+  ],
+  "script": {
+    "responses": [
+      {
+        "content": "Preference recalled: Prefer const over let.",
+        "finishReason": "tool_use",
+        "toolCalls": [
+          {
+            "name": "completion:complete_task",
+            "arguments": {
+              "summary": "Recalled the const preference."
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

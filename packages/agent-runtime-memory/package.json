@@ -27,9 +27,11 @@
   "dependencies": {
     "@ku0/ai-core": "workspace:*",
     "@ku0/vector-similarity-rs": "workspace:*",
+    "better-sqlite3": "^9.6.0",
     "mem0ai": "^2.2.1"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.10.2",
     "typescript": "^5.7.3",
     "vitest": "^4.0.0"

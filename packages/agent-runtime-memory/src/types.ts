@@ -115,6 +115,37 @@ export interface Lesson {
   metadata?: Record<string, unknown>;
 }
 
+export type SemanticMemoryPolicy = "hard" | "soft";
+
+export interface SemanticMemoryRecord {
+  id: string;
+  trigger: string;
+  rule: string;
+  confidence: number;
+  source: LessonSource;
+  scope: LessonScope;
+  projectId?: string;
+  profile: LessonProfile;
+  policy: SemanticMemoryPolicy;
+  createdAt: number;
+  updatedAt: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface SemanticMemoryQuery {
+  projectId?: string;
+  scopes?: LessonScope[];
+  profiles?: LessonProfile[];
+  minConfidence?: number;
+  limit?: number;
+  policy?: SemanticMemoryPolicy | SemanticMemoryPolicy[];
+}
+
+export type SemanticMemorySearchResult = {
+  record: SemanticMemoryRecord;
+  score: number;
+};
+
 /**
  * A single memory entry.
  */

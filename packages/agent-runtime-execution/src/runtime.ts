@@ -12,12 +12,12 @@ import {
 import { type PersistenceStore, PersistentAuditLogger } from "@ku0/agent-runtime-persistence";
 import type { TelemetryContext } from "@ku0/agent-runtime-telemetry/telemetry";
 import type {
-  IToolRegistry,
   SkillPromptAdapter,
   SkillRegistry,
   SkillSession,
-} from "@ku0/agent-runtime-tools";
-import { createToolRegistry } from "@ku0/agent-runtime-tools";
+} from "@ku0/agent-runtime-tools/skills";
+import type { IToolRegistry } from "@ku0/agent-runtime-tools/tools/mcp";
+import { createToolRegistry } from "@ku0/agent-runtime-tools/tools/mcp";
 import { createFileContextTracker, type FileContextTracker } from "./context";
 import type { ToolExecutor } from "./executor";
 import { createKernel, type Kernel, type KernelConfig, type RuntimeServices } from "./kernel";
