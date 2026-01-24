@@ -249,6 +249,9 @@ importers:
       '@ku0/agent-runtime-telemetry':
         specifier: workspace:*
         version: link:../agent-runtime-telemetry
+      '@ku0/agent-workforce-rs':
+        specifier: workspace:*
+        version: link:../agent-workforce-rs
       '@ku0/workspace-session-rs':
         specifier: workspace:*
         version: link:../workspace-session-rs
@@ -527,6 +530,22 @@ importers:
       vitest:
         specifier: ^4.0.0
         version: 4.0.16(@opentelemetry/api@1.9.0)(@types/node@22.19.3)(jiti@2.6.1)(jsdom@26.1.0)(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2)
+
+  packages/agent-workforce-rs:
+    dependencies:
+      '@ku0/native-bindings':
+        specifier: workspace:*
+        version: link:../native-bindings
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.19.3
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
 
   packages/ai-context-hash-rs:
     dependencies:

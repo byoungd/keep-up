@@ -892,6 +892,142 @@ export interface ExecutionStateStore {
   getLatestTaskSnapshots(): Promise<ExecutionTaskSnapshot[]>;
 }
 
+// ============================================================================
+// Workforce Orchestrator Types
+// ============================================================================
+
+export type WorkforceTaskStatus =
+  | "queued"
+  | "running"
+  | "blocked"
+  | "completed"
+  | "failed"
+  | "canceled";
+
+export type WorkforceTaskBlockedReason = "dependencies" | "backoff" | "escalated";
+
+export interface WorkforceFailurePolicy {
+  retryCount: number;
+  backoffMs: number;
+  escalateAfter: number;
+}
+
+export interface WorkforceRuntimeConfig {
+  runId?: string;
+  eventVersion?: number;
+  failurePolicy?: WorkforceFailurePolicy;
+}
+
+export interface WorkforceTaskInput {
+  taskId: string;
+  title: string;
+  requiredCapabilities?: string[];
+  dependsOn?: string[];
+  priority?: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface WorkforcePlanInput {
+  planId: string;
+  goal?: string;
+  tasks: WorkforceTaskInput[];
+}
+
+export interface WorkforceTaskNode {
+  taskId: string;
+  title: string;
+  status: WorkforceTaskStatus;
+  dependsOn: string[];
+  requiredCapabilities: string[];
+  attempt: number;
+  priority: number;
+  assignedWorkerId?: string;
+  blockedUntil?: number;
+  blockedReason?: WorkforceTaskBlockedReason;
+  metadata?: Record<string, unknown>;
+  result?: unknown;
+  error?: string;
+}
+
+export type WorkforceWorkerState = "idle" | "busy" | "draining";
+
+export interface WorkforceWorkerRegistration {
+  workerId: string;
+  capabilities: string[];
+  capacity: number;
+  state?: WorkforceWorkerState;
+}
+
+export interface WorkforceWorkerProfile {
+  workerId: string;
+  capabilities: string[];
+  capacity: number;
+  activeCount: number;
+  state: WorkforceWorkerState;
+}
+
+export interface WorkforceAssignment {
+  taskId: string;
+  workerId: string;
+}
+
+export type WorkforceResultStatus = "completed" | "failed" | "canceled";
+
+export interface WorkforceResultEnvelope {
+  taskId: string;
+  workerId: string;
+  status: WorkforceResultStatus;
+  output?: unknown;
+  error?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export type WorkforceEventType =
+  | "plan_created"
+  | "task_queued"
+  | "task_assigned"
+  | "task_started"
+  | "task_blocked"
+  | "task_completed"
+  | "task_failed"
+  | "task_canceled"
+  | "task_retry_scheduled"
+  | "task_escalated"
+  | "task_dead_lettered"
+  | "worker_registered"
+  | "result_published"
+  | "scheduler_tick";
+
+export interface WorkforceEvent {
+  sequence: number;
+  eventVersion: number;
+  runId: string;
+  type: WorkforceEventType;
+  taskId?: string;
+  workerId?: string;
+  logicalTime?: number;
+  payload?: Record<string, unknown>;
+}
+
+export type WorkforceChannelMessageType = "task" | "result";
+
+export interface WorkforceChannelMessage {
+  sequence: number;
+  type: WorkforceChannelMessageType;
+  taskId: string;
+  payload: unknown;
+}
+
+export interface WorkforceSnapshot {
+  runId: string;
+  planId?: string;
+  goal?: string;
+  tasks: WorkforceTaskNode[];
+  workers: WorkforceWorkerProfile[];
+  eventCursor: number;
+  channelCursor: number;
+}
+
 /** Agent configuration */
 export interface AgentConfig {
   /** Agent name */
