@@ -107,6 +107,7 @@ TypeScript policy layer
 ## Rollout Plan
 
 - Feature flag: `runtime.sandbox.mode = rust|docker`.
+- Cowork runtime override: `COWORK_SANDBOX_MODE=rust|docker|process|auto` (auto defaults to docker with fallback).
 - Gradual rollout by OS and cohort.
 - Automatic fallback to Docker on unsupported kernels.
 
