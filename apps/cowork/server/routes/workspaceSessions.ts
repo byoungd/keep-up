@@ -1,6 +1,7 @@
 import type { CoworkWorkspaceEvent, CoworkWorkspaceSession } from "@ku0/agent-runtime";
 import { Hono } from "hono";
 import { formatZodError, jsonError, readJsonBody } from "../http";
+import type { WorkspaceSessionRuntime } from "../runtime/services/WorkspaceSessionRuntime";
 import {
   workspaceSessionCreateSchema,
   workspaceSessionEventSchema,
@@ -18,6 +19,7 @@ interface WorkspaceSessionRouteDeps {
   workspaceSessions: WorkspaceSessionStoreLike;
   workspaceEvents: WorkspaceEventStoreLike;
   events: SessionEventHub;
+  runtime?: WorkspaceSessionRuntime;
 }
 
 type WorkspaceEventInput = {
@@ -25,6 +27,19 @@ type WorkspaceEventInput = {
   payload: CoworkWorkspaceEvent["payload"];
   source?: CoworkWorkspaceEvent["source"];
   timestamp?: number;
+};
+
+type RuntimeSessionInfo = {
+  status: CoworkWorkspaceSession["status"];
+  createdAt: number;
+  updatedAt: number;
+};
+
+type WorkspaceSessionUpdateResult = {
+  updated: CoworkWorkspaceSession | null;
+  controllerChanged: boolean;
+  previousController: CoworkWorkspaceSession["controller"] | null;
+  previousControllerId?: string;
 };
 
 function parseNumber(value: string | undefined): number | undefined {
@@ -56,6 +71,144 @@ function parseEventInputs(body: unknown): WorkspaceEventInput[] | null {
   return null;
 }
 
+function formatErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function startRuntimeSession(
+  runtime: WorkspaceSessionRuntime | undefined,
+  input: {
+    workspaceSessionId: string;
+    kind: CoworkWorkspaceSession["kind"];
+    ownerAgentId?: string;
+  }
+): { runtimeSession: RuntimeSessionInfo | null; error?: string } {
+  if (!runtime) {
+    return { runtimeSession: null };
+  }
+  try {
+    return {
+      runtimeSession: runtime.createSession({
+        workspaceSessionId: input.workspaceSessionId,
+        kind: input.kind,
+        ownerAgentId: input.ownerAgentId,
+      }),
+    };
+  } catch (error) {
+    return { runtimeSession: null, error: formatErrorMessage(error) };
+  }
+}
+
+function applyRuntimeStatusUpdate(
+  runtime: WorkspaceSessionRuntime | undefined,
+  workspaceSessionId: string,
+  currentStatus: CoworkWorkspaceSession["status"],
+  nextStatus?: CoworkWorkspaceSession["status"]
+): string | null {
+  if (!runtime || !nextStatus || nextStatus === currentStatus) {
+    return null;
+  }
+  try {
+    if (nextStatus === "paused") {
+      runtime.pauseSession(workspaceSessionId);
+    } else if (nextStatus === "active") {
+      runtime.resumeSession(workspaceSessionId);
+    } else if (nextStatus === "closed") {
+      runtime.closeSession(workspaceSessionId);
+    }
+    return null;
+  } catch (error) {
+    return formatErrorMessage(error);
+  }
+}
+
+async function updateWorkspaceSessionRecord(
+  store: WorkspaceSessionStoreLike,
+  workspaceSessionId: string,
+  input: {
+    nextStatus: CoworkWorkspaceSession["status"];
+    controller?: CoworkWorkspaceSession["controller"];
+    controllerId?: string;
+    metadata?: Record<string, unknown>;
+    endedAt?: number;
+  }
+): Promise<WorkspaceSessionUpdateResult> {
+  let controllerChanged = false;
+  let previousController: CoworkWorkspaceSession["controller"] | null = null;
+  let previousControllerId: string | undefined;
+
+  const updated = await store.update(workspaceSessionId, (prev) => {
+    const now = Date.now();
+    const endedAt =
+      input.endedAt ?? (input.nextStatus === "closed" && !prev.endedAt ? now : prev.endedAt);
+    const nextController = input.controller ?? prev.controller;
+    const nextControllerId = input.controllerId ?? prev.controllerId;
+
+    controllerChanged =
+      nextController !== prev.controller || nextControllerId !== prev.controllerId;
+    previousController = prev.controller;
+    previousControllerId = prev.controllerId;
+
+    return {
+      ...prev,
+      status: input.nextStatus,
+      controller: nextController,
+      controllerId: nextControllerId,
+      endedAt,
+      updatedAt: now,
+      metadata: input.metadata ? { ...(prev.metadata ?? {}), ...input.metadata } : prev.metadata,
+    };
+  });
+
+  return {
+    updated,
+    controllerChanged,
+    previousController,
+    previousControllerId,
+  };
+}
+
+async function maybeEmitControllerHandoff(
+  deps: Pick<WorkspaceSessionRouteDeps, "workspaceEvents" | "events">,
+  session: CoworkWorkspaceSession,
+  controllerChanged: boolean,
+  previousController: CoworkWorkspaceSession["controller"] | null,
+  previousControllerId?: string
+): Promise<void> {
+  if (!controllerChanged || !previousController) {
+    return;
+  }
+  const event = await deps.workspaceEvents.append({
+    workspaceSessionId: session.workspaceSessionId,
+    sessionId: session.sessionId,
+    kind: "log_line",
+    payload: {
+      message: "control_handoff",
+      from: previousController,
+      to: session.controller,
+      fromId: previousControllerId,
+      toId: session.controllerId,
+    },
+    source: "system",
+  });
+  deps.events.publish(session.sessionId, COWORK_EVENTS.WORKSPACE_SESSION_EVENT, {
+    sessionId: session.sessionId,
+    workspaceSessionId: session.workspaceSessionId,
+    event,
+  });
+}
+
+function maybePublishSessionEnded(events: SessionEventHub, session: CoworkWorkspaceSession): void {
+  if (session.status !== "closed" || !session.endedAt) {
+    return;
+  }
+  events.publish(session.sessionId, COWORK_EVENTS.WORKSPACE_SESSION_ENDED, {
+    sessionId: session.sessionId,
+    workspaceSessionId: session.workspaceSessionId,
+    endedAt: session.endedAt,
+  });
+}
+
 export function createWorkspaceSessionRoutes(deps: WorkspaceSessionRouteDeps) {
   const app = new Hono();
 
@@ -78,18 +231,31 @@ export function createWorkspaceSessionRoutes(deps: WorkspaceSessionRouteDeps) {
       return jsonError(c, 404, "Session not found");
     }
 
+    const workspaceSessionId = crypto.randomUUID();
+    const runtimeResult = startRuntimeSession(deps.runtime, {
+      workspaceSessionId,
+      kind: parsed.data.kind,
+      ownerAgentId: parsed.data.ownerAgentId,
+    });
+    if (runtimeResult.error) {
+      return jsonError(c, 500, "Failed to start workspace session", runtimeResult.error);
+    }
+
     const now = Date.now();
+    const createdAt = runtimeResult.runtimeSession?.createdAt ?? now;
+    const updatedAt = runtimeResult.runtimeSession?.updatedAt ?? createdAt;
+    const status = runtimeResult.runtimeSession?.status ?? "created";
     const workspaceSession: CoworkWorkspaceSession = {
-      workspaceSessionId: crypto.randomUUID(),
+      workspaceSessionId,
       sessionId,
       workspaceId: resolveWorkspaceId(session, parsed.data.workspaceId),
       kind: parsed.data.kind,
-      status: "requested",
+      status,
       ownerAgentId: parsed.data.ownerAgentId,
       controller: parsed.data.controller ?? "agent",
       controllerId: parsed.data.controllerId,
-      createdAt: now,
-      updatedAt: now,
+      createdAt,
+      updatedAt,
       metadata: parsed.data.metadata,
     };
 
@@ -99,6 +265,7 @@ export function createWorkspaceSessionRoutes(deps: WorkspaceSessionRouteDeps) {
       workspaceSession: created,
     });
 
+    await deps.runtime?.drainAndPublish();
     return c.json({ ok: true, workspaceSession: created }, 201);
   });
 
@@ -113,41 +280,35 @@ export function createWorkspaceSessionRoutes(deps: WorkspaceSessionRouteDeps) {
 
   app.patch("/workspace-sessions/:workspaceSessionId", async (c) => {
     const workspaceSessionId = c.req.param("workspaceSessionId");
+    const existing = await deps.workspaceSessions.getById(workspaceSessionId);
+    if (!existing) {
+      return jsonError(c, 404, "Workspace session not found");
+    }
     const body = await readJsonBody(c);
     const parsed = workspaceSessionUpdateSchema.safeParse(body ?? {});
     if (!parsed.success) {
       return jsonError(c, 400, "Invalid workspace session update", formatZodError(parsed.error));
     }
 
-    let controllerChanged = false;
-    let previousController: CoworkWorkspaceSession["controller"] | null = null;
-    let previousControllerId: string | undefined;
+    const nextStatus = parsed.data.status ?? existing.status;
+    const runtimeError = applyRuntimeStatusUpdate(
+      deps.runtime,
+      workspaceSessionId,
+      existing.status,
+      parsed.data.status
+    );
+    if (runtimeError) {
+      return jsonError(c, 500, "Failed to update workspace session runtime", runtimeError);
+    }
 
-    const updated = await deps.workspaceSessions.update(workspaceSessionId, (prev) => {
-      const now = Date.now();
-      const nextStatus = parsed.data.status ?? prev.status;
-      const endedAt =
-        parsed.data.endedAt ?? (nextStatus === "ended" && !prev.endedAt ? now : prev.endedAt);
-      const nextController = parsed.data.controller ?? prev.controller;
-      const nextControllerId = parsed.data.controllerId ?? prev.controllerId;
-
-      controllerChanged =
-        nextController !== prev.controller || nextControllerId !== prev.controllerId;
-      previousController = prev.controller;
-      previousControllerId = prev.controllerId;
-
-      return {
-        ...prev,
-        status: nextStatus,
-        controller: nextController,
-        controllerId: nextControllerId,
-        endedAt,
-        updatedAt: now,
-        metadata: parsed.data.metadata
-          ? { ...(prev.metadata ?? {}), ...parsed.data.metadata }
-          : prev.metadata,
-      };
-    });
+    const { updated, controllerChanged, previousController, previousControllerId } =
+      await updateWorkspaceSessionRecord(deps.workspaceSessions, workspaceSessionId, {
+        nextStatus,
+        controller: parsed.data.controller,
+        controllerId: parsed.data.controllerId,
+        metadata: parsed.data.metadata,
+        endedAt: parsed.data.endedAt,
+      });
 
     if (!updated) {
       return jsonError(c, 404, "Workspace session not found");
@@ -158,34 +319,17 @@ export function createWorkspaceSessionRoutes(deps: WorkspaceSessionRouteDeps) {
       workspaceSession: updated,
     });
 
-    if (controllerChanged && previousController) {
-      const event = await deps.workspaceEvents.append({
-        workspaceSessionId: updated.workspaceSessionId,
-        sessionId: updated.sessionId,
-        kind: "control_handoff",
-        payload: {
-          from: previousController,
-          to: updated.controller,
-          fromId: previousControllerId,
-          toId: updated.controllerId,
-        },
-        source: "system",
-      });
-      deps.events.publish(updated.sessionId, COWORK_EVENTS.WORKSPACE_SESSION_EVENT, {
-        sessionId: updated.sessionId,
-        workspaceSessionId: updated.workspaceSessionId,
-        event,
-      });
-    }
+    await maybeEmitControllerHandoff(
+      deps,
+      updated,
+      controllerChanged,
+      previousController,
+      previousControllerId
+    );
 
-    if (updated.status === "ended" && updated.endedAt) {
-      deps.events.publish(updated.sessionId, COWORK_EVENTS.WORKSPACE_SESSION_ENDED, {
-        sessionId: updated.sessionId,
-        workspaceSessionId: updated.workspaceSessionId,
-        endedAt: updated.endedAt,
-      });
-    }
+    maybePublishSessionEnded(deps.events, updated);
 
+    await deps.runtime?.drainAndPublish();
     return c.json({ ok: true, workspaceSession: updated });
   });
 
@@ -212,6 +356,7 @@ export function createWorkspaceSessionRoutes(deps: WorkspaceSessionRouteDeps) {
       return jsonError(c, 404, "Workspace session not found");
     }
 
+    await deps.runtime?.drainAndPublish();
     const afterSequence = parseNumber(c.req.query("afterSequence"));
     const limit = parseNumber(c.req.query("limit"));
     const events = await deps.workspaceEvents.getByWorkspaceSession(workspaceSessionId, {

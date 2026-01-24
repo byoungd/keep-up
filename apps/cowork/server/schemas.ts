@@ -67,7 +67,7 @@ export const workspaceSessionCreateSchema = z.object({
 });
 
 export const workspaceSessionUpdateSchema = z.object({
-  status: z.enum(["requested", "running", "paused", "blocked", "ended", "errored"]).optional(),
+  status: z.enum(["created", "active", "paused", "closed"]).optional(),
   controller: z.enum(["agent", "user"]).optional(),
   controllerId: z.string().min(1).optional(),
   endedAt: z.number().optional(),
@@ -76,17 +76,14 @@ export const workspaceSessionUpdateSchema = z.object({
 
 export const workspaceSessionEventSchema = z.object({
   kind: z.enum([
-    "terminal_stdout",
-    "terminal_stderr",
-    "terminal_exit",
-    "dom_snapshot",
+    "stdout",
+    "stderr",
+    "prompt",
     "screenshot",
-    "file_snapshot",
-    "file_diff",
+    "dom_snapshot",
+    "file_view",
     "log_line",
-    "control_handoff",
-    "approval_request",
-    "approval_decision",
+    "status",
   ]),
   payload: z.record(z.string(), z.unknown()),
   source: z.enum(["agent", "user", "system"]).optional(),

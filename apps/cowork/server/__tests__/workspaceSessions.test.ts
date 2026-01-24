@@ -252,6 +252,7 @@ describe("Workspace session routes", () => {
 
     const storedEvents = await workspaceEventStore.getByWorkspaceSession(workspaceSessionId);
     expect(storedEvents).toHaveLength(1);
-    expect(storedEvents[0]?.kind).toBe("control_handoff");
+    expect(storedEvents[0]?.kind).toBe("log_line");
+    expect(storedEvents[0]?.payload?.message).toBe("control_handoff");
   });
 });
