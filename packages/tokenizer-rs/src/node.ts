@@ -65,6 +65,8 @@ function buildCandidatePaths(packageRoot: string): string[] {
   return [
     join(packageRoot, "tokenizer_rs.node"),
     join(packageRoot, "index.node"),
+    join(packageRoot, `tokenizer_rs.${platformArch}.node`),
+    join(packageRoot, `index.${platformArch}.node`),
     join(packageRoot, "native", "tokenizer_rs.node"),
     join(packageRoot, "native", "index.node"),
     join(packageRoot, "native", "target", "release", "tokenizer_rs.node"),
