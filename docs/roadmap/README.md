@@ -65,6 +65,14 @@ cowork initiatives. Use this index to navigate the active tracks and supporting 
 - docs/roadmap/phase-8-rust-agent-capabilities/track-at-agent-toolkits.md
 - docs/roadmap/phase-8-rust-agent-capabilities/track-au-local-first-data.md
 
+## Phase 9: Convergence and Productionization (Q1 2028)
+- docs/roadmap/phase-9-convergence/README.md
+- docs/roadmap/phase-9-convergence/track-av-cognition-delivery.md
+- docs/roadmap/phase-9-convergence/track-aw-rust-native-completion.md
+- docs/roadmap/phase-9-convergence/track-ax-rust-first-capabilities.md
+- docs/roadmap/phase-9-convergence/track-ay-policy-ops-parity.md
+- docs/roadmap/phase-9-convergence/track-az-cowork-ui-convergence.md
+
 ## Parallel Product Tracks (UI & Cowork)
 - docs/roadmap/ui-cowork-cowork/README.md
 - docs/roadmap/ui-cowork-cowork/track-1-foundation.md
@@ -76,3 +84,5 @@ cowork initiatives. Use this index to navigate the active tracks and supporting 
 - Include a top metadata block where possible (Owner, Status, Date, Timeline, Dependencies).
 - Keep links repo-relative; avoid local-only file:// references.
 - Use consistent status labels from the Status Vocabulary section above.
+- Use the track template for new work: docs/roadmap/track-template.md
+- Track generator: `pnpm roadmap:new-track -- --id AV --title "Cognition Delivery" --phase phase-9-convergence`
