@@ -5,5 +5,6 @@
  */
 
 export * from "./events";
+export * from "./modelFabricConfig";
 export * from "./workforce";
 export * from "./workspaceSessions";

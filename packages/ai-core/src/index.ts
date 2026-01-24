@@ -307,6 +307,7 @@ export {
   // Vercel AI SDK Adapters (Recommended)
   createAnthropicAdapter,
   createGoogleAdapter,
+  createModelFabricProvider,
   createOpenAIAdapter,
   createProviderRouter,
   createResilientProvider,
@@ -317,6 +318,8 @@ export {
   type LLMProvider,
   type Message,
   type MessageRole,
+  ModelFabricProvider,
+  type ModelFabricProviderConfig,
   type ModelPricing,
   type OpenAIConfig,
   // Implementations

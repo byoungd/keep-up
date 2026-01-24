@@ -272,6 +272,9 @@ packages/workspace-session-rs/*.node
 packages/streaming-markdown-rs/target/
 packages/streaming-markdown-rs/Cargo.lock
 packages/streaming-markdown-rs/*.node
+packages/model-fabric-rs/target/
+packages/model-fabric-rs/Cargo.lock
+packages/model-fabric-rs/*.node
 packages/keepup-tui/target/
 packages/keepup-tui/Cargo.lock
 packages/markdown-content-rs/target/
