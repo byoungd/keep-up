@@ -86,6 +86,7 @@ export class RustCheckpointStorage implements ICheckpointStorage {
   private readonly engine: NativeStorageEngine;
   private readonly index = new Map<string, CheckpointIndexEntry>();
   private readonly latestByAgent = new Map<string, string>();
+  private readonly latestCheckpointByAgent = new Map<string, Checkpoint>();
   private readonly chainLengthById = new Map<string, number>();
   private loaded = false;
 
@@ -123,7 +124,11 @@ export class RustCheckpointStorage implements ICheckpointStorage {
       return;
     }
 
-    const previous = await this.load(previousId);
+    const cachedPrevious = this.latestCheckpointByAgent.get(checkpoint.agentId);
+    const previous =
+      cachedPrevious && cachedPrevious.id === previousId
+        ? cachedPrevious
+        : await this.load(previousId);
     const previousChain = this.chainLengthById.get(previousId) ?? 0;
 
     if (!previous || previousChain >= this.maxDeltaChain) {
@@ -218,6 +223,7 @@ export class RustCheckpointStorage implements ICheckpointStorage {
 
     if (this.latestByAgent.get(entry.agentId) === id) {
       this.latestByAgent.delete(entry.agentId);
+      this.latestCheckpointByAgent.delete(entry.agentId);
       this.rebuildLatestForAgent(entry.agentId);
     }
 
@@ -296,6 +302,7 @@ export class RustCheckpointStorage implements ICheckpointStorage {
     this.index.set(id, entry);
     if (entry.agentId) {
       this.latestByAgent.set(entry.agentId, id);
+      this.latestCheckpointByAgent.set(entry.agentId, summary);
     }
     this.chainLengthById.set(id, chainLength);
     await this.persistIndex();
@@ -359,6 +366,7 @@ export class RustCheckpointStorage implements ICheckpointStorage {
     }
     candidates.sort((a, b) => b.createdAt - a.createdAt);
     this.latestByAgent.set(agentId, candidates[0].id);
+    this.latestCheckpointByAgent.delete(agentId);
   }
 }
 
