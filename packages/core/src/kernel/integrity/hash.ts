@@ -82,7 +82,7 @@ async function sha256Hex(data: string): Promise<string> {
   const bytes = stringToBytes(data);
   const subtle = typeof globalThis !== "undefined" ? globalThis.crypto?.subtle : undefined;
   if (subtle) {
-    const hashBuffer = await subtle.digest("SHA-256", bytes);
+    const hashBuffer = await subtle.digest("SHA-256", new Uint8Array(bytes));
     return bytesToHex(new Uint8Array(hashBuffer));
   }
 
