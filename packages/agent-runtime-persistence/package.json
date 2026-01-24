@@ -5,35 +5,40 @@
   "type": "module",
   "description": "Checkpoint persistence and time-travel utilities",
   "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "types": "./src/index.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
+      "types": "./src/index.ts",
       "default": "./dist/index.js"
     },
+    "./node": {
+      "types": "./src/node.ts",
+      "default": "./dist/node.js"
+    },
     "./checkpoint": {
-      "types": "./dist/checkpoint/index.d.ts",
+      "types": "./src/checkpoint/index.ts",
       "default": "./dist/checkpoint/index.js"
     },
     "./execution": {
-      "types": "./dist/execution/index.d.ts",
+      "types": "./src/execution/index.ts",
       "default": "./dist/execution/index.js"
     },
     "./artifacts": {
-      "types": "./dist/artifacts/index.d.ts",
+      "types": "./src/artifacts/index.ts",
       "default": "./dist/artifacts/index.js"
     },
     "./timetravel": {
-      "types": "./dist/timetravel/index.d.ts",
+      "types": "./src/timetravel/index.ts",
       "default": "./dist/timetravel/index.js"
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "*.node"
   ],
   "sideEffects": false,
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/build-native.js --release",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -44,6 +49,7 @@
     "@ku0/agent-runtime-control": "workspace:*",
     "@ku0/agent-runtime-core": "workspace:*",
     "@ku0/core": "workspace:*",
+    "@ku0/native-bindings": "workspace:*",
     "@ku0/storage-engine-rs": "workspace:*",
     "@msgpack/msgpack": "^3.1.3",
     "zod": "^4.3.5",

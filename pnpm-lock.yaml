@@ -403,6 +403,9 @@ importers:
       '@ku0/core':
         specifier: workspace:*
         version: link:../core
+      '@ku0/native-bindings':
+        specifier: workspace:*
+        version: link:../native-bindings
       '@ku0/storage-engine-rs':
         specifier: workspace:*
         version: link:../storage-engine-rs

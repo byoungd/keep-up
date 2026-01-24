@@ -5,21 +5,18 @@
   "type": "module",
   "description": "Agent Runtime telemetry, metrics, and logging",
   "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "types": "./src/index.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "development": "./src/index.ts",
+      "types": "./src/index.ts",
       "default": "./dist/index.js"
     },
     "./logging": {
-      "types": "./dist/logging/index.d.ts",
-      "development": "./src/logging/index.ts",
+      "types": "./src/logging/index.ts",
       "default": "./dist/logging/index.js"
     },
     "./telemetry": {
-      "types": "./dist/telemetry/index.d.ts",
-      "development": "./src/telemetry/index.ts",
+      "types": "./src/telemetry/index.ts",
       "default": "./dist/telemetry/index.js"
     }
   },

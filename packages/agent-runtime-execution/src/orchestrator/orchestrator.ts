@@ -13,6 +13,7 @@
  */
 
 import { getGlobalEventBus, type RuntimeEventBus } from "@ku0/agent-runtime-control";
+import { hashPayload, type PersistenceStore } from "@ku0/agent-runtime-persistence";
 import type {
   ArtifactEmissionContext,
   ArtifactEmissionResult,
@@ -47,7 +48,12 @@ import {
   type ToolDiscoveryEngine,
   validateCompletionInput,
 } from "@ku0/agent-runtime-tools";
-import { MODEL_CATALOG, type ModelCapability } from "@ku0/ai-core";
+import {
+  getModelCapability,
+  MODEL_CATALOG,
+  type ModelCapability,
+  type ModelPricing,
+} from "@ku0/ai-core";
 import type { IntentRegistry } from "@ku0/core";
 import { createIntentRegistry } from "@ku0/core";
 import type { ContextFrameBuilder, ContextItem, FileContextTracker } from "../context";
@@ -65,6 +71,7 @@ import { AGENTS_GUIDE_PROMPT } from "../prompts/agentGuidelines";
 import type { ModelRouter, ModelRoutingDecision } from "../routing/modelRouter";
 import { resolveRuntimeCacheConfig } from "../runtimeConfig";
 import {
+  type ApprovalAuditLogger,
   ApprovalManager,
   createAuditLogger,
   createPermissionChecker,
@@ -92,15 +99,19 @@ import type {
   MCPToolCall,
   MCPToolResult,
   MCPToolServer,
+  ModelEvent,
   ParallelExecutionConfig,
   PermissionEscalation,
   RuntimeCacheConfig,
   RuntimeConfig,
   SecurityPolicy,
+  TaskRunStatus,
   TokenUsageStats,
   ToolContext,
   ToolError,
   ToolExecutionContext,
+  WorkspaceEvent,
+  WorkspaceEventKind,
 } from "../types";
 import { ToolResultCache, type ToolResultCacheOptions } from "../utils/cache";
 import { countTokens } from "../utils/tokenCounter";
@@ -250,6 +261,8 @@ export interface OrchestratorComponents {
   sopExecutor?: ISOPExecutor;
   /** Model router for per-turn model selection (Track F) */
   modelRouter?: ModelRouter;
+  /** Optional persistence store for local-first audit/logging */
+  persistenceStore?: PersistenceStore;
 }
 
 export interface OrchestratorStreamBridge {
@@ -320,6 +333,7 @@ export class AgentOrchestrator {
   private readonly artifactPipeline?: ArtifactPipeline;
   private readonly sopExecutor?: ISOPExecutor;
   private readonly modelRouter?: ModelRouter;
+  private readonly persistenceStore?: PersistenceStore;
   private readonly loopStateMachine: AgentLoopStateMachine;
   private readonly singleStepEnforcer: SingleStepEnforcer;
   private readonly statusController: OrchestratorStatusController;
@@ -339,6 +353,7 @@ export class AgentOrchestrator {
   private recoveryState: RecoveryState = { active: false, warned: false };
   private forceCompletionToolsOnly = false;
   private subagentPreludeExecuted = false;
+  private currentModelId?: string;
 
   private state: AgentState;
 
@@ -395,6 +410,7 @@ export class AgentOrchestrator {
       allowZeroToolCalls: true,
     });
     this.toolExecutor = components.toolExecutor;
+    this.persistenceStore = components.persistenceStore;
     this.approvalManager = this.resolveApprovalManager(components);
     this.eventBus = components.eventBus;
     this.errorRecoveryEngine = this.resolveErrorRecoveryEngine(config, components);
@@ -449,7 +465,67 @@ export class AgentOrchestrator {
     if (components.approvalManager) {
       return components.approvalManager;
     }
-    return new ApprovalManager();
+    const auditLogger = this.persistenceStore ? this.createApprovalAuditLogger() : undefined;
+    return new ApprovalManager(auditLogger ? { auditLogger } : undefined);
+  }
+
+  private createApprovalAuditLogger(): ApprovalAuditLogger {
+    return {
+      logRequest: (record) => {
+        this.persistWorkspaceEvent(
+          "approval_requested",
+          {
+            approvalId: record.id,
+            kind: record.kind,
+            request: record.request,
+            requestedAt: record.requestedAt,
+            expiresAt: record.expiresAt,
+          },
+          record.requestedAt
+        );
+      },
+      logResolution: (record, decision) => {
+        this.persistWorkspaceEvent(
+          "approval_resolved",
+          {
+            approvalId: record.id,
+            kind: record.kind,
+            status: decision.status,
+            approved: decision.approved,
+            reason: decision.reason,
+            resolvedAt: record.resolvedAt ?? Date.now(),
+          },
+          record.resolvedAt ?? Date.now()
+        );
+      },
+    };
+  }
+
+  private persistWorkspaceEvent(
+    kind: WorkspaceEventKind,
+    payload: Record<string, unknown>,
+    createdAt: number,
+    sessionId?: string
+  ): void {
+    if (!this.persistenceStore) {
+      return;
+    }
+    const resolvedSessionId =
+      sessionId ?? this.currentRunId ?? this.sessionState?.id ?? this.config.name;
+    const event: WorkspaceEvent = {
+      eventId: `ws_${resolvedSessionId}_${Date.now().toString(36)}_${Math.random()
+        .toString(36)
+        .slice(2, 8)}`,
+      sessionId: resolvedSessionId,
+      kind,
+      payloadHash: hashPayload(payload),
+      createdAt,
+    };
+    try {
+      this.persistenceStore.saveWorkspaceEvent(event);
+    } catch {
+      // Fail-open: workspace event persistence should not block execution.
+    }
   }
 
   private resolveErrorRecoveryEngine(
@@ -635,54 +711,72 @@ export class AgentOrchestrator {
     this.taskGraph?.setEventContext({ correlationId: runId, source: this.config.name });
     this.currentPlanNodeId = this.createPlanNode(userMessage);
     const detachStreamBridge = this.attachStreamBridge(runId);
-
-    await this.initializeCheckpoint(userMessage);
-
-    // Add user message
-    const userMsg: AgentMessage = { role: "user", content: userMessage };
-    this.state.messages.push(userMsg);
-    this.recordMessage(userMsg);
-    await this.maybeRunSubagentPrelude(userMessage);
-    this.metrics?.gauge(AGENT_METRICS.activeAgents.name, 1, {});
-    this.loopStateMachine.stop();
+    const runStartedAt = Date.now();
+    this.recordTaskRunStart(runId, userMessage, runStartedAt);
+    this.persistWorkspaceEvent(
+      "session_started",
+      { runId, goal: userMessage },
+      runStartedAt,
+      runId
+    );
 
     try {
-      if (!this.hasCompletionTool()) {
-        this.statusController.setStatus(this.state, "error");
-        this.state.error = "Completion tool not registered.";
-        this.emit("error", { error: this.state.error });
-        this.metrics?.increment(AGENT_METRICS.turnsTotal.name, { status: "error" });
-        await this.finalizeCheckpointStatus();
-        return this.state;
-      }
+      await this.initializeCheckpoint(userMessage);
 
-      // Run the agentic loop
-      while (this.shouldContinue()) {
-        await this.awaitControlGate();
-        if (!this.shouldContinue()) {
-          break;
+      // Add user message
+      const userMsg: AgentMessage = { role: "user", content: userMessage };
+      this.state.messages.push(userMsg);
+      this.recordMessage(userMsg);
+      await this.maybeRunSubagentPrelude(userMessage);
+      this.metrics?.gauge(AGENT_METRICS.activeAgents.name, 1, {});
+      this.loopStateMachine.stop();
+
+      try {
+        if (!this.hasCompletionTool()) {
+          this.statusController.setStatus(this.state, "error");
+          this.state.error = "Completion tool not registered.";
+          this.emit("error", { error: this.state.error });
+          this.metrics?.increment(AGENT_METRICS.turnsTotal.name, { status: "error" });
+          await this.finalizeCheckpointStatus();
+          return this.state;
         }
-        await this.executeTurn();
-        this.applyStepPause();
+
+        // Run the agentic loop
+        while (this.shouldContinue()) {
+          await this.awaitControlGate();
+          if (!this.shouldContinue()) {
+            break;
+          }
+          await this.executeTurn();
+          this.applyStepPause();
+        }
+      } finally {
+        detachStreamBridge?.();
+        this.finalizePlanNode();
+        this.metrics?.gauge(AGENT_METRICS.activeAgents.name, 0, {});
       }
+
+      if (
+        this.state.status !== "complete" &&
+        this.state.status !== "waiting_confirmation" &&
+        this.state.status !== "error"
+      ) {
+        this.statusController.setStatus(this.state, "error");
+        this.state.error = this.state.error ?? "Task terminated without calling complete_task.";
+        this.emit("error", { error: this.state.error });
+      }
+
+      await this.finalizeCheckpointStatus();
+      return this.state;
     } finally {
-      detachStreamBridge?.();
-      this.finalizePlanNode();
-      this.metrics?.gauge(AGENT_METRICS.activeAgents.name, 0, {});
+      this.persistTaskRunStatus(runId);
+      this.persistWorkspaceEvent(
+        "session_ended",
+        { runId, status: this.state.status },
+        Date.now(),
+        runId
+      );
     }
-
-    if (
-      this.state.status !== "complete" &&
-      this.state.status !== "waiting_confirmation" &&
-      this.state.status !== "error"
-    ) {
-      this.statusController.setStatus(this.state, "error");
-      this.state.error = this.state.error ?? "Task terminated without calling complete_task.";
-      this.emit("error", { error: this.state.error });
-    }
-
-    await this.finalizeCheckpointStatus();
-    return this.state;
   }
 
   private async maybeRunSubagentPrelude(userMessage: string): Promise<void> {
@@ -712,6 +806,48 @@ export class AgentOrchestrator {
       };
       this.state.messages.push(failureMsg);
       this.recordMessage(failureMsg);
+    }
+  }
+
+  private recordTaskRunStart(runId: string, goal: string, startedAt: number): void {
+    if (!this.persistenceStore) {
+      return;
+    }
+    try {
+      this.persistenceStore.saveTaskRun({
+        runId,
+        goal,
+        status: "running",
+        startedAt,
+      });
+    } catch {
+      // Fail-open: persistence should not block execution.
+    }
+  }
+
+  private persistTaskRunStatus(runId: string): void {
+    if (!this.persistenceStore) {
+      return;
+    }
+    const status = this.resolveTaskRunStatus(this.state.status);
+    const endedAt = status === "running" || status === "queued" ? undefined : Date.now();
+    try {
+      this.persistenceStore.updateTaskRunStatus(runId, status, endedAt);
+    } catch {
+      // Fail-open: persistence should not block execution.
+    }
+  }
+
+  private resolveTaskRunStatus(status: AgentState["status"]): TaskRunStatus {
+    switch (status) {
+      case "complete":
+        return "completed";
+      case "error":
+        return "failed";
+      case "waiting_confirmation":
+        return "running";
+      default:
+        return "running";
     }
   }
 
@@ -1791,6 +1927,7 @@ export class AgentOrchestrator {
   }
 
   private emitRoutingDecision(decision: ModelRoutingDecision): void {
+    this.currentModelId = decision.resolved;
     this.emit("routing:decision" as OrchestratorEventType, {
       requested: decision.requested,
       resolved: decision.resolved,
@@ -2923,11 +3060,53 @@ export class AgentOrchestrator {
       }
     }
 
+    this.persistOrchestratorEvent(type, data);
+
     this.eventBus?.emitRaw(`orchestrator:${type}`, event, {
       source: this.config.name,
       correlationId: this.currentRunId,
       priority: "normal",
     });
+  }
+
+  private persistOrchestratorEvent(type: OrchestratorEventType, data: unknown): void {
+    if (!this.persistenceStore || !this.currentRunId) {
+      return;
+    }
+    if (type !== "usage:update") {
+      return;
+    }
+
+    const usage = (data as { usage?: TokenUsageStats }).usage;
+    if (!usage) {
+      return;
+    }
+
+    const modelId = this.currentModelId ?? "unknown";
+    const capability = getModelCapability(modelId);
+    const providerId = capability?.provider ?? "unknown";
+    const costUsd = capability?.pricing ? calculateCost(usage, capability.pricing) : undefined;
+    const eventId = `model_${this.currentRunId}_${this.state.turn}_${Date.now().toString(36)}_${Math.random()
+      .toString(36)
+      .slice(2, 8)}`;
+
+    const event: ModelEvent = {
+      eventId,
+      runId: this.currentRunId,
+      providerId,
+      modelId,
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      totalTokens: usage.totalTokens,
+      costUsd,
+      createdAt: Date.now(),
+    };
+
+    try {
+      this.persistenceStore.saveModelEvent(event);
+    } catch {
+      // Fail-open: persistence should not block execution.
+    }
   }
 
   private generateRunId(): string {
@@ -2976,6 +3155,12 @@ function isToolConfirmationResolver(
   return (
     typeof (executor as { requiresConfirmation?: unknown }).requiresConfirmation === "function"
   );
+}
+
+function calculateCost(usage: TokenUsageStats, pricing: ModelPricing): number {
+  const inputCost = (usage.inputTokens / 1_000_000) * pricing.inputTokensPer1M;
+  const outputCost = (usage.outputTokens / 1_000_000) * pricing.outputTokensPer1M;
+  return Math.round((inputCost + outputCost) * 1_000_000) / 1_000_000;
 }
 
 function isToolConfirmationDetailsProvider(

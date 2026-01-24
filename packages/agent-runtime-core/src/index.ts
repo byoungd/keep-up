@@ -629,6 +629,92 @@ export interface AuditFilter {
 }
 
 // ============================================================================
+// Persistence Types (Track AU)
+// ============================================================================
+
+export type TaskRunStatus = "queued" | "running" | "completed" | "failed" | "canceled";
+
+export interface TaskRun {
+  runId: string;
+  goal: string;
+  status: TaskRunStatus;
+  startedAt: number;
+  endedAt?: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface ToolEvent {
+  eventId: string;
+  runId: string;
+  toolId: string;
+  inputHash: string;
+  outputHash: string;
+  durationMs: number;
+  createdAt: number;
+}
+
+export interface ModelEvent {
+  eventId: string;
+  runId: string;
+  providerId: string;
+  modelId: string;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  costUsd?: number;
+  createdAt: number;
+}
+
+export type WorkspaceEventKind =
+  | "session_started"
+  | "session_ended"
+  | "approval_requested"
+  | "approval_resolved";
+
+export interface WorkspaceEvent {
+  eventId: string;
+  sessionId: string;
+  kind: WorkspaceEventKind;
+  payloadHash: string;
+  createdAt: number;
+}
+
+export interface SecretRecord {
+  key: string;
+  encryptedPayload: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ExportBundle {
+  taskRuns: TaskRun[];
+  toolEvents: ToolEvent[];
+  modelEvents: ModelEvent[];
+  workspaceEvents: WorkspaceEvent[];
+}
+
+export interface PersistenceConfig {
+  dbPath: string;
+  encryptionKeyRef?: string;
+}
+
+export interface TaskRunFilter {
+  runId?: string;
+  status?: TaskRunStatus | TaskRunStatus[];
+  startedAfter?: number;
+  startedBefore?: number;
+  limit?: number;
+}
+
+export interface ExportFilter {
+  runId?: string;
+  sessionId?: string;
+  since?: number;
+  until?: number;
+  limit?: number;
+}
+
+// ============================================================================
 // Agent Orchestrator Types
 // ============================================================================
 

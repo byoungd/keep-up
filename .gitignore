@@ -204,6 +204,8 @@ packages/agent-gym/reports/
 
 packages/storage-engine-rs/target/
 packages/storage-engine-rs/Cargo.lock
+packages/agent-runtime-persistence/native/target/
+packages/agent-runtime-persistence/native/Cargo.lock
 
 packages/anchor-relocation-rs/target/
 packages/anchor-relocation-rs/Cargo.lock

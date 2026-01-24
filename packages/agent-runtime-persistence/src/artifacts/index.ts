@@ -12,7 +12,6 @@ import type { ArtifactEmissionContext, ArtifactEmissionResult } from "./artifact
 export type {
   ArtifactEmissionContext,
   ArtifactEmissionResult,
-  ArtifactEmitter,
 } from "./artifactTypes";
 
 export interface ArtifactValidationResult {
