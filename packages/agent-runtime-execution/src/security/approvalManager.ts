@@ -4,22 +4,22 @@
  * Tracks approval requests with explicit status transitions and optional timeouts.
  */
 
-export type ApprovalStatus = "pending" | "approved" | "rejected" | "expired";
+export type SecurityApprovalStatus = "pending" | "approved" | "rejected" | "expired";
 export type ApprovalKind = "tool" | "plan" | "escalation";
 
 export interface ApprovalRecord<RequestT = unknown> {
   id: string;
   kind: ApprovalKind;
   request: RequestT;
-  status: ApprovalStatus;
+  status: SecurityApprovalStatus;
   requestedAt: number;
   resolvedAt?: number;
   expiresAt?: number;
   reason?: string;
 }
 
-export interface ApprovalDecision {
-  status: ApprovalStatus;
+export interface SecurityApprovalDecision {
+  status: SecurityApprovalStatus;
   approved: boolean;
   reason?: string;
 }
@@ -28,7 +28,9 @@ export interface ApprovalRequestOptions {
   timeoutMs?: number;
 }
 
-export type ApprovalHandler<RequestT> = (request: RequestT) => Promise<boolean | ApprovalDecision>;
+export type ApprovalHandler<RequestT> = (
+  request: RequestT
+) => Promise<boolean | SecurityApprovalDecision>;
 
 /**
  * Audit logger for approval events.
@@ -36,7 +38,7 @@ export type ApprovalHandler<RequestT> = (request: RequestT) => Promise<boolean |
  */
 export interface ApprovalAuditLogger {
   logRequest?(record: ApprovalRecord): void | Promise<void>;
-  logResolution?(record: ApprovalRecord, decision: ApprovalDecision): void | Promise<void>;
+  logResolution?(record: ApprovalRecord, decision: SecurityApprovalDecision): void | Promise<void>;
 }
 
 export interface ApprovalManagerConfig {
@@ -57,7 +59,7 @@ export class ApprovalManager {
     request: RequestT,
     handler?: ApprovalHandler<RequestT>,
     options: ApprovalRequestOptions = {}
-  ): Promise<ApprovalDecision> {
+  ): Promise<SecurityApprovalDecision> {
     const record = this.createRecord(kind, request, options.timeoutMs);
     if (!handler) {
       return this.resolve(record.id, {
@@ -113,7 +115,7 @@ export class ApprovalManager {
     return record;
   }
 
-  private resolve(id: string, decision: ApprovalDecision): ApprovalDecision {
+  private resolve(id: string, decision: SecurityApprovalDecision): SecurityApprovalDecision {
     const record = this.records.get(id);
     if (!record) {
       return decision;
@@ -133,12 +135,12 @@ export class ApprovalManager {
     handler: ApprovalHandler<RequestT>,
     request: RequestT,
     timeoutMs?: number
-  ): Promise<ApprovalDecision> {
+  ): Promise<SecurityApprovalDecision> {
     if (!timeoutMs) {
       return this.normalizeDecision(await handler(request));
     }
 
-    return new Promise<ApprovalDecision>((resolve) => {
+    return new Promise<SecurityApprovalDecision>((resolve) => {
       const timeout = setTimeout(() => {
         resolve({ status: "expired", approved: false, reason: "Approval timed out" });
       }, timeoutMs);
@@ -156,7 +158,7 @@ export class ApprovalManager {
     });
   }
 
-  private normalizeDecision(result: boolean | ApprovalDecision): ApprovalDecision {
+  private normalizeDecision(result: boolean | SecurityApprovalDecision): SecurityApprovalDecision {
     if (typeof result === "boolean") {
       return {
         status: result ? "approved" : "rejected",

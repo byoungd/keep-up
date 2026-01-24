@@ -273,6 +273,8 @@ packages/keepup-tui/Cargo.lock
 packages/markdown-content-rs/target/
 packages/markdown-content-rs/Cargo.lock
 packages/markdown-content-rs/*.node
+packages/agent-workforce-rs/target/
+
 
 # Desktop Tauri
 apps/desktop-tauri/src-tauri/target/
