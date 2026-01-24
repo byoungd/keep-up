@@ -3,7 +3,13 @@
  * Eliminates magic strings and provides compile-time safety.
  */
 
-import type { ClarificationRequest, ClarificationResponse, ToolActivity } from "@ku0/agent-runtime";
+import type {
+  ClarificationRequest,
+  ClarificationResponse,
+  CoworkWorkspaceEvent,
+  CoworkWorkspaceSession,
+  ToolActivity,
+} from "@ku0/agent-runtime";
 
 export const COWORK_EVENTS = {
   // Session lifecycle
@@ -14,6 +20,12 @@ export const COWORK_EVENTS = {
   SESSION_MODE_CHANGED: "session.mode.changed",
   SESSION_USAGE_UPDATED: "session.usage.updated",
   TOKEN_USAGE: "token.usage",
+
+  // Workspace sessions
+  WORKSPACE_SESSION_CREATED: "workspace.session.created",
+  WORKSPACE_SESSION_UPDATED: "workspace.session.updated",
+  WORKSPACE_SESSION_ENDED: "workspace.session.ended",
+  WORKSPACE_SESSION_EVENT: "workspace.session.event",
 
   // Task lifecycle
   TASK_CREATED: "task.created",
@@ -116,6 +128,24 @@ export interface CoworkEventPayloads {
   [COWORK_EVENTS.TASK_FAILED]: {
     taskId: string;
     error: string;
+  };
+  [COWORK_EVENTS.WORKSPACE_SESSION_CREATED]: {
+    sessionId: string;
+    workspaceSession: CoworkWorkspaceSession;
+  };
+  [COWORK_EVENTS.WORKSPACE_SESSION_UPDATED]: {
+    sessionId: string;
+    workspaceSession: CoworkWorkspaceSession;
+  };
+  [COWORK_EVENTS.WORKSPACE_SESSION_ENDED]: {
+    sessionId: string;
+    workspaceSessionId: string;
+    endedAt: number;
+  };
+  [COWORK_EVENTS.WORKSPACE_SESSION_EVENT]: {
+    sessionId: string;
+    workspaceSessionId: string;
+    event: CoworkWorkspaceEvent;
   };
   [COWORK_EVENTS.APPROVAL_REQUIRED]: {
     approvalId: string;

@@ -139,6 +139,50 @@ export interface CoworkWorkspace {
   metadata?: Record<string, unknown>;
 }
 
+export type CoworkWorkspaceSessionKind = "terminal" | "browser" | "file";
+
+export type CoworkWorkspaceSessionStatus = "created" | "active" | "paused" | "closed";
+
+export type CoworkWorkspaceSessionController = "agent" | "user";
+
+export interface CoworkWorkspaceSession {
+  workspaceSessionId: string;
+  sessionId: string;
+  workspaceId?: string;
+  kind: CoworkWorkspaceSessionKind;
+  status: CoworkWorkspaceSessionStatus;
+  ownerAgentId?: string;
+  controller: CoworkWorkspaceSessionController;
+  controllerId?: string;
+  createdAt: number;
+  updatedAt: number;
+  endedAt?: number;
+  metadata?: Record<string, unknown>;
+}
+
+export type CoworkWorkspaceEventKind =
+  | "stdout"
+  | "stderr"
+  | "prompt"
+  | "screenshot"
+  | "dom_snapshot"
+  | "file_view"
+  | "log_line"
+  | "status";
+
+export type CoworkWorkspaceEventSource = "agent" | "user" | "system";
+
+export interface CoworkWorkspaceEvent {
+  eventId: string;
+  workspaceSessionId: string;
+  sessionId: string;
+  sequence: number;
+  timestamp: number;
+  kind: CoworkWorkspaceEventKind;
+  payload: Record<string, unknown>;
+  source?: CoworkWorkspaceEventSource;
+}
+
 export interface CoworkWorkflowTemplateInput {
   key: string;
   label: string;

@@ -3,6 +3,8 @@ import type {
   CoworkRiskTag,
   CoworkTask,
   CoworkTaskStatus,
+  CoworkWorkspaceEvent,
+  CoworkWorkspaceSession,
   ToolActivity,
 } from "@ku0/agent-runtime";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -15,6 +17,7 @@ import {
   listClarifications,
   listSessionArtifacts,
   listTasks,
+  listWorkspaceSessions,
   resolveApproval,
   revertArtifact as revertArtifactRequest,
   submitClarification,
@@ -32,6 +35,7 @@ import {
 } from "../types";
 
 const RISK_TAGS = new Set<CoworkRiskTag>(["delete", "overwrite", "network", "connector", "batch"]);
+const MAX_WORKSPACE_EVENTS = 200;
 
 // --- LocalStorage Persistence ---
 const GRAPH_STORAGE_PREFIX = "cowork-task-graph-";
@@ -87,6 +91,12 @@ function loadGraphFromStorage(sessionId: string): TaskGraph | null {
       clarifications: parsed.clarifications ?? [],
       pendingApprovalId: parsed.pendingApprovalId,
       messageUsage: parsed.messageUsage ?? {},
+      workspaceSessions: isRecord(parsed.workspaceSessions)
+        ? (parsed.workspaceSessions as Record<string, CoworkWorkspaceSession>)
+        : {},
+      workspaceEvents: isRecord(parsed.workspaceEvents)
+        ? (parsed.workspaceEvents as Record<string, CoworkWorkspaceEvent[]>)
+        : {},
     };
   } catch {
     return null;
@@ -171,6 +181,114 @@ function upsertNode(nodes: TaskNode[], next: TaskNode): TaskNode[] {
   return updated;
 }
 
+const WORKSPACE_STATUSES: CoworkWorkspaceSession["status"][] = [
+  "created",
+  "active",
+  "paused",
+  "closed",
+];
+
+function mapWorkspaceSessions(
+  sessions: CoworkWorkspaceSession[]
+): Record<string, CoworkWorkspaceSession> {
+  return Object.fromEntries(sessions.map((session) => [session.workspaceSessionId, session]));
+}
+
+function isWorkspaceSession(value: unknown): value is CoworkWorkspaceSession {
+  return (
+    isRecord(value) &&
+    typeof value.workspaceSessionId === "string" &&
+    typeof value.sessionId === "string" &&
+    typeof value.kind === "string" &&
+    typeof value.status === "string"
+  );
+}
+
+function isWorkspaceEvent(value: unknown): value is CoworkWorkspaceEvent {
+  return (
+    isRecord(value) &&
+    typeof value.workspaceSessionId === "string" &&
+    typeof value.sequence === "number" &&
+    typeof value.timestamp === "number" &&
+    typeof value.kind === "string" &&
+    isRecord(value.payload)
+  );
+}
+
+function resolveWorkspaceStatus(
+  payload: Record<string, unknown>
+): CoworkWorkspaceSession["status"] | null {
+  const status = typeof payload.status === "string" ? payload.status : undefined;
+  if (!status || !WORKSPACE_STATUSES.includes(status as CoworkWorkspaceSession["status"])) {
+    return null;
+  }
+  return status as CoworkWorkspaceSession["status"];
+}
+
+function upsertWorkspaceSession(prev: TaskGraph, session: CoworkWorkspaceSession): TaskGraph {
+  return {
+    ...prev,
+    workspaceSessions: {
+      ...(prev.workspaceSessions ?? {}),
+      [session.workspaceSessionId]: session,
+    },
+  };
+}
+
+function appendWorkspaceEvent(prev: TaskGraph, event: CoworkWorkspaceEvent): TaskGraph {
+  const workspaceEvents = { ...(prev.workspaceEvents ?? {}) };
+  const existing = workspaceEvents[event.workspaceSessionId] ?? [];
+  const nextEvents = [...existing, event];
+  const capped =
+    nextEvents.length > MAX_WORKSPACE_EVENTS
+      ? nextEvents.slice(nextEvents.length - MAX_WORKSPACE_EVENTS)
+      : nextEvents;
+  workspaceEvents[event.workspaceSessionId] = capped;
+
+  const sessions = prev.workspaceSessions ?? {};
+  const current = sessions[event.workspaceSessionId];
+  if (!current) {
+    return {
+      ...prev,
+      workspaceEvents,
+    };
+  }
+
+  let nextSession = current;
+  if (event.kind === "status") {
+    const status = resolveWorkspaceStatus(event.payload);
+    if (status) {
+      nextSession = {
+        ...current,
+        status,
+        updatedAt: Math.max(current.updatedAt, event.timestamp),
+        endedAt: status === "closed" ? (current.endedAt ?? event.timestamp) : current.endedAt,
+      };
+    }
+  } else if (event.timestamp > current.updatedAt) {
+    nextSession = {
+      ...current,
+      updatedAt: event.timestamp,
+    };
+  }
+
+  if (nextSession === current) {
+    return {
+      ...prev,
+      workspaceEvents,
+    };
+  }
+
+  return {
+    ...prev,
+    workspaceSessions: {
+      ...sessions,
+      [event.workspaceSessionId]: nextSession,
+    },
+    workspaceEvents,
+  };
+}
+
 function buildTaskNodes(tasks: CoworkTask[]): TaskStatusNode[] {
   return [...tasks]
     .sort((a, b) => a.createdAt - b.createdAt)
@@ -198,6 +316,8 @@ export function useTaskStream(sessionId: string) {
     artifacts: {},
     clarifications: [],
     messageUsage: {},
+    workspaceSessions: {},
+    workspaceEvents: {},
   });
 
   const [isConnected, setIsConnected] = useState(false);
@@ -241,6 +361,8 @@ export function useTaskStream(sessionId: string) {
         artifacts: {},
         clarifications: [],
         messageUsage: {},
+        workspaceSessions: {},
+        workspaceEvents: {},
       });
       seenEventIdsRef.current = new Set();
     }
@@ -263,13 +385,15 @@ export function useTaskStream(sessionId: string) {
         return;
       }
       try {
-        const [session, tasks, approvals, artifacts, clarifications] = await Promise.all([
-          getSession(sessionId),
-          listTasks(sessionId),
-          listApprovals(sessionId),
-          listSessionArtifacts(sessionId),
-          listClarifications(sessionId),
-        ]);
+        const [session, tasks, approvals, artifacts, clarifications, workspaceSessions] =
+          await Promise.all([
+            getSession(sessionId),
+            listTasks(sessionId),
+            listApprovals(sessionId),
+            listSessionArtifacts(sessionId),
+            listClarifications(sessionId),
+            listWorkspaceSessions(sessionId),
+          ]);
         if (isActiveRef && !isActiveRef.current) {
           return;
         }
@@ -286,6 +410,8 @@ export function useTaskStream(sessionId: string) {
                 artifacts: {},
                 clarifications: [],
                 messageUsage: {},
+                workspaceSessions: {},
+                workspaceEvents: {},
               }
             : prev;
           const normalizedMode =
@@ -294,7 +420,7 @@ export function useTaskStream(sessionId: string) {
             session.agentMode === "review"
               ? session.agentMode
               : undefined;
-          return deriveInitialState(
+          const derived = deriveInitialState(
             base,
             tasks,
             approvals,
@@ -305,6 +431,11 @@ export function useTaskStream(sessionId: string) {
             taskPromptRef.current,
             taskMetadataRef.current
           );
+          return {
+            ...derived,
+            workspaceSessions: mapWorkspaceSessions(workspaceSessions),
+            workspaceEvents: base.workspaceEvents ?? {},
+          };
         });
       } catch (error) {
         if (!isActiveRef || isActiveRef.current) {
@@ -723,6 +854,10 @@ type EventHandler = (
 
 const EVENT_HANDLERS: Record<string, EventHandler> = {
   "session.mode.changed": handleSessionModeChanged,
+  "workspace.session.created": handleWorkspaceSessionCreated,
+  "workspace.session.updated": handleWorkspaceSessionUpdated,
+  "workspace.session.ended": handleWorkspaceSessionEnded,
+  "workspace.session.event": handleWorkspaceSessionEvent,
   "task.created": handleTaskUpdate,
   "task.updated": handleTaskUpdate,
   "approval.required": handleApprovalRequired,
@@ -817,6 +952,83 @@ function handleTokenUsage(
       [messageId]: usageEntry,
     },
   };
+}
+
+function handleWorkspaceSessionCreated(
+  prev: TaskGraph,
+  _id: string,
+  data: unknown,
+  _now: string,
+  _taskTitles: Map<string, string>,
+  _taskPrompts: Map<string, string>,
+  _taskMetadata: Map<string, Record<string, unknown>>
+): TaskGraph {
+  if (!isRecord(data) || !isWorkspaceSession(data.workspaceSession)) {
+    return prev;
+  }
+  return upsertWorkspaceSession(prev, data.workspaceSession);
+}
+
+function handleWorkspaceSessionUpdated(
+  prev: TaskGraph,
+  _id: string,
+  data: unknown,
+  _now: string,
+  _taskTitles: Map<string, string>,
+  _taskPrompts: Map<string, string>,
+  _taskMetadata: Map<string, Record<string, unknown>>
+): TaskGraph {
+  if (!isRecord(data) || !isWorkspaceSession(data.workspaceSession)) {
+    return prev;
+  }
+  return upsertWorkspaceSession(prev, data.workspaceSession);
+}
+
+function handleWorkspaceSessionEnded(
+  prev: TaskGraph,
+  _id: string,
+  data: unknown,
+  _now: string,
+  _taskTitles: Map<string, string>,
+  _taskPrompts: Map<string, string>,
+  _taskMetadata: Map<string, Record<string, unknown>>
+): TaskGraph {
+  if (!isRecord(data) || typeof data.workspaceSessionId !== "string") {
+    return prev;
+  }
+  const sessions = prev.workspaceSessions ?? {};
+  const current = sessions[data.workspaceSessionId];
+  if (!current) {
+    return prev;
+  }
+  const endedAt = typeof data.endedAt === "number" ? data.endedAt : current.endedAt;
+  return {
+    ...prev,
+    workspaceSessions: {
+      ...sessions,
+      [data.workspaceSessionId]: {
+        ...current,
+        status: "closed",
+        endedAt,
+        updatedAt: endedAt ?? current.updatedAt,
+      },
+    },
+  };
+}
+
+function handleWorkspaceSessionEvent(
+  prev: TaskGraph,
+  _id: string,
+  data: unknown,
+  _now: string,
+  _taskTitles: Map<string, string>,
+  _taskPrompts: Map<string, string>,
+  _taskMetadata: Map<string, Record<string, unknown>>
+): TaskGraph {
+  if (!isRecord(data) || !isWorkspaceEvent(data.event)) {
+    return prev;
+  }
+  return appendWorkspaceEvent(prev, data.event);
 }
 
 function handleSessionModeChanged(

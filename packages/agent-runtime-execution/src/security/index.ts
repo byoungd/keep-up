@@ -823,14 +823,14 @@ export type { ToolPolicyContext, ToolPolicyDecision, ToolPolicyEngine } from "..
 
 export {
   type ApprovalAuditLogger,
-  type ApprovalDecision,
   type ApprovalHandler,
   type ApprovalKind,
   ApprovalManager,
   type ApprovalManagerConfig,
   type ApprovalRecord,
   type ApprovalRequestOptions,
-  type ApprovalStatus,
+  type SecurityApprovalDecision,
+  type SecurityApprovalStatus,
 } from "./approvalManager";
 export { CoworkToolPolicyAdapter } from "./coworkPolicyAdapter";
 export {

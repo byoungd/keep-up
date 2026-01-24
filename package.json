@@ -39,6 +39,7 @@
     "lint": "turbo run lint && biome check .",
     "lint:fix": "biome check --write .",
     "docs:normative-index": "node scripts/update-normative-index.mjs",
+    "roadmap:new-track": "tsx scripts/roadmap/create-track.ts",
     "ui:contract": "bash scripts/check-ui-contract.sh",
     "check:circular": "bash scripts/check-circular-deps.sh",
     "format": "biome format --write .",

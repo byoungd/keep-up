@@ -265,6 +265,10 @@ packages/policy-hash-rs/target/
 packages/policy-hash-rs/Cargo.lock
 packages/policy-hash-rs/*.node
 
+packages/workspace-session-rs/target/
+packages/workspace-session-rs/Cargo.lock
+packages/workspace-session-rs/*.node
+
 packages/streaming-markdown-rs/target/
 packages/streaming-markdown-rs/Cargo.lock
 packages/streaming-markdown-rs/*.node
@@ -276,6 +280,8 @@ packages/keepup-tui/Cargo.lock
 packages/markdown-content-rs/target/
 packages/markdown-content-rs/Cargo.lock
 packages/markdown-content-rs/*.node
+packages/agent-workforce-rs/target/
+
 
 # Desktop Tauri
 apps/desktop-tauri/src-tauri/target/

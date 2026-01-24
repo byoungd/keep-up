@@ -182,6 +182,15 @@ export const aliases: AliasEntry[] = [
     find: "@ku0/streaming-markdown-rs/node",
     replacement: path.resolve(__dirname, "packages/streaming-markdown-rs/src/node.ts"),
   },
+  // @ku0/workspace-session-rs subpaths
+  {
+    find: "@ku0/workspace-session-rs/node",
+    replacement: path.resolve(__dirname, "packages/workspace-session-rs/src/node.ts"),
+  },
+  {
+    find: "@ku0/agent-workforce-rs/node",
+    replacement: path.resolve(__dirname, "packages/agent-workforce-rs/src/node.ts"),
+  },
 
   // ============================================
   // Main packages (alphabetical order)
@@ -341,6 +350,10 @@ export const aliases: AliasEntry[] = [
   {
     find: "@ku0/streaming-markdown-rs",
     replacement: path.resolve(__dirname, "packages/streaming-markdown-rs/src/index.ts"),
+  },
+  {
+    find: "@ku0/workspace-session-rs",
+    replacement: path.resolve(__dirname, "packages/workspace-session-rs/src/index.ts"),
   },
   {
     find: "@ku0/symbol-index-rs",

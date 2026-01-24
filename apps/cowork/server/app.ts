@@ -23,9 +23,11 @@ import { createSessionRoutes } from "./routes/sessions";
 import { createSettingsRoutes } from "./routes/settings";
 import { createStreamRoutes } from "./routes/stream";
 import { createWorkflowRoutes } from "./routes/workflows";
+import { createWorkspaceSessionRoutes } from "./routes/workspaceSessions";
 import { createWorkspaceRoutes } from "./routes/workspaces";
 import { CoworkRuntimeBridge } from "./runtime/coworkRuntime";
 import type { CoworkTaskRuntime } from "./runtime/coworkTaskRuntime";
+import { WorkspaceSessionRuntime } from "./runtime/services/WorkspaceSessionRuntime";
 import type { ContextIndexManager } from "./services/contextIndexManager";
 import { ProviderKeyService } from "./services/providerKeyService";
 import type { StorageLayer } from "./storage/contracts";
@@ -42,20 +44,29 @@ export interface CoworkAppDeps {
   pipelineStore?: PipelineStore;
   pipelineRunner?: PipelineRunner;
   logger?: Pick<typeof serverLogger, "info" | "warn" | "error">;
+  workspaceRuntime?: WorkspaceSessionRuntime;
   lessonStore?: LessonStore;
   critic?: CriticAgent;
 }
 
 export function createCoworkApp(deps: CoworkAppDeps) {
   const eventHub = deps.events ?? new SessionEventHub();
+  const logger = deps.logger ?? serverLogger;
   const runtime =
     deps.runtime ??
     new CoworkRuntimeBridge(deps.storage.approvalStore, undefined, deps.storage.auditLogStore, {
       configStore: deps.storage.configStore,
       repoRoot: process.cwd(),
     });
+  const workspaceRuntime =
+    deps.workspaceRuntime ??
+    new WorkspaceSessionRuntime({
+      workspaceSessions: deps.storage.workspaceSessionStore,
+      workspaceEvents: deps.storage.workspaceEventStore,
+      events: eventHub,
+      logger,
+    });
   const taskRuntime = deps.taskRuntime;
-  const logger = deps.logger ?? serverLogger;
   const providerKeys =
     deps.providerKeys ?? new ProviderKeyService(deps.storage.configStore, logger);
 
@@ -153,6 +164,17 @@ export function createCoworkApp(deps: CoworkAppDeps) {
     "/api",
     createWorkspaceRoutes({
       sessionStore: deps.storage.sessionStore,
+    })
+  );
+
+  app.route(
+    "/api",
+    createWorkspaceSessionRoutes({
+      sessions: deps.storage.sessionStore,
+      workspaceSessions: deps.storage.workspaceSessionStore,
+      workspaceEvents: deps.storage.workspaceEventStore,
+      events: eventHub,
+      runtime: workspaceRuntime,
     })
   );
 

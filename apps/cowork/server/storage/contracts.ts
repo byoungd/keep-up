@@ -1,4 +1,10 @@
-import type { CoworkProject, CoworkSession, CoworkTask } from "@ku0/agent-runtime";
+import type {
+  CoworkProject,
+  CoworkSession,
+  CoworkTask,
+  CoworkWorkspaceEvent,
+  CoworkWorkspaceSession,
+} from "@ku0/agent-runtime";
 import type {
   AgentStateCheckpointRecord,
   CoworkApproval,
@@ -49,6 +55,36 @@ export interface ApprovalStoreLike {
     approvalId: string,
     updater: (approval: CoworkApproval) => CoworkApproval
   ): Promise<CoworkApproval | null>;
+}
+
+export type CoworkWorkspaceEventInput = Omit<
+  CoworkWorkspaceEvent,
+  "eventId" | "sequence" | "timestamp"
+> & {
+  eventId?: string;
+  sequence?: number;
+  timestamp?: number;
+};
+
+export interface WorkspaceSessionStoreLike {
+  getAll(): Promise<CoworkWorkspaceSession[]>;
+  getById(workspaceSessionId: string): Promise<CoworkWorkspaceSession | null>;
+  getBySession(sessionId: string): Promise<CoworkWorkspaceSession[]>;
+  create(session: CoworkWorkspaceSession): Promise<CoworkWorkspaceSession>;
+  update(
+    workspaceSessionId: string,
+    updater: (session: CoworkWorkspaceSession) => CoworkWorkspaceSession
+  ): Promise<CoworkWorkspaceSession | null>;
+  delete(workspaceSessionId: string): Promise<boolean>;
+}
+
+export interface WorkspaceEventStoreLike {
+  getByWorkspaceSession(
+    workspaceSessionId: string,
+    options?: { afterSequence?: number; limit?: number }
+  ): Promise<CoworkWorkspaceEvent[]>;
+  append(event: CoworkWorkspaceEventInput): Promise<CoworkWorkspaceEvent>;
+  appendMany(events: CoworkWorkspaceEventInput[]): Promise<CoworkWorkspaceEvent[]>;
 }
 
 export interface AgentStateCheckpointStoreLike {
@@ -130,6 +166,8 @@ export interface StorageLayer {
   artifactStore: ArtifactStoreLike;
   chatMessageStore: ChatMessageStoreLike;
   approvalStore: ApprovalStoreLike;
+  workspaceSessionStore: WorkspaceSessionStoreLike;
+  workspaceEventStore: WorkspaceEventStoreLike;
   agentStateStore: AgentStateCheckpointStoreLike;
   configStore: ConfigStoreLike;
   projectStore: ProjectStoreLike;
