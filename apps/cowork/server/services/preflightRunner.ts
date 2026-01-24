@@ -14,6 +14,7 @@ import {
   type IBashExecutor,
   ProcessBashExecutor,
   RuntimeAssetManager,
+  RustBashExecutor,
   runPreflightPlan,
   selectPreflightChecks,
 } from "@ku0/agent-runtime";
@@ -377,21 +378,52 @@ async function resolveBashExecutor(
   if (!assetManager) {
     return null;
   }
+
+  const sandboxMode = resolveSandboxMode();
+  if (sandboxMode === "process") {
+    return null;
+  }
+
+  if (sandboxMode === "rust") {
+    const rustExecutor = tryResolveRustExecutor(input, logger);
+    if (rustExecutor) {
+      return rustExecutor;
+    }
+  }
+
+  return resolveDockerExecutor(input, assetManager, logger);
+}
+
+function tryResolveRustExecutor(
+  input: PreflightRunInput,
+  logger?: Pick<Console, "info" | "warn" | "error">
+): BashExecutorResolution | null {
+  try {
+    const executor = new RustBashExecutor({
+      type: "rust",
+      networkAccess: "full",
+      fsIsolation: "workspace",
+      workingDirectory: resolve(input.rootPath),
+    });
+    return { executor };
+  } catch (error) {
+    logger?.warn("Rust sandbox unavailable for preflight; falling back to docker/process.", error);
+    return null;
+  }
+}
+
+async function resolveDockerExecutor(
+  input: PreflightRunInput,
+  assetManager: RuntimeAssetManager,
+  logger?: Pick<Console, "info" | "warn" | "error">
+): Promise<BashExecutorResolution | null> {
   const dockerImage = process.env.COWORK_SANDBOX_IMAGE ?? DEFAULT_DOCKER_IMAGE;
   const dockerPullOnDemand = parseBooleanEnv(process.env.COWORK_DOCKER_PULL, true);
   const dockerStatus = await assetManager.inspectDockerImage(dockerImage);
   const dockerAvailable =
     dockerStatus.available && (dockerStatus.imagePresent || dockerPullOnDemand);
   if (!dockerAvailable) {
-    if (!dockerStatus.available) {
-      logger?.warn(
-        `Docker sandbox unavailable (${dockerStatus.reason ?? "unknown"}); using process executor.`
-      );
-    } else if (!dockerStatus.imagePresent) {
-      logger?.warn(
-        `Docker image ${dockerImage} missing; set COWORK_DOCKER_PULL=true to enable on-demand pulls.`
-      );
-    }
+    logDockerUnavailable(dockerStatus, dockerImage, logger);
     return null;
   }
 
@@ -399,7 +431,7 @@ async function resolveBashExecutor(
     const sizeHint = dockerStatus.expectedDownloadMB
       ? ` (~${dockerStatus.expectedDownloadMB}MB)`
       : "";
-    logger?.info(`Docker image ${dockerImage} missing; will pull on demand${sizeHint}.`);
+    logger?.info?.(`Docker image ${dockerImage} missing; will pull on demand${sizeHint}.`);
   }
 
   const workspacePath = resolve(input.rootPath);
@@ -422,6 +454,24 @@ async function resolveBashExecutor(
   };
 }
 
+function logDockerUnavailable(
+  dockerStatus: Awaited<ReturnType<RuntimeAssetManager["inspectDockerImage"]>>,
+  dockerImage: string,
+  logger?: Pick<Console, "info" | "warn" | "error">
+): void {
+  if (!dockerStatus.available) {
+    logger?.warn?.(
+      `Docker sandbox unavailable (${dockerStatus.reason ?? "unknown"}); using process executor.`
+    );
+    return;
+  }
+  if (!dockerStatus.imagePresent) {
+    logger?.warn?.(
+      `Docker image ${dockerImage} missing; set COWORK_DOCKER_PULL=true to enable on-demand pulls.`
+    );
+  }
+}
+
 function createRuntimeAssetManager(
   logger?: Pick<Console, "info" | "warn" | "error">
 ): RuntimeAssetManager {
@@ -436,6 +486,19 @@ function createRuntimeAssetManager(
 }
 
 const DEFAULT_DOCKER_IMAGE = "node:20-alpine";
+
+type RequestedSandboxMode = "auto" | "docker" | "process" | "rust";
+
+function resolveSandboxMode(): RequestedSandboxMode {
+  const raw = process.env.COWORK_SANDBOX_MODE?.trim().toLowerCase();
+  if (!raw) {
+    return "auto";
+  }
+  if (raw === "docker" || raw === "process" || raw === "rust") {
+    return raw;
+  }
+  return "auto";
+}
 
 function resolveRuntimeAssetDir(): string {
   return process.env.COWORK_RUNTIME_ASSET_DIR
