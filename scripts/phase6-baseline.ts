@@ -2,9 +2,22 @@ import { mkdir, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
+import type {
+  Checkpoint,
+  CheckpointMessage,
+  CheckpointToolCall,
+  CheckpointToolResult,
+} from "../packages/agent-runtime-core/src/index";
 import { SymbolGraph } from "../packages/agent-runtime-execution/src/lsp/symbolGraph";
+import { createFileToolOutputSpooler } from "../packages/agent-runtime-execution/src/spooling";
 import { NativeTaskGraphEventLog } from "../packages/agent-runtime-execution/src/tasks/taskGraphEventLog";
 import { countTokens } from "../packages/agent-runtime-execution/src/utils/tokenCounter";
+import {
+  MessagePackCheckpointStorage,
+  RustCheckpointStorage,
+} from "../packages/agent-runtime-persistence/src/checkpoint";
+import { createTwoFilesPatch } from "../packages/diff-rs/src/index";
+import { loadNativeBinding as loadDiffBinding } from "../packages/diff-rs/src/native.js";
 import { createSandbox, SandboxManager, WORKSPACE_POLICY } from "../packages/sandbox-rs/src/index";
 import { isNativeStorageEngineAvailable } from "../packages/storage-engine-rs/src/index";
 import { createSymbolIndex } from "../packages/symbol-index-rs/src/index";
@@ -22,8 +35,18 @@ type SummaryStats = {
 };
 
 type MetricResult = SummaryStats & { note?: string };
+type MemoryStats = {
+  avgMb: number;
+  p50Mb: number;
+  p95Mb: number;
+  p99Mb: number;
+  minMb: number;
+  maxMb: number;
+  iterations: number;
+};
 
 const OUTPUT_PATH = "artifacts/perf-metrics.json";
+const MB = 1024 * 1024;
 
 function percentile(sorted: number[], p: number): number {
   if (sorted.length === 0) {
@@ -49,6 +72,22 @@ function summarize(samples: number[]): SummaryStats {
   };
 }
 
+function summarizeMb(samples: number[]): MemoryStats {
+  const sorted = [...samples].sort((a, b) => a - b);
+  const total = samples.reduce((sum, value) => sum + value, 0);
+  const avg = samples.length > 0 ? total / samples.length : 0;
+
+  return {
+    avgMb: avg,
+    p50Mb: percentile(sorted, 0.5),
+    p95Mb: percentile(sorted, 0.95),
+    p99Mb: percentile(sorted, 0.99),
+    minMb: sorted[0] ?? 0,
+    maxMb: sorted[sorted.length - 1] ?? 0,
+    iterations: samples.length,
+  };
+}
+
 function measure(fn: () => void, iterations: number, warmup = 5): SummaryStats {
   const samples: number[] = [];
   const totalRuns = iterations + warmup;
@@ -65,6 +104,26 @@ function measure(fn: () => void, iterations: number, warmup = 5): SummaryStats {
   return summarize(samples);
 }
 
+async function measureAsync(
+  fn: () => Promise<void>,
+  iterations: number,
+  warmup = 5
+): Promise<SummaryStats> {
+  const samples: number[] = [];
+  const totalRuns = iterations + warmup;
+
+  for (let i = 0; i < totalRuns; i += 1) {
+    const start = performance.now();
+    await fn();
+    const end = performance.now();
+    if (i >= warmup) {
+      samples.push(end - start);
+    }
+  }
+
+  return summarize(samples);
+}
+
 function makeTokenSample(wordCount: number): string {
   const words = Array.from({ length: wordCount }, () => "token");
   return words.join(" ");
@@ -72,6 +131,121 @@ function makeTokenSample(wordCount: number): string {
 
 function sampleQueries(): string[] {
   return ["Component", "handler", "useState", "render", "update", "SymbolGraph"];
+}
+
+function buildDiffSample(
+  lineCount: number,
+  changeEvery: number
+): { oldText: string; newText: string } {
+  const oldLines: string[] = [];
+  const newLines: string[] = [];
+
+  for (let i = 0; i < lineCount; i += 1) {
+    const base = `line-${i}-value`;
+    oldLines.push(base);
+    if (i % changeEvery === 0) {
+      newLines.push(`${base}-updated`);
+    } else {
+      newLines.push(base);
+    }
+  }
+
+  return {
+    oldText: `${oldLines.join("\n")}\n`,
+    newText: `${newLines.join("\n")}\n`,
+  };
+}
+
+function buildLargeText(targetBytes: number): string {
+  const chunk = "baseline-output-line-0123456789abcdefghijklmnopqrstuvwxyz\n";
+  const chunkBytes = Buffer.byteLength(chunk);
+  const repeats = Math.max(1, Math.ceil(targetBytes / chunkBytes));
+  return chunk.repeat(repeats);
+}
+
+function buildCheckpointMessages(count: number, startTimestamp: number): CheckpointMessage[] {
+  const payload = "Baseline message payload for checkpoint storage benchmarking.";
+  const messages: CheckpointMessage[] = [];
+
+  for (let i = 0; i < count; i += 1) {
+    messages.push({
+      role: i % 2 === 0 ? "user" : "assistant",
+      content: `${payload} #${i}`,
+      timestamp: startTimestamp + i,
+    });
+  }
+
+  return messages;
+}
+
+function buildCheckpointToolCalls(count: number, startTimestamp: number): CheckpointToolCall[] {
+  const calls: CheckpointToolCall[] = [];
+  for (let i = 0; i < count; i += 1) {
+    calls.push({
+      id: `call-${i}`,
+      name: "baseline-tool",
+      arguments: { query: `query-${i}`, depth: i % 3 },
+      timestamp: startTimestamp + i,
+    });
+  }
+  return calls;
+}
+
+function buildCheckpointToolResults(count: number, startTimestamp: number): CheckpointToolResult[] {
+  const results: CheckpointToolResult[] = [];
+  for (let i = 0; i < count; i += 1) {
+    results.push({
+      callId: `call-${i}`,
+      name: "baseline-tool",
+      arguments: { query: `query-${i}` },
+      result: { ok: true, index: i },
+      success: true,
+      durationMs: 12 + i,
+      timestamp: startTimestamp + i,
+    });
+  }
+  return results;
+}
+
+function buildCheckpointSamples(count: number): {
+  samples: Checkpoint[];
+  messagesPerCheckpoint: number;
+} {
+  const startTimestamp = Date.now();
+  const baseMessages = buildCheckpointMessages(24, startTimestamp);
+  const pendingToolCalls = buildCheckpointToolCalls(6, startTimestamp + 1000);
+  const completedToolCalls = buildCheckpointToolResults(6, startTimestamp + 2000);
+  const samples: Checkpoint[] = [];
+
+  for (let i = 0; i < count; i += 1) {
+    const messages = [
+      ...baseMessages,
+      {
+        role: "assistant",
+        content: `Checkpoint step ${i}`,
+        timestamp: startTimestamp + 3000 + i,
+      },
+    ];
+
+    samples.push({
+      id: `baseline-${i}`,
+      version: 1,
+      createdAt: startTimestamp + i,
+      task: "Baseline checkpoint",
+      agentType: "runtime",
+      agentId: "baseline-agent",
+      status: "pending",
+      messages,
+      pendingToolCalls,
+      completedToolCalls,
+      currentStep: i,
+      maxSteps: 100,
+      metadata: { baseline: true, iteration: i },
+      childCheckpointIds: [],
+    });
+  }
+
+  return { samples, messagesPerCheckpoint: baseMessages.length + 1 };
 }
 
 async function measureSandboxStartup(): Promise<{
@@ -96,7 +270,7 @@ async function measureSandboxStartup(): Promise<{
     );
 
     return { available: true, stats };
-  } catch (error) {
+  } catch (_error) {
     const message = error instanceof Error ? error.message : String(error);
     return {
       available: false,
@@ -134,6 +308,68 @@ async function measureEventLog(): Promise<MetricResult> {
   return stats;
 }
 
+async function measureCheckpointStorage(): Promise<{
+  save: MetricResult;
+  load: MetricResult;
+  backend: string;
+  checkpointCount: number;
+  messagesPerCheckpoint: number;
+  note?: string;
+}> {
+  const iterations = 100;
+  const warmup = 10;
+  const totalRuns = iterations + warmup;
+  const { samples, messagesPerCheckpoint } = buildCheckpointSamples(totalRuns);
+  const rootDir = path.join(".tmp", "bench", `checkpoint-${Date.now()}`);
+
+  let storage: RustCheckpointStorage | MessagePackCheckpointStorage;
+  let backend = "native";
+  try {
+    storage = new RustCheckpointStorage({ rootDir });
+  } catch (_error) {
+    backend = "messagepack";
+    storage = new MessagePackCheckpointStorage({ rootDir });
+  }
+
+  const saveSamples = samples;
+  let saveIndex = 0;
+  const saveStats = await measureAsync(
+    async () => {
+      const checkpoint = saveSamples[saveIndex];
+      saveIndex += 1;
+      if (!checkpoint) {
+        return;
+      }
+      await storage.save(checkpoint);
+    },
+    iterations,
+    warmup
+  );
+
+  const ids = saveSamples.map((checkpoint) => checkpoint.id);
+  let loadIndex = 0;
+  const loadStats = await measureAsync(
+    async () => {
+      const id = ids[loadIndex % ids.length];
+      loadIndex += 1;
+      if (!id) {
+        return;
+      }
+      await storage.load(id);
+    },
+    iterations,
+    warmup
+  );
+
+  return {
+    save: saveStats,
+    load: loadStats,
+    backend,
+    checkpointCount: iterations,
+    messagesPerCheckpoint,
+  };
+}
+
 function measureTokenCounting(): {
   stats: MetricResult;
   tokens: number;
@@ -169,6 +405,20 @@ function measureTokenCounting(): {
     per10kP99Ms,
     backend,
   };
+}
+
+function measureDiffPatch(): { stats: MetricResult; backend: string; lineCount: number } {
+  const { oldText, newText } = buildDiffSample(2000, 20);
+  const backend = loadDiffBinding() ? "native" : "js";
+  const stats = measure(
+    () => {
+      createTwoFilesPatch("baseline-old.txt", "baseline-new.txt", oldText, newText);
+    },
+    200,
+    20
+  );
+
+  return { stats, backend, lineCount: 2000 };
 }
 
 function buildSymbolDataset(fileCount: number, symbolsPerFile: number) {
@@ -222,11 +472,62 @@ function measureSymbolQuery(): { stats: MetricResult; backend: string; symbolCou
   return { stats, backend, symbolCount: dataset.totalSymbols };
 }
 
+async function measureSpoolerMemory(): Promise<{
+  heapDeltaMb: MemoryStats;
+  rssDeltaMb: MemoryStats;
+  outputBytes: number;
+  note?: string;
+}> {
+  try {
+    const rootDir = path.join(".tmp", "bench", `spool-${Date.now()}`);
+    const spooler = createFileToolOutputSpooler({ rootDir });
+    const text = buildLargeText(512 * 1024);
+    const content = [{ type: "text", text }] as const;
+    const outputBytes = Buffer.byteLength(text);
+    const heapSamples: number[] = [];
+    const rssSamples: number[] = [];
+    const iterations = 40;
+    const warmup = 5;
+    const totalRuns = iterations + warmup;
+
+    for (let i = 0; i < totalRuns; i += 1) {
+      const before = process.memoryUsage();
+      await spooler.spool({
+        toolName: "baseline",
+        toolCallId: `spool-${i}`,
+        content,
+      });
+      const after = process.memoryUsage();
+      if (i >= warmup) {
+        heapSamples.push(Math.max(0, (after.heapUsed - before.heapUsed) / MB));
+        rssSamples.push(Math.max(0, (after.rss - before.rss) / MB));
+      }
+    }
+
+    return {
+      heapDeltaMb: summarizeMb(heapSamples),
+      rssDeltaMb: summarizeMb(rssSamples),
+      outputBytes,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      heapDeltaMb: summarizeMb([]),
+      rssDeltaMb: summarizeMb([]),
+      outputBytes: 0,
+      note: message,
+    };
+  }
+}
+
 async function main() {
   const sandbox = await measureSandboxStartup();
   const eventLog = await measureEventLog();
+  const checkpointStorage = await measureCheckpointStorage();
   const tokenCounting = measureTokenCounting();
+  const diffPatch = measureDiffPatch();
   const symbolQuery = measureSymbolQuery();
+  const spoolerMemory = await measureSpoolerMemory();
 
   const payload = {
     generatedAt: new Date().toISOString(),
@@ -245,6 +546,18 @@ async function main() {
         ...sandbox.stats,
       },
       eventLogAppend: eventLog,
+      checkpointSave: {
+        ...checkpointStorage.save,
+        backend: checkpointStorage.backend,
+        checkpointCount: checkpointStorage.checkpointCount,
+        messagesPerCheckpoint: checkpointStorage.messagesPerCheckpoint,
+      },
+      checkpointLoad: {
+        ...checkpointStorage.load,
+        backend: checkpointStorage.backend,
+        checkpointCount: checkpointStorage.checkpointCount,
+        messagesPerCheckpoint: checkpointStorage.messagesPerCheckpoint,
+      },
       tokenCounting: {
         ...tokenCounting.stats,
         tokensPerSample: tokenCounting.tokens,
@@ -252,10 +565,21 @@ async function main() {
         p99MsPer10kTokens: Number(tokenCounting.per10kP99Ms.toFixed(4)),
         backend: tokenCounting.backend,
       },
+      diffPatch: {
+        ...diffPatch.stats,
+        backend: diffPatch.backend,
+        lineCount: diffPatch.lineCount,
+      },
       symbolQuery: {
         ...symbolQuery.stats,
         backend: symbolQuery.backend,
         symbolCount: symbolQuery.symbolCount,
+      },
+      spoolerMemory: {
+        heapDeltaMb: spoolerMemory.heapDeltaMb,
+        rssDeltaMb: spoolerMemory.rssDeltaMb,
+        outputBytes: spoolerMemory.outputBytes,
+        note: spoolerMemory.note,
       },
     },
   };
