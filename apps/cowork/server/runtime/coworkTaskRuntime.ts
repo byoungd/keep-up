@@ -61,6 +61,7 @@ import {
   NativeTaskGraphEventLog,
   ProcessCodeExecutor,
   RuntimeAssetManager,
+  RustBashExecutor,
   RustCheckpointStorage,
   type SkillDirectoryConfig,
   type SkillRegistry,
@@ -102,6 +103,9 @@ import {
 import { createWebSearchProvider } from "./webSearchProvider";
 
 type Logger = Pick<Console, "info" | "warn" | "error" | "debug">;
+
+type RequestedSandboxMode = "auto" | "docker" | "process" | "rust";
+type ExecutionSandboxMode = "docker" | "process" | "rust";
 
 export type RuntimePersistenceConfig = {
   toolCachePath?: string;
@@ -584,7 +588,7 @@ export class CoworkTaskRuntime {
       sessionId: session.sessionId,
     });
     const caseInsensitivePaths = settings.caseInsensitivePaths ?? false;
-    const securityPolicy = this.buildRuntimeSecurityPolicy(toolRegistryResult.dockerAvailable);
+    const securityPolicy = this.buildRuntimeSecurityPolicy(toolRegistryResult.executionMode);
     const fileSandbox = securityPolicy ? createRustSandboxManager(securityPolicy.sandbox) : null;
     await toolRegistry.register(
       fileSandbox ? createFileToolServer({ sandbox: fileSandbox }) : createFileToolServer()
@@ -688,14 +692,17 @@ export class CoworkTaskRuntime {
     };
   }
 
-  private buildRuntimeSecurityPolicy(dockerAvailable: boolean) {
-    if (!this.isLfccGatewayConfigured()) {
-      return dockerAvailable ? buildDockerSecurityPolicy() : undefined;
-    }
+  private buildRuntimeSecurityPolicy(executionMode: ExecutionSandboxMode) {
+    const basePolicy =
+      executionMode === "docker"
+        ? buildDockerSecurityPolicy()
+        : executionMode === "rust"
+          ? buildRustSecurityPolicy(process.cwd())
+          : createSecurityPolicy("balanced");
 
-    const basePolicy = dockerAvailable
-      ? buildDockerSecurityPolicy()
-      : createSecurityPolicy("balanced");
+    if (!this.isLfccGatewayConfigured()) {
+      return executionMode === "process" ? undefined : basePolicy;
+    }
 
     return {
       ...basePolicy,
@@ -711,14 +718,14 @@ export class CoworkTaskRuntime {
 
   private async buildToolRegistry(session: CoworkSession): Promise<{
     registry: ReturnType<typeof createToolRegistry>;
-    dockerAvailable: boolean;
+    executionMode: ExecutionSandboxMode;
   }> {
     const toolRegistry = createToolRegistry();
     await toolRegistry.register(createCompletionToolServer());
     await this.registerLfccTools(toolRegistry, session);
     const workspacePath = process.cwd();
     const assetManager = this.getRuntimeAssetManager();
-    const dockerAvailable = await this.registerExecutionTools({
+    const executionMode = await this.registerExecutionTools({
       registry: toolRegistry,
       session,
       workspacePath,
@@ -726,7 +733,7 @@ export class CoworkTaskRuntime {
     });
     await toolRegistry.register(createWebSearchToolServer(createWebSearchProvider(this.logger)));
     await this.registerBrowserTools(toolRegistry, assetManager);
-    return { registry: toolRegistry, dockerAvailable };
+    return { registry: toolRegistry, executionMode };
   }
 
   private async registerLfccTools(
@@ -1066,7 +1073,31 @@ export class CoworkTaskRuntime {
     session: CoworkSession;
     workspacePath: string;
     assetManager: RuntimeAssetManager;
-  }): Promise<boolean> {
+  }): Promise<ExecutionSandboxMode> {
+    const requestedMode = resolveSandboxMode();
+
+    if (requestedMode === "process") {
+      await input.registry.register(createBashToolServer());
+      await input.registry.register(createCodeToolServer());
+      return "process";
+    }
+
+    if (requestedMode === "rust") {
+      const rustConfig = buildRustSandboxConfig(input.workspacePath);
+      try {
+        const rustBash = new RustBashExecutor(rustConfig);
+        await input.registry.register(createBashToolServer(rustBash));
+        const codeExecutor = new ProcessCodeExecutor({ bashExecutor: rustBash });
+        await input.registry.register(createCodeToolServer(codeExecutor));
+        return "rust";
+      } catch (error) {
+        this.logger.warn(
+          "Rust sandbox unavailable; falling back to docker/process execution.",
+          error
+        );
+      }
+    }
+
     const { dockerAvailable, dockerImage, dockerStatus } = await this.resolveDockerRuntimeStatus(
       input.assetManager
     );
@@ -1075,7 +1106,7 @@ export class CoworkTaskRuntime {
       this.logDockerFallback(dockerStatus, dockerImage);
       await input.registry.register(createBashToolServer());
       await input.registry.register(createCodeToolServer());
-      return false;
+      return "process";
     }
 
     if (!dockerStatus.imagePresent) {
@@ -1098,7 +1129,7 @@ export class CoworkTaskRuntime {
     const codeExecutor = new ProcessCodeExecutor({ bashExecutor: dockerBash });
     await input.registry.register(createCodeToolServer(codeExecutor));
     await input.registry.register(createSandboxToolServer({ manager: sandboxManager }));
-    return true;
+    return "docker";
   }
 
   private async registerBrowserTools(
@@ -1493,6 +1524,38 @@ function buildDockerSecurityPolicy() {
       workingDirectory: "/workspace",
     },
   };
+}
+
+function buildRustSandboxConfig(workspacePath: string) {
+  const policy = createSecurityPolicy("balanced");
+  return {
+    ...policy.sandbox,
+    type: "rust" as const,
+    workingDirectory: workspacePath,
+  };
+}
+
+function buildRustSecurityPolicy(workspacePath: string) {
+  const policy = createSecurityPolicy("balanced");
+  return {
+    ...policy,
+    sandbox: {
+      ...policy.sandbox,
+      type: "rust" as const,
+      workingDirectory: workspacePath,
+    },
+  };
+}
+
+function resolveSandboxMode(): RequestedSandboxMode {
+  const raw = process.env.COWORK_SANDBOX_MODE?.trim().toLowerCase();
+  if (!raw) {
+    return "auto";
+  }
+  if (raw === "docker" || raw === "process" || raw === "rust") {
+    return raw;
+  }
+  return "auto";
 }
 
 const RUNTIME_ARTIFACT_TYPES = new Set<CoworkArtifactPayload["type"]>([

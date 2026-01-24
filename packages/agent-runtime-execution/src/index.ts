@@ -334,6 +334,7 @@ export {
   type MultiDocumentPolicy,
   type MultiDocumentRequestDocument,
   type MultiDocumentRole,
+  RustBashExecutor,
   ToolRegistryView,
   type ToolRegistryViewOptions,
   validateCompletionInput,

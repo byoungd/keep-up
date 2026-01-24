@@ -11,8 +11,10 @@ import type {
   BashExecuteOptions,
   BashExecuteResult,
   IBashExecutor,
+  SandboxConfig,
   ToolContext,
 } from "@ku0/agent-runtime-core";
+import { createSandbox, type SandboxPolicy } from "@ku0/sandbox-rs";
 import { BaseToolServer, errorResult, type ToolHandler, textResult } from "../mcp/baseServer";
 
 // ============================================================================
@@ -129,6 +131,62 @@ export class ProcessBashExecutor implements IBashExecutor {
         });
       });
     });
+  }
+}
+
+/**
+ * Rust-backed bash executor using sandbox-rs.
+ * Executes via `bash -lc` inside the native sandbox policy.
+ */
+export class RustBashExecutor implements IBashExecutor {
+  private readonly sandbox: SandboxPolicy;
+  private readonly shell: string;
+
+  constructor(config: SandboxConfig, shell = "/bin/bash") {
+    this.shell = shell;
+    this.sandbox = createSandbox(config);
+  }
+
+  async execute(command: string, options: BashExecuteOptions): Promise<BashExecuteResult> {
+    const startTime = Date.now();
+    if (options.signal?.aborted) {
+      return {
+        exitCode: -1,
+        stdout: "",
+        stderr: "Execution aborted before start.",
+        timedOut: false,
+        truncated: false,
+        durationMs: 0,
+      };
+    }
+
+    try {
+      const result = await this.sandbox.execute(this.shell, ["-lc", command], {
+        cwd: options.cwd,
+        timeoutMs: options.timeoutMs,
+        env: options.env,
+        maxOutputBytes: options.maxOutputBytes,
+      });
+
+      return {
+        exitCode: result.exitCode,
+        stdout: result.stdout,
+        stderr: result.stderr,
+        timedOut: result.timedOut,
+        truncated: result.truncated,
+        durationMs: result.durationMs ?? Date.now() - startTime,
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return {
+        exitCode: -1,
+        stdout: "",
+        stderr: message,
+        timedOut: false,
+        truncated: false,
+        durationMs: Date.now() - startTime,
+      };
+    }
   }
 }
 
