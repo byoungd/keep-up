@@ -7,4 +7,5 @@
 export * from "./artifacts";
 export * from "./checkpoint";
 export * from "./execution";
+export * from "./persistence";
 export * from "./timetravel";

@@ -9,6 +9,7 @@ import {
   getGlobalEventBus,
   type RuntimeEventBus,
 } from "@ku0/agent-runtime-control";
+import { type PersistenceStore, PersistentAuditLogger } from "@ku0/agent-runtime-persistence";
 import type { TelemetryContext } from "@ku0/agent-runtime-telemetry/telemetry";
 import type {
   IToolRegistry,
@@ -40,6 +41,7 @@ export interface RuntimeComponents {
   permissionChecker?: IPermissionChecker;
   security?: SecurityPolicy | SecurityPreset;
   auditLogger?: AuditLogger;
+  persistenceStore?: PersistenceStore;
   telemetry?: TelemetryContext;
   eventBus?: RuntimeEventBus;
   messageBus?: RuntimeMessageBus;
@@ -71,6 +73,7 @@ export interface RuntimeInstance {
   sessionState?: SessionState;
   checkpointManager?: ICheckpointManager;
   fileContextTracker?: FileContextTracker;
+  persistenceStore?: PersistenceStore;
 }
 
 export async function createRuntime(options: CreateRuntimeOptions): Promise<RuntimeInstance> {
@@ -78,8 +81,12 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<Runt
   const registry = components.registry ?? createToolRegistry();
   const eventBus = components.eventBus ?? getGlobalEventBus();
   const messageBus = components.messageBus ?? createMessageBus(eventBus);
-  const resolvedAuditLogger = components.auditLogger
-    ? withAuditTelemetry(components.auditLogger, {
+  const persistenceStore = components.persistenceStore;
+  const baseAuditLogger = persistenceStore
+    ? new PersistentAuditLogger(persistenceStore, components.auditLogger)
+    : components.auditLogger;
+  const resolvedAuditLogger = baseAuditLogger
+    ? withAuditTelemetry(baseAuditLogger, {
         eventBus,
         telemetry: components.telemetry,
         source: "audit:runtime",
@@ -117,6 +124,7 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<Runt
     checkpointManager: components.checkpointManager,
     fileContextTracker,
     audit: resolvedAuditLogger,
+    persistenceStore,
     telemetry: components.telemetry,
     clock: components.clock,
     ids: components.ids,
@@ -147,6 +155,7 @@ export async function createRuntime(options: CreateRuntimeOptions): Promise<Runt
     sessionState: components.sessionState,
     checkpointManager: components.checkpointManager,
     fileContextTracker,
+    persistenceStore,
   };
 }
 

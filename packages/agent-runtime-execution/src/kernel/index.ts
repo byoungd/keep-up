@@ -90,6 +90,7 @@ export interface RuntimeServices {
   checkpointManager?: ICheckpointManager;
   fileContextTracker?: FileContextTracker;
   audit?: AuditLogger;
+  persistenceStore?: import("@ku0/agent-runtime-persistence").PersistenceStore;
   telemetry?: TelemetryContext;
   clock?: Clock;
   ids?: IdGenerator;
@@ -228,6 +229,7 @@ export class RuntimeKernel implements Kernel {
           skillPromptAdapter: this.skillPromptAdapter,
           taskGraph: this.taskGraph,
           artifactPipeline: this.artifactPipeline,
+          persistenceStore: this.services.persistenceStore,
         },
       };
     }
@@ -253,6 +255,8 @@ export class RuntimeKernel implements Kernel {
           this.config.orchestrator.components?.skillPromptAdapter ?? this.skillPromptAdapter,
         taskGraph: this.taskGraph,
         artifactPipeline: this.artifactPipeline,
+        persistenceStore:
+          this.config.orchestrator.components?.persistenceStore ?? this.services.persistenceStore,
       },
     };
   }
