@@ -1,11 +1,7 @@
 use serde::{Deserialize, Serialize};
-use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State};
 
-use sandbox_rs::guards::command::CommandValidator;
-use sandbox_rs::guards::filesystem::FileSystemGuard;
-use sandbox_rs::policy::{CommandPolicy, FilesystemPolicy};
 use sandbox_rs::{create_sandbox, EnvVar, ExecOptions, SandboxConfig};
 
 use crate::enclave::{AuditEntry, Decision, EnclavePolicy, EnclaveState};
@@ -68,11 +64,14 @@ pub fn fs_read(path: String, state: State<'_, EnclaveState>) -> Result<Vec<u8>, 
     let policy = state.policy()?.clone();
     ensure_allowed_roots(&policy, ACTION_FS_READ, &state)?;
 
-    let guard = build_fs_guard(&policy);
-    let decision = guard.check_access(&path, "read");
-    if !decision.allowed {
-        let reason = decision.reason.unwrap_or_else(|| "Access denied".to_string());
-        record_audit(&state, ACTION_FS_READ, &path, Decision::Denied { reason: reason.clone() }, &policy);
+    if let Err(reason) = ensure_fs_access(&policy, &path, "read") {
+        record_audit(
+            &state,
+            ACTION_FS_READ,
+            &path,
+            Decision::Denied { reason: reason.clone() },
+            &policy,
+        );
         return Err(reason);
     }
 
@@ -100,11 +99,14 @@ pub fn fs_write(path: String, contents: Vec<u8>, state: State<'_, EnclaveState>)
     let policy = state.policy()?.clone();
     ensure_allowed_roots(&policy, ACTION_FS_WRITE, &state)?;
 
-    let guard = build_fs_guard(&policy);
-    let decision = guard.check_access(&path, "write");
-    if !decision.allowed {
-        let reason = decision.reason.unwrap_or_else(|| "Access denied".to_string());
-        record_audit(&state, ACTION_FS_WRITE, &path, Decision::Denied { reason: reason.clone() }, &policy);
+    if let Err(reason) = ensure_fs_access(&policy, &path, "write") {
+        record_audit(
+            &state,
+            ACTION_FS_WRITE,
+            &path,
+            Decision::Denied { reason: reason.clone() },
+            &policy,
+        );
         return Err(reason);
     }
 
@@ -141,11 +143,14 @@ pub fn fs_list(path: String, state: State<'_, EnclaveState>) -> Result<Vec<FileE
     let policy = state.policy()?.clone();
     ensure_allowed_roots(&policy, ACTION_FS_LIST, &state)?;
 
-    let guard = build_fs_guard(&policy);
-    let decision = guard.check_access(&path, "read");
-    if !decision.allowed {
-        let reason = decision.reason.unwrap_or_else(|| "Access denied".to_string());
-        record_audit(&state, ACTION_FS_LIST, &path, Decision::Denied { reason: reason.clone() }, &policy);
+    if let Err(reason) = ensure_fs_access(&policy, &path, "read") {
+        record_audit(
+            &state,
+            ACTION_FS_LIST,
+            &path,
+            Decision::Denied { reason: reason.clone() },
+            &policy,
+        );
         return Err(reason);
     }
 
@@ -212,12 +217,7 @@ pub async fn shell_exec(
     let policy = state.policy()?.clone();
     ensure_allowed_roots(&policy, ACTION_SHELL_EXEC, &state)?;
 
-    let validator = build_command_validator(&policy);
-    let validation = validator.validate_command(&args.cmd);
-    if !validation.allowed {
-        let reason = validation
-            .reason
-            .unwrap_or_else(|| "Command not allowed".to_string());
+    if let Err(reason) = validate_command(&policy, &args.cmd) {
         record_audit(
             &state,
             ACTION_SHELL_EXEC,
@@ -272,46 +272,59 @@ pub async fn shell_exec(
     }
 }
 
-fn build_fs_guard(policy: &EnclavePolicy) -> FileSystemGuard {
-    let allowed_paths = policy
-        .allowed_roots
-        .iter()
-        .map(|path| path.to_string_lossy().to_string())
-        .collect();
+fn ensure_fs_access(policy: &EnclavePolicy, path: &str, intent: &str) -> Result<(), String> {
+    let sandbox = build_sandbox(policy)?;
+    let decision = sandbox
+        .evaluate_file_action(path.to_string(), intent.to_string())
+        .map_err(|error| error.to_string())?;
 
-    let fs_policy = FilesystemPolicy {
-        mode: "allowlist".to_string(),
-        allowed_paths,
-        blocked_paths: Vec::new(),
-        allow_symlinks: false,
-        allow_hidden_files: true,
-    };
-
-    let workspace_root = policy
-        .allowed_roots
-        .iter()
-        .next()
-        .cloned()
-        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| Path::new("/").to_path_buf()));
-
-    FileSystemGuard::new(fs_policy, workspace_root)
+    if decision.decision == "allow" {
+        Ok(())
+    } else {
+        Err(decision.reason.unwrap_or_else(|| "Access denied".to_string()))
+    }
 }
 
-fn build_command_validator(policy: &EnclavePolicy) -> CommandValidator {
-    let allowed_commands = if policy.allowed_commands.is_empty() {
-        Some(Vec::new())
-    } else {
-        Some(policy.allowed_commands.iter().cloned().collect())
-    };
+fn validate_command(policy: &EnclavePolicy, command: &str) -> Result<(), String> {
+    let normalized = command.trim().to_lowercase();
 
-    let command_policy = CommandPolicy {
-        mode: "whitelist".to_string(),
-        allowed_commands,
-        blocked_commands: None,
-        allow_sudo: false,
-    };
+    if normalized.contains("sudo") {
+        return Err("sudo not allowed".to_string());
+    }
 
-    CommandValidator::new(command_policy)
+    if policy.allowed_commands.is_empty() {
+        return Err("Command not in whitelist".to_string());
+    }
+
+    let allowed = policy
+        .allowed_commands
+        .iter()
+        .any(|allowed_command| normalized.starts_with(&allowed_command.to_lowercase()));
+    if !allowed {
+        return Err("Command not in whitelist".to_string());
+    }
+
+    if is_dangerous_command(&normalized) {
+        return Err("Command matches dangerous pattern".to_string());
+    }
+
+    Ok(())
+}
+
+fn is_dangerous_command(command: &str) -> bool {
+    if command.contains("rm -rf /") {
+        return true;
+    }
+    if command.contains("dd if=") {
+        return true;
+    }
+    if command.contains("mkfs") {
+        return true;
+    }
+    if command.contains("chmod 777") {
+        return true;
+    }
+    command.contains(":(){") && command.contains(":|:&};:")
 }
 
 fn build_sandbox(policy: &EnclavePolicy) -> Result<sandbox_rs::Sandbox, String> {

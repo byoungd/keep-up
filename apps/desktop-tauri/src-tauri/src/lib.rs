@@ -8,6 +8,8 @@ mod vectorstore;
 mod watcher;
 mod window_state;
 
+use tauri::Manager;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -46,25 +48,25 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             deeplink::get_pending_deep_link,
-            enclave::get_policy,
-            enclave::set_policy,
-            enclave::get_audit_log,
-            enclave::export_audit_log,
-            enclave::fs_read,
-            enclave::fs_write,
-            enclave::fs_list,
-            enclave::shell_exec,
+            enclave::commands::get_policy,
+            enclave::commands::set_policy,
+            enclave::commands::get_audit_log,
+            enclave::commands::export_audit_log,
+            enclave::commands::fs_read,
+            enclave::commands::fs_write,
+            enclave::commands::fs_list,
+            enclave::commands::shell_exec,
             terminal::spawn_terminal,
             terminal::write_terminal,
             terminal::kill_terminal,
             watcher::watch_paths,
             watcher::unwatch_paths,
-            vectorstore::vectorstore_upsert_chunks,
-            vectorstore::vectorstore_list_chunks,
-            vectorstore::vectorstore_search,
-            vectorstore::vectorstore_delete_chunks,
-            vectorstore::vectorstore_stats,
-            vectorstore::vectorstore_index_files
+            vectorstore::commands::vectorstore_upsert_chunks,
+            vectorstore::commands::vectorstore_list_chunks,
+            vectorstore::commands::vectorstore_search,
+            vectorstore::commands::vectorstore_delete_chunks,
+            vectorstore::commands::vectorstore_stats,
+            vectorstore::commands::vectorstore_index_files
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

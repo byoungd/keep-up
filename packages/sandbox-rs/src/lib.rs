@@ -369,8 +369,8 @@ impl Sandbox {
         }
 
         for root in &self.state.policy.allowed_roots {
-            if normalized.starts_with(root) {
-                return Ok(normalized);
+            if path_security::is_within_root(path, root)? {
+                return path_security::enforce_within_root(path, root).map_err(SandboxError::from);
             }
         }
 

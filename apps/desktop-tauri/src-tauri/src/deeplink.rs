@@ -1,6 +1,6 @@
 use std::sync::Mutex;
 
-use tauri::{AppHandle, Manager, Runtime, State};
+use tauri::{AppHandle, Emitter, Manager, Runtime, State};
 
 const DEEPLINK_EVENT: &str = "deep-link";
 

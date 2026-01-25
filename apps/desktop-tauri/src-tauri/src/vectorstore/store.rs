@@ -1,5 +1,5 @@
 use rusqlite::{params, types::Value, Connection, OptionalExtension};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -11,7 +11,6 @@ const DEFAULT_CHUNK_OVERLAP: usize = 200;
 #[derive(Clone)]
 pub struct VectorStore {
     connection: Arc<Mutex<Connection>>,
-    db_path: PathBuf,
 }
 
 impl VectorStore {
@@ -20,12 +19,7 @@ impl VectorStore {
         initialize_schema(&connection)?;
         Ok(Self {
             connection: Arc::new(Mutex::new(connection)),
-            db_path: path,
         })
-    }
-
-    pub fn path(&self) -> &Path {
-        &self.db_path
     }
 
     pub fn upsert_chunks(&self, chunks: Vec<ChunkInput>) -> Result<(), String> {
@@ -34,7 +28,7 @@ impl VectorStore {
         }
 
         let now = current_timestamp();
-        let connection = self.lock_connection()?;
+        let mut connection = self.lock_connection()?;
         let tx = connection
             .transaction()
             .map_err(|error| error.to_string())?;
@@ -185,7 +179,7 @@ impl VectorStore {
     }
 
     pub fn delete_chunks(&self, args: DeleteChunksArgs) -> Result<usize, String> {
-        let connection = self.lock_connection()?;
+        let mut connection = self.lock_connection()?;
         let tx = connection
             .transaction()
             .map_err(|error| error.to_string())?;
