@@ -30,6 +30,10 @@ function createSecurityPolicy(preset: SecurityPreset): SecurityPolicy {
 export interface SubagentTask {
   /** Optional unique ID for dependency tracking */
   id?: string;
+  /** Optional explicit agent ID override */
+  agentId?: string;
+  /** Optional recursion depth override (internal use) */
+  _depth?: number;
   /** Subagent type */
   type: AgentType;
   /** Task description for this subagent */
@@ -345,11 +349,13 @@ export class SubagentOrchestrator {
     const security =
       task.scope || baseSecurity ? this.buildScopeSecurity(task, baseSecurity) : undefined;
     return {
+      agentId: task.agentId,
       type: task.type,
       task: this.buildTaskWithContext(task.task, scopedContext),
       maxTurns: task.maxTurns,
       parentTraceId: parentId,
       parentContextId: contextId,
+      _depth: task._depth,
       signal,
       security,
       allowedTools: task.scope?.allowedTools,

@@ -42,6 +42,7 @@ export const COWORK_EVENTS = {
   AGENT_TOOL_CALL: "agent.tool.call",
   AGENT_TOOL_RESULT: "agent.tool.result",
   AGENT_PLAN: "agent.plan",
+  TASK_PLAN: "task.plan",
   AGENT_ARTIFACT: "agent.artifact",
   AGENT_TURN_START: "agent.turn.start",
   AGENT_TURN_END: "agent.turn.end",
@@ -186,6 +187,11 @@ export interface CoworkEventPayloads {
     taskId?: string;
   };
   [COWORK_EVENTS.AGENT_PLAN]: {
+    artifactId: string;
+    plan: unknown;
+    taskId?: string;
+  };
+  [COWORK_EVENTS.TASK_PLAN]: {
     artifactId: string;
     plan: unknown;
     taskId?: string;

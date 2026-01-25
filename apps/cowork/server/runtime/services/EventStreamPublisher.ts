@@ -123,6 +123,11 @@ export class EventStreamPublisher {
       plan: data.plan,
       taskId: data.taskId,
     });
+    this.events.publish(data.sessionId, COWORK_EVENTS.TASK_PLAN, {
+      artifactId: data.artifactId,
+      plan: data.plan,
+      taskId: data.taskId,
+    });
   }
 
   publishAgentTurnStart(data: { sessionId: string; turn: number; taskId?: string }) {

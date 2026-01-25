@@ -13,6 +13,7 @@ import type {
   ToolContext,
 } from "@ku0/agent-runtime-core";
 import type { AgentLineageManager, DelegationRole } from "../../agents/lineage";
+import { SubagentOrchestrator } from "../../orchestrator/subagentOrchestrator";
 import { BaseToolServer, errorResult, textResult } from "../mcp/baseServer";
 
 // ============================================================================
@@ -58,14 +59,16 @@ const VALID_ROLES: DelegationRole[] = ["researcher", "coder", "reviewer", "analy
 export class DelegationToolServer extends BaseToolServer {
   readonly name = "delegation";
   readonly description = "Delegate tasks to specialized child agents";
+  private readonly orchestrator: SubagentOrchestrator;
 
   constructor(
-    private readonly manager: IAgentManager,
+    manager: IAgentManager,
     private readonly lineageManager?: AgentLineageManager,
     private readonly parentAgentId?: string,
     private readonly parentDepth: number = 0
   ) {
     super();
+    this.orchestrator = new SubagentOrchestrator(manager);
     this.registerTools();
   }
 
@@ -156,15 +159,25 @@ export class DelegationToolServer extends BaseToolServer {
       this.trackLineageStart(agentId, role, childDepth);
     }
 
+    const scope = constraints ? { allowedTools: constraints } : undefined;
+    const parentId = toolContext.correlationId ?? this.parentAgentId ?? "delegation";
+
     try {
-      const result = await this.manager.spawn({
-        type: agentType,
-        task: this.buildTaskPrompt(task, args.expectedOutput as string | undefined),
-        allowedTools: constraints,
-        _depth: childDepth,
-        agentId,
-        signal: toolContext.signal,
-      });
+      const result = await this.orchestrator.spawnSubagent(
+        parentId,
+        {
+          type: agentType,
+          task: this.buildTaskPrompt(task, args.expectedOutput as string | undefined),
+          scope,
+          agentId,
+          _depth: childDepth,
+        },
+        {
+          signal: toolContext.signal,
+          baseSecurity: toolContext.security,
+          contextId: toolContext.contextId,
+        }
+      );
 
       this.updateLineageStatus(agentId ?? result.agentId, result.success);
       return this.formatResult(result, role, toolContext);
