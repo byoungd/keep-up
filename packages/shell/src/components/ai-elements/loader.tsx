@@ -19,7 +19,7 @@ export function Loader({ size = "md", label, className, ...props }: LoaderProps)
       aria-live={ariaLive}
       {...props}
     >
-      <Loader2 className={cn("animate-spin", sizeClass)} aria-hidden="true" />
+      <Loader2 className={cn(sizeClass)} aria-hidden="true" />
       {label ? <span className="text-fine">{label}</span> : null}
       {!label ? <span className="sr-only">Loading</span> : null}
     </output>

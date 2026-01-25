@@ -23,6 +23,7 @@ import { CostMeter } from "./components/CostMeter";
 import { ModeToggle } from "./components/ModeToggle";
 import { useChatSession } from "./hooks/useChatSession";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
+import { useSafeAutoFocus } from "./hooks/useSafeAutoFocus";
 import { downloadFile, exportToJson, exportToMarkdown } from "./utils/exportUtils";
 
 // ChatMessage is no longer used, we use Message from @ku0/shell via useChatSession
@@ -124,6 +125,8 @@ export function ChatThread({ sessionId }: { sessionId: string }) {
   const listRef = React.useRef<HTMLDivElement>(null);
   const attachmentRefs = React.useRef(new Map<string, ChatAttachmentRef>());
   const attachmentsRef = React.useRef<PanelAttachment[]>([]);
+
+  useSafeAutoFocus(inputRef, [sessionId]);
 
   // Keyboard shortcuts
   useKeyboardShortcuts({

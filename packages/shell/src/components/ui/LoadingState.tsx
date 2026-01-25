@@ -50,10 +50,7 @@ export function LoadingState({
   const content = (
     <>
       {variant === "spinner" && (
-        <Loader2
-          className={cn("animate-spin text-muted-foreground", styles.spinner)}
-          aria-hidden="true"
-        />
+        <Loader2 className={cn("text-muted-foreground", styles.spinner)} aria-hidden="true" />
       )}
 
       {variant === "dots" && (
@@ -62,12 +59,11 @@ export function LoadingState({
             <div
               key={i}
               className={cn(
-                "rounded-full bg-muted-foreground animate-pulse",
+                "rounded-full bg-muted-foreground",
                 size === "sm" && "h-1.5 w-1.5",
                 size === "md" && "h-2 w-2",
                 size === "lg" && "h-2.5 w-2.5"
               )}
-              style={{ animationDelay: `${i * 150}ms` }}
             />
           ))}
         </div>

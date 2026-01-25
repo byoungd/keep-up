@@ -103,8 +103,8 @@ export function ThinkingIndicatorInline({ className }: { className?: string }) {
         className
       )}
     >
-      <Brain className="h-3 w-3 animate-pulse" aria-hidden="true" />
-      <span className="animate-pulse">Thinking...</span>
+      <Brain className="h-3 w-3" aria-hidden="true" />
+      <span>Thinking...</span>
     </div>
   );
 }

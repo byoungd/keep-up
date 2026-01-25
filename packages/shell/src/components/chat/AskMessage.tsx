@@ -96,7 +96,7 @@ function ActionButtons({
         onClick={() => onAction?.("launch_browser")}
         className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-info text-info-foreground rounded-lg hover:bg-info/90 transition-all duration-fast hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-info/20 text-sm font-medium group-hover:shadow-info/30"
       >
-        <MonitorPlay className="w-4 h-4 animate-pulse" />
+        <MonitorPlay className="w-4 h-4" />
         Launch Browser Control
       </button>
     );

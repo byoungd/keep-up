@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { createInterface } from "node:readline";
-import type { StreamChunk, StreamWriter } from "@ku0/agent-runtime";
+import type { RuntimeStreamChunk, StreamWriter } from "@ku0/agent-runtime";
 import type { RuntimeEvent } from "@ku0/agent-runtime-control";
 import type { AgentState, MCPToolResult } from "@ku0/agent-runtime-core";
 import type { ToolCallRecord } from "@ku0/tooling-session";
@@ -44,7 +44,7 @@ function sendError(id: string, op: OpName, message: string, code?: string): void
   send({ type: "result", id, op, ok: false, error: { message, code } });
 }
 
-function sendStreamChunk(chunk: StreamChunk): void {
+function sendStreamChunk(chunk: RuntimeStreamChunk): void {
   const requestId = state.streamRequestId;
   if (!requestId) {
     return;

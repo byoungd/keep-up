@@ -88,7 +88,7 @@ export function getStatusMeta(status: AgentTask["status"]) {
     case "running":
       return {
         label: "In Progress",
-        icon: <Loader2 className="h-3.5 w-3.5 animate-spin" />,
+        icon: <Loader2 className="h-3.5 w-3.5" />,
         textClass: TASK_THEME.status.running.text,
         bgClass: TASK_THEME.status.running.bg,
         badgeBg: TASK_THEME.status.running.badge,

@@ -10,7 +10,7 @@ import {
   filterStream,
   mergeStreams,
   processStreamWithCallbacks,
-  type StreamChunk,
+  type RuntimeStreamChunk,
   type TextChunkData,
   transformStream,
 } from "../streaming";
@@ -319,7 +319,7 @@ describe("mergeStreams", () => {
     }, 20);
 
     const merged = mergeStreams(writer1, writer2);
-    const chunks: StreamChunk[] = [];
+    const chunks: RuntimeStreamChunk[] = [];
 
     for await (const chunk of merged) {
       chunks.push(chunk);
@@ -381,7 +381,7 @@ describe("async iteration", () => {
     writer.writeText("b");
     writer.close();
 
-    const chunks: StreamChunk[] = [];
+    const chunks: RuntimeStreamChunk[] = [];
     for await (const chunk of writer) {
       chunks.push(chunk);
       if (chunk.type === "done") {
@@ -396,7 +396,7 @@ describe("async iteration", () => {
     const writer = createStreamWriter();
 
     const readPromise = (async () => {
-      const chunks: StreamChunk[] = [];
+      const chunks: RuntimeStreamChunk[] = [];
       for await (const chunk of writer) {
         chunks.push(chunk);
         if (chunk.type === "done") {

@@ -76,7 +76,7 @@ export function PlanCardArtifact({ payload }: PlanCardArtifactProps) {
                     />
                   </svg>
                 ) : status === "running" ? (
-                  <span className="h-2 w-2 rounded-full bg-info animate-pulse" />
+                  <span className="h-2 w-2 rounded-full bg-info" />
                 ) : null}
               </div>
               <div className="flex-1">

@@ -71,7 +71,7 @@ export function ApprovalCard({
           disabled={isDisabled || isBusy}
           aria-busy={pendingAction === "reject"}
         >
-          {pendingAction === "reject" && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+          {pendingAction === "reject" && <Loader2 className="h-3.5 w-3.5" />}
           Reject
         </Button>
         <Button
@@ -81,7 +81,7 @@ export function ApprovalCard({
           disabled={isDisabled || isBusy}
           aria-busy={pendingAction === "approve"}
         >
-          {pendingAction === "approve" && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+          {pendingAction === "approve" && <Loader2 className="h-3.5 w-3.5" />}
           Approve
         </Button>
       </CardFooter>

@@ -76,7 +76,7 @@ export function ProjectContextPanelContent() {
       <div className="flex-1 overflow-hidden relative">
         {isLoading ? (
           <div className="absolute inset-0 flex items-center justify-center bg-surface-0/50 z-10">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+            <div className="rounded-full h-8 w-8 border-b-2 border-primary" />
           </div>
         ) : null}
 
@@ -140,7 +140,7 @@ No context generated yet. Click 'Regenerate' to analyze project."
         >
           {isGenerating ? (
             <>
-              <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full" />
               Analyzing...
             </>
           ) : (

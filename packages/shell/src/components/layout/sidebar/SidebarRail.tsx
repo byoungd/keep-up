@@ -75,7 +75,7 @@ export const SidebarRail = React.memo(function SidebarRail({
         className="flex h-full w-full flex-col items-center justify-center gap-2 py-3"
         aria-label="Primary sidebar"
       >
-        <div className="h-5 w-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+        <div className="h-5 w-5 border-2 border-primary/30 border-t-primary rounded-full" />
       </aside>
     );
   }

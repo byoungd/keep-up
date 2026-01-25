@@ -101,7 +101,7 @@ function StepsSummary({ steps }: { steps: ExecutionStep[] }) {
       )}
       {statusCounts.executing > 0 && (
         <span className="flex items-center gap-1 text-primary">
-          <Loader2 className="h-2.5 w-2.5 animate-spin" />
+          <Loader2 className="h-2.5 w-2.5" />
           {statusCounts.executing}
         </span>
       )}

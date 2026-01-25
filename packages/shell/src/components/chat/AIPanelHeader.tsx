@@ -140,7 +140,7 @@ function StatusDot({ isStreaming, isLoading }: { isStreaming: boolean; isLoading
       <span
         className={cn(
           "absolute inline-flex h-full w-full rounded-full opacity-50",
-          isStreaming ? "bg-success animate-pulse" : "bg-warning animate-pulse"
+          isStreaming ? "bg-success" : "bg-warning"
         )}
       />
       {/* Core dot with glow */}

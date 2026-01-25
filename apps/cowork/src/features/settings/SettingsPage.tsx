@@ -236,7 +236,7 @@ function ProvidersSection({ state, onInputChange, onSave, onDelete }: ProviderSe
       </div>
       {state.isLoading ? (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <div className="h-4 w-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+          <div className="h-4 w-4 border-2 border-primary/30 border-t-primary rounded-full" />
           Loading providers…
         </div>
       ) : (
@@ -322,7 +322,7 @@ function GymReportSection({ gymState }: GymReportSectionProps) {
       </div>
       {gymState.isLoading ? (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <div className="h-4 w-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+          <div className="h-4 w-4 border-2 border-primary/30 border-t-primary rounded-full" />
           Loading gym report…
         </div>
       ) : gymState.error ? (
@@ -362,7 +362,7 @@ function PolicySection({
 
       {policyState.isLoading ? (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <div className="h-4 w-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+          <div className="h-4 w-4 border-2 border-primary/30 border-t-primary rounded-full" />
           Loading policy…
         </div>
       ) : null}
@@ -507,7 +507,7 @@ function AuditLogSection({
 
       {auditState.isLoading ? (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <div className="h-4 w-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+          <div className="h-4 w-4 border-2 border-primary/30 border-t-primary rounded-full" />
           Loading audit logs…
         </div>
       ) : null}
@@ -585,7 +585,7 @@ function CheckpointSection({
 
       {checkpointState.isLoading ? (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <div className="h-4 w-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+          <div className="h-4 w-4 border-2 border-primary/30 border-t-primary rounded-full" />
           Loading checkpoints…
         </div>
       ) : null}
@@ -1267,7 +1267,7 @@ export function SettingsPage() {
     return (
       <div className="page-grid">
         <section className="card-panel flex items-center justify-center py-12">
-          <div className="h-5 w-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+          <div className="h-5 w-5 border-2 border-primary/30 border-t-primary rounded-full" />
         </section>
       </div>
     );

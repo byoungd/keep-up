@@ -42,11 +42,7 @@ export function BackgroundTaskIndicator({
       <span
         className={cn(
           "h-2 w-2 rounded-full",
-          hasRunning
-            ? "bg-accent-amber animate-pulse"
-            : hasPaused
-              ? "bg-accent-blue"
-              : "bg-muted-foreground/60"
+          hasRunning ? "bg-accent-amber" : hasPaused ? "bg-accent-blue" : "bg-muted-foreground/60"
         )}
         aria-hidden="true"
       />

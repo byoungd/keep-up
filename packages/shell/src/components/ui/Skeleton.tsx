@@ -42,7 +42,7 @@ function Skeleton({
 
   return (
     <div
-      className={cn("animate-pulse bg-muted", variantStyles[variant], className)}
+      className={cn("bg-muted", variantStyles[variant], className)}
       style={{
         width: width,
         height: height,

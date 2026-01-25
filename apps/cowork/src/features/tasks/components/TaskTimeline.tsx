@@ -53,7 +53,7 @@ export function TaskTimeline({ graph, isConnected, approveTool, rejectTool }: Ta
       <div className="px-5 py-3 border-b border-border/40 bg-surface-0/90 sticky top-0 z-20 flex justify-between items-center shadow-sm">
         <h2 className="text-sm font-semibold text-foreground tracking-tight flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-primary/20 flex items-center justify-center">
-            <div className="w-1 h-1 rounded-full bg-primary animate-pulse" />
+            <div className="w-1 h-1 rounded-full bg-primary" />
           </div>
           Execution Flow
         </h2>
