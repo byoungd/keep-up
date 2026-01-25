@@ -114,8 +114,16 @@ describe("AgentOrchestrator task graph", () => {
 
   it("creates plan step nodes when planning is enabled", async () => {
     const registry = createToolRegistry({ enforceQualifiedNames: false });
-    await registry.register(createCompletionToolServer());
-    await registry.register(createPingServer());
+    try {
+      await registry.register(createCompletionToolServer());
+    } catch (_e) {
+      // Ignore if already registered
+    }
+    try {
+      await registry.register(createPingServer());
+    } catch (_e) {
+      // Ignore if already registered
+    }
 
     const graph = createTaskGraphStore();
     const workingDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "taskgraph-plan-"));
