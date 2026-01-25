@@ -8,7 +8,7 @@ use std::{
     sync::{Arc, Mutex},
     thread,
 };
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, State};
 
 const DEFAULT_COLS: u16 = 80;
 const DEFAULT_ROWS: u16 = 24;
@@ -86,7 +86,7 @@ pub async fn spawn_terminal(
         .spawn_command(command)
         .map_err(|e| format!("Failed to spawn PTY command: {e}"))?;
 
-    let mut master = pair.master;
+    let master = pair.master;
     let writer = master
         .take_writer()
         .map_err(|e| format!("Failed to take PTY writer: {e}"))?;
@@ -151,7 +151,7 @@ fn resolve_cwd(cwd: Option<&str>) -> Option<PathBuf> {
         }
     }
 
-    if let Some(home) = tauri::path::home_dir() {
+    if let Some(home) = resolve_home_dir() {
         if home.is_dir() {
             return Some(home);
         }
@@ -195,6 +195,31 @@ fn default_shell() -> (String, Vec<String>) {
     }
 }
 
+fn resolve_home_dir() -> Option<PathBuf> {
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(profile) = env::var_os("USERPROFILE") {
+            return Some(PathBuf::from(profile));
+        }
+        if let (Some(drive), Some(path)) = (env::var_os("HOMEDRIVE"), env::var_os("HOMEPATH")) {
+            let combined = format!("{}{}", drive.to_string_lossy(), path.to_string_lossy());
+            if !combined.trim().is_empty() {
+                return Some(PathBuf::from(combined));
+            }
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        if let Some(home) = env::var_os("HOME") {
+            return Some(PathBuf::from(home));
+        }
+    }
+
+    None
+}
+
+#[cfg(target_os = "windows")]
 fn find_in_path(binary: &str) -> Option<String> {
     let path_var = env::var_os("PATH")?;
     for dir in env::split_paths(&path_var) {
@@ -234,7 +259,7 @@ pub fn write_terminal(
 
 #[tauri::command]
 pub fn kill_terminal(id: String, manager: State<'_, PtyManager>) -> Result<(), String> {
-    let session = manager
+    let mut session = manager
         .sessions
         .lock()
         .map_err(|_| "PTY session lock poisoned".to_string())?

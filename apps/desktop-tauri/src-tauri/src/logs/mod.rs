@@ -6,11 +6,12 @@ use std::{
     thread,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter};
 use tracing::{Event, Subscriber};
 use tracing_subscriber::{
     layer::{Context, SubscriberExt},
     registry::LookupSpan,
+    util::SubscriberInitExt,
     Layer,
 };
 
@@ -82,12 +83,12 @@ where
     }
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 pub struct LogBatch {
     pub entries: Vec<LogEntry>,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 pub struct LogEntry {
     pub level: String,
     pub target: String,

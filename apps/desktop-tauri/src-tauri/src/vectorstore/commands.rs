@@ -1,4 +1,4 @@
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, State};
 
 use super::{
     DeleteChunksArgs, IndexFilesArgs, IndexProgress, IndexStatus, ListChunksArgs, SearchQuery,

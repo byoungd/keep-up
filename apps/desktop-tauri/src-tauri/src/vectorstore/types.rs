@@ -75,6 +75,7 @@ pub struct IndexProgress {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "state", content = "message", rename_all = "snake_case")]
+#[allow(dead_code)]
 pub enum IndexStatus {
     Idle,
     Indexing,

@@ -10,7 +10,7 @@ use std::{
     thread,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter};
 
 const DEFAULT_DEBOUNCE_MS: u64 = 50;
 
@@ -40,12 +40,12 @@ pub struct WatchPathsArgs {
     pub debounce_ms: Option<u64>,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 pub struct FileWatcherBatch {
     pub events: Vec<FileWatcherEvent>,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 pub struct FileWatcherEvent {
     pub kind: String,
     pub raw_kind: String,

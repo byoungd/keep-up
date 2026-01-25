@@ -1,15 +1,11 @@
-mod commands;
+pub(crate) mod commands;
 mod store;
 mod types;
 
 use std::path::PathBuf;
 
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 
-pub use commands::{
-    vectorstore_delete_chunks, vectorstore_index_files, vectorstore_list_chunks,
-    vectorstore_search, vectorstore_stats, vectorstore_upsert_chunks,
-};
 pub use store::VectorStore;
 pub use types::*;
 
