@@ -34,7 +34,7 @@ const PROMPT_EVENT_TYPE: WorkspaceEventType = "prompt";
 class InMemoryWorkspaceSessionManager implements NativeWorkspaceSessionManager {
   private sessions = new Map<string, WorkspaceSession>();
   private events: WorkspaceEvent[] = [];
-  private approvals = new Map<string, { status: ApprovalStatus }>();
+  private approvals = new Map<string, { status: ApprovalStatus; expiresAt?: number }>();
   private pendingApprovals = 0;
   private nextSession = 1;
   private nextApproval = 1;
@@ -72,6 +72,7 @@ class InMemoryWorkspaceSessionManager implements NativeWorkspaceSessionManager {
   }
 
   sendInput(sessionId: string, payload: Record<string, unknown>): void {
+    this.expireApprovals();
     if (this.pendingApprovals > 0) {
       throw new Error("Workspace sessions are blocked pending approval");
     }
@@ -106,15 +107,17 @@ class InMemoryWorkspaceSessionManager implements NativeWorkspaceSessionManager {
       throw new Error("Approval request already exists");
     }
 
+    const now = Date.now();
+    const expiresAt = request.timeoutMs ? now + request.timeoutMs : undefined;
     const approval: ApprovalRequest = {
       requestId,
       kind: request.kind,
       payload: request.payload,
-      requestedAt: Date.now(),
+      requestedAt: now,
       timeoutMs: request.timeoutMs,
     };
 
-    this.approvals.set(requestId, { status: "pending" });
+    this.approvals.set(requestId, { status: "pending", expiresAt });
     this.pendingApprovals += 1;
     return approval;
   }
@@ -123,6 +126,20 @@ class InMemoryWorkspaceSessionManager implements NativeWorkspaceSessionManager {
     const record = this.approvals.get(decision.requestId);
     if (!record) {
       throw new Error("Approval request not found");
+    }
+
+    const now = Date.now();
+    if (record.expiresAt && record.expiresAt <= now) {
+      this.approvals.delete(decision.requestId);
+      if (record.status === "pending" && this.pendingApprovals > 0) {
+        this.pendingApprovals -= 1;
+      }
+      return {
+        requestId: decision.requestId,
+        status: "expired",
+        approved: false,
+        reason: decision.reason ?? "Approval timed out",
+      };
     }
 
     const status = resolveApprovalStatus(decision);
@@ -190,6 +207,21 @@ class InMemoryWorkspaceSessionManager implements NativeWorkspaceSessionManager {
       throw new Error("Workspace session not found");
     }
     return session;
+  }
+
+  private expireApprovals(now = Date.now()): void {
+    for (const [requestId, record] of this.approvals.entries()) {
+      if (record.status !== "pending" || !record.expiresAt) {
+        continue;
+      }
+      if (record.expiresAt > now) {
+        continue;
+      }
+      this.approvals.delete(requestId);
+      if (this.pendingApprovals > 0) {
+        this.pendingApprovals -= 1;
+      }
+    }
   }
 }
 

@@ -5,45 +5,28 @@
  */
 
 import * as path from "node:path";
-import type { CoworkPolicyActionLike } from "@ku0/agent-runtime-core";
-import { COWORK_POLICY_ACTIONS } from "@ku0/agent-runtime-core";
+import type {
+  CoworkPolicyActionLike,
+  CoworkPolicyConditions,
+  CoworkPolicyConfig,
+  CoworkPolicyDecisionType,
+  CoworkPolicyRule,
+  CoworkRiskTag,
+} from "@ku0/agent-runtime-core";
+import {
+  COWORK_POLICY_SCHEMA,
+  computeCoworkPolicyHash,
+  normalizeCoworkPolicyConfig,
+  parseCoworkPolicyConfig,
+  validateCoworkPolicyConfig,
+} from "@ku0/agent-runtime-core";
 import type { TelemetryContext } from "@ku0/agent-runtime-telemetry/telemetry";
 import { AGENT_METRICS } from "@ku0/agent-runtime-telemetry/telemetry";
-import { z } from "zod";
 import { LRUCache } from "../utils/cache";
 
-// Defined locally to avoid circular dependency with cowork/types.ts
-export type CoworkRiskTag = "delete" | "overwrite" | "network" | "connector" | "batch";
-
-export type CoworkPolicyDecisionType = "allow" | "allow_with_confirm" | "deny";
+export type { CoworkPolicyConfig, CoworkPolicyDecisionType, CoworkPolicyRule, CoworkRiskTag };
 
 export type CoworkPolicyAction = CoworkPolicyActionLike;
-
-export interface CoworkPolicyRule {
-  id: string;
-  action: CoworkPolicyAction;
-  when?: CoworkPolicyConditions;
-  decision: CoworkPolicyDecisionType;
-  riskTags?: CoworkRiskTag[];
-  reason?: string;
-}
-
-export interface CoworkPolicyConditions {
-  pathWithinGrant?: boolean;
-  pathWithinOutputRoot?: boolean;
-  matchesPattern?: string[];
-  fileSizeGreaterThan?: number;
-  hostInAllowlist?: boolean;
-  connectorScopeAllowed?: boolean;
-}
-
-export interface CoworkPolicyConfig {
-  version: "1.0";
-  defaults: {
-    fallback: CoworkPolicyDecisionType;
-  };
-  rules: CoworkPolicyRule[];
-}
 
 export interface CoworkPolicyInput {
   action: CoworkPolicyAction;
@@ -71,55 +54,14 @@ export interface CoworkPolicyEngineOptions {
   enableDecisionCache?: boolean;
 }
 
-const COWORK_RISK_TAGS = ["delete", "overwrite", "network", "connector", "batch"] as const;
-
-const policyDecisionSchema = z.enum(["allow", "allow_with_confirm", "deny"]);
-const policyActionSchema = z.enum(COWORK_POLICY_ACTIONS);
-const policyRiskTagSchema = z.enum(COWORK_RISK_TAGS);
-const policyConditionsSchema = z
-  .object({
-    pathWithinGrant: z.boolean().optional(),
-    pathWithinOutputRoot: z.boolean().optional(),
-    matchesPattern: z.array(z.string()).optional(),
-    fileSizeGreaterThan: z.number().optional(),
-    hostInAllowlist: z.boolean().optional(),
-    connectorScopeAllowed: z.boolean().optional(),
-  })
-  .strict();
-
-const policyRuleSchema = z
-  .object({
-    id: z.string().min(1),
-    action: policyActionSchema,
-    when: policyConditionsSchema.optional(),
-    decision: policyDecisionSchema,
-    riskTags: z.array(policyRiskTagSchema).optional(),
-    reason: z.string().optional(),
-  })
-  .strict();
-
-const policyConfigSchema = z
-  .object({
-    version: z.literal("1.0"),
-    defaults: z
-      .object({
-        fallback: policyDecisionSchema,
-      })
-      .strict(),
-    rules: z.array(policyRuleSchema),
-  })
-  .strict();
-
 // Re-export from core to maintain API compatibility
 export { isCoworkPolicyAction } from "@ku0/agent-runtime-core";
-
-export function parseCoworkPolicyConfig(input: unknown): CoworkPolicyConfig | null {
-  const parsed = policyConfigSchema.safeParse(input);
-  if (!parsed.success) {
-    return null;
-  }
-  return parsed.data;
-}
+export {
+  COWORK_POLICY_SCHEMA,
+  computeCoworkPolicyHash,
+  parseCoworkPolicyConfig,
+  validateCoworkPolicyConfig,
+};
 
 export function createDenyAllPolicy(): CoworkPolicyConfig {
   return {
@@ -136,7 +78,7 @@ export class CoworkPolicyEngine {
   private readonly actionRuleCache = new Map<CoworkPolicyAction, CoworkPolicyRule[]>();
 
   constructor(config: CoworkPolicyConfig, options: CoworkPolicyEngineOptions = {}) {
-    this.config = config;
+    this.config = normalizeCoworkPolicyConfig(config);
     this.telemetry = options.telemetry;
     this.decisionCache =
       options.enableDecisionCache === false
