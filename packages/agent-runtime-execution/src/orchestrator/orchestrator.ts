@@ -351,6 +351,7 @@ export class AgentOrchestrator {
   private currentPlanNodeId?: string;
   private planArtifactEmitted = false;
   private readonly taskGraphToolCalls = new WeakMap<MCPToolCall, string>();
+  private readonly planStepTaskNodes = new Map<string, string>();
   private totalUsage: TokenUsageStats = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
   private readonly controlState: ControlStateSnapshot = { paused: false, stepMode: false };
   private controlGate?: { promise: Promise<void>; resolve: () => void };
@@ -712,6 +713,7 @@ export class AgentOrchestrator {
     this.forceCompletionToolsOnly = false;
     this.planArtifactEmitted = false;
     this.subagentPreludeExecuted = false;
+    this.planStepTaskNodes.clear();
     this.taskGraph?.setEventContext({ correlationId: runId, source: this.config.name });
     this.currentPlanNodeId = this.createPlanNode(userMessage);
     const detachStreamBridge = this.attachStreamBridge(runId);
@@ -2332,6 +2334,7 @@ export class AgentOrchestrator {
     const plan = this.buildPlan(toolCalls);
     this.emit("plan:created", plan);
     this.maybeEmitPlanArtifact(plan, toolCalls);
+    this.syncPlanStepsWithTaskGraph(plan);
 
     if (plan.requiresApproval) {
       this.loopStateMachine.pause();
@@ -2419,6 +2422,193 @@ export class AgentOrchestrator {
     }
   }
 
+  private syncPlanStepsWithTaskGraph(plan: ExecutionPlan): void {
+    if (!this.taskGraph) {
+      return;
+    }
+
+    const stepNodeIds = new Map<string, string>();
+
+    for (const step of plan.steps) {
+      const nodeId = this.ensurePlanStepTaskNode(plan, step);
+      if (nodeId) {
+        stepNodeIds.set(step.id, nodeId);
+      }
+    }
+
+    for (const step of plan.steps) {
+      const nodeId = stepNodeIds.get(step.id);
+      if (!nodeId) {
+        continue;
+      }
+
+      const desiredStatus = this.mapPlanStepStatus(step.status) ?? "pending";
+      this.updatePlanStepTaskGraphStatus(nodeId, desiredStatus);
+
+      const desiredTitle = this.formatPlanStepTitle(step);
+      const dependencyNodes = step.dependencies
+        .map((dependencyId) => stepNodeIds.get(dependencyId))
+        .filter((dependencyId): dependencyId is string => Boolean(dependencyId));
+
+      this.updateTaskGraphNode(nodeId, desiredTitle, dependencyNodes);
+
+      for (const dependencyId of dependencyNodes) {
+        this.addTaskGraphDependencyEdge(nodeId, dependencyId);
+      }
+    }
+  }
+
+  private ensurePlanStepTaskNode(plan: ExecutionPlan, step: PlanStep): string | undefined {
+    if (!this.taskGraph) {
+      return undefined;
+    }
+
+    const existing = this.resolvePlanStepTaskNodeId(plan.id, step.id);
+    if (existing) {
+      return existing;
+    }
+
+    const initialStatus = this.mapPlanStepStatus(step.status) ?? "pending";
+    const node = this.taskGraph.createNode({
+      type: "subtask",
+      title: this.formatPlanStepTitle(step),
+      status: initialStatus,
+      artifactId: this.getPlanStepArtifactId(plan.id, step.id),
+    });
+
+    this.planStepTaskNodes.set(step.id, node.id);
+    return node.id;
+  }
+
+  private resolvePlanStepTaskNodeId(planId: string, stepId: string): string | undefined {
+    const cached = this.planStepTaskNodes.get(stepId);
+    if (cached) {
+      return cached;
+    }
+
+    if (!this.taskGraph) {
+      return undefined;
+    }
+
+    const artifactId = this.getPlanStepArtifactId(planId, stepId);
+    const existing = this.taskGraph
+      .listNodes()
+      .find((node) => node.type === "subtask" && node.artifactId === artifactId);
+
+    if (!existing) {
+      return undefined;
+    }
+
+    this.planStepTaskNodes.set(stepId, existing.id);
+    return existing.id;
+  }
+
+  private formatPlanStepTitle(step: PlanStep): string {
+    const description = step.description.trim();
+    if (description.length === 0) {
+      return `Step ${step.order}`;
+    }
+    return `Step ${step.order}: ${description}`;
+  }
+
+  private getPlanStepArtifactId(planId: string, stepId: string): string {
+    return `plan-step:${planId}:${stepId}`;
+  }
+
+  private updatePlanStepTaskGraphStatus(nodeId: string, status: TaskNodeStatus): void {
+    if (!this.taskGraph) {
+      return;
+    }
+
+    const node = this.taskGraph.getNode(nodeId);
+    if (!node || node.status === status) {
+      return;
+    }
+
+    try {
+      this.taskGraph.updateNodeStatus(nodeId, status);
+      return;
+    } catch {
+      // Fall through for invalid transitions.
+    }
+
+    if (status !== "completed") {
+      return;
+    }
+
+    if (node.status === "pending" || node.status === "blocked") {
+      try {
+        this.taskGraph.updateNodeStatus(nodeId, "running");
+      } catch {
+        // Ignore intermediate transition failures.
+      }
+
+      try {
+        this.taskGraph.updateNodeStatus(nodeId, status);
+      } catch {
+        // Ignore final transition failures.
+      }
+    }
+  }
+
+  private updateTaskGraphNode(nodeId: string, title: string, dependsOn: string[]): void {
+    if (!this.taskGraph) {
+      return;
+    }
+
+    const node = this.taskGraph.getNode(nodeId);
+    if (!node) {
+      return;
+    }
+
+    const shouldUpdateTitle = node.title !== title;
+    const shouldUpdateDependsOn = !this.areSameDependencies(node.dependsOn, dependsOn);
+
+    if (!shouldUpdateTitle && !shouldUpdateDependsOn) {
+      return;
+    }
+
+    const update: { title?: string; dependsOn?: string[] } = {};
+    if (shouldUpdateTitle) {
+      update.title = title;
+    }
+    if (shouldUpdateDependsOn) {
+      update.dependsOn = [...dependsOn];
+    }
+
+    try {
+      this.taskGraph.updateNode(nodeId, update);
+    } catch {
+      // Avoid breaking orchestration on task graph update errors.
+    }
+  }
+
+  private addTaskGraphDependencyEdge(from: string, to: string): void {
+    if (!this.taskGraph) {
+      return;
+    }
+
+    try {
+      this.taskGraph.addEdge({ from, to, type: "depends_on" });
+    } catch {
+      // Ignore duplicate edges or missing nodes.
+    }
+  }
+
+  private areSameDependencies(left: readonly string[], right: readonly string[]): boolean {
+    if (left.length !== right.length) {
+      return false;
+    }
+
+    for (let i = 0; i < left.length; i++) {
+      if (left[i] !== right[i]) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   private async advanceSopToPhase(targetPhase: string): Promise<void> {
     if (!this.sopExecutor) {
       return;
@@ -2503,6 +2693,7 @@ export class AgentOrchestrator {
     const persisted = await this.loadCurrentPlan();
     if (persisted) {
       this.emit("plan:created", { steps: persisted.steps });
+      this.syncPlanStepsWithTaskGraph(persisted);
       return;
     }
 
@@ -2610,6 +2801,7 @@ export class AgentOrchestrator {
   private async savePlanAndEmit(plan: ExecutionPlan): Promise<void> {
     await this.getPlanPersistence().saveCurrent(plan);
     this.emit("plan:created", { steps: plan.steps });
+    this.syncPlanStepsWithTaskGraph(plan);
   }
 
   private async loadCurrentPlan(): Promise<ExecutionPlan | null> {
