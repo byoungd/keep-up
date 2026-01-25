@@ -59,6 +59,7 @@ export type {
   EmbeddingProvider,
   InMemoryVectorStoreConfig,
   SqliteVectorStoreConfig,
+  SqliteVectorStoreExtension,
   VectorSearchOptions,
   VectorSearchResult as VectorStoreSearchResult,
   VectorStore,
