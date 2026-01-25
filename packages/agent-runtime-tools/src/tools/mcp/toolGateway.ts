@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import type {
   CapabilityGrant,
   McpManifest,
@@ -9,14 +10,39 @@ import type {
   ToolRegistryEntry,
 } from "@ku0/agent-runtime-core";
 import type { PersistenceStore } from "@ku0/agent-runtime-persistence";
-import {
-  getNativeToolGateway,
-  getNativeToolGatewayError,
-  type NativeToolGatewayBinding,
-  type ToolGatewayBinding,
-} from "@ku0/tool-gateway-rs/node";
+import type { NativeToolGatewayBinding, ToolGatewayBinding } from "@ku0/tool-gateway-rs/node";
 
+type NativeToolGatewayModule = {
+  getNativeToolGateway: () => NativeToolGatewayBinding | null;
+  getNativeToolGatewayError: () => Error | null;
+  ToolGateway: new () => ToolGatewayBinding;
+};
+
+let cachedModule: NativeToolGatewayModule | null | undefined;
+let cachedModuleError: Error | null | undefined;
 let cachedBinding: NativeToolGatewayBinding | null | undefined;
+
+function resolveModule(): NativeToolGatewayModule {
+  if (cachedModule !== undefined) {
+    if (!cachedModule) {
+      throw cachedModuleError ?? new Error("Tool gateway native module unavailable.");
+    }
+    return cachedModule;
+  }
+
+  try {
+    const require = createRequire(import.meta.url);
+    const mod = require("@ku0/tool-gateway-rs/node") as NativeToolGatewayModule;
+    cachedModule = mod;
+    cachedModuleError = null;
+    return mod;
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    cachedModule = null;
+    cachedModuleError = error;
+    throw new Error(`Tool gateway native module unavailable. ${error.message}`);
+  }
+}
 
 function resolveBinding(): NativeToolGatewayBinding {
   if (cachedBinding !== undefined) {
@@ -26,9 +52,10 @@ function resolveBinding(): NativeToolGatewayBinding {
     return cachedBinding;
   }
 
-  const binding = getNativeToolGateway();
+  const module = resolveModule();
+  const binding = module.getNativeToolGateway();
   if (!binding) {
-    const error = getNativeToolGatewayError();
+    const error = module.getNativeToolGatewayError();
     cachedBinding = null;
     const detail = error ? ` ${error.message}` : "";
     throw new Error(`Tool gateway native binding unavailable.${detail}`);
