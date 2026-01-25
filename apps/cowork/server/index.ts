@@ -22,7 +22,25 @@ const pipelineStore = await createPipelineStore();
 const pipelineRunner = createPipelineRunner({ store: pipelineStore, logger: serverLogger });
 void pipelineRunner.resumePendingRuns();
 const aiEnvelopeGateway = createAIEnvelopeGateway(serverLogger);
-const lessonStore = createLessonStore({ filePath: join(stateDir, "lessons.json") });
+const lessonVectorPath =
+  process.env.COWORK_LESSON_VECTOR_PATH ?? join(stateDir, "lessons.vectors.sqlite");
+const sqliteVecPath = process.env.COWORK_SQLITE_VEC_PATH;
+const vectorStoreExtensions = sqliteVecPath
+  ? [
+      {
+        name: "sqlite-vec",
+        load: (db: { loadExtension: (path: string) => void }) => {
+          db.loadExtension(sqliteVecPath);
+        },
+      },
+    ]
+  : undefined;
+const lessonStore = createLessonStore({
+  filePath: join(stateDir, "lessons.json"),
+  vectorStorePath: lessonVectorPath,
+  vectorStoreExtensions,
+  vectorStoreIgnoreExtensionErrors: process.env.COWORK_SQLITE_VEC_IGNORE_ERRORS === "true",
+});
 const critic = new CriticAgent({ lessonStore, logger: serverLogger });
 const taskRuntime = new CoworkTaskRuntime({
   storage,

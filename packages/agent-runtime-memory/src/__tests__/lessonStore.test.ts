@@ -1,4 +1,4 @@
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -57,5 +57,27 @@ describe("LessonStore", () => {
     const list = await reloaded.list();
     expect(list).toHaveLength(1);
     expect(list[0]?.rule).toBe("Prefer const over let.");
+  });
+
+  it("uses sqlite vector storage when a vectorStorePath is provided", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "lesson-store-"));
+    const filePath = join(dir, "lessons.json");
+    const vectorStorePath = join(dir, "lessons.vectors.sqlite");
+    const store = createLessonStore({ filePath, vectorStorePath });
+
+    await store.add({
+      trigger: "imports",
+      rule: "Prefer explicit named imports.",
+      confidence: 0.6,
+      scope: "global",
+      profile: "default",
+      source: "manual",
+    });
+
+    const stats = await stat(vectorStorePath);
+    expect(stats.isFile()).toBe(true);
+
+    const results = await store.search("imports", { limit: 1 });
+    expect(results).toHaveLength(1);
   });
 });

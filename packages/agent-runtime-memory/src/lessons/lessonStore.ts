@@ -10,6 +10,8 @@ import { dirname } from "node:path";
 import {
   type EmbeddingProvider,
   InMemoryVectorStore,
+  SqliteVectorStore,
+  type SqliteVectorStoreExtension,
   type VectorSearchOptions,
   type VectorStore,
 } from "../semantic/vectorStore";
@@ -36,6 +38,9 @@ export type LessonStoreConfig = {
   maxEntries?: number;
   clock?: () => number;
   vectorStore?: VectorStore<LessonVectorEntry>;
+  vectorStorePath?: string;
+  vectorStoreExtensions?: SqliteVectorStoreExtension[];
+  vectorStoreIgnoreExtensionErrors?: boolean;
 };
 
 type LessonInput = Omit<
@@ -75,11 +80,19 @@ export class LessonStore {
     this.embeddingProvider = resolveEmbeddingProvider(config);
     this.vectorStore =
       config.vectorStore ??
-      new InMemoryVectorStore<LessonVectorEntry>({
-        dimension: this.embeddingProvider.dimension,
-        maxEntries: config.maxEntries,
-        embeddingProvider: this.embeddingProvider,
-      });
+      (config.vectorStorePath
+        ? new SqliteVectorStore<LessonVectorEntry>({
+            filePath: config.vectorStorePath,
+            dimension: this.embeddingProvider.dimension,
+            maxEntries: config.maxEntries,
+            extensions: config.vectorStoreExtensions,
+            ignoreExtensionErrors: config.vectorStoreIgnoreExtensionErrors,
+          })
+        : new InMemoryVectorStore<LessonVectorEntry>({
+            dimension: this.embeddingProvider.dimension,
+            maxEntries: config.maxEntries,
+            embeddingProvider: this.embeddingProvider,
+          }));
   }
 
   async add(input: LessonInput): Promise<Lesson> {
