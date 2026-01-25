@@ -34,7 +34,7 @@
     "test:e2e:collab": "node scripts/run-e2e-category.mjs collab",
     "test:e2e:annotations": "node scripts/run-e2e-category.mjs annotations",
     "test:e2e:features": "node scripts/run-e2e-category.mjs features",
-    "test:e2e:smoke": "pnpm --filter @ku0/e2e-tests test:e2e -- src/sidebar.spec.ts",
+    "test:e2e:smoke": "node scripts/run-e2e-category.mjs smoke",
     "test:pr": "pnpm test:unit",
     "test:ci": "pnpm test:unit:ci",
     "test:nightly": "pnpm test:unit:ci",
