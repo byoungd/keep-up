@@ -41,6 +41,8 @@ export type LessonStoreConfig = {
   vectorStorePath?: string;
   vectorStoreExtensions?: SqliteVectorStoreExtension[];
   vectorStoreIgnoreExtensionErrors?: boolean;
+  vectorStoreUseVec?: boolean;
+  vectorStoreDistanceMetric?: "cosine" | "l2";
 };
 
 type LessonInput = Omit<
@@ -87,6 +89,8 @@ export class LessonStore {
             maxEntries: config.maxEntries,
             extensions: config.vectorStoreExtensions,
             ignoreExtensionErrors: config.vectorStoreIgnoreExtensionErrors,
+            enableVecSearch: config.vectorStoreUseVec,
+            vecDistanceMetric: config.vectorStoreDistanceMetric,
           })
         : new InMemoryVectorStore<LessonVectorEntry>({
             dimension: this.embeddingProvider.dimension,

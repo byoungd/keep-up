@@ -43,4 +43,17 @@ describe("SqliteVectorStore", () => {
     await store.upsert({ id: "a", content: "alpha", embedding: [0.1, 0.2, 0.3, 0.4] });
     expect(loaded).toBe(true);
   });
+
+  it("falls back when vec search is enabled but extension is unavailable", async () => {
+    const store = new SqliteVectorStore({
+      filePath: ":memory:",
+      dimension: 3,
+      enableVecSearch: true,
+      ignoreExtensionErrors: true,
+    });
+
+    await store.upsert({ id: "a", content: "alpha", embedding: [0.1, 0.1, 0.1] });
+    const results = await store.searchByEmbedding([0.1, 0.1, 0.1], { limit: 1 });
+    expect(results[0]?.entry.id).toBe("a");
+  });
 });
