@@ -10,6 +10,7 @@ import {
   updateSession,
 } from "../../api/coworkApi";
 import type { Project, Session, Workspace } from "../../features/workspace/types";
+import { useCurrentUser } from "../../hooks/useCurrentUser";
 import { config } from "../../lib/config";
 
 const STORAGE_KEYS = {
@@ -149,6 +150,8 @@ function buildWorkspaces(sessions: CoworkSession[]): Workspace[] {
 
 export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
+  const { data: currentUser } = useCurrentUser();
+  const userId = currentUser?.id;
   const [activeWorkspaceId, setActiveWorkspaceId] = React.useState<string | null>(() =>
     readStorage(STORAGE_KEYS.activeWorkspace)
   );
@@ -235,6 +238,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     async (path: string, title?: string) => {
       const session = await createSessionApi({
         title,
+        userId,
         grants: [
           {
             rootPath: path,
@@ -261,12 +265,12 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       setActiveWorkspaceId(mapped.workspaceId);
       return mapped;
     },
-    [activeProjectId, projects, pushSession]
+    [activeProjectId, projects, pushSession, userId]
   );
 
   const createSessionWithoutGrant = React.useCallback(
     async (title?: string) => {
-      const session = await createSessionApi({ title });
+      const session = await createSessionApi({ title, userId });
       const activeProject = activeProjectId
         ? projects.find((project) => project.id === activeProjectId)
         : undefined;
@@ -278,7 +282,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       pushSession(session);
       return mapSession(session);
     },
-    [activeProjectId, projects, pushSession]
+    [activeProjectId, projects, pushSession, userId]
   );
 
   const createProject = React.useCallback(

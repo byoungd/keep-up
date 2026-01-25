@@ -53,7 +53,16 @@ export type ApiResult<T> = {
   results?: LessonSearchResult[];
   artifacts?: CoworkArtifact[];
   artifact?: CoworkArtifact;
+  user?: CoworkUser | null;
 } & T;
+
+export type CoworkUser = {
+  id: string;
+  email?: string;
+  fullName?: string;
+  imageUrl?: string;
+  permissions?: string[];
+};
 
 export type CoworkApprovalStatus = "pending" | "approved" | "rejected";
 
@@ -392,6 +401,15 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(data.error?.message ?? "Request failed");
   }
   return data;
+}
+
+export async function getCurrentUser(): Promise<CoworkUser | null> {
+  try {
+    const data = await fetchJson<{ user?: CoworkUser | null }>("/api/me");
+    return data.user ?? null;
+  } catch (_err) {
+    return null;
+  }
 }
 
 export async function listLessons(options: LessonListOptions = {}): Promise<CoworkLesson[]> {

@@ -19,7 +19,7 @@ export function SessionRoute() {
       // For now, let's keep it simple: meta+enter inside textarea works by default
     },
     onNewSession: () => {
-      // TODO: Navigate to new session
+      router.navigate({ to: "/new-session" });
     },
     onSearch: () => {
       router.navigate({ to: "/search" });
