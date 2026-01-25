@@ -258,6 +258,7 @@ export interface ThinkingNode extends BaseNode {
 
 export interface ToolCallNode extends BaseNode {
   type: "tool_call";
+  callId?: string;
   toolName: string;
   args: Record<string, unknown>;
   requiresApproval?: boolean;
@@ -269,13 +270,14 @@ export interface ToolCallNode extends BaseNode {
 
 export interface ToolOutputNode extends BaseNode {
   type: "tool_output";
-  callId: string; // References ToolCallNode.id
+  callId: string; // Tool call ID or resolved ToolCallNode.id
   toolName?: string;
   output: unknown;
   isError?: boolean;
   errorCode?: string;
   durationMs?: number;
   attempts?: number;
+  cached?: boolean;
   activity?: ToolActivity;
   activityLabel?: string;
 }

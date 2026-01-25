@@ -70,6 +70,7 @@ export class EventStreamPublisher {
 
   publishAgentToolCall(data: {
     sessionId: string;
+    callId?: string;
     tool: string;
     args: Record<string, unknown>;
     activity: string;
@@ -77,6 +78,7 @@ export class EventStreamPublisher {
     taskId?: string;
   }) {
     this.events.publish(data.sessionId, COWORK_EVENTS.AGENT_TOOL_CALL, {
+      callId: data.callId,
       tool: data.tool,
       args: data.args,
       activity: data.activity,
@@ -94,6 +96,7 @@ export class EventStreamPublisher {
     errorCode?: string;
     durationMs?: number;
     attempts?: number;
+    cached?: boolean;
     activity: string;
     activityLabel: string;
     taskId?: string;
@@ -106,6 +109,7 @@ export class EventStreamPublisher {
       errorCode: data.errorCode,
       durationMs: data.durationMs,
       attempts: data.attempts,
+      cached: data.cached,
       activity: data.activity,
       activityLabel: data.activityLabel,
       taskId: data.taskId,

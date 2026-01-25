@@ -235,28 +235,118 @@ export class PlanPersistence {
 
   private parseStepsFromMarkdown(content: string): PlanStep[] {
     const steps: PlanStep[] = [];
-    const stepRegex = /^(\d+)\.\s*\[([x /!-])\]\s*(.+?)(?:\s*←\s*CURRENT)?$/gm;
+    const lines = this.getStepsSectionLines(content);
+    if (lines.length === 0) {
+      return steps;
+    }
 
-    const matches = content.matchAll(stepRegex);
-    for (const match of matches) {
-      const [, orderStr, checkbox, description] = match;
-      const order = Number.parseInt(orderStr, 10);
+    let current: PlanStep | null = null;
+    for (const line of lines) {
+      if (line.trim() === "") {
+        continue;
+      }
 
-      const status = this.checkboxToStatus(checkbox);
+      const parsed = this.parseStepLine(line);
+      if (parsed) {
+        if (current) {
+          steps.push(current);
+        }
+        current = this.buildPlanStep(parsed.order, parsed.status, parsed.description);
+        continue;
+      }
 
-      steps.push({
-        id: `step_${order}_${Date.now().toString(36)}`,
-        order,
-        description: description.trim(),
-        tools: [],
-        expectedOutcome: "",
-        dependencies: [],
-        parallelizable: false,
-        status,
-      });
+      if (current) {
+        this.applyStepDetail(current, line);
+      }
+    }
+
+    if (current) {
+      steps.push(current);
     }
 
     return steps;
+  }
+
+  private getStepsSectionLines(content: string): string[] {
+    const lines = content.split(/\r?\n/);
+    const stepsHeaderIndex = lines.findIndex((line) => line.trim() === "## Steps");
+    if (stepsHeaderIndex === -1) {
+      return [];
+    }
+
+    const section: string[] = [];
+    for (let i = stepsHeaderIndex + 1; i < lines.length; i += 1) {
+      const line = lines[i];
+      if (line.trim().startsWith("## ") && line.trim() !== "## Steps") {
+        break;
+      }
+      section.push(line);
+    }
+    return section;
+  }
+
+  private parseStepLine(
+    line: string
+  ): { order: number; status: PlanStep["status"]; description: string } | null {
+    const stepRegex = /^(\d+)\.\s*\[([x /!-])\]\s*(.+?)(?:\s*←\s*CURRENT)?$/;
+    const match = stepRegex.exec(line);
+    if (!match) {
+      return null;
+    }
+
+    const [, orderStr, checkbox, description] = match;
+    const order = Number.parseInt(orderStr, 10);
+    if (Number.isNaN(order)) {
+      return null;
+    }
+
+    return {
+      order,
+      status: this.checkboxToStatus(checkbox),
+      description: description.trim(),
+    };
+  }
+
+  private buildPlanStep(order: number, status: PlanStep["status"], description: string): PlanStep {
+    return {
+      id: `step_${order}_${Date.now().toString(36)}`,
+      order,
+      description,
+      tools: [],
+      expectedOutcome: "",
+      dependencies: [],
+      parallelizable: false,
+      status,
+    };
+  }
+
+  private applyStepDetail(step: PlanStep, line: string): void {
+    const detailRegex = /^\s*-\s*(Expected|Tools|Depends on):\s*(.*)$/;
+    const match = detailRegex.exec(line);
+    if (!match) {
+      return;
+    }
+
+    const [, field, valueRaw] = match;
+    const value = valueRaw.trim();
+    if (field === "Expected") {
+      step.expectedOutcome = value;
+      return;
+    }
+    if (field === "Tools") {
+      step.tools = this.parseCommaList(value);
+      return;
+    }
+    if (field === "Depends on") {
+      step.dependencies = this.parseCommaList(value);
+    }
+  }
+
+  private parseCommaList(value: string): string[] {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0);
   }
 
   private checkboxToStatus(checkbox: string): PlanStep["status"] {
@@ -279,6 +369,19 @@ export class PlanPersistence {
     const riskMatch = content.match(/>\s*\*\*Risk\*\*:\s*(\w+)/);
     if (riskMatch) {
       plan.riskAssessment = riskMatch[1] as ExecutionPlan["riskAssessment"];
+    }
+
+    // Parse approval requirement
+    const approvalMatch = content.match(/>\s*\*\*Requires Approval\*\*:\s*(Yes|No)/i);
+    if (approvalMatch) {
+      plan.requiresApproval = approvalMatch[1].toLowerCase() === "yes";
+    }
+
+    // Parse context required
+    const contextSection = content.match(/## Context Required\n\n((?:- .+\n?)+)/);
+    if (contextSection) {
+      const contextMatches = contextSection[1].matchAll(/- (.+)/g);
+      plan.contextRequired = Array.from(contextMatches).map((m) => m[1]);
     }
 
     // Parse tools needed

@@ -165,6 +165,7 @@ export interface CoworkEventPayloads {
     taskId?: string;
   };
   [COWORK_EVENTS.AGENT_TOOL_CALL]: {
+    callId?: string;
     tool: string;
     args: Record<string, unknown>;
     requiresApproval?: boolean;
@@ -182,6 +183,7 @@ export interface CoworkEventPayloads {
     errorCode?: string;
     durationMs?: number;
     attempts?: number;
+    cached?: boolean;
     activity?: ToolActivity;
     activityLabel?: string;
     taskId?: string;

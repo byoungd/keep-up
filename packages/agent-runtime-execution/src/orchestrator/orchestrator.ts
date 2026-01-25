@@ -84,7 +84,12 @@ import {
 import type { SessionState } from "../session";
 import type { ISOPExecutor } from "../sop/types";
 import { attachRuntimeEventStreamBridge, type StreamWriter } from "../streaming";
-import { createTaskGraphStore, type TaskGraphStore, type TaskNodeStatus } from "../tasks/taskGraph";
+import {
+  createTaskGraphStore,
+  type TaskGraphNode,
+  type TaskGraphStore,
+  type TaskNodeStatus,
+} from "../tasks/taskGraph";
 import type {
   A2AContext,
   AgentConfig,
@@ -349,6 +354,8 @@ export class AgentOrchestrator {
   private currentCheckpointAgentId?: string;
   private currentTask?: string;
   private currentPlanNodeId?: string;
+  private currentPlanId?: string;
+  private currentPlan?: ExecutionPlan;
   private planArtifactEmitted = false;
   private readonly taskGraphToolCalls = new WeakMap<MCPToolCall, string>();
   private readonly planStepTaskNodes = new Map<string, string>();
@@ -708,6 +715,8 @@ export class AgentOrchestrator {
     this.currentCheckpointId = undefined;
     this.currentCheckpointStatus = undefined;
     this.currentCheckpointAgentId = undefined;
+    this.currentPlanId = undefined;
+    this.currentPlan = undefined;
     this.state.checkpointId = undefined;
     this.recoveryState = { active: false, warned: false };
     this.forceCompletionToolsOnly = false;
@@ -2332,6 +2341,8 @@ export class AgentOrchestrator {
     await this.advanceSopToPhase("plan");
 
     const plan = this.buildPlan(toolCalls);
+    this.currentPlanId = plan.id;
+    this.currentPlan = plan;
     this.emit("plan:created", plan);
     this.maybeEmitPlanArtifact(plan, toolCalls);
     this.syncPlanStepsWithTaskGraph(plan);
@@ -2442,7 +2453,12 @@ export class AgentOrchestrator {
         continue;
       }
 
-      const desiredStatus = this.mapPlanStepStatus(step.status) ?? "pending";
+      const mappedStatus = this.mapPlanStepStatus(step.status);
+      const inferredStatus = this.inferPlanStepStatus(step);
+      const desiredStatus =
+        mappedStatus && mappedStatus !== "pending"
+          ? mappedStatus
+          : (inferredStatus ?? mappedStatus ?? "pending");
       this.updatePlanStepTaskGraphStatus(nodeId, desiredStatus);
 
       const desiredTitle = this.formatPlanStepTitle(step);
@@ -2456,6 +2472,56 @@ export class AgentOrchestrator {
         this.addTaskGraphDependencyEdge(nodeId, dependencyId);
       }
     }
+  }
+
+  private inferPlanStepStatus(step: PlanStep): TaskNodeStatus | undefined {
+    if (!this.taskGraph) {
+      return undefined;
+    }
+
+    const toolCallIds = (step.toolCalls ?? [])
+      .map((call) => call.id)
+      .filter((id): id is string => Boolean(id));
+    if (step.tools.length === 0 && toolCallIds.length === 0) {
+      return undefined;
+    }
+    const toolNodes = this.resolvePlanStepToolNodes(step, toolCallIds);
+
+    if (toolNodes.length === 0) {
+      return undefined;
+    }
+    if (toolNodes.some((node) => node.status === "failed")) {
+      return "failed";
+    }
+    if (toolNodes.every((node) => node.status === "completed")) {
+      return "completed";
+    }
+    if (toolNodes.some((node) => node.status === "running")) {
+      return "running";
+    }
+    return "pending";
+  }
+
+  private resolvePlanStepToolNodes(step: PlanStep, toolCallIds: string[]): TaskGraphNode[] {
+    if (!this.taskGraph) {
+      return [];
+    }
+
+    const nodes = this.taskGraph.listNodes();
+    if (toolCallIds.length > 0) {
+      const callIdSet = new Set(toolCallIds);
+      const matches = nodes.filter(
+        (node) => node.type === "tool_call" && node.toolCallId && callIdSet.has(node.toolCallId)
+      );
+      if (matches.length > 0) {
+        return matches;
+      }
+    }
+
+    return nodes.filter(
+      (node) =>
+        node.type === "tool_call" && step.tools.some((tool) => node.title === `Tool: ${tool}`)
+    );
   }
 
   private ensurePlanStepTaskNode(plan: ExecutionPlan, step: PlanStep): string | undefined {
@@ -2668,6 +2734,8 @@ export class AgentOrchestrator {
       expectedOutcome: `Result from ${call.name}`,
       dependencies: [],
       parallelizable: false,
+      status: "pending" as const,
+      toolCalls: [call],
     }));
 
     const toolsNeeded = Array.from(new Set(toolCalls.map((call) => call.name)));
@@ -2793,23 +2861,68 @@ export class AgentOrchestrator {
     toolName: string,
     status: PlanStep["status"]
   ): PlanStep | undefined {
-    return plan.steps.find(
-      (step) => step.status === status && step.tools.some((tool) => tool === toolName)
-    );
+    return plan.steps.find((step) => {
+      if (!step.tools.some((tool) => tool === toolName)) {
+        return false;
+      }
+      if (status === "pending") {
+        return step.status === "pending" || step.status === undefined;
+      }
+      return step.status === status;
+    });
   }
 
   private async savePlanAndEmit(plan: ExecutionPlan): Promise<void> {
     await this.getPlanPersistence().saveCurrent(plan);
+    this.currentPlanId = plan.id;
+    this.currentPlan = plan;
     this.emit("plan:created", { steps: plan.steps });
     this.syncPlanStepsWithTaskGraph(plan);
   }
 
   private async loadCurrentPlan(): Promise<ExecutionPlan | null> {
-    try {
-      return await this.getPlanPersistence().loadCurrent();
-    } catch {
-      return null;
+    if (this.currentPlan) {
+      return this.currentPlan;
     }
+
+    if (this.currentPlanId) {
+      const inMemory = this.planningEngine.getPlan(this.currentPlanId);
+      if (inMemory) {
+        this.currentPlan = inMemory;
+        return inMemory;
+      }
+    }
+
+    let persisted: ExecutionPlan | null = null;
+    try {
+      persisted = await this.getPlanPersistence().loadCurrent();
+    } catch {
+      persisted = null;
+    }
+
+    if (persisted) {
+      this.currentPlanId = persisted.id;
+      this.currentPlan = persisted;
+      return persisted;
+    }
+
+    return null;
+  }
+
+  private async refreshPlanStepTaskGraph(toolName?: string): Promise<void> {
+    if (!this.taskGraph || !this.config.planning?.enabled) {
+      return;
+    }
+    if (toolName && !this.shouldSyncPlanForTool(toolName)) {
+      return;
+    }
+
+    const plan = await this.loadCurrentPlan();
+    if (!plan) {
+      return;
+    }
+
+    this.syncPlanStepsWithTaskGraph(plan);
   }
 
   private getPlanPersistence(): PlanPersistence {
@@ -2971,7 +3084,8 @@ export class AgentOrchestrator {
     toolSpan?: SpanContext
   ): Promise<void> {
     const taskNodeId = this.ensureTaskGraphToolNode(call, "running");
-    this.emit("tool:calling", { toolName: call.name, arguments: call.arguments });
+    const callId = this.ensureToolCallId(call);
+    this.emit("tool:calling", { toolName: call.name, arguments: call.arguments, callId });
     await this.updatePlanStepOnToolStart(call);
 
     if (!this.toolExecutor) {
@@ -2982,14 +3096,16 @@ export class AgentOrchestrator {
     }
 
     const context = this.createToolContext(call);
-    const result = await this.getToolResultWithCache(call, context);
+    const { result, cached } = await this.getToolResultWithCache(call, context);
+    const durationMs = Date.now() - toolStart;
 
-    this.emit("tool:result", { toolName: call.name, result });
+    this.emit("tool:result", { toolName: call.name, result, callId, cached, durationMs });
     await this.maybeEmitPlanFromToolCall(call, result);
     await this.updatePlanStepOnToolResult(call, result);
     this.addToolResult(call.name, result);
-    await this.recordCheckpointToolResult(call, result, Date.now() - toolStart);
+    await this.recordCheckpointToolResult(call, result, durationMs);
     this.updateTaskGraphStatus(taskNodeId, result.success ? "completed" : "failed");
+    await this.refreshPlanStepTaskGraph(call.name);
 
     this.recordToolMetrics(call, result, toolStart);
     this.toolScheduler.recordResult(call.name, Date.now() - toolStart, {
@@ -3004,18 +3120,16 @@ export class AgentOrchestrator {
   private async getToolResultWithCache(
     call: MCPToolCall,
     context: ToolContext
-  ): Promise<MCPToolResult> {
+  ): Promise<{ result: MCPToolResult; cached: boolean }> {
     const nodeCached = this.nodeResultCache?.get(call, context);
     if (nodeCached) {
-      this.emit("tool:result", { toolName: call.name, result: nodeCached, cached: true });
-      return nodeCached;
+      return { result: nodeCached, cached: true };
     }
 
     // Try cache first
     let result = this.toolResultCache.get(call.name, call.arguments) as MCPToolResult | undefined;
     if (result) {
-      this.emit("tool:result", { toolName: call.name, result, cached: true });
-      return result;
+      return { result, cached: true };
     }
 
     result = await this.executeToolCall(call, context);
@@ -3035,7 +3149,7 @@ export class AgentOrchestrator {
     // Cache the result
     this.toolResultCache.set(call.name, call.arguments, result);
     this.nodeResultCache?.set(call, context, result);
-    return result;
+    return { result, cached: false };
   }
 
   private async executeToolCall(call: MCPToolCall, context: ToolContext): Promise<MCPToolResult> {
@@ -3398,9 +3512,18 @@ export class AgentOrchestrator {
       return undefined;
     }
 
+    const toolCallId = this.ensureToolCallId(call);
     const existing = this.taskGraphToolCalls.get(call);
     if (existing) {
       this.updateTaskGraphStatus(existing, status);
+      const node = this.taskGraph.getNode(existing);
+      if (node && node.toolCallId !== toolCallId) {
+        try {
+          this.taskGraph.updateNode(existing, { toolCallId });
+        } catch {
+          // Ignore task graph update errors.
+        }
+      }
       return existing;
     }
 
@@ -3408,6 +3531,7 @@ export class AgentOrchestrator {
       type: "tool_call",
       title: `Tool: ${call.name}`,
       status,
+      toolCallId,
     });
     this.taskGraphToolCalls.set(call, node.id);
     return node.id;
