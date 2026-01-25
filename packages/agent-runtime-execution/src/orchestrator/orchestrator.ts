@@ -2334,6 +2334,7 @@ export class AgentOrchestrator {
     const plan = this.buildPlan(toolCalls);
     this.emit("plan:created", plan);
     this.maybeEmitPlanArtifact(plan, toolCalls);
+    await this.persistPlan(plan);
     this.syncPlanStepsWithTaskGraph(plan);
 
     if (plan.requiresApproval) {
@@ -2428,16 +2429,20 @@ export class AgentOrchestrator {
     }
 
     const stepNodeIds = new Map<string, string>();
+    const stepIdToKey = new Map<string, string>();
 
     for (const step of plan.steps) {
-      const nodeId = this.ensurePlanStepTaskNode(plan, step);
+      const stepKey = this.getPlanStepKey(plan.id, step);
+      stepIdToKey.set(step.id, stepKey);
+      const nodeId = this.ensurePlanStepTaskNode(plan, step, stepKey);
       if (nodeId) {
-        stepNodeIds.set(step.id, nodeId);
+        stepNodeIds.set(stepKey, nodeId);
       }
     }
 
     for (const step of plan.steps) {
-      const nodeId = stepNodeIds.get(step.id);
+      const stepKey = this.getPlanStepKey(plan.id, step);
+      const nodeId = stepNodeIds.get(stepKey);
       if (!nodeId) {
         continue;
       }
@@ -2447,7 +2452,8 @@ export class AgentOrchestrator {
 
       const desiredTitle = this.formatPlanStepTitle(step);
       const dependencyNodes = step.dependencies
-        .map((dependencyId) => stepNodeIds.get(dependencyId))
+        .map((dependencyId) => stepIdToKey.get(dependencyId))
+        .map((dependencyKey) => (dependencyKey ? stepNodeIds.get(dependencyKey) : undefined))
         .filter((dependencyId): dependencyId is string => Boolean(dependencyId));
 
       this.updateTaskGraphNode(nodeId, desiredTitle, dependencyNodes);
@@ -2458,12 +2464,16 @@ export class AgentOrchestrator {
     }
   }
 
-  private ensurePlanStepTaskNode(plan: ExecutionPlan, step: PlanStep): string | undefined {
+  private ensurePlanStepTaskNode(
+    plan: ExecutionPlan,
+    step: PlanStep,
+    stepKey: string
+  ): string | undefined {
     if (!this.taskGraph) {
       return undefined;
     }
 
-    const existing = this.resolvePlanStepTaskNodeId(plan.id, step.id);
+    const existing = this.resolvePlanStepTaskNodeId(plan.id, stepKey);
     if (existing) {
       return existing;
     }
@@ -2473,15 +2483,15 @@ export class AgentOrchestrator {
       type: "subtask",
       title: this.formatPlanStepTitle(step),
       status: initialStatus,
-      artifactId: this.getPlanStepArtifactId(plan.id, step.id),
+      artifactId: this.getPlanStepArtifactId(plan.id, step),
     });
 
-    this.planStepTaskNodes.set(step.id, node.id);
+    this.planStepTaskNodes.set(stepKey, node.id);
     return node.id;
   }
 
-  private resolvePlanStepTaskNodeId(planId: string, stepId: string): string | undefined {
-    const cached = this.planStepTaskNodes.get(stepId);
+  private resolvePlanStepTaskNodeId(planId: string, stepKey: string): string | undefined {
+    const cached = this.planStepTaskNodes.get(stepKey);
     if (cached) {
       return cached;
     }
@@ -2490,7 +2500,7 @@ export class AgentOrchestrator {
       return undefined;
     }
 
-    const artifactId = this.getPlanStepArtifactId(planId, stepId);
+    const artifactId = this.getPlanStepArtifactIdFromKey(planId, stepKey);
     const existing = this.taskGraph
       .listNodes()
       .find((node) => node.type === "subtask" && node.artifactId === artifactId);
@@ -2499,7 +2509,7 @@ export class AgentOrchestrator {
       return undefined;
     }
 
-    this.planStepTaskNodes.set(stepId, existing.id);
+    this.planStepTaskNodes.set(stepKey, existing.id);
     return existing.id;
   }
 
@@ -2511,8 +2521,17 @@ export class AgentOrchestrator {
     return `Step ${step.order}: ${description}`;
   }
 
-  private getPlanStepArtifactId(planId: string, stepId: string): string {
-    return `plan-step:${planId}:${stepId}`;
+  private getPlanStepKey(planId: string, step: PlanStep): string {
+    return `${planId}:${step.order}`;
+  }
+
+  private getPlanStepArtifactId(planId: string, step: PlanStep): string {
+    return `plan-step:${planId}:${step.order}`;
+  }
+
+  private getPlanStepArtifactIdFromKey(planId: string, stepKey: string): string {
+    const suffix = stepKey.startsWith(`${planId}:`) ? stepKey.slice(planId.length + 1) : stepKey;
+    return `plan-step:${planId}:${suffix}`;
   }
 
   private updatePlanStepTaskGraphStatus(nodeId: string, status: TaskNodeStatus): void {
@@ -2746,15 +2765,15 @@ export class AgentOrchestrator {
       return;
     }
 
-    if (plan.steps.some((step) => step.status === "executing")) {
+    if (plan.steps.some((step) => this.getPlanStepStatus(step) === "executing")) {
       return;
     }
 
     const nextStep =
       this.findStepMatchingTool(plan, call.name, "pending") ??
-      plan.steps.find((step) => step.status === "pending");
+      plan.steps.find((step) => this.getPlanStepStatus(step) === "pending");
 
-    if (!nextStep || nextStep.status === "executing") {
+    if (!nextStep || this.getPlanStepStatus(nextStep) === "executing") {
       return;
     }
 
@@ -2777,7 +2796,7 @@ export class AgentOrchestrator {
 
     const matchingExecuting = this.findStepMatchingTool(plan, call.name, "executing");
     const matchingPending = this.findStepMatchingTool(plan, call.name, "pending");
-    const executing = plan.steps.find((step) => step.status === "executing");
+    const executing = plan.steps.find((step) => this.getPlanStepStatus(step) === "executing");
     const current = matchingExecuting ?? matchingPending ?? executing;
 
     if (!current) {
@@ -2794,14 +2813,27 @@ export class AgentOrchestrator {
     status: PlanStep["status"]
   ): PlanStep | undefined {
     return plan.steps.find(
-      (step) => step.status === status && step.tools.some((tool) => tool === toolName)
+      (step) =>
+        this.getPlanStepStatus(step) === status && step.tools.some((tool) => tool === toolName)
     );
+  }
+
+  private getPlanStepStatus(step: PlanStep): PlanStep["status"] {
+    return step.status ?? "pending";
   }
 
   private async savePlanAndEmit(plan: ExecutionPlan): Promise<void> {
     await this.getPlanPersistence().saveCurrent(plan);
     this.emit("plan:created", { steps: plan.steps });
     this.syncPlanStepsWithTaskGraph(plan);
+  }
+
+  private async persistPlan(plan: ExecutionPlan): Promise<void> {
+    try {
+      await this.getPlanPersistence().saveCurrent(plan);
+    } catch {
+      // Ignore persistence errors - plan execution should continue.
+    }
   }
 
   private async loadCurrentPlan(): Promise<ExecutionPlan | null> {
