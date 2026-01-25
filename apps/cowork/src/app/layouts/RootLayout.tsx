@@ -13,7 +13,9 @@ import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
 import React from "react";
 import { createTask, setSessionMode } from "../../api/coworkApi";
+import { CommandPalette } from "../../components/CommandPalette";
 import { SessionHeaderActions } from "../../components/session/SessionHeaderActions";
+import { SessionStatusIndicator } from "../../components/session/SessionStatusIndicator";
 import { CoworkSidebarSections } from "../../components/sidebar/CoworkSidebarSections";
 import { COWORK_SIDEBAR_CONFIG_KEY, COWORK_SIDEBAR_GROUPS } from "../../config/sidebar";
 import { AIControlProvider } from "../../features/chat/AIControlContext";
@@ -454,6 +456,7 @@ export function RootLayout() {
 
   // AI Panel with preview callback
   const aiPanelElement = <CoworkAIPanel onPreviewArtifact={handlePreviewArtifact} />;
+  const commandPalette = <CommandPalette />;
 
   const renderSidebarGroup = React.useCallback(
     ({ group, defaultGroup }: SidebarGroupRenderProps) => {
@@ -485,6 +488,7 @@ export function RootLayout() {
               <AppShell
                 rightPanel={aiPanelElement}
                 auxPanel={contextPanel}
+                commandPalette={commandPalette}
                 appName="KeepUp"
                 sidebarProps={{
                   showSearch: false,
@@ -501,7 +505,14 @@ export function RootLayout() {
                   leftSlot: (
                     <span className="font-semibold text-sm text-foreground">Cowork Agent</span>
                   ),
-                  rightSlot: <SessionHeaderActions />,
+                  rightSlot: (
+                    <div className="flex items-center gap-2">
+                      {resolvedSessionId ? (
+                        <SessionStatusIndicator sessionId={resolvedSessionId} />
+                      ) : null}
+                      <SessionHeaderActions />
+                    </div>
+                  ),
                 }}
               >
                 <Outlet />

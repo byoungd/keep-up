@@ -66,9 +66,7 @@ export function PlanCard({ steps }: PlanCardProps) {
                   />
                 </svg>
               )}
-              {step.status === "in_progress" && (
-                <div className="w-2 h-2 bg-info rounded-full animate-pulse" />
-              )}
+              {step.status === "in_progress" && <div className="w-2 h-2 bg-info rounded-full" />}
             </div>
             <span
               className={`text-sm ${step.status === "completed" ? "text-muted-foreground line-through" : "text-foreground"}`}

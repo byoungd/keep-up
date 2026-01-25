@@ -173,7 +173,7 @@ export function CheckpointsPanelContent() {
 
       {isLoading ? (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <div className="h-4 w-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+          <div className="h-4 w-4 border-2 border-primary/30 border-t-primary rounded-full" />
           Loading checkpoints...
         </div>
       ) : null}

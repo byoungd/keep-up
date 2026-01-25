@@ -8,7 +8,7 @@ import type { MessageStatus } from "./types";
 const STATUS_META: Record<MessageStatus, { className: string; icon: React.ReactNode }> = {
   streaming: {
     className: "text-primary/50",
-    icon: <div className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />,
+    icon: <div className="h-1.5 w-1.5 rounded-full bg-current" />,
   },
   done: {
     className: "text-success",

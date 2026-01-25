@@ -139,7 +139,7 @@ export function StepItem({
               >
                 <span className="mt-[3px] opacity-40 shrink-0">
                   {action.status === "running" ? (
-                    <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                    <Loader2 className="h-2.5 w-2.5" />
                   ) : (
                     <Terminal className="h-2.5 w-2.5" />
                   )}
@@ -174,7 +174,7 @@ export function StepItem({
 // Local StepIcon to reduce import complexity
 function StepIcon({ status }: { status: TaskStep["status"] }) {
   if (status === "running") {
-    return <Loader2 className="h-3.5 w-3.5 text-warning animate-spin" />;
+    return <Loader2 className="h-3.5 w-3.5 text-warning" />;
   }
   if (status === "failed") {
     return <AlertCircle className="h-3.5 w-3.5 text-error" />;

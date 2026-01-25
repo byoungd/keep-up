@@ -1,9 +1,9 @@
 # Track AZ: Cowork UI Convergence and Runtime Integration
 
 > Priority: P1
-> Status: Proposed
+> Status: In Progress (Delta Finish)
 > Owner: Cowork UI Team
-> Dependencies: UI Cowork tracks, Phase 7 Tauri shell
+> Dependencies: UI Cowork tracks (merged), Phase 7 Tauri shell (merged), Track AY/AX (merged)
 > Source: docs/roadmap/ui-cowork/README.md
 
 ---
@@ -12,6 +12,49 @@
 
 Finalize Cowork UI tracks and integrate with the converged runtime (TS + Rust),
 without redoing Phase 7 shell work.
+
+---
+
+## Current Code Reality (Main)
+
+The majority of Track AZ scope is already implemented in `apps/cowork` and `packages/shell`.
+These are the main areas already in place:
+
+- **Shell/Sidebar**: `packages/shell/src/components/layout/AppShell.tsx`,
+  `packages/shell/src/components/layout/ResizableThreePaneLayout.tsx`,
+  `apps/cowork/src/app/layouts/RootLayout.tsx`,
+  `apps/cowork/src/components/sidebar/CoworkSidebarSections.tsx`
+- **Chat/Canvas**: `apps/cowork/src/features/chat/ChatThread.tsx`,
+  `packages/shell/src/components/chat/MessageBubble.tsx`,
+  `packages/shell/src/components/chat/InputArea.tsx`
+- **Controls/Approvals**: `packages/shell/src/components/chat/AIPanel.tsx`,
+  `packages/shell/src/components/ai/ApprovalCard.tsx`,
+  `apps/cowork/src/features/tasks/components/TaskTimeline.tsx`
+- **Agentic surfaces + runtime wiring**:
+  `apps/cowork/src/features/tasks/hooks/useTaskStream.ts`,
+  `apps/cowork/src/features/tasks/components/TaskNode.tsx`,
+  `apps/cowork/src/features/context/CheckpointsPanelContent.tsx`,
+  `apps/cowork/server/routes/checkpoints.ts`
+
+---
+
+## Remaining Gaps (Delta Work)
+
+1) **Command Palette**
+- `CommandPalette.tsx` does not exist; `Cmd+K` currently focuses search input only.
+- Need a real palette UI + action routing + keyboard open/close.
+
+2) **Input Auto-Focus**
+- Chat input does not auto-focus on initial load.
+- Implement a safe, non-janky focus on mount (respecting reduced motion and modal focus traps).
+
+3) **Session Status Indicators**
+- `useTaskStream` tracks `workspaceSessions` + `workspaceEvents`, but UI does not surface them.
+- Add a compact status surface (e.g., in header/right rail) driven by stable event IDs.
+
+4) **Reduced-Motion Compliance**
+- Additional looping animations exist beyond the AI sheen (e.g., typing cursor/thinking dots).
+- Ensure non-essential loops stop under `prefers-reduced-motion` or swap to static indicators.
 
 ---
 
@@ -35,39 +78,46 @@ without redoing Phase 7 shell work.
 ## Implementation Spec (Executable)
 
 1) UI completion
-- Complete Shell/Sidebar, Chat/Canvas, Controls/Approvals per UI-cowork acceptance criteria.
-- Ensure reduced-motion compliance and token usage.
+- Close remaining UI gaps (Command Palette + input auto-focus).
+- Verify UI-cowork acceptance criteria against current main; update any mismatches.
+- Ensure reduced-motion compliance (single loop: AI sheen).
 
 2) Runtime integration
-- Wire approval modals to policy decisions from Track AY.
-- Connect timeline/checkpoints to runtime event streams.
-- Add session status indicators with stable event IDs.
+- Confirm approval modal uses policy decision metadata from AY schema when available.
+- Confirm checkpoints/timeline remain backed by event streams (already wired).
+- Add session status indicators driven by stable workspace event IDs.
 
 3) Agentic surfaces
-- Expose agent status, tool activity, and task lineage.
-- Ensure errors and escalation prompts are surfaced clearly.
+- Keep existing agent status/tool activity/task lineage surfaces.
+- Add missing status affordances where necessary (session state, escalation).
 
 ---
 
 ## Deliverables
 
-- UI features merged behind feature flags.
-- Integration adapters for runtime events and approvals.
+- Command Palette + keyboard shortcuts fully functional.
+- Chat input auto-focus behavior aligned with UX spec.
+- Session status indicators backed by runtime events.
+- Reduced-motion compliance verified.
 
 ---
 
 ## Acceptance Criteria
 
-- UI tracks meet UI-cowork acceptance criteria.
-- Approval and checkpoint flows operate end-to-end with runtime data.
-- No regression in existing Cowork panels and navigation.
+- UI tracks meet UI-cowork acceptance criteria (validate against main).
+- Approval + checkpoint flows operate end-to-end with runtime data.
+- Session status is visible and updates from runtime events.
+- No regressions in existing Cowork panels and navigation.
 
 ---
 
 ## Validation
 
 - Run UI smoke tests and typecheck.
-- Execute basic runtime integration flow in apps/cowork.
+- Execute basic runtime integration flow in `apps/cowork`:
+  - approval required -> approve/reject
+  - checkpoint created/restored
+  - session event updates visible
 
 
 ## Single-Doc Execution Checklist

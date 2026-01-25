@@ -14,7 +14,6 @@ import {
   Target,
 } from "lucide-react";
 import * as React from "react";
-import { TextShimmer } from "../ui/TextShimmer";
 import type { AgentTask, ArtifactItem, TaskPhase } from "./types";
 import { groupArtifactsByType } from "./types";
 
@@ -55,10 +54,10 @@ function PhaseItem({
         )}
       >
         {/* Pulsing Dot for Active Phase */}
-        {isActive && <span className="absolute inset-0 bg-primary/5 animate-pulse" />}
+        {isActive && <span className="absolute inset-0 bg-primary/5" />}
 
         {isCompleted && <CheckCircle2 className="w-3.5 h-3.5" />}
-        {isActive && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+        {isActive && <Loader2 className="w-3.5 h-3.5" />}
         <span className="relative z-10">{phase.label}</span>
       </motion.div>
     </div>
@@ -140,7 +139,7 @@ function TaskDetails({
                 ) : isRunning ? (
                   <div className="flex items-center justify-center w-4 h-4">
                     <div className="w-3.5 h-3.5 rounded-full border border-info/30 flex items-center justify-center">
-                      <div className="w-1.5 h-1.5 bg-gradient-to-tr from-accent-indigo to-info rounded-full animate-pulse-spring" />
+                      <div className="w-1.5 h-1.5 bg-gradient-to-tr from-accent-indigo to-info rounded-full" />
                     </div>
                   </div>
                 ) : (
@@ -158,7 +157,7 @@ function TaskDetails({
                     isPending && "text-muted-foreground"
                   )}
                 >
-                  {isRunning ? <TextShimmer>{step.label}</TextShimmer> : step.label}
+                  {step.label}
                 </span>
               </div>
 
@@ -241,8 +240,8 @@ function TaskAccordionItem({
               <CheckCircle2 className="w-4 h-4" />
             </div>
           ) : task.status === "running" ? (
-            <div className="bg-info/10 text-info p-1 rounded-full animate-pulse-subtle">
-              <Loader2 className="w-4 h-4 animate-spin" />
+            <div className="bg-info/10 text-info p-1 rounded-full">
+              <Loader2 className="w-4 h-4" />
             </div>
           ) : task.status === "failed" ? (
             <div className="bg-error/10 text-error p-1 rounded-full">

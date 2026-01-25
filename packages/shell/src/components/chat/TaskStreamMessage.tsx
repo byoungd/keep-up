@@ -121,8 +121,8 @@ export function TaskStreamMessage({ task, onPreview, onAction }: TaskStreamMessa
                   {/* Empty State */}
                   {displaySteps.length === 0 && plans.length === 0 && deliverables.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-8 text-center">
-                      <div className="h-10 w-10 rounded-full bg-surface-2 flex items-center justify-center mb-3 animate-pulse">
-                        <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground animate-spin" />
+                      <div className="h-10 w-10 rounded-full bg-surface-2 flex items-center justify-center mb-3">
+                        <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
                       </div>
                       <p className="text-sm text-muted-foreground">Preparing task...</p>
                     </div>

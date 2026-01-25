@@ -27,7 +27,6 @@ export function MinimalTaskView({ task, content }: { task: AgentTask; content?: 
             <span className="flex items-center gap-1.5">
               {isRunning ? (
                 <span className="relative flex h-1.5 w-1.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-info/70 opacity-75" />
                   <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-info" />
                 </span>
               ) : (
@@ -252,12 +251,9 @@ function StatusNodeDisplay({
               ? "bg-success"
               : node.status === "failed"
                 ? "bg-error"
-                : "bg-info animate-pulse"
+                : "bg-info"
           }`}
         />
-        {node.status === "running" && (
-          <div className="absolute inset-0 bg-info rounded-full animate-ping opacity-20" />
-        )}
       </div>
       <div className="flex flex-col gap-0.5 flex-1 min-w-0">
         <div className="flex items-center justify-between gap-4">

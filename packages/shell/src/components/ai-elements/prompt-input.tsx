@@ -141,7 +141,7 @@ export function PromptInputSubmit({
       className={cn("h-9 w-9", className)}
       {...props}
     >
-      <Icon className={cn("size-4", config.spin && "animate-spin")} aria-hidden="true" />
+      <Icon className={cn("size-4")} aria-hidden="true" />
     </Button>
   );
 }

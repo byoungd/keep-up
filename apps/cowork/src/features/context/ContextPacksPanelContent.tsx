@@ -248,7 +248,7 @@ export function ContextPacksPanelContent() {
           <div className="space-y-2">
             {isSearching ? (
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <div className="h-3 w-3 rounded-full border-2 border-muted-foreground border-t-transparent animate-spin" />
+                <div className="h-3 w-3 rounded-full border-2 border-muted-foreground border-t-transparent" />
                 Scanning...
               </div>
             ) : null}

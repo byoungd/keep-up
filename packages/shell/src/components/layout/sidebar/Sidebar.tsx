@@ -115,7 +115,7 @@ export const Sidebar = React.memo(function Sidebar({
         aria-label="Primary sidebar"
       >
         <div className="flex-1 flex items-center justify-center">
-          <div className="h-5 w-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+          <div className="h-5 w-5 border-2 border-primary/30 border-t-primary rounded-full" />
         </div>
       </aside>
     );

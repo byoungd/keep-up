@@ -3,6 +3,7 @@
 import { type ArtifactItem, AIPanel as ShellAIPanel, useShellPanels } from "@ku0/shell";
 import { useEffect, useMemo } from "react";
 import { CostMeter } from "./components/CostMeter";
+import { useSafeAutoFocus } from "./hooks/useSafeAutoFocus";
 import { useCoworkAIPanelController } from "./useCoworkAIPanelController";
 
 export interface CoworkAIPanelProps {
@@ -46,6 +47,8 @@ export function CoworkAIPanel({ onClose, onPreviewArtifact }: CoworkAIPanelProps
     usage,
   } = ctrl;
 
+  useSafeAutoFocus(inputRef, []);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "e") {
@@ -62,7 +65,7 @@ export function CoworkAIPanel({ onClose, onPreviewArtifact }: CoworkAIPanelProps
     if (!isConnected && messages.length > 0) {
       return (
         <div className="text-fine font-medium text-warning flex items-center gap-2 px-2 py-1.5 rounded-lg bg-warning/5 border border-warning/10">
-          <span className="h-1.5 w-1.5 rounded-full bg-warning animate-pulse" />
+          <span className="h-1.5 w-1.5 rounded-full bg-warning" />
           Reconnecting...
         </div>
       );

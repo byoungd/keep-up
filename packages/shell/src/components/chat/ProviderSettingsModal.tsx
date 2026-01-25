@@ -485,7 +485,7 @@ export function ProviderDetailView({ providerId, onBack, onClose }: ProviderDeta
           >
             {isSaving ? (
               <span className="flex items-center gap-1.5">
-                <span className="h-3.5 w-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                <span className="h-3.5 w-3.5 border-2 border-current border-t-transparent rounded-full" />
                 {t("providerSaving")}
               </span>
             ) : saveStatus === "success" ? (

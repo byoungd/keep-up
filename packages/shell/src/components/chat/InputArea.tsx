@@ -427,7 +427,7 @@ function AttachmentList({
             {att.name}
           </span>
           {(att.status === "processing" || att.status === "sending") && (
-            <Loader2 className="h-2.5 w-2.5 animate-spin text-primary/60" />
+            <Loader2 className="h-2.5 w-2.5 text-primary/60" />
           )}
           {att.status === "error" && <AlertTriangle className="h-2.5 w-2.5 text-destructive" />}
           <button

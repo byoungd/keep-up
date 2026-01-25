@@ -11,7 +11,7 @@ export function ConnectionStatus({ isConnected, isLive, hasMessages }: Connectio
     if (!isConnected && hasMessages) {
       return (
         <div className="text-fine font-medium text-warning flex items-center gap-2 px-2 py-1.5 rounded-lg bg-warning/5 border border-warning/10">
-          <span className="h-1.5 w-1.5 rounded-full bg-warning animate-pulse" />
+          <span className="h-1.5 w-1.5 rounded-full bg-warning" />
           Reconnecting...
         </div>
       );
