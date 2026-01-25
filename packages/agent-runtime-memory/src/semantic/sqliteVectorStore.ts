@@ -23,6 +23,9 @@ export type SqliteVectorStoreConfig = {
   enableWal?: boolean;
   extensions?: SqliteVectorStoreExtension[];
   ignoreExtensionErrors?: boolean;
+  enableVecSearch?: boolean;
+  vecTableName?: string;
+  vecDistanceMetric?: "cosine" | "l2";
 };
 
 type SqliteRow = {
@@ -63,25 +66,37 @@ function loadDatabaseConstructor(): DatabaseConstructor {
 export class SqliteVectorStore<T extends VectorStoreEntry> implements VectorStore<T> {
   private readonly db: DatabaseInstance;
   private readonly tableName: string;
+  private readonly vecTableName?: string;
   private readonly dimension: number;
   private readonly maxEntries?: number;
   private readonly embeddingProvider?: EmbeddingProvider;
+  private readonly vecDistanceMetric: "cosine" | "l2";
+  private readonly ignoreExtensionErrors: boolean;
+  private vecEnabled = false;
 
   constructor(config: SqliteVectorStoreConfig) {
     this.tableName = normalizeIdentifier(config.tableName ?? DEFAULT_TABLE);
     this.dimension = config.dimension;
     this.maxEntries = config.maxEntries;
     this.embeddingProvider = config.embeddingProvider;
+    this.vecTableName = config.vecTableName
+      ? normalizeIdentifier(config.vecTableName)
+      : `${this.tableName}_vec`;
+    this.vecDistanceMetric = config.vecDistanceMetric ?? "cosine";
+    this.ignoreExtensionErrors = config.ignoreExtensionErrors ?? false;
     const Database = loadDatabaseConstructor();
     this.db = new Database(config.filePath);
 
-    this.loadExtensions(config.extensions, config.ignoreExtensionErrors ?? false);
+    this.loadExtensions(config.extensions, this.ignoreExtensionErrors);
 
     if (config.enableWal ?? true) {
       this.db.pragma("journal_mode = WAL");
     }
 
     this.initializeSchema();
+    if (config.enableVecSearch) {
+      this.initializeVecSchema();
+    }
   }
 
   async upsert(entry: T): Promise<void> {
@@ -107,11 +122,18 @@ export class SqliteVectorStore<T extends VectorStoreEntry> implements VectorStor
       )
       .run(entry.id, entry.content, serialized, metadata, now);
 
+    if (this.vecEnabled) {
+      this.upsertVecEntry(entry.id, embedding);
+    }
+
     this.evictIfNeeded();
   }
 
   async delete(id: string): Promise<void> {
     this.db.prepare(`DELETE FROM ${this.tableName} WHERE id = ?`).run(id);
+    if (this.vecEnabled) {
+      this.deleteVecEntry(id);
+    }
   }
 
   async search(query: string, options?: VectorSearchOptions): Promise<VectorSearchResult<T>[]> {
@@ -127,27 +149,14 @@ export class SqliteVectorStore<T extends VectorStoreEntry> implements VectorStor
     options?: VectorSearchOptions
   ): Promise<VectorSearchResult<T>[]> {
     this.assertDimension(embedding);
-    const rows = this.db
-      .prepare(`SELECT id, content, embedding, metadata, created_at FROM ${this.tableName}`)
-      .all() as SqliteRow[];
-    const threshold = options?.threshold ?? 0;
-    const limit = options?.limit ?? rows.length;
-
-    const results: VectorSearchResult<T>[] = [];
-    for (const row of rows) {
-      const candidateEmbedding = deserializeEmbedding(row.embedding);
-      const score = cosineSimilarity(embedding, candidateEmbedding);
-      if (score < threshold) {
-        continue;
+    if (this.vecEnabled) {
+      const vecResults = this.searchByEmbeddingVec(embedding, options);
+      if (vecResults) {
+        return vecResults;
       }
-      results.push({
-        entry: this.fromRow(row, candidateEmbedding),
-        score,
-      });
     }
 
-    results.sort((a, b) => b.score - a.score);
-    return results.slice(0, limit);
+    return this.searchByEmbeddingFallback(embedding, options);
   }
 
   close(): void {
@@ -164,6 +173,27 @@ export class SqliteVectorStore<T extends VectorStoreEntry> implements VectorStor
         created_at INTEGER NOT NULL
       );`
     );
+  }
+
+  private initializeVecSchema(): void {
+    if (!this.vecTableName) {
+      return;
+    }
+
+    try {
+      this.db.exec(
+        `CREATE VIRTUAL TABLE IF NOT EXISTS ${this.vecTableName}
+         USING vec0(embedding float[${this.dimension}], id TEXT);`
+      );
+      this.vecEnabled = true;
+    } catch (error) {
+      if (this.ignoreExtensionErrors) {
+        this.vecEnabled = false;
+        return;
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to initialize sqlite-vec table: ${message}`);
+    }
   }
 
   private loadExtensions(
@@ -216,6 +246,132 @@ export class SqliteVectorStore<T extends VectorStoreEntry> implements VectorStor
       return undefined;
     }
     return this.embeddingProvider.embed(text);
+  }
+
+  private searchByEmbeddingFallback(
+    embedding: number[],
+    options?: VectorSearchOptions
+  ): VectorSearchResult<T>[] {
+    const rows = this.db
+      .prepare(`SELECT id, content, embedding, metadata, created_at FROM ${this.tableName}`)
+      .all() as SqliteRow[];
+    const threshold = options?.threshold ?? 0;
+    const limit = options?.limit ?? rows.length;
+
+    const results: VectorSearchResult<T>[] = [];
+    for (const row of rows) {
+      const candidateEmbedding = deserializeEmbedding(row.embedding);
+      const score = cosineSimilarity(embedding, candidateEmbedding);
+      if (score < threshold) {
+        continue;
+      }
+      results.push({
+        entry: this.fromRow(row, candidateEmbedding),
+        score,
+      });
+    }
+
+    results.sort((a, b) => b.score - a.score);
+    return results.slice(0, limit);
+  }
+
+  private searchByEmbeddingVec(
+    embedding: number[],
+    options?: VectorSearchOptions
+  ): VectorSearchResult<T>[] | null {
+    if (!this.vecTableName || !this.vecEnabled) {
+      return null;
+    }
+
+    const limit = options?.limit ?? 10;
+    const threshold = options?.threshold ?? 0;
+    const queryVector = JSON.stringify(embedding);
+    const vecLimit = limit * 3;
+
+    try {
+      const rows = this.db
+        .prepare(
+          `SELECT id, distance FROM ${this.vecTableName}
+           WHERE embedding MATCH ?
+           ORDER BY distance
+           LIMIT ?`
+        )
+        .all(queryVector, vecLimit) as Array<{ id: string; distance: number }>;
+
+      if (rows.length === 0) {
+        return [];
+      }
+
+      const ids = rows.map((row) => row.id);
+      const placeholders = ids.map(() => "?").join(", ");
+      const entries = this.db
+        .prepare(
+          `SELECT id, content, embedding, metadata, created_at
+           FROM ${this.tableName}
+           WHERE id IN (${placeholders})`
+        )
+        .all(...ids) as SqliteRow[];
+      const entryMap = new Map(entries.map((row) => [row.id, row]));
+
+      const results: VectorSearchResult<T>[] = [];
+      for (const row of rows) {
+        const entryRow = entryMap.get(row.id);
+        if (!entryRow) {
+          continue;
+        }
+        const score = distanceToScore(row.distance, this.vecDistanceMetric);
+        if (score < threshold) {
+          continue;
+        }
+        results.push({
+          entry: this.fromRow(entryRow, deserializeEmbedding(entryRow.embedding)),
+          score,
+        });
+        if (results.length >= limit) {
+          break;
+        }
+      }
+
+      return results;
+    } catch (error) {
+      if (!this.ignoreExtensionErrors) {
+        throw error;
+      }
+      this.vecEnabled = false;
+      return null;
+    }
+  }
+
+  private upsertVecEntry(id: string, embedding: number[]): void {
+    if (!this.vecTableName || !this.vecEnabled) {
+      return;
+    }
+
+    try {
+      this.db.prepare(`DELETE FROM ${this.vecTableName} WHERE id = ?`).run(id);
+      this.db
+        .prepare(`INSERT INTO ${this.vecTableName} (embedding, id) VALUES (?, ?)`)
+        .run(JSON.stringify(embedding), id);
+    } catch (error) {
+      if (!this.ignoreExtensionErrors) {
+        throw error;
+      }
+      this.vecEnabled = false;
+    }
+  }
+
+  private deleteVecEntry(id: string): void {
+    if (!this.vecTableName || !this.vecEnabled) {
+      return;
+    }
+    try {
+      this.db.prepare(`DELETE FROM ${this.vecTableName} WHERE id = ?`).run(id);
+    } catch (error) {
+      if (!this.ignoreExtensionErrors) {
+        throw error;
+      }
+      this.vecEnabled = false;
+    }
   }
 
   private searchByText(query: string, options?: VectorSearchOptions): VectorSearchResult<T>[] {
@@ -295,4 +451,14 @@ function textScore(content: string, query: string): number {
     return Math.min(0.9, query.length / normalized.length + 0.3);
   }
   return 0;
+}
+
+function distanceToScore(distance: number, metric: "cosine" | "l2"): number {
+  if (!Number.isFinite(distance)) {
+    return Number.NEGATIVE_INFINITY;
+  }
+  if (metric === "cosine") {
+    return 1 - distance;
+  }
+  return 1 / (1 + distance);
 }

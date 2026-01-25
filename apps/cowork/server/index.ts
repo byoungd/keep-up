@@ -40,6 +40,8 @@ const lessonStore = createLessonStore({
   vectorStorePath: lessonVectorPath,
   vectorStoreExtensions,
   vectorStoreIgnoreExtensionErrors: process.env.COWORK_SQLITE_VEC_IGNORE_ERRORS === "true",
+  vectorStoreUseVec: Boolean(sqliteVecPath),
+  vectorStoreDistanceMetric: "cosine",
 });
 const critic = new CriticAgent({ lessonStore, logger: serverLogger });
 const taskRuntime = new CoworkTaskRuntime({
