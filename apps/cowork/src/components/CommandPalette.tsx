@@ -50,6 +50,16 @@ export function CommandPalette() {
   const inputRef = React.useRef<HTMLInputElement | null>(null);
   const listRef = React.useRef<HTMLDivElement | null>(null);
 
+  React.useEffect(() => {
+    if (typeof document === "undefined") {
+      return;
+    }
+    document.body.dataset.commandPalette = "true";
+    return () => {
+      delete document.body.dataset.commandPalette;
+    };
+  }, []);
+
   const actionItems = React.useMemo<CommandPaletteItem[]>(
     () => [
       {

@@ -1,4 +1,5 @@
 import { cn } from "@ku0/shared/utils";
+import { useReducedMotion } from "framer-motion";
 import { Download, History, MoreHorizontal, PanelRightClose, Plus } from "lucide-react";
 import { Button } from "../ui/Button";
 import {
@@ -122,6 +123,7 @@ export function AIPanelHeader({
 }
 
 function StatusDot({ isStreaming, isLoading }: { isStreaming: boolean; isLoading: boolean }) {
+  const prefersReducedMotion = useReducedMotion();
   if (!isStreaming && !isLoading) {
     return null;
   }
@@ -131,7 +133,8 @@ function StatusDot({ isStreaming, isLoading }: { isStreaming: boolean; isLoading
       {/* Outer glow ring */}
       <span
         className={cn(
-          "absolute -inset-1 rounded-full opacity-30 animate-ping",
+          "absolute -inset-1 rounded-full",
+          prefersReducedMotion ? "opacity-20" : "opacity-30 animate-ping",
           isStreaming ? "bg-success" : "bg-warning"
         )}
         style={{ animationDuration: "1.5s" }}

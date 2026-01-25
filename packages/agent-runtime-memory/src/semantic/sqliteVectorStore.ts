@@ -1,5 +1,5 @@
+import { createRequire } from "node:module";
 import type { Database as DatabaseInstance } from "better-sqlite3";
-import Database from "better-sqlite3";
 import { cosineSimilarity } from "../types";
 import type {
   EmbeddingProvider,
@@ -28,6 +28,31 @@ type SqliteRow = {
 
 const DEFAULT_TABLE = "vector_entries";
 
+type DatabaseConstructor = new (filePath: string) => DatabaseInstance;
+
+let cachedDatabaseConstructor: DatabaseConstructor | null = null;
+
+function loadDatabaseConstructor(): DatabaseConstructor {
+  if (cachedDatabaseConstructor) {
+    return cachedDatabaseConstructor;
+  }
+  const require = createRequire(import.meta.url);
+  let loaded: unknown;
+  try {
+    loaded = require("better-sqlite3");
+  } catch (error) {
+    const message =
+      "better-sqlite3 is required to use SqliteVectorStore. Install dependencies or disable sqlite-backed memory stores.";
+    throw new Error(message, { cause: error });
+  }
+  const Database = (loaded as { default?: DatabaseConstructor }).default ?? loaded;
+  if (typeof Database !== "function") {
+    throw new Error("Failed to load better-sqlite3 constructor.");
+  }
+  cachedDatabaseConstructor = Database as DatabaseConstructor;
+  return cachedDatabaseConstructor;
+}
+
 export class SqliteVectorStore<T extends VectorStoreEntry> implements VectorStore<T> {
   private readonly db: DatabaseInstance;
   private readonly tableName: string;
@@ -40,6 +65,7 @@ export class SqliteVectorStore<T extends VectorStoreEntry> implements VectorStor
     this.dimension = config.dimension;
     this.maxEntries = config.maxEntries;
     this.embeddingProvider = config.embeddingProvider;
+    const Database = loadDatabaseConstructor();
     this.db = new Database(config.filePath);
 
     if (config.enableWal ?? true) {
