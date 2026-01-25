@@ -138,7 +138,7 @@ export function useShellI18n() {
 }
 
 export function useShellUser() {
-  return useRequiredContext(ShellUserContext, "useShellUser");
+  return useContext(ShellUserContext);
 }
 
 const ReaderShellProviderContext = ReaderShellContext.Provider;

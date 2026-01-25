@@ -211,6 +211,14 @@ export const aliases: AliasEntry[] = [
     replacement: path.resolve(__dirname, "packages/workspace-session-rs/src/node.ts"),
   },
   {
+    find: "@ku0/tool-gateway-rs/node",
+    replacement: path.resolve(__dirname, "packages/tool-gateway-rs/src/node.ts"),
+  },
+  {
+    find: "@ku0/model-fabric-rs/node",
+    replacement: path.resolve(__dirname, "packages/model-fabric-rs/src/node.ts"),
+  },
+  {
     find: "@ku0/agent-workforce-rs/node",
     replacement: path.resolve(__dirname, "packages/agent-workforce-rs/src/node.ts"),
   },

@@ -48,6 +48,12 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
       const handleKeyDown = (e: KeyboardEvent) => {
         // Support Cmd+K or Ctrl+K
         if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+          if (e.defaultPrevented) {
+            return;
+          }
+          if (document.body.dataset.commandPalette === "true") {
+            return;
+          }
           e.preventDefault();
           internalRef.current?.focus();
         }
