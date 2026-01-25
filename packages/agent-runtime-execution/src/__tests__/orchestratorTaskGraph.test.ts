@@ -2,6 +2,9 @@
  * Orchestrator TaskGraph Integration Tests
  */
 
+import * as fs from "node:fs/promises";
+import * as os from "node:os";
+import * as path from "node:path";
 import { createCompletionToolServer, createToolRegistry } from "@ku0/agent-runtime-tools";
 import { describe, expect, it } from "vitest";
 import type { AgentLLMRequest, AgentLLMResponse, IAgentLLM } from "../orchestrator/orchestrator";
@@ -107,5 +110,40 @@ describe("AgentOrchestrator task graph", () => {
     const nodes = graph.listNodes();
     const toolNode = nodes.find((node) => node.type === "tool_call");
     expect(toolNode?.status).toBe("failed");
+  });
+
+  it("creates plan step nodes when planning is enabled", async () => {
+    const registry = createToolRegistry({ enforceQualifiedNames: false });
+    try {
+      await registry.register(createCompletionToolServer());
+    } catch (_e) {
+      // Ignore if already registered
+    }
+    try {
+      await registry.register(createPingServer());
+    } catch (_e) {
+      // Ignore if already registered
+    }
+
+    const graph = createTaskGraphStore();
+    const workingDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "taskgraph-plan-"));
+
+    try {
+      const orchestrator = createOrchestrator(new OneShotToolLLM(), registry, {
+        security: createSecurityPolicy("balanced"),
+        requireConfirmation: false,
+        components: { taskGraph: graph },
+        planning: { enabled: true, persistToFile: true, workingDirectory },
+      });
+
+      await orchestrator.run("Run ping with planning");
+
+      const planStepNodes = graph.listNodes().filter((node) => node.type === "subtask");
+      expect(planStepNodes).toHaveLength(1);
+      expect(planStepNodes[0]?.title).toBe("Step 1: Call ping");
+      expect(planStepNodes[0]?.status).toBe("completed");
+    } finally {
+      await fs.rm(workingDirectory, { recursive: true, force: true });
+    }
   });
 });
