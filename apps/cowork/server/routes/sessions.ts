@@ -10,6 +10,7 @@ import {
 } from "../schemas";
 import type { SessionStoreLike, TaskStoreLike } from "../storage/contracts";
 import { COWORK_EVENTS, type SessionEventHub } from "../streaming/eventHub";
+import { resolveCurrentUserId } from "../utils/currentUser";
 
 interface SessionRouteDeps {
   sessionStore: SessionStoreLike;
@@ -29,9 +30,10 @@ export function createSessionRoutes(deps: SessionRouteDeps) {
     }
 
     const { userId, deviceId, grants, connectors, title } = parsed.data;
+    const requestUserId = resolveCurrentUserId(c);
     const session: CoworkSession = {
       sessionId: crypto.randomUUID(),
-      userId: userId ?? "local-user",
+      userId: userId ?? requestUserId ?? "local-user",
       deviceId: deviceId ?? "local-device",
       platform: "macos",
       mode: "cowork",

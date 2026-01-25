@@ -315,6 +315,35 @@ export function useCoworkAIPanelController() {
     }
   }, [input, isSending, resolveSendContent, getSendError, dispatchSend]);
 
+  const handleRunBackground = useCallback(async () => {
+    const content = input.trim();
+    if (!content || isSending) {
+      return;
+    }
+
+    setStatusMessage(null);
+    setInput("");
+
+    try {
+      const resolved = resolveSendContent(content);
+      if (!resolved) {
+        return;
+      }
+      const sendError = getSendError("task");
+      if (sendError) {
+        setStatusMessage(sendError);
+        setInput(content);
+        return;
+      }
+      await dispatchSend(resolved.resolvedContent, "task");
+    } catch (_err) {
+      setInput(content);
+      setStatusMessage(
+        "Unable to run task in background. Ensure the Cowork server is running, then try again."
+      );
+    }
+  }, [dispatchSend, getSendError, input, isSending, resolveSendContent]);
+
   const startEditing = useCallback(
     (id: string) => {
       const msg = messages.find((m) => m.id === id);
@@ -483,6 +512,7 @@ export function useCoworkAIPanelController() {
     setModel: handleSetModel,
     filteredModels,
     handleSend,
+    handleRunBackground,
     handleAbort: () => {
       /* Not implemented yet */
     },

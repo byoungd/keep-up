@@ -22,6 +22,7 @@ import { AIControlProvider } from "../../features/chat/AIControlContext";
 import { CoworkAIPanel } from "../../features/chat/CoworkAIPanel";
 import { generateTaskTitle } from "../../features/chat/utils/textUtils";
 import { ContextPanel, type ContextPanelTab } from "../../features/context/ContextPanel";
+import { useCurrentUser } from "../../hooks/useCurrentUser";
 import { isTauriRuntime } from "../../lib/tauriRuntime";
 
 function resolveI18nArgs(
@@ -141,6 +142,7 @@ export function RootLayout() {
   const location = useLocation();
   const { sessionId } = useParams({ strict: false }) as { sessionId?: string };
   const resolvedSessionId = sessionId && sessionId !== "undefined" ? sessionId : null;
+  const { data: currentUser } = useCurrentUser();
 
   // Use ref for router to avoid useMemo dependency changes
   const routerRef = React.useRef(router);
@@ -199,6 +201,19 @@ export function RootLayout() {
     },
     [resolvedSessionId]
   );
+
+  const shellUser = React.useMemo(() => {
+    if (!currentUser) {
+      return undefined;
+    }
+    return {
+      id: currentUser.id,
+      email: currentUser.email,
+      fullName: currentUser.fullName ?? currentUser.email ?? currentUser.id,
+      imageUrl: currentUser.imageUrl,
+      permissions: currentUser.permissions,
+    };
+  }, [currentUser]);
 
   // Load state from localStorage on mount
   React.useEffect(() => {
@@ -355,11 +370,7 @@ export function RootLayout() {
 
   const shellContextValue = React.useMemo(
     () => ({
-      user: {
-        id: "demo-user",
-        displayName: "Demo User", // TODO: Connect to real auth
-        avatarUrl: undefined,
-      },
+      user: shellUser,
       router: {
         ...stableRouterFns,
         pathname: location.pathname,
@@ -409,6 +420,7 @@ export function RootLayout() {
       },
     }),
     [
+      shellUser,
       isSidebarCollapsed,
       sidebarWidth,
       isAuxPanelVisible,

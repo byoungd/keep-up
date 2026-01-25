@@ -27,6 +27,7 @@ export function CoworkAIPanel({ onClose, onPreviewArtifact }: CoworkAIPanelProps
     setModel,
     filteredModels,
     handleSend,
+    handleRunBackground,
     handleAbort,
     handleTaskAction,
     attachments,
@@ -195,7 +196,6 @@ export function CoworkAIPanel({ onClose, onPreviewArtifact }: CoworkAIPanelProps
         listRef={listRef}
         onEdit={onEdit}
         onBranch={(id) => {
-          // TODO: Implement proper branch UI (set replyingTo state then send)
           onBranch(id);
         }}
         onQuote={onQuote}
@@ -205,17 +205,16 @@ export function CoworkAIPanel({ onClose, onPreviewArtifact }: CoworkAIPanelProps
           }
         }}
         onRetry={onRetry}
-        onSuggestionClick={() => {
-          /* TODO */
+        onSuggestionClick={(suggestion) => {
+          setInput(suggestion);
+          inputRef.current?.focus();
         }}
         messageListTranslations={translations}
         // Input
         input={input}
         setInput={setInput}
         onSend={handleSend}
-        onRunBackground={() => {
-          /* TODO */
-        }}
+        onRunBackground={handleRunBackground}
         onAbort={handleAbort}
         onTaskAction={handleTaskAction}
         attachments={attachments}

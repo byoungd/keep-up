@@ -22,6 +22,7 @@ import { createProviderRoutes } from "./routes/providers";
 import { createSessionRoutes } from "./routes/sessions";
 import { createSettingsRoutes } from "./routes/settings";
 import { createStreamRoutes } from "./routes/stream";
+import { createUserRoutes } from "./routes/user";
 import { createWorkflowRoutes } from "./routes/workflows";
 import { createWorkspaceSessionRoutes } from "./routes/workspaceSessions";
 import { createWorkspaceRoutes } from "./routes/workspaces";
@@ -142,6 +143,8 @@ export function createCoworkApp(deps: CoworkAppDeps) {
       events: eventHub,
     })
   );
+
+  app.route("/api", createUserRoutes());
 
   app.route(
     "/api",
