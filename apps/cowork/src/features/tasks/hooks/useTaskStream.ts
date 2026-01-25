@@ -8,6 +8,7 @@ import type {
   ToolActivity,
 } from "@ku0/agent-runtime";
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { z } from "zod";
 import {
   applyArtifact as applyArtifactRequest,
   type CoworkApproval,
@@ -868,6 +869,7 @@ const EVENT_HANDLERS: Record<string, EventHandler> = {
   "agent.tool.call": handleToolCall,
   "agent.tool.result": handleToolResult,
   "agent.plan": handlePlanUpdate,
+  "task.plan": handlePlanUpdate,
   "agent.artifact": handleArtifactUpdate,
   "agent.turn.start": handleTurnStart,
   "agent.turn.end": handleTurnEnd,
@@ -1465,6 +1467,10 @@ function handlePlanUpdate(
   }
   const artifactId = typeof data.artifactId === "string" ? data.artifactId : "plan";
   const taskId = typeof data.taskId === "string" ? data.taskId : undefined;
+  const existing = prev.artifacts[artifactId];
+  if (existing?.type === "plan" && arePlanStepsEqual(existing.steps, parsedPlan.data)) {
+    return prev;
+  }
 
   return {
     ...prev,
@@ -1480,6 +1486,22 @@ function handlePlanUpdate(
       timestamp: now,
     }),
   };
+}
+
+function arePlanStepsEqual(
+  left: z.infer<typeof PlanStepSchema>[],
+  right: z.infer<typeof PlanStepSchema>[]
+): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+  return left.every((step, index) => {
+    const other = right[index];
+    if (!other) {
+      return false;
+    }
+    return step.id === other.id && step.label === other.label && step.status === other.status;
+  });
 }
 
 function handleArtifactUpdate(

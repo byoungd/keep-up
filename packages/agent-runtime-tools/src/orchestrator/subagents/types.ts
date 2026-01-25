@@ -23,4 +23,6 @@ export interface SubagentWorkItem {
   config: SubagentConfig;
   input: unknown;
   dependencies?: string[];
+  parentTraceId?: string;
+  parentContextId?: string;
 }

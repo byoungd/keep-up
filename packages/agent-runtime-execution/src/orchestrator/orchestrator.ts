@@ -33,11 +33,13 @@ import type {
 import { AGENT_METRICS } from "@ku0/agent-runtime-telemetry/telemetry";
 import {
   COMPLETION_TOOL_NAME,
+  createPlanPersistence,
   createSkillPolicyGuard,
   createSkillPromptAdapter,
   createSkillSession,
   createToolDiscoveryEngine,
   type IToolRegistry,
+  type PlanPersistence,
   type SkillPromptAdapter,
   type SkillRegistry,
   type SkillSession,
@@ -136,6 +138,7 @@ import {
   type ExecutionPlan,
   type PlanApprovalHandler,
   type PlanningEngine,
+  type PlanStep,
 } from "./planning";
 import { createRequestCache, type RequestCache } from "./requestCache";
 import { createSingleStepEnforcer, type SingleStepEnforcer } from "./singleStepEnforcer";
@@ -310,6 +313,7 @@ export class AgentOrchestrator {
   private readonly dependencyAnalyzer: DependencyAnalyzer;
   private readonly toolScheduler: SmartToolScheduler;
   private readonly planningEngine: PlanningEngine;
+  private planPersistence?: PlanPersistence;
   private readonly turnExecutor: ITurnExecutor;
   private readonly toolExecutor?: ToolExecutor;
   private readonly subagentManager?: SubagentManager;
@@ -924,6 +928,8 @@ export class AgentOrchestrator {
       id: crypto.randomUUID(),
       config,
       input,
+      parentTraceId: this.currentRunId,
+      parentContextId: this.sessionState?.getContextId(),
     };
   }
 
@@ -949,6 +955,52 @@ export class AgentOrchestrator {
 
     this.state.messages.push(summaryMessage);
     this.recordMessage(summaryMessage);
+    this.maybeEmitSubagentSummaryArtifact(tasks, results);
+  }
+
+  private maybeEmitSubagentSummaryArtifact(
+    tasks: SubagentWorkItem[],
+    results: SubagentResult<unknown>[]
+  ): void {
+    if (!this.artifactPipeline || results.length === 0) {
+      return;
+    }
+
+    const sections = tasks.map((task, index) => {
+      const result = results[index];
+      if (!result) {
+        return { heading: task.config.name, content: "No result" };
+      }
+      if (!result.success) {
+        return {
+          heading: `${task.config.name} (failed)`,
+          content: result.error?.message ?? "Unknown error",
+        };
+      }
+      return {
+        heading: task.config.name,
+        content: this.formatSubagentOutput(result.output),
+      };
+    });
+
+    const successful = results.filter((result) => result?.success).length;
+    const failed = results.filter((result) => result && !result.success).length;
+    const summary = `Executed ${results.length} subagent${results.length === 1 ? "" : "s"}: ${
+      successful
+    } succeeded, ${failed} failed.`;
+
+    this.emitArtifact({
+      id: `subagent-summary-${this.currentRunId ?? Date.now().toString(36)}`,
+      type: "ReportCard",
+      schemaVersion: "1.0.0",
+      title: "Subagent Summary",
+      payload: {
+        summary,
+        sections,
+      },
+      taskNodeId: this.currentPlanNodeId ?? this.currentRunId ?? "subagent-summary",
+      createdAt: new Date().toISOString(),
+    });
   }
 
   private formatSubagentOutput(output: unknown): string {
@@ -2443,6 +2495,140 @@ export class AgentOrchestrator {
     });
   }
 
+  private async maybeEmitPlanFromToolCall(call: MCPToolCall, result: MCPToolResult): Promise<void> {
+    if (!result.success || !this.isPlanMutationTool(call.name)) {
+      return;
+    }
+
+    const persisted = await this.loadCurrentPlan();
+    if (persisted) {
+      this.emit("plan:created", { steps: persisted.steps });
+      return;
+    }
+
+    if (call.name !== "plan:save") {
+      return;
+    }
+
+    const stepsInput = (call.arguments as { steps?: unknown }).steps;
+    if (!Array.isArray(stepsInput) || stepsInput.length === 0) {
+      return;
+    }
+
+    const timestamp = Date.now().toString(36);
+    const steps = stepsInput.map((step, index) => {
+      const description =
+        step && typeof step === "object" && "description" in step
+          ? String((step as { description?: unknown }).description ?? `Step ${index + 1}`)
+          : `Step ${index + 1}`;
+      return {
+        id: `step_${index + 1}_${timestamp}`,
+        description,
+        status: "pending" as const,
+      };
+    });
+
+    this.emit("plan:created", { steps });
+  }
+
+  private isPlanMutationTool(toolName: string): boolean {
+    return (
+      toolName === "plan:save" ||
+      toolName === "plan:step" ||
+      toolName === "plan:update" ||
+      toolName === "plan:advance" ||
+      toolName === "plan:archive"
+    );
+  }
+
+  private shouldSyncPlanForTool(toolName: string): boolean {
+    return !toolName.startsWith("plan:") && !toolName.startsWith("completion:");
+  }
+
+  private async updatePlanStepOnToolStart(call: MCPToolCall): Promise<void> {
+    if (!this.shouldSyncPlanForTool(call.name)) {
+      return;
+    }
+
+    const plan = await this.loadCurrentPlan();
+    if (!plan || plan.steps.length === 0 || plan.status === "executed") {
+      return;
+    }
+
+    if (plan.steps.some((step) => step.status === "executing")) {
+      return;
+    }
+
+    const nextStep =
+      this.findStepMatchingTool(plan, call.name, "pending") ??
+      plan.steps.find((step) => step.status === "pending");
+
+    if (!nextStep || nextStep.status === "executing") {
+      return;
+    }
+
+    nextStep.status = "executing";
+    await this.savePlanAndEmit(plan);
+  }
+
+  private async updatePlanStepOnToolResult(
+    call: MCPToolCall,
+    result: MCPToolResult
+  ): Promise<void> {
+    if (!this.shouldSyncPlanForTool(call.name)) {
+      return;
+    }
+
+    const plan = await this.loadCurrentPlan();
+    if (!plan || plan.steps.length === 0 || plan.status === "executed") {
+      return;
+    }
+
+    const matchingExecuting = this.findStepMatchingTool(plan, call.name, "executing");
+    const matchingPending = this.findStepMatchingTool(plan, call.name, "pending");
+    const executing = plan.steps.find((step) => step.status === "executing");
+    const current = matchingExecuting ?? matchingPending ?? executing;
+
+    if (!current) {
+      return;
+    }
+
+    current.status = result.success ? "complete" : "failed";
+    await this.savePlanAndEmit(plan);
+  }
+
+  private findStepMatchingTool(
+    plan: ExecutionPlan,
+    toolName: string,
+    status: PlanStep["status"]
+  ): PlanStep | undefined {
+    return plan.steps.find(
+      (step) => step.status === status && step.tools.some((tool) => tool === toolName)
+    );
+  }
+
+  private async savePlanAndEmit(plan: ExecutionPlan): Promise<void> {
+    await this.getPlanPersistence().saveCurrent(plan);
+    this.emit("plan:created", { steps: plan.steps });
+  }
+
+  private async loadCurrentPlan(): Promise<ExecutionPlan | null> {
+    try {
+      return await this.getPlanPersistence().loadCurrent();
+    } catch {
+      return null;
+    }
+  }
+
+  private getPlanPersistence(): PlanPersistence {
+    if (!this.planPersistence) {
+      this.planPersistence = createPlanPersistence({
+        workingDirectory: this.config.planning?.workingDirectory,
+      });
+    }
+    return this.planPersistence;
+  }
+
   private assessPlanRisk(toolCalls: MCPToolCall[]): "low" | "medium" | "high" {
     let risk: "low" | "medium" | "high" = "low";
     for (const call of toolCalls) {
@@ -2594,6 +2780,7 @@ export class AgentOrchestrator {
   ): Promise<void> {
     const taskNodeId = this.ensureTaskGraphToolNode(call, "running");
     this.emit("tool:calling", { toolName: call.name, arguments: call.arguments });
+    await this.updatePlanStepOnToolStart(call);
 
     if (!this.toolExecutor) {
       this.metrics?.increment(AGENT_METRICS.toolCallsTotal.name, {
@@ -2606,6 +2793,8 @@ export class AgentOrchestrator {
     const result = await this.getToolResultWithCache(call, context);
 
     this.emit("tool:result", { toolName: call.name, result });
+    await this.maybeEmitPlanFromToolCall(call, result);
+    await this.updatePlanStepOnToolResult(call, result);
     this.addToolResult(call.name, result);
     await this.recordCheckpointToolResult(call, result, Date.now() - toolStart);
     this.updateTaskGraphStatus(taskNodeId, result.success ? "completed" : "failed");

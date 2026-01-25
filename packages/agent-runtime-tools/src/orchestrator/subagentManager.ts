@@ -139,6 +139,8 @@ export class SubagentManager {
       type: agentType,
       task: taskPrompt,
       allowedTools: task.config.tools,
+      parentTraceId: task.parentTraceId,
+      parentContextId: task.parentContextId,
       signal,
     };
   }
