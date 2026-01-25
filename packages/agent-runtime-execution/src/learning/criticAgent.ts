@@ -233,14 +233,6 @@ function extractFromLine(line: string): ExtractedLesson | null {
     return { trigger, rule, confidence };
   }
 
-  const preferMatch = matchPrefer(line);
-  if (preferMatch) {
-    const prefer = trimTerminalPunctuation(preferMatch.prefer);
-    const over = preferMatch.over ? trimTerminalPunctuation(preferMatch.over) : undefined;
-    const rule = over ? `Prefer ${prefer} over ${over}.` : `Prefer ${prefer}.`;
-    return { trigger: line, rule, confidence };
-  }
-
   const avoidMatch = matchAvoid(line);
   if (avoidMatch) {
     const target = trimTerminalPunctuation(avoidMatch);
@@ -254,6 +246,14 @@ function extractFromLine(line: string): ExtractedLesson | null {
       const normalized = trimTerminalPunctuation(target);
       return { trigger: line, rule: `Avoid ${normalized}.`, confidence };
     }
+  }
+
+  const preferMatch = matchPrefer(line);
+  if (preferMatch) {
+    const prefer = trimTerminalPunctuation(preferMatch.prefer);
+    const over = preferMatch.over ? trimTerminalPunctuation(preferMatch.over) : undefined;
+    const rule = over ? `Prefer ${prefer} over ${over}.` : `Prefer ${prefer}.`;
+    return { trigger: line, rule, confidence };
   }
 
   return null;

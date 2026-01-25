@@ -937,6 +937,7 @@ export class CodeInteractionServer extends BaseToolServer {
     try {
       const absolutePath = path.resolve(filePath);
       const session = await this.getLspSession(absolutePath);
+      await this.ensureWorkspaceWarmup(session);
       const locations = await session.client.goToDefinition(absolutePath, {
         line: position.line - 1,
         character: position.character - 1,

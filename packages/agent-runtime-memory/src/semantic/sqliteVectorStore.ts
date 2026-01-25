@@ -9,6 +9,11 @@ import type {
   VectorStoreEntry,
 } from "./vectorStore";
 
+export type SqliteVectorStoreExtension = {
+  name?: string;
+  load: (db: DatabaseInstance) => void;
+};
+
 export type SqliteVectorStoreConfig = {
   filePath: string;
   tableName?: string;
@@ -16,6 +21,8 @@ export type SqliteVectorStoreConfig = {
   maxEntries?: number;
   embeddingProvider?: EmbeddingProvider;
   enableWal?: boolean;
+  extensions?: SqliteVectorStoreExtension[];
+  ignoreExtensionErrors?: boolean;
 };
 
 type SqliteRow = {
@@ -67,6 +74,8 @@ export class SqliteVectorStore<T extends VectorStoreEntry> implements VectorStor
     this.embeddingProvider = config.embeddingProvider;
     const Database = loadDatabaseConstructor();
     this.db = new Database(config.filePath);
+
+    this.loadExtensions(config.extensions, config.ignoreExtensionErrors ?? false);
 
     if (config.enableWal ?? true) {
       this.db.pragma("journal_mode = WAL");
@@ -155,6 +164,28 @@ export class SqliteVectorStore<T extends VectorStoreEntry> implements VectorStor
         created_at INTEGER NOT NULL
       );`
     );
+  }
+
+  private loadExtensions(
+    extensions: SqliteVectorStoreExtension[] | undefined,
+    ignoreErrors: boolean
+  ): void {
+    if (!extensions || extensions.length === 0) {
+      return;
+    }
+
+    for (const extension of extensions) {
+      try {
+        extension.load(this.db);
+      } catch (error) {
+        if (ignoreErrors) {
+          continue;
+        }
+        const label = extension.name ? ` (${extension.name})` : "";
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(`Failed to load sqlite vector extension${label}: ${message}`);
+      }
+    }
   }
 
   private evictIfNeeded(): void {
