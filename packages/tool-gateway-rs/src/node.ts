@@ -44,7 +44,7 @@ export function getNativeToolGateway(): NativeToolGatewayBinding | null {
 
   cachedError = result.error;
   cachedBinding = result.binding ?? null;
-  return cachedBinding;
+  return cachedBinding ?? null;
 }
 
 export function getNativeToolGatewayError(): Error | null {
