@@ -1,7 +1,7 @@
 # Track AX: Rust-First Capabilities Delivery (Phase 8 Execution)
 
 > Priority: P0
-> Status: Proposed
+> Status: Completed (PR #262)
 > Owner: Agent Runtime Team
 > Dependencies: Track AW (sandbox + storage), Phase 7 Desktop Sovereignty
 > Source: docs/roadmap/phase-8-rust-agent-capabilities/README.md

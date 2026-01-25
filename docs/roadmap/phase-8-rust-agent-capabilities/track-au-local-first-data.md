@@ -1,7 +1,7 @@
 # Track AU: Local-First Data and Audit (Rust)
 
 > Priority: P0
-> Status: Proposed
+> Status: Completed (PR #260)
 > Owner: Data Platform Team
 > Dependencies: Phase 6 storage engine
 > Estimated Effort: 2 weeks

@@ -1,7 +1,7 @@
 # Track AW: Rust Native Completion and Readiness
 
 > Priority: P0
-> Status: Active
+> Status: Completed (PR #259)
 > Owner: Agent Runtime Team
 > Dependencies: Phase 6 Rust Native baseline
 > Source: docs/roadmap/phase-6-rust-native/README.md

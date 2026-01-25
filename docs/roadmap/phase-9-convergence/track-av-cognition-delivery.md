@@ -1,7 +1,7 @@
 # Track AV: Cognition Delivery (Phase 4 Completion)
 
 > Priority: P0
-> Status: Proposed
+> Status: Completed (PR #261)
 > Owner: Agent Runtime Team
 > Dependencies: Phase 3 Graph Runtime, Track AW (vector similarity, LSP indexer)
 > Source: docs/roadmap/phase-4-cognition/README.md

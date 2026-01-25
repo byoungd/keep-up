@@ -1,7 +1,7 @@
 # Track AY: Policy and Ops Parity (TS <-> Rust)
 
 > Priority: P1
-> Status: Proposed
+> Status: Completed (PR #263)
 > Owner: Agent Runtime Team
 > Dependencies: Phase 5 AC, Track AX (tool gateway), Phase 7 enclave
 > Source: docs/roadmap/phase-5-expansion/README.md
