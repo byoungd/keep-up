@@ -12,10 +12,10 @@ export {
   ContextCompactor,
   type ContextManagementConfig,
   createContextCompactor,
-  type Message,
+  type Message as ContextMessage,
   type ThresholdCheckResult,
-  type ToolCall,
-  type ToolResult,
+  type ToolCall as ContextToolCall,
+  type ToolResult as ContextToolResult,
 } from "./ContextCompactor";
 export {
   type ContextBudget,

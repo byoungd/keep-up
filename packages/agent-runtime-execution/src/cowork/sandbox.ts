@@ -127,7 +127,7 @@ function mergeRiskTags(
   base: CoworkSandboxDecision["riskTags"],
   extra: CoworkSandboxDecision["riskTags"]
 ): CoworkSandboxDecision["riskTags"] {
-  const tags = new Set<string>();
+  const tags = new Set<CoworkSandboxDecision["riskTags"][number]>();
   for (const entry of base ?? []) {
     tags.add(entry);
   }
