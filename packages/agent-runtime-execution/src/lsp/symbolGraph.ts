@@ -86,17 +86,21 @@ export class SymbolGraph {
   }
 
   query(query: string, options: SymbolQueryOptions = {}): SymbolQueryResult[] {
+    let results: SymbolQueryResult[] = [];
+
     if (this.memoryIndex) {
-      return this.memoryIndex.query(query, options);
+      results = this.memoryIndex.query(query, options);
+    } else {
+      const nativeIndex = this.nativeIndex;
+      if (!nativeIndex) {
+        return [];
+      }
+
+      const nativeOptions = toNativeQueryOptions(options);
+      results = nativeIndex.query(query, nativeOptions);
     }
 
-    const nativeIndex = this.nativeIndex;
-    if (!nativeIndex) {
-      return [];
-    }
-
-    const nativeOptions = toNativeQueryOptions(options);
-    return nativeIndex.query(query, nativeOptions);
+    return sortSymbolResults(results);
   }
 
   getStats(): { symbolCount: number; fileCount: number } {
@@ -223,6 +227,28 @@ function toNativeQueryOptions(options: SymbolQueryOptions): NativeQueryOptions |
     limit: options.limit,
     kinds: options.kinds,
   };
+}
+
+function sortSymbolResults(results: SymbolQueryResult[]): SymbolQueryResult[] {
+  return results.slice().sort((a, b) => {
+    const scoreDelta = b.score - a.score;
+    if (scoreDelta !== 0) {
+      return scoreDelta;
+    }
+    const nameDelta = a.symbol.name.localeCompare(b.symbol.name);
+    if (nameDelta !== 0) {
+      return nameDelta;
+    }
+    const fileDelta = a.symbol.file.localeCompare(b.symbol.file);
+    if (fileDelta !== 0) {
+      return fileDelta;
+    }
+    const lineDelta = a.symbol.line - b.symbol.line;
+    if (lineDelta !== 0) {
+      return lineDelta;
+    }
+    return a.symbol.column - b.symbol.column;
+  });
 }
 
 function flattenSymbols(symbols: LspSymbolWithDetail[], container?: string): SymbolDescriptor[] {

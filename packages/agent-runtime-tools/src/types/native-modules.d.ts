@@ -14,7 +14,6 @@ declare module "@ku0/gitignore-rs" {
   export function hasNativeSupport(): boolean;
   export function listFiles(path: string, options?: ListFilesOptions): FileEntry[];
 }
-
 declare module "@ku0/sandbox-rs" {
   export interface SandboxPolicy {
     execute(

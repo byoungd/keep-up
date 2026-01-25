@@ -53,6 +53,10 @@ Q3 is not complete based on documentation and script wiring. To close:
 - Run `pnpm test:q3` and attach results in this folder.
 - If X/Y AC tests are missing, implement them and tag with AC IDs.
 - Record KPI baselines in KeepUpGym and link the report here.
+- Q3 Gym baselines:
+  - `baselines/q3-perception-accuracy.json`
+  - `baselines/q3-memory-recall.json`
+  - `baselines/q3-plan-quality.json`
 
 ---
 

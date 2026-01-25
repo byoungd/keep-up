@@ -101,7 +101,7 @@ pub struct WorkforceResultEnvelope {
     pub metadata: Option<Value>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkforceAssignment {
     pub task_id: String,
@@ -127,7 +127,7 @@ pub enum WorkforceEventType {
     SchedulerTick,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkforceEvent {
     pub sequence: u64,
@@ -148,7 +148,7 @@ pub enum TaskChannelMessageType {
     Result,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskChannelMessage {
     pub sequence: u64,
@@ -158,7 +158,7 @@ pub struct TaskChannelMessage {
     pub payload: Value,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkforceTaskSnapshot {
     pub task_id: String,
@@ -176,7 +176,7 @@ pub struct WorkforceTaskSnapshot {
     pub error: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkforceWorkerSnapshot {
     pub worker_id: String,
@@ -186,7 +186,7 @@ pub struct WorkforceWorkerSnapshot {
     pub state: WorkerState,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkforceSnapshot {
     pub run_id: String,

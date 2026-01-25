@@ -33,6 +33,7 @@
     "lint:fix": "biome check --write ."
   },
   "dependencies": {
+    "@ku0/agent-runtime-core": "workspace:*",
     "@ku0/native-bindings": "workspace:*"
   },
   "devDependencies": {

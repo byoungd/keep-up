@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AuditEntry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["timestamp", "toolName", "action", "sandboxed"],
+  "properties": {
+    "entryId": { "type": "string" },
+    "timestamp": { "type": "number" },
+    "toolName": { "type": "string" },
+    "action": {
+      "type": "string",
+      "enum": ["call", "result", "error", "policy"]
+    },
+    "sessionId": { "type": "string" },
+    "taskId": { "type": "string" },
+    "userId": { "type": "string" },
+    "correlationId": { "type": "string" },
+    "input": { "type": "object", "additionalProperties": true },
+    "output": {},
+    "error": { "type": "string" },
+    "durationMs": { "type": "number" },
+    "sandboxed": { "type": "boolean" },
+    "policyDecision": {
+      "type": "string",
+      "enum": ["allow", "allow_with_confirm", "deny"]
+    },
+    "policyRuleId": { "type": "string" },
+    "riskTags": { "type": "array", "items": { "type": "string" } },
+    "riskScore": { "type": "number" },
+    "reason": { "type": "string" }
+  }
+}

@@ -15,6 +15,26 @@
       "types": "./src/tools/index.ts",
       "default": "./dist/tools/index.js"
     },
+    "./tools/mcp": {
+      "types": "./src/tools/mcp/index.ts",
+      "default": "./dist/tools/mcp/index.js"
+    },
+    "./tools/core": {
+      "types": "./src/tools/core/index.ts",
+      "default": "./dist/tools/core/index.js"
+    },
+    "./tools/core/bash": {
+      "types": "./src/tools/core/bash.ts",
+      "default": "./dist/tools/core/bash.js"
+    },
+    "./tools/core/completion": {
+      "types": "./src/tools/core/completion.ts",
+      "default": "./dist/tools/core/completion.js"
+    },
+    "./tools/core/file": {
+      "types": "./src/tools/core/file.ts",
+      "default": "./dist/tools/core/file.js"
+    },
     "./tools/computer": {
       "types": "./src/tools/computer/index.ts",
       "default": "./dist/tools/computer/index.js"
@@ -47,10 +67,12 @@
   "dependencies": {
     "@ku0/agent-runtime-control": "workspace:*",
     "@ku0/agent-runtime-core": "workspace:*",
+    "@ku0/agent-runtime-persistence": "workspace:*",
     "@ku0/agent-runtime-sandbox": "workspace:*",
     "@ku0/agent-runtime-telemetry": "workspace:*",
     "@ku0/agent-runtime-vision": "workspace:*",
     "@ku0/agent-toolkit-rs": "workspace:*",
+    "@ku0/tool-gateway-rs": "workspace:*",
     "@ku0/core": "workspace:*",
     "@ku0/db": "workspace:*",
     "@ku0/diff-rs": "workspace:*",

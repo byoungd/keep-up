@@ -5,6 +5,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@ku0/ai-core": path.resolve(__dirname, "../ai-core/src/index.ts"),
+      "@ku0/model-fabric-rs": path.resolve(__dirname, "../model-fabric-rs/src/index.ts"),
     },
   },
   test: {

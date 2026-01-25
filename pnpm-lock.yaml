@@ -202,12 +202,15 @@ importers:
 
   packages/agent-gym:
     dependencies:
-      '@ku0/agent-runtime':
-        specifier: workspace:*
-        version: link:../agent-runtime
       '@ku0/agent-runtime-core':
         specifier: workspace:*
         version: link:../agent-runtime-core
+      '@ku0/agent-runtime-execution':
+        specifier: workspace:*
+        version: link:../agent-runtime-execution
+      '@ku0/agent-runtime-tools':
+        specifier: workspace:*
+        version: link:../agent-runtime-tools
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
@@ -224,15 +227,27 @@ importers:
 
   packages/agent-runtime:
     dependencies:
+      '@ku0/agent-runtime-control':
+        specifier: workspace:*
+        version: link:../agent-runtime-control
       '@ku0/agent-runtime-core':
         specifier: workspace:*
         version: link:../agent-runtime-core
       '@ku0/agent-runtime-execution':
         specifier: workspace:*
         version: link:../agent-runtime-execution
+      '@ku0/agent-runtime-memory':
+        specifier: workspace:*
+        version: link:../agent-runtime-memory
       '@ku0/agent-runtime-persistence':
         specifier: workspace:*
         version: link:../agent-runtime-persistence
+      '@ku0/agent-runtime-telemetry':
+        specifier: workspace:*
+        version: link:../agent-runtime-telemetry
+      '@ku0/agent-runtime-tools':
+        specifier: workspace:*
+        version: link:../agent-runtime-tools
     devDependencies:
       '@types/node':
         specifier: ^22.10.2
@@ -378,10 +393,16 @@ importers:
       '@ku0/vector-similarity-rs':
         specifier: workspace:*
         version: link:../vector-similarity-rs
+      better-sqlite3:
+        specifier: ^9.6.0
+        version: 9.6.0
       mem0ai:
         specifier: ^2.2.1
         version: 2.2.1(@anthropic-ai/sdk@0.40.1(encoding@0.1.13))(@azure/identity@4.13.0)(@azure/search-documents@12.2.0)(@cloudflare/workers-types@4.20260117.0)(@google/genai@1.37.0(@modelcontextprotocol/sdk@1.25.2(@cfworker/json-schema@4.1.1)(hono@4.11.4)(zod@3.25.76)))(@langchain/core@0.3.80(@opentelemetry/api@1.9.0)(openai@6.16.0(ws@8.19.0)(zod@3.25.76)))(@mistralai/mistralai@1.11.0)(@qdrant/js-client-rest@1.13.0(typescript@5.9.3))(@supabase/supabase-js@2.90.1)(@types/jest@29.5.14)(@types/pg@8.11.0)(@types/sqlite3@3.1.11)(cloudflare@4.5.0(encoding@0.1.13))(encoding@0.1.13)(groq-sdk@0.3.0(encoding@0.1.13))(neo4j-driver@5.28.2)(ollama@0.5.18)(pg@8.11.3)(redis@4.7.1)(sqlite3@5.1.7)(ws@8.19.0)
     devDependencies:
+      '@types/better-sqlite3':
+        specifier: ^7.6.12
+        version: 7.6.13
       '@types/node':
         specifier: ^22.10.2
         version: 22.19.3
@@ -474,6 +495,9 @@ importers:
       '@ku0/agent-runtime-core':
         specifier: workspace:*
         version: link:../agent-runtime-core
+      '@ku0/agent-runtime-persistence':
+        specifier: workspace:*
+        version: link:../agent-runtime-persistence
       '@ku0/agent-runtime-sandbox':
         specifier: workspace:*
         version: link:../agent-runtime-sandbox
@@ -501,6 +525,9 @@ importers:
       '@ku0/sandbox-rs':
         specifier: workspace:*
         version: link:../sandbox-rs
+      '@ku0/tool-gateway-rs':
+        specifier: workspace:*
+        version: link:../tool-gateway-rs
       '@modelcontextprotocol/sdk':
         specifier: ^1.25.2
         version: 1.25.2(@cfworker/json-schema@4.1.1)(hono@4.11.4)(zod@4.3.5)
@@ -1041,6 +1068,9 @@ importers:
 
   packages/model-fabric-rs:
     dependencies:
+      '@ku0/agent-runtime-core':
+        specifier: workspace:*
+        version: link:../agent-runtime-core
       '@ku0/native-bindings':
         specifier: workspace:*
         version: link:../native-bindings
@@ -1292,6 +1322,25 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
+  packages/tool-gateway-rs:
+    dependencies:
+      '@ku0/agent-runtime-core':
+        specifier: workspace:*
+        version: link:../agent-runtime-core
+      '@ku0/native-bindings':
+        specifier: workspace:*
+        version: link:../native-bindings
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.19.3
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
   packages/tool-lsp:
     dependencies:
       typescript-language-server:
@@ -1393,6 +1442,9 @@ importers:
 
   packages/workspace-session-rs:
     dependencies:
+      '@ku0/agent-runtime-core':
+        specifier: workspace:*
+        version: link:../agent-runtime-core
       '@ku0/native-bindings':
         specifier: workspace:*
         version: link:../native-bindings

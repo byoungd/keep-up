@@ -4,6 +4,7 @@ import * as path from "node:path";
 import { createTypeScriptProvider, LspClient, type LspProvider } from "@ku0/tool-lsp";
 import chokidar, { type FSWatcher } from "chokidar";
 
+import { LspCodeKnowledgeGraph } from "./codeKnowledgeGraph";
 import { ImportGraph } from "./importGraph";
 import { SymbolGraph, type SymbolQueryResult } from "./symbolGraph";
 import type { SymbolContextOptions, SymbolContextProvider } from "./types";
@@ -64,6 +65,7 @@ export class LspService implements SymbolContextProvider {
 
   private readonly symbolGraph = new SymbolGraph();
   private readonly importGraph = new ImportGraph();
+  private readonly knowledgeGraph = new LspCodeKnowledgeGraph(this.symbolGraph, this.importGraph);
   private readonly providerByExtension = new Map<string, LspProvider>();
   private readonly clients = new Map<string, LspClient>();
   private readonly disabledProviders = new Set<string>();
@@ -106,6 +108,10 @@ export class LspService implements SymbolContextProvider {
 
   getImportGraph(): ImportGraph {
     return this.importGraph;
+  }
+
+  getKnowledgeGraph(): LspCodeKnowledgeGraph {
+    return this.knowledgeGraph;
   }
 
   async start(options: LspServiceStartOptions = {}): Promise<void> {

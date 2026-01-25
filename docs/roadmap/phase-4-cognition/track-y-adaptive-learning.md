@@ -27,6 +27,8 @@ The agent currently resets its personality every session. Track Y introduces "Lo
 ### Y2: Vector-Backed Knowledge Store
 - **Store**: Use a local vector DB (e.g., LanceDB or SQLite VSS) to store "Lessons".
 - **Retrieval**: On every new prompt, query the store for relevant "Lessons" based on the task description.
+- **Implementation Note**: Provide a SQLite-backed vector store adapter in `agent-runtime-memory` for
+  local persistence, with a pluggable path for VSS extensions.
 
 ### Y3: "Personality" Profiles
 - Allow switching between Personas (e.g., "Strict Reviewer", "Creative Prototyper") which load different memory subsets.

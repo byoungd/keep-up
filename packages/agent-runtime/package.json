@@ -27,6 +27,10 @@
       "types": "./src/security/index.ts",
       "default": "./dist/security/index.js"
     },
+    "./lsp": {
+      "types": "./src/lsp/index.ts",
+      "default": "./dist/lsp/index.js"
+    },
     "./types": {
       "types": "./src/types/index.ts",
       "default": "./dist/types/index.js"
@@ -42,8 +46,12 @@
   },
   "dependencies": {
     "@ku0/agent-runtime-core": "workspace:*",
+    "@ku0/agent-runtime-control": "workspace:*",
     "@ku0/agent-runtime-execution": "workspace:*",
-    "@ku0/agent-runtime-persistence": "workspace:*"
+    "@ku0/agent-runtime-memory": "workspace:*",
+    "@ku0/agent-runtime-persistence": "workspace:*",
+    "@ku0/agent-runtime-telemetry": "workspace:*",
+    "@ku0/agent-runtime-tools": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

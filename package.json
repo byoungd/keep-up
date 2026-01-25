@@ -27,7 +27,7 @@
     "test:y4": "pnpm --filter @ku0/agent-runtime-execution test -- --grep \"Y-AC-4\"",
     "test:z1": "pnpm --filter @ku0/agent-gym test -- --grep \"Z-AC-1\"",
     "test:z2": "pnpm --filter @ku0/agent-gym test -- --grep \"Z-AC-2\"",
-    "test:q3": "pnpm test:x1 && pnpm test:x2 && pnpm test:x3 && pnpm test:x4 && pnpm test:y1 && pnpm test:y2 && pnpm test:y3 && pnpm test:y4 && pnpm test:z1 && pnpm test:z2",
+    "test:q3": "pnpm test:x1 && pnpm test:x2 && pnpm test:x3 && pnpm test:x4 && pnpm test:y1 && pnpm test:y2 && pnpm test:y3 && pnpm test:y4 && pnpm test:z1 && pnpm test:z2 && pnpm --filter @ku0/agent-gym gym:q3:ci",
     "test:e2e": "pnpm --filter @ku0/e2e-tests test:e2e",
     "test:e2e:smoke": "pnpm --filter @ku0/e2e-tests test:e2e -- src/sidebar.spec.ts",
     "test:pr": "pnpm test:unit",

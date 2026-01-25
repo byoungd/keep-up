@@ -7,8 +7,12 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import type { EmbeddingProvider, VectorSearchOptions } from "../semantic/vectorStore";
-import { InMemoryVectorStore } from "../semantic/vectorStore";
+import {
+  type EmbeddingProvider,
+  InMemoryVectorStore,
+  type VectorSearchOptions,
+  type VectorStore,
+} from "../semantic/vectorStore";
 import type { IEmbeddingProvider, Lesson, LessonProfile, LessonScope } from "../types";
 import { MockEmbeddingProvider } from "../vectorIndex";
 
@@ -31,6 +35,7 @@ export type LessonStoreConfig = {
   dimension?: number;
   maxEntries?: number;
   clock?: () => number;
+  vectorStore?: VectorStore<LessonVectorEntry>;
 };
 
 type LessonInput = Omit<
@@ -58,7 +63,7 @@ const DEFAULT_DIMENSION = 384;
 
 export class LessonStore {
   private readonly filePath?: string;
-  private readonly vectorStore: InMemoryVectorStore<LessonVectorEntry>;
+  private readonly vectorStore: VectorStore<LessonVectorEntry>;
   private readonly embeddingProvider: EmbeddingProvider;
   private readonly clock: () => number;
   private readonly lessons = new Map<string, Lesson>();
@@ -68,11 +73,13 @@ export class LessonStore {
     this.filePath = config.filePath;
     this.clock = config.clock ?? (() => Date.now());
     this.embeddingProvider = resolveEmbeddingProvider(config);
-    this.vectorStore = new InMemoryVectorStore<LessonVectorEntry>({
-      dimension: this.embeddingProvider.dimension,
-      maxEntries: config.maxEntries,
-      embeddingProvider: this.embeddingProvider,
-    });
+    this.vectorStore =
+      config.vectorStore ??
+      new InMemoryVectorStore<LessonVectorEntry>({
+        dimension: this.embeddingProvider.dimension,
+        maxEntries: config.maxEntries,
+        embeddingProvider: this.embeddingProvider,
+      });
   }
 
   async add(input: LessonInput): Promise<Lesson> {
@@ -170,7 +177,8 @@ export class LessonStore {
   async search(query: string, options: LessonStoreQuery = {}): Promise<LessonSearchResult[]> {
     await this.ensureLoaded();
     const limit = options.limit ?? 8;
-    const results = await this.vectorStore.search(query, {
+    const embedding = await this.embeddingProvider.embed(normalizeText(query));
+    const results = await this.vectorStore.searchByEmbedding(embedding, {
       limit: limit * 3,
     } satisfies VectorSearchOptions);
     const filtered: LessonSearchResult[] = [];
