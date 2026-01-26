@@ -11,7 +11,10 @@ import type {
   WorkspaceSessionConfig,
   WorkspaceSnapshot,
 } from "@ku0/workspace-session-rs";
-import type { NativeWorkspaceSessionManager } from "@ku0/workspace-session-rs/node";
+import type {
+  NativeWorkspaceSessionBinding,
+  NativeWorkspaceSessionManager,
+} from "@ku0/workspace-session-rs/node";
 
 export type {
   ApprovalDecision,
@@ -27,7 +30,7 @@ export type {
 } from "@ku0/workspace-session-rs";
 
 type WorkspaceSessionNativeModule = {
-  getNativeWorkspaceSessionManager: () => NativeWorkspaceSessionManager | null;
+  getNativeWorkspaceSessionManager: () => NativeWorkspaceSessionBinding | null;
   getNativeWorkspaceSessionManagerError: () => Error | null;
 };
 
@@ -46,7 +49,7 @@ function loadWorkspaceSessionModule(): WorkspaceSessionNativeModule | null {
   return cachedModule;
 }
 
-function resolveNativeWorkspaceSessionManager(): NativeWorkspaceSessionManager | null {
+function resolveNativeWorkspaceSessionBinding(): NativeWorkspaceSessionBinding | null {
   const module = loadWorkspaceSessionModule();
   if (!module) {
     return null;
@@ -275,7 +278,7 @@ export class WorkspaceSessionManager {
   private readonly manager: NativeWorkspaceSessionManager;
 
   constructor() {
-    const binding = resolveNativeWorkspaceSessionManager();
+    const binding = resolveNativeWorkspaceSessionBinding();
     this.manager = binding
       ? new binding.WorkspaceSessionManager()
       : new InMemoryWorkspaceSessionManager();
