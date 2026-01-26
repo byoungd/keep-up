@@ -19,8 +19,18 @@ function shouldAutoFocus() {
   if (typeof document === "undefined") {
     return false;
   }
-  const modal = document.querySelector("[aria-modal='true']");
-  if (modal) {
+  const hasDialogElement = typeof HTMLDialogElement !== "undefined";
+  const modals = document.querySelectorAll("[aria-modal='true']");
+  for (const modal of modals) {
+    if (hasDialogElement && modal instanceof HTMLDialogElement) {
+      if (!modal.open) {
+        continue;
+      }
+      return false;
+    }
+    if (modal instanceof HTMLElement && modal.getClientRects().length === 0) {
+      continue;
+    }
     return false;
   }
   const active = document.activeElement;
