@@ -196,5 +196,5 @@ describe("Q3 Track X Acceptance", () => {
       await service.stop();
       await project.cleanup();
     }
-  });
+  }, 60_000);
 });

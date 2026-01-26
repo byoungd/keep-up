@@ -261,9 +261,9 @@ describe("GitToolServer", () => {
       const diff = tools.find((t) => t.name === "diff");
       const log = tools.find((t) => t.name === "log");
 
-      expect(status?.annotations?.requiresConfirmation).toBeUndefined();
-      expect(diff?.annotations?.requiresConfirmation).toBeUndefined();
-      expect(log?.annotations?.requiresConfirmation).toBeUndefined();
+      expect(status?.annotations?.requiresConfirmation).toBe(false);
+      expect(diff?.annotations?.requiresConfirmation).toBe(false);
+      expect(log?.annotations?.requiresConfirmation).toBe(false);
     });
   });
 

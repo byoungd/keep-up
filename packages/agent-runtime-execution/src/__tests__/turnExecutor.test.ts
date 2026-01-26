@@ -9,6 +9,10 @@ import { ContextFrameBuilder } from "../context";
 import type { AgentLLMResponse, IAgentLLM } from "../orchestrator/orchestrator";
 import type { TurnExecutorDependencies } from "../orchestrator/turnExecutor";
 import { createTurnExecutor } from "../orchestrator/turnExecutor";
+import {
+  getModelCapabilityCache,
+  resetGlobalCapabilityCache,
+} from "../routing/modelCapabilityCache";
 import type { AgentState } from "../types";
 
 describe("TurnExecutor", () => {
@@ -27,6 +31,12 @@ describe("TurnExecutor", () => {
         compressionRatio: 0,
         removedCount: 0,
       }),
+      compressWithMaxTokens: vi.fn().mockReturnValue({
+        messages: [],
+        compressionRatio: 0,
+        removedCount: 0,
+      }),
+      getMaxTokens: vi.fn().mockReturnValue(8000),
     } as TurnExecutorDependencies["messageCompressor"],
     requestCache: {
       get: vi.fn().mockReturnValue(undefined),
@@ -122,6 +132,12 @@ describe("TurnExecutor", () => {
             compressionRatio: 0.5,
             removedCount: 3,
           }),
+          compressWithMaxTokens: vi.fn().mockReturnValue({
+            messages: [],
+            compressionRatio: 0.5,
+            removedCount: 3,
+          }),
+          getMaxTokens: vi.fn().mockReturnValue(8000),
         } as TurnExecutorDependencies["messageCompressor"],
       });
       const executor = createTurnExecutor(deps);
@@ -130,6 +146,48 @@ describe("TurnExecutor", () => {
       const outcome = await executor.execute(state);
 
       expect(outcome.metrics.compressionRatio).toBe(0.5);
+    });
+
+    it("applies context window guard when model window is smaller", async () => {
+      resetGlobalCapabilityCache();
+      const cache = getModelCapabilityCache();
+      cache.set({
+        modelId: "tiny-model",
+        contextWindow: 2000,
+        costPerInputKToken: 0,
+        costPerOutputKToken: 0,
+        avgLatencyMs: 1,
+        p95LatencyMs: 1,
+        supportsVision: false,
+        supportsFunctionCalling: true,
+        lastUpdated: Date.now(),
+      });
+
+      const compressWithMaxTokens = vi.fn().mockReturnValue({
+        messages: [],
+        compressionRatio: 0,
+        removedCount: 0,
+      });
+
+      const deps = createMockDeps({
+        getModelId: () => "tiny-model",
+        messageCompressor: {
+          compress: vi.fn().mockReturnValue({
+            messages: [],
+            compressionRatio: 0,
+            removedCount: 0,
+          }),
+          compressWithMaxTokens,
+          getMaxTokens: vi.fn().mockReturnValue(8000),
+        } as TurnExecutorDependencies["messageCompressor"],
+      });
+      const executor = createTurnExecutor(deps);
+      const state = createMockState();
+
+      await executor.execute(state);
+
+      expect(compressWithMaxTokens).toHaveBeenCalledWith(expect.any(Array), 1600);
+      resetGlobalCapabilityCache();
     });
 
     it("includes totalTimeMs in metrics", async () => {

@@ -131,6 +131,7 @@ export class MessageCompressor {
     input: AgentMessage[];
     totalTokens: number;
     compressionRatio: number;
+    maxTokens: number;
   };
   protected summarizer?: ISummarizer;
 
@@ -146,6 +147,13 @@ export class MessageCompressor {
    */
   setSummarizer(summarizer: ISummarizer): void {
     this.summarizer = summarizer;
+  }
+
+  /**
+   * Get the configured max token budget for compression.
+   */
+  getMaxTokens(): number {
+    return this.config.maxTokens;
   }
 
   /**
@@ -229,8 +237,29 @@ export class MessageCompressor {
     return finalResult;
   }
 
+  /**
+   * Compress message history with a temporary token budget override.
+   */
+  compressWithMaxTokens(messages: AgentMessage[], maxTokens: number): CompressionResult {
+    if (maxTokens === this.config.maxTokens) {
+      return this.compress(messages);
+    }
+
+    const previousMaxTokens = this.config.maxTokens;
+    this.config.maxTokens = maxTokens;
+    try {
+      return this.compress(messages);
+    } finally {
+      this.config.maxTokens = previousMaxTokens;
+    }
+  }
+
   private tryIncrementalCompression(messages: AgentMessage[]): CompressionResult | null {
     if (!this.config.incremental || !this.lastSnapshot) {
+      return null;
+    }
+
+    if (this.lastSnapshot.maxTokens !== this.config.maxTokens) {
       return null;
     }
 
@@ -271,6 +300,7 @@ export class MessageCompressor {
       input: messages.slice(),
       totalTokens: result.totalTokens,
       compressionRatio: result.compressionRatio,
+      maxTokens: this.config.maxTokens,
     };
   }
 

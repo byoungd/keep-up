@@ -466,6 +466,7 @@ export class AgentOrchestrator {
       skillRegistry: this.skillRegistry,
       skillPromptAdapter: this.skillPromptAdapter,
       metrics: this.metrics,
+      getModelId: () => this.currentModelId,
       getToolDefinitions: () => this.getToolDefinitions(),
     });
 
