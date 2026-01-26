@@ -6,7 +6,7 @@
  */
 
 import type { MCPToolCall, MCPToolResult, ToolContext } from "@ku0/agent-runtime-core";
-import { getLogger } from "@ku0/agent-runtime-telemetry/logging";
+import { createSubsystemLogger } from "@ku0/agent-runtime-telemetry/logging";
 
 // ============================================================================
 // Types
@@ -70,9 +70,8 @@ export function loggingMiddleware(
     logger?: (message: string, data?: unknown) => void;
   } = {}
 ): ToolMiddleware {
-  const structuredLogger = getLogger("tool-middleware");
-  const log =
-    options.logger ?? ((msg: string, data?: unknown) => structuredLogger.info(msg, { data }));
+  const structuredLogger = createSubsystemLogger("agent", "tools:middleware");
+  const log = options.logger ?? ((msg: string, data?: unknown) => structuredLogger.info(msg, data));
   const logInput = options.logInput ?? true;
   const logOutput = options.logOutput ?? true;
 
@@ -80,13 +79,14 @@ export function loggingMiddleware(
     const { call } = ctx;
 
     if (logInput) {
-      log(`[Tool] ${call.name} called`, { arguments: call.arguments });
+      log(`[Tool] ${call.name} called`, { toolName: call.name, arguments: call.arguments });
     }
 
     const result = await next(ctx);
 
     if (logOutput) {
       log(`[Tool] ${call.name} completed`, {
+        toolName: call.name,
         success: result.success,
         duration: ctx.timing.endTime ? ctx.timing.endTime - ctx.timing.startTime : undefined,
       });
