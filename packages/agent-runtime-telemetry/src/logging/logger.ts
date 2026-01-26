@@ -561,6 +561,19 @@ export function getLogger(name?: string): Logger {
 }
 
 /**
+ * Create a subsystem logger with a namespaced label.
+ */
+export function createSubsystemLogger(
+  base: string,
+  subsystem: string,
+  context?: LogContext
+): Logger {
+  const name = subsystem ? `${base}:${subsystem}` : base;
+  const logger = getLogger(name);
+  return context ? logger.child(context) : logger;
+}
+
+/**
  * Configure the global logger.
  */
 export function configureLogger(config: Omit<LoggerConfig, "name"> & { name?: string }): Logger {

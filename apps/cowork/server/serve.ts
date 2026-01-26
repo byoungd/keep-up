@@ -5,10 +5,12 @@ import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { CriticAgent, createLessonStore } from "@ku0/agent-runtime";
+import { createEventBus } from "@ku0/agent-runtime-control";
 import { createCoworkApp } from "./app";
 import { serverConfig } from "./config";
 import { serverLogger } from "./logger";
 import { CoworkTaskRuntime } from "./runtime/coworkTaskRuntime";
+import { createGatewayControlRuntime } from "./runtime/gatewayControl";
 import { ContextIndexManager } from "./services/contextIndexManager";
 import { createStorageLayer } from "./storage";
 import { ensureStateDir } from "./storage/statePaths";
@@ -17,6 +19,7 @@ import { SessionEventHub } from "./streaming/eventHub";
 const storage = await createStorageLayer(serverConfig.storage);
 const stateDir = await ensureStateDir();
 const eventHub = new SessionEventHub();
+const runtimeEventBus = createEventBus();
 const contextIndexManager = new ContextIndexManager({ stateDir });
 const lessonVectorPath =
   process.env.COWORK_LESSON_VECTOR_PATH ?? join(stateDir, "lessons.vectors.sqlite");
@@ -43,10 +46,17 @@ const critic = new CriticAgent({ lessonStore, logger: serverLogger });
 const taskRuntime = new CoworkTaskRuntime({
   storage,
   events: eventHub,
+  eventBus: runtimeEventBus,
   logger: serverLogger,
   contextIndexManager,
   runtimePersistence: serverConfig.runtimePersistence,
   lessonStore,
+});
+const gatewayRuntime = createGatewayControlRuntime({
+  gateway: serverConfig.gatewayControl,
+  telegram: serverConfig.telegram,
+  taskRuntime,
+  eventBus: runtimeEventBus,
 });
 const app = createCoworkApp({
   storage,
@@ -94,6 +104,7 @@ export default app;
 if (process.env.COWORK_SERVER_START === "true") {
   const { port } = serverConfig;
   serverLogger.info(`Cowork UI+API listening on http://localhost:${port}`);
+  await gatewayRuntime.start();
   serve({
     port,
     fetch: app.fetch,

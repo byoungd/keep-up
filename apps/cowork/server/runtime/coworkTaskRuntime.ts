@@ -133,6 +133,7 @@ type SessionRuntime = {
   modeManager: AgentModeManager;
   clarificationManager?: ClarificationManager;
   eventBus?: RuntimeEventBus;
+  eventSource?: string;
   activeTaskId: string | null;
   modelId: string | null;
   providerId: string | null;
@@ -164,6 +165,7 @@ type RuntimeBuildResult = {
   fallbackNotice: string | null;
   contextPackKey: string | null;
   eventBus?: RuntimeEventBus;
+  eventSource?: string;
   clarificationManager?: ClarificationManager;
   checkpointStorage?: ICheckpointStorage;
   checkpointManager?: ICheckpointManager;
@@ -187,6 +189,8 @@ export class CoworkTaskRuntime {
   private readonly runtimePersistence?: RuntimePersistenceConfig;
   private readonly toolResultCache?: ToolResultCache;
   private readonly lfccConfig?: LfccRuntimeConfig;
+  private readonly runtimeEventBus?: RuntimeEventBus;
+  private readonly subagentAutomation: { enabled: boolean; maxConcurrent: number };
   private readonly referenceStores = new Map<string, LoroReferenceStore>();
   private readonly referenceVerifier: ReferenceVerificationProvider;
   private runtimeAssetManager?: RuntimeAssetManager;
@@ -209,6 +213,7 @@ export class CoworkTaskRuntime {
   constructor(deps: {
     storage: StorageLayer;
     events: SessionEventHub;
+    eventBus?: RuntimeEventBus;
     logger?: Logger;
     runtimeFactory?: RuntimeFactory;
     approvalService?: ApprovalService;
@@ -221,6 +226,7 @@ export class CoworkTaskRuntime {
     this.logger = deps.logger ?? console; // Assign to property
     const logger = this.logger;
     this.runtimeFactory = deps.runtimeFactory;
+    this.runtimeEventBus = deps.eventBus;
     this.configStore = deps.storage.configStore;
     this.auditLogStore = deps.storage.auditLogStore;
     this.runtimePersistence = deps.runtimePersistence;
@@ -264,6 +270,13 @@ export class CoworkTaskRuntime {
       this.approvalCoordinator
     );
     this.projectContextManager = new ProjectContextManager(logger, deps.contextIndexManager);
+
+    const subagentEnabled = parseBooleanEnv(process.env.COWORK_SUBAGENTS_ENABLED, true);
+    const subagentMaxConcurrent = parseNumberEnv(process.env.COWORK_SUBAGENTS_MAX_CONCURRENT) ?? 4;
+    this.subagentAutomation = {
+      enabled: subagentEnabled,
+      maxConcurrent: Math.max(1, subagentMaxConcurrent),
+    };
 
     // Initialize Mem0 memory adapter if API key provided (per ARCHITECTURE.md)
     const mem0ApiKey = process.env.MEM0_API_KEY;
@@ -594,7 +607,8 @@ export class CoworkTaskRuntime {
       prompt: session.title ?? "Cowork Session",
     });
     const modelId = resolved.model ?? requestedModel;
-    const eventBus = createEventBus();
+    const eventBus = this.runtimeEventBus ?? createEventBus();
+    const eventSource = `cowork:${session.sessionId}`;
     const clarificationManager = new ClarificationManager();
     const toolRegistryResult = await this.buildToolRegistry(session);
     const toolRegistry = toolRegistryResult.registry;
@@ -672,7 +686,7 @@ export class CoworkTaskRuntime {
       registry: artifactRegistry,
       taskGraph,
       eventBus,
-      eventSource: "cowork-runtime",
+      eventSource,
     });
     const components = this.buildOrchestratorComponents(taskGraph, checkpointManager, {
       clarificationManager,
@@ -705,6 +719,7 @@ export class CoworkTaskRuntime {
       taskQueueConfig: { maxConcurrent: 1 },
       outputRoots: collectOutputRoots(session),
       orchestratorOptions: {
+        name: eventSource,
         planning: {
           enabled: modeManager.isPlanMode(),
           autoExecuteLowRisk: false,
@@ -726,6 +741,7 @@ export class CoworkTaskRuntime {
       fallbackNotice: resolved.fallbackNotice ?? null,
       contextPackKey: prompt.contextPackKey,
       eventBus,
+      eventSource,
       clarificationManager,
       checkpointStorage,
       checkpointManager,
@@ -886,6 +902,7 @@ export class CoworkTaskRuntime {
       modeManager,
       clarificationManager: runtimeResult.clarificationManager,
       eventBus: runtimeResult.eventBus,
+      eventSource: runtimeResult.eventSource,
       activeTaskId: null,
       modelId: runtimeResult.modelId,
       providerId: runtimeResult.providerId,
@@ -989,27 +1006,36 @@ export class CoworkTaskRuntime {
       return noop;
     }
 
-    const subscription = eventBus.subscribe("artifact:emitted", (event) => {
-      const payload = event.payload as ArtifactEvents["artifact:emitted"];
-      if (!payload?.stored) {
-        return;
-      }
-      const coworkPayload = toCoworkArtifactPayload(payload.artifact);
-      if (!coworkPayload) {
-        return;
-      }
-      const taskId = event.meta.correlationId ?? runtimeState.activeTaskId ?? undefined;
-      runtimeState.eventQueue = runtimeState.eventQueue
-        .then(() =>
-          this.persistRuntimeArtifact(
-            runtimeState.sessionId,
-            taskId,
-            payload.artifact,
-            coworkPayload
+    const eventSource = runtimeState.eventSource;
+    const subscription = eventBus.subscribe(
+      "artifact:emitted",
+      (event) => {
+        const payload = event.payload as ArtifactEvents["artifact:emitted"];
+        if (!payload?.stored) {
+          return;
+        }
+        const coworkPayload = toCoworkArtifactPayload(payload.artifact);
+        if (!coworkPayload) {
+          return;
+        }
+        const taskId = event.meta.correlationId ?? runtimeState.activeTaskId ?? undefined;
+        runtimeState.eventQueue = runtimeState.eventQueue
+          .then(() =>
+            this.persistRuntimeArtifact(
+              runtimeState.sessionId,
+              taskId,
+              payload.artifact,
+              coworkPayload
+            )
           )
-        )
-        .catch((err) => this.logger.error("Artifact event error", err));
-    });
+          .catch((err) => this.logger.error("Artifact event error", err));
+      },
+      eventSource
+        ? {
+            filter: (event) => event.meta.source === eventSource,
+          }
+        : undefined
+    );
 
     return subscription.unsubscribe;
   }
@@ -1259,7 +1285,12 @@ export class CoworkTaskRuntime {
         : {}),
       ...(extras?.subagentManager ? { subagentManager: extras.subagentManager } : {}),
       ...(extras?.subagentManager
-        ? { subagentAutomation: { enabled: true, maxConcurrent: 2 } }
+        ? {
+            subagentAutomation: {
+              enabled: this.subagentAutomation.enabled,
+              maxConcurrent: this.subagentAutomation.maxConcurrent,
+            },
+          }
         : {}),
     };
   }
