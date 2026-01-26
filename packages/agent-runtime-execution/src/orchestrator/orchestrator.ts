@@ -366,6 +366,7 @@ export class AgentOrchestrator {
   private forceCompletionToolsOnly = false;
   private subagentPreludeExecuted = false;
   private currentModelId?: string;
+  private currentModelDecision?: ModelRoutingDecision;
 
   private state: AgentState;
 
@@ -468,6 +469,8 @@ export class AgentOrchestrator {
       metrics: this.metrics,
       getModelId: () => this.currentModelId,
       getToolDefinitions: () => this.getToolDefinitions(),
+      getModelDecision: () => this.currentModelDecision,
+      modelRouter: this.modelRouter,
     });
 
     this.loopStateMachine = createAgentLoopStateMachine({ enableCycleLogging: false });
@@ -1960,7 +1963,10 @@ export class AgentOrchestrator {
     const routingDecision = this.resolveModelForTurn();
     if (routingDecision) {
       this.emitRoutingDecision(routingDecision);
+      this.currentModelDecision = routingDecision;
       turnSpan?.setAttribute("model.resolved", routingDecision.resolved);
+    } else {
+      this.currentModelDecision = undefined;
     }
 
     const outcomePromise = this.turnExecutor.execute(this.state, turnSpan);
@@ -1997,6 +2003,7 @@ export class AgentOrchestrator {
       resolved: decision.resolved,
       reason: decision.reason,
       policy: decision.policy,
+      fallbackModels: decision.fallbackModels,
       turn: this.state.turn,
     });
 
@@ -2025,6 +2032,10 @@ export class AgentOrchestrator {
     if (outcome.compressedMessages && outcome.assistantMessage) {
       this.state.messages = [...outcome.compressedMessages, outcome.assistantMessage];
       this.recordMessage(outcome.assistantMessage);
+    }
+
+    if (outcome.modelId) {
+      this.currentModelId = outcome.modelId;
     }
 
     if (outcome.usage) {

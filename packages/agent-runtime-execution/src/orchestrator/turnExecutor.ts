@@ -31,6 +31,7 @@ import type { KnowledgeMatchResult, KnowledgeRegistry } from "../knowledge";
 import type { SymbolContextProvider } from "../lsp";
 import { AGENTS_GUIDE_PROMPT } from "../prompts/agentGuidelines";
 import { getModelCapabilityCache } from "../routing/modelCapabilityCache";
+import type { ModelRouter, ModelRoutingDecision } from "../routing/modelRouter";
 import type { AgentMessage, AgentState, MCPToolCall, TokenUsageStats } from "../types";
 import type { AgentLLMRequest, AgentLLMResponse, AgentToolDefinition, IAgentLLM } from "./llmTypes";
 import type { MessageCompressor } from "./messageCompression";
@@ -52,6 +53,8 @@ export interface TurnOutcome {
   readonly type: TurnOutcomeType;
   /** The raw LLM response (undefined on error) */
   readonly response?: AgentLLMResponse;
+  /** The model used for the response (when available) */
+  readonly modelId?: string;
   /** The assistant message to add to conversation history */
   readonly assistantMessage?: AgentMessage;
   /** Tool calls requested by the LLM (only when type is 'tool_use') */
@@ -111,6 +114,10 @@ export interface TurnExecutorDependencies {
   readonly metrics?: IMetricsCollector;
   /** Optional model ID provider for context window guard */
   readonly getModelId?: () => string | undefined;
+  /** Optional model routing decision provider */
+  readonly getModelDecision?: () => ModelRoutingDecision | undefined;
+  /** Optional model router for health tracking */
+  readonly modelRouter?: ModelRouter;
   /** Function to retrieve available tool definitions */
   readonly getToolDefinitions: () => AgentToolDefinition[];
 }
@@ -194,10 +201,12 @@ export class TurnExecutor implements ITurnExecutor {
     };
 
     try {
+      const modelDecision = this.deps.getModelDecision?.();
+
       // Step 1: Compress message history
-      const modelId = this.deps.getModelId?.();
+      const contextModelId = this.deps.getModelDecision?.()?.resolved ?? this.deps.getModelId?.();
       const compressorMaxTokens = this.deps.messageCompressor.getMaxTokens();
-      const contextWindowBudget = this.resolveContextWindowBudget(modelId, span);
+      const contextWindowBudget = this.resolveContextWindowBudget(contextModelId, span);
       const compressionMaxTokens =
         contextWindowBudget && contextWindowBudget < compressorMaxTokens
           ? contextWindowBudget
@@ -219,11 +228,16 @@ export class TurnExecutor implements ITurnExecutor {
         knowledgeContent,
         symbolContext,
         skillPrompt,
-        contextFrame?.content
+        contextFrame?.content,
+        modelDecision?.resolved
       );
 
       // Step 4: Get LLM response (with caching)
-      const { response, cacheHit, cacheTimeMs } = await this.getResponse(request, span);
+      const { response, cacheHit, cacheTimeMs, modelId } = await this.getResponse(
+        request,
+        modelDecision,
+        span
+      );
       metrics.cacheHit = cacheHit;
       metrics.cacheTimeMs = cacheTimeMs;
 
@@ -235,6 +249,7 @@ export class TurnExecutor implements ITurnExecutor {
 
       const outcomeBase = {
         response,
+        modelId,
         assistantMessage,
         metrics,
         compressedMessages: compressionResult.messages,
@@ -382,7 +397,8 @@ export class TurnExecutor implements ITurnExecutor {
     knowledgeContent?: string,
     symbolContext?: string,
     skillPrompt?: string,
-    contextFrameContent?: string
+    contextFrameContent?: string,
+    modelId?: string
   ): AgentLLMRequest {
     const basePrompt = this.config.systemPrompt ?? AGENTS_GUIDE_PROMPT;
     const promptParts = [basePrompt];
@@ -406,35 +422,139 @@ export class TurnExecutor implements ITurnExecutor {
       systemPrompt,
       temperature: this.config.temperature,
       maxTokens: this.config.maxTokens,
+      model: modelId,
     };
   }
 
   private async getResponse(
     request: AgentLLMRequest,
+    modelDecision: ModelRoutingDecision | undefined,
     span?: SpanContext
-  ): Promise<{ response: AgentLLMResponse; cacheHit: boolean; cacheTimeMs: number }> {
+  ): Promise<{
+    response: AgentLLMResponse;
+    cacheHit: boolean;
+    cacheTimeMs: number;
+    modelId?: string;
+  }> {
     const start = performance.now();
-    const cached = this.deps.requestCache.get(request);
+    const attempts = this.buildAttemptRequests(request, modelDecision);
+    let lastError: unknown;
 
-    if (cached) {
-      this.deps.metrics?.increment(AGENT_METRICS.requestCacheHits.name);
-      span?.setAttribute("cache.hit", true);
-      return {
-        response: cached,
-        cacheHit: true,
-        cacheTimeMs: performance.now() - start,
-      };
+    for (let index = 0; index < attempts.length; index += 1) {
+      const attempt = attempts[index];
+      const cached = this.getCachedAttempt(attempt, index, start, span);
+      if (cached) {
+        return cached;
+      }
+
+      const outcome = await this.executeAttempt(attempt, index, start, span);
+      if (outcome.result) {
+        return outcome.result;
+      }
+      lastError = outcome.error;
     }
 
-    const response = await this.deps.llm.complete(request);
-    this.deps.requestCache.set(request, response);
-    this.deps.metrics?.increment(AGENT_METRICS.requestCacheMisses.name);
-    span?.setAttribute("cache.hit", false);
+    throw lastError ?? new Error("LLM request failed");
+  }
 
-    const cacheTimeMs = performance.now() - start;
-    this.deps.metrics?.observe(AGENT_METRICS.requestCacheTime.name, cacheTimeMs);
+  private buildAttemptRequests(
+    request: AgentLLMRequest,
+    modelDecision: ModelRoutingDecision | undefined
+  ): Array<{ modelId?: string; request: AgentLLMRequest }> {
+    const primaryModel = request.model;
+    const fallbackModels = modelDecision?.fallbackModels ?? [];
+    const candidates = primaryModel
+      ? [primaryModel, ...fallbackModels.filter((model) => model !== primaryModel)]
+      : [];
 
-    return { response, cacheHit: false, cacheTimeMs };
+    if (candidates.length === 0) {
+      return [{ modelId: request.model, request }];
+    }
+
+    return candidates.map((modelId) => ({
+      modelId,
+      request: { ...request, model: modelId },
+    }));
+  }
+
+  private getCachedAttempt(
+    attempt: { modelId?: string; request: AgentLLMRequest },
+    index: number,
+    start: number,
+    span?: SpanContext
+  ): {
+    response: AgentLLMResponse;
+    cacheHit: boolean;
+    cacheTimeMs: number;
+    modelId?: string;
+  } | null {
+    const cached = this.deps.requestCache.get(attempt.request);
+    if (!cached) {
+      return null;
+    }
+
+    this.deps.metrics?.increment(AGENT_METRICS.requestCacheHits.name);
+    span?.setAttribute("cache.hit", true);
+    if (index > 0) {
+      span?.setAttribute("model.fallback", true);
+    }
+
+    return {
+      response: cached,
+      cacheHit: true,
+      cacheTimeMs: performance.now() - start,
+      modelId: attempt.modelId,
+    };
+  }
+
+  private async executeAttempt(
+    attempt: { modelId?: string; request: AgentLLMRequest },
+    index: number,
+    start: number,
+    span?: SpanContext
+  ): Promise<{
+    result?: {
+      response: AgentLLMResponse;
+      cacheHit: boolean;
+      cacheTimeMs: number;
+      modelId?: string;
+    };
+    error?: unknown;
+  }> {
+    const attemptStart = performance.now();
+    try {
+      const response = await this.deps.llm.complete(attempt.request);
+      const latencyMs = performance.now() - attemptStart;
+
+      this.deps.requestCache.set(attempt.request, response);
+      this.deps.metrics?.increment(AGENT_METRICS.requestCacheMisses.name);
+      span?.setAttribute("cache.hit", false);
+
+      if (attempt.modelId) {
+        this.deps.modelRouter?.recordLatency(attempt.modelId, latencyMs);
+      }
+      if (index > 0) {
+        span?.setAttribute("model.fallback", true);
+      }
+
+      const cacheTimeMs = performance.now() - start;
+      this.deps.metrics?.observe(AGENT_METRICS.requestCacheTime.name, cacheTimeMs);
+
+      return {
+        result: {
+          response,
+          cacheHit: false,
+          cacheTimeMs,
+          modelId: attempt.modelId,
+        },
+      };
+    } catch (error) {
+      const latencyMs = performance.now() - attemptStart;
+      if (attempt.modelId) {
+        this.deps.modelRouter?.recordError(attempt.modelId, latencyMs);
+      }
+      return { error };
+    }
   }
 
   private buildAssistantMessage(response: AgentLLMResponse): AgentMessage {

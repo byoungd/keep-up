@@ -219,6 +219,7 @@ export class SubagentToolServer extends BaseToolServer {
         {
           signal: toolContext.signal,
           baseSecurity: this.cloneSecurity(toolContext.security),
+          baseToolExecution: toolContext.toolExecution,
           contextId: toolContext.contextId,
         }
       );
@@ -254,6 +255,7 @@ export class SubagentToolServer extends BaseToolServer {
         signal: toolContext.signal,
         maxConcurrent,
         baseSecurity: this.cloneSecurity(toolContext.security),
+        baseToolExecution: toolContext.toolExecution,
         contextId: toolContext.contextId,
       });
       return this.formatOutput(
@@ -360,6 +362,7 @@ export class SubagentToolServer extends BaseToolServer {
         {
           signal: toolContext.signal,
           baseSecurity: this.cloneSecurity(toolContext.security),
+          baseToolExecution: toolContext.toolExecution,
           contextId: toolContext.contextId,
         }
       );
