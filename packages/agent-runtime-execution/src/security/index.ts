@@ -21,6 +21,8 @@ import type {
   ToolPolicyContext,
   ToolPolicyDecision,
   ToolPolicyEngine,
+  ToolSafetyChecker,
+  ToolSafetyCheckResult,
 } from "../types";
 import { SECURITY_PRESETS, type SecurityPreset } from "../types";
 import { CoworkToolPolicyAdapter } from "./coworkPolicyAdapter";
@@ -358,19 +360,43 @@ export class ToolGovernancePolicyEngine implements ToolPolicyEngine {
       };
     }
 
+    const safetyDecision = evaluateSafetyCheckers(executionContext.safetyCheckers, context);
+    if (safetyDecision?.decision === "deny") {
+      return {
+        allowed: false,
+        requiresConfirmation: false,
+        reason: safetyDecision.reason ?? "Tool denied by safety checker",
+        reasonCode: safetyDecision.reasonCode ?? "policy:safety",
+        riskTags: mergeRiskTags(baseDecision.riskTags, safetyDecision.riskTags, ["policy:safety"]),
+        policyDecision: baseDecision.policyDecision,
+        policyRuleId: baseDecision.policyRuleId,
+        policyAction: baseDecision.policyAction,
+      };
+    }
+
     const approvalRequired = isAnyToolAllowed(toolNames, requiresApproval);
-    const requiresConfirmation = baseDecision.requiresConfirmation || approvalRequired;
+    const requiresConfirmation =
+      baseDecision.requiresConfirmation ||
+      approvalRequired ||
+      safetyDecision?.decision === "ask_user";
     const reason =
       baseDecision.reason ??
+      safetyDecision?.reason ??
       (approvalRequired ? "Tool requires approval by execution policy" : undefined);
+    const safetyTags =
+      safetyDecision && safetyDecision.decision !== "allow"
+        ? mergeRiskTags(safetyDecision.riskTags, ["policy:safety"])
+        : safetyDecision?.riskTags;
 
     return {
       allowed: true,
       requiresConfirmation,
       reason,
+      reasonCode: baseDecision.reasonCode ?? safetyDecision?.reasonCode,
       riskTags: mergeRiskTags(
         baseDecision.riskTags,
-        approvalRequired ? ["policy:approval"] : undefined
+        approvalRequired ? ["policy:approval"] : undefined,
+        safetyTags
       ),
       policyDecision: baseDecision.policyDecision,
       policyRuleId: baseDecision.policyRuleId,
@@ -455,6 +481,40 @@ function isAnyToolAllowed(toolNames: string[], patterns: string[]): boolean {
     }
   }
   return false;
+}
+
+function evaluateSafetyCheckers(
+  checkers: ToolSafetyChecker[] | undefined,
+  context: ToolPolicyContext
+): ToolSafetyCheckResult | undefined {
+  if (!checkers || checkers.length === 0) {
+    return undefined;
+  }
+
+  let askUser: ToolSafetyCheckResult | undefined;
+  for (const checker of checkers) {
+    try {
+      const result = checker(context);
+      if (!result) {
+        continue;
+      }
+      if (result.decision === "deny") {
+        return result;
+      }
+      if (result.decision === "ask_user" && !askUser) {
+        askUser = result;
+      }
+    } catch (error) {
+      return {
+        decision: "deny",
+        reason: error instanceof Error ? error.message : String(error),
+        reasonCode: "policy:safety_error",
+        riskTags: ["policy:safety"],
+      };
+    }
+  }
+
+  return askUser;
 }
 
 function mergeRiskTags(...tags: Array<string[] | undefined>): string[] | undefined {

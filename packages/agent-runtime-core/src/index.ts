@@ -2299,6 +2299,24 @@ export interface ToolPolicyEngine {
   evaluate(context: ToolPolicyContext): ToolPolicyDecision;
 }
 
+export type ToolSafetyDecision = "allow" | "deny" | "ask_user";
+
+export interface ToolSafetyCheckResult {
+  decision: ToolSafetyDecision;
+  reason?: string;
+  reasonCode?: string;
+  riskTags?: string[];
+}
+
+export type ToolSafetyChecker = (
+  context: ToolPolicyContext
+) => ToolSafetyCheckResult | null | undefined;
+
+export interface ToolExecutionContext {
+  /** Optional safety checkers that can deny or request confirmation. */
+  safetyCheckers?: ToolSafetyChecker[];
+}
+
 // ============================================================================
 // Agent Types
 // ============================================================================
