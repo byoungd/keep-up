@@ -6,7 +6,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ContextItem } from "../context";
 import { ContextFrameBuilder } from "../context";
-import type { AgentLLMResponse, IAgentLLM } from "../orchestrator/orchestrator";
+import type { AgentLLMRequest, AgentLLMResponse, IAgentLLM } from "../orchestrator/orchestrator";
 import type { TurnExecutorDependencies } from "../orchestrator/turnExecutor";
 import { createTurnExecutor } from "../orchestrator/turnExecutor";
 import type { AgentState } from "../types";
@@ -61,7 +61,7 @@ describe("TurnExecutor", () => {
           complete: vi.fn().mockResolvedValue({
             content: "Using tools",
             finishReason: "tool_use",
-            toolCalls: [{ callId: "1", name: "test_tool", arguments: {} }],
+            toolCalls: [{ id: "1", name: "test_tool", arguments: {} }],
           } satisfies AgentLLMResponse),
         } as unknown as IAgentLLM,
       });
@@ -88,6 +88,41 @@ describe("TurnExecutor", () => {
 
       expect(outcome.type).toBe("error");
       expect(outcome.error).toBe("LLM failed");
+    });
+
+    it("falls back to secondary model when primary fails", async () => {
+      const completeFn = vi.fn().mockImplementation(async (request: AgentLLMRequest) => {
+        if (request.model === "primary") {
+          throw new Error("Primary failed");
+        }
+        return {
+          content: "Fallback response",
+          finishReason: "tool_use",
+          toolCalls: [{ id: "1", name: "test_tool", arguments: {} }],
+        } satisfies AgentLLMResponse;
+      });
+      const deps = createMockDeps({
+        llm: { complete: completeFn } as unknown as IAgentLLM,
+        requestCache: {
+          get: vi.fn().mockReturnValue(undefined),
+          set: vi.fn(),
+        } as unknown as TurnExecutorDependencies["requestCache"],
+        getModelDecision: () => ({
+          requested: "primary",
+          resolved: "primary",
+          reason: "test",
+          policy: "quality",
+          fallbackModels: ["fallback"],
+        }),
+      });
+      const executor = createTurnExecutor(deps);
+      const state = createMockState();
+
+      const outcome = await executor.execute(state);
+
+      expect(outcome.type).toBe("tool_use");
+      expect(outcome.modelId).toBe("fallback");
+      expect(completeFn).toHaveBeenCalledTimes(2);
     });
 
     it("uses cache when available", async () => {
