@@ -28,7 +28,18 @@ describe("output formatting", () => {
 
     const output = formatAgentOutput(state, "json", {
       sessionId: "session-1",
-      toolCalls: [{ name: "tool", arguments: {}, status: "completed", startedAt: 0 }],
+      toolCalls: [
+        {
+          name: "tool",
+          arguments: {},
+          status: "completed",
+          startedAt: 0,
+          result: {
+            success: true,
+            content: [{ type: "text", text: "ok" }],
+          },
+        },
+      ],
       approvals: [
         {
           id: "approval-1",
@@ -40,7 +51,13 @@ describe("output formatting", () => {
       ],
     });
 
-    expect(output).toContain('"toolCalls"');
-    expect(output).toContain('"approvals"');
+    const parsed = JSON.parse(output) as {
+      toolCalls: Array<{ result?: { success: boolean; content: Array<{ type: string }> } }>;
+      approvals: Array<{ id: string }>;
+    };
+
+    expect(parsed.toolCalls[0]?.result?.success).toBe(true);
+    expect(parsed.toolCalls[0]?.result?.content[0]?.type).toBe("text");
+    expect(parsed.approvals[0]?.id).toBe("approval-1");
   });
 });

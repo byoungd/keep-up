@@ -15,6 +15,26 @@ export interface SessionMessage {
 
 export type ToolCallStatus = "started" | "completed" | "failed";
 
+export type ToolCallContent =
+  | { type: "text"; text: string }
+  | { type: "image"; data: string; mimeType: string }
+  | { type: "resource"; uri: string; mimeType?: string };
+
+export interface ToolCallResult {
+  success: boolean;
+  content: ToolCallContent[];
+  error?: {
+    message: string;
+    code?: string;
+  };
+  meta?: {
+    durationMs?: number;
+    toolName?: string;
+    sandboxed?: boolean;
+    outputSpool?: unknown;
+  };
+}
+
 export interface ToolCallRecord {
   id?: string;
   name: string;
@@ -25,6 +45,7 @@ export interface ToolCallRecord {
   durationMs?: number;
   error?: string;
   errorCode?: string;
+  result?: ToolCallResult;
 }
 
 export type ApprovalKind = "tool" | "plan" | "escalation";
