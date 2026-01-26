@@ -941,6 +941,9 @@ importers:
       '@ku0/agent-runtime-control':
         specifier: workspace:*
         version: link:../agent-runtime-control
+      '@ku0/agent-runtime-telemetry':
+        specifier: workspace:*
+        version: link:../agent-runtime-telemetry
       '@ku0/core':
         specifier: workspace:*
         version: link:../core
@@ -951,6 +954,9 @@ importers:
       '@types/node':
         specifier: ^22.10.2
         version: 22.19.3
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.1
       typescript:
         specifier: ^5.7.3
         version: 5.9.3

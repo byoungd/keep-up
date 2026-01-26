@@ -1,21 +1,28 @@
-export { type GatewayEvent, GatewayEventHub, type GatewayEventListener } from "./eventHub";
+export { ChannelRegistry, type ChannelRegistryConfig } from "./channels/registry";
+export { TelegramAdapter, type TelegramAdapterConfig } from "./channels/telegramAdapter";
+export type {
+  ChannelAdapter,
+  ChannelAdapterContext,
+  ChannelMessage,
+  ChannelMessageHandler,
+  ChannelTarget,
+} from "./channels/types";
 export {
-  decodeGatewayFrame,
-  encodeGatewayFrame,
-  type GatewayChannel,
-  type GatewayControlEvent,
-  type GatewayControlFrame,
-  type GatewayControlHello,
-} from "./protocol";
-export {
-  bridgeRuntimeEvents,
-  type RuntimeEventBridgeOptions,
-  type RuntimeEventMapper,
-  type RuntimeEventScopeResolver,
-} from "./runtimeEventBridge";
-export {
-  type GatewayControlAttachment,
-  type GatewayControlConnectionOptions,
+  attachGatewayWebSocket,
+  createGatewayControlServer,
   GatewayControlServer,
-  type GatewayControlServerConfig,
-} from "./wsBridge";
+  resolveGatewayLogger,
+} from "./controlPlane/server";
+export type {
+  GatewayConnectionHandle,
+  GatewayControlClient,
+  GatewayControlInboundMessage,
+  GatewayControlOutboundMessage,
+  GatewayControlServerConfig,
+  GatewayWebSocketLike,
+} from "./controlPlane/types";
+export {
+  type GatewayNodeServerConfig,
+  type GatewayNodeServerHandle,
+  startGatewayControlNodeServer,
+} from "./node";
