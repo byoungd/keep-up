@@ -206,6 +206,7 @@ function updateToolCalls(
     const success = Boolean(result?.success ?? true);
     const errorMessage = result?.error?.message;
     const errorCode = result?.error?.code;
+    const mappedResult = mapToolResult(result);
 
     const last = findLastPendingCall(toolCalls, toolName);
     const completedAt = timestamp;
@@ -216,6 +217,7 @@ function updateToolCalls(
       last.durationMs = result?.meta?.durationMs;
       last.error = errorMessage;
       last.errorCode = errorCode;
+      last.result = mappedResult;
     } else {
       toolCalls.push({
         id: `tool_${toolName}_${timestamp}`,
@@ -227,6 +229,7 @@ function updateToolCalls(
         durationMs: result?.meta?.durationMs,
         error: errorMessage,
         errorCode,
+        result: mappedResult,
       });
     }
   }
@@ -240,6 +243,30 @@ function findLastPendingCall(toolCalls: ToolCallRecord[], toolName: string) {
     }
   }
   return undefined;
+}
+
+function mapToolResult(result?: MCPToolResult): ToolCallRecord["result"] {
+  if (!result) {
+    return undefined;
+  }
+  return {
+    success: result.success,
+    content: result.content,
+    error: result.error
+      ? {
+          message: result.error.message,
+          code: result.error.code,
+        }
+      : undefined,
+    meta: result.meta
+      ? {
+          durationMs: result.meta.durationMs,
+          toolName: result.meta.toolName,
+          sandboxed: result.meta.sandboxed,
+          outputSpool: result.meta.outputSpool ?? undefined,
+        }
+      : undefined,
+  };
 }
 
 function handleRuntimeEvent(event: RuntimeEvent, requestId: string, toolCalls: ToolCallRecord[]) {
