@@ -20,6 +20,12 @@ Run a one-shot prompt:
 keepup agent run "Summarize the repo structure"
 ```
 
+Shorthand (same as `keepup agent run`):
+
+```bash
+keepup run "Summarize the repo structure"
+```
+
 Use `--prompt` for scripting:
 
 ```bash
