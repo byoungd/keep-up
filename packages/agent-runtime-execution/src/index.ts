@@ -155,6 +155,7 @@ export {
   ConsoleTransport,
   configureLogger,
   createLogger,
+  createSubsystemLogger,
   getLogger,
   Logger,
   type LoggerConfig,

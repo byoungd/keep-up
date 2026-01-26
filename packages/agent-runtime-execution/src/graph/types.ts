@@ -4,7 +4,7 @@
 
 import type { RuntimeEventBus } from "@ku0/agent-runtime-control";
 import type { CheckpointCreateParams, ICheckpointManager } from "@ku0/agent-runtime-core";
-import type { RuntimeLogger } from "../utils/logger";
+import type { Logger } from "@ku0/agent-runtime-telemetry/logging";
 
 export type ChannelReducer<T> = (current: T | undefined, update: T) => T;
 
@@ -101,7 +101,7 @@ export interface GraphRunnerConfig {
   readonly graph: GraphDefinition;
   readonly runId?: string;
   readonly eventBus?: RuntimeEventBus;
-  readonly logger?: RuntimeLogger;
+  readonly logger?: Logger;
   readonly maxIterations?: number;
   readonly checkpoint?: GraphCheckpointOptions;
   readonly cache?: GraphNodeCache;

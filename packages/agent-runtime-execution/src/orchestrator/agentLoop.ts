@@ -14,10 +14,10 @@
  * Parallel function calling is strictly forbidden.
  */
 
-import { getLogger } from "@ku0/agent-runtime-telemetry/logging";
+import { createSubsystemLogger } from "@ku0/agent-runtime-telemetry/logging";
 import type { AgentMessage, MCPToolCall, MCPToolResult } from "../types";
 
-const logger = getLogger("agent-loop");
+const logger = createSubsystemLogger("agent", "loop");
 
 // ============================================================================
 // Agent Loop Types

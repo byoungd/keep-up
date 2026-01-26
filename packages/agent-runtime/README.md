@@ -57,11 +57,11 @@ import {
   createBashToolServer,
   createCompletionToolServer,
   createFileToolServer,
-  createRuntimeLogger
+  createSubsystemLogger
 } from '@ku0/agent-runtime';
 
 // 1. Setup logging
-const logger = createRuntimeLogger({ module: "MyAgent" });
+const logger = createSubsystemLogger("agent", "my-agent");
 
 // 2. Setup Memory (Mem0)
 const memory = createMem0MemoryAdapter({
