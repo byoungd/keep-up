@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import type {
   ApprovalDecision,
   ApprovalDecisionInput,
@@ -10,9 +11,9 @@ import type {
   WorkspaceSessionConfig,
   WorkspaceSnapshot,
 } from "@ku0/workspace-session-rs";
-import {
-  getNativeWorkspaceSessionManager,
-  type NativeWorkspaceSessionManager,
+import type {
+  NativeWorkspaceSessionBinding,
+  NativeWorkspaceSessionManager,
 } from "@ku0/workspace-session-rs/node";
 
 export type {
@@ -27,6 +28,34 @@ export type {
   WorkspaceSessionConfig,
   WorkspaceSnapshot,
 } from "@ku0/workspace-session-rs";
+
+type WorkspaceSessionNativeModule = {
+  getNativeWorkspaceSessionManager: () => NativeWorkspaceSessionBinding | null;
+  getNativeWorkspaceSessionManagerError: () => Error | null;
+};
+
+const require = createRequire(import.meta.url);
+let cachedModule: WorkspaceSessionNativeModule | null | undefined;
+
+function loadWorkspaceSessionModule(): WorkspaceSessionNativeModule | null {
+  if (cachedModule !== undefined) {
+    return cachedModule;
+  }
+  try {
+    cachedModule = require("@ku0/workspace-session-rs/node") as WorkspaceSessionNativeModule;
+  } catch {
+    cachedModule = null;
+  }
+  return cachedModule;
+}
+
+function resolveNativeWorkspaceSessionBinding(): NativeWorkspaceSessionBinding | null {
+  const module = loadWorkspaceSessionModule();
+  if (!module) {
+    return null;
+  }
+  return module.getNativeWorkspaceSessionManager();
+}
 
 const STATUS_EVENT_TYPE: WorkspaceEventType = "status";
 const PROMPT_EVENT_TYPE: WorkspaceEventType = "prompt";
@@ -249,7 +278,7 @@ export class WorkspaceSessionManager {
   private readonly manager: NativeWorkspaceSessionManager;
 
   constructor() {
-    const binding = getNativeWorkspaceSessionManager();
+    const binding = resolveNativeWorkspaceSessionBinding();
     this.manager = binding
       ? new binding.WorkspaceSessionManager()
       : new InMemoryWorkspaceSessionManager();

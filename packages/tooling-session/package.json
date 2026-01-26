@@ -23,6 +23,7 @@
     "@ku0/agent-runtime": "workspace:*",
     "@ku0/agent-runtime-control": "workspace:*",
     "@ku0/agent-runtime-core": "workspace:*",
+    "@ku0/agent-runtime-sandbox": "workspace:*",
     "@ku0/ai-core": "workspace:*"
   }
 }

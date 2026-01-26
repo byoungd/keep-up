@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import type {
   WorkforceAssignment,
   WorkforceChannelMessage,
@@ -10,14 +11,32 @@ import type {
   WorkforceWorkerProfile,
   WorkforceWorkerRegistration,
 } from "@ku0/agent-runtime-core";
-import {
-  getNativeAgentWorkforce,
-  getNativeAgentWorkforceError,
-  type NativeAgentWorkforceBinding,
-  type WorkforceOrchestratorBinding,
+import type {
+  NativeAgentWorkforceBinding,
+  WorkforceOrchestratorBinding,
 } from "@ku0/agent-workforce-rs/node";
 
+type WorkforceNativeModule = {
+  getNativeAgentWorkforce: () => NativeAgentWorkforceBinding | null;
+  getNativeAgentWorkforceError: () => Error | null;
+};
+
+const require = createRequire(import.meta.url);
+let cachedModule: WorkforceNativeModule | null | undefined;
+
 let cachedBinding: NativeAgentWorkforceBinding | null | undefined;
+
+function loadWorkforceModule(): WorkforceNativeModule | null {
+  if (cachedModule !== undefined) {
+    return cachedModule;
+  }
+  try {
+    cachedModule = require("@ku0/agent-workforce-rs/node") as WorkforceNativeModule;
+  } catch {
+    cachedModule = null;
+  }
+  return cachedModule;
+}
 
 function resolveBinding(): NativeAgentWorkforceBinding {
   if (cachedBinding !== undefined) {
@@ -27,9 +46,15 @@ function resolveBinding(): NativeAgentWorkforceBinding {
     return cachedBinding;
   }
 
-  const binding = getNativeAgentWorkforce();
+  const module = loadWorkforceModule();
+  if (!module) {
+    cachedBinding = null;
+    throw new Error("Agent workforce native binding unavailable.");
+  }
+
+  const binding = module.getNativeAgentWorkforce();
   if (!binding) {
-    const error = getNativeAgentWorkforceError();
+    const error = module.getNativeAgentWorkforceError?.();
     cachedBinding = null;
     const detail = error ? ` ${error.message}` : "";
     throw new Error(`Agent workforce native binding unavailable.${detail}`);
