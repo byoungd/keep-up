@@ -74,6 +74,9 @@ importers:
       '@ku0/agent-runtime-control':
         specifier: workspace:*
         version: link:../../packages/agent-runtime-control
+      '@ku0/agent-runtime-telemetry':
+        specifier: workspace:*
+        version: link:../../packages/agent-runtime-telemetry
       '@ku0/ai-core':
         specifier: workspace:*
         version: link:../../packages/ai-core
@@ -86,6 +89,9 @@ importers:
       '@ku0/design-system':
         specifier: workspace:*
         version: link:../../packages/design-system
+      '@ku0/gateway-control':
+        specifier: workspace:*
+        version: link:../../packages/gateway-control
       '@ku0/lfcc-bridge':
         specifier: workspace:*
         version: link:../../packages/lfcc-bridge
@@ -765,6 +771,9 @@ importers:
         specifier: ^11.1.0
         version: 11.1.0
     devDependencies:
+      '@types/better-sqlite3':
+        specifier: ^7.6.13
+        version: 7.6.13
       '@types/node':
         specifier: ^22.10.2
         version: 22.19.3
@@ -929,6 +938,34 @@ importers:
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
+
+  packages/gateway-control:
+    dependencies:
+      '@ku0/agent-runtime-control':
+        specifier: workspace:*
+        version: link:../agent-runtime-control
+      '@ku0/agent-runtime-telemetry':
+        specifier: workspace:*
+        version: link:../agent-runtime-telemetry
+      '@ku0/core':
+        specifier: workspace:*
+        version: link:../core
+      ws:
+        specifier: ^8.18.3
+        version: 8.19.0
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.19.3
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.1
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.0.0
+        version: 4.0.16(@opentelemetry/api@1.9.0)(@types/node@22.19.3)(jiti@2.6.1)(jsdom@26.1.0)(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2)
 
   packages/gitignore-rs:
     devDependencies:
@@ -9427,6 +9464,14 @@ snapshots:
     optionalDependencies:
       vite: 7.3.1(@types/node@20.19.27)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2)
 
+  '@vitest/mocker@4.0.16(vite@7.3.1(@types/node@22.19.3)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2))':
+    dependencies:
+      '@vitest/spy': 4.0.16
+      estree-walker: 3.0.3
+      magic-string: 0.30.21
+    optionalDependencies:
+      vite: 7.3.1(@types/node@22.19.3)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2)
+
   '@vitest/pretty-format@4.0.16':
     dependencies:
       tinyrainbow: 3.0.3
@@ -13466,7 +13511,7 @@ snapshots:
   vitest@4.0.16(@opentelemetry/api@1.9.0)(@types/node@22.19.3)(jiti@2.6.1)(jsdom@26.1.0)(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2):
     dependencies:
       '@vitest/expect': 4.0.16
-      '@vitest/mocker': 4.0.16(vite@7.3.1(@types/node@20.19.27)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2))
+      '@vitest/mocker': 4.0.16(vite@7.3.1(@types/node@22.19.3)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2))
       '@vitest/pretty-format': 4.0.16
       '@vitest/runner': 4.0.16
       '@vitest/snapshot': 4.0.16

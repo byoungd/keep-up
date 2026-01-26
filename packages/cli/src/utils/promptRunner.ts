@@ -258,8 +258,8 @@ function handleApprovalResolved(
     const target =
       (pendingApprovalId && approvals.find((approval) => approval.id === pendingApprovalId)) ??
       approvals[approvals.length - 1];
-    target.status = status as ApprovalRecord["status"];
-    target.resolvedAt = timestamp;
+    (target as ApprovalRecord).status = status as ApprovalRecord["status"];
+    (target as ApprovalRecord).resolvedAt = timestamp;
   }
 
   if (!quiet) {

@@ -1,9 +1,11 @@
 import { createRequire } from "node:module";
 
+import type { AgentToolkitRegistryBinding } from "@ku0/agent-toolkit-rs";
+
 import { AgentToolkitToolServer, type AgentToolkitToolServerOptions } from "./toolkitServer";
 
 type NativeAgentToolkit = {
-  AgentToolkitRegistry: new () => unknown;
+  AgentToolkitRegistry: new () => AgentToolkitRegistryBinding;
 };
 
 type NativeToolkitModule = {

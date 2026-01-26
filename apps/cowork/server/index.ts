@@ -2,12 +2,14 @@ import "./env";
 import { join } from "node:path";
 import { serve } from "@hono/node-server";
 import { CriticAgent, createLessonStore } from "@ku0/agent-runtime";
+import { createEventBus } from "@ku0/agent-runtime-control";
 import { createCoworkApp } from "./app";
 import { serverConfig } from "./config";
 import { serverLogger } from "./logger";
 import { createPipelineRunner } from "./pipelines/pipelineRunner";
 import { createPipelineStore } from "./pipelines/pipelineStore";
 import { CoworkTaskRuntime } from "./runtime/coworkTaskRuntime";
+import { createGatewayControlRuntime } from "./runtime/gatewayControl";
 import { createAIEnvelopeGateway } from "./runtime/lfccEnvelopeGateway";
 import { ContextIndexManager } from "./services/contextIndexManager";
 import { createStorageLayer } from "./storage";
@@ -17,6 +19,7 @@ import { SessionEventHub } from "./streaming/eventHub";
 const storage = await createStorageLayer(serverConfig.storage);
 const stateDir = await ensureStateDir();
 const eventHub = new SessionEventHub();
+const runtimeEventBus = createEventBus();
 const contextIndexManager = new ContextIndexManager({ stateDir });
 const pipelineStore = await createPipelineStore();
 const pipelineRunner = createPipelineRunner({ store: pipelineStore, logger: serverLogger });
@@ -47,11 +50,18 @@ const critic = new CriticAgent({ lessonStore, logger: serverLogger });
 const taskRuntime = new CoworkTaskRuntime({
   storage,
   events: eventHub,
+  eventBus: runtimeEventBus,
   logger: serverLogger,
   contextIndexManager,
   runtimePersistence: serverConfig.runtimePersistence,
   lfcc: aiEnvelopeGateway ? { aiEnvelopeGateway } : undefined,
   lessonStore,
+});
+const gatewayRuntime = createGatewayControlRuntime({
+  gateway: serverConfig.gatewayControl,
+  telegram: serverConfig.telegram,
+  taskRuntime,
+  eventBus: runtimeEventBus,
 });
 const app = createCoworkApp({
   storage,
@@ -71,6 +81,7 @@ export default app;
 if (process.env.COWORK_SERVER_START === "true") {
   const { port } = serverConfig;
   serverLogger.info(`Server listening on http://localhost:${port}`);
+  await gatewayRuntime.start();
   serve({
     port,
     fetch: app.fetch,

@@ -1,17 +1,14 @@
 {
-  "name": "@ku0/cli",
+  "name": "@ku0/gateway-control",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Keep-Up CLI tooling",
+  "description": "Gateway control-plane WS multiplexing for runtime events + sync",
   "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "bin": {
-    "keepup": "dist/index.js"
-  },
+  "types": "./src/index.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
+      "types": "./src/index.ts",
       "default": "./dist/index.js"
     }
   },
@@ -22,22 +19,20 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --config vitest.config.ts",
-    "test:watch": "vitest --config vitest.config.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "lint": "biome check .",
     "lint:fix": "biome check --write ."
   },
   "dependencies": {
-    "@ku0/agent-runtime": "workspace:*",
     "@ku0/agent-runtime-control": "workspace:*",
-    "@ku0/agent-runtime-core": "workspace:*",
-    "@ku0/ai-core": "workspace:*",
-    "@ku0/tooling-session": "workspace:*",
-    "commander": "^11.1.0"
+    "@ku0/agent-runtime-telemetry": "workspace:*",
+    "@ku0/core": "workspace:*",
+    "ws": "^8.18.3"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.10.2",
+    "@types/ws": "^8.18.1",
     "typescript": "^5.7.3",
     "vitest": "^4.0.0"
   }

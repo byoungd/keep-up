@@ -94,5 +94,6 @@ function isProviderMissingEnv(provider: string): boolean {
   if (!provider || provider === "auto") {
     return false;
   }
-  return !resolveProviderFromEnv(provider);
+  // biome-ignore lint/suspicious/noExplicitAny: type alignment
+  return !resolveProviderFromEnv(provider as any);
 }

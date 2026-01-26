@@ -12,7 +12,7 @@ import { runPromptWithStreaming } from "../utils/promptRunner";
 import { createRuntimeResources } from "../utils/runtimeClient";
 import { resolveOutput, resolveRuntimeConfigString } from "../utils/runtimeOptions";
 import { type SessionMessage, type SessionRecord, SessionStore } from "../utils/sessionStore";
-import { writeStderr, writeStdout } from "../utils/terminal";
+import { readStdin, writeStderr, writeStdout } from "../utils/terminal";
 import {
   resolveTuiBinary,
   resolveTuiHost,
@@ -172,7 +172,8 @@ async function runPromptCommand(
   inputPrompt: string | undefined,
   options: RunOptions
 ): Promise<void> {
-  const resolvedPrompt = resolvePrompt(inputPrompt, options);
+  const stdinPrompt = await readPromptFromStdin();
+  const resolvedPrompt = resolvePrompt(inputPrompt ?? stdinPrompt, options);
   const configStore = new ConfigStore();
   const config = await configStore.load();
   const resolved = resolveRunConfig(options, config);
@@ -230,10 +231,20 @@ async function runPromptCommand(
   }
 }
 
+async function readPromptFromStdin(): Promise<string | undefined> {
+  try {
+    const data = await readStdin();
+    const trimmed = data.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function resolvePrompt(inputPrompt: string | undefined, options: RunOptions): string {
   const resolved = options.prompt ?? inputPrompt;
   if (!resolved) {
-    throw new Error("Prompt is required. Pass it as an argument or with --prompt.");
+    throw new Error("Prompt is required. Pass it as an argument, with --prompt, or via stdin.");
   }
   return resolved;
 }

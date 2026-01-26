@@ -37,25 +37,25 @@ function renderBash(): string {
   return `# Bash completion for keepup
 _keepup_complete() {
   local cur prev
-  cur="${COMP_WORDS[COMP_CWORD]}"
-  prev="${COMP_WORDS[COMP_CWORD - 1]}"
+  cur="\${COMP_WORDS[COMP_CWORD]}"
+  prev="\${COMP_WORDS[COMP_CWORD - 1]}"
 
   if [[ $COMP_CWORD -eq 1 ]]; then
-    COMPREPLY=( $(compgen -W "${TOP_LEVEL.join(" ")}" -- "$cur") )
+    COMPREPLY=( $(compgen -W "\${TOP_LEVEL.join(" ")}" -- "$cur") )
     return 0
   fi
 
-  if [[ ${COMP_WORDS[1]} == "agent" ]]; then
+  if [[ \${COMP_WORDS[1]} == "agent" ]]; then
     if [[ $COMP_CWORD -eq 2 ]]; then
-      COMPREPLY=( $(compgen -W "${AGENT_SUB.join(" ")}" -- "$cur") )
+      COMPREPLY=( $(compgen -W "\${AGENT_SUB.join(" ")}" -- "$cur") )
       return 0
     fi
-    if [[ ${COMP_WORDS[2]} == "session" && $COMP_CWORD -eq 3 ]]; then
-      COMPREPLY=( $(compgen -W "${SESSION_SUB.join(" ")}" -- "$cur") )
+    if [[ \${COMP_WORDS[2]} == "session" && $COMP_CWORD -eq 3 ]]; then
+      COMPREPLY=( $(compgen -W "\${SESSION_SUB.join(" ")}" -- "$cur") )
       return 0
     fi
-    if [[ ${COMP_WORDS[2]} == "config" && $COMP_CWORD -eq 3 ]]; then
-      COMPREPLY=( $(compgen -W "${CONFIG_SUB.join(" ")}" -- "$cur") )
+    if [[ \${COMP_WORDS[2]} == "config" && $COMP_CWORD -eq 3 ]]; then
+      COMPREPLY=( $(compgen -W "\${CONFIG_SUB.join(" ")}" -- "$cur") )
       return 0
     fi
   fi
