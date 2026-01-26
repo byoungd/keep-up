@@ -2758,7 +2758,7 @@ export class AgentOrchestrator {
       return;
     }
 
-    const persisted = await this.loadCurrentPlan();
+    const persisted = await this.refreshPlanFromPersistence();
     if (persisted) {
       this.emit("plan:created", { steps: persisted.steps });
       this.syncPlanStepsWithTaskGraph(persisted);
@@ -2903,10 +2903,29 @@ export class AgentOrchestrator {
     if (persisted) {
       this.currentPlanId = persisted.id;
       this.currentPlan = persisted;
+      this.planningEngine.registerPlan(persisted);
       return persisted;
     }
 
     return null;
+  }
+
+  private async refreshPlanFromPersistence(): Promise<ExecutionPlan | null> {
+    let persisted: ExecutionPlan | null = null;
+    try {
+      persisted = await this.getPlanPersistence().loadCurrent();
+    } catch {
+      persisted = null;
+    }
+
+    if (!persisted) {
+      return null;
+    }
+
+    this.currentPlanId = persisted.id;
+    this.currentPlan = persisted;
+    this.planningEngine.registerPlan(persisted);
+    return persisted;
   }
 
   private async refreshPlanStepTaskGraph(toolName?: string): Promise<void> {
