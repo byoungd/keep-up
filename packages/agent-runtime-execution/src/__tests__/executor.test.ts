@@ -43,6 +43,7 @@ import type {
   ToolContext,
   ToolExecutionContext,
   ToolExecutionRecord,
+  ToolSafetyChecker,
 } from "../types";
 import { ToolResultCache } from "../utils/cache";
 // Actually I need to import the class, so remove 'type'
@@ -574,6 +575,59 @@ describe("ToolExecutionPipeline", () => {
 
       const requiresConfirmation = pipeline.requiresConfirmation(
         createMockCall("sensitive:tool"),
+        context
+      );
+
+      expect(requiresConfirmation).toBe(true);
+    });
+
+    it("denies tools when safety checkers block execution", async () => {
+      registry.setTools([createMockTool("safe:tool")]);
+      const safetyChecker: ToolSafetyChecker = () => ({
+        decision: "deny",
+        reason: "Blocked by safety checker",
+      });
+      const toolExecutionContext: ToolExecutionContext = {
+        policy: "interactive",
+        allowedTools: ["*"],
+        requiresApproval: [],
+        maxParallel: 1,
+        safetyCheckers: [safetyChecker],
+      };
+      const policyEngine = createToolGovernancePolicyEngine(
+        createToolPolicyEngine(policy),
+        toolExecutionContext
+      );
+      pipeline = new ToolExecutionPipeline({ registry, policy, policyEngine });
+
+      const result = await pipeline.execute(createMockCall("safe:tool"), context);
+
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe("PERMISSION_DENIED");
+      expect(result.error?.message).toBe("Blocked by safety checker");
+    });
+
+    it("marks tools as requiring confirmation when safety checker asks user", async () => {
+      registry.setTools([createMockTool("safe:tool")]);
+      const safetyChecker: ToolSafetyChecker = () => ({
+        decision: "ask_user",
+        reason: "Needs confirmation",
+      });
+      const toolExecutionContext: ToolExecutionContext = {
+        policy: "interactive",
+        allowedTools: ["*"],
+        requiresApproval: [],
+        maxParallel: 1,
+        safetyCheckers: [safetyChecker],
+      };
+      const policyEngine = createToolGovernancePolicyEngine(
+        createToolPolicyEngine(policy),
+        toolExecutionContext
+      );
+      pipeline = new ToolExecutionPipeline({ registry, policy, policyEngine });
+
+      const requiresConfirmation = pipeline.requiresConfirmation(
+        createMockCall("safe:tool"),
         context
       );
 
