@@ -22,6 +22,8 @@ export interface WorkflowTemplate {
   name: string;
   /** Template description */
   description: string;
+  /** Workflow dependencies */
+  dependsOn?: string[];
   /** Workflow phases/steps */
   phases: WorkflowPhase[];
   /** Tools required for this workflow */
@@ -32,6 +34,8 @@ export interface WorkflowTemplate {
   estimatedDuration?: number;
   /** Risk level */
   riskLevel: "low" | "medium" | "high";
+  /** Optional metadata */
+  metadata?: Record<string, string>;
   /** Optional graph definition for execution */
   graph?: GraphDefinition;
 }
@@ -469,3 +473,21 @@ export class WorkflowTemplateManager {
 export function createWorkflowTemplateManager(): WorkflowTemplateManager {
   return new WorkflowTemplateManager();
 }
+
+export type {
+  WorkflowFrontmatter,
+  WorkflowParseOutcome,
+  WorkflowValidationOptions,
+} from "./workflowParsing";
+export {
+  normalizeWorkflowId,
+  parseWorkflowMarkdown,
+  validateWorkflowId,
+} from "./workflowParsing";
+export type {
+  WorkflowDirectoryConfig,
+  WorkflowDiscoveryResult,
+  WorkflowRegistryOptions,
+  WorkflowValidationError,
+} from "./workflowRegistry";
+export { WorkflowRegistry } from "./workflowRegistry";

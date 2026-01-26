@@ -380,11 +380,29 @@ export * from "./types";
 // Utilities
 // ============================================================================
 export * from "./utils";
-export type { WorkflowContext, WorkflowPhase, WorkflowTemplate } from "./workflows";
+export type {
+  WorkflowContext,
+  WorkflowDirectoryConfig,
+  WorkflowDiscoveryResult,
+  WorkflowFrontmatter,
+  WorkflowParseOutcome,
+  WorkflowPhase,
+  WorkflowRegistryOptions,
+  WorkflowTemplate,
+  WorkflowValidationError,
+  WorkflowValidationOptions,
+} from "./workflows";
 // ============================================================================
 // Workflows
 // ============================================================================
-export { BUILT_IN_WORKFLOWS, createWorkflowTemplateManager } from "./workflows";
+export {
+  BUILT_IN_WORKFLOWS,
+  createWorkflowTemplateManager,
+  normalizeWorkflowId,
+  parseWorkflowMarkdown,
+  validateWorkflowId,
+  WorkflowRegistry,
+} from "./workflows";
 
 // ============================================================================
 // Convenience Re-exports
