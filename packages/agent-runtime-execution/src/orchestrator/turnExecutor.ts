@@ -207,10 +207,13 @@ export class TurnExecutor implements ITurnExecutor {
       const contextModelId = this.deps.getModelDecision?.()?.resolved ?? this.deps.getModelId?.();
       const compressorMaxTokens = this.deps.messageCompressor.getMaxTokens();
       const contextWindowBudget = this.resolveContextWindowBudget(contextModelId, span);
+      const fallbackBudget = Math.floor(compressorMaxTokens * CONTEXT_WINDOW_BUFFER_RATIO);
       const compressionMaxTokens =
         contextWindowBudget && contextWindowBudget < compressorMaxTokens
           ? contextWindowBudget
-          : undefined;
+          : fallbackBudget > 0 && fallbackBudget < compressorMaxTokens
+            ? fallbackBudget
+            : undefined;
       const compressionResult = this.compressMessages(state.messages, span, compressionMaxTokens);
       metrics.compressionRatio = compressionResult.ratio;
       metrics.compressionTimeMs = compressionResult.timeMs;

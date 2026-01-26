@@ -183,6 +183,31 @@ describe("TurnExecutor", () => {
       expect(outcome.metrics.compressionRatio).toBe(0.5);
     });
 
+    it("applies fallback buffer when model window is unknown", async () => {
+      const compressWithMaxTokens = vi.fn().mockReturnValue({
+        messages: [],
+        compressionRatio: 0,
+        removedCount: 0,
+      });
+      const deps = createMockDeps({
+        messageCompressor: {
+          compress: vi.fn().mockReturnValue({
+            messages: [],
+            compressionRatio: 0,
+            removedCount: 0,
+          }),
+          compressWithMaxTokens,
+          getMaxTokens: vi.fn().mockReturnValue(8000),
+        } as TurnExecutorDependencies["messageCompressor"],
+      });
+      const executor = createTurnExecutor(deps);
+      const state = createMockState();
+
+      await executor.execute(state);
+
+      expect(compressWithMaxTokens).toHaveBeenCalledWith(expect.any(Array), 6400);
+    });
+
     it("applies context window guard when model window is smaller", async () => {
       resetGlobalCapabilityCache();
       const cache = getModelCapabilityCache();
