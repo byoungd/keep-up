@@ -23,6 +23,8 @@ export interface MCPTool {
     requiresConfirmation?: boolean;
     /** Whether tool can modify state */
     readOnly?: boolean;
+    /** Concurrency hint for tool execution */
+    concurrency?: "parallel" | "exclusive";
     /** Estimated execution time hint */
     estimatedDuration?: "instant" | "fast" | "medium" | "slow";
     /** Required OAuth scopes for remote MCP tools */

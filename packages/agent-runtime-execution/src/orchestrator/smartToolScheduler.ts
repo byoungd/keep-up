@@ -1,5 +1,9 @@
 import type { MCPToolCall, ToolErrorCode } from "../types";
-import type { DependencyAnalyzer } from "./dependencyAnalyzer";
+import type {
+  DependencyAnalysisOptions,
+  DependencyAnalyzer,
+  ToolConcurrencyResolver,
+} from "./dependencyAnalyzer";
 import { createDependencyAnalyzer } from "./dependencyAnalyzer";
 
 export interface ToolExecutionProfile {
@@ -23,6 +27,7 @@ export interface SmartToolSchedulerConfig {
   failurePenalty?: number;
   rateLimitPenalty?: number;
   minFailureScale?: number;
+  resolveConcurrency?: ToolConcurrencyResolver;
 }
 
 type ConcurrencyBudget = {
@@ -128,6 +133,7 @@ type BatchState = {
 
 export class SmartToolScheduler {
   private readonly dependencyAnalyzer: DependencyAnalyzer;
+  private readonly resolveConcurrency?: ToolConcurrencyResolver;
   private readonly profiles = new Map<string, ToolExecutionProfile>();
   private readonly budget: ConcurrencyBudget;
   private readonly adaptiveConcurrency: boolean;
@@ -144,7 +150,10 @@ export class SmartToolScheduler {
     options: { config?: SmartToolSchedulerConfig; dependencyAnalyzer?: DependencyAnalyzer } = {}
   ) {
     const config = options.config ?? {};
-    this.dependencyAnalyzer = options.dependencyAnalyzer ?? createDependencyAnalyzer();
+    this.resolveConcurrency = config.resolveConcurrency;
+    this.dependencyAnalyzer =
+      options.dependencyAnalyzer ??
+      createDependencyAnalyzer({ resolveConcurrency: this.resolveConcurrency });
     this.budget = {
       cpu: config.maxCpuConcurrent ?? DEFAULT_BUDGET.cpu,
       network: config.maxNetworkConcurrent ?? DEFAULT_BUDGET.network,
@@ -165,11 +174,13 @@ export class SmartToolScheduler {
     }
   }
 
-  schedule(calls: MCPToolCall[]): MCPToolCall[][] {
+  schedule(calls: MCPToolCall[], options: DependencyAnalysisOptions = {}): MCPToolCall[][] {
     if (calls.length <= 1) {
       return calls.length === 0 ? [] : [calls];
     }
-    const analysis = this.dependencyAnalyzer.analyze(calls);
+    const analysis = this.dependencyAnalyzer.analyze(calls, {
+      resolveConcurrency: options.resolveConcurrency ?? this.resolveConcurrency,
+    });
     return this.scheduleGroups(analysis.groups);
   }
 
