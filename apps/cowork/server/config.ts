@@ -9,6 +9,7 @@ export interface CoworkServerConfig {
   runtimePersistence: CoworkRuntimePersistenceConfig;
   gatewayControl: CoworkGatewayControlConfig;
   telegram: CoworkTelegramConfig;
+  discord: CoworkDiscordConfig;
 }
 
 export interface CoworkRuntimePersistenceConfig {
@@ -27,6 +28,14 @@ export interface CoworkTelegramConfig {
   sessionId?: string;
   pollingIntervalMs?: number;
   longPollTimeoutSeconds?: number;
+}
+
+export interface CoworkDiscordConfig {
+  enabled: boolean;
+  token?: string;
+  channelId?: string;
+  pollingIntervalMs?: number;
+  baseUrl?: string;
 }
 
 function parseStorageMode(value?: string): StorageMode {
@@ -79,6 +88,8 @@ function parseNumberEnv(value: string | undefined): number | undefined {
 const port = Number(process.env.PORT ?? 3000);
 const gatewayControlPort = parseNumberEnv(process.env.COWORK_GATEWAY_CONTROL_PORT) ?? port + 1;
 const telegramToken = process.env.COWORK_TELEGRAM_TOKEN;
+const discordToken = process.env.COWORK_DISCORD_TOKEN;
+const discordChannelId = process.env.COWORK_DISCORD_CHANNEL_ID;
 
 export const serverConfig: CoworkServerConfig = {
   port,
@@ -95,5 +106,15 @@ export const serverConfig: CoworkServerConfig = {
     sessionId: process.env.COWORK_TELEGRAM_SESSION_ID,
     pollingIntervalMs: parseNumberEnv(process.env.COWORK_TELEGRAM_POLL_INTERVAL_MS),
     longPollTimeoutSeconds: parseNumberEnv(process.env.COWORK_TELEGRAM_LONG_POLL_SECONDS),
+  },
+  discord: {
+    enabled: parseBooleanEnv(
+      process.env.COWORK_DISCORD_ENABLED,
+      Boolean(discordToken && discordChannelId)
+    ),
+    token: discordToken,
+    channelId: discordChannelId,
+    pollingIntervalMs: parseNumberEnv(process.env.COWORK_DISCORD_POLL_INTERVAL_MS),
+    baseUrl: process.env.COWORK_DISCORD_BASE_URL,
   },
 };

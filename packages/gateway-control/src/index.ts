@@ -1,3 +1,4 @@
+export { DiscordAdapter, type DiscordAdapterConfig } from "./channels/discordAdapter";
 export { ChannelRegistry, type ChannelRegistryConfig } from "./channels/registry";
 export { TelegramAdapter, type TelegramAdapterConfig } from "./channels/telegramAdapter";
 export type {
