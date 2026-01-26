@@ -1,5 +1,6 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import type { ContextCompressionConfig } from "@ku0/agent-runtime-core";
 import type { ApprovalPolicy } from "@ku0/agent-runtime-tools";
 import { ensureCliStateDir, resolveCliPath } from "./statePaths";
 
@@ -12,6 +13,7 @@ export type CliConfig = {
   approvalPolicies?: ApprovalPolicy[];
   approvalWorkspacePaths?: string[];
   sandbox?: string;
+  context?: Partial<ContextCompressionConfig>;
   [key: string]: unknown;
 };
 

@@ -31,10 +31,22 @@ describe("TurnExecutor", () => {
         compressionRatio: 0,
         removedCount: 0,
       }),
+      compressAsync: vi.fn().mockResolvedValue({
+        messages: [],
+        compressionRatio: 0,
+        removedCount: 0,
+        summarizedCount: 0,
+      }),
       compressWithMaxTokens: vi.fn().mockReturnValue({
         messages: [],
         compressionRatio: 0,
         removedCount: 0,
+      }),
+      compressWithMaxTokensAsync: vi.fn().mockResolvedValue({
+        messages: [],
+        compressionRatio: 0,
+        removedCount: 0,
+        summarizedCount: 0,
       }),
       getMaxTokens: vi.fn().mockReturnValue(8000),
     } as TurnExecutorDependencies["messageCompressor"],
@@ -167,10 +179,22 @@ describe("TurnExecutor", () => {
             compressionRatio: 0.5,
             removedCount: 3,
           }),
+          compressAsync: vi.fn().mockResolvedValue({
+            messages: [],
+            compressionRatio: 0.5,
+            removedCount: 3,
+            summarizedCount: 0,
+          }),
           compressWithMaxTokens: vi.fn().mockReturnValue({
             messages: [],
             compressionRatio: 0.5,
             removedCount: 3,
+          }),
+          compressWithMaxTokensAsync: vi.fn().mockResolvedValue({
+            messages: [],
+            compressionRatio: 0.5,
+            removedCount: 3,
+            summarizedCount: 0,
           }),
           getMaxTokens: vi.fn().mockReturnValue(8000),
         } as TurnExecutorDependencies["messageCompressor"],
@@ -184,10 +208,11 @@ describe("TurnExecutor", () => {
     });
 
     it("applies fallback buffer when model window is unknown", async () => {
-      const compressWithMaxTokens = vi.fn().mockReturnValue({
+      const compressWithMaxTokensAsync = vi.fn().mockResolvedValue({
         messages: [],
         compressionRatio: 0,
         removedCount: 0,
+        summarizedCount: 0,
       });
       const deps = createMockDeps({
         messageCompressor: {
@@ -196,7 +221,13 @@ describe("TurnExecutor", () => {
             compressionRatio: 0,
             removedCount: 0,
           }),
-          compressWithMaxTokens,
+          compressAsync: vi.fn().mockResolvedValue({
+            messages: [],
+            compressionRatio: 0,
+            removedCount: 0,
+            summarizedCount: 0,
+          }),
+          compressWithMaxTokensAsync,
           getMaxTokens: vi.fn().mockReturnValue(8000),
         } as TurnExecutorDependencies["messageCompressor"],
       });
@@ -205,7 +236,7 @@ describe("TurnExecutor", () => {
 
       await executor.execute(state);
 
-      expect(compressWithMaxTokens).toHaveBeenCalledWith(expect.any(Array), 6400);
+      expect(compressWithMaxTokensAsync).toHaveBeenCalledWith(expect.any(Array), 6400);
     });
 
     it("applies context window guard when model window is smaller", async () => {
@@ -223,10 +254,11 @@ describe("TurnExecutor", () => {
         lastUpdated: Date.now(),
       });
 
-      const compressWithMaxTokens = vi.fn().mockReturnValue({
+      const compressWithMaxTokensAsync = vi.fn().mockResolvedValue({
         messages: [],
         compressionRatio: 0,
         removedCount: 0,
+        summarizedCount: 0,
       });
 
       const deps = createMockDeps({
@@ -237,7 +269,13 @@ describe("TurnExecutor", () => {
             compressionRatio: 0,
             removedCount: 0,
           }),
-          compressWithMaxTokens,
+          compressAsync: vi.fn().mockResolvedValue({
+            messages: [],
+            compressionRatio: 0,
+            removedCount: 0,
+            summarizedCount: 0,
+          }),
+          compressWithMaxTokensAsync,
           getMaxTokens: vi.fn().mockReturnValue(8000),
         } as TurnExecutorDependencies["messageCompressor"],
       });
@@ -246,7 +284,7 @@ describe("TurnExecutor", () => {
 
       await executor.execute(state);
 
-      expect(compressWithMaxTokens).toHaveBeenCalledWith(expect.any(Array), 1600);
+      expect(compressWithMaxTokensAsync).toHaveBeenCalledWith(expect.any(Array), 1600);
       resetGlobalCapabilityCache();
     });
 

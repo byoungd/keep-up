@@ -1,3 +1,4 @@
+import type { ContextCompressionConfig } from "@ku0/agent-runtime-core";
 import type { OutputFormat } from "./output";
 
 const AUTO_VALUES = new Set(["auto", "default"]);
@@ -48,6 +49,15 @@ export function resolveRuntimeConfigString(
     return normalizeValue(fallback);
   }
   return undefined;
+}
+
+export function resolveContextCompressionConfig(
+  value: unknown
+): ContextCompressionConfig | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+  return value as ContextCompressionConfig;
 }
 
 function normalizeValue(value: string | undefined): string | undefined {

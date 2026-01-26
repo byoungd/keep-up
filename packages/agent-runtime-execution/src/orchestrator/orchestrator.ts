@@ -162,6 +162,7 @@ import { createRequestCache, type RequestCache } from "./requestCache";
 import { createSingleStepEnforcer, type SingleStepEnforcer } from "./singleStepEnforcer";
 import { SmartToolScheduler } from "./smartToolScheduler";
 import { OrchestratorStatusController } from "./statusController";
+import { createDefaultSummarizer } from "./summarizer";
 import { createTurnExecutor, type ITurnExecutor, type TurnOutcome } from "./turnExecutor";
 
 export type {
@@ -484,6 +485,12 @@ export class AgentOrchestrator {
       skillRegistry: this.skillRegistry,
       skillPromptAdapter: this.skillPromptAdapter,
       metrics: this.metrics,
+      contextManager: this.sessionState?.context,
+      getContextId: () => this.sessionState?.getContextId(),
+      contextCompression: this.config.contextCompression,
+      auditLogger: this.auditLogger,
+      getSessionId: () => this.sessionState?.id,
+      getCorrelationId: () => this.currentRunId,
       getModelId: () => this.currentModelId,
       getToolDefinitions: () => this.getToolDefinitions(),
       getModelDecision: () => this.currentModelDecision,
@@ -594,13 +601,20 @@ export class AgentOrchestrator {
     if (components.messageCompressor) {
       return components.messageCompressor;
     }
-    return new SmartMessageCompressor({
-      maxTokens: 8000,
-      strategy: "hybrid",
-      preserveCount: 3,
+    const compression = this.config.contextCompression;
+    const compressor = new SmartMessageCompressor({
+      maxTokens: compression?.maxTokens ?? 8000,
+      strategy: compression?.strategy ?? "hybrid",
+      preserveCount: compression?.preserveCount ?? 3,
+      minMessages: compression?.minMessages ?? 5,
+      enableSummarization: compression?.enableSummarization ?? true,
       estimateTokens: (text: string) => countTokens(text),
       maxToolResultTokens: 500,
     });
+    if (compression?.enableSummarization) {
+      compressor.setSummarizer(createDefaultSummarizer(this.llm));
+    }
+    return compressor;
   }
 
   private resolveToolResultCache(components: OrchestratorComponents): ToolResultCache {
@@ -3944,6 +3958,8 @@ export interface CreateOrchestratorOptions {
   a2a?: A2AContext;
   /** Optional runtime configuration (cache defaults, etc) */
   runtime?: RuntimeConfig;
+  /** Optional context compression configuration */
+  contextCompression?: AgentConfig["contextCompression"];
   toolExecutionContext?: Partial<ToolExecutionContext>;
   /** Enable parallel execution of independent tool calls (default: true) */
   parallelExecution?: boolean | Partial<ParallelExecutionConfig>;
@@ -4088,6 +4104,7 @@ function buildAgentConfig(
     planning: buildPlanningConfig(options.planning),
     recovery: buildRecoveryConfig(options.recovery),
     toolDiscovery: buildToolDiscoveryConfig(options.toolDiscovery),
+    contextCompression: options.contextCompression,
     toolExecutionContext: options.toolExecutionContext
       ? {
           policy: options.toolExecutionContext.policy ?? "batch",

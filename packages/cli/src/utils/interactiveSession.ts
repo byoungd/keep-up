@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { createInterface } from "node:readline";
+import type { ContextCompressionConfig } from "@ku0/agent-runtime-core";
 import {
   type ApprovalMode,
   type AutoApprovalOptions,
@@ -11,6 +12,7 @@ import { runPromptWithStreaming } from "./promptRunner";
 import { createRuntimeResources } from "./runtimeClient";
 import type { SandboxMode } from "./runtimeOptions";
 import { type SessionRecord, SessionStore } from "./sessionStore";
+import { extractConversationSummary, upsertConversationSummary } from "./sessionSummary";
 import { writeStdout } from "./terminal";
 
 export interface InteractiveSessionOptions {
@@ -23,6 +25,7 @@ export interface InteractiveSessionOptions {
   sandbox?: SandboxMode;
   autoApproval?: AutoApprovalOptions;
   instructions?: string;
+  contextCompression?: ContextCompressionConfig;
 }
 
 const EXIT_COMMANDS = new Set(["/exit", "/quit"]);
@@ -56,6 +59,7 @@ export async function runInteractiveSession(options: InteractiveSessionOptions):
     initialMessages: session.messages,
     instructions: options.instructions,
     sandbox: options.sandbox,
+    contextCompression: options.contextCompression,
   });
   const confirmationHandler = createConfirmationHandler({
     mode: options.approvalMode ?? "ask",
@@ -212,6 +216,10 @@ async function handlePrompt(input: {
     confirmationHandler: input.confirmationHandler,
   });
 
+  const summary = extractConversationSummary(state);
+  if (summary) {
+    upsertConversationSummary(input.session, summary);
+  }
   const assistantText = extractAssistantText(state);
   const now = Date.now();
   input.session.messages.push(

@@ -16,7 +16,7 @@ import {
   type StreamWriter,
 } from "@ku0/agent-runtime";
 import { createEventBus, type RuntimeEventBus } from "@ku0/agent-runtime-control";
-import type { AgentMessage, AgentState } from "@ku0/agent-runtime-core";
+import type { AgentMessage, AgentState, ContextCompressionConfig } from "@ku0/agent-runtime-core";
 import {
   type CompletionRequest,
   type CompletionResponse,
@@ -38,6 +38,7 @@ export interface RuntimeConfigOptions {
   initialMessages?: SessionMessage[];
   instructions?: string;
   sandbox?: "auto" | "docker" | "none";
+  contextCompression?: ContextCompressionConfig;
 }
 
 export interface RuntimeResources {
@@ -82,6 +83,7 @@ export async function createRuntimeResources(
       sessionState,
     },
     orchestrator: {
+      contextCompression: options.contextCompression,
       components: {
         streamBridge: { stream },
       },
