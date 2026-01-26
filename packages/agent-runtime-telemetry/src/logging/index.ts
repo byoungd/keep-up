@@ -11,6 +11,7 @@ export {
   createConsoleTransport,
   createLogger,
   createMemoryTransport,
+  createSubsystemLogger,
   getLogger,
   type ILogTransport,
   type LogContext,
