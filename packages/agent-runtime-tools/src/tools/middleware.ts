@@ -71,7 +71,10 @@ export function loggingMiddleware(
   } = {}
 ): ToolMiddleware {
   const structuredLogger = createSubsystemLogger("agent", "tools:middleware");
-  const log = options.logger ?? ((msg: string, data?: unknown) => structuredLogger.info(msg, data));
+  const log =
+    options.logger ??
+    ((msg: string, data?: unknown) =>
+      structuredLogger.info(msg, data as Record<string, unknown> | undefined));
   const logInput = options.logInput ?? true;
   const logOutput = options.logOutput ?? true;
 
