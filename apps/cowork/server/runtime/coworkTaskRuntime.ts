@@ -82,6 +82,7 @@ import {
   referenceStoreDocId,
 } from "@ku0/lfcc-bridge";
 import { DEFAULT_PROJECT_CONTEXT_TOKEN_BUDGET, isRecord } from "@ku0/shared";
+import { getLogger } from "../logger";
 import { ApprovalService } from "../services/approvalService";
 import type { ContextIndexManager } from "../services/contextIndexManager";
 import { ProviderKeyService } from "../services/providerKeyService";
@@ -223,7 +224,7 @@ export class CoworkTaskRuntime {
     lfcc?: LfccRuntimeConfig;
     lessonStore?: LessonStore;
   }) {
-    this.logger = deps.logger ?? console; // Assign to property
+    this.logger = deps.logger ?? getLogger("runtime");
     const logger = this.logger;
     this.runtimeFactory = deps.runtimeFactory;
     this.runtimeEventBus = deps.eventBus;
