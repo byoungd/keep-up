@@ -3,7 +3,11 @@ import { randomUUID } from "node:crypto";
 import { createInterface } from "node:readline";
 import type { AgentState } from "@ku0/agent-runtime-core";
 import { Command } from "commander";
-import { createConfirmationHandler, resolveApprovalMode } from "../utils/approvals";
+import {
+  createConfirmationHandler,
+  resolveApprovalMode,
+  resolveAutoApprovalOptions,
+} from "../utils/approvals";
 import { type CliConfig, ConfigStore } from "../utils/configStore";
 import { runInteractiveSession } from "../utils/interactiveSession";
 import { extractAssistantText, formatAgentOutput } from "../utils/output";
@@ -95,6 +99,10 @@ function tuiCommand(): Command {
         "KEEPUP_APPROVAL_MODE"
       );
       const sandbox = resolveSandboxMode(undefined, config.sandbox, "KEEPUP_SANDBOX");
+      const autoApproval = resolveAutoApprovalOptions({
+        policies: config.approvalPolicies,
+        workspacePaths: config.approvalWorkspacePaths,
+      });
       const instructions = await loadProjectInstructions({
         override: options.instructions,
       });
@@ -131,6 +139,7 @@ function tuiCommand(): Command {
           quiet: options.quiet,
           approvalMode,
           sandbox,
+          autoApproval,
           instructions,
         });
       } catch (error) {
@@ -184,6 +193,10 @@ async function runPromptCommand(
   const config = await configStore.load();
   const resolved = resolveRunConfig(options, config);
   const sandbox = resolveSandboxMode(undefined, config.sandbox, "KEEPUP_SANDBOX");
+  const autoApproval = resolveAutoApprovalOptions({
+    policies: config.approvalPolicies,
+    workspacePaths: config.approvalWorkspacePaths,
+  });
 
   const sessionStore = new SessionStore();
   const sessionId = resolveSessionId(options, config);
@@ -200,6 +213,7 @@ async function runPromptCommand(
       mode: resolved.approvalMode,
       ask: askHandle?.ask,
       quiet: resolved.quiet,
+      autoApproval,
     });
     const { runtime } = await createRuntimeResources({
       model: resolved.model,
