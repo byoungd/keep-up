@@ -1,5 +1,6 @@
 import type { IncomingMessage } from "node:http";
 import { createSubsystemLogger, type Logger } from "@ku0/agent-runtime-telemetry/logging";
+import type { RawData, WebSocket } from "ws";
 import { WebSocketServer } from "ws";
 import type { GatewayControlServer } from "./controlPlane/server";
 
@@ -20,15 +21,16 @@ export function startGatewayControlNodeServer(
   const logger = config.logger ?? createSubsystemLogger("gateway", "ws");
   const wss = new WebSocketServer({ port: config.port });
 
-  wss.on("connection", (socket, request) => {
-    const { clientId, subscriptions } = parseQuery(request);
+  wss.on("connection", (socket: WebSocket, request) => {
+    const incoming = request as IncomingMessage;
+    const { clientId, subscriptions } = parseQuery(incoming);
     const handle = config.server.handleConnection(socket, {
       clientId,
       subscriptions,
-      userAgent: request.headers["user-agent"],
+      userAgent: incoming.headers["user-agent"],
     });
 
-    socket.on("message", (data) => {
+    socket.on("message", (data: RawData) => {
       const payload = typeof data === "string" ? data : data.toString();
       handle.onMessage(payload);
     });
@@ -42,7 +44,7 @@ export function startGatewayControlNodeServer(
     logger.info("Gateway control WS server listening", { port: config.port });
   });
 
-  wss.on("error", (error) => {
+  wss.on("error", (error: Error) => {
     logger.error("Gateway control WS server error", error);
   });
 
@@ -50,7 +52,7 @@ export function startGatewayControlNodeServer(
     wss,
     close: () =>
       new Promise((resolve, reject) => {
-        wss.close((err) => {
+        wss.close((err?: Error) => {
           if (err) {
             reject(err);
             return;

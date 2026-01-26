@@ -9,7 +9,10 @@
     "baseUrl": ".",
     "paths": {
       "@ku0/agent-runtime": ["../../packages/agent-runtime/src"],
-      "@ku0/ai-core": ["../../packages/ai-core/src"]
+      "@ku0/ai-core": ["../../packages/ai-core/src"],
+      "@ku0/agent-runtime-telemetry": ["../../packages/agent-runtime-telemetry/src"],
+      "@ku0/agent-runtime-telemetry/*": ["../../packages/agent-runtime-telemetry/src/*"],
+      "ws": ["../../packages/gateway-control/src/types/ws.d.ts"]
     }
   },
   "include": ["src", "server"]
