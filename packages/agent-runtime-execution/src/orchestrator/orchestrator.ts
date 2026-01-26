@@ -131,7 +131,11 @@ import {
   type ToolDecision,
 } from "./agentLoop";
 import type { ClarificationManager, ClarificationRecord } from "./clarificationManager";
-import { createDependencyAnalyzer, type DependencyAnalyzer } from "./dependencyAnalyzer";
+import {
+  createDependencyAnalyzer,
+  type DependencyAnalyzer,
+  type ToolConcurrencyHint,
+} from "./dependencyAnalyzer";
 import { createErrorRecoveryEngine, type ErrorRecoveryEngine } from "./errorRecovery";
 import { BackpressureEventStream } from "./eventStream";
 import type { AgentToolDefinition, IAgentLLM } from "./llmTypes";
@@ -2996,7 +3000,9 @@ export class AgentOrchestrator {
    */
   private analyzeToolDependencies(toolCalls: MCPToolCall[], span?: SpanContext): MCPToolCall[][] {
     const analysisStart = performance.now();
-    const analysis = this.dependencyAnalyzer.analyze(toolCalls);
+    const analysis = this.dependencyAnalyzer.analyze(toolCalls, {
+      resolveConcurrency: this.buildToolConcurrencyResolver(),
+    });
 
     this.metrics?.observe(
       AGENT_METRICS.dependencyAnalysisTime.name,
@@ -3010,6 +3016,29 @@ export class AgentOrchestrator {
     }
 
     return analysis.groups;
+  }
+
+  private buildToolConcurrencyResolver(): (toolName: string) => ToolConcurrencyHint | undefined {
+    const tools = this.registry.listTools();
+    const concurrencyMap = new Map<string, ToolConcurrencyHint>();
+    for (const tool of tools) {
+      const concurrency = tool.annotations?.concurrency;
+      if (concurrency) {
+        concurrencyMap.set(tool.name, concurrency);
+      }
+    }
+
+    return (toolName: string) => {
+      const direct = concurrencyMap.get(toolName);
+      if (direct) {
+        return direct;
+      }
+      const server = this.registry.resolveToolServer?.(toolName);
+      if (server) {
+        return concurrencyMap.get(`${server}:${toolName}`);
+      }
+      return undefined;
+    };
   }
 
   /**

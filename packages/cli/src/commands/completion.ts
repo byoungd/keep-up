@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { writeStderr, writeStdout } from "../utils/terminal";
 
-const TOP_LEVEL = ["agent", "doctor", "completion"];
+const TOP_LEVEL = ["agent", "run", "doctor", "completion"];
 const AGENT_SUB = ["run", "tui", "session", "config"];
 const SESSION_SUB = ["list", "resume", "export", "delete"];
 const CONFIG_SUB = ["show", "set", "unset"];

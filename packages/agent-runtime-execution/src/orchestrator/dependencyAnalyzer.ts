@@ -55,6 +55,14 @@ export interface DependencyAnalysis {
 /** Resource extractor function */
 type ResourceExtractor = (call: MCPToolCall) => ResourceAccess[];
 
+export type ToolConcurrencyHint = "parallel" | "exclusive";
+
+export type ToolConcurrencyResolver = (toolName: string) => ToolConcurrencyHint | undefined;
+
+export type DependencyAnalysisOptions = {
+  resolveConcurrency?: ToolConcurrencyResolver;
+};
+
 // ============================================================================
 // Resource Extractors
 // ============================================================================
@@ -115,10 +123,12 @@ export const SERIALIZED_TOOLS = new Set([
  * Analyzes tool call dependencies using graph algorithms.
  */
 export class DependencyAnalyzer {
+  constructor(private readonly resolveConcurrency?: ToolConcurrencyResolver) {}
+
   /**
    * Analyze dependencies and group for parallel execution.
    */
-  analyze(calls: MCPToolCall[]): DependencyAnalysis {
+  analyze(calls: MCPToolCall[], options: DependencyAnalysisOptions = {}): DependencyAnalysis {
     if (calls.length === 0) {
       return {
         groups: [],
@@ -128,8 +138,9 @@ export class DependencyAnalyzer {
       };
     }
 
+    const resolveConcurrency = options.resolveConcurrency ?? this.resolveConcurrency;
     // Build dependency graph
-    const graph = this.buildGraph(calls);
+    const graph = this.buildGraph(calls, resolveConcurrency);
 
     // Detect cycles
     const cycles = this.detectCycles(graph);
@@ -151,9 +162,12 @@ export class DependencyAnalyzer {
   /**
    * Build dependency graph from tool calls.
    */
-  private buildGraph(calls: MCPToolCall[]): Map<number, DependencyNode> {
+  private buildGraph(
+    calls: MCPToolCall[],
+    resolveConcurrency?: ToolConcurrencyResolver
+  ): Map<number, DependencyNode> {
     const graph = this.initializeNodes(calls);
-    this.resolveDependencies(calls, graph);
+    this.resolveDependencies(calls, graph, resolveConcurrency);
     return graph;
   }
 
@@ -178,8 +192,13 @@ export class DependencyAnalyzer {
     return graph;
   }
 
-  private resolveDependencies(calls: MCPToolCall[], graph: Map<number, DependencyNode>): void {
+  private resolveDependencies(
+    calls: MCPToolCall[],
+    graph: Map<number, DependencyNode>,
+    resolveConcurrency?: ToolConcurrencyResolver
+  ): void {
     const resourceState = new Map<string, { reads: Set<number>; lastWrite?: number }>();
+    let lastExclusiveIndex: number | undefined;
 
     for (let i = 0; i < calls.length; i++) {
       const node = graph.get(i);
@@ -188,7 +207,21 @@ export class DependencyAnalyzer {
       }
 
       const call = calls[i];
-      const isSerialized = SERIALIZED_TOOLS.has(call.name);
+      const concurrency = resolveConcurrency?.(call.name);
+      const isExclusive = concurrency === "exclusive";
+      const isParallel = concurrency === "parallel";
+      const isSerialized = !isParallel && SERIALIZED_TOOLS.has(call.name);
+
+      if (lastExclusiveIndex !== undefined && lastExclusiveIndex !== i) {
+        node.dependencies.add(lastExclusiveIndex);
+        graph.get(lastExclusiveIndex)?.dependents.add(i);
+      }
+
+      if (isExclusive) {
+        this.addSerializedDependencies(i, node, graph);
+        lastExclusiveIndex = i;
+        continue;
+      }
 
       if (isSerialized) {
         this.addSerializedDependencies(i, node, graph);
@@ -462,8 +495,10 @@ export class DependencyAnalyzer {
 /**
  * Create a dependency analyzer.
  */
-export function createDependencyAnalyzer(): DependencyAnalyzer {
-  return new DependencyAnalyzer();
+export function createDependencyAnalyzer(
+  options: DependencyAnalysisOptions = {}
+): DependencyAnalyzer {
+  return new DependencyAnalyzer(options.resolveConcurrency);
 }
 
 function extractFileAccesses(call: MCPToolCall, mode: AccessMode): ResourceAccess[] {
