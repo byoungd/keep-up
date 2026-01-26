@@ -1,6 +1,7 @@
 import type { CoworkSession } from "@ku0/agent-runtime";
 import { Hono } from "hono";
 import { formatZodError, jsonError, readJsonBody } from "../http";
+import { getLogger } from "../logger";
 import type { CoworkTaskRuntime } from "../runtime/coworkTaskRuntime";
 import {
   createSessionSchema,
@@ -21,6 +22,7 @@ interface SessionRouteDeps {
 
 export function createSessionRoutes(deps: SessionRouteDeps) {
   const app = new Hono();
+  const logger = getLogger("sessions");
 
   app.post("/sessions", async (c) => {
     const body = await readJsonBody(c);
@@ -51,8 +53,7 @@ export function createSessionRoutes(deps: SessionRouteDeps) {
     };
 
     await deps.sessionStore.create(session);
-    // biome-ignore lint/suspicious/noConsole: Server logging
-    console.info("[cowork] session created", {
+    logger.info("session created", {
       sessionId: session.sessionId,
       userId: session.userId,
     });
@@ -103,8 +104,7 @@ export function createSessionRoutes(deps: SessionRouteDeps) {
 
     try {
       const task = await deps.taskRuntime.enqueueTask(session.sessionId, parsed.data);
-      // biome-ignore lint/suspicious/noConsole: Server logging
-      console.info("[cowork] task created", {
+      logger.info("task created", {
         sessionId,
         taskId: task.taskId,
         status: task.status,
@@ -144,8 +144,7 @@ export function createSessionRoutes(deps: SessionRouteDeps) {
       fallbackNotice: updated.fallbackNotice,
       metadata: updated.metadata,
     });
-    // biome-ignore lint/suspicious/noConsole: Server logging
-    console.info("[cowork] task updated", {
+    logger.info("task updated", {
       sessionId: updated.sessionId,
       taskId: updated.taskId,
       status: updated.status,
