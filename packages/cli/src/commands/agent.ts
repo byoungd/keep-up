@@ -10,7 +10,11 @@ import { extractAssistantText, formatAgentOutput } from "../utils/output";
 import { loadProjectInstructions } from "../utils/projectInstructions";
 import { runPromptWithStreaming } from "../utils/promptRunner";
 import { createRuntimeResources } from "../utils/runtimeClient";
-import { resolveOutput, resolveRuntimeConfigString } from "../utils/runtimeOptions";
+import {
+  resolveOutput,
+  resolveRuntimeConfigString,
+  resolveSandboxMode,
+} from "../utils/runtimeOptions";
 import { type SessionMessage, type SessionRecord, SessionStore } from "../utils/sessionStore";
 import { readStdin, writeStderr, writeStdout } from "../utils/terminal";
 import {
@@ -90,6 +94,7 @@ function tuiCommand(): Command {
         config.approvalMode,
         "KEEPUP_APPROVAL_MODE"
       );
+      const sandbox = resolveSandboxMode(undefined, config.sandbox, "KEEPUP_SANDBOX");
       const instructions = await loadProjectInstructions({
         override: options.instructions,
       });
@@ -125,6 +130,7 @@ function tuiCommand(): Command {
           output,
           quiet: options.quiet,
           approvalMode,
+          sandbox,
           instructions,
         });
       } catch (error) {
@@ -177,6 +183,7 @@ async function runPromptCommand(
   const configStore = new ConfigStore();
   const config = await configStore.load();
   const resolved = resolveRunConfig(options, config);
+  const sandbox = resolveSandboxMode(undefined, config.sandbox, "KEEPUP_SANDBOX");
 
   const sessionStore = new SessionStore();
   const sessionId = resolveSessionId(options, config);
@@ -200,6 +207,7 @@ async function runPromptCommand(
       sessionId,
       initialMessages: session.messages,
       instructions,
+      sandbox,
     });
 
     const result = await runPromptWithStreaming({
