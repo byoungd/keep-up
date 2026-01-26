@@ -13,6 +13,7 @@ import type {
   SecurityPolicy,
   SecurityPreset,
   SpawnAgentOptions,
+  ToolExecutionContext,
 } from "@ku0/agent-runtime-core";
 import { SECURITY_PRESETS } from "@ku0/agent-runtime-core";
 
@@ -116,6 +117,7 @@ export class SubagentOrchestrator {
       signal?: AbortSignal;
       maxConcurrent?: number;
       baseSecurity?: SecurityPolicy;
+      baseToolExecution?: ToolExecutionContext;
       contextId?: string;
     } = {}
   ): Promise<AggregatedResults> {
@@ -132,6 +134,7 @@ export class SubagentOrchestrator {
           task,
           options.signal,
           options.baseSecurity,
+          options.baseToolExecution,
           parentId,
           options.contextId
         )
@@ -168,13 +171,19 @@ export class SubagentOrchestrator {
   async spawnSubagent(
     parentId: string,
     task: SubagentTask,
-    options: { signal?: AbortSignal; baseSecurity?: SecurityPolicy; contextId?: string } = {}
+    options: {
+      signal?: AbortSignal;
+      baseSecurity?: SecurityPolicy;
+      baseToolExecution?: ToolExecutionContext;
+      contextId?: string;
+    } = {}
   ): Promise<AgentResult> {
     const result = await this.manager.spawn(
       this.buildSpawnOptions(
         task,
         options.signal,
         options.baseSecurity,
+        options.baseToolExecution,
         parentId,
         options.contextId
       )
@@ -209,7 +218,12 @@ export class SubagentOrchestrator {
       context?: Record<string, unknown>;
       scope?: SubagentScope;
     },
-    options: { signal?: AbortSignal; baseSecurity?: SecurityPolicy; contextId?: string } = {}
+    options: {
+      signal?: AbortSignal;
+      baseSecurity?: SecurityPolicy;
+      baseToolExecution?: ToolExecutionContext;
+      contextId?: string;
+    } = {}
   ): Promise<{
     research?: AgentResult;
     plan?: AgentResult;
@@ -340,12 +354,17 @@ export class SubagentOrchestrator {
     task: SubagentTask,
     signal?: AbortSignal,
     baseSecurity?: SecurityPolicy,
+    baseToolExecution?: ToolExecutionContext,
     parentId?: string,
     contextId?: string
   ): SpawnAgentOptions {
     const scopedContext = task.scope
       ? { ...(task.context ?? {}), scope: task.scope }
       : task.context;
+    const scopedAllowedTools =
+      task.scope?.allowedTools !== undefined
+        ? task.scope.allowedTools
+        : baseToolExecution?.allowedTools;
     const security =
       task.scope || baseSecurity ? this.buildScopeSecurity(task, baseSecurity) : undefined;
     return {
@@ -358,7 +377,7 @@ export class SubagentOrchestrator {
       _depth: task._depth,
       signal,
       security,
-      allowedTools: task.scope?.allowedTools,
+      allowedTools: scopedAllowedTools,
     };
   }
 

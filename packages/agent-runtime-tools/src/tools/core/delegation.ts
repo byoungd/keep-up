@@ -179,6 +179,7 @@ export class DelegationToolServer extends BaseToolServer {
         {
           signal: toolContext.signal,
           baseSecurity: toolContext.security,
+          baseToolExecution: toolContext.toolExecution,
           contextId: toolContext.contextId,
         }
       );

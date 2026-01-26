@@ -113,6 +113,26 @@ describe("SubagentOrchestrator", () => {
     expect(spawned?.scope?.fileAccess).toBe("read");
   });
 
+  it("inherits allowed tools from parent execution context when scope is absent", async () => {
+    const manager = new FakeAgentManager();
+    const orchestrator = new SubagentOrchestrator(manager);
+
+    await orchestrator.spawnSubagent(
+      "parent",
+      { type: "plan", task: "do work" },
+      {
+        baseToolExecution: {
+          policy: "batch",
+          allowedTools: ["file:read"],
+          requiresApproval: [],
+          maxParallel: 1,
+        },
+      }
+    );
+
+    expect(manager.spawned[0]?.scope?.allowedTools).toEqual(["file:read"]);
+  });
+
   it("threads workflow context between subagents", async () => {
     const manager = new FakeAgentManager();
     const orchestrator = new SubagentOrchestrator(manager);
