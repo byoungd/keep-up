@@ -1,11 +1,17 @@
 import {
   type AICoreProvider,
   createAICoreAdapter,
+  createBashToolServer,
+  createBrowserToolServer,
+  createCodeInteractionServer,
   createCompletionToolServer,
+  createFileToolServer,
   createRuntime,
+  createSandboxToolServer,
   createSessionState,
   createStreamWriter,
   createToolRegistry,
+  createWebSearchToolServer,
   type RuntimeInstance,
   type StreamWriter,
 } from "@ku0/agent-runtime";
@@ -31,6 +37,7 @@ export interface RuntimeConfigOptions {
   sessionId?: string;
   initialMessages?: SessionMessage[];
   instructions?: string;
+  sandbox?: "auto" | "docker" | "none";
 }
 
 export interface RuntimeResources {
@@ -53,6 +60,12 @@ export async function createRuntimeResources(
   const eventBus = createEventBus();
   const registry = createToolRegistry();
   await registry.register(createCompletionToolServer());
+  await registry.register(createFileToolServer());
+  await registry.register(createCodeInteractionServer());
+  await registry.register(createBashToolServer());
+  await registry.register(createBrowserToolServer());
+  await registry.register(createWebSearchToolServer());
+  await maybeRegisterSandboxTool(registry, options.sandbox);
   const stream = createStreamWriter(options.sessionId ? `tui_${options.sessionId}` : undefined);
   const sessionState = createSessionState({
     id: options.sessionId,
@@ -76,6 +89,19 @@ export async function createRuntimeResources(
   });
 
   return { runtime, eventBus, stream };
+}
+
+async function maybeRegisterSandboxTool(
+  registry: ReturnType<typeof createToolRegistry>,
+  mode?: RuntimeConfigOptions["sandbox"]
+): Promise<void> {
+  if (mode !== "docker") {
+    return;
+  }
+
+  const { DockerSandboxManager } = await import("@ku0/agent-runtime-sandbox");
+  const manager = new DockerSandboxManager();
+  await registry.register(createSandboxToolServer({ manager }));
 }
 
 function mergeInstructionMessages(

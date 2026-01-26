@@ -6,11 +6,49 @@
 
 import { execFile } from "node:child_process";
 import * as fs from "node:fs/promises";
+import { createRequire } from "node:module";
 import * as path from "node:path";
 import { promisify } from "node:util";
-import { hasNativeSupport, listFiles as listFilesWithGitignoreNative } from "@ku0/gitignore-rs";
+
+type GitignoreNativeModule = {
+  hasNativeSupport: () => boolean;
+  listFiles: (
+    dirPath: string,
+    options: { maxDepth?: number; includeHidden?: boolean; respectGitignore?: boolean }
+  ) => FileEntry[];
+};
 
 const execFileAsync = promisify(execFile);
+const require = createRequire(import.meta.url);
+let cachedGitignoreModule: GitignoreNativeModule | null | undefined;
+
+function loadGitignoreModule(): GitignoreNativeModule | null {
+  if (cachedGitignoreModule !== undefined) {
+    return cachedGitignoreModule;
+  }
+  try {
+    cachedGitignoreModule = require("@ku0/gitignore-rs") as GitignoreNativeModule;
+  } catch {
+    cachedGitignoreModule = null;
+  }
+  return cachedGitignoreModule;
+}
+
+function hasGitignoreNativeSupport(): boolean {
+  const module = loadGitignoreModule();
+  return module?.hasNativeSupport?.() ?? false;
+}
+
+function listFilesWithGitignoreNative(
+  dirPath: string,
+  options: { maxDepth?: number; includeHidden?: boolean; respectGitignore?: boolean }
+): FileEntry[] {
+  const module = loadGitignoreModule();
+  if (!module) {
+    throw new Error("Native gitignore module unavailable.");
+  }
+  return module.listFiles(dirPath, options);
+}
 
 // ============================================================================
 // Types
@@ -119,7 +157,7 @@ export async function listFiles(
   const includeHidden = options.includeHidden ?? false;
   const respectGitignore = options.respectGitignore ?? true;
 
-  if (hasNativeSupport()) {
+  if (hasGitignoreNativeSupport()) {
     try {
       const nativeMaxDepth = Number.isFinite(maxDepth) ? maxDepth : undefined;
       return listFilesWithGitignoreNative(absolutePath, {
