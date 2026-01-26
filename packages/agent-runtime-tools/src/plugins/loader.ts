@@ -4,7 +4,7 @@
  * Loads and manages plugin lifecycle with security boundaries.
  */
 
-import { getLogger } from "@ku0/agent-runtime-telemetry/logging";
+import { createSubsystemLogger } from "@ku0/agent-runtime-telemetry/logging";
 import type {
   AgentContribution,
   AgentFactory,
@@ -488,7 +488,11 @@ interface HookRegistration {
 // ============================================================================
 
 function createConsoleLogger(prefix: string): PluginLogger {
-  const logger = getLogger(prefix);
+  const baseLogger = createSubsystemLogger("agent", "plugins");
+  const logger =
+    prefix === "PluginLoader"
+      ? baseLogger.child({ component: "loader" })
+      : baseLogger.forPlugin(prefix);
   return {
     debug: (msg, ...args) => logger.debug(`${msg}`, { args }),
     info: (msg, ...args) => logger.info(`${msg}`, { args }),

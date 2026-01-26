@@ -16,7 +16,7 @@ import type {
   MessageEnvelope,
   ToolExecutionRecord,
 } from "@ku0/agent-runtime-core";
-import { getLogger, type Logger } from "@ku0/agent-runtime-telemetry/logging";
+import { createSubsystemLogger, type Logger } from "@ku0/agent-runtime-telemetry/logging";
 
 // ============================================================================
 // Types
@@ -309,7 +309,7 @@ export class EventBus {
   private pendingHandlers = 0;
 
   constructor(config: EventBusConfig = {}) {
-    this.logger = config.logger ?? getLogger("event-bus");
+    this.logger = config.logger ?? createSubsystemLogger("agent", "event-bus");
     this.config = {
       maxHistorySize: config.maxHistorySize ?? 1000,
       historyTtlMs: config.historyTtlMs ?? 5 * 60 * 1000, // 5 minutes

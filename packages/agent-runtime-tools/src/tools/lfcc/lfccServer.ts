@@ -8,7 +8,7 @@
  */
 
 import type { MCPToolResult, ToolContext } from "@ku0/agent-runtime-core";
-import { getLogger } from "@ku0/agent-runtime-telemetry/logging";
+import { createSubsystemLogger } from "@ku0/agent-runtime-telemetry/logging";
 import type {
   AIEnvelopeDiagnostic,
   AIEnvelopeResponse,
@@ -54,7 +54,7 @@ export type {
   MultiDocumentRole,
 } from "./multiDocument";
 
-const logger = getLogger("lfcc-tool");
+const logger = createSubsystemLogger("agent", "tools:lfcc");
 const BLOCK_TYPES: BlockType[] = [
   "paragraph",
   "heading1",
