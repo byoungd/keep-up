@@ -226,6 +226,16 @@ function resolveWorkspaceStatus(
   return status as CoworkWorkspaceSession["status"];
 }
 
+function buildToolCallIndex(nodes: TaskNode[]): Map<string, string> {
+  const index = new Map<string, string>();
+  for (const node of nodes) {
+    if (node.type === "tool_call" && node.callId) {
+      index.set(node.callId, node.id);
+    }
+  }
+  return index;
+}
+
 function upsertWorkspaceSession(prev: TaskGraph, session: CoworkWorkspaceSession): TaskGraph {
   return {
     ...prev,
@@ -332,6 +342,7 @@ export function useTaskStream(sessionId: string) {
   const taskTitleRef = useRef(new Map<string, string>());
   const taskPromptRef = useRef(new Map<string, string>());
   const taskMetadataRef = useRef(new Map<string, Record<string, unknown>>());
+  const toolCallIndexRef = useRef<Map<string, string>>(new Map());
 
   useEffect(() => {
     graphRef.current = graph;
@@ -342,6 +353,7 @@ export function useTaskStream(sessionId: string) {
     const cached = loadGraphFromStorage(sessionId);
     if (cached && cached.nodes.length > 0) {
       setGraph(cached);
+      toolCallIndexRef.current = buildToolCallIndex(cached.nodes);
       // Populate seenEventIds from cached nodes to prevent duplicate filtering
       // We extract base IDs from node IDs (e.g., "call-xyz" -> "xyz", "task-abc" -> "abc")
       const seenIds = new Set<string>();
@@ -366,6 +378,7 @@ export function useTaskStream(sessionId: string) {
         workspaceEvents: {},
       });
       seenEventIdsRef.current = new Set();
+      toolCallIndexRef.current.clear();
     }
     lastEventIdRef.current = null;
     taskTitleRef.current.clear();
@@ -432,6 +445,7 @@ export function useTaskStream(sessionId: string) {
             taskPromptRef.current,
             taskMetadataRef.current
           );
+          toolCallIndexRef.current = buildToolCallIndex(derived.nodes);
           return {
             ...derived,
             workspaceSessions: mapWorkspaceSessions(workspaceSessions),
@@ -528,7 +542,8 @@ export function useTaskStream(sessionId: string) {
         new Date().toISOString(),
         taskTitleRef.current,
         taskPromptRef.current,
-        taskMetadataRef.current
+        taskMetadataRef.current,
+        toolCallIndexRef.current
       )
     );
   }, []);
@@ -850,7 +865,8 @@ type EventHandler = (
   now: string,
   taskTitles: Map<string, string>,
   taskPrompts: Map<string, string>,
-  taskMetadata: Map<string, Record<string, unknown>>
+  taskMetadata: Map<string, Record<string, unknown>>,
+  toolCallIndex: Map<string, string>
 ) => TaskGraph;
 
 const EVENT_HANDLERS: Record<string, EventHandler> = {
@@ -887,7 +903,8 @@ function handleUsageUpdated(
   _now: string,
   _taskTitles: Map<string, string>,
   _taskPrompts: Map<string, string>,
-  _taskMetadata: Map<string, Record<string, unknown>>
+  _taskMetadata: Map<string, Record<string, unknown>>,
+  _toolCallIndex: Map<string, string>
 ): TaskGraph {
   if (
     !isRecord(data) ||
@@ -914,7 +931,8 @@ function handleTokenUsage(
   _now: string,
   _taskTitles: Map<string, string>,
   _taskPrompts: Map<string, string>,
-  _taskMetadata: Map<string, Record<string, unknown>>
+  _taskMetadata: Map<string, Record<string, unknown>>,
+  _toolCallIndex: Map<string, string>
 ): TaskGraph {
   if (
     !isRecord(data) ||
@@ -963,7 +981,8 @@ function handleWorkspaceSessionCreated(
   _now: string,
   _taskTitles: Map<string, string>,
   _taskPrompts: Map<string, string>,
-  _taskMetadata: Map<string, Record<string, unknown>>
+  _taskMetadata: Map<string, Record<string, unknown>>,
+  _toolCallIndex: Map<string, string>
 ): TaskGraph {
   if (!isRecord(data) || !isWorkspaceSession(data.workspaceSession)) {
     return prev;
@@ -978,7 +997,8 @@ function handleWorkspaceSessionUpdated(
   _now: string,
   _taskTitles: Map<string, string>,
   _taskPrompts: Map<string, string>,
-  _taskMetadata: Map<string, Record<string, unknown>>
+  _taskMetadata: Map<string, Record<string, unknown>>,
+  _toolCallIndex: Map<string, string>
 ): TaskGraph {
   if (!isRecord(data) || !isWorkspaceSession(data.workspaceSession)) {
     return prev;
@@ -993,7 +1013,8 @@ function handleWorkspaceSessionEnded(
   _now: string,
   _taskTitles: Map<string, string>,
   _taskPrompts: Map<string, string>,
-  _taskMetadata: Map<string, Record<string, unknown>>
+  _taskMetadata: Map<string, Record<string, unknown>>,
+  _toolCallIndex: Map<string, string>
 ): TaskGraph {
   if (!isRecord(data) || typeof data.workspaceSessionId !== "string") {
     return prev;
@@ -1025,7 +1046,8 @@ function handleWorkspaceSessionEvent(
   _now: string,
   _taskTitles: Map<string, string>,
   _taskPrompts: Map<string, string>,
-  _taskMetadata: Map<string, Record<string, unknown>>
+  _taskMetadata: Map<string, Record<string, unknown>>,
+  _toolCallIndex: Map<string, string>
 ): TaskGraph {
   if (!isRecord(data) || !isWorkspaceEvent(data.event)) {
     return prev;
@@ -1040,7 +1062,8 @@ function handleSessionModeChanged(
   _now: string,
   _taskTitles: Map<string, string>,
   _taskPrompts: Map<string, string>,
-  _taskMetadata: Map<string, Record<string, unknown>>
+  _taskMetadata: Map<string, Record<string, unknown>>,
+  _toolCallIndex: Map<string, string>
 ): TaskGraph {
   if (!isRecord(data) || typeof data.mode !== "string") {
     return prev;
@@ -1058,7 +1081,8 @@ function handleApprovalRequired(
   now: string,
   _taskTitles: Map<string, string>,
   _taskPrompts: Map<string, string>,
-  _taskMetadata: Map<string, Record<string, unknown>>
+  _taskMetadata: Map<string, Record<string, unknown>>,
+  _toolCallIndex: Map<string, string>
 ): TaskGraph {
   if (!isRecord(data)) {
     return prev;
@@ -1097,7 +1121,8 @@ function handleApprovalResolved(
   now: string,
   _taskTitles: Map<string, string>,
   _taskPrompts: Map<string, string>,
-  _taskMetadata: Map<string, Record<string, unknown>>
+  _taskMetadata: Map<string, Record<string, unknown>>,
+  _toolCallIndex: Map<string, string>
 ): TaskGraph {
   if (!isRecord(data)) {
     return prev;
@@ -1127,7 +1152,8 @@ function handleClarificationRequested(
   _now: string,
   _taskTitles: Map<string, string>,
   _taskPrompts: Map<string, string>,
-  _taskMetadata: Map<string, Record<string, unknown>>
+  _taskMetadata: Map<string, Record<string, unknown>>,
+  _toolCallIndex: Map<string, string>
 ): TaskGraph {
   if (!isRecord(data) || !isRecord(data.request)) {
     return prev;
@@ -1152,7 +1178,8 @@ function handleClarificationAnswered(
   _now: string,
   _taskTitles: Map<string, string>,
   _taskPrompts: Map<string, string>,
-  _taskMetadata: Map<string, Record<string, unknown>>
+  _taskMetadata: Map<string, Record<string, unknown>>,
+  _toolCallIndex: Map<string, string>
 ): TaskGraph {
   if (!isRecord(data) || !isRecord(data.response)) {
     return prev;
@@ -1174,7 +1201,8 @@ function handleAgentThink(
   now: string,
   _taskTitles: Map<string, string>,
   _taskPrompts: Map<string, string>,
-  _taskMetadata: Map<string, Record<string, unknown>>
+  _taskMetadata: Map<string, Record<string, unknown>>,
+  _toolCallIndex: Map<string, string>
 ): TaskGraph {
   if (!isRecord(data) || typeof data.content !== "string") {
     return prev;
@@ -1199,7 +1227,8 @@ function handleTurnStart(
   now: string,
   _taskTitles: Map<string, string>,
   _taskPrompts: Map<string, string>,
-  _taskMetadata: Map<string, Record<string, unknown>>
+  _taskMetadata: Map<string, Record<string, unknown>>,
+  _toolCallIndex: Map<string, string>
 ): TaskGraph {
   if (!isRecord(data) || typeof data.turn !== "number") {
     return prev;
@@ -1225,7 +1254,8 @@ function handleTurnEnd(
   now: string,
   _taskTitles: Map<string, string>,
   _taskPrompts: Map<string, string>,
-  _taskMetadata: Map<string, Record<string, unknown>>
+  _taskMetadata: Map<string, Record<string, unknown>>,
+  _toolCallIndex: Map<string, string>
 ): TaskGraph {
   if (!isRecord(data) || typeof data.turn !== "number") {
     return prev;
@@ -1251,19 +1281,26 @@ function handleToolCall(
   now: string,
   _taskTitles: Map<string, string>,
   _taskPrompts: Map<string, string>,
-  _taskMetadata: Map<string, Record<string, unknown>>
+  _taskMetadata: Map<string, Record<string, unknown>>,
+  toolCallIndex: Map<string, string>
 ): TaskGraph {
   if (!isRecord(data) || typeof data.tool !== "string") {
     return prev;
   }
 
   const { riskLevel, activity, activityLabel, taskId } = extractToolInvocationMetadata(data);
+  const callId = typeof data.callId === "string" ? data.callId : undefined;
+  const nodeId = `call-${id}`;
+  if (callId) {
+    toolCallIndex.set(callId, nodeId);
+  }
 
   return {
     ...prev,
     nodes: appendNode(prev.nodes, {
-      id: `call-${id}`,
+      id: nodeId,
       type: "tool_call",
+      callId,
       toolName: data.tool,
       args: isRecord(data.args) ? data.args : {},
       timestamp: now,
@@ -1278,6 +1315,25 @@ function handleToolCall(
   };
 }
 
+function resolveToolCallNodeId(
+  nodes: TaskNode[],
+  callId: string,
+  toolCallIndex: Map<string, string>
+): string | null {
+  const indexed = toolCallIndex.get(callId);
+  if (indexed) {
+    return indexed;
+  }
+  for (let i = nodes.length - 1; i >= 0; i -= 1) {
+    const node = nodes[i];
+    if (node?.type === "tool_call" && node.callId === callId) {
+      toolCallIndex.set(callId, node.id);
+      return node.id;
+    }
+  }
+  return null;
+}
+
 function handleToolResult(
   prev: TaskGraph,
   id: string,
@@ -1285,26 +1341,32 @@ function handleToolResult(
   now: string,
   _taskTitles: Map<string, string>,
   _taskPrompts: Map<string, string>,
-  _taskMetadata: Map<string, Record<string, unknown>>
+  _taskMetadata: Map<string, Record<string, unknown>>,
+  toolCallIndex: Map<string, string>
 ): TaskGraph {
   if (!isRecord(data)) {
     return prev;
   }
 
   const { toolName, activity, activityLabel, taskId } = extractToolResultMetadata(data);
+  const rawCallId = typeof data.callId === "string" ? data.callId : undefined;
+  const resolvedCallId = rawCallId
+    ? (resolveToolCallNodeId(prev.nodes, rawCallId, toolCallIndex) ?? rawCallId)
+    : "unknown";
 
   return {
     ...prev,
     nodes: appendNode(prev.nodes, {
       id: `out-${id}`,
       type: "tool_output",
-      callId: typeof data.callId === "string" ? data.callId : "unknown",
+      callId: resolvedCallId,
       toolName,
       output: data.result,
       isError: typeof data.isError === "boolean" ? data.isError : undefined,
       errorCode: typeof data.errorCode === "string" ? data.errorCode : undefined,
       durationMs: typeof data.durationMs === "number" ? data.durationMs : undefined,
       attempts: typeof data.attempts === "number" ? data.attempts : undefined,
+      cached: typeof data.cached === "boolean" ? data.cached : undefined,
       activity,
       activityLabel,
       taskId,
@@ -1320,7 +1382,8 @@ function handlePolicyDecision(
   now: string,
   _taskTitles: Map<string, string>,
   _taskPrompts: Map<string, string>,
-  _taskMetadata: Map<string, Record<string, unknown>>
+  _taskMetadata: Map<string, Record<string, unknown>>,
+  _toolCallIndex: Map<string, string>
 ): TaskGraph {
   if (!isRecord(data)) {
     return prev;
@@ -1359,7 +1422,8 @@ function handleCheckpointCreated(
   now: string,
   _taskTitles: Map<string, string>,
   _taskPrompts: Map<string, string>,
-  _taskMetadata: Map<string, Record<string, unknown>>
+  _taskMetadata: Map<string, Record<string, unknown>>,
+  _toolCallIndex: Map<string, string>
 ): TaskGraph {
   if (!isRecord(data) || typeof data.checkpointId !== "string") {
     return prev;
@@ -1391,7 +1455,8 @@ function handleCheckpointRestored(
   now: string,
   _taskTitles: Map<string, string>,
   _taskPrompts: Map<string, string>,
-  _taskMetadata: Map<string, Record<string, unknown>>
+  _taskMetadata: Map<string, Record<string, unknown>>,
+  _toolCallIndex: Map<string, string>
 ): TaskGraph {
   if (!isRecord(data) || typeof data.checkpointId !== "string") {
     return prev;
@@ -1456,7 +1521,8 @@ function handlePlanUpdate(
   now: string,
   _taskTitles: Map<string, string>,
   _taskPrompts: Map<string, string>,
-  _taskMetadata: Map<string, Record<string, unknown>>
+  _taskMetadata: Map<string, Record<string, unknown>>,
+  _toolCallIndex: Map<string, string>
 ): TaskGraph {
   if (!isRecord(data)) {
     return prev;
@@ -1511,7 +1577,8 @@ function handleArtifactUpdate(
   now: string,
   _taskTitles: Map<string, string>,
   _taskPrompts: Map<string, string>,
-  _taskMetadata: Map<string, Record<string, unknown>>
+  _taskMetadata: Map<string, Record<string, unknown>>,
+  _toolCallIndex: Map<string, string>
 ): TaskGraph {
   if (!isRecord(data)) {
     return prev;
@@ -1636,7 +1703,8 @@ function handleTaskUpdate(
   now: string,
   taskTitles: Map<string, string>,
   taskPrompts: Map<string, string>,
-  taskMetadata: Map<string, Record<string, unknown>>
+  taskMetadata: Map<string, Record<string, unknown>>,
+  _toolCallIndex: Map<string, string>
 ): TaskGraph {
   if (!isRecord(data)) {
     return prev;
@@ -1773,11 +1841,12 @@ function reduceGraph(
   now: string,
   taskTitles: Map<string, string>,
   taskPrompts: Map<string, string>,
-  taskMetadata: Map<string, Record<string, unknown>>
+  taskMetadata: Map<string, Record<string, unknown>>,
+  toolCallIndex: Map<string, string>
 ): TaskGraph {
   const handler = EVENT_HANDLERS[type];
   if (handler) {
-    return handler(prev, id, data, now, taskTitles, taskPrompts, taskMetadata);
+    return handler(prev, id, data, now, taskTitles, taskPrompts, taskMetadata, toolCallIndex);
   }
   return prev;
 }

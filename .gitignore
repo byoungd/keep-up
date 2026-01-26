@@ -2,6 +2,7 @@
 node_modules
 /dist
 coverage/
+.agent-runtime/
 
 # local env files
 .env.local

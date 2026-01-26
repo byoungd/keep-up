@@ -1093,7 +1093,10 @@ export class CoworkTaskRuntime {
     if (requestedModel && requestedModel !== runtime.modelId) {
       return true;
     }
-    const nextPackKey = await this.projectContextManager.getContextPackKey(session);
+    const tokenModel = runtime.modelId ?? requestedModel ?? undefined;
+    const nextPackKey = await this.projectContextManager.getContextPackKey(session, {
+      tokenModel,
+    });
     return nextPackKey !== runtime.contextPackKey;
   }
 

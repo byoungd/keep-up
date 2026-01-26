@@ -303,6 +303,7 @@ export class TaskOrchestrator {
 
     this.eventPublisher.publishAgentToolCall({
       sessionId,
+      callId: typeof data.callId === "string" ? data.callId : undefined,
       tool: data.toolName,
       args: isRecord(data.arguments) ? data.arguments : {},
       activity,
@@ -328,16 +329,23 @@ export class TaskOrchestrator {
     const telemetry = extractTelemetry(data);
     const activity = resolveActivity(data.toolName);
     const activityLabel = formatActivity(activity);
+    const callId =
+      typeof data.callId === "string" ? data.callId : `${data.toolName}-${Date.now().toString(36)}`;
+    const durationMs =
+      typeof data.durationMs === "number" ? data.durationMs : telemetry?.durationMs;
+    const attempts = telemetry?.attempts;
+    const cached = typeof data.cached === "boolean" ? data.cached : undefined;
 
     this.eventPublisher.publishAgentToolResult({
       sessionId,
-      callId: `${data.toolName}-${Date.now().toString(36)}`,
+      callId,
       toolName: data.toolName,
       result,
       isError,
       errorCode,
-      durationMs: telemetry?.durationMs,
-      attempts: telemetry?.attempts,
+      durationMs,
+      attempts,
+      cached,
       activity,
       activityLabel,
       taskId: activeTaskId ?? undefined,
