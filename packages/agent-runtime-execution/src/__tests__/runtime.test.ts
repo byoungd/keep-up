@@ -4,16 +4,19 @@
 
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  type AgentMessage,
   createAuditLogger,
   createBashToolServer,
   createCodeToolServer,
   createCompletionToolServer,
+  createContextCompactor,
   createFileToolServer,
   createLFCCToolServer,
   createMockLLM,
   createOrchestrator,
   createSecurityPolicy,
   createToolRegistry,
+  InMemorySessionState,
   type MCPToolCall,
   SECURITY_PRESETS,
   securityPolicy,
@@ -371,6 +374,78 @@ describe("AgentOrchestrator", () => {
     expect(state.status).toBe("complete");
     expect(state.messages.some((m) => m.role === "tool")).toBe(true);
     expect(callCount).toBe(2);
+  });
+
+  it("should compact context when history exceeds threshold", async () => {
+    const initialMessages: AgentMessage[] = [
+      { role: "system", content: "System prompt" },
+      ...Array.from({ length: 6 }).flatMap((_, index) => [
+        {
+          role: "user",
+          content: `User message ${index}: ${"detail ".repeat(40)}`,
+        },
+        {
+          role: "assistant",
+          content: `Assistant reply ${index}: ${"response ".repeat(40)}`,
+        },
+      ]),
+    ];
+
+    const sessionState = new InMemorySessionState({
+      initialState: {
+        turn: 0,
+        messages: initialMessages,
+        pendingToolCalls: [],
+        status: "idle",
+      },
+    });
+
+    const compactor = createContextCompactor({
+      targetThreshold: 1,
+      contextConfig: {
+        maxTokens: 500,
+        compressionThreshold: 0.01,
+        preserveLastN: 1,
+        compressionStrategy: "hybrid",
+      },
+    });
+
+    let callCount = 0;
+    llm.complete = async () => {
+      callCount += 1;
+      if (callCount === 1) {
+        return {
+          content: "Listing files.",
+          toolCalls: [{ name: "file:list", arguments: { path: "/tmp" } }],
+          finishReason: "tool_use" as const,
+        };
+      }
+      return {
+        content: "Done.",
+        toolCalls: [
+          {
+            name: "completion:complete_task",
+            arguments: { summary: "Listed files." },
+          },
+        ],
+        finishReason: "tool_use" as const,
+      };
+    };
+
+    const agent = createOrchestrator(llm, registry, {
+      requireConfirmation: false,
+      components: { sessionState, contextCompactor: compactor },
+    });
+
+    const state = await agent.run("Trigger compaction");
+    const summaryMessage = state.messages.find(
+      (message) => message.role === "system" && message.content.startsWith("[Conversation Summary]")
+    );
+
+    expect(summaryMessage).toBeDefined();
+    expect(state.messages[0]?.role).toBe("system");
+    expect(state.messages[0]?.content).toBe("System prompt");
+    expect(state.messages.length).toBeLessThan(initialMessages.length);
   });
 
   it("should respect max turns limit", async () => {
