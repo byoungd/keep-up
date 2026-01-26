@@ -1623,6 +1623,7 @@ export class LFCCToolServer extends BaseToolServer {
         },
         annotations: {
           category: "knowledge",
+          requiresConfirmation: false,
           readOnly: true,
           estimatedDuration: "fast",
           policyAction: "connector.read",
@@ -1645,6 +1646,7 @@ export class LFCCToolServer extends BaseToolServer {
         },
         annotations: {
           category: "knowledge",
+          requiresConfirmation: false,
           readOnly: true,
           estimatedDuration: "fast",
           policyAction: "connector.read",
@@ -1667,6 +1669,7 @@ export class LFCCToolServer extends BaseToolServer {
         },
         annotations: {
           category: "knowledge",
+          requiresConfirmation: false,
           readOnly: true,
           estimatedDuration: "fast",
           policyAction: "connector.read",
@@ -1689,6 +1692,7 @@ export class LFCCToolServer extends BaseToolServer {
         },
         annotations: {
           category: "knowledge",
+          requiresConfirmation: false,
           readOnly: true,
           estimatedDuration: "fast",
           policyAction: "connector.read",
@@ -1805,6 +1809,7 @@ export class LFCCToolServer extends BaseToolServer {
         },
         annotations: {
           category: "knowledge",
+          requiresConfirmation: false,
           readOnly: true,
           estimatedDuration: "medium",
           policyAction: "connector.read",

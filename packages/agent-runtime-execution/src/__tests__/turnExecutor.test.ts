@@ -44,16 +44,15 @@ describe("TurnExecutor", () => {
   });
 
   describe("execute", () => {
-    it("returns complete outcome when LLM returns stop", async () => {
+    it("returns error outcome when LLM returns stop without completion tool", async () => {
       const deps = createMockDeps();
       const executor = createTurnExecutor(deps);
       const state = createMockState();
 
       const outcome = await executor.execute(state);
 
-      expect(outcome.type).toBe("complete");
-      expect(outcome.response?.content).toBe("Test response");
-      expect(outcome.assistantMessage?.role).toBe("assistant");
+      expect(outcome.type).toBe("error");
+      expect(outcome.error).toContain("Completion tool");
     });
 
     it("returns tool_use outcome when LLM returns tool calls", async () => {
@@ -143,7 +142,8 @@ describe("TurnExecutor", () => {
 
       const outcome = await executor.execute(state);
 
-      expect(outcome.response?.content).toBe("Cached response");
+      expect(outcome.type).toBe("error");
+      expect(outcome.error).toContain("Completion tool");
       expect(outcome.metrics.cacheHit).toBe(true);
       expect(completeFn).not.toHaveBeenCalled();
     });
