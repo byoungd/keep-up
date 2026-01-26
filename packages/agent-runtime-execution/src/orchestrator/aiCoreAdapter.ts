@@ -121,7 +121,7 @@ export class AICoreProviderAdapter implements IAgentLLM {
     this.toolNameMap = toolNameMap;
 
     return {
-      model: this.options.model,
+      model: request.model ?? this.options.model,
       messages,
       temperature: request.temperature ?? this.options.temperature ?? 0.7,
       maxTokens: request.maxTokens ?? this.options.maxTokens,

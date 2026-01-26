@@ -55,6 +55,7 @@ export interface ModelRoutingDecision {
   resolved: string;
   reason: string;
   policy: ModelRoutingPolicy;
+  fallbackModels?: string[];
   /** Routing metrics for observability (Track H.1) */
   metrics?: RoutingMetrics;
 }
@@ -179,6 +180,7 @@ export class ModelRouter {
         resolved: decision.modelId,
         reason: decision.reason,
         policy: decision.policy,
+        fallbackModels: decision.fallbackModels,
         metrics: {
           routingLatencyMs,
           cacheHit: decision.metrics?.cacheHit ?? false,
@@ -206,6 +208,8 @@ export class ModelRouter {
           ? "fallback to default model after routing failure"
           : "fallback to requested model; default exceeded budget",
         policy,
+        fallbackModels:
+          request.preferredModels?.filter((modelId) => modelId !== resolvedModel) ?? [],
         metrics: {
           routingLatencyMs,
           cacheHit: false,

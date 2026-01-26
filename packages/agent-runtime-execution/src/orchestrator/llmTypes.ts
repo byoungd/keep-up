@@ -24,6 +24,8 @@ export interface AgentLLMRequest {
   systemPrompt?: string;
   temperature?: number;
   maxTokens?: number;
+  /** Optional model override for this request */
+  model?: string;
 }
 
 export interface AgentToolDefinition {

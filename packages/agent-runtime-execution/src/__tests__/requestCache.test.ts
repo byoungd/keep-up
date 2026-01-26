@@ -16,7 +16,7 @@ import type { AgentMessage } from "../types";
 function createRequest(
   messages: AgentMessage[],
   tools: Array<{ name: string; description?: string; inputSchema?: unknown }> = [],
-  options: { systemPrompt?: string; temperature?: number } = {}
+  options: { systemPrompt?: string; temperature?: number; model?: string } = {}
 ): AgentLLMRequest {
   return {
     messages,
@@ -27,6 +27,7 @@ function createRequest(
     })),
     systemPrompt: options.systemPrompt,
     temperature: options.temperature,
+    model: options.model,
   };
 }
 
@@ -195,6 +196,19 @@ describe("RequestCache Collision Prevention", () => {
 
     const request1 = createRequest(messages, [], { systemPrompt: "Prompt A" });
     const request2 = createRequest(messages, [], { systemPrompt: "Prompt B" });
+
+    const response1 = createResponse("A");
+
+    cache.set(request1, response1);
+
+    expect(cache.get(request2)).toBeNull();
+  });
+
+  it("should differentiate by model", () => {
+    const messages: AgentMessage[] = [{ role: "user", content: "Same content" }];
+
+    const request1 = createRequest(messages, [], { model: "model-a" });
+    const request2 = createRequest(messages, [], { model: "model-b" });
 
     const response1 = createResponse("A");
 

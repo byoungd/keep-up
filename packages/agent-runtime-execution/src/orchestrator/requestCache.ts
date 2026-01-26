@@ -241,8 +241,9 @@ export class RequestCache {
     const toolsKey = this.hashTools(request.tools);
     const systemKey = request.systemPrompt ? hashString(request.systemPrompt) : "";
     const tempKey = request.temperature?.toString() ?? "";
+    const modelKey = request.model ?? "";
 
-    return hashString(`${messagesKey}:${toolsKey}:${systemKey}:${tempKey}`);
+    return hashString(`${messagesKey}:${toolsKey}:${systemKey}:${tempKey}:${modelKey}`);
   }
 
   private hashMessages(messages: AgentMessage[]): string {
