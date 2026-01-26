@@ -61,7 +61,7 @@ describe("TurnExecutor", () => {
           complete: vi.fn().mockResolvedValue({
             content: "Using tools",
             finishReason: "tool_use",
-            toolCalls: [{ callId: "1", name: "test_tool", arguments: {} }],
+            toolCalls: [{ id: "1", name: "test_tool", arguments: {} }],
           } satisfies AgentLLMResponse),
         } as unknown as IAgentLLM,
       });
@@ -97,7 +97,8 @@ describe("TurnExecutor", () => {
         }
         return {
           content: "Fallback response",
-          finishReason: "stop",
+          finishReason: "tool_use",
+          toolCalls: [{ id: "1", name: "test_tool", arguments: {} }],
         } satisfies AgentLLMResponse;
       });
       const deps = createMockDeps({
@@ -119,7 +120,7 @@ describe("TurnExecutor", () => {
 
       const outcome = await executor.execute(state);
 
-      expect(outcome.type).toBe("complete");
+      expect(outcome.type).toBe("tool_use");
       expect(outcome.modelId).toBe("fallback");
       expect(completeFn).toHaveBeenCalledTimes(2);
     });
