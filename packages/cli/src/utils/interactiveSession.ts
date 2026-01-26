@@ -9,6 +9,7 @@ import type { OutputFormat } from "./output";
 import { extractAssistantText, formatAgentOutput } from "./output";
 import { runPromptWithStreaming } from "./promptRunner";
 import { createRuntimeResources } from "./runtimeClient";
+import type { SandboxMode } from "./runtimeOptions";
 import { type SessionRecord, SessionStore } from "./sessionStore";
 import { writeStdout } from "./terminal";
 
@@ -19,6 +20,7 @@ export interface InteractiveSessionOptions {
   output: OutputFormat;
   quiet?: boolean;
   approvalMode?: ApprovalMode;
+  sandbox?: SandboxMode;
   autoApproval?: AutoApprovalOptions;
   instructions?: string;
 }
@@ -53,6 +55,7 @@ export async function runInteractiveSession(options: InteractiveSessionOptions):
     sessionId: session.id,
     initialMessages: session.messages,
     instructions: options.instructions,
+    sandbox: options.sandbox,
   });
   const confirmationHandler = createConfirmationHandler({
     mode: options.approvalMode ?? "ask",

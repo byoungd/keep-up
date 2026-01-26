@@ -1,6 +1,7 @@
 import type { OutputFormat } from "./output";
 
 const AUTO_VALUES = new Set(["auto", "default"]);
+const SANDBOX_VALUES = new Set(["auto", "docker", "none"]);
 
 export function resolveOutput(value: string): OutputFormat {
   if (value === "json") {
@@ -10,6 +11,24 @@ export function resolveOutput(value: string): OutputFormat {
     return "markdown";
   }
   return "text";
+}
+
+export type SandboxMode = "auto" | "docker" | "none";
+
+export function resolveSandboxMode(
+  primary: string | undefined,
+  fallback: unknown,
+  envVar?: string
+): SandboxMode {
+  const resolved = resolveRuntimeConfigString(primary, fallback, envVar);
+  if (!resolved) {
+    return "auto";
+  }
+  const normalized = resolved.trim().toLowerCase();
+  if (SANDBOX_VALUES.has(normalized)) {
+    return normalized as SandboxMode;
+  }
+  return "auto";
 }
 
 export function resolveRuntimeConfigString(
