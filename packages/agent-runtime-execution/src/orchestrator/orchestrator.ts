@@ -58,7 +58,16 @@ import {
 } from "@ku0/ai-core";
 import type { IntentRegistry } from "@ku0/core";
 import { createIntentRegistry } from "@ku0/core";
-import type { ContextFrameBuilder, ContextItem, FileContextTracker } from "../context";
+import {
+  type ContextCompactor,
+  type ContextFrameBuilder,
+  type ContextItem,
+  type ContextMessage,
+  type ContextToolCall,
+  type ContextToolResult,
+  createContextCompactor,
+  type FileContextTracker,
+} from "../context";
 import {
   createToolExecutor,
   type ToolConfirmationDetailsProvider,
@@ -221,6 +230,7 @@ export interface ControlStateSnapshot {
 
 export interface OrchestratorComponents {
   messageCompressor?: MessageCompressor;
+  contextCompactor?: ContextCompactor;
   requestCache?: RequestCache;
   dependencyAnalyzer?: DependencyAnalyzer;
   toolScheduler?: SmartToolScheduler;
@@ -289,6 +299,7 @@ const DEFAULT_RECOVERY_GRACE_TURNS = 2;
 const DEFAULT_RECOVERY_TIMEOUT_MS = 60_000;
 const DEFAULT_RECOVERY_WARNING_TEMPLATE =
   "Final warning: turn limit reached. Call complete_task now with a summary, artifacts, and next steps. Do not call any other tools.";
+const CONTEXT_SUMMARY_PREFIX = "[Conversation Summary]";
 
 type CompletionPayload = {
   summary: string;
@@ -316,6 +327,7 @@ export class AgentOrchestrator {
 
   // Performance optimizations
   private readonly messageCompressor: MessageCompressor;
+  private readonly contextCompactor: ContextCompactor;
   private readonly requestCache: RequestCache;
   private readonly toolResultCache: ToolResultCache;
   private readonly nodeResultCache?: NodeResultCache;
@@ -440,6 +452,7 @@ export class AgentOrchestrator {
 
     // Initialize performance optimizations
     this.messageCompressor = this.resolveMessageCompressor(components);
+    this.contextCompactor = components.contextCompactor ?? createContextCompactor();
     this.toolResultCache = this.resolveToolResultCache(components);
     this.nodeResultCache = this.resolveNodeResultCache(config, components);
     this.requestCache = this.resolveRequestCache(components);
@@ -2050,6 +2063,125 @@ export class AgentOrchestrator {
     this.loopStateMachine.transitionToDecision(thinkingResult);
   }
 
+  private compactContextIfNeeded(): void {
+    if (this.state.messages.length === 0) {
+      return;
+    }
+
+    const systemMessages = this.state.messages.filter(
+      (message) =>
+        message.role === "system" && !message.content.trim().startsWith(CONTEXT_SUMMARY_PREFIX)
+    );
+    const nonSystemMessages = this.state.messages.filter((message) => message.role !== "system");
+    if (nonSystemMessages.length === 0) {
+      return;
+    }
+
+    const contextMessages = this.toContextMessages(nonSystemMessages);
+    if (!this.contextCompactor.needsCompaction(contextMessages)) {
+      return;
+    }
+
+    const { preserved, toSummarize } = this.contextCompactor.getMessagesToPreserve(contextMessages);
+    if (toSummarize.length === 0) {
+      return;
+    }
+
+    const summary = this.buildCompactionSummary(toSummarize);
+    const summaryMessage: AgentMessage = {
+      role: "system",
+      content: `${CONTEXT_SUMMARY_PREFIX}\n${summary}`.trim(),
+    };
+
+    const fallbackCount = 5;
+    const hasPreserved = preserved.length > 0;
+    const preservedIndices = hasPreserved
+      ? preserved.map((message) => contextMessages.indexOf(message)).filter((idx) => idx >= 0)
+      : contextMessages.map((_, index) => index).slice(-fallbackCount);
+    const preservedMessages =
+      preservedIndices.length > 0
+        ? preservedIndices.map((idx) => nonSystemMessages[idx])
+        : nonSystemMessages.slice(-fallbackCount);
+
+    this.state.messages = [...systemMessages, summaryMessage, ...preservedMessages];
+    this.sessionState?.setState(this.state);
+
+    const contextManager = this.sessionState?.context;
+    const contextId = this.sessionState?.getContextId();
+    if (contextManager && contextId) {
+      const recentMessages = hasPreserved ? preserved : contextMessages.slice(-fallbackCount);
+      this.contextCompactor.applyCompaction(
+        contextManager,
+        contextId,
+        summary,
+        recentMessages,
+        contextMessages
+      );
+    }
+  }
+
+  private toContextMessages(messages: AgentMessage[]): ContextMessage[] {
+    return messages.map((message, index) => {
+      if (message.role === "tool") {
+        const toolResult: ContextToolResult = {
+          callId: `${message.toolName ?? "tool"}-${index}`,
+          result: message.result,
+          size: this.estimateToolResultSize(message.result),
+        };
+        return {
+          role: "assistant",
+          content: `[Tool Result: ${message.toolName ?? "tool"}]`,
+          toolResults: [toolResult],
+        };
+      }
+
+      const contextMessage: ContextMessage = {
+        role: message.role,
+        content: "content" in message && message.content ? message.content : "",
+      };
+
+      if (message.role === "assistant" && message.toolCalls?.length) {
+        const toolCalls: ContextToolCall[] = message.toolCalls.map((call, callIndex) => ({
+          id: call.id ?? `call_${index}_${callIndex}`,
+          name: call.name,
+          arguments: call.arguments,
+        }));
+        contextMessage.toolCalls = toolCalls;
+      }
+
+      return contextMessage;
+    });
+  }
+
+  private buildCompactionSummary(messages: ContextMessage[]): string {
+    const lines: string[] = [];
+    for (const message of messages) {
+      const trimmed = message.content?.trim().replace(/\s+/g, " ");
+      if (!trimmed) {
+        continue;
+      }
+      lines.push(`- ${message.role}: ${trimmed.slice(0, 160)}`);
+      if (lines.length >= 20) {
+        break;
+      }
+    }
+
+    if (lines.length === 0) {
+      return "Conversation history compacted.";
+    }
+
+    const summary = lines.join("\n");
+    return summary.length > 2000 ? `${summary.slice(0, 2000)}…` : summary;
+  }
+
+  private estimateToolResultSize(result: MCPToolResult): number | undefined {
+    try {
+      return JSON.stringify(result).length;
+    } catch {
+      return undefined;
+    }
+  }
+
   private async finalizeRecoveryTurn(
     outcome: TurnOutcome,
     turnStart: number,
@@ -2085,6 +2217,7 @@ export class AgentOrchestrator {
       await this.handleToolUseOutcome(outcome.toolCalls, turnStart, turnSpan);
     }
 
+    this.compactContextIfNeeded();
     this.emitTurnSuccess(turnSpan);
   }
 
