@@ -31,14 +31,15 @@ export function createConfirmationHandler(options: {
   if (options.mode === "deny") {
     return async () => false;
   }
-  if (!options.ask) {
+  const ask = options.ask;
+  if (!ask) {
     return async () => false;
   }
   return async (request: ConfirmationRequest) => {
     if (!options.quiet) {
       writeStdout(formatApprovalDetails(request));
     }
-    const answer = await options.ask(`Approve ${request.toolName}? [y/N]: `);
+    const answer = await ask(`Approve ${request.toolName}? [y/N]: `);
     return answer.toLowerCase().startsWith("y");
   };
 }

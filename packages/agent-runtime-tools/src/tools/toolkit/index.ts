@@ -1,11 +1,32 @@
-import { getNativeAgentToolkit } from "@ku0/agent-toolkit-rs/node";
+import { createRequire } from "node:module";
+
+import type { AgentToolkitRegistryBinding } from "@ku0/agent-toolkit-rs";
 
 import { AgentToolkitToolServer, type AgentToolkitToolServerOptions } from "./toolkitServer";
+
+type NativeAgentToolkit = {
+  AgentToolkitRegistry: new () => AgentToolkitRegistryBinding;
+};
+
+type NativeToolkitModule = {
+  getNativeAgentToolkit: () => NativeAgentToolkit | null;
+};
+
+const require = createRequire(import.meta.url);
+
+function loadNativeAgentToolkit(): NativeToolkitModule | null {
+  try {
+    return require("@ku0/agent-toolkit-rs/node") as NativeToolkitModule;
+  } catch {
+    return null;
+  }
+}
 
 export function createAgentToolkitToolServer(
   options: AgentToolkitToolServerOptions = {}
 ): AgentToolkitToolServer | null {
-  const native = getNativeAgentToolkit();
+  const nativeModule = loadNativeAgentToolkit();
+  const native = nativeModule?.getNativeAgentToolkit?.();
   if (!native) {
     return null;
   }
