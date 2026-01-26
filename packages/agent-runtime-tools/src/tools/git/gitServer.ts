@@ -55,6 +55,8 @@ export class GitToolServer implements MCPToolServer, IGitOperations {
           properties: {},
         },
         annotations: {
+          requiresConfirmation: false,
+          readOnly: true,
           policyAction: "connector.read",
         },
       },
@@ -75,6 +77,8 @@ export class GitToolServer implements MCPToolServer, IGitOperations {
           },
         },
         annotations: {
+          requiresConfirmation: false,
+          readOnly: true,
           policyAction: "connector.read",
         },
       },
@@ -93,6 +97,7 @@ export class GitToolServer implements MCPToolServer, IGitOperations {
         },
         annotations: {
           requiresConfirmation: false,
+          readOnly: false,
           policyAction: "connector.action",
         },
       },
@@ -119,6 +124,7 @@ export class GitToolServer implements MCPToolServer, IGitOperations {
         },
         annotations: {
           requiresConfirmation: true,
+          readOnly: false,
           policyAction: "connector.action",
         },
       },
@@ -139,6 +145,8 @@ export class GitToolServer implements MCPToolServer, IGitOperations {
           },
         },
         annotations: {
+          requiresConfirmation: false,
+          readOnly: true,
           policyAction: "connector.read",
         },
       },
@@ -150,6 +158,8 @@ export class GitToolServer implements MCPToolServer, IGitOperations {
           properties: {},
         },
         annotations: {
+          requiresConfirmation: false,
+          readOnly: true,
           policyAction: "connector.read",
         },
       },
@@ -172,6 +182,7 @@ export class GitToolServer implements MCPToolServer, IGitOperations {
         },
         annotations: {
           requiresConfirmation: true,
+          readOnly: false,
           policyAction: "connector.action",
         },
       },
@@ -188,6 +199,8 @@ export class GitToolServer implements MCPToolServer, IGitOperations {
           },
         },
         annotations: {
+          requiresConfirmation: false,
+          readOnly: true,
           policyAction: "connector.read",
         },
       },
@@ -199,6 +212,8 @@ export class GitToolServer implements MCPToolServer, IGitOperations {
           properties: {},
         },
         annotations: {
+          requiresConfirmation: false,
+          readOnly: true,
           policyAction: "connector.read",
         },
       },
@@ -210,6 +225,8 @@ export class GitToolServer implements MCPToolServer, IGitOperations {
           properties: {},
         },
         annotations: {
+          requiresConfirmation: false,
+          readOnly: true,
           policyAction: "connector.read",
         },
       },
@@ -233,6 +250,7 @@ export class GitToolServer implements MCPToolServer, IGitOperations {
         },
         annotations: {
           requiresConfirmation: true,
+          readOnly: false,
           policyAction: "connector.action",
         },
       },
