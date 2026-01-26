@@ -219,6 +219,9 @@ packages/text-normalization-rs/*.node
 
 packages/diff-rs/target/
 packages/diff-rs/Cargo.lock
+packages/discovery-rs/target/
+packages/discovery-rs/Cargo.lock
+packages/discovery-rs/*.node
 packages/vector-similarity-rs/target/
 packages/vector-similarity-rs/Cargo.lock
 packages/sandbox-rs/target/
