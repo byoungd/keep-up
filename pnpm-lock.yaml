@@ -942,6 +942,22 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
+  packages/discovery-rs:
+    dependencies:
+      '@ku0/native-bindings':
+        specifier: workspace:*
+        version: link:../native-bindings
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.19.3
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
   packages/gateway-control:
     dependencies:
       '@ku0/agent-runtime-control':

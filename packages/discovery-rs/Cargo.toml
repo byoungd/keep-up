@@ -1,0 +1,22 @@
+[package]
+name = "discovery-rs"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "mDNS discovery bindings for Open Wrap."
+publish = false
+build = "build.rs"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+mdns-sd = "0.10"
+napi = { version = "3.5.1", features = ["napi8", "serde-json", "tokio_rt"] }
+napi-derive = "3.5.1"
+once_cell = "1.20"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[build-dependencies]
+napi-build = "2.1.3"
