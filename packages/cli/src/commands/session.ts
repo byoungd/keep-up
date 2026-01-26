@@ -1,3 +1,4 @@
+import { writeFile } from "node:fs/promises";
 import { Command } from "commander";
 import { ConfigStore } from "../utils/configStore";
 import { runInteractiveSession } from "../utils/interactiveSession";
@@ -10,6 +11,7 @@ export function sessionCommand(): Command {
     .description("Manage sessions")
     .addCommand(listCommand())
     .addCommand(resumeCommand())
+    .addCommand(exportCommand())
     .addCommand(deleteCommand());
 }
 
@@ -38,9 +40,11 @@ function resumeCommand(): Command {
       }
       const configStore = new ConfigStore();
       const config = await configStore.load();
-      const model = resolveRuntimeConfigString(undefined, config.model) ?? "auto";
-      const provider = resolveRuntimeConfigString(undefined, config.provider);
-      const output = resolveOutput(resolveRuntimeConfigString(undefined, config.output) ?? "text");
+      const model = resolveRuntimeConfigString(undefined, config.model, "KEEPUP_MODEL") ?? "auto";
+      const provider = resolveRuntimeConfigString(undefined, config.provider, "KEEPUP_PROVIDER");
+      const output = resolveOutput(
+        resolveRuntimeConfigString(undefined, config.output, "KEEPUP_OUTPUT") ?? "text"
+      );
 
       writeStdout(`Resuming session ${id}...`);
       await runInteractiveSession({
@@ -49,6 +53,28 @@ function resumeCommand(): Command {
         provider,
         output,
       });
+    });
+}
+
+function exportCommand(): Command {
+  return new Command("export")
+    .description("Export a session record as JSON")
+    .argument("<id>", "Session ID")
+    .option("-o, --output <path>", "Output file path")
+    .action(async (id: string, options: { output?: string }) => {
+      const store = new SessionStore();
+      const session = await store.get(id);
+      if (!session) {
+        writeStderr(`Session ${id} not found`);
+        process.exit(1);
+      }
+      const payload = JSON.stringify(session, null, 2);
+      if (options.output) {
+        await writeFile(options.output, payload, "utf8");
+        writeStdout(`Session ${id} exported to ${options.output}`);
+        return;
+      }
+      writeStdout(payload);
     });
 }
 

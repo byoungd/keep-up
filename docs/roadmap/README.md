@@ -74,6 +74,19 @@ cowork initiatives. Use this index to navigate the active tracks and supporting 
 - docs/roadmap/phase-9-convergence/track-ay-policy-ops-parity.md
 - docs/roadmap/phase-9-convergence/track-az-cowork-ui-convergence.md
 
+## Phase 10: Coding Agent Parity (Q2 2028)
+- docs/roadmap/phase-10-coding-agent-parity/README.md
+- docs/roadmap/phase-10-coding-agent-parity/track-ba-cli-parity.md
+- docs/roadmap/phase-10-coding-agent-parity/track-bb-tui-parity.md
+- docs/roadmap/phase-10-coding-agent-parity/track-bc-toolchain-parity.md
+- docs/roadmap/phase-10-coding-agent-parity/track-bd-plugins-hooks-skills.md
+- docs/roadmap/phase-10-coding-agent-parity/track-be-mcp-integration.md
+- docs/roadmap/phase-10-coding-agent-parity/track-bf-lsp-intelligence.md
+- docs/roadmap/phase-10-coding-agent-parity/track-bg-approvals-sandbox.md
+- docs/roadmap/phase-10-coding-agent-parity/track-bh-context-compaction.md
+- docs/roadmap/phase-10-coding-agent-parity/track-bi-recovery-time-travel.md
+- docs/roadmap/phase-10-coding-agent-parity/track-bj-ide-github.md
+
 ## Parallel Product Tracks (UI & Cowork)
 - docs/roadmap/ui-cowork-cowork/README.md
 - docs/roadmap/ui-cowork-cowork/track-1-foundation.md

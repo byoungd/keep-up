@@ -24,6 +24,30 @@ export interface ToolCallRecord {
   completedAt?: number;
   durationMs?: number;
   error?: string;
+  errorCode?: string;
+}
+
+export type ApprovalKind = "tool" | "plan" | "escalation";
+export type ApprovalStatus = "requested" | "approved" | "rejected" | "timeout";
+
+export interface ApprovalRecord {
+  id: string;
+  kind: ApprovalKind;
+  status: ApprovalStatus;
+  request: {
+    toolName?: string;
+    description?: string;
+    arguments?: Record<string, unknown>;
+    risk?: string;
+    reason?: string;
+    reasonCode?: string;
+    riskTags?: string[];
+    taskNodeId?: string;
+    escalation?: unknown;
+  };
+  requestedAt: number;
+  resolvedAt?: number;
+  decisionReason?: string;
 }
 
 export interface SessionRecord {
@@ -33,6 +57,7 @@ export interface SessionRecord {
   updatedAt: number;
   messages: SessionMessage[];
   toolCalls: ToolCallRecord[];
+  approvals: ApprovalRecord[];
 }
 
 export interface SessionStoreOptions {
@@ -98,7 +123,7 @@ export class SessionStore {
     try {
       const data = await readFile(await this.resolvePath(), "utf8");
       const parsed = JSON.parse(data) as SessionRecord[];
-      return Array.isArray(parsed) ? parsed : [];
+      return Array.isArray(parsed) ? parsed.map(normalizeSessionRecord) : [];
     } catch {
       return [];
     }
@@ -116,6 +141,15 @@ export class SessionStore {
     const baseDir = await ensureToolingStateDir();
     return path.join(baseDir, this.filePath);
   }
+}
+
+function normalizeSessionRecord(record: SessionRecord): SessionRecord {
+  return {
+    ...record,
+    messages: record.messages ?? [],
+    toolCalls: record.toolCalls ?? [],
+    approvals: record.approvals ?? [],
+  };
 }
 
 export * from "./runtime";

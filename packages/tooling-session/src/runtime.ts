@@ -30,6 +30,7 @@ export interface RuntimeConfigOptions {
   provider?: string;
   sessionId?: string;
   initialMessages?: SessionMessage[];
+  instructions?: string;
 }
 
 export interface RuntimeResources {
@@ -55,7 +56,9 @@ export async function createRuntimeResources(
   const stream = createStreamWriter(options.sessionId ? `tui_${options.sessionId}` : undefined);
   const sessionState = createSessionState({
     id: options.sessionId,
-    initialState: buildInitialAgentState(options.initialMessages ?? []),
+    initialState: buildInitialAgentState(
+      mergeInstructionMessages(options.initialMessages ?? [], options.instructions)
+    ),
   });
 
   const runtime = await createRuntime({
@@ -73,6 +76,28 @@ export async function createRuntimeResources(
   });
 
   return { runtime, eventBus, stream };
+}
+
+function mergeInstructionMessages(
+  messages: SessionMessage[],
+  instructions?: string
+): SessionMessage[] {
+  const trimmed = instructions?.trim();
+  if (!trimmed) {
+    return messages;
+  }
+  const alreadyInjected = messages.some(
+    (message) => message.role === "system" && message.content.includes(trimmed)
+  );
+  if (alreadyInjected) {
+    return messages;
+  }
+  const systemMessage: SessionMessage = {
+    role: "system",
+    content: trimmed,
+    timestamp: Date.now(),
+  };
+  return [systemMessage, ...messages];
 }
 
 export function resolveProviderSelection(providerOverride?: string) {
