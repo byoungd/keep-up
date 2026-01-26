@@ -230,17 +230,19 @@ export class TurnExecutor implements ITurnExecutor {
         usage: response.usage,
       };
 
-      if (this.isComplete(response)) {
-        return {
-          type: "complete",
-          ...outcomeBase,
-        };
+      const toolCalls = response.toolCalls ?? [];
+      if (toolCalls.length === 0) {
+        const reason =
+          response.finishReason === "stop"
+            ? "Completion tool required for termination."
+            : `Model returned ${response.finishReason} without tool calls.`;
+        return this.buildErrorOutcome(new Error(reason), metrics);
       }
 
       return {
         type: "tool_use",
         ...outcomeBase,
-        toolCalls: response.toolCalls,
+        toolCalls,
       };
     } catch (err) {
       metrics.totalTimeMs = performance.now() - turnStart;
@@ -401,15 +403,6 @@ export class TurnExecutor implements ITurnExecutor {
       content: response.content,
       toolCalls: response.toolCalls,
     };
-  }
-
-  private isComplete(response: AgentLLMResponse): boolean {
-    // If tool calls are present, it is not complete regardless of finishReason
-    if (response.toolCalls && response.toolCalls.length > 0) {
-      return false;
-    }
-    // Otherwise rely on finish reason "stop"
-    return response.finishReason === "stop";
   }
 
   private buildErrorOutcome(err: unknown, metrics: TurnMetrics): TurnOutcome {
