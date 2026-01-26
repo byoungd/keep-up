@@ -41,7 +41,7 @@ export function agentCommand(): Command {
     .addCommand(configCommand());
 }
 
-function runCommand(): Command {
+export function runCommand(): Command {
   return new Command("run")
     .description("Run agent with a prompt")
     .argument("[prompt]", "The prompt to execute")
