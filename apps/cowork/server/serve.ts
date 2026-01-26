@@ -55,6 +55,7 @@ const taskRuntime = new CoworkTaskRuntime({
 const gatewayRuntime = createGatewayControlRuntime({
   gateway: serverConfig.gatewayControl,
   telegram: serverConfig.telegram,
+  discord: serverConfig.discord,
   taskRuntime,
   eventBus: runtimeEventBus,
 });

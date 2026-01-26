@@ -1,8 +1,17 @@
 import { createEventBus, type RuntimeEventBus } from "@ku0/agent-runtime-control";
 import { createSubsystemLogger, type Logger } from "@ku0/agent-runtime-telemetry/logging";
-import { ChannelRegistry, createGatewayControlServer, TelegramAdapter } from "@ku0/gateway-control";
+import {
+  ChannelRegistry,
+  createGatewayControlServer,
+  DiscordAdapter,
+  TelegramAdapter,
+} from "@ku0/gateway-control";
 import { startGatewayControlNodeServer } from "@ku0/gateway-control/node";
-import type { CoworkGatewayControlConfig, CoworkTelegramConfig } from "../config";
+import type {
+  CoworkDiscordConfig,
+  CoworkGatewayControlConfig,
+  CoworkTelegramConfig,
+} from "../config";
 import type { CoworkTaskRuntime } from "./coworkTaskRuntime";
 
 export interface GatewayControlRuntime {
@@ -14,6 +23,7 @@ export interface GatewayControlRuntime {
 export interface GatewayControlRuntimeConfig {
   gateway: CoworkGatewayControlConfig;
   telegram: CoworkTelegramConfig;
+  discord: CoworkDiscordConfig;
   taskRuntime: CoworkTaskRuntime;
   eventBus?: RuntimeEventBus;
   logger?: Logger;
@@ -38,6 +48,19 @@ export function createGatewayControlRuntime(
     );
   } else if (config.telegram.enabled) {
     logger.warn("Telegram adapter enabled but missing token.");
+  }
+
+  if (config.discord.enabled && config.discord.token && config.discord.channelId) {
+    channelRegistry.register(
+      new DiscordAdapter({
+        token: config.discord.token,
+        channelId: config.discord.channelId,
+        pollingIntervalMs: config.discord.pollingIntervalMs,
+        baseUrl: config.discord.baseUrl,
+      })
+    );
+  } else if (config.discord.enabled) {
+    logger.warn("Discord adapter enabled but missing token or channel id.");
   }
 
   channelRegistry.onMessage(async (message) => {
