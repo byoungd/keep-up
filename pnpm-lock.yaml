@@ -761,6 +761,9 @@ importers:
       '@ku0/agent-runtime-core':
         specifier: workspace:*
         version: link:../agent-runtime-core
+      '@ku0/agent-runtime-tools':
+        specifier: workspace:*
+        version: link:../agent-runtime-tools
       '@ku0/ai-core':
         specifier: workspace:*
         version: link:../ai-core

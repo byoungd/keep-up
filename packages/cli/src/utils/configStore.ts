@@ -1,5 +1,6 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import type { ApprovalPolicy } from "@ku0/agent-runtime-tools";
 import { ensureCliStateDir, resolveCliPath } from "./statePaths";
 
 export type CliConfig = {
@@ -8,6 +9,8 @@ export type CliConfig = {
   output?: string;
   session?: string;
   approvalMode?: string;
+  approvalPolicies?: ApprovalPolicy[];
+  approvalWorkspacePaths?: string[];
   sandbox?: string;
   [key: string]: unknown;
 };

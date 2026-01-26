@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { createInterface } from "node:readline";
-import { type ApprovalMode, createConfirmationHandler } from "./approvals";
+import {
+  type ApprovalMode,
+  type AutoApprovalOptions,
+  createConfirmationHandler,
+} from "./approvals";
 import type { OutputFormat } from "./output";
 import { extractAssistantText, formatAgentOutput } from "./output";
 import { runPromptWithStreaming } from "./promptRunner";
@@ -15,6 +19,7 @@ export interface InteractiveSessionOptions {
   output: OutputFormat;
   quiet?: boolean;
   approvalMode?: ApprovalMode;
+  autoApproval?: AutoApprovalOptions;
   instructions?: string;
 }
 
@@ -53,6 +58,7 @@ export async function runInteractiveSession(options: InteractiveSessionOptions):
     mode: options.approvalMode ?? "ask",
     ask,
     quiet: options.quiet,
+    autoApproval: options.autoApproval,
   });
 
   try {
