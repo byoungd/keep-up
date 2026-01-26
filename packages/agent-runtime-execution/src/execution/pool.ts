@@ -7,10 +7,10 @@ import type {
   ExecutionTaskSnapshot,
   ExecutionWorkerState,
 } from "@ku0/agent-runtime-core";
+import { createSubsystemLogger, type Logger } from "@ku0/agent-runtime-telemetry/logging";
 import type { TelemetryContext } from "@ku0/agent-runtime-telemetry/telemetry";
 import { AGENT_METRICS } from "@ku0/agent-runtime-telemetry/telemetry";
 import { resolveExecutionConfig } from "../runtimeConfig";
-import { getLogger, type RuntimeLogger } from "../utils/logger";
 import { ExecutionScheduler } from "./scheduler";
 import { ExecutionTaskQueue } from "./taskQueue";
 import type {
@@ -62,7 +62,7 @@ export class ExecutionPool {
   private readonly eventBus?: RuntimeEventBus;
   private readonly now: () => number;
   private readonly idFactory: () => string;
-  private readonly logger: RuntimeLogger;
+  private readonly logger: Logger;
   private sequenceCounter = 0;
   private ticker?: NodeJS.Timeout;
   private schedulerRun?: Promise<void>;
@@ -86,7 +86,7 @@ export class ExecutionPool {
     this.eventBus = config.eventBus;
     this.now = config.now ?? (() => Date.now());
     this.idFactory = config.idFactory ?? (() => randomUUID());
-    this.logger = getLogger().child({ module: "execution-pool" });
+    this.logger = createSubsystemLogger("agent", "execution-pool");
   }
 
   registerTaskHandler<TPayload, TResult>(

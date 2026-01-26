@@ -13,7 +13,7 @@ We have standardized on the following libraries. **Do not create custom implemen
 | **Multi-Agent** | `@openai/agents` | `OpenAIAgentsOrchestrator` | ✅ Mandatory |
 | **Memory** | `mem0ai` | `Mem0MemoryAdapter` | ✅ Mandatory |
 | **File Watching** | `chokidar` | `GhostAgent` | ✅ Mandatory |
-| **Logging** | `pino` | `RuntimeLogger` / `createRuntimeLogger` | ✅ Mandatory |
+| **Logging** | `@ku0/agent-runtime-telemetry` | `createSubsystemLogger` / `createLogger` | ✅ Mandatory |
 | **YAML Parsing** | `gray-matter` | `parseFrontmatter` | ✅ Mandatory |
 
 ---
@@ -76,13 +76,13 @@ fs.watch("/workspace", (event, filename) => { ... });
 
 ## 4. Logging & Observability
 
-**Standard**: Use `pino` layered via `RuntimeLogger`.
+**Standard**: Use the structured telemetry logger with subsystem names.
 **Forbidden**: usage of `console.log`, `console.error`, or `console.warn` in production code.
 
 ```typescript
 // ✅ CORRECT
-import { createRuntimeLogger } from "@ku0/agent-runtime";
-const logger = createRuntimeLogger({ module: "MyComponent" });
+import { createSubsystemLogger } from "@ku0/agent-runtime";
+const logger = createSubsystemLogger("agent", "my-component");
 logger.info("Operation started", { id: 123 });
 
 // ❌ WRONG

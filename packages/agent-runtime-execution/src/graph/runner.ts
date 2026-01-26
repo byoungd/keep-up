@@ -4,7 +4,7 @@
 
 import type { RuntimeEventBus } from "@ku0/agent-runtime-control";
 import type { ICheckpointManager } from "@ku0/agent-runtime-core";
-import { getLogger, type RuntimeLogger } from "../utils/logger";
+import { createSubsystemLogger, type Logger } from "@ku0/agent-runtime-telemetry/logging";
 import { createGraphNodeCache } from "./cache";
 import type {
   ChannelDefinition,
@@ -149,7 +149,7 @@ class GraphNodeContextImpl implements GraphNodeContext {
 export class GraphRunner {
   private readonly graph: GraphDefinition;
   private readonly eventBus?: RuntimeEventBus;
-  private readonly logger: RuntimeLogger;
+  private readonly logger: Logger;
   private readonly runId: string;
   private readonly maxIterations: number;
   private readonly cache: GraphNodeCache;
@@ -167,8 +167,9 @@ export class GraphRunner {
   constructor(private readonly config: GraphRunnerConfig) {
     this.graph = config.graph;
     this.eventBus = config.eventBus;
-    this.logger = config.logger ?? getLogger();
     this.runId = config.runId ?? crypto.randomUUID();
+    const baseLogger = config.logger ?? createSubsystemLogger("agent", "graph-runner");
+    this.logger = baseLogger.child({ runId: this.runId });
     this.maxIterations = config.maxIterations ?? DEFAULT_MAX_ITERATIONS;
     this.cache = config.cache ?? createGraphNodeCache();
     this.eventSource = config.eventSource ?? "graph-runtime";

@@ -11,9 +11,9 @@
  * - Backpressure handling
  */
 
-import { getLogger } from "@ku0/agent-runtime-telemetry/logging";
+import { createSubsystemLogger } from "@ku0/agent-runtime-telemetry/logging";
 
-const logger = getLogger("resource-pool");
+const logger = createSubsystemLogger("agent", "resource-pool");
 
 // ============================================================================
 // Types
