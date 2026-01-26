@@ -105,6 +105,8 @@ export class DelegationToolServer extends BaseToolServer {
           required: ["role", "task"],
         },
         annotations: {
+          requiresConfirmation: false,
+          readOnly: false,
           policyAction: "connector.action",
         },
       },
@@ -121,6 +123,8 @@ export class DelegationToolServer extends BaseToolServer {
           required: [],
         },
         annotations: {
+          requiresConfirmation: false,
+          readOnly: true,
           policyAction: "connector.read",
         },
       },
