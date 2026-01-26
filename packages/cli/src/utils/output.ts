@@ -1,15 +1,35 @@
 import type { AgentMessage, AgentState } from "@ku0/agent-runtime-core";
+import type { ApprovalRecord, ToolCallRecord } from "@ku0/tooling-session";
 
-export type OutputFormat = "text" | "json";
+export type OutputFormat = "text" | "json" | "markdown";
+
+export interface OutputMetadata {
+  sessionId?: string;
+  toolCalls?: ToolCallRecord[];
+  approvals?: ApprovalRecord[];
+}
 
 export function extractAssistantText(state: AgentState): string {
   const message = findLastAssistantMessage(state.messages);
   return message?.content ?? "";
 }
 
-export function formatAgentOutput(state: AgentState, output: OutputFormat): string {
+export function formatAgentOutput(
+  state: AgentState,
+  output: OutputFormat,
+  metadata: OutputMetadata = {}
+): string {
   if (output === "json") {
-    return JSON.stringify(state, null, 2);
+    return JSON.stringify(
+      {
+        sessionId: metadata.sessionId,
+        state,
+        toolCalls: metadata.toolCalls ?? [],
+        approvals: metadata.approvals ?? [],
+      },
+      null,
+      2
+    );
   }
 
   const text = extractAssistantText(state);

@@ -18,7 +18,7 @@ describe("output formatting", () => {
     expect(extractAssistantText(state)).toBe("second");
   });
 
-  it("formats json output", () => {
+  it("formats json output with metadata", () => {
     const state: AgentState = {
       turn: 1,
       status: "complete",
@@ -26,6 +26,21 @@ describe("output formatting", () => {
       pendingToolCalls: [],
     };
 
-    expect(formatAgentOutput(state, "json")).toContain('"messages"');
+    const output = formatAgentOutput(state, "json", {
+      sessionId: "session-1",
+      toolCalls: [{ name: "tool", arguments: {}, status: "completed", startedAt: 0 }],
+      approvals: [
+        {
+          id: "approval-1",
+          kind: "tool",
+          status: "approved",
+          request: { toolName: "tool" },
+          requestedAt: 0,
+        },
+      ],
+    });
+
+    expect(output).toContain('"toolCalls"');
+    expect(output).toContain('"approvals"');
   });
 });

@@ -1,4 +1,5 @@
 export {
+  type ApprovalRecord,
   type SessionMessage,
   type SessionRecord,
   SessionStore,

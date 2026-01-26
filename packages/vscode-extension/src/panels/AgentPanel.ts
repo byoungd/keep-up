@@ -216,6 +216,7 @@ export class AgentPanel {
       updatedAt: now,
       messages: [],
       toolCalls: [],
+      approvals: [],
     };
 
     await this.sessionStore.save(this.session);

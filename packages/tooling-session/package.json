@@ -9,7 +9,7 @@
     "build": "tsc",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
-    "test": "vitest run"
+    "test": "vitest run --config vitest.config.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

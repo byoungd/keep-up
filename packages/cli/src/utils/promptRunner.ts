@@ -1,7 +1,12 @@
 import type { RuntimeInstance } from "@ku0/agent-runtime";
 import type { RuntimeEvent } from "@ku0/agent-runtime-control";
-import type { AgentState, MCPToolResult } from "@ku0/agent-runtime-core";
-import type { ToolCallRecord } from "@ku0/tooling-session";
+import type {
+  AgentState,
+  ConfirmationHandler,
+  ConfirmationRequest,
+  MCPToolResult,
+} from "@ku0/agent-runtime-core";
+import type { ApprovalRecord, ToolCallRecord } from "@ku0/tooling-session";
 import { writeStderr, writeStdout } from "./terminal";
 
 export interface PromptRunnerOptions {
@@ -9,9 +14,12 @@ export interface PromptRunnerOptions {
   prompt: string;
   quiet?: boolean;
   toolCalls?: ToolCallRecord[];
+  approvals?: ApprovalRecord[];
+  confirmationHandler?: ConfirmationHandler;
 }
 
 export async function runPromptWithStreaming(options: PromptRunnerOptions): Promise<AgentState> {
+  pendingApprovalId = undefined;
   const staleSubscription = options.runtime.eventBus?.subscribe(
     "context:file-stale",
     (event: RuntimeEvent) => {
@@ -22,7 +30,11 @@ export async function runPromptWithStreaming(options: PromptRunnerOptions): Prom
     }
   );
 
-  const iterator = options.runtime.kernel.runStream(options.prompt)[Symbol.asyncIterator]();
+  const iterator = options.runtime.kernel
+    .runStream(options.prompt, {
+      confirmationHandler: options.confirmationHandler,
+    })
+    [Symbol.asyncIterator]();
   let finalState: AgentState | undefined;
 
   try {
@@ -33,7 +45,12 @@ export async function runPromptWithStreaming(options: PromptRunnerOptions): Prom
         break;
       }
 
-      handleRuntimeEvent(result.value, options.quiet ?? false, options.toolCalls);
+      handleRuntimeEvent(
+        result.value,
+        options.quiet ?? false,
+        options.toolCalls,
+        options.approvals
+      );
     }
   } finally {
     staleSubscription?.unsubscribe();
@@ -49,7 +66,8 @@ export async function runPromptWithStreaming(options: PromptRunnerOptions): Prom
 function handleRuntimeEvent(
   event: RuntimeEvent,
   quiet: boolean,
-  toolCalls?: ToolCallRecord[]
+  toolCalls?: ToolCallRecord[],
+  approvals?: ApprovalRecord[]
 ): void {
   const payload = event.payload as { type?: string; data?: unknown; timestamp?: number };
   if (!payload.type) {
@@ -64,6 +82,12 @@ function handleRuntimeEvent(
       break;
     case "tool:result":
       handleToolResult(payload.data, timestamp, quiet, toolCalls);
+      break;
+    case "confirmation:required":
+      handleApprovalRequested(payload.data, timestamp, quiet, approvals);
+      break;
+    case "confirmation:received":
+      handleApprovalResolved(payload.data, timestamp, quiet, approvals);
       break;
     case "error":
       handleError(payload.data, quiet);
@@ -118,6 +142,7 @@ function handleToolResult(
   const result = typedData?.result;
   const success = Boolean(result?.success ?? true);
   const errorMessage = result?.error?.message;
+  const errorCode = result?.error?.code;
 
   if (toolCalls) {
     const last = findLastPendingCall(toolCalls, toolName);
@@ -128,6 +153,7 @@ function handleToolResult(
       last.completedAt = completedAt;
       last.durationMs = result?.meta?.durationMs;
       last.error = errorMessage;
+      last.errorCode = errorCode;
     } else {
       toolCalls.push({
         id: `tool_${toolName}_${timestamp}`,
@@ -138,6 +164,7 @@ function handleToolResult(
         completedAt,
         durationMs: result?.meta?.durationMs,
         error: errorMessage,
+        errorCode,
       });
     }
   }
@@ -151,6 +178,65 @@ function handleError(data: unknown, quiet: boolean) {
   const typedData = data as { error?: string };
   if (!quiet) {
     writeStderr(typedData?.error ?? "Agent error");
+  }
+}
+
+let pendingApprovalId: string | undefined;
+
+function handleApprovalRequested(
+  data: unknown,
+  timestamp: number,
+  quiet: boolean,
+  approvals?: ApprovalRecord[]
+): void {
+  const request = data as ConfirmationRequest;
+  const id = `approval_${timestamp}`;
+  pendingApprovalId = id;
+
+  if (approvals) {
+    approvals.push({
+      id,
+      kind: request.escalation ? "escalation" : "tool",
+      status: "requested",
+      request: {
+        toolName: request.toolName,
+        description: request.description,
+        arguments: request.arguments,
+        risk: request.risk,
+        reason: request.reason,
+        reasonCode: request.reasonCode,
+        riskTags: request.riskTags,
+        taskNodeId: request.taskNodeId,
+        escalation: request.escalation,
+      },
+      requestedAt: timestamp,
+    });
+  }
+
+  if (!quiet) {
+    const risk = request.risk ? ` (${request.risk})` : "";
+    writeStdout(`[approval] ${request.toolName}${risk} requires confirmation`);
+  }
+}
+
+function handleApprovalResolved(
+  data: unknown,
+  timestamp: number,
+  quiet: boolean,
+  approvals?: ApprovalRecord[]
+): void {
+  const payload = data as { confirmed?: boolean; status?: string };
+  const status = payload.status ?? (payload.confirmed ? "approved" : "rejected");
+  if (approvals && approvals.length > 0) {
+    const target =
+      (pendingApprovalId && approvals.find((approval) => approval.id === pendingApprovalId)) ??
+      approvals[approvals.length - 1];
+    target.status = status as ApprovalRecord["status"];
+    target.resolvedAt = timestamp;
+  }
+
+  if (!quiet) {
+    writeStdout(`[approval] ${status}`);
   }
 }
 

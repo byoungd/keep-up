@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { createInterface } from "node:readline";
+import { type ApprovalMode, createConfirmationHandler } from "./approvals";
 import type { OutputFormat } from "./output";
-import { extractAssistantText } from "./output";
+import { extractAssistantText, formatAgentOutput } from "./output";
 import { runPromptWithStreaming } from "./promptRunner";
 import { createRuntimeResources } from "./runtimeClient";
 import { type SessionRecord, SessionStore } from "./sessionStore";
@@ -13,6 +14,8 @@ export interface InteractiveSessionOptions {
   provider?: string;
   output: OutputFormat;
   quiet?: boolean;
+  approvalMode?: ApprovalMode;
+  instructions?: string;
 }
 
 const EXIT_COMMANDS = new Set(["/exit", "/quit"]);
@@ -26,17 +29,14 @@ export async function runInteractiveSession(options: InteractiveSessionOptions):
     input: process.stdin,
     output: process.stdout,
   });
-
-  const ask = (prompt: string) =>
-    new Promise<string>((resolve) => {
-      rl.question(prompt, (answer) => resolve(answer.trim()));
-    });
+  const ask = createAsk(rl);
 
   const session = await selectSession({
     sessions,
     sessionId: options.sessionId,
     ask,
   });
+  ensureSessionMetadata(session);
 
   writeStdout("Keep-Up TUI");
   writeStdout(`Session: ${session.id}${session.title ? ` (${session.title})` : ""}`);
@@ -47,46 +47,23 @@ export async function runInteractiveSession(options: InteractiveSessionOptions):
     provider: options.provider,
     sessionId: session.id,
     initialMessages: session.messages,
+    instructions: options.instructions,
+  });
+  const confirmationHandler = createConfirmationHandler({
+    mode: options.approvalMode ?? "ask",
+    ask,
+    quiet: options.quiet,
   });
 
   try {
-    while (true) {
-      const input = await ask("> ");
-      if (!input) {
-        continue;
-      }
-      if (EXIT_COMMANDS.has(input)) {
-        break;
-      }
-      if (HELP_COMMANDS.has(input)) {
-        printHelp();
-        continue;
-      }
-
-      const state = await runPromptWithStreaming({
-        runtime,
-        prompt: input,
-        quiet: options.quiet,
-        toolCalls: session.toolCalls,
-      });
-
-      const assistantText = extractAssistantText(state);
-      const now = Date.now();
-      session.messages.push(
-        { role: "user", content: input, timestamp: now },
-        { role: "assistant", content: assistantText, timestamp: now + 1 }
-      );
-      session.updatedAt = Date.now();
-      session.title = session.title || input.slice(0, 48);
-
-      await sessionStore.save(session);
-
-      if (options.output === "json") {
-        writeStdout(JSON.stringify(state, null, 2));
-      } else {
-        writeStdout(assistantText || "<no assistant response>");
-      }
-    }
+    await runInteractiveLoop({
+      ask,
+      runtime,
+      options,
+      session,
+      sessionStore,
+      confirmationHandler,
+    });
   } finally {
     rl.close();
   }
@@ -135,6 +112,7 @@ async function selectSession(input: SessionSelectionInput): Promise<SessionRecor
     updatedAt: now,
     messages: [],
     toolCalls: [],
+    approvals: [],
   };
 }
 
@@ -142,4 +120,110 @@ function printHelp(): void {
   writeStdout("Commands:");
   writeStdout("  /help  Show this help");
   writeStdout("  /exit  Exit the session");
+}
+
+type InputAction =
+  | { type: "skip" }
+  | { type: "exit" }
+  | { type: "help" }
+  | { type: "prompt"; text: string };
+
+function createAsk(rl: ReturnType<typeof createInterface>) {
+  return (prompt: string) =>
+    new Promise<string>((resolve) => {
+      rl.question(prompt, (answer) => resolve(answer.trim()));
+    });
+}
+
+function classifyInput(input: string): InputAction {
+  if (!input) {
+    return { type: "skip" };
+  }
+  if (EXIT_COMMANDS.has(input)) {
+    return { type: "exit" };
+  }
+  if (HELP_COMMANDS.has(input)) {
+    return { type: "help" };
+  }
+  return { type: "prompt", text: input };
+}
+
+function ensureSessionMetadata(session: SessionRecord): void {
+  session.toolCalls = session.toolCalls ?? [];
+  session.approvals = session.approvals ?? [];
+}
+
+async function runInteractiveLoop(input: {
+  ask: (prompt: string) => Promise<string>;
+  runtime: Awaited<ReturnType<typeof createRuntimeResources>>["runtime"];
+  options: InteractiveSessionOptions;
+  session: SessionRecord;
+  sessionStore: SessionStore;
+  confirmationHandler?: ReturnType<typeof createConfirmationHandler>;
+}): Promise<void> {
+  while (true) {
+    const raw = await input.ask("> ");
+    const action = classifyInput(raw);
+    if (action.type === "skip") {
+      continue;
+    }
+    if (action.type === "exit") {
+      return;
+    }
+    if (action.type === "help") {
+      printHelp();
+      continue;
+    }
+
+    await handlePrompt({
+      prompt: action.text,
+      runtime: input.runtime,
+      options: input.options,
+      session: input.session,
+      sessionStore: input.sessionStore,
+      confirmationHandler: input.confirmationHandler,
+    });
+  }
+}
+
+async function handlePrompt(input: {
+  prompt: string;
+  runtime: Awaited<ReturnType<typeof createRuntimeResources>>["runtime"];
+  options: InteractiveSessionOptions;
+  session: SessionRecord;
+  sessionStore: SessionStore;
+  confirmationHandler?: ReturnType<typeof createConfirmationHandler>;
+}): Promise<void> {
+  const state = await runPromptWithStreaming({
+    runtime: input.runtime,
+    prompt: input.prompt,
+    quiet: input.options.quiet,
+    toolCalls: input.session.toolCalls,
+    approvals: input.session.approvals,
+    confirmationHandler: input.confirmationHandler,
+  });
+
+  const assistantText = extractAssistantText(state);
+  const now = Date.now();
+  input.session.messages.push(
+    { role: "user", content: input.prompt, timestamp: now },
+    { role: "assistant", content: assistantText, timestamp: now + 1 }
+  );
+  input.session.updatedAt = Date.now();
+  input.session.title = input.session.title || input.prompt.slice(0, 48);
+
+  await input.sessionStore.save(input.session);
+
+  if (input.options.output === "json") {
+    writeStdout(
+      formatAgentOutput(state, input.options.output, {
+        sessionId: input.session.id,
+        toolCalls: input.session.toolCalls,
+        approvals: input.session.approvals,
+      })
+    );
+    return;
+  }
+
+  writeStdout(assistantText || "<no assistant response>");
 }

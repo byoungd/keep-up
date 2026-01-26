@@ -120,6 +120,7 @@ async function handleSessionCreate(message: OpMessage): Promise<void> {
     updatedAt: now,
     messages: [],
     toolCalls: [],
+    approvals: [],
   };
   await sessionStore.save(session);
   sendResult(message.id, message.op, { session });
@@ -140,6 +141,12 @@ async function initRuntime(message: OpMessage): Promise<void> {
   if (!session) {
     sendError(message.id, message.op, "Session not found.", "SESSION_NOT_FOUND");
     return;
+  }
+  if (!session.toolCalls) {
+    session.toolCalls = [];
+  }
+  if (!session.approvals) {
+    session.approvals = [];
   }
 
   const model = typeof message.payload?.model === "string" ? message.payload.model : undefined;
@@ -198,6 +205,7 @@ function updateToolCalls(
     const result = typed?.result;
     const success = Boolean(result?.success ?? true);
     const errorMessage = result?.error?.message;
+    const errorCode = result?.error?.code;
 
     const last = findLastPendingCall(toolCalls, toolName);
     const completedAt = timestamp;
@@ -207,6 +215,7 @@ function updateToolCalls(
       last.completedAt = completedAt;
       last.durationMs = result?.meta?.durationMs;
       last.error = errorMessage;
+      last.errorCode = errorCode;
     } else {
       toolCalls.push({
         id: `tool_${toolName}_${timestamp}`,
@@ -217,6 +226,7 @@ function updateToolCalls(
         completedAt,
         durationMs: result?.meta?.durationMs,
         error: errorMessage,
+        errorCode,
       });
     }
   }
