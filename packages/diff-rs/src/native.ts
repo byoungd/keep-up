@@ -52,8 +52,17 @@ function resolveNativeBindingPath(): string | null {
   return null;
 }
 
+function isNativeDisabled(): boolean {
+  const raw = process.env.KU0_DIFF_RS_DISABLE_NATIVE;
+  if (!raw) {
+    return false;
+  }
+  const normalized = raw.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes";
+}
+
 export function loadNativeBinding(): NativeDiffBinding | null {
-  if (process.env.KU0_DIFF_RS_DISABLE_NATIVE === "1") {
+  if (isNativeDisabled()) {
     return null;
   }
 

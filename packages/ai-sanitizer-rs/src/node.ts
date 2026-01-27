@@ -24,7 +24,11 @@ function resolvePackageRoot(): string {
 }
 
 function readBooleanFlag(value: string | undefined): boolean {
-  return value === "1" || value === "true";
+  if (!value) {
+    return false;
+  }
+  const normalized = value.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes";
 }
 
 function isNativeDisabled(): boolean {
