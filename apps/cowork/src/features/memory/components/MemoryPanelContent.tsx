@@ -52,7 +52,11 @@ export function MemoryPanelContent() {
         </button>
       </div>
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
-      <div className="flex-1 space-y-2 overflow-y-auto">
+      <div
+        className="flex-1 space-y-2 overflow-y-auto"
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+        tabIndex={0}
+      >
         {results.length === 0 ? (
           <p className="text-xs text-muted-foreground">No results yet.</p>
         ) : (
