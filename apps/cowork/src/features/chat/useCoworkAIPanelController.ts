@@ -500,6 +500,34 @@ export function useCoworkAIPanelController() {
     fileInputRef.current?.click();
   }, []);
 
+  const handleClear = useCallback(async () => {
+    setInput("");
+    setEditingMessageId(null);
+    setBranchParentId(null);
+    setStatusMessage(null);
+    clearAttachments();
+    pendingMessageRef.current = null;
+    pendingAttachmentRef.current = null;
+
+    const nextSession = activeWorkspaceId
+      ? await createSessionForPath(activeWorkspaceId, "Untitled Session")
+      : await createSessionWithoutGrant("Untitled Session");
+
+    if (nextSession.id !== sessionId) {
+      await navigate({
+        to: "/sessions/$sessionId",
+        params: { sessionId: nextSession.id },
+      });
+    }
+  }, [
+    activeWorkspaceId,
+    clearAttachments,
+    createSessionForPath,
+    createSessionWithoutGrant,
+    navigate,
+    sessionId,
+  ]);
+
   return {
     messages,
     input,
@@ -542,6 +570,7 @@ export function useCoworkAIPanelController() {
     toggleMode,
     usage,
     runTemplate,
+    onClear: handleClear,
   };
 }
 
