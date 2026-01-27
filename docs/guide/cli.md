@@ -72,6 +72,12 @@ List sessions:
 keepup agent session list
 ```
 
+List all sessions:
+
+```bash
+keepup agent session list --all
+```
+
 Resume a session:
 
 ```bash
