@@ -15,6 +15,7 @@ import { createClarificationRoutes } from "./routes/clarifications";
 import { createContextRoutes } from "./routes/context";
 import { createCostRoutes } from "./routes/cost";
 import { createLessonRoutes } from "./routes/lessons";
+import { createMcpAppsRoutes } from "./routes/mcpApps";
 import { createPipelineRoutes } from "./routes/pipelines";
 import { createPreflightRoutes } from "./routes/preflight";
 import { createProjectRoutes } from "./routes/projects";
@@ -30,6 +31,7 @@ import { CoworkRuntimeBridge } from "./runtime/coworkRuntime";
 import type { CoworkTaskRuntime } from "./runtime/coworkTaskRuntime";
 import { WorkspaceSessionRuntime } from "./runtime/services/WorkspaceSessionRuntime";
 import type { ContextIndexManager } from "./services/contextIndexManager";
+import type { McpServerManager } from "./services/mcpServerManager";
 import { ProviderKeyService } from "./services/providerKeyService";
 import type { StorageLayer } from "./storage/contracts";
 import { SessionEventHub } from "./streaming/eventHub";
@@ -48,6 +50,7 @@ export interface CoworkAppDeps {
   workspaceRuntime?: WorkspaceSessionRuntime;
   lessonStore?: LessonStore;
   critic?: CriticAgent;
+  mcpServers?: McpServerManager;
 }
 
 export function createCoworkApp(deps: CoworkAppDeps) {
@@ -143,6 +146,15 @@ export function createCoworkApp(deps: CoworkAppDeps) {
       events: eventHub,
     })
   );
+
+  if (deps.mcpServers) {
+    app.route(
+      "/api",
+      createMcpAppsRoutes({
+        mcpServers: deps.mcpServers,
+      })
+    );
+  }
 
   app.route("/api", createUserRoutes());
 

@@ -19,6 +19,14 @@ import type {
   PreflightPlan,
   PreflightReport,
 } from "@ku0/agent-runtime";
+import type {
+  CallToolResult,
+  ListResourcesResult,
+  ListResourceTemplatesResult,
+  ReadResourceResult,
+  Resource,
+  ResourceTemplate,
+} from "@modelcontextprotocol/sdk/types.js";
 import { apiUrl } from "../lib/config";
 
 export type ApiResult<T> = {
@@ -393,6 +401,50 @@ export type ToolCheckResult =
       status: "denied";
       decision: { decision: "deny"; riskTags: CoworkRiskTag[] };
     };
+
+export type McpUiToolVisibility = "always" | "contextual" | "hidden";
+
+export type McpUiToolMeta = {
+  resourceUri: string;
+  label?: string;
+  icon?: string;
+  visibility?: McpUiToolVisibility;
+};
+
+export type CoworkMcpTool = {
+  name: string;
+  description: string;
+  inputSchema: unknown;
+  annotations?: Record<string, unknown>;
+  ui?: McpUiToolMeta;
+  metadata?: Record<string, unknown>;
+};
+
+export type CoworkMcpServerStatus = {
+  state: "disconnected" | "connecting" | "connected" | "error";
+  transport: "stdio" | "sse" | "streamableHttp";
+  serverUrl?: string;
+  lastError?: string;
+  authRequired?: boolean;
+};
+
+export type CoworkMcpServerSummary = {
+  name: string;
+  description: string;
+  status: CoworkMcpServerStatus;
+};
+
+export type CoworkMcpResource = Resource;
+
+export type CoworkMcpResourceTemplate = ResourceTemplate;
+
+export type CoworkMcpReadResourceResult = ReadResourceResult;
+
+export type CoworkMcpListResourcesResult = ListResourcesResult;
+
+export type CoworkMcpListResourceTemplatesResult = ListResourceTemplatesResult;
+
+export type CoworkMcpToolCallResult = CallToolResult;
 
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(apiUrl(path), init);
@@ -1367,6 +1419,73 @@ export async function importWorkflowTemplates(
     body: JSON.stringify({ templates }),
   });
   return data.templates ?? [];
+}
+
+// ============================================================================
+// MCP Apps API (SEP-1865)
+// ============================================================================
+
+export async function listMcpServers(): Promise<CoworkMcpServerSummary[]> {
+  const data = await fetchJson<{ servers?: CoworkMcpServerSummary[] }>("/api/mcp/servers");
+  return data.servers ?? [];
+}
+
+export async function listMcpTools(serverName: string): Promise<CoworkMcpTool[]> {
+  const data = await fetchJson<{ tools?: CoworkMcpTool[] }>(
+    `/api/mcp/servers/${encodeURIComponent(serverName)}/tools`
+  );
+  return data.tools ?? [];
+}
+
+export async function callMcpTool(
+  serverName: string,
+  payload: { name: string; arguments?: Record<string, unknown> }
+): Promise<CoworkMcpToolCallResult> {
+  const data = await fetchJson<{ result?: CoworkMcpToolCallResult }>(
+    `/api/mcp/servers/${encodeURIComponent(serverName)}/tools/call`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }
+  );
+  return data.result ?? { content: [], isError: true };
+}
+
+export async function listMcpResources(
+  serverName: string,
+  cursor?: string
+): Promise<CoworkMcpListResourcesResult> {
+  const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
+  const data = await fetchJson<{ result?: CoworkMcpListResourcesResult }>(
+    `/api/mcp/servers/${encodeURIComponent(serverName)}/resources${query}`
+  );
+  return data.result ?? { resources: [] };
+}
+
+export async function listMcpResourceTemplates(
+  serverName: string,
+  cursor?: string
+): Promise<CoworkMcpListResourceTemplatesResult> {
+  const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
+  const data = await fetchJson<{ result?: CoworkMcpListResourceTemplatesResult }>(
+    `/api/mcp/servers/${encodeURIComponent(serverName)}/resource-templates${query}`
+  );
+  return data.result ?? { resourceTemplates: [] };
+}
+
+export async function readMcpResource(
+  serverName: string,
+  uri: string
+): Promise<CoworkMcpReadResourceResult> {
+  const query = new URLSearchParams({ uri }).toString();
+  const data = await fetchJson<{ result?: CoworkMcpReadResourceResult }>(
+    `/api/mcp/servers/${encodeURIComponent(serverName)}/resource?${query}`
+  );
+  if (!data.result) {
+    throw new Error("MCP resource not found");
+  }
+  return data.result;
 }
 
 // ============================================================================
