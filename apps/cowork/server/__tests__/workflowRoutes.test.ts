@@ -179,4 +179,23 @@ describe("Workflow template routes", () => {
     const data = (await importRes.json()) as { templates: CoworkWorkflowTemplate[] };
     expect(data.templates.length).toBe(1);
   });
+
+  it("accepts review mode templates", async () => {
+    const res = await app.request("/workflows", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Review Checklist",
+        description: "Risk assessment and review.",
+        mode: "review",
+        inputs: [],
+        prompt: "Review the changes for risks.",
+        expectedArtifacts: ["review.md"],
+        version: "1.0.0",
+      }),
+    });
+    expect(res.status).toBe(201);
+    const data = (await res.json()) as { template: CoworkWorkflowTemplate };
+    expect(data.template.mode).toBe("review");
+  });
 });
