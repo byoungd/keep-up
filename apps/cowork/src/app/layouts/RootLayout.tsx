@@ -9,7 +9,13 @@ import {
 import { Link, Outlet, useLocation, useParams, useRouter } from "@tanstack/react-router";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
+import {
+  AnimatePresence,
+  LayoutGroup,
+  MotionConfig,
+  motion,
+  useReducedMotion,
+} from "framer-motion";
 import { Sparkles } from "lucide-react";
 import React from "react";
 import { createTask, setSessionMode } from "../../api/coworkApi";
@@ -501,53 +507,55 @@ export function RootLayout() {
   );
 
   return (
-    <AIControlProvider>
-      <TooltipProvider>
-        <ReaderShellProvider
-          value={shellContextValue}
-          sidebarConfig={{
-            initialGroups: COWORK_SIDEBAR_GROUPS,
-            configKey: COWORK_SIDEBAR_CONFIG_KEY,
-          }}
-        >
-          <ReaderPreferencesProvider>
-            <LayoutGroup id="artifact-preview">
-              <AppShell
-                rightPanel={aiPanelElement}
-                auxPanel={contextPanel}
-                commandPalette={commandPalette}
-                appName="KeepUp"
-                sidebarProps={{
-                  showSearch: false,
-                  renderGroup: renderSidebarGroup,
-                  newAction: {
-                    label: "New Session",
-                    ariaLabel: "New Session",
-                    icon: Sparkles,
-                    onClick: () => router.navigate({ to: "/new-session" }),
-                  },
-                }}
-                layoutStyle="arc"
-                headerProps={{
-                  leftSlot: (
-                    <span className="font-semibold text-sm text-foreground">Cowork Agent</span>
-                  ),
-                  rightSlot: (
-                    <div className="flex items-center gap-2">
-                      {resolvedSessionId ? (
-                        <SessionStatusIndicator sessionId={resolvedSessionId} />
-                      ) : null}
-                      <SessionHeaderActions />
-                    </div>
-                  ),
-                }}
-              >
-                <Outlet />
-              </AppShell>
-            </LayoutGroup>
-          </ReaderPreferencesProvider>
-        </ReaderShellProvider>
-      </TooltipProvider>
-    </AIControlProvider>
+    <MotionConfig reducedMotion="user">
+      <AIControlProvider>
+        <TooltipProvider>
+          <ReaderShellProvider
+            value={shellContextValue}
+            sidebarConfig={{
+              initialGroups: COWORK_SIDEBAR_GROUPS,
+              configKey: COWORK_SIDEBAR_CONFIG_KEY,
+            }}
+          >
+            <ReaderPreferencesProvider>
+              <LayoutGroup id="artifact-preview">
+                <AppShell
+                  rightPanel={aiPanelElement}
+                  auxPanel={contextPanel}
+                  commandPalette={commandPalette}
+                  appName="KeepUp"
+                  sidebarProps={{
+                    showSearch: false,
+                    renderGroup: renderSidebarGroup,
+                    newAction: {
+                      label: "New Session",
+                      ariaLabel: "New Session",
+                      icon: Sparkles,
+                      onClick: () => router.navigate({ to: "/new-session" }),
+                    },
+                  }}
+                  layoutStyle="arc"
+                  headerProps={{
+                    leftSlot: (
+                      <span className="font-semibold text-sm text-foreground">Cowork Agent</span>
+                    ),
+                    rightSlot: (
+                      <div className="flex items-center gap-2">
+                        {resolvedSessionId ? (
+                          <SessionStatusIndicator sessionId={resolvedSessionId} />
+                        ) : null}
+                        <SessionHeaderActions />
+                      </div>
+                    ),
+                  }}
+                >
+                  <Outlet />
+                </AppShell>
+              </LayoutGroup>
+            </ReaderPreferencesProvider>
+          </ReaderShellProvider>
+        </TooltipProvider>
+      </AIControlProvider>
+    </MotionConfig>
   );
 }
