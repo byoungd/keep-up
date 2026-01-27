@@ -41,11 +41,21 @@ export async function runInteractiveSession(options: InteractiveSessionOptions):
   });
   const ask = createAsk(rl);
 
-  const session = await selectSession({
-    sessions,
-    sessionId: options.sessionId,
-    ask,
-  });
+  let session: SessionRecord;
+  if (options.sessionId) {
+    const existing = await sessionStore.get(options.sessionId);
+    if (existing) {
+      session = existing;
+    } else {
+      writeStdout(`Session ${options.sessionId} not found. Starting a new session.`);
+      session = createNewSession(options.sessionId);
+    }
+  } else {
+    session = await selectSession({
+      sessions,
+      ask,
+    });
+  }
   ensureSessionMetadata(session);
 
   writeStdout("Keep-Up TUI");
@@ -84,19 +94,11 @@ export async function runInteractiveSession(options: InteractiveSessionOptions):
 
 type SessionSelectionInput = {
   sessions: SessionRecord[];
-  sessionId?: string;
   ask: (prompt: string) => Promise<string>;
 };
 
 async function selectSession(input: SessionSelectionInput): Promise<SessionRecord> {
-  if (input.sessionId) {
-    const existing = input.sessions.find((session) => session.id === input.sessionId);
-    if (existing) {
-      return existing;
-    }
-  }
-
-  if (input.sessions.length > 0 && !input.sessionId) {
+  if (input.sessions.length > 0) {
     writeStdout("Recent sessions:");
     input.sessions.forEach((session, index) => {
       writeStdout(`  [${index + 1}] ${session.id} - ${session.title || "(untitled)"}`);
@@ -116,17 +118,7 @@ async function selectSession(input: SessionSelectionInput): Promise<SessionRecor
     }
   }
 
-  const newSessionId = input.sessionId ?? `session_${randomUUID()}`;
-  const now = Date.now();
-  return {
-    id: newSessionId,
-    title: "",
-    createdAt: now,
-    updatedAt: now,
-    messages: [],
-    toolCalls: [],
-    approvals: [],
-  };
+  return createNewSession();
 }
 
 function printHelp(): void {
@@ -146,6 +138,20 @@ function createAsk(rl: ReturnType<typeof createInterface>) {
     new Promise<string>((resolve) => {
       rl.question(prompt, (answer) => resolve(answer.trim()));
     });
+}
+
+function createNewSession(sessionId?: string): SessionRecord {
+  const newSessionId = sessionId ?? `session_${randomUUID()}`;
+  const now = Date.now();
+  return {
+    id: newSessionId,
+    title: "",
+    createdAt: now,
+    updatedAt: now,
+    messages: [],
+    toolCalls: [],
+    approvals: [],
+  };
 }
 
 function classifyInput(input: string): InputAction {
