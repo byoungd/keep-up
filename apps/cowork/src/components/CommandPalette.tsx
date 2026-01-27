@@ -244,6 +244,7 @@ export function CommandPalette() {
           <List
             ref={listRef}
             className="max-h-72 overflow-y-auto rounded-xl border border-border/30 bg-background/40 p-1"
+            tabIndex={0}
             onSelect={handleSelect}
           >
             {groupedRows.map((row) => {

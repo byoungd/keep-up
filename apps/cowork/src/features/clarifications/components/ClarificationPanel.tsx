@@ -129,7 +129,11 @@ function ClarificationCard({
       )}
 
       {request.context?.codeSnippet && (
-        <pre className="text-[11px] leading-relaxed bg-surface-0/70 border border-border/40 rounded-xl p-3 max-h-40 overflow-auto text-foreground/80">
+        <pre
+          className="text-[11px] leading-relaxed bg-surface-0/70 border border-border/40 rounded-xl p-3 max-h-40 overflow-auto text-foreground/80"
+          // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+          tabIndex={0}
+        >
           {request.context.codeSnippet}
         </pre>
       )}
