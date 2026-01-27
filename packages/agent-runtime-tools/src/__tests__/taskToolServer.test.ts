@@ -6,7 +6,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { MCPToolResult, ToolContext } from "@ku0/agent-runtime-core";
-import { SECURITY_PRESETS } from "@ku0/agent-runtime-core";
+import { DEFAULT_AGENT_RUNTIME_DIR, SECURITY_PRESETS } from "@ku0/agent-runtime-core";
 import { describe, expect, it } from "vitest";
 import { TaskToolServer } from "../tools/core/task";
 
@@ -75,6 +75,42 @@ describe("TaskToolServer", () => {
       expect(statusResult.success).toBe(true);
       expect(text).toContain("Task:");
       expect(text).toContain("Subtasks:");
+    });
+  });
+
+  it("rejects empty titles", async () => {
+    await withTempDir(async (dir) => {
+      const server = new TaskToolServer();
+      const context = createContext({ workingDirectory: dir, filePermission: "workspace" });
+
+      const result = await server.callTool(
+        { name: "create", arguments: { title: "   " } },
+        context
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe("INVALID_ARGUMENTS");
+    });
+  });
+
+  it("sanitizes subtask descriptions", async () => {
+    await withTempDir(async (dir) => {
+      const server = new TaskToolServer();
+      const context = createContext({ workingDirectory: dir, filePermission: "workspace" });
+
+      await server.callTool(
+        {
+          name: "create",
+          arguments: { title: "Task", subtasks: [" a ", "", "b "] },
+        },
+        context
+      );
+
+      const taskPath = path.join(dir, DEFAULT_AGENT_RUNTIME_DIR, "TASKS.json");
+      const content = await fs.readFile(taskPath, "utf-8");
+      const store = JSON.parse(content) as { tasks: { subtasks: { description: string }[] }[] };
+
+      expect(store.tasks[0].subtasks.map((subtask) => subtask.description)).toEqual(["a", "b"]);
     });
   });
 
