@@ -32,8 +32,19 @@ export interface MCPTool {
     /** Policy action for Cowork policy evaluation */
     policyAction?: CoworkPolicyActionLike;
   };
+  /** Optional UI metadata for MCP Apps */
+  ui?: McpUiToolMeta;
   /** Optional metadata for tool adapters */
   metadata?: Record<string, unknown>;
+}
+
+export type McpUiToolVisibility = "always" | "contextual" | "hidden";
+
+export interface McpUiToolMeta {
+  resourceUri: string;
+  label?: string;
+  icon?: string;
+  visibility?: McpUiToolVisibility;
 }
 
 /** JSON Schema subset for tool parameters */
