@@ -20,12 +20,29 @@ const bindingState: { binding: NativeBinding | null; error: Error | null } = {
   error: null,
 };
 
+function isNativeDisabled(): boolean {
+  const raw = process.env.KU0_STORAGE_ENGINE_DISABLE_NATIVE;
+  if (!raw) {
+    return false;
+  }
+  const normalized = raw.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes";
+}
+
 function loadNativeBinding(): NativeBinding {
   if (bindingState.binding) {
     return bindingState.binding;
   }
   if (bindingState.error) {
     throw bindingState.error;
+  }
+
+  if (isNativeDisabled()) {
+    const error = new Error(
+      "Storage engine native binding disabled by KU0_STORAGE_ENGINE_DISABLE_NATIVE."
+    );
+    bindingState.error = error;
+    throw error;
   }
 
   const require = createRequire(import.meta.url);
