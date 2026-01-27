@@ -13,10 +13,12 @@ import type {
   CoworkPolicyConfig,
   CoworkSession,
   CoworkTask,
+  CoworkWorkspaceSession,
   ICheckpointManager,
   ICheckpointStorage,
   RuntimeEventBus,
   TaskGraphStore,
+  ToastSuggestion,
 } from "@ku0/agent-runtime";
 import {
   AgentManager,
@@ -147,6 +149,8 @@ type SessionRuntime = {
   checkpointStorage?: ICheckpointStorage;
   checkpointManager?: ICheckpointManager;
   ghostAgent?: GhostAgent;
+  ghostWorkspaceSessionId?: string;
+  ghostEventUnsubscribe?: () => void;
 };
 
 type RuntimeFactory = (
@@ -207,6 +211,8 @@ export class CoworkTaskRuntime {
   private readonly providerKeys: ProviderKeyService;
   private readonly configStore: StorageLayer["configStore"];
   private readonly auditLogStore: StorageLayer["auditLogStore"];
+  private readonly workspaceSessionStore: StorageLayer["workspaceSessionStore"];
+  private readonly workspaceEventStore: StorageLayer["workspaceEventStore"];
   private readonly lessonStore: LessonStore;
   // Optional Advanced Services (enabled per ARCHITECTURE.md standards)
   private memoryAdapter?: Mem0MemoryAdapter;
@@ -230,6 +236,8 @@ export class CoworkTaskRuntime {
     this.runtimeEventBus = deps.eventBus;
     this.configStore = deps.storage.configStore;
     this.auditLogStore = deps.storage.auditLogStore;
+    this.workspaceSessionStore = deps.storage.workspaceSessionStore;
+    this.workspaceEventStore = deps.storage.workspaceEventStore;
     this.runtimePersistence = deps.runtimePersistence;
     this.lfccConfig = deps.lfcc;
     this.referenceVerifier = deps.lfcc?.referenceVerifier ?? DEFAULT_REFERENCE_VERIFIER;
@@ -323,22 +331,56 @@ export class CoworkTaskRuntime {
     if (workspacePath) {
       const enableGhost = parseBooleanEnv(process.env.COWORK_GHOST_ENABLED, false);
       if (enableGhost) {
+        const ghostWorkspaceSession = await this.createGhostWorkspaceSession(
+          initialSession,
+          workspacePath
+        );
+        runtimeState.ghostWorkspaceSessionId = ghostWorkspaceSession?.workspaceSessionId;
         runtimeState.ghostAgent = createGhostAgent(workspacePath, {
           enableWatcher: true,
           enabledChecks: ["typecheck", "lint"],
         });
-        runtimeState.ghostAgent.start().catch((err) => {
-          this.logger.warn("GhostAgent failed to start", err);
-        });
-        this.logger.info("GhostAgent started for workspace", { path: workspacePath });
 
         // Wire GhostAgent events to session event stream
-        runtimeState.ghostAgent.onEvent((event) => {
+        runtimeState.ghostEventUnsubscribe = runtimeState.ghostAgent.onEvent((event) => {
           if (event.type === "toast:show") {
-            // TODO: Publish to eventPublisher as a toast/notification event
-            // this.eventPublisher.publish(sessionId, "notification", event.data);
+            const workspaceSessionId = runtimeState.ghostWorkspaceSessionId;
+            if (!workspaceSessionId || !isToastSuggestion(event.data)) {
+              return;
+            }
+            void this.publishGhostToastEvent({
+              sessionId,
+              workspaceSessionId,
+              toast: event.data,
+              eventTimestamp: event.timestamp,
+            });
           }
         });
+
+        runtimeState.ghostAgent
+          .start()
+          .then(() => {
+            this.logger.info("GhostAgent started for workspace", { path: workspacePath });
+            const workspaceSessionId = runtimeState.ghostWorkspaceSessionId;
+            if (workspaceSessionId) {
+              void this.updateWorkspaceSessionStatus({
+                sessionId,
+                workspaceSessionId,
+                status: "active",
+              });
+            }
+          })
+          .catch((err) => {
+            this.logger.warn("GhostAgent failed to start", err);
+            const workspaceSessionId = runtimeState.ghostWorkspaceSessionId;
+            if (workspaceSessionId) {
+              void this.updateWorkspaceSessionStatus({
+                sessionId,
+                workspaceSessionId,
+                status: "closed",
+              });
+            }
+          });
       }
     }
 
@@ -360,8 +402,117 @@ export class CoworkTaskRuntime {
 
     // Stop GhostAgent if active
     if (runtime?.ghostAgent) {
+      runtime.ghostEventUnsubscribe?.();
+      runtime.ghostEventUnsubscribe = undefined;
       await runtime.ghostAgent.stop();
       this.logger.info("GhostAgent stopped for session", { sessionId });
+    }
+    if (runtime?.ghostWorkspaceSessionId) {
+      await this.updateWorkspaceSessionStatus({
+        sessionId,
+        workspaceSessionId: runtime.ghostWorkspaceSessionId,
+        status: "closed",
+      });
+    }
+  }
+
+  private async createGhostWorkspaceSession(
+    session: CoworkSession,
+    workspacePath: string
+  ): Promise<CoworkWorkspaceSession | null> {
+    const now = Date.now();
+    const workspaceSession: CoworkWorkspaceSession = {
+      workspaceSessionId: crypto.randomUUID(),
+      sessionId: session.sessionId,
+      workspaceId: session.workspaceId ?? workspacePath,
+      kind: "file",
+      status: "created",
+      controller: "agent",
+      createdAt: now,
+      updatedAt: now,
+      metadata: {
+        source: "ghost_agent",
+      },
+    };
+
+    try {
+      const created = await this.workspaceSessionStore.create(workspaceSession);
+      this.eventPublisher.publishWorkspaceSessionCreated({
+        sessionId: session.sessionId,
+        workspaceSession: created,
+      });
+      return created;
+    } catch (error) {
+      this.logger.warn("Failed to create GhostAgent workspace session", error);
+      return null;
+    }
+  }
+
+  private async updateWorkspaceSessionStatus(params: {
+    sessionId: string;
+    workspaceSessionId: string;
+    status: CoworkWorkspaceSession["status"];
+  }): Promise<void> {
+    const now = Date.now();
+    try {
+      const updated = await this.workspaceSessionStore.update(
+        params.workspaceSessionId,
+        (prev) => ({
+          ...prev,
+          status: params.status,
+          updatedAt: Math.max(prev.updatedAt, now),
+          endedAt: params.status === "closed" ? (prev.endedAt ?? now) : prev.endedAt,
+        })
+      );
+      if (!updated) {
+        return;
+      }
+      this.eventPublisher.publishWorkspaceSessionUpdated({
+        sessionId: params.sessionId,
+        workspaceSession: updated,
+      });
+      if (updated.status === "closed" && updated.endedAt) {
+        this.eventPublisher.publishWorkspaceSessionEnded({
+          sessionId: params.sessionId,
+          workspaceSessionId: updated.workspaceSessionId,
+          endedAt: updated.endedAt,
+        });
+      }
+    } catch (error) {
+      this.logger.warn("Failed to update GhostAgent workspace session", error);
+    }
+  }
+
+  private async publishGhostToastEvent(params: {
+    sessionId: string;
+    workspaceSessionId: string;
+    toast: ToastSuggestion;
+    eventTimestamp: Date;
+  }): Promise<void> {
+    const timestamp =
+      params.eventTimestamp instanceof Date ? params.eventTimestamp.getTime() : Date.now();
+    const payload = buildGhostToastPayload(params.toast);
+
+    try {
+      const stored = await this.workspaceEventStore.append({
+        workspaceSessionId: params.workspaceSessionId,
+        sessionId: params.sessionId,
+        kind: "log_line",
+        payload,
+        source: "system",
+        timestamp,
+      });
+      await this.workspaceSessionStore.update(params.workspaceSessionId, (prev) => ({
+        ...prev,
+        updatedAt: Math.max(prev.updatedAt, timestamp),
+      }));
+      this.eventPublisher.publishWorkspaceSessionEvent({
+        sessionId: params.sessionId,
+        workspaceSessionId: params.workspaceSessionId,
+        event: stored,
+      });
+    } catch (error) {
+      this.logger.warn("Failed to publish GhostAgent toast event", error);
     }
   }
 
@@ -916,6 +1067,8 @@ export class CoworkTaskRuntime {
       checkpointStorage: runtimeResult.checkpointStorage,
       checkpointManager: runtimeResult.checkpointManager,
       ghostAgent: undefined,
+      ghostWorkspaceSessionId: undefined,
+      ghostEventUnsubscribe: undefined,
     };
   }
 
@@ -1493,6 +1646,39 @@ export class CoworkTaskRuntime {
   async resolveApproval(approvalId: string, decision: "approved" | "rejected") {
     return this.approvalCoordinator.resolveApproval(approvalId, decision);
   }
+}
+
+function isToastSuggestion(value: unknown): value is ToastSuggestion {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    typeof value.type === "string" &&
+    typeof value.title === "string" &&
+    typeof value.message === "string"
+  );
+}
+
+function buildGhostToastPayload(toast: ToastSuggestion): Record<string, unknown> {
+  const timestamp =
+    toast.timestamp instanceof Date ? toast.timestamp.toISOString() : toast.timestamp;
+  const payload: Record<string, unknown> = {
+    toastId: toast.id,
+    type: toast.type,
+    title: toast.title,
+    message: toast.message,
+    origin: "ghost_agent",
+    timestamp,
+  };
+  if (toast.actions?.length) {
+    payload.actions = toast.actions;
+  }
+  if (typeof toast.autoDismissMs === "number") {
+    payload.autoDismissMs = toast.autoDismissMs;
+  }
+  if (toast.sourceCheck) {
+    payload.sourceCheck = toast.sourceCheck;
+  }
+  return payload;
 }
 
 function buildCheckpointFromState(
