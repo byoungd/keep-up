@@ -5,8 +5,9 @@
  * Tools: lsp_find_references, lsp_rename, lsp_document_symbols, lsp_diagnostics
  */
 
+import { resolve as resolvePath } from "node:path";
 import type { LspClient } from "../client";
-import type { LspLocation, LspSymbol, LspWorkspaceEdit } from "../types";
+import type { LspDiagnostic, LspLocation, LspSymbol, LspWorkspaceEdit } from "../types";
 
 // Import types from agent-runtime (avoid circular dependency)
 type MCPTool = {
@@ -234,14 +235,10 @@ export class LspToolServer {
     const { file } = args as { file: string };
 
     try {
-      // Open the document to trigger diagnostics
       await client.openDocument(file);
-
-      // Wait a bit for diagnostics to be computed
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      // TODO: Collect diagnostics from the client's event emitter
-      return this.successResult("Diagnostics requested. Check the diagnostics event for results.");
+      const normalizedFile = resolvePath(file);
+      const diagnostics = await this.waitForDiagnostics(client, normalizedFile);
+      return this.successResult(this.formatDiagnostics(diagnostics));
     } catch (error) {
       return this.errorResult("INTERNAL_ERROR", `Failed to get diagnostics: ${error}`);
     }
@@ -297,6 +294,20 @@ export class LspToolServer {
     return lines.join("\n");
   }
 
+  private formatDiagnostics(diagnostics: LspDiagnostic[]): string {
+    if (diagnostics.length === 0) {
+      return "No diagnostics found.";
+    }
+
+    const lines = [`Found ${diagnostics.length} diagnostic(s):\n`];
+    for (const diagnostic of diagnostics) {
+      lines.push(
+        `  [${diagnostic.severity}] ${diagnostic.file}:${diagnostic.line}:${diagnostic.column} ${diagnostic.message}`
+      );
+    }
+    return lines.join("\n");
+  }
+
   private formatSymbols(symbols: LspSymbol[], indent = 0): string {
     const prefix = "  ".repeat(indent);
     const lines: string[] = [];
@@ -310,6 +321,34 @@ export class LspToolServer {
     }
 
     return lines.join("\n");
+  }
+
+  private waitForDiagnostics(
+    client: LspClient,
+    filePath: string,
+    timeoutMs = 1500
+  ): Promise<LspDiagnostic[]> {
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        cleanup();
+        resolve([]);
+      }, timeoutMs);
+
+      const handler = (diagnosticFile: string, diagnostics: LspDiagnostic[]) => {
+        if (resolvePath(diagnosticFile) !== filePath) {
+          return;
+        }
+        cleanup();
+        resolve(diagnostics);
+      };
+
+      const cleanup = () => {
+        clearTimeout(timer);
+        client.off("diagnostics", handler);
+      };
+
+      client.on("diagnostics", handler);
+    });
   }
 }
 
