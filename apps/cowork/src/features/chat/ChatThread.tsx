@@ -14,9 +14,11 @@ import {
   DropdownMenuTrigger,
   AIPanel as ShellAIPanel,
 } from "@ku0/shell";
+import { useNavigate } from "@tanstack/react-router";
 import { Download } from "lucide-react";
 import React, { useCallback, useMemo } from "react";
 import { type ChatAttachmentRef, updateSettings, uploadChatAttachment } from "../../api/coworkApi";
+import { useWorkspace } from "../../app/providers/WorkspaceProvider";
 import { detectIntent } from "../../lib/intentDetector";
 import { parseSlashCommand } from "../../lib/slashCommands";
 import { CostMeter } from "./components/CostMeter";
@@ -100,6 +102,8 @@ function isAgentTask(value: unknown): value is AgentTask {
 }
 
 export function ChatThread({ sessionId }: { sessionId: string }) {
+  const navigate = useNavigate();
+  const { activeWorkspaceId, createSessionForPath, createSessionWithoutGrant } = useWorkspace();
   const {
     messages,
     sendMessage,
@@ -186,6 +190,32 @@ export function ChatThread({ sessionId }: { sessionId: string }) {
     });
     attachmentRefs.current.clear();
   }, []);
+
+  const handleClear = useCallback(async () => {
+    setInput("");
+    setEditingMessageId(null);
+    setBranchParentId(null);
+    setStatusMessage(null);
+    clearAttachments();
+
+    const nextSession = activeWorkspaceId
+      ? await createSessionForPath(activeWorkspaceId, "Untitled Session")
+      : await createSessionWithoutGrant("Untitled Session");
+
+    if (nextSession.id !== sessionId) {
+      await navigate({
+        to: "/sessions/$sessionId",
+        params: { sessionId: nextSession.id },
+      });
+    }
+  }, [
+    activeWorkspaceId,
+    clearAttachments,
+    createSessionForPath,
+    createSessionWithoutGrant,
+    navigate,
+    sessionId,
+  ]);
 
   const removeAttachment = useCallback((id: string) => {
     setAttachments((prev) => {
@@ -564,9 +594,7 @@ export function ChatThread({ sessionId }: { sessionId: string }) {
           /* no-op */
         }}
         showClose={false}
-        onClear={() => {
-          /* no-op */
-        }}
+        onClear={handleClear}
         onCopyLast={() => {
           /* no-op */
         }}
