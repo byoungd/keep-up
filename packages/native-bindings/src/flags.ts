@@ -14,7 +14,8 @@ function readBooleanFlag(value: string | undefined, fallback: boolean): boolean 
   if (value === undefined) {
     return fallback;
   }
-  return value === "true" || value === "1";
+  const normalized = value.trim().toLowerCase();
+  return normalized === "true" || normalized === "1" || normalized === "yes";
 }
 
 export function createFlagStore<T extends Record<string, FlagDefinition>>(
