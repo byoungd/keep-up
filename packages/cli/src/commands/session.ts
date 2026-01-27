@@ -25,10 +25,12 @@ function listCommand(): Command {
   return new Command("list")
     .description("List all sessions")
     .option("-n, --limit <n>", "Limit results", "10")
-    .action(async (options: { limit: string }) => {
+    .option("-a, --all", "List all sessions")
+    .action(async (options: { limit: string; all?: boolean }) => {
       const store = new SessionStore();
-      const limit = Number.parseInt(options.limit, 10);
-      const sessions = await store.list(Number.isNaN(limit) ? 10 : limit);
+      const limit = options.all ? 0 : Number.parseInt(options.limit, 10);
+      const resolvedLimit = Number.isNaN(limit) ? 10 : limit;
+      const sessions = await store.list(resolvedLimit);
       printSessionTable(sessions);
     });
 }
