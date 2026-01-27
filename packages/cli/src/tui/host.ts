@@ -92,6 +92,8 @@ function summarizeSession(session: SessionRecord) {
     createdAt: session.createdAt,
     updatedAt: session.updatedAt,
     messageCount: session.messages.length,
+    toolCallCount: session.toolCalls?.length ?? 0,
+    approvalCount: session.approvals?.length ?? 0,
   };
 }
 
