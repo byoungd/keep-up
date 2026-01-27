@@ -186,53 +186,93 @@ function updateToolCalls(
   timestamp: number
 ) {
   if (payload.type === "tool:calling") {
-    const typed = payload.data as { toolName?: string; arguments?: Record<string, unknown> };
-    const toolName = typed?.toolName ?? "unknown";
-    const args = typed?.arguments ?? {};
-    toolCalls.push({
-      id: `tool_${toolName}_${timestamp}`,
-      name: toolName,
-      arguments: args,
-      status: "started",
-      startedAt: timestamp,
-    });
+    recordToolCallStart(toolCalls, payload.data, timestamp);
     return;
   }
 
   if (payload.type === "tool:result") {
-    const typed = payload.data as { toolName?: string; result?: MCPToolResult };
-    const toolName = typed?.toolName ?? "unknown";
-    const result = typed?.result;
-    const success = Boolean(result?.success ?? true);
-    const errorMessage = result?.error?.message;
-    const errorCode = result?.error?.code;
-
-    const last = findLastPendingCall(toolCalls, toolName);
-    const completedAt = timestamp;
-
-    if (last) {
-      last.status = success ? "completed" : "failed";
-      last.completedAt = completedAt;
-      last.durationMs = result?.meta?.durationMs;
-      last.error = errorMessage;
-      last.errorCode = errorCode;
-    } else {
-      toolCalls.push({
-        id: `tool_${toolName}_${timestamp}`,
-        name: toolName,
-        arguments: {},
-        status: success ? "completed" : "failed",
-        startedAt: completedAt,
-        completedAt,
-        durationMs: result?.meta?.durationMs,
-        error: errorMessage,
-        errorCode,
-      });
-    }
+    recordToolCallResult(toolCalls, payload.data, timestamp);
   }
 }
 
-function findLastPendingCall(toolCalls: ToolCallRecord[], toolName: string) {
+type ToolCallPayload = {
+  toolName: string;
+  callId?: string;
+  result?: MCPToolResult;
+  success: boolean;
+  errorMessage?: string;
+  errorCode?: string;
+  timestamp: number;
+};
+
+function recordToolCallStart(toolCalls: ToolCallRecord[], data: unknown, timestamp: number): void {
+  const typed = data as {
+    toolName?: string;
+    arguments?: Record<string, unknown>;
+    callId?: string;
+  };
+  const toolName = typed?.toolName ?? "unknown";
+  const args = typed?.arguments ?? {};
+  toolCalls.push({
+    id: typed?.callId ?? `tool_${toolName}_${timestamp}`,
+    name: toolName,
+    arguments: args,
+    status: "started",
+    startedAt: timestamp,
+  });
+}
+
+function recordToolCallResult(toolCalls: ToolCallRecord[], data: unknown, timestamp: number): void {
+  const payload = parseToolCallPayload(data, timestamp);
+  const last = findLastPendingCall(toolCalls, payload.toolName, payload.callId);
+  const completedAt = payload.timestamp;
+
+  if (last) {
+    last.status = payload.success ? "completed" : "failed";
+    last.completedAt = completedAt;
+    last.durationMs = payload.result?.meta?.durationMs;
+    last.error = payload.errorMessage;
+    last.errorCode = payload.errorCode;
+    return;
+  }
+
+  toolCalls.push({
+    id: payload.callId ?? `tool_${payload.toolName}_${payload.timestamp}`,
+    name: payload.toolName,
+    arguments: {},
+    status: payload.success ? "completed" : "failed",
+    startedAt: completedAt,
+    completedAt,
+    durationMs: payload.result?.meta?.durationMs,
+    error: payload.errorMessage,
+    errorCode: payload.errorCode,
+  });
+}
+
+function parseToolCallPayload(data: unknown, timestamp: number): ToolCallPayload {
+  const typed = data as { toolName?: string; result?: MCPToolResult; callId?: string };
+  const toolName = typed?.toolName ?? "unknown";
+  const result = typed?.result;
+  return {
+    toolName,
+    callId: typed?.callId,
+    result,
+    success: Boolean(result?.success ?? true),
+    errorMessage: result?.error?.message,
+    errorCode: result?.error?.code,
+    timestamp,
+  };
+}
+
+function findLastPendingCall(toolCalls: ToolCallRecord[], toolName: string, callId?: string) {
+  if (callId) {
+    for (let i = toolCalls.length - 1; i >= 0; i -= 1) {
+      const record = toolCalls[i];
+      if (record.id === callId && record.status === "started") {
+        return record;
+      }
+    }
+  }
   for (let i = toolCalls.length - 1; i >= 0; i -= 1) {
     const record = toolCalls[i];
     if (record.name === toolName && record.status === "started") {
