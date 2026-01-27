@@ -320,7 +320,11 @@ export function ContextPanel({
       </div>
 
       {/* Unified Tab Bar */}
-      <div className="shrink-0 px-3 py-2 border-b border-border/20 flex items-center gap-1 overflow-x-auto scrollbar-auto-hide">
+      <div
+        className="shrink-0 px-3 py-2 border-b border-border/20 flex items-center gap-1 overflow-x-auto scrollbar-auto-hide"
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+        tabIndex={0}
+      >
         {availableTabs.map((tab) => (
           <button
             type="button"
