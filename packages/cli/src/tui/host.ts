@@ -468,8 +468,9 @@ function handleApprovalResolved(
     return;
   }
   const target =
-    (pendingApprovalId && approvals.find((approval) => approval.id === pendingApprovalId)) ??
-    approvals[approvals.length - 1];
+    (pendingApprovalId
+      ? approvals.find((approval) => approval.id === pendingApprovalId)
+      : undefined) ?? approvals[approvals.length - 1];
   target.status = status as ApprovalRecord["status"];
   target.resolvedAt = timestamp;
 }
