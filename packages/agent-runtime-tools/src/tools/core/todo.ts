@@ -298,8 +298,8 @@ export class TodoToolServer extends BaseToolServer {
     }
 
     const action = args.action as string;
-    const id = args.id as string | undefined;
-    const text = args.text as string | undefined;
+    const id = normalizeOptionalString(args.id);
+    const text = normalizeOptionalString(args.text);
     const status = args.status as TodoItem["status"] | undefined;
     const priority = args.priority as TodoItem["priority"] | undefined;
 
@@ -409,6 +409,14 @@ export class TodoToolServer extends BaseToolServer {
 
     return textResult(output);
   }
+}
+
+function normalizeOptionalString(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
 }
 
 /**

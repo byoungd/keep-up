@@ -6,7 +6,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { MCPToolResult, ToolContext } from "@ku0/agent-runtime-core";
-import { SECURITY_PRESETS } from "@ku0/agent-runtime-core";
+import { DEFAULT_AGENT_RUNTIME_DIR, SECURITY_PRESETS } from "@ku0/agent-runtime-core";
 import { describe, expect, it } from "vitest";
 import { TodoToolServer } from "../tools/core/todo";
 
@@ -74,6 +74,39 @@ describe("TodoToolServer", () => {
 
       expect(readResult.success).toBe(true);
       expect(text).toContain("Ship it");
+    });
+  });
+
+  it("rejects empty todo text", async () => {
+    await withTempDir(async (dir) => {
+      const server = new TodoToolServer();
+      const context = createContext({ workingDirectory: dir, filePermission: "workspace" });
+
+      const result = await server.callTool(
+        { name: "write", arguments: { action: "add", text: "   " } },
+        context
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe("INVALID_ARGUMENTS");
+    });
+  });
+
+  it("trims todo text before saving", async () => {
+    await withTempDir(async (dir) => {
+      const server = new TodoToolServer();
+      const context = createContext({ workingDirectory: dir, filePermission: "workspace" });
+
+      await server.callTool(
+        { name: "write", arguments: { action: "add", text: "  Ship it  " } },
+        context
+      );
+
+      const todoPath = path.join(dir, DEFAULT_AGENT_RUNTIME_DIR, "TODO.md");
+      const content = await fs.readFile(todoPath, "utf-8");
+
+      expect(content).toContain("Ship it");
+      expect(content).not.toContain("  Ship it  ");
     });
   });
 
