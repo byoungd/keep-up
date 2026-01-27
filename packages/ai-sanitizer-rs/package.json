@@ -14,7 +14,7 @@
   },
   "scripts": {
     "build": "tsc && pnpm build:native",
-    "build:native": "napi build --cargo-cwd native --platform --release",
+    "build:native": "tsx scripts/build-native.ts --platform --release",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "lint:fix": "biome check --write ."
@@ -23,6 +23,7 @@
   "devDependencies": {
     "@napi-rs/cli": "^2.18.4",
     "@types/node": "^22.10.2",
+    "tsx": "^4.21.0",
     "typescript": "^5.7.3"
   },
   "napi": {
