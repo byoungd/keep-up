@@ -88,3 +88,32 @@
 ### 5.2 List Artifacts
 `GET /api/cowork/tasks/:taskId/artifacts`
 *   **Response**: `ArtifactMetadata[]`
+
+---
+
+## 6. MCP Apps (SEP-1865)
+
+### 6.1 List MCP Servers
+`GET /api/mcp/servers`
+*   **Response**: `{ ok: true, servers: McpServerSummary[] }`
+
+### 6.2 List MCP Tools
+`GET /api/mcp/servers/:server/tools`
+*   **Response**: `{ ok: true, tools: MCPTool[] }`
+
+### 6.3 Call MCP Tool
+`POST /api/mcp/servers/:server/tools/call`
+*   **Body**: `{ name: string, arguments?: Record<string, unknown> }`
+*   **Response**: `{ ok: true, result: CallToolResult }`
+
+### 6.4 List MCP Resources
+`GET /api/mcp/servers/:server/resources?cursor=...`
+*   **Response**: `{ ok: true, result: ListResourcesResult }`
+
+### 6.5 List MCP Resource Templates
+`GET /api/mcp/servers/:server/resource-templates?cursor=...`
+*   **Response**: `{ ok: true, result: ListResourceTemplatesResult }`
+
+### 6.6 Read MCP Resource
+`GET /api/mcp/servers/:server/resource?uri=...`
+*   **Response**: `{ ok: true, result: ReadResourceResult }`

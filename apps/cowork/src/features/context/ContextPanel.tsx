@@ -8,6 +8,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import * as React from "react";
 import type { AgentMode } from "../../api/coworkApi";
 import { ArtifactsList } from "../artifacts/components/ArtifactsList";
+import { McpAppsPanelContent } from "../mcp/McpAppsPanelContent";
 import { MemoryPanelContent } from "../memory/components/MemoryPanelContent";
 import { PreflightPanelContent } from "../preflight/PreflightPanelContent";
 import { useTaskStream } from "../tasks/hooks/useTaskStream";
@@ -23,6 +24,7 @@ export type ContextPanelTab =
   | "packs"
   | "workflows"
   | "preflight"
+  | "apps"
   | "checkpoints"
   | "artifacts"
   | "notes"
@@ -72,6 +74,7 @@ const TAB_CONFIG: { id: ContextPanelTab; label: string }[] = [
   { id: "packs", label: "Packs" },
   { id: "workflows", label: "Workflows" },
   { id: "preflight", label: "Preflight" },
+  { id: "apps", label: "Apps" },
   { id: "checkpoints", label: "Checkpoints" },
   { id: "artifacts", label: "Artifacts" },
   { id: "notes", label: "Notes" },
@@ -227,6 +230,8 @@ function ContextPanelContent({
       return <WorkflowTemplatesPanelContent onRunTemplate={onRunTemplate} />;
     case "preflight":
       return <PreflightPanelContent />;
+    case "apps":
+      return <McpAppsPanelContent />;
     case "checkpoints":
       return <CheckpointsPanelContent />;
     case "artifacts":

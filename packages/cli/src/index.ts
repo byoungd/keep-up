@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from "commander";
 import { agentCommand, runCommand } from "./commands/agent";
+import { approvalsCommand } from "./commands/approvals";
 import { completionCommand } from "./commands/completion";
 import { doctorCommand } from "./commands/doctor";
 import { writeStderr } from "./utils/terminal";
@@ -11,6 +12,7 @@ program.name("keepup").description("Keep-Up CLI").version("0.1.0");
 
 program.addCommand(agentCommand());
 program.addCommand(runCommand());
+program.addCommand(approvalsCommand());
 program.addCommand(doctorCommand());
 program.addCommand(completionCommand());
 

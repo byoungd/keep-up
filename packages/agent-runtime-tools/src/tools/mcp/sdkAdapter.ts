@@ -9,6 +9,8 @@ import type {
   JSONSchema,
   MCPTool,
   MCPToolResult,
+  McpUiToolMeta,
+  McpUiToolVisibility,
   ToolContent,
 } from "@ku0/agent-runtime-core";
 import { COWORK_POLICY_ACTIONS } from "@ku0/agent-runtime-core";
@@ -26,6 +28,7 @@ export interface ToolScopeConfig {
 const CATEGORY_VALUES = new Set(["core", "knowledge", "external", "communication", "control"]);
 const SCHEMA_TYPES = new Set(["object", "string", "number", "boolean", "array"]);
 const COWORK_POLICY_ACTION_SET = new Set<string>(COWORK_POLICY_ACTIONS);
+const UI_VISIBILITY_VALUES = new Set<McpUiToolVisibility>(["always", "contextual", "hidden"]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -33,6 +36,57 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isCoworkPolicyActionLike(value: string): value is CoworkPolicyActionLike {
   return COWORK_POLICY_ACTION_SET.has(value);
+}
+
+function parseUiVisibility(value: unknown): McpUiToolVisibility | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  if (!UI_VISIBILITY_VALUES.has(value as McpUiToolVisibility)) {
+    return undefined;
+  }
+  return value as McpUiToolVisibility;
+}
+
+function parseUiMeta(meta?: Record<string, unknown>): McpUiToolMeta | undefined {
+  if (!meta) {
+    return undefined;
+  }
+
+  const ui = meta.ui;
+  if (!isRecord(ui)) {
+    const directUri = meta["ui/resourceUri"];
+    if (typeof directUri === "string" && directUri.trim().length > 0) {
+      return { resourceUri: directUri };
+    }
+    return undefined;
+  }
+
+  const resourceUri = ui.resourceUri;
+  if (typeof resourceUri !== "string" || resourceUri.trim().length === 0) {
+    const directUri = meta["ui/resourceUri"];
+    if (typeof directUri === "string" && directUri.trim().length > 0) {
+      return { resourceUri: directUri };
+    }
+    return undefined;
+  }
+
+  const mapped: McpUiToolMeta = {
+    resourceUri,
+  };
+
+  if (typeof ui.label === "string" && ui.label.trim().length > 0) {
+    mapped.label = ui.label;
+  }
+  if (typeof ui.icon === "string" && ui.icon.trim().length > 0) {
+    mapped.icon = ui.icon;
+  }
+  const visibility = parseUiVisibility(ui.visibility);
+  if (visibility) {
+    mapped.visibility = visibility;
+  }
+
+  return mapped;
 }
 
 function toSdkAnnotations(annotations?: MCPTool["annotations"]): SdkToolAnnotations | undefined {
@@ -172,6 +226,58 @@ function normalizeSdkInputSchema(schema: SdkTool["inputSchema"] | undefined): JS
   };
 }
 
+function applyAnnotationMeta(
+  meta: Record<string, unknown>,
+  annotations: MCPTool["annotations"] | undefined
+): void {
+  if (!annotations) {
+    return;
+  }
+  if (annotations.category) {
+    meta.category = annotations.category;
+  }
+  if (annotations.requiredScopes) {
+    meta.oauth = {
+      ...(isRecord(meta.oauth) ? meta.oauth : {}),
+      scopes: annotations.requiredScopes,
+    };
+  }
+  if (annotations.estimatedDuration) {
+    meta.estimatedDuration = annotations.estimatedDuration;
+  }
+  if (annotations.policyAction) {
+    meta.policyAction = annotations.policyAction;
+  }
+}
+
+function applyUiMeta(meta: Record<string, unknown>, ui?: McpUiToolMeta): void {
+  if (!ui) {
+    return;
+  }
+  const uiMeta = isRecord(meta.ui) ? { ...(meta.ui as Record<string, unknown>) } : {};
+  uiMeta.resourceUri = ui.resourceUri;
+  if (ui.label) {
+    uiMeta.label = ui.label;
+  }
+  if (ui.icon) {
+    uiMeta.icon = ui.icon;
+  }
+  if (ui.visibility) {
+    uiMeta.visibility = ui.visibility;
+  }
+  meta.ui = uiMeta;
+  if (meta["ui/resourceUri"] === undefined) {
+    meta["ui/resourceUri"] = ui.resourceUri;
+  }
+}
+
+function buildSdkMeta(tool: MCPTool): Record<string, unknown> | undefined {
+  const meta: Record<string, unknown> = { ...(tool.metadata ?? {}) };
+  applyAnnotationMeta(meta, tool.annotations);
+  applyUiMeta(meta, tool.ui);
+  return Object.keys(meta).length > 0 ? meta : undefined;
+}
+
 export function normalizeSdkTool(tool: SdkTool): SdkTool | null {
   if (!tool || typeof tool.name !== "string" || tool.name.trim().length === 0) {
     return null;
@@ -186,30 +292,14 @@ export function normalizeSdkTool(tool: SdkTool): SdkTool | null {
 
 export function toSdkTool(tool: MCPTool): SdkTool {
   const inputSchema = normalizeInputSchema(tool.inputSchema);
-  const meta: Record<string, unknown> = { ...(tool.metadata ?? {}) };
-
-  if (tool.annotations?.category) {
-    meta.category = tool.annotations.category;
-  }
-  if (tool.annotations?.requiredScopes) {
-    meta.oauth = {
-      ...(isRecord(meta.oauth) ? meta.oauth : {}),
-      scopes: tool.annotations.requiredScopes,
-    };
-  }
-  if (tool.annotations?.estimatedDuration) {
-    meta.estimatedDuration = tool.annotations.estimatedDuration;
-  }
-  if (tool.annotations?.policyAction) {
-    meta.policyAction = tool.annotations.policyAction;
-  }
+  const meta = buildSdkMeta(tool);
 
   return {
     name: tool.name,
     description: tool.description,
     inputSchema: inputSchema as SdkTool["inputSchema"],
     annotations: toSdkAnnotations(tool.annotations),
-    _meta: Object.keys(meta).length > 0 ? meta : undefined,
+    _meta: meta,
   };
 }
 
@@ -229,11 +319,14 @@ export function fromSdkTool(tool: SdkTool, scopeConfig?: ToolScopeConfig): MCPTo
     };
   }
 
+  const ui = parseUiMeta(meta);
+
   return {
     name: tool.name,
     description: tool.description ?? "MCP tool",
     inputSchema: normalizeSdkInputSchema(tool.inputSchema),
     annotations,
+    ui,
     metadata: meta,
   };
 }

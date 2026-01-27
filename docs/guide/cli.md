@@ -63,6 +63,7 @@ Environment overrides:
 - `KEEPUP_OUTPUT`
 - `KEEPUP_SESSION`
 - `KEEPUP_APPROVAL_MODE`
+- `KEEPUP_SANDBOX`
 
 ## Sessions
 
@@ -103,6 +104,12 @@ Use `--json` for machine-readable output:
 
 ```bash
 keepup agent run "Summarize tests" --json
+```
+
+Use `--format markdown` for a structured markdown response:
+
+```bash
+keepup agent run "Summarize tests" --format markdown
 ```
 
 Disable streaming progress output:

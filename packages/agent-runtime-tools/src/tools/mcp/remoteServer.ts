@@ -20,7 +20,15 @@ import {
 } from "@modelcontextprotocol/sdk/client/auth.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import type { CallToolResult, Tool as SdkTool } from "@modelcontextprotocol/sdk/types.js";
+import type {
+  CallToolResult,
+  ListResourcesRequest,
+  ListResourcesResult,
+  ListResourceTemplatesRequest,
+  ListResourceTemplatesResult,
+  ReadResourceResult,
+  Tool as SdkTool,
+} from "@modelcontextprotocol/sdk/types.js";
 import {
   createMcpOAuthClientProvider,
   type McpOAuthClientConfig,
@@ -88,6 +96,7 @@ export class McpRemoteToolServer implements MCPToolServer {
   private readonly auditLogger?: AuditLogger;
   private readonly onStatusChange?: (status: McpConnectionStatus) => void;
   private tools: MCPTool[] = [];
+  private rawTools: MCPTool[] = [];
   private connected = false;
   private connecting?: Promise<void>;
   private status: McpConnectionStatus;
@@ -145,6 +154,10 @@ export class McpRemoteToolServer implements MCPToolServer {
     return [...this.tools];
   }
 
+  listToolsRaw(): MCPTool[] {
+    return [...this.rawTools];
+  }
+
   async callTool(call: MCPToolCall, _context: ToolContext): Promise<MCPToolResult> {
     await this.ensureConnected();
     const toolName = call.name.includes(":") ? call.name.split(":")[1] : call.name;
@@ -174,6 +187,55 @@ export class McpRemoteToolServer implements MCPToolServer {
         },
       };
     }
+  }
+
+  async callToolRaw(call: MCPToolCall, _context?: ToolContext): Promise<CallToolResult> {
+    await this.ensureConnected();
+    const toolName = call.name.includes(":") ? call.name.split(":")[1] : call.name;
+    const requiredScopes = this.resolveRequiredScopes(toolName);
+
+    try {
+      await this.ensureScopes(requiredScopes);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (error instanceof UnauthorizedError) {
+        this.updateStatus({ authRequired: true, lastError: message, state: this.status.state });
+      }
+      return {
+        content: [{ type: "text", text: message }],
+        isError: true,
+      };
+    }
+
+    try {
+      return (await this.client.callTool({
+        name: toolName,
+        arguments: call.arguments,
+      })) as CallToolResult;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        content: [{ type: "text", text: message }],
+        isError: true,
+      };
+    }
+  }
+
+  async listResources(params?: ListResourcesRequest["params"]): Promise<ListResourcesResult> {
+    await this.ensureConnected();
+    return (await this.client.listResources(params)) as ListResourcesResult;
+  }
+
+  async listResourceTemplates(
+    params?: ListResourceTemplatesRequest["params"]
+  ): Promise<ListResourceTemplatesResult> {
+    await this.ensureConnected();
+    return (await this.client.listResourceTemplates(params)) as ListResourceTemplatesResult;
+  }
+
+  async readResource(uri: string): Promise<ReadResourceResult> {
+    await this.ensureConnected();
+    return (await this.client.readResource({ uri })) as ReadResourceResult;
   }
 
   async dispose(): Promise<void> {
@@ -231,9 +293,9 @@ export class McpRemoteToolServer implements MCPToolServer {
       .map((tool: SdkTool) => normalizeSdkTool(tool))
       .filter((tool): tool is SdkTool => tool !== null);
 
-    this.tools = normalized
-      .map((tool) => this.decorateTool(fromSdkTool(tool, this.toolScopes)))
-      .filter(hasValidPolicyAction);
+    const mapped = normalized.map((tool) => this.decorateTool(fromSdkTool(tool, this.toolScopes)));
+    this.rawTools = mapped;
+    this.tools = mapped.filter(hasValidPolicyAction);
   }
 
   private decorateTool(tool: MCPTool): MCPTool {
@@ -255,7 +317,9 @@ export class McpRemoteToolServer implements MCPToolServer {
   }
 
   private resolveRequiredScopes(toolName: string): string[] {
-    const tool = this.tools.find((entry) => entry.name === toolName);
+    const tool =
+      this.rawTools.find((entry) => entry.name === toolName) ??
+      this.tools.find((entry) => entry.name === toolName);
     return (
       tool?.annotations?.requiredScopes ??
       this.toolScopes?.toolScopes?.[toolName] ??

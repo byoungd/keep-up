@@ -512,26 +512,17 @@ function handleRuntimeEvent(event: RuntimeEvent, requestId: string, toolCalls: T
     timestamp,
     data: payload.data ?? null,
   };
-  updateToolCalls(toolCalls, { type: payload.type, data: payload.data }, timestamp);
-  emitExplicitEvent(payload.type, envelope, requestId);
-  sendEvent(`agent.${payload.type}`, envelope, requestId);
-}
 
-function emitExplicitEvent(
-  type: string,
-  payload: { turn: number; timestamp: number; data: unknown },
-  requestId: string
-) {
-  switch (type) {
-    case "tool:calling":
-      sendEvent("tool.calling", payload, requestId);
-      return;
-    case "tool:result":
-      sendEvent("tool.result", payload, requestId);
-      return;
-    default:
-      return;
+  updateToolCalls(toolCalls, { type: payload.type, data: payload.data }, timestamp);
+
+  // Emit explicit events for tools (from PR #325 logic)
+  if (payload.type === "tool:calling") {
+    sendEvent("tool.calling", envelope, requestId);
+  } else if (payload.type === "tool:result") {
+    sendEvent("tool.result", envelope, requestId);
   }
+
+  sendEvent(`agent.${payload.type}`, envelope, requestId);
 }
 
 async function handlePrompt(message: OpMessage): Promise<void> {
@@ -714,7 +705,7 @@ function startHost(): void {
     }
     void handleOp(message).catch((error) => {
       const messageText = error instanceof Error ? error.message : String(error);
-      sendError(message.id, message.op, messageText, "HOST_ERROR");
+      sendEvent("host.error", { message: messageText });
     });
   });
 }

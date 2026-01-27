@@ -12,6 +12,7 @@ import { CoworkTaskRuntime } from "./runtime/coworkTaskRuntime";
 import { createGatewayControlRuntime } from "./runtime/gatewayControl";
 import { createAIEnvelopeGateway } from "./runtime/lfccEnvelopeGateway";
 import { ContextIndexManager } from "./services/contextIndexManager";
+import { McpServerManager } from "./services/mcpServerManager";
 import { createStorageLayer } from "./storage";
 import { ensureStateDir } from "./storage/statePaths";
 import { SessionEventHub } from "./streaming/eventHub";
@@ -21,6 +22,12 @@ const stateDir = await ensureStateDir();
 const eventHub = new SessionEventHub();
 const runtimeEventBus = createEventBus();
 const contextIndexManager = new ContextIndexManager({ stateDir });
+const mcpServers = new McpServerManager({
+  stateDir,
+  eventBus: runtimeEventBus,
+  logger: serverLogger,
+});
+await mcpServers.initialize();
 const pipelineStore = await createPipelineStore();
 const pipelineRunner = createPipelineRunner({ store: pipelineStore, logger: serverLogger });
 void pipelineRunner.resumePendingRuns();
@@ -75,6 +82,7 @@ const app = createCoworkApp({
   pipelineRunner,
   lessonStore,
   critic,
+  mcpServers,
 });
 
 export default app;
