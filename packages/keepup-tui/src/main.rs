@@ -960,7 +960,26 @@ fn handle_event(app: &mut App, event: String, payload: Option<Value>) {
         return;
     }
 
+    if event == "tool.calling" || event == "tool.result" {
+        if let Some(message) = format_tool_event(&event, payload.as_ref()) {
+            app.push_system_message(message.clone());
+            app.status = message;
+            return;
+        }
+    }
+
+    if event == "approval.requested" || event == "approval.resolved" {
+        if let Some(message) = format_approval_event(&event, payload.as_ref()) {
+            app.push_system_message(message.clone());
+            app.status = message;
+            return;
+        }
+    }
+
     if event.starts_with("agent.") {
+        if should_ignore_agent_event(app, &event) {
+            return;
+        }
         if let Some(message) = format_agent_event(&event, payload.as_ref()) {
             app.push_system_message(message.clone());
             app.status = message;
@@ -972,25 +991,19 @@ fn handle_event(app: &mut App, event: String, payload: Option<Value>) {
 }
 
 fn format_agent_event(event: &str, payload: Option<&Value>) -> Option<String> {
-    let data = payload?.get("data")?;
     if event.ends_with("tool:calling") {
-        let tool = data.get("toolName")?.as_str().unwrap_or("unknown");
-        let args = data
-            .get("arguments")
-            .map(|value| value.to_string())
-            .unwrap_or_else(|| "{}".to_string());
-        return Some(format!("Tool call: {tool} {args}"));
+        return format_tool_event("tool.calling", payload);
     }
     if event.ends_with("tool:result") {
-        let tool = data.get("toolName")?.as_str().unwrap_or("unknown");
-        let success = data
-            .get("result")
-            .and_then(|value| value.get("success"))
-            .and_then(|value| value.as_bool())
-            .unwrap_or(true);
-        let status = if success { "ok" } else { "failed" };
-        return Some(format!("Tool result: {tool} {status}"));
+        return format_tool_event("tool.result", payload);
     }
+    if event.ends_with("confirmation:required") {
+        return format_approval_event("approval.requested", payload);
+    }
+    if event.ends_with("confirmation:received") {
+        return format_approval_event("approval.resolved", payload);
+    }
+    let data = payload?.get("data")?;
     if event.ends_with("plan:created") {
         return Some("Plan created.".to_string());
     }
@@ -1007,6 +1020,80 @@ fn format_agent_event(event: &str, payload: Option<&Value>) -> Option<String> {
         return Some("Agent error.".to_string());
     }
     None
+}
+
+fn format_tool_event(event: &str, payload: Option<&Value>) -> Option<String> {
+    let data = payload?.get("data")?;
+    if event == "tool.calling" {
+        let tool = data.get("toolName")?.as_str().unwrap_or("unknown");
+        let args = data
+            .get("arguments")
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "{}".to_string());
+        return Some(format!("Tool call: {tool} {args}"));
+    }
+    if event == "tool.result" {
+        let tool = data.get("toolName")?.as_str().unwrap_or("unknown");
+        let success = data
+            .get("result")
+            .and_then(|value| value.get("success"))
+            .and_then(|value| value.as_bool())
+            .unwrap_or(true);
+        let status = if success { "ok" } else { "failed" };
+        return Some(format!("Tool result: {tool} {status}"));
+    }
+    None
+}
+
+fn format_approval_event(event: &str, payload: Option<&Value>) -> Option<String> {
+    let data = payload?.get("data")?;
+    if event == "approval.requested" {
+        let tool = data.get("toolName")?.as_str().unwrap_or("unknown");
+        let risk = data
+            .get("risk")
+            .and_then(|value| value.as_str())
+            .unwrap_or("");
+        let suffix = if risk.is_empty() {
+            String::new()
+        } else {
+            format!(" ({risk})")
+        };
+        return Some(format!("Approval required: {tool}{suffix}"));
+    }
+    if event == "approval.resolved" {
+        let status = data
+            .get("status")
+            .and_then(|value| value.as_str())
+            .or_else(|| {
+                data.get("confirmed")
+                    .and_then(|value| value.as_bool())
+                    .map(|approved| if approved { "approved" } else { "rejected" })
+            })
+            .unwrap_or("resolved");
+        return Some(format!("Approval {status}."));
+    }
+    None
+}
+
+fn should_ignore_agent_event(app: &App, event: &str) -> bool {
+    if host_supports(app, "tool-events")
+        && (event.ends_with("tool:calling") || event.ends_with("tool:result"))
+    {
+        return true;
+    }
+    if host_supports(app, "approval-events")
+        && (event.ends_with("confirmation:required") || event.ends_with("confirmation:received"))
+    {
+        return true;
+    }
+    false
+}
+
+fn host_supports(app: &App, feature: &str) -> bool {
+    app.host_caps
+        .as_ref()
+        .map(|caps| caps.features.iter().any(|item| item == feature))
+        .unwrap_or(false)
 }
 
 fn handle_stream_chunk(app: &mut App, payload: Option<Value>) {

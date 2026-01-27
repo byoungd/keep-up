@@ -43,7 +43,15 @@ export type HostCapabilities = {
   features: string[];
 };
 
-export const HOST_FEATURES = ["sessions", "interrupt", "runtime:init", "events", "stream"] as const;
+export const HOST_FEATURES = [
+  "sessions",
+  "interrupt",
+  "runtime:init",
+  "events",
+  "stream",
+  "tool-events",
+  "approval-events",
+] as const;
 
 export function buildHostCapabilities(): HostCapabilities {
   return {

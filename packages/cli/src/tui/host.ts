@@ -319,16 +319,37 @@ function handleRuntimeEvent(event: RuntimeEvent, requestId: string, toolCalls: T
     return;
   }
   const timestamp = payload.timestamp ?? Date.now();
+  const envelope = {
+    turn: payload.turn ?? 0,
+    timestamp,
+    data: payload.data ?? null,
+  };
   updateToolCalls(toolCalls, { type: payload.type, data: payload.data }, timestamp);
-  sendEvent(
-    `agent.${payload.type}`,
-    {
-      turn: payload.turn ?? 0,
-      timestamp,
-      data: payload.data ?? null,
-    },
-    requestId
-  );
+  emitExplicitEvent(payload.type, envelope, requestId);
+  sendEvent(`agent.${payload.type}`, envelope, requestId);
+}
+
+function emitExplicitEvent(
+  type: string,
+  payload: { turn: number; timestamp: number; data: unknown },
+  requestId: string
+) {
+  switch (type) {
+    case "tool:calling":
+      sendEvent("tool.calling", payload, requestId);
+      return;
+    case "tool:result":
+      sendEvent("tool.result", payload, requestId);
+      return;
+    case "confirmation:required":
+      sendEvent("approval.requested", payload, requestId);
+      return;
+    case "confirmation:received":
+      sendEvent("approval.resolved", payload, requestId);
+      return;
+    default:
+      return;
+  }
 }
 
 async function handlePrompt(message: OpMessage): Promise<void> {
