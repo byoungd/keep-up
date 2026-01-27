@@ -46,6 +46,7 @@ export function CoworkAIPanel({ onClose, onPreviewArtifact }: CoworkAIPanelProps
     onQuote,
     onRetry,
     usage,
+    onClear,
   } = ctrl;
 
   useSafeAutoFocus(inputRef, []);
@@ -176,9 +177,7 @@ export function CoworkAIPanel({ onClose, onPreviewArtifact }: CoworkAIPanelProps
           })
         }
         showClose={false}
-        onClear={() => {
-          /* TODO */
-        }}
+        onClear={onClear}
         onCopyLast={() => {
           const last = messages[messages.length - 1];
           if (last?.content) {
