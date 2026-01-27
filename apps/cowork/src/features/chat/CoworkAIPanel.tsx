@@ -49,7 +49,7 @@ export function CoworkAIPanel({ onClose, onPreviewArtifact }: CoworkAIPanelProps
     onClear,
   } = ctrl;
 
-  useSafeAutoFocus(inputRef, []);
+  useSafeAutoFocus(inputRef, [aiPanel.isVisible], aiPanel.isVisible);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
