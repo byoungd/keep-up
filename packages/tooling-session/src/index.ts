@@ -111,7 +111,11 @@ export class SessionStore {
 
   async list(limit = 10): Promise<SessionRecord[]> {
     const sessions = await this.loadAll();
-    return sessions.sort((a, b) => b.updatedAt - a.updatedAt).slice(0, limit);
+    const sorted = sessions.sort((a, b) => b.updatedAt - a.updatedAt);
+    if (limit <= 0) {
+      return sorted;
+    }
+    return sorted.slice(0, limit);
   }
 
   async get(id: string): Promise<SessionRecord | undefined> {
