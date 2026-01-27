@@ -189,7 +189,11 @@ function ToolCallNodeDisplay({ node }: { node: TaskNode & { type: "tool_call" } 
           </div>
         )}
       </div>
-      <div className="font-mono text-micro bg-surface-2/50 rounded-lg p-2 overflow-x-auto border border-border/40">
+      <div
+        className="font-mono text-micro bg-surface-2/50 rounded-lg p-2 overflow-x-auto border border-border/40"
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+        tabIndex={0}
+      >
         <pre>{JSON.stringify(node.args, null, 2)}</pre>
       </div>
     </div>

@@ -49,7 +49,11 @@ function DiffPreview({ diff }: { diff: string }) {
   const lines = diff.split("\n");
 
   return (
-    <div className="overflow-x-auto bg-surface-1/80 text-fine font-mono leading-relaxed">
+    <div
+      className="overflow-x-auto bg-surface-1/80 text-fine font-mono leading-relaxed"
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+      tabIndex={0}
+    >
       <table className="w-full border-collapse">
         <tbody>
           {lines.map((line, index) => {
