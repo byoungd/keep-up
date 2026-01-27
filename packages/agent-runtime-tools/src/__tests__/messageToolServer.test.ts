@@ -33,7 +33,7 @@ describe("MessageToolServer", () => {
     );
 
     expect(result.success).toBe(false);
-    expect(getText(result)).toContain("Message type must be one of");
+    expect(result.error?.message).toContain("Invalid value for argument");
   });
 
   it("rejects empty messages", async () => {

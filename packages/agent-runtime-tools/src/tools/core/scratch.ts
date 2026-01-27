@@ -261,10 +261,16 @@ export class ScratchToolServer extends BaseToolServer {
     }
 
     try {
-      const name = args.name as string;
-      const content = args.content as string;
-      const type = (args.type as string) ?? "text";
-      const description = args.description as string | undefined;
+      const name = normalizeRequiredString(args.name);
+      if (!name) {
+        return errorResult("INVALID_ARGUMENTS", "Scratch name must be a non-empty string.");
+      }
+      const content = normalizeRequiredString(args.content);
+      if (!content) {
+        return errorResult("INVALID_ARGUMENTS", "Scratch content must be a non-empty string.");
+      }
+      const type = typeof args.type === "string" ? args.type : "text";
+      const description = normalizeOptionalString(args.description);
 
       await this.ensureScratchDir(context);
 
@@ -308,7 +314,10 @@ export class ScratchToolServer extends BaseToolServer {
     }
 
     try {
-      const name = args.name as string;
+      const name = normalizeRequiredString(args.name);
+      if (!name) {
+        return errorResult("INVALID_ARGUMENTS", "Scratch name must be a non-empty string.");
+      }
       const scratchDir = this.getScratchDir(context);
 
       // Try to find the file with any extension
@@ -403,8 +412,8 @@ export class ScratchToolServer extends BaseToolServer {
     }
 
     try {
-      const maxAgeHours = (args.maxAgeHours as number) ?? 24;
-      const clearAll = args.all as boolean;
+      const maxAgeHours = normalizeMaxAgeHours(args.maxAgeHours, 24);
+      const clearAll = args.all === true;
 
       const scratchDir = this.getScratchDir(context);
       const files = await fs.readdir(scratchDir).catch(() => []);
@@ -451,9 +460,15 @@ export class ScratchToolServer extends BaseToolServer {
     }
 
     try {
-      const name = args.name as string;
-      const content = args.content as string;
-      const separator = (args.separator as string) ?? "\n\n";
+      const name = normalizeRequiredString(args.name);
+      if (!name) {
+        return errorResult("INVALID_ARGUMENTS", "Scratch name must be a non-empty string.");
+      }
+      const content = normalizeRequiredString(args.content);
+      if (!content) {
+        return errorResult("INVALID_ARGUMENTS", "Scratch content must be a non-empty string.");
+      }
+      const separator = normalizeSeparator(args.separator, "\n\n");
 
       const scratchDir = this.getScratchDir(context);
       const files = await fs.readdir(scratchDir).catch(() => []);
@@ -517,6 +532,37 @@ export class ScratchToolServer extends BaseToolServer {
 
     return textResult(output);
   }
+}
+
+function normalizeRequiredString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeOptionalString(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function normalizeSeparator(value: unknown, fallback: string): string {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? value : fallback;
+}
+
+function normalizeMaxAgeHours(value: unknown, fallback: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    return fallback;
+  }
+  return value;
 }
 
 // ============================================================================

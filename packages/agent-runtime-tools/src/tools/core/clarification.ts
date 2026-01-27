@@ -119,7 +119,7 @@ export class ClarificationToolServer extends BaseToolServer {
     return this.formatOutput(JSON.stringify(response, null, 2), context);
   }
 
-  private isPriority(value: string): value is ClarificationRequest["priority"] {
+  private isPriority(value: string | undefined): value is ClarificationRequest["priority"] {
     return value === "low" || value === "medium" || value === "high" || value === "blocking";
   }
 

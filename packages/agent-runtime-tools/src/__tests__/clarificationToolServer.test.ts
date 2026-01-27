@@ -51,15 +51,15 @@ describe("ClarificationToolServer", () => {
         name: "ask_clarification_question",
         arguments: {
           question: "Need confirmation?",
-          options: [" yes ", "", 42],
-          priority: "urgent",
+          options: [" yes ", "", "no "],
+          priority: "low",
         },
       },
       context
     );
 
-    expect(captured?.options).toEqual(["yes"]);
-    expect(captured?.priority).toBeUndefined();
+    expect(captured?.options).toEqual(["yes", "no"]);
+    expect(captured?.priority).toBe("low");
   });
 
   it("truncates large outputs", async () => {

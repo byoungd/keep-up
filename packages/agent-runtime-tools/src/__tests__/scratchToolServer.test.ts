@@ -80,6 +80,36 @@ describe("ScratchToolServer", () => {
     });
   });
 
+  it("rejects empty names", async () => {
+    await withTempDir(async (dir) => {
+      const server = new ScratchToolServer();
+      const context = createContext({ workingDirectory: dir, filePermission: "workspace" });
+
+      const result = await server.callTool(
+        { name: "save", arguments: { name: "   ", content: "data" } },
+        context
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe("INVALID_ARGUMENTS");
+    });
+  });
+
+  it("rejects empty content", async () => {
+    await withTempDir(async (dir) => {
+      const server = new ScratchToolServer();
+      const context = createContext({ workingDirectory: dir, filePermission: "workspace" });
+
+      const result = await server.callTool(
+        { name: "save", arguments: { name: "note", content: "   " } },
+        context
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe("INVALID_ARGUMENTS");
+    });
+  });
+
   it("truncates large outputs", async () => {
     await withTempDir(async (dir) => {
       const server = new ScratchToolServer();
