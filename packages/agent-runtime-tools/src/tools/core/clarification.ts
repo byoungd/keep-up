@@ -76,14 +76,17 @@ export class ClarificationToolServer extends BaseToolServer {
       return errorResult("INVALID_ARGUMENTS", "Provide a non-empty clarification question.");
     }
 
-    const options =
-      Array.isArray(args.options) && args.options.every((opt) => typeof opt === "string")
-        ? (args.options as string[])
-        : undefined;
+    const options = Array.isArray(args.options)
+      ? (args.options as unknown[])
+          .filter((opt) => typeof opt === "string")
+          .map((opt) => (opt as string).trim())
+          .filter((opt) => opt.length > 0)
+      : undefined;
     const continueWork = typeof args.continueWork === "boolean" ? args.continueWork : false;
+    const priorityCandidate = typeof args.priority === "string" ? args.priority : undefined;
     const priority =
-      typeof args.priority === "string"
-        ? (args.priority as ClarificationRequest["priority"])
+      priorityCandidate && this.isPriority(priorityCandidate)
+        ? (priorityCandidate as ClarificationRequest["priority"])
         : undefined;
     const timeoutMs = typeof args.timeoutMs === "number" ? args.timeoutMs : undefined;
     const requestContext =
@@ -106,11 +109,28 @@ export class ClarificationToolServer extends BaseToolServer {
 
     const responsePromise = this.handler.requestClarification(request);
     if (continueWork) {
-      return textResult(JSON.stringify({ requestId: request.id, status: "pending" }, null, 2));
+      return this.formatOutput(
+        JSON.stringify({ requestId: request.id, status: "pending" }, null, 2),
+        context
+      );
     }
 
     const response = await responsePromise;
-    return textResult(JSON.stringify(response, null, 2));
+    return this.formatOutput(JSON.stringify(response, null, 2), context);
+  }
+
+  private isPriority(value: string): value is ClarificationRequest["priority"] {
+    return value === "low" || value === "medium" || value === "high" || value === "blocking";
+  }
+
+  private formatOutput(output: string, context: ToolContext): MCPToolResult {
+    const maxOutputBytes = context.security.limits.maxOutputBytes;
+    if (Buffer.byteLength(output) > maxOutputBytes) {
+      const truncated = Buffer.from(output).subarray(0, maxOutputBytes).toString();
+      return textResult(`${truncated}\n\n[Output truncated at ${maxOutputBytes} bytes]`);
+    }
+
+    return textResult(output);
   }
 }
 
