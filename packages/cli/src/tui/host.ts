@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 import { createInterface } from "node:readline";
 import type { RuntimeStreamChunk, StreamWriter } from "@ku0/agent-runtime";
 import type { RuntimeEvent } from "@ku0/agent-runtime-control";
-import type { AgentState, MCPToolResult } from "@ku0/agent-runtime-core";
-import type { ToolCallRecord } from "@ku0/tooling-session";
+import type { AgentState, ConfirmationRequest, MCPToolResult } from "@ku0/agent-runtime-core";
+import type { ApprovalRecord, ToolCallRecord } from "@ku0/tooling-session";
 import { extractAssistantText } from "../utils/output";
 import { createRuntimeResources } from "../utils/runtimeClient";
 import { type SessionRecord, SessionStore } from "../utils/sessionStore";
@@ -27,6 +27,7 @@ const state: RuntimeState = {
   subscriptions: [],
   activeRun: false,
 };
+let pendingApprovalId: string | undefined;
 
 function send(message: HostMessage): void {
   process.stdout.write(`${JSON.stringify(message)}\n`);
@@ -195,6 +196,21 @@ function updateToolCalls(
   }
 }
 
+function updateApprovals(
+  approvals: ApprovalRecord[],
+  payload: { type: string; data?: unknown },
+  timestamp: number
+) {
+  if (payload.type === "confirmation:required") {
+    handleApprovalRequested(payload.data, timestamp, approvals);
+    return;
+  }
+
+  if (payload.type === "confirmation:received") {
+    handleApprovalResolved(payload.data, timestamp, approvals);
+  }
+}
+
 type ToolCallPayload = {
   toolName: string;
   callId?: string;
@@ -308,7 +324,12 @@ function mapToolResult(result?: MCPToolResult): ToolCallRecord["result"] {
   };
 }
 
-function handleRuntimeEvent(event: RuntimeEvent, requestId: string, toolCalls: ToolCallRecord[]) {
+function handleRuntimeEvent(
+  event: RuntimeEvent,
+  requestId: string,
+  toolCalls: ToolCallRecord[],
+  approvals: ApprovalRecord[]
+) {
   const payload = event.payload as {
     type?: string;
     data?: unknown;
@@ -320,6 +341,7 @@ function handleRuntimeEvent(event: RuntimeEvent, requestId: string, toolCalls: T
   }
   const timestamp = payload.timestamp ?? Date.now();
   updateToolCalls(toolCalls, { type: payload.type, data: payload.data }, timestamp);
+  updateApprovals(approvals, { type: payload.type, data: payload.data }, timestamp);
   sendEvent(
     `agent.${payload.type}`,
     {
@@ -349,6 +371,7 @@ async function handlePrompt(message: OpMessage): Promise<void> {
 
   state.activeRun = true;
   state.streamRequestId = message.id;
+  pendingApprovalId = undefined;
   let finalState: AgentState | undefined;
   const clearStreamRequestId = () => {
     if (state.streamRequestId === message.id) {
@@ -364,7 +387,12 @@ async function handlePrompt(message: OpMessage): Promise<void> {
         finalState = result.value;
         break;
       }
-      handleRuntimeEvent(result.value, message.id, state.session.toolCalls);
+      handleRuntimeEvent(
+        result.value,
+        message.id,
+        state.session.toolCalls,
+        state.session.approvals
+      );
     }
   } catch (error) {
     const messageText = error instanceof Error ? error.message : String(error);
@@ -399,6 +427,51 @@ async function handlePrompt(message: OpMessage): Promise<void> {
     title: state.session.title,
   });
   clearStreamRequestId();
+}
+
+function handleApprovalRequested(
+  data: unknown,
+  timestamp: number,
+  approvals: ApprovalRecord[]
+): void {
+  const request = data as ConfirmationRequest;
+  const id = `approval_${timestamp}`;
+  pendingApprovalId = id;
+
+  approvals.push({
+    id,
+    kind: request.escalation ? "escalation" : "tool",
+    status: "requested",
+    request: {
+      toolName: request.toolName,
+      description: request.description,
+      arguments: request.arguments,
+      risk: request.risk,
+      reason: request.reason,
+      reasonCode: request.reasonCode,
+      riskTags: request.riskTags,
+      taskNodeId: request.taskNodeId,
+      escalation: request.escalation,
+    },
+    requestedAt: timestamp,
+  });
+}
+
+function handleApprovalResolved(
+  data: unknown,
+  timestamp: number,
+  approvals: ApprovalRecord[]
+): void {
+  const payload = data as { confirmed?: boolean; status?: string };
+  const status = payload.status ?? (payload.confirmed ? "approved" : "rejected");
+  if (approvals.length === 0) {
+    return;
+  }
+  const target =
+    (pendingApprovalId && approvals.find((approval) => approval.id === pendingApprovalId)) ??
+    approvals[approvals.length - 1];
+  target.status = status as ApprovalRecord["status"];
+  target.resolvedAt = timestamp;
 }
 
 async function handleOp(message: OpMessage): Promise<void> {
