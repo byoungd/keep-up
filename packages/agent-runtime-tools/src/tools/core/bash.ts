@@ -244,9 +244,13 @@ export class BashToolServer extends BaseToolServer {
     args: Record<string, unknown>,
     context: ToolContext
   ): ReturnType<ToolHandler> {
-    const command = args.command as string;
-    const cwdInput = (args.cwd as string) ?? context.security.sandbox.workingDirectory;
-    const timeout = (args.timeout as number) ?? context.security.limits.maxExecutionTimeMs;
+    const command = normalizeCommand(args.command);
+    if (!command) {
+      return errorResult("INVALID_ARGUMENTS", "Command must be a non-empty string.");
+    }
+
+    const cwdInput = normalizeCwd(args.cwd, context.security.sandbox.workingDirectory);
+    const timeout = resolveTimeout(args.timeout, context.security.limits.maxExecutionTimeMs);
 
     // Check permissions
     if (context.security.permissions.bash === "disabled") {
@@ -254,22 +258,12 @@ export class BashToolServer extends BaseToolServer {
     }
 
     // Check for dangerous commands (basic blocklist)
-    const dangerousPatterns = [
-      /rm\s+-rf\s+[/~]/i,
-      /mkfs/i,
-      /dd\s+if=/i,
-      />\s*\/dev\//i,
-      /chmod\s+777/i,
-      /:(){ :|:& };:/, // Fork bomb
-    ];
-
-    for (const pattern of dangerousPatterns) {
-      if (pattern.test(command)) {
-        return errorResult(
-          "PERMISSION_DENIED",
-          `Command contains potentially dangerous pattern: ${pattern.source}`
-        );
-      }
+    const dangerousPattern = findDangerousPattern(command);
+    if (dangerousPattern) {
+      return errorResult(
+        "PERMISSION_DENIED",
+        `Command contains potentially dangerous pattern: ${dangerousPattern.source}`
+      );
     }
 
     const shellOperator = detectShellOperator(command);
@@ -362,6 +356,15 @@ type ShellOperatorMatch = {
   description: string;
 };
 
+const DANGEROUS_COMMAND_PATTERNS = [
+  /rm\s+-rf\s+[/~]/i,
+  /mkfs/i,
+  /dd\s+if=/i,
+  />\s*\/dev\//i,
+  /chmod\s+777/i,
+  /:(){ :|:& };:/, // Fork bomb
+] as const;
+
 const SHELL_OPERATOR_DESCRIPTIONS: Record<string, string> = {
   ";": "command chaining (semicolon)",
   "&&": "command chaining (AND)",
@@ -397,6 +400,38 @@ type QuoteState = {
 };
 
 const SINGLE_CHAR_OPERATORS = new Set([";", "|", "&", ">", "<", "`"]);
+
+function normalizeCommand(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeCwd(value: unknown, fallback: string | undefined): string | undefined {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : fallback;
+}
+
+function resolveTimeout(value: unknown, maxTimeout: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    return maxTimeout;
+  }
+  return Math.min(value, maxTimeout);
+}
+
+function findDangerousPattern(command: string): RegExp | null {
+  for (const pattern of DANGEROUS_COMMAND_PATTERNS) {
+    if (pattern.test(command)) {
+      return pattern;
+    }
+  }
+  return null;
+}
 
 function detectShellOperator(command: string): ShellOperatorMatch | null {
   const quoteState: QuoteState = {
