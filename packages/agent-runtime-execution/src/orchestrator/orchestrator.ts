@@ -130,7 +130,6 @@ import type {
   WorkspaceEventKind,
 } from "../types";
 import { ToolResultCache, type ToolResultCacheOptions } from "../utils/cache";
-import { countTokens } from "../utils/tokenCounter";
 import {
   type AgentLoopStateMachine,
   createAgentLoopStateMachine,
@@ -608,7 +607,6 @@ export class AgentOrchestrator {
       preserveCount: compression?.preserveCount ?? 3,
       minMessages: compression?.minMessages ?? 5,
       enableSummarization: compression?.enableSummarization ?? true,
-      estimateTokens: (text: string) => countTokens(text),
       maxToolResultTokens: 500,
     });
     if (compression?.enableSummarization) {
