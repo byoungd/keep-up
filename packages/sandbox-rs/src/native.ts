@@ -6,6 +6,15 @@ import { fileURLToPath } from "node:url";
 const require = createRequire(import.meta.url);
 const currentDir = dirname(fileURLToPath(import.meta.url));
 
+function isNativeDisabled(): boolean {
+  const raw = process.env.SANDBOX_RS_DISABLE_NATIVE;
+  if (!raw) {
+    return false;
+  }
+  const normalized = raw.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes";
+}
+
 export interface NativeSandboxBinding {
   createSandbox(config: NativeSandboxConfig): NativeSandbox;
   SandboxManager: NativeSandboxManagerConstructor;
@@ -113,6 +122,10 @@ let cached: NativeSandboxBinding | null = null;
 export function getNativeBinding(): NativeSandboxBinding {
   if (cached) {
     return cached;
+  }
+
+  if (isNativeDisabled()) {
+    throw new Error("Sandbox native binding disabled by SANDBOX_RS_DISABLE_NATIVE.");
   }
 
   const explicit = process.env.SANDBOX_RS_BINDING_PATH;
