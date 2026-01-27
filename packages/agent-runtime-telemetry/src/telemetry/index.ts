@@ -145,6 +145,24 @@ export const AGENT_METRICS = {
     description: "Message compression time in milliseconds",
     labels: [],
   },
+  contextCompactionTokensSaved: {
+    name: "agent_context_compaction_tokens_saved_total",
+    type: "counter" as const,
+    description: "Tokens saved by context compaction",
+    labels: [],
+  },
+  contextCompactionRatio: {
+    name: "agent_context_compaction_ratio",
+    type: "histogram" as const,
+    description: "Context compaction ratio (0-1)",
+    labels: [],
+  },
+  contextCompactionTime: {
+    name: "agent_context_compaction_time_ms",
+    type: "histogram" as const,
+    description: "Context compaction time in milliseconds",
+    labels: [],
+  },
   requestCacheHits: {
     name: "agent_request_cache_hits_total",
     type: "counter" as const,

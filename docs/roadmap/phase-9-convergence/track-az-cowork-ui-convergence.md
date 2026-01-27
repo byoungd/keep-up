@@ -40,21 +40,23 @@ These are the main areas already in place:
 
 ## Remaining Gaps (Delta Work)
 
-1) **Command Palette**
-- `CommandPalette.tsx` does not exist; `Cmd+K` currently focuses search input only.
-- Need a real palette UI + action routing + keyboard open/close.
+The original gaps are now implemented in main. Validation still required.
 
-2) **Input Auto-Focus**
-- Chat input does not auto-focus on initial load.
-- Implement a safe, non-janky focus on mount (respecting reduced motion and modal focus traps).
+1) **Command Palette** (Completed)
+- Implemented in `apps/cowork/src/components/CommandPalette.tsx`.
+- Wired in `apps/cowork/src/app/layouts/RootLayout.tsx` with `Cmd+K` open/close behavior.
 
-3) **Session Status Indicators**
-- `useTaskStream` tracks `workspaceSessions` + `workspaceEvents`, but UI does not surface them.
-- Add a compact status surface (e.g., in header/right rail) driven by stable event IDs.
+2) **Input Auto-Focus** (Completed)
+- Safe auto-focus implemented in `apps/cowork/src/features/chat/hooks/useSafeAutoFocus.ts`.
+- Used by `apps/cowork/src/features/chat/CoworkAIPanel.tsx` and `apps/cowork/src/features/chat/ChatThread.tsx`.
 
-4) **Reduced-Motion Compliance**
-- Additional looping animations exist beyond the AI sheen (e.g., typing cursor/thinking dots).
-- Ensure non-essential loops stop under `prefers-reduced-motion` or swap to static indicators.
+3) **Session Status Indicators** (Completed)
+- Status UI in `apps/cowork/src/components/session/SessionStatusIndicator.tsx`.
+- Connected via `apps/cowork/src/features/tasks/hooks/useTaskStream.ts`.
+
+4) **Reduced-Motion Compliance** (Completed)
+- Reduced-motion overrides in `apps/cowork/src/styles/animations.css` and `packages/design-system/src/animations.css`.
+- Per-component handling in `packages/shell/src/components/chat/AIPanelHeader.tsx` and `packages/shell/src/components/chat/InputArea.tsx`.
 
 ---
 

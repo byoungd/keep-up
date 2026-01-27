@@ -1776,6 +1776,23 @@ export interface WorkforceSnapshot {
   channelCursor: number;
 }
 
+export type ContextCompressionStrategy = "sliding_window" | "summarize" | "truncate" | "hybrid";
+
+export interface ContextCompressionConfig {
+  /** Model context window limit (tokens) */
+  maxTokens?: number;
+  /** Threshold ratio for triggering compaction (0-1) */
+  compressionThreshold?: number;
+  /** Number of recent messages to preserve */
+  preserveCount?: number;
+  /** Minimum messages to keep after compression */
+  minMessages?: number;
+  /** Compression strategy */
+  strategy?: ContextCompressionStrategy;
+  /** Enable LLM summarization */
+  enableSummarization?: boolean;
+}
+
 /** Agent configuration */
 export interface AgentConfig {
   /** Agent name */
@@ -1822,6 +1839,8 @@ export interface AgentConfig {
     maxResults?: number;
     minScore?: number;
   };
+  /** Context compression configuration */
+  contextCompression?: ContextCompressionConfig;
 }
 
 /** Agent execution state */

@@ -1,8 +1,14 @@
 import { writeFile } from "node:fs/promises";
 import { Command } from "commander";
+import { resolveApprovalMode, resolveAutoApprovalOptions } from "../utils/approvals";
 import { ConfigStore } from "../utils/configStore";
 import { runInteractiveSession } from "../utils/interactiveSession";
-import { resolveOutput, resolveRuntimeConfigString } from "../utils/runtimeOptions";
+import { loadProjectInstructions } from "../utils/projectInstructions";
+import {
+  resolveOutput,
+  resolveRuntimeConfigString,
+  resolveSandboxMode,
+} from "../utils/runtimeOptions";
 import { SessionStore } from "../utils/sessionStore";
 import { writeStderr, writeStdout } from "../utils/terminal";
 
@@ -45,6 +51,17 @@ function resumeCommand(): Command {
       const output = resolveOutput(
         resolveRuntimeConfigString(undefined, config.output, "KEEPUP_OUTPUT") ?? "text"
       );
+      const approvalMode = resolveApprovalMode(
+        undefined,
+        config.approvalMode,
+        "KEEPUP_APPROVAL_MODE"
+      );
+      const sandbox = resolveSandboxMode(undefined, config.sandbox, "KEEPUP_SANDBOX");
+      const autoApproval = resolveAutoApprovalOptions({
+        policies: config.approvalPolicies,
+        workspacePaths: config.approvalWorkspacePaths,
+      });
+      const instructions = await loadProjectInstructions({});
 
       writeStdout(`Resuming session ${id}...`);
       await runInteractiveSession({
@@ -52,6 +69,10 @@ function resumeCommand(): Command {
         model,
         provider,
         output,
+        approvalMode,
+        sandbox,
+        autoApproval,
+        instructions,
       });
     });
 }

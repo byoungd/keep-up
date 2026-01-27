@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { getConfiguredProviders, resolveProviderFromEnv } from "@ku0/ai-core";
 import { Command } from "commander";
 import { ConfigStore } from "../utils/configStore";
-import { resolveRuntimeConfigString } from "../utils/runtimeOptions";
+import { resolveRuntimeConfigString, resolveSandboxMode } from "../utils/runtimeOptions";
 import { resolveCliPath, resolveCliStateDir } from "../utils/statePaths";
 import { writeStdout } from "../utils/terminal";
 import { resolveTuiBinary, resolveTuiHost } from "../utils/tui";
@@ -27,6 +27,7 @@ type DoctorReport = {
   model: string;
   output: string;
   approvalMode: string;
+  sandbox: string;
   providers: string[];
   providerMissingEnv: boolean;
   tuiBinary?: string;
@@ -46,6 +47,7 @@ async function collectDoctorReport(): Promise<DoctorReport> {
   const output = resolveRuntimeConfigString(undefined, config.output, "KEEPUP_OUTPUT") ?? "text";
   const approvalMode =
     resolveRuntimeConfigString(undefined, config.approvalMode, "KEEPUP_APPROVAL_MODE") ?? "ask";
+  const sandbox = resolveSandboxMode(undefined, config.sandbox, "KEEPUP_SANDBOX");
   const providerMissingEnv = isProviderMissingEnv(provider);
 
   return {
@@ -56,6 +58,7 @@ async function collectDoctorReport(): Promise<DoctorReport> {
     model,
     output,
     approvalMode,
+    sandbox,
     providers,
     providerMissingEnv,
     tuiBinary: resolveTuiBinary(),
@@ -71,6 +74,7 @@ function renderDoctorReport(report: DoctorReport): number {
   writeStdout(`- Model: ${report.model}`);
   writeStdout(`- Output: ${report.output}`);
   writeStdout(`- Approval mode: ${report.approvalMode}`);
+  writeStdout(`- Sandbox: ${report.sandbox}`);
 
   if (report.providers.length === 0) {
     writeStdout("- Providers configured: none (set OPENAI_API_KEY/ANTHROPIC_API_KEY/etc)");

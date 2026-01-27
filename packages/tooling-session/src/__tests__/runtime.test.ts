@@ -30,5 +30,6 @@ describe("tooling-session runtime", () => {
     expect(tools).toContain("code_interaction:apply_patch");
     expect(tools).toContain("bash:execute");
     expect(tools).toContain("web:search");
+    expect(tools).toContain("browser:navigate");
   });
 });
