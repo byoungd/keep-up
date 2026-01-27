@@ -220,9 +220,12 @@ export class TaskToolServer extends BaseToolServer {
       return writeAccess;
     }
 
-    const title = args.title as string;
-    const description = (args.description as string) ?? "";
-    const subtaskDescs = (args.subtasks as string[]) ?? [];
+    const title = normalizeRequiredString(args.title);
+    if (!title) {
+      return errorResult("INVALID_ARGUMENTS", "Task title must be a non-empty string.");
+    }
+    const description = normalizeOptionalString(args.description) ?? "";
+    const subtaskDescs = normalizeStringArray(args.subtasks);
     const setAsCurrent = (args.setAsCurrent as boolean) ?? true;
 
     try {
@@ -274,7 +277,7 @@ export class TaskToolServer extends BaseToolServer {
       return readAccess;
     }
 
-    const taskId = args.taskId as string | undefined;
+    const taskId = normalizeOptionalString(args.taskId);
 
     try {
       const store = await this.loadStore(context);
@@ -322,10 +325,10 @@ export class TaskToolServer extends BaseToolServer {
       return writeAccess;
     }
 
-    const taskId = args.taskId as string | undefined;
-    const subtaskId = args.subtaskId as string | undefined;
+    const taskId = normalizeOptionalString(args.taskId);
+    const subtaskId = normalizeOptionalString(args.subtaskId);
     const status = args.status as ToolTask["status"] | ToolSubtask["status"] | undefined;
-    const addSubtask = args.addSubtask as string | undefined;
+    const addSubtask = normalizeOptionalString(args.addSubtask);
 
     try {
       const store = await this.loadStore(context);
@@ -448,6 +451,32 @@ export class TaskToolServer extends BaseToolServer {
 
     return textResult(output);
   }
+}
+
+function normalizeRequiredString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeOptionalString(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
 }
 
 /**
