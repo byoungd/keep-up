@@ -49,6 +49,15 @@ function resolvePackageRoot(): string {
   return path.resolve(currentDir, "..");
 }
 
+function isNativeDisabled(): boolean {
+  const raw = process.env.KU0_SYMBOL_INDEX_DISABLE_NATIVE;
+  if (!raw) {
+    return false;
+  }
+  const normalized = raw.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes";
+}
+
 function resolveNativeBindingPath(): string | null {
   const override = process.env.KU0_SYMBOL_INDEX_NATIVE_PATH?.trim();
   if (override) {
@@ -74,7 +83,7 @@ function resolveNativeBindingPath(): string | null {
 }
 
 function loadNativeModule(): NativeSymbolIndexModule | null {
-  if (process.env.KU0_SYMBOL_INDEX_DISABLE_NATIVE === "1") {
+  if (isNativeDisabled()) {
     return null;
   }
 

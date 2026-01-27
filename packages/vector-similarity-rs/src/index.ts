@@ -19,6 +19,15 @@ function resolvePackageRoot(): string {
   return path.resolve(currentDir, "..");
 }
 
+function isNativeDisabled(): boolean {
+  const raw = process.env.KU0_VECTOR_SIMILARITY_DISABLE_NATIVE;
+  if (!raw) {
+    return false;
+  }
+  const normalized = raw.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes";
+}
+
 function resolveNativeBindingPath(): string | null {
   const override = process.env.KU0_VECTOR_SIMILARITY_NATIVE_PATH?.trim();
   if (override) {
@@ -44,7 +53,7 @@ function resolveNativeBindingPath(): string | null {
 }
 
 function loadNativeModule(): NativeVectorSimilarityModule | null {
-  if (process.env.KU0_VECTOR_SIMILARITY_DISABLE_NATIVE === "1") {
+  if (isNativeDisabled()) {
     return null;
   }
 
