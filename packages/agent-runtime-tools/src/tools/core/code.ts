@@ -154,14 +154,13 @@ export class ProcessCodeExecutor implements ICodeExecutor {
       };
     }
 
-    // Create temp file
-    const timestamp = Date.now();
-    const random = Math.random().toString(36).slice(2, 8);
-    const filename = `code_${timestamp}_${random}${config.extension}`;
-    const filePath = `${this.tempDir}/${filename}`;
+    let runDir: string | undefined;
+    let filePath: string | undefined;
 
     try {
       await fs.mkdir(this.tempDir, { recursive: true });
+      runDir = await fs.mkdtemp(path.join(this.tempDir, "run-"));
+      filePath = path.join(runDir, `snippet${config.extension}`);
       await fs.writeFile(filePath, code, "utf-8");
 
       // Execute the code
@@ -193,15 +192,19 @@ export class ProcessCodeExecutor implements ICodeExecutor {
         durationMs: Date.now() - startTime,
       };
     } finally {
-      const cleanupPaths = [
-        filePath,
-        ...(config.cleanupPaths ? config.cleanupPaths(filePath) : []),
-      ];
-      await Promise.allSettled(
-        cleanupPaths.map((cleanupPath) =>
-          fs.rm(cleanupPath, { force: true }).catch(() => undefined)
-        )
-      );
+      if (runDir) {
+        await fs.rm(runDir, { recursive: true, force: true }).catch(() => undefined);
+      } else if (filePath) {
+        const cleanupPaths = [
+          filePath,
+          ...(config.cleanupPaths ? config.cleanupPaths(filePath) : []),
+        ];
+        await Promise.allSettled(
+          cleanupPaths.map((cleanupPath) =>
+            fs.rm(cleanupPath, { force: true }).catch(() => undefined)
+          )
+        );
+      }
     }
   }
 }
