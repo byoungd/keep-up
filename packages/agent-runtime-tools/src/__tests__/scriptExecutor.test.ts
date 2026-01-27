@@ -82,6 +82,47 @@ return echoed;
     expect(result.logs).toContain("hello");
   });
 
+  it("truncates console output when over the limit", async () => {
+    const executor = new ScriptExecutor({
+      timeoutMs: 1000,
+      captureConsole: true,
+      maxLogBytes: 5,
+    });
+    const context = {
+      registry: createRegistry(),
+      toolContext: createContext(),
+      variables: {},
+    };
+
+    const result = await executor.execute('console.log("abcdef"); return "done";', context);
+
+    expect(result.success).toBe(true);
+    expect(result.logs[0]).toBe("abcde");
+    expect(result.logs).toContain("[log truncated]");
+  });
+
+  it("cleans up timers after execution", async () => {
+    const executor = new ScriptExecutor({ timeoutMs: 1000, captureConsole: true });
+    const context = {
+      registry: createRegistry(),
+      toolContext: createContext(),
+      variables: {},
+    };
+
+    const result = await executor.execute(
+      `
+setInterval(() => console.log("tick"), 5);
+await new Promise((resolve) => setTimeout(resolve, 12));
+return "done";
+`,
+      context
+    );
+
+    const logCount = result.logs.length;
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(result.logs.length).toBe(logCount);
+  });
+
   it("times out on synchronous loops", async () => {
     const executor = new ScriptExecutor({ timeoutMs: 20, captureConsole: false });
     const context = {

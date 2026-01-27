@@ -55,6 +55,60 @@ export interface ScriptExecutorConfig {
   maxMemoryBytes?: number;
   /** Enable console.log capture */
   captureConsole: boolean;
+  /** Maximum console output size (bytes) */
+  maxLogBytes?: number;
+}
+
+type TimerTracker = {
+  setTimeout: (...args: Parameters<typeof setTimeout>) => ReturnType<typeof setTimeout>;
+  clearTimeout: (handle: ReturnType<typeof setTimeout>) => void;
+  setInterval: (...args: Parameters<typeof setInterval>) => ReturnType<typeof setInterval>;
+  clearInterval: (handle: ReturnType<typeof setInterval>) => void;
+  cleanup: () => void;
+};
+
+function createTimerTracker(): TimerTracker {
+  const timeouts = new Set<ReturnType<typeof setTimeout>>();
+  const intervals = new Set<ReturnType<typeof setInterval>>();
+
+  const setTimeoutTracked: TimerTracker["setTimeout"] = (...args) => {
+    const handle = setTimeout(...args);
+    timeouts.add(handle);
+    return handle;
+  };
+
+  const clearTimeoutTracked: TimerTracker["clearTimeout"] = (handle) => {
+    clearTimeout(handle);
+    timeouts.delete(handle);
+  };
+
+  const setIntervalTracked: TimerTracker["setInterval"] = (...args) => {
+    const handle = setInterval(...args);
+    intervals.add(handle);
+    return handle;
+  };
+
+  const clearIntervalTracked: TimerTracker["clearInterval"] = (handle) => {
+    clearInterval(handle);
+    intervals.delete(handle);
+  };
+
+  return {
+    setTimeout: setTimeoutTracked,
+    clearTimeout: clearTimeoutTracked,
+    setInterval: setIntervalTracked,
+    clearInterval: clearIntervalTracked,
+    cleanup: () => {
+      for (const handle of timeouts) {
+        clearTimeout(handle);
+      }
+      for (const handle of intervals) {
+        clearInterval(handle);
+      }
+      timeouts.clear();
+      intervals.clear();
+    },
+  };
 }
 
 // ============================================================================
@@ -146,6 +200,7 @@ export class ScriptExecutor {
       timeoutMs: config.timeoutMs ?? 60000,
       maxMemoryBytes: config.maxMemoryBytes,
       captureConsole: config.captureConsole ?? true,
+      maxLogBytes: config.maxLogBytes ?? 64 * 1024,
     };
   }
 
@@ -155,26 +210,61 @@ export class ScriptExecutor {
   async execute(script: string, context: ScriptContext): Promise<ScriptResult> {
     const startTime = Date.now();
     const logs: string[] = [];
+    const logState = {
+      bytes: 0,
+      truncated: false,
+    };
     const toolProxy = new ToolProxy(context.registry, context.toolContext);
     const tools = toolProxy.createProxy();
 
+    const appendLog = (args: unknown[]) => {
+      if (!this.config.captureConsole) {
+        return;
+      }
+      if (logState.truncated) {
+        return;
+      }
+      const maxLogBytes = this.config.maxLogBytes ?? 0;
+      const message = args.map((a) => String(a)).join(" ");
+      const remaining = maxLogBytes - logState.bytes;
+
+      if (remaining <= 0) {
+        logState.truncated = true;
+        logs.push("[log truncated]");
+        return;
+      }
+
+      if (message.length > remaining) {
+        logs.push(message.slice(0, Math.max(remaining, 0)));
+        logState.bytes += Math.max(remaining, 0);
+        logState.truncated = true;
+        logs.push("[log truncated]");
+        return;
+      }
+
+      logs.push(message);
+      logState.bytes += message.length;
+    };
+
     const scriptConsole = {
       log: (...args: unknown[]) => {
-        logs.push(args.map((a) => String(a)).join(" "));
+        appendLog(args);
       },
       info: (...args: unknown[]) => {
-        logs.push(args.map((a) => String(a)).join(" "));
+        appendLog(args);
       },
       warn: (...args: unknown[]) => {
-        logs.push(args.map((a) => String(a)).join(" "));
+        appendLog(args);
       },
       error: (...args: unknown[]) => {
-        logs.push(args.map((a) => String(a)).join(" "));
+        appendLog(args);
       },
     };
 
+    const timerTracker = createTimerTracker();
+
     try {
-      const sandbox = this.createSandbox(tools, context.variables, scriptConsole);
+      const sandbox = this.createSandbox(tools, context.variables, scriptConsole, timerTracker);
       const vmContext = createContext(sandbox);
       const wrappedScript = this.wrapScript(script);
       const compiled = new Script(wrappedScript, { filename: "scriptExecutor.vm" });
@@ -200,6 +290,8 @@ export class ScriptExecutor {
         durationMs: Date.now() - startTime,
         logs,
       };
+    } finally {
+      timerTracker.cleanup();
     }
   }
 
@@ -211,16 +303,17 @@ export class ScriptExecutor {
       info: (...args: unknown[]) => void;
       warn: (...args: unknown[]) => void;
       error: (...args: unknown[]) => void;
-    }
+    },
+    timers: TimerTracker
   ): Record<string, unknown> {
     return {
       tools,
       variables,
       console: this.config.captureConsole ? scriptConsole : console,
-      setTimeout,
-      clearTimeout,
-      setInterval,
-      clearInterval,
+      setTimeout: timers.setTimeout,
+      clearTimeout: timers.clearTimeout,
+      setInterval: timers.setInterval,
+      clearInterval: timers.clearInterval,
     };
   }
 
