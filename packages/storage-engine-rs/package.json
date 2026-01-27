@@ -16,6 +16,7 @@
     "build": "pnpm run build:rs && tsc",
     "build:rs": "tsx scripts/build-native.ts --release",
     "build:debug": "tsx scripts/build-native.ts",
+    "bench": "tsx scripts/bench-storage-engine.ts",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "lint:fix": "biome check --write ."
