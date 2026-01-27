@@ -314,13 +314,13 @@ export class SubagentToolServer extends BaseToolServer {
     const maxTurns = this.parseMaxTurns(entryRecord.maxTurns);
     const context = this.parseContext(entryRecord.context);
     const scope = this.parseScope(entryRecord.scope);
-    const id =
-      typeof entryRecord.id === "string" && entryRecord.id.length > 0 ? entryRecord.id : undefined;
+    const id = normalizeOptionalString(entryRecord.id);
+    const dependenciesResult = normalizeStringArray(entryRecord.dependencies);
+    if (dependenciesResult.invalid) {
+      return { error: "Dependencies must be an array of task IDs." };
+    }
     const dependencies =
-      Array.isArray(entryRecord.dependencies) &&
-      entryRecord.dependencies.every((dep) => typeof dep === "string" && dep.length > 0)
-        ? (entryRecord.dependencies as string[])
-        : undefined;
+      dependenciesResult.values.length > 0 ? dependenciesResult.values : undefined;
 
     if (dependencies && !id) {
       return { error: "Tasks with dependencies must include a non-empty 'id'." };
@@ -428,9 +428,9 @@ export class SubagentToolServer extends BaseToolServer {
 
     const record = value as Record<string, unknown>;
     const scope: SubagentScope = {};
-    const allowedTools = record.allowedTools;
-    if (Array.isArray(allowedTools) && allowedTools.every((tool) => typeof tool === "string")) {
-      scope.allowedTools = allowedTools;
+    const allowedToolsResult = normalizeStringArray(record.allowedTools);
+    if (!allowedToolsResult.invalid && allowedToolsResult.values.length > 0) {
+      scope.allowedTools = allowedToolsResult.values;
     }
 
     if (
@@ -466,6 +466,39 @@ export class SubagentToolServer extends BaseToolServer {
 
     return textResult(output);
   }
+}
+
+function normalizeOptionalString(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function normalizeStringArray(value: unknown): { values: string[]; invalid: boolean } {
+  if (value === undefined) {
+    return { values: [], invalid: false };
+  }
+  if (!Array.isArray(value)) {
+    return { values: [], invalid: true };
+  }
+
+  const values: string[] = [];
+  let invalid = false;
+
+  for (const item of value) {
+    if (typeof item !== "string") {
+      invalid = true;
+      continue;
+    }
+    const trimmed = item.trim();
+    if (trimmed.length > 0) {
+      values.push(trimmed);
+    }
+  }
+
+  return { values, invalid };
 }
 
 export function createSubagentToolServer(manager: IAgentManager): SubagentToolServer {
