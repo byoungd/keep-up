@@ -210,6 +210,9 @@ async function runPromptCommand(
   const sessionStore = new SessionStore();
   const sessionId = resolveSessionId(options, config);
   const existingSession = await sessionStore.get(sessionId);
+  if (options.session && !existingSession && !resolved.quiet) {
+    writeStderr(`Session ${sessionId} not found. Starting a new session.`);
+  }
   const session = normalizeSessionRecord(existingSession, sessionId, resolvedPrompt);
 
   const instructions = await loadProjectInstructions({
