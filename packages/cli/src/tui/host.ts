@@ -233,6 +233,7 @@ function recordToolCallResult(toolCalls: ToolCallRecord[], data: unknown, timest
     last.durationMs = payload.result?.meta?.durationMs;
     last.error = payload.errorMessage;
     last.errorCode = payload.errorCode;
+    last.result = mapToolResult(payload.result);
     return;
   }
 
@@ -246,6 +247,7 @@ function recordToolCallResult(toolCalls: ToolCallRecord[], data: unknown, timest
     durationMs: payload.result?.meta?.durationMs,
     error: payload.errorMessage,
     errorCode: payload.errorCode,
+    result: mapToolResult(payload.result),
   });
 }
 
@@ -280,6 +282,30 @@ function findLastPendingCall(toolCalls: ToolCallRecord[], toolName: string, call
     }
   }
   return undefined;
+}
+
+function mapToolResult(result?: MCPToolResult): ToolCallRecord["result"] {
+  if (!result) {
+    return undefined;
+  }
+  return {
+    success: result.success,
+    content: result.content,
+    error: result.error
+      ? {
+          message: result.error.message,
+          code: result.error.code,
+        }
+      : undefined,
+    meta: result.meta
+      ? {
+          durationMs: result.meta.durationMs,
+          toolName: result.meta.toolName,
+          sandboxed: result.meta.sandboxed,
+          outputSpool: result.meta.outputSpool ?? undefined,
+        }
+      : undefined,
+  };
 }
 
 function handleRuntimeEvent(event: RuntimeEvent, requestId: string, toolCalls: ToolCallRecord[]) {
