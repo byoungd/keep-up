@@ -8,6 +8,7 @@ import type {
   AgentType,
   IAgentManager,
   MCPToolResult,
+  SpawnAgentOptions,
   ToolContext,
 } from "@ku0/agent-runtime-core";
 import { SECURITY_PRESETS } from "@ku0/agent-runtime-core";
@@ -38,16 +39,22 @@ function createProfile(type: AgentType): AgentProfile {
   };
 }
 
-function createManager(output: string): IAgentManager {
+function createManager(
+  output: string,
+  onSpawn?: (options: SpawnAgentOptions) => void
+): IAgentManager {
   return {
-    spawn: async (options): Promise<AgentResult> => ({
-      agentId: "agent-1",
-      type: options.type,
-      success: true,
-      output,
-      turns: 1,
-      durationMs: 5,
-    }),
+    spawn: async (options): Promise<AgentResult> => {
+      onSpawn?.(options);
+      return {
+        agentId: "agent-1",
+        type: options.type,
+        success: true,
+        output,
+        turns: 1,
+        durationMs: 5,
+      };
+    },
     spawnParallel: async () => [],
     getAvailableTypes: () => ["code", "research", "plan", "explore", "code-reviewer"],
     getProfile: (type) => createProfile(type),
@@ -74,6 +81,46 @@ describe("DelegationToolServer", () => {
     const text = getText(result);
     expect(result.success).toBe(true);
     expect(text).toContain("Output truncated");
+  });
+
+  it("rejects empty task descriptions", async () => {
+    const manager = createManager("ok");
+    const server = new DelegationToolServer(manager);
+    const context = createContext();
+
+    const result = await server.callTool(
+      { name: "delegate", arguments: { role: "coder", task: "   " } },
+      context
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error?.code).toBe("INVALID_ARGUMENTS");
+  });
+
+  it("sanitizes constraints and expected output", async () => {
+    let captured: SpawnAgentOptions | undefined;
+    const manager = createManager("ok", (options) => {
+      captured = options;
+    });
+    const server = new DelegationToolServer(manager);
+    const context = createContext();
+
+    const result = await server.callTool(
+      {
+        name: "delegate",
+        arguments: {
+          role: "coder",
+          task: "Do work",
+          constraints: [" file:read ", " ", "bash:execute "],
+          expectedOutput: "  json  ",
+        },
+      },
+      context
+    );
+
+    expect(result.success).toBe(true);
+    expect(captured?.allowedTools).toEqual(["file:read", "bash:execute"]);
+    expect(captured?.task).toContain("Expected output format: json");
   });
 
   it("truncates list_roles output", async () => {

@@ -145,13 +145,14 @@ export class DelegationToolServer extends BaseToolServer {
     }
 
     const { role, task, constraints } = validation;
+    const expectedOutput = this.parseExpectedOutput(args.expectedOutput);
     const a2aTarget = this.resolveA2ATarget(role, toolContext);
     if (a2aTarget) {
       return this.delegateViaA2A(toolContext, a2aTarget, {
         role,
         task,
         constraints,
-        expectedOutput: args.expectedOutput as string | undefined,
+        expectedOutput,
       });
     }
 
@@ -171,7 +172,7 @@ export class DelegationToolServer extends BaseToolServer {
         parentId,
         {
           type: agentType,
-          task: this.buildTaskPrompt(task, args.expectedOutput as string | undefined),
+          task: this.buildTaskPrompt(task, expectedOutput),
           scope,
           agentId,
           _depth: childDepth,
@@ -381,10 +382,25 @@ export class DelegationToolServer extends BaseToolServer {
     if (value === undefined) {
       return { valid: true };
     }
-    if (Array.isArray(value) && value.every((item) => typeof item === "string")) {
-      return { valid: true, constraints: value };
+    if (!Array.isArray(value)) {
+      return { valid: false };
     }
-    return { valid: false };
+    if (!value.every((item) => typeof item === "string")) {
+      return { valid: false };
+    }
+    const constraints = value.map((item) => item.trim()).filter((item) => item.length > 0);
+    if (constraints.length === 0) {
+      return { valid: true };
+    }
+    return { valid: true, constraints };
+  }
+
+  private parseExpectedOutput(value: unknown): string | undefined {
+    if (typeof value !== "string") {
+      return undefined;
+    }
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
   }
 
   private buildTaskPrompt(task: string, expectedOutput?: string): string {
