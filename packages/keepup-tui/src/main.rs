@@ -1057,12 +1057,33 @@ fn format_approval_event(event: &str, payload: Option<&Value>) -> Option<String>
             .get("risk")
             .and_then(|value| value.as_str())
             .unwrap_or("");
-        let suffix = if risk.is_empty() {
-            String::new()
-        } else {
-            format!(" ({risk})")
-        };
-        return Some(format!("Approval required: {tool}{suffix}"));
+        let reason = data
+            .get("reason")
+            .and_then(|value| value.as_str())
+            .or_else(|| data.get("description").and_then(|value| value.as_str()))
+            .unwrap_or("");
+        let args = data
+            .get("arguments")
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "{}".to_string());
+
+        let mut message = format!("Approval required: {tool}");
+        if !risk.is_empty() {
+            message.push_str(&format!(" ({risk})"));
+        }
+
+        let mut details = Vec::new();
+        if !reason.is_empty() {
+            details.push(format!("Reason: {reason}"));
+        }
+        if args != "{}" {
+            details.push(format!("Args: {args}"));
+        }
+
+        if details.is_empty() {
+            return Some(message);
+        }
+        return Some(format!("{message} — {}", details.join(" | ")));
     }
     if event == "approval.resolved" {
         let status = data
