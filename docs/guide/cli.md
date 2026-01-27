@@ -105,6 +105,12 @@ Use `--json` for machine-readable output:
 keepup agent run "Summarize tests" --json
 ```
 
+Use `--format markdown` for a structured markdown response:
+
+```bash
+keepup agent run "Summarize tests" --format markdown
+```
+
 Disable streaming progress output:
 
 ```bash
