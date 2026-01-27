@@ -46,4 +46,24 @@ describe("CompletionToolServer", () => {
     expect(result.success).toBe(true);
     expect(text).toContain("Output truncated");
   });
+
+  it("deduplicates artifacts", async () => {
+    const server = new CompletionToolServer();
+    const context = createContext();
+
+    const result = await server.callTool(
+      {
+        name: "complete_task",
+        arguments: {
+          summary: "Done",
+          artifacts: ["a.txt", "a.txt", "b.txt"],
+        },
+      },
+      context
+    );
+
+    const text = getText(result);
+    expect(result.success).toBe(true);
+    expect(text).toContain("Artifacts: a.txt, b.txt");
+  });
 });

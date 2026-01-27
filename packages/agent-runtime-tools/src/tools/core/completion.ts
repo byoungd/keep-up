@@ -166,7 +166,8 @@ function validateCompletionArtifacts(
     }
   }
 
-  return { ok: true, value: artifactsValue.map((item) => item.trim()) };
+  const trimmed = artifactsValue.map((item) => item.trim());
+  return { ok: true, value: dedupeStrings(trimmed) };
 }
 
 function validateCompletionNextSteps(
@@ -192,6 +193,19 @@ function validateCompletionNextSteps(
   }
 
   return { ok: true, value: trimmed };
+}
+
+function dedupeStrings(values: string[]): string[] {
+  const seen = new Set<string>();
+  const output: string[] = [];
+  for (const value of values) {
+    if (seen.has(value)) {
+      continue;
+    }
+    seen.add(value);
+    output.push(value);
+  }
+  return output;
 }
 
 // ============================================================================
