@@ -4,7 +4,7 @@ import { cn } from "@ku0/shared/utils";
 import type { ArtifactItem } from "@ku0/shell";
 import { ArtifactPreviewPane } from "@ku0/shell";
 import { useParams } from "@tanstack/react-router";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import * as React from "react";
 import type { AgentMode } from "../../api/coworkApi";
 import { ArtifactsList } from "../artifacts/components/ArtifactsList";
@@ -165,6 +165,20 @@ function PreviewPanel({
   previewArtifact: ArtifactItem | null;
   onClosePreview: () => void;
 }) {
+  const reduceMotion = useReducedMotion();
+  const emptyMotion = reduceMotion
+    ? {
+        initial: { opacity: 1 },
+        animate: { opacity: 1 },
+        exit: { opacity: 1 },
+        transition: { duration: 0 },
+      }
+    : {
+        initial: { opacity: 0 },
+        animate: { opacity: 1 },
+        exit: { opacity: 0 },
+        transition: { duration: 0.2, ease: "easeOut" },
+      };
   return (
     <div className="h-full">
       <AnimatePresence mode="sync">
@@ -177,10 +191,10 @@ function PreviewPanel({
         ) : (
           <motion.div
             key="empty"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
+            initial={emptyMotion.initial}
+            animate={emptyMotion.animate}
+            exit={emptyMotion.exit}
+            transition={emptyMotion.transition}
             className="p-4 text-sm text-muted-foreground"
           >
             No preview selected.
