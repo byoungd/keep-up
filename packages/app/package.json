@@ -24,8 +24,8 @@
   },
   "scripts": {
     "build": "tsc",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "pnpm -C ../.. exec vitest run packages/app/src",
+    "test:watch": "pnpm -C ../.. exec vitest packages/app/src",
     "lint": "biome check .",
     "lint:fix": "biome check --apply .",
     "clean": "rm -rf dist node_modules"

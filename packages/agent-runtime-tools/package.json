@@ -59,8 +59,8 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "pnpm -C ../.. exec vitest run packages/agent-runtime-tools/src",
+    "test:watch": "pnpm -C ../.. exec vitest packages/agent-runtime-tools/src",
     "lint": "biome check .",
     "lint:fix": "biome check --write ."
   },

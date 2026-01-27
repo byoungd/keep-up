@@ -114,6 +114,7 @@ export default defineConfig({
             "packages/tokenizer-rs/src/**/*.test.ts",
             "packages/diff-rs/src/**/*.test.ts",
             "packages/storage-engine-rs/src/**/*.test.ts",
+            "packages/agent-gym/src/**/*.test.ts",
           ],
           exclude: defaultExclude,
           server: {

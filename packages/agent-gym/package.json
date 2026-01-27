@@ -9,8 +9,8 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --config vitest.config.ts",
-    "test:watch": "vitest --config vitest.config.ts",
+    "test": "pnpm -C ../.. exec vitest run packages/agent-gym/src",
+    "test:watch": "pnpm -C ../.. exec vitest packages/agent-gym/src",
     "gym:run": "tsx src/cli/run.ts",
     "gym:ci": "tsx src/cli/run.ts --suite easy --baseline baselines/easy.json --min-score 90 --report reports/latest.json",
     "gym:q3:ci": "tsx src/cli/run.ts --suite easy --category perception-accuracy --benchmarks benchmarks/q3 --baseline ../../docs/roadmap/phase-4-cognition/baselines/q3-perception-accuracy.json --min-score 90 --report reports/q3-perception-accuracy.json && tsx src/cli/run.ts --suite easy --category memory-recall --benchmarks benchmarks/q3 --baseline ../../docs/roadmap/phase-4-cognition/baselines/q3-memory-recall.json --min-score 90 --report reports/q3-memory-recall.json && tsx src/cli/run.ts --suite easy --category plan-quality --benchmarks benchmarks/q3 --baseline ../../docs/roadmap/phase-4-cognition/baselines/q3-plan-quality.json --min-score 90 --report reports/q3-plan-quality.json",
