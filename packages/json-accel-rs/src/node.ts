@@ -15,6 +15,15 @@ interface NativeBinding {
 let cachedAccel: NativeJsonAccel | null | undefined;
 let cachedBindingError: Error | null = null;
 
+function isNativeDisabled(): boolean {
+  const raw = process.env.JSON_ACCEL_RS_DISABLE_NATIVE;
+  if (!raw) {
+    return false;
+  }
+  const normalized = raw.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes";
+}
+
 function loadNativeBinding(): NativeBinding | null {
   const require = createRequire(import.meta.url);
   const baseDir = dirname(fileURLToPath(import.meta.url));
@@ -64,6 +73,14 @@ function buildCandidatePaths(packageRoot: string): string[] {
 
 export function getNativeJsonAccel(): NativeJsonAccel | null {
   if (cachedAccel !== undefined) {
+    return cachedAccel;
+  }
+
+  if (isNativeDisabled()) {
+    cachedAccel = null;
+    cachedBindingError = new Error(
+      "JSON accel native binding disabled by JSON_ACCEL_RS_DISABLE_NATIVE."
+    );
     return cachedAccel;
   }
 

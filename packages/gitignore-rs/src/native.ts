@@ -6,6 +6,15 @@ import { fileURLToPath } from "node:url";
 const require = createRequire(import.meta.url);
 const currentDir = dirname(fileURLToPath(import.meta.url));
 
+function isNativeDisabled(): boolean {
+  const raw = process.env.GITIGNORE_RS_DISABLE_NATIVE;
+  if (!raw) {
+    return false;
+  }
+  const normalized = raw.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes";
+}
+
 export interface NativeListFilesOptions {
   maxDepth?: number;
   includeHidden?: boolean;
@@ -28,6 +37,10 @@ let cached: NativeGitignoreBinding | null = null;
 export function getNativeBinding(): NativeGitignoreBinding {
   if (cached) {
     return cached;
+  }
+
+  if (isNativeDisabled()) {
+    throw new Error("Gitignore native binding disabled by GITIGNORE_RS_DISABLE_NATIVE.");
   }
 
   const explicit = process.env.GITIGNORE_RS_BINDING_PATH;
