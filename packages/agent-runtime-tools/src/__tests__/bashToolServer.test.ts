@@ -7,13 +7,16 @@ import { SECURITY_PRESETS } from "@ku0/agent-runtime-core";
 import { describe, expect, it, vi } from "vitest";
 import { BashToolServer, type IBashExecutor } from "../tools/core/bash";
 
-function createContext(workingDirectory?: string): ToolContext {
+function createContext(workingDirectory?: string, maxExecutionTimeMs?: number): ToolContext {
   const base = SECURITY_PRESETS.balanced;
   return {
     security: {
       sandbox: { ...base.sandbox, workingDirectory },
       permissions: { ...base.permissions, bash: "confirm" },
-      limits: { ...base.limits },
+      limits: {
+        ...base.limits,
+        maxExecutionTimeMs: maxExecutionTimeMs ?? base.limits.maxExecutionTimeMs,
+      },
     },
   };
 }
@@ -89,5 +92,35 @@ describe("BashToolServer", () => {
     expect(result.success).toBe(false);
     expect(result.error?.code).toBe("PERMISSION_DENIED");
     expect(executor.execute).not.toHaveBeenCalled();
+  });
+
+  it("rejects empty commands", async () => {
+    const executor = createExecutor();
+    const server = new BashToolServer(executor);
+    const context = createContext();
+
+    const result = await server.callTool(
+      { name: "execute", arguments: { command: "   " } },
+      context
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error?.code).toBe("INVALID_ARGUMENTS");
+    expect(executor.execute).not.toHaveBeenCalled();
+  });
+
+  it("clamps timeout to max execution time", async () => {
+    const executor = createExecutor();
+    const server = new BashToolServer(executor);
+    const context = createContext(undefined, 5);
+
+    await server.callTool(
+      { name: "execute", arguments: { command: "echo ok", timeout: 100 } },
+      context
+    );
+
+    expect(executor.execute).toHaveBeenCalled();
+    const options = (executor.execute as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    expect(options.timeoutMs).toBe(5);
   });
 });
