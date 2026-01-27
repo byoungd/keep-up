@@ -153,7 +153,6 @@ pub fn compress_context(
           if truncated_tokens > 0 {
             truncated_rev.push(truncated_msg);
             selected_indices_rev.push(index);
-            used_tokens += truncated_tokens;
           }
         }
       }

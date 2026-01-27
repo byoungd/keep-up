@@ -192,8 +192,8 @@ function parseWorkflowTemplate(body: WorkflowTemplatePayload | CoworkWorkflowTem
   }
   const description = typeof body.description === "string" ? body.description.trim() : "";
   const mode = body.mode;
-  if (mode !== "plan" && mode !== "build") {
-    return { ok: false, error: "mode must be 'plan' or 'build'" };
+  if (mode !== "plan" && mode !== "build" && mode !== "review") {
+    return { ok: false, error: "mode must be 'plan', 'build', or 'review'" };
   }
   const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
   if (!prompt) {
@@ -415,8 +415,8 @@ function parseOptionalMode(
   if (mode === undefined) {
     return { ok: true, value: undefined };
   }
-  if (mode !== "plan" && mode !== "build") {
-    return { ok: false, error: "mode must be 'plan' or 'build'" };
+  if (mode !== "plan" && mode !== "build" && mode !== "review") {
+    return { ok: false, error: "mode must be 'plan', 'build', or 'review'" };
   }
   return { ok: true, value: mode };
 }
