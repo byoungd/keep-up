@@ -9,7 +9,7 @@ import {
 import { Link, Outlet, useLocation, useParams, useRouter } from "@tanstack/react-router";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
+import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
 import { Sparkles } from "lucide-react";
 import React from "react";
 import { createTask, setSessionMode } from "../../api/coworkApi";
@@ -143,6 +143,7 @@ export function RootLayout() {
   const { sessionId } = useParams({ strict: false }) as { sessionId?: string };
   const resolvedSessionId = sessionId && sessionId !== "undefined" ? sessionId : null;
   const { data: currentUser } = useCurrentUser();
+  const reduceMotion = useReducedMotion();
 
   // Use ref for router to avoid useMemo dependency changes
   const routerRef = React.useRef(router);
@@ -438,16 +439,30 @@ export function RootLayout() {
     ]
   );
 
+  const contextPanelMotion = reduceMotion
+    ? {
+        initial: { opacity: 1, x: 0 },
+        animate: { opacity: 1, x: 0 },
+        exit: { opacity: 1, x: 0 },
+        transition: { duration: 0 },
+      }
+    : {
+        initial: { opacity: 0, x: 20 },
+        animate: { opacity: 1, x: 0 },
+        exit: { opacity: 0, x: 20 },
+        transition: { duration: 0.2, ease: "easeInOut" },
+      };
+
   const contextPanel = (
     <AnimatePresence mode="wait" onExitComplete={() => setIsExiting(false)}>
       {isAuxPanelVisible && !isExiting && (
         <motion.div
           key="context-panel"
           className="h-full"
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: 20 }}
-          transition={{ duration: 0.2, ease: "easeInOut" }}
+          initial={contextPanelMotion.initial}
+          animate={contextPanelMotion.animate}
+          exit={contextPanelMotion.exit}
+          transition={contextPanelMotion.transition}
         >
           <ContextPanel
             activeTab={contextTab}
