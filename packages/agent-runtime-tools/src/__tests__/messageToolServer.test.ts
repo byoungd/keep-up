@@ -23,6 +23,32 @@ function getText(result: MCPToolResult): string {
 }
 
 describe("MessageToolServer", () => {
+  it("rejects invalid message types", async () => {
+    const server = new MessageToolServer();
+    const context = createContext();
+
+    const result = await server.callTool(
+      { name: "send", arguments: { type: "unknown", message: "Hello" } },
+      context
+    );
+
+    expect(result.success).toBe(false);
+    expect(getText(result)).toContain("Message type must be one of");
+  });
+
+  it("rejects empty messages", async () => {
+    const server = new MessageToolServer();
+    const context = createContext();
+
+    const result = await server.callTool(
+      { name: "send", arguments: { type: "info", message: "   " } },
+      context
+    );
+
+    expect(result.success).toBe(false);
+    expect(getText(result)).toContain("Message content must be a non-empty string");
+  });
+
   it("normalizes ask metadata and excludes UI action when none", async () => {
     const server = new MessageToolServer();
     const context = createContext();
