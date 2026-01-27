@@ -463,11 +463,15 @@ fn to_napi_error(error: SandboxError) -> napi::Error {
     napi::Error::from_reason(error.to_string())
 }
 
-pub(crate) fn run_command(
+pub(crate) fn run_command_with<F>(
     command: &str,
     args: &[String],
     options: &ExecRequest,
-) -> Result<ExecResult, SandboxError> {
+    configure: F,
+) -> Result<ExecResult, SandboxError>
+where
+    F: FnOnce(&mut std::process::Command) -> Result<(), SandboxError>,
+{
     let mut cmd = std::process::Command::new(command);
     cmd.args(args);
     if let Some(cwd) = &options.cwd {
@@ -479,6 +483,8 @@ pub(crate) fn run_command(
     cmd.stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
+
+    configure(&mut cmd)?;
 
     let mut child = cmd.spawn()?;
     if let Some(stdin) = &options.stdin {
@@ -505,6 +511,14 @@ pub(crate) fn run_command(
         timed_out,
         truncated: stdout_truncated || stderr_truncated,
     })
+}
+
+pub(crate) fn run_command(
+    command: &str,
+    args: &[String],
+    options: &ExecRequest,
+) -> Result<ExecResult, SandboxError> {
+    run_command_with(command, args, options, |_| Ok(()))
 }
 
 fn wait_with_timeout(
