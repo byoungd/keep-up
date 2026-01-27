@@ -216,10 +216,18 @@ export function serializeCanonNode(node: CanonNode): string {
 }
 
 function isNativeSerializationEnabled(): boolean {
-  if (process.env.KU0_CANONICALIZER_SERIALIZATION_DISABLE_NATIVE === "1") {
+  if (readDisableFlag(process.env.KU0_CANONICALIZER_SERIALIZATION_DISABLE_NATIVE)) {
     return false;
   }
   return nativeFlagStore.getFlag("native_accelerators_enabled");
+}
+
+function readDisableFlag(value: string | undefined): boolean {
+  if (!value) {
+    return false;
+  }
+  const normalized = value.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes";
 }
 
 function serializeCanonNodeFallback(node: CanonNode): string {

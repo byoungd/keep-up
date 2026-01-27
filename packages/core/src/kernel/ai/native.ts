@@ -11,8 +11,8 @@ function readBooleanEnv(value: string | undefined): boolean | undefined {
   if (value === undefined) {
     return undefined;
   }
-  const normalized = value.toLowerCase();
-  return normalized === "1" || normalized === "true";
+  const normalized = value.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes";
 }
 
 export function isNativeAiSanitizerEnabled(): boolean {

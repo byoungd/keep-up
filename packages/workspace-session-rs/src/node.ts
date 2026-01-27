@@ -23,8 +23,16 @@ export type {
 let cachedBinding: NativeWorkspaceSessionBinding | null | undefined;
 let cachedError: Error | null = null;
 
+function readDisableFlag(value: string | undefined): boolean {
+  if (!value) {
+    return false;
+  }
+  const normalized = value.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes";
+}
+
 function isNativeEnabled(): boolean {
-  if (process.env.KU0_WORKSPACE_SESSION_DISABLE_NATIVE === "1") {
+  if (readDisableFlag(process.env.KU0_WORKSPACE_SESSION_DISABLE_NATIVE)) {
     return false;
   }
   return nativeFlagStore.getFlag("native_accelerators_enabled");

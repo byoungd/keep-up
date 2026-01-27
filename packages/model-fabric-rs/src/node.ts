@@ -41,9 +41,16 @@ const bindingState: NativeBindingLoadResult<NativeBinding> & {
   checkedPaths: [],
 };
 
+function readDisableFlag(value: string | undefined): boolean {
+  if (!value) {
+    return false;
+  }
+  const normalized = value.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes";
+}
+
 function isNativeDisabled(): boolean {
-  const value = process.env[DISABLE_NATIVE_ENV];
-  return value === "1" || value === "true";
+  return readDisableFlag(process.env[DISABLE_NATIVE_ENV]);
 }
 
 function loadBinding(): NativeBinding {
