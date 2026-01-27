@@ -91,28 +91,57 @@ export abstract class BaseToolServer implements MCPToolServer {
       return null;
     }
 
-    // Check required fields
-    if (schema.required) {
-      for (const field of schema.required) {
-        if (!(field in args)) {
-          return {
-            code: "INVALID_ARGUMENTS",
-            message: `Missing required argument: ${field}`,
-          };
-        }
-      }
+    const requiredError = this.validateRequiredFields(args, schema.required);
+    if (requiredError) {
+      return requiredError;
     }
 
     // Basic type checking for properties
-    if (schema.properties) {
-      for (const [key, value] of Object.entries(args)) {
-        const propSchema = schema.properties[key];
-        if (propSchema?.type && !this.checkType(value, propSchema.type)) {
-          return {
-            code: "INVALID_ARGUMENTS",
-            message: `Invalid type for argument "${key}": expected ${propSchema.type}`,
-          };
-        }
+    return this.validatePropertyValues(args, schema.properties);
+  }
+
+  private validateRequiredFields(
+    args: Record<string, unknown>,
+    required: string[] | undefined
+  ): ToolError | null {
+    if (!required) {
+      return null;
+    }
+    for (const field of required) {
+      if (!(field in args)) {
+        return {
+          code: "INVALID_ARGUMENTS",
+          message: `Missing required argument: ${field}`,
+        };
+      }
+    }
+
+    return null;
+  }
+
+  private validatePropertyValues(
+    args: Record<string, unknown>,
+    properties: MCPTool["inputSchema"]["properties"]
+  ): ToolError | null {
+    if (!properties) {
+      return null;
+    }
+
+    for (const [key, value] of Object.entries(args)) {
+      const propSchema = properties[key];
+      if (propSchema?.type && !this.checkType(value, propSchema.type)) {
+        return {
+          code: "INVALID_ARGUMENTS",
+          message: `Invalid type for argument "${key}": expected ${propSchema.type}`,
+        };
+      }
+      if (propSchema?.enum && !propSchema.enum.includes(value as never)) {
+        return {
+          code: "INVALID_ARGUMENTS",
+          message: `Invalid value for argument "${key}": expected one of ${propSchema.enum.join(
+            ", "
+          )}`,
+        };
       }
     }
 
