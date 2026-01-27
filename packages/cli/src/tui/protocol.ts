@@ -6,6 +6,7 @@ export const HOST_OPS = [
   "session.create",
   "runtime.init",
   "agent.prompt",
+  "approval.resolve",
   "agent.interrupt",
   "client.shutdown",
 ] as const;

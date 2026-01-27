@@ -2,14 +2,22 @@ import { randomUUID } from "node:crypto";
 import { createInterface } from "node:readline";
 import type { RuntimeStreamChunk, StreamWriter } from "@ku0/agent-runtime";
 import type { RuntimeEvent } from "@ku0/agent-runtime-control";
-import type { AgentState, MCPToolResult } from "@ku0/agent-runtime-core";
-import type { ToolCallRecord } from "@ku0/tooling-session";
+import type { AgentState, ConfirmationRequest, MCPToolResult } from "@ku0/agent-runtime-core";
+import type { ApprovalRecord, ToolCallRecord } from "@ku0/tooling-session";
 import { extractAssistantText } from "../utils/output";
 import { createRuntimeResources } from "../utils/runtimeClient";
 import { type SessionRecord, SessionStore } from "../utils/sessionStore";
 import { buildHostCapabilities, type HostMessage, type OpName } from "./protocol";
 
 type OpMessage = Extract<HostMessage, { type: "op" }>;
+
+type PendingApproval = {
+  id: string;
+  requestId: string;
+  request?: ConfirmationRequest;
+  resolver?: (approved: boolean) => void;
+  pendingDecision?: boolean;
+};
 
 type RuntimeState = {
   runtime?: Awaited<ReturnType<typeof createRuntimeResources>>["runtime"];
@@ -20,6 +28,7 @@ type RuntimeState = {
   session?: SessionRecord;
   subscriptions: Array<() => void>;
   activeRun: boolean;
+  pendingApproval?: PendingApproval;
 };
 
 const sessionStore = new SessionStore();
@@ -310,6 +319,174 @@ function mapToolResult(result?: MCPToolResult): ToolCallRecord["result"] {
   };
 }
 
+function buildApprovalPayload(request: ConfirmationRequest, approvalId: string) {
+  return {
+    approvalId,
+    toolName: request.toolName,
+    description: request.description,
+    arguments: request.arguments,
+    risk: request.risk,
+    reason: request.reason,
+    reasonCode: request.reasonCode,
+    riskTags: request.riskTags,
+    taskNodeId: request.taskNodeId,
+    escalation: request.escalation,
+  };
+}
+
+function recordApprovalRequested(
+  session: SessionRecord,
+  approvalId: string,
+  request: ConfirmationRequest,
+  timestamp: number
+): void {
+  const approvals = session.approvals ?? [];
+  const existing = approvals.find((item) => item.id === approvalId);
+  if (existing) {
+    existing.status = "requested";
+    existing.requestedAt = timestamp;
+    existing.resolvedAt = undefined;
+    existing.request = buildApprovalPayload(request, approvalId);
+    session.approvals = approvals;
+    session.updatedAt = timestamp;
+    return;
+  }
+  approvals.push({
+    id: approvalId,
+    kind: "tool",
+    status: "requested",
+    request: buildApprovalPayload(request, approvalId),
+    requestedAt: timestamp,
+  });
+  session.approvals = approvals;
+  session.updatedAt = timestamp;
+}
+
+function recordApprovalResolved(
+  session: SessionRecord,
+  approvalId: string,
+  status: ApprovalRecord["status"],
+  timestamp: number
+): void {
+  const approvals = session.approvals ?? [];
+  const approval = approvals.find((item) => item.id === approvalId);
+  if (approval) {
+    approval.status = status;
+    approval.resolvedAt = timestamp;
+    session.approvals = approvals;
+    session.updatedAt = timestamp;
+    return;
+  }
+
+  approvals.push({
+    id: approvalId,
+    kind: "tool",
+    status,
+    request: { toolName: "unknown" },
+    requestedAt: timestamp,
+    resolvedAt: timestamp,
+  });
+  session.approvals = approvals;
+  session.updatedAt = timestamp;
+}
+
+function resolveApprovalStatus(data: unknown): ApprovalRecord["status"] {
+  const typed = data as { status?: string; confirmed?: boolean };
+  const status = typed?.status;
+  if (status === "approved" || status === "rejected" || status === "timeout") {
+    return status;
+  }
+  if (typeof typed?.confirmed === "boolean") {
+    return typed.confirmed ? "approved" : "rejected";
+  }
+  return "requested";
+}
+
+function handleApprovalRequestedEvent(
+  payload: { data?: unknown; turn?: number },
+  requestId: string,
+  timestamp: number
+): void {
+  const request = payload.data as ConfirmationRequest | undefined;
+  if (!request) {
+    return;
+  }
+  const existing = state.pendingApproval;
+  const approvalId =
+    existing && existing.requestId === requestId ? existing.id : `approval_${randomUUID()}`;
+  state.pendingApproval = {
+    id: approvalId,
+    requestId,
+    request,
+    resolver: existing?.resolver,
+    pendingDecision: existing?.pendingDecision,
+  };
+  if (state.session) {
+    recordApprovalRequested(state.session, approvalId, request, timestamp);
+  }
+  sendEvent(
+    "approval.requested",
+    {
+      turn: payload.turn ?? 0,
+      timestamp,
+      data: buildApprovalPayload(request, approvalId),
+    },
+    requestId
+  );
+}
+
+function handleApprovalResolvedEvent(
+  payload: { data?: unknown; turn?: number },
+  requestId: string,
+  timestamp: number
+): void {
+  const status = resolveApprovalStatus(payload.data);
+  const approvalId = state.pendingApproval?.id;
+  if (state.session && approvalId) {
+    recordApprovalResolved(state.session, approvalId, status, timestamp);
+  }
+
+  const data = payload.data && typeof payload.data === "object" ? payload.data : {};
+  sendEvent(
+    "approval.resolved",
+    {
+      turn: payload.turn ?? 0,
+      timestamp,
+      data: approvalId ? { ...(data as Record<string, unknown>), approvalId } : data,
+    },
+    requestId
+  );
+  state.pendingApproval = undefined;
+}
+
+function createTuiConfirmationHandler(requestId: string) {
+  return (request: ConfirmationRequest) => {
+    const pending = state.pendingApproval;
+    if (pending && pending.requestId === requestId) {
+      pending.request = request;
+    } else {
+      state.pendingApproval = {
+        id: `approval_${randomUUID()}`,
+        requestId,
+        request,
+      };
+    }
+    return new Promise<boolean>((resolve) => {
+      const updated = state.pendingApproval;
+      if (!updated) {
+        resolve(false);
+        return;
+      }
+      updated.resolver = resolve;
+      if (updated.pendingDecision !== undefined) {
+        const decision = updated.pendingDecision;
+        updated.pendingDecision = undefined;
+        resolve(decision);
+      }
+    });
+  };
+}
+
 function handleRuntimeEvent(event: RuntimeEvent, requestId: string, toolCalls: ToolCallRecord[]) {
   const payload = event.payload as {
     type?: string;
@@ -321,6 +498,15 @@ function handleRuntimeEvent(event: RuntimeEvent, requestId: string, toolCalls: T
     return;
   }
   const timestamp = payload.timestamp ?? Date.now();
+  if (payload.type === "confirmation:required") {
+    handleApprovalRequestedEvent(payload, requestId, timestamp);
+    return;
+  }
+  if (payload.type === "confirmation:received") {
+    handleApprovalResolvedEvent(payload, requestId, timestamp);
+    return;
+  }
+
   const envelope = {
     turn: payload.turn ?? 0,
     timestamp,
@@ -342,12 +528,6 @@ function emitExplicitEvent(
       return;
     case "tool:result":
       sendEvent("tool.result", payload, requestId);
-      return;
-    case "confirmation:required":
-      sendEvent("approval.requested", payload, requestId);
-      return;
-    case "confirmation:received":
-      sendEvent("approval.resolved", payload, requestId);
       return;
     default:
       return;
@@ -372,6 +552,7 @@ async function handlePrompt(message: OpMessage): Promise<void> {
 
   state.activeRun = true;
   state.streamRequestId = message.id;
+  state.pendingApproval = undefined;
   let finalState: AgentState | undefined;
   const clearStreamRequestId = () => {
     if (state.streamRequestId === message.id) {
@@ -380,7 +561,10 @@ async function handlePrompt(message: OpMessage): Promise<void> {
   };
 
   try {
-    const iterator = state.runtime.kernel.runStream(prompt)[Symbol.asyncIterator]();
+    const confirmationHandler = createTuiConfirmationHandler(message.id);
+    const iterator = state.runtime.kernel
+      .runStream(prompt, { confirmationHandler })
+      [Symbol.asyncIterator]();
     while (true) {
       const result = await iterator.next();
       if (result.done) {
@@ -397,6 +581,7 @@ async function handlePrompt(message: OpMessage): Promise<void> {
     return;
   } finally {
     state.activeRun = false;
+    state.pendingApproval = undefined;
   }
 
   if (!finalState) {
@@ -424,6 +609,38 @@ async function handlePrompt(message: OpMessage): Promise<void> {
   clearStreamRequestId();
 }
 
+async function handleApprovalResolve(message: OpMessage): Promise<void> {
+  if (!state.activeRun) {
+    sendError(message.id, message.op, "No active run.", "NO_ACTIVE_RUN");
+    return;
+  }
+  const approvalId =
+    typeof message.payload?.approvalId === "string" ? message.payload.approvalId : undefined;
+  const approved =
+    typeof message.payload?.approved === "boolean" ? message.payload.approved : undefined;
+  if (!approvalId || approved === undefined) {
+    sendError(message.id, message.op, "approvalId and approved are required.", "BAD_REQUEST");
+    return;
+  }
+
+  const pending = state.pendingApproval;
+  if (!pending || pending.id !== approvalId) {
+    sendError(message.id, message.op, "Approval not found.", "NOT_FOUND");
+    return;
+  }
+
+  if (pending.resolver) {
+    pending.resolver(approved);
+  } else {
+    pending.pendingDecision = approved;
+  }
+
+  sendResult(message.id, message.op, {
+    approvalId,
+    status: approved ? "approved" : "rejected",
+  });
+}
+
 async function handleOp(message: OpMessage): Promise<void> {
   switch (message.op) {
     case "client.hello":
@@ -440,6 +657,9 @@ async function handleOp(message: OpMessage): Promise<void> {
       return;
     case "agent.prompt":
       await handlePrompt(message);
+      return;
+    case "approval.resolve":
+      await handleApprovalResolve(message);
       return;
     case "agent.interrupt":
       if (!state.activeRun) {
