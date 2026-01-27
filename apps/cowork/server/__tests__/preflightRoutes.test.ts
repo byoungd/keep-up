@@ -248,4 +248,37 @@ describe("Preflight routes", () => {
     const data = (await res.json()) as { error?: { message?: string } };
     expect(data.error?.message).toBe("Preflight requires Build Mode");
   });
+
+  it("blocks preflight when session is in review mode", async () => {
+    const reviewSession: CoworkSession = {
+      sessionId: "session-review",
+      userId: "user-1",
+      deviceId: "device-1",
+      platform: "macos",
+      mode: "cowork",
+      agentMode: "review",
+      grants: [
+        {
+          id: "grant-3",
+          rootPath,
+          allowWrite: false,
+          allowDelete: false,
+          allowCreate: false,
+        },
+      ],
+      connectors: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    await sessionStore.create(reviewSession);
+
+    const res = await app.request("/preflight", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId: "session-review" }),
+    });
+    expect(res.status).toBe(409);
+    const data = (await res.json()) as { error?: { message?: string } };
+    expect(data.error?.message).toBe("Preflight requires Build Mode");
+  });
 });
