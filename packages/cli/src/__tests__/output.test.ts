@@ -60,4 +60,45 @@ describe("output formatting", () => {
     expect(parsed.toolCalls[0]?.result?.content[0]?.type).toBe("text");
     expect(parsed.approvals[0]?.id).toBe("approval-1");
   });
+
+  it("formats markdown output with metadata sections", () => {
+    const state: AgentState = {
+      turn: 1,
+      status: "complete",
+      messages: [{ role: "assistant", content: "done" }],
+      pendingToolCalls: [],
+    };
+
+    const output = formatAgentOutput(state, "markdown", {
+      sessionId: "session-1",
+      toolCalls: [
+        {
+          name: "tool",
+          arguments: {},
+          status: "completed",
+          startedAt: 0,
+          result: {
+            success: true,
+            content: [{ type: "text", text: "ok" }],
+          },
+        },
+      ],
+      approvals: [
+        {
+          id: "approval-1",
+          kind: "tool",
+          status: "approved",
+          request: { toolName: "tool" },
+          requestedAt: 0,
+        },
+      ],
+    });
+
+    expect(output).toContain("# Response");
+    expect(output).toContain("## Metadata");
+    expect(output).toContain("## Tool Calls");
+    expect(output).toContain("## Approvals");
+    expect(output).toContain("```json");
+    expect(output).toContain('"tool"');
+  });
 });
