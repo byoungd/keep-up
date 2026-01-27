@@ -127,6 +127,12 @@ system instructions. Override with:
 keepup agent run "Review the API" --instructions "Use functional style."
 ```
 
+Include instructions from multiple directories (repeatable):
+
+```bash
+keepup agent run "Review the API" --add-dir ../shared --add-dir ~/work/standards
+```
+
 ## Doctor and Completion
 
 Check environment and configuration:

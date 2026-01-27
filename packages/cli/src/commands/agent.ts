@@ -43,6 +43,10 @@ export function agentCommand(): Command {
     .addCommand(configCommand());
 }
 
+function collectValues(value: string, previous: string[]): string[] {
+  return [...previous, value];
+}
+
 export function runCommand(): Command {
   return new Command("run")
     .description("Run agent with a prompt")
@@ -57,6 +61,7 @@ export function runCommand(): Command {
     .option("--session <id>", "Continue existing session")
     .option("--approval <mode>", "Approval mode: ask, auto, deny")
     .option("--instructions <text>", "Override AGENTS/CLAUDE instructions")
+    .option("--add-dir <path>", "Include instructions from another directory", collectValues, [])
     .option("--no-stream", "Disable streaming output (still runs the agent)")
     .action((inputPrompt: string | undefined, options: RunOptions) => {
       void runPromptCommand(inputPrompt, options).catch((error) => {
@@ -78,6 +83,7 @@ function tuiCommand(): Command {
     .option("--session <id>", "Resume existing session")
     .option("--approval <mode>", "Approval mode: ask, auto, deny")
     .option("--instructions <text>", "Override AGENTS/CLAUDE instructions")
+    .option("--add-dir <path>", "Include instructions from another directory", collectValues, [])
     .action(async (options: TuiOptions) => {
       const configStore = new ConfigStore();
       const config = await configStore.load();
@@ -110,6 +116,7 @@ function tuiCommand(): Command {
       );
       const instructions = await loadProjectInstructions({
         override: options.instructions,
+        additionalDirs: options.addDir,
       });
 
       try {
@@ -166,6 +173,7 @@ type RunOptions = {
   session?: string;
   approval?: string;
   instructions?: string;
+  addDir?: string[];
   stream?: boolean;
   prompt?: string;
 };
@@ -179,6 +187,7 @@ type TuiOptions = {
   session?: string;
   approval?: string;
   instructions?: string;
+  addDir?: string[];
 };
 
 type ResolvedRunConfig = {
@@ -217,6 +226,7 @@ async function runPromptCommand(
 
   const instructions = await loadProjectInstructions({
     override: options.instructions,
+    additionalDirs: options.addDir,
   });
 
   const askHandle = shouldPromptForApproval(resolved.approvalMode) ? createAskHandle() : undefined;
