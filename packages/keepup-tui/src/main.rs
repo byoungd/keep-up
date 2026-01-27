@@ -78,6 +78,10 @@ struct SessionSummary {
     id: String,
     title: String,
     message_count: usize,
+    #[serde(default)]
+    tool_call_count: usize,
+    #[serde(default)]
+    approval_count: usize,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1399,8 +1403,12 @@ fn draw_picker(frame: &mut ratatui::Frame, app: &App, area: Rect) {
                 session.title.as_str()
             };
             ListItem::new(format!(
-                "{} - {} ({} messages)",
-                session.id, title, session.message_count
+                "{} - {} ({} messages, {} tools, {} approvals)",
+                session.id,
+                title,
+                session.message_count,
+                session.tool_call_count,
+                session.approval_count
             ))
         })
         .collect();
