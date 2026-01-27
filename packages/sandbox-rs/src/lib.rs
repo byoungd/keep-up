@@ -248,6 +248,8 @@ impl Sandbox {
             network_access,
         };
 
+        validate_platform_support(&policy)?;
+
         let state = SandboxState {
             policy,
             fs_isolation,
@@ -459,6 +461,26 @@ fn parse_fs_isolation(value: &str) -> Result<FsIsolation, SandboxError> {
     }
 }
 
+fn requires_os_enforcement(policy: &SandboxPolicy) -> bool {
+    policy.network_access != NetworkAccess::Full || !policy.allowed_roots.is_empty()
+}
+
+fn validate_platform_support(policy: &SandboxPolicy) -> Result<(), SandboxError> {
+    let requires_enforcement = requires_os_enforcement(policy);
+    #[cfg(target_os = "windows")]
+    {
+        if requires_enforcement {
+            return Err(SandboxError::ExecutionFailed(
+                "Windows sandbox enforcement is not available; use docker or process fallback."
+                    .to_string(),
+            ));
+        }
+    }
+
+    let _ = requires_enforcement;
+    Ok(())
+}
+
 fn to_napi_error(error: SandboxError) -> napi::Error {
     napi::Error::from_reason(error.to_string())
 }
@@ -539,4 +561,37 @@ fn truncate_output(bytes: &[u8], max_bytes: usize) -> (String, bool) {
 
     let truncated = &bytes[..max_bytes];
     (String::from_utf8_lossy(truncated).to_string(), true)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{requires_os_enforcement, NetworkAccess, SandboxPolicy};
+    use std::path::PathBuf;
+
+    #[test]
+    fn requires_enforcement_for_restricted_network() {
+        let policy = SandboxPolicy {
+            allowed_roots: Vec::new(),
+            network_access: NetworkAccess::Allowlist,
+        };
+        assert!(requires_os_enforcement(&policy));
+    }
+
+    #[test]
+    fn requires_enforcement_for_allowed_roots() {
+        let policy = SandboxPolicy {
+            allowed_roots: vec![PathBuf::from("/tmp")],
+            network_access: NetworkAccess::Full,
+        };
+        assert!(requires_os_enforcement(&policy));
+    }
+
+    #[test]
+    fn no_enforcement_for_full_access() {
+        let policy = SandboxPolicy {
+            allowed_roots: Vec::new(),
+            network_access: NetworkAccess::Full,
+        };
+        assert!(!requires_os_enforcement(&policy));
+    }
 }
