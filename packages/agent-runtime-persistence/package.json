@@ -51,6 +51,7 @@
     "@ku0/core": "workspace:*",
     "@ku0/native-bindings": "workspace:*",
     "@ku0/storage-engine-rs": "workspace:*",
+    "@ku0/tokenizer-rs": "workspace:*",
     "@msgpack/msgpack": "^3.1.3",
     "zod": "^4.3.5",
     "better-sqlite3": "^9.6.0"

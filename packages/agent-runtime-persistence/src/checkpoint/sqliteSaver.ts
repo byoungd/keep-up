@@ -1,4 +1,5 @@
 import { gunzipSync, gzipSync } from "node:zlib";
+import { getNativeTokenizer } from "@ku0/tokenizer-rs";
 import type { Database as DatabaseInstance } from "better-sqlite3";
 import Database from "better-sqlite3";
 import type {
@@ -371,6 +372,15 @@ function encodeState(
   const json = JSON.stringify(state);
   const sizeBytes = Buffer.byteLength(json);
   if (sizeBytes >= compressionThreshold) {
+    const zstdPayload = tryCompressPayloadZstd(state, compressionThreshold);
+    if (zstdPayload) {
+      return {
+        payload: Buffer.from(zstdPayload),
+        encoding: "zstd",
+        compressed: true,
+        sizeBytes,
+      };
+    }
     return {
       payload: gzipSync(json),
       encoding: "gzip",
@@ -388,6 +398,35 @@ function encodeState(
 }
 
 function decodeState(buffer: Buffer, encoding: string): Checkpoint["state"] {
-  const json = encoding === "gzip" ? gunzipSync(buffer).toString("utf8") : buffer.toString("utf8");
+  const json =
+    encoding === "gzip"
+      ? gunzipSync(buffer).toString("utf8")
+      : encoding === "zstd"
+        ? decodeZstdPayload(buffer)
+        : buffer.toString("utf8");
   return JSON.parse(json) as Checkpoint["state"];
+}
+
+function tryCompressPayloadZstd(state: Checkpoint["state"], minBytes: number): Uint8Array | null {
+  const native = getNativeTokenizer();
+  if (!native?.compressPayloadZstd || !native.decompressPayloadZstd) {
+    return null;
+  }
+
+  const compressed = native.compressPayloadZstd(state, minBytes);
+  return compressed?.data ?? null;
+}
+
+function decodeZstdPayload(buffer: Buffer): string {
+  const native = getNativeTokenizer();
+  if (!native?.decompressPayloadZstd) {
+    throw new Error("Native tokenizer binding does not support zstd decompression.");
+  }
+
+  const decompressed = native.decompressPayloadZstd(buffer);
+  if (!decompressed) {
+    throw new Error("Failed to decompress zstd checkpoint payload.");
+  }
+
+  return Buffer.from(decompressed).toString("utf8");
 }

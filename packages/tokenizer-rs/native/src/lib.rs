@@ -4,7 +4,9 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Mutex;
 use tiktoken_rs::{cl100k_base, get_bpe_from_model, CoreBPE};
+use std::io::Cursor;
 use zstd::bulk::compress as zstd_compress;
+use zstd::stream::decode_all as zstd_decompress;
 
 const TOKEN_APPROX_CHARS: u32 = 4;
 const TOOL_CALL_TOKEN_COST: u32 = 50;
@@ -223,6 +225,13 @@ pub fn compress_payload_zstd(
     compression_ratio,
     encoding: "zstd".to_string(),
   })
+}
+
+#[napi]
+pub fn decompress_payload_zstd(data: Vec<u8>) -> Option<Vec<u8>> {
+  let mut cursor = Cursor::new(data);
+  let decompressed = zstd_decompress(&mut cursor).ok()?;
+  Some(decompressed)
 }
 
 fn resolve_bpe(model: &str) -> Option<CoreBPE> {

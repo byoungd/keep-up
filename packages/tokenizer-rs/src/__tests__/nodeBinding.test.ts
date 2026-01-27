@@ -49,6 +49,7 @@ describe("native binding loader", () => {
       estimate_json_tokens: vi.fn(() => 4),
       compress_context: vi.fn(() => compressedContext),
       compress_payload_zstd: vi.fn(() => null),
+      decompress_payload_zstd: vi.fn(() => new Uint8Array([1, 2, 3])),
     };
 
     const tokenizer = await loadTokenizer();
@@ -61,6 +62,9 @@ describe("native binding loader", () => {
     expect(tokenizer.countTokensBatch(["a", "b"], "cl100k_base")).toEqual([1, 2]);
     expect(tokenizer.estimateJsonTokens({ value: "x" }, "cl100k_base")).toBe(4);
     expect(tokenizer.compressContext([], 10, 1, "cl100k_base")).toEqual(compressedContext);
+    expect(tokenizer.decompressPayloadZstd?.(new Uint8Array([9]))).toEqual(
+      new Uint8Array([1, 2, 3])
+    );
     expect(requiredPath).toBe(expectedCandidate);
   });
 
@@ -79,6 +83,7 @@ describe("native binding loader", () => {
       estimate_json_tokens: vi.fn(() => 6),
       compress_context: vi.fn(() => compressedContext),
       compress_payload_zstd: vi.fn(() => null),
+      decompress_payload_zstd: vi.fn(() => new Uint8Array([4, 5, 6])),
     };
 
     const tokenizer = await loadTokenizer();
@@ -91,5 +96,8 @@ describe("native binding loader", () => {
     expect(tokenizer.countTokensBatch(["c", "d"], "cl100k_base")).toEqual([3, 4]);
     expect(tokenizer.estimateJsonTokens({ value: "y" }, "cl100k_base")).toBe(6);
     expect(tokenizer.compressContext([], 10, 1, "cl100k_base")).toEqual(compressedContext);
+    expect(tokenizer.decompressPayloadZstd?.(new Uint8Array([9]))).toEqual(
+      new Uint8Array([4, 5, 6])
+    );
   });
 });

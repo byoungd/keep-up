@@ -19,6 +19,7 @@ interface NativeBinding {
     minBytes: number,
     level?: number
   ) => CompressedPayload | null;
+  decompress_payload_zstd?: (data: Uint8Array) => Uint8Array | null;
 }
 
 export type {
@@ -110,6 +111,9 @@ export function getNativeTokenizer(): NativeTokenizer | null {
       binding.compress_context(messages, maxTokens, preserveLastN, model),
     compressPayloadZstd: (value, minBytes, level) =>
       binding.compress_payload_zstd ? binding.compress_payload_zstd(value, minBytes, level) : null,
+    decompressPayloadZstd: binding.decompress_payload_zstd
+      ? (data) => binding.decompress_payload_zstd?.(data) ?? null
+      : undefined,
   };
 
   return cachedTokenizer;
