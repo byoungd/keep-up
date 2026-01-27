@@ -323,22 +323,32 @@ export class PlanToolServer extends BaseToolServer {
     }
 
     try {
-      const goal = args.goal as string;
-      const stepsInput = args.steps as Array<{
-        description: string;
-        tools?: string[];
-        expectedOutcome?: string;
-      }>;
-      const riskAssessment = (args.riskAssessment as ExecutionPlan["riskAssessment"]) ?? "low";
-      const successCriteria = (args.successCriteria as string[]) ?? [];
+      const goal = normalizeRequiredString(args.goal);
+      if (!goal) {
+        return errorResult("INVALID_ARGUMENTS", "Plan goal must be a non-empty string.");
+      }
+
+      const stepInput = normalizePlanSteps(args.steps);
+      if (stepInput.invalidCount > 0) {
+        return errorResult(
+          "INVALID_ARGUMENTS",
+          "Each plan step must include a non-empty description."
+        );
+      }
+      if (stepInput.steps.length === 0) {
+        return errorResult("INVALID_ARGUMENTS", "Provide at least one plan step.");
+      }
+
+      const riskAssessment = isRiskAssessment(args.riskAssessment) ? args.riskAssessment : "low";
+      const successCriteria = normalizeStringArray(args.successCriteria);
 
       // Build plan steps
-      const steps: PlanStep[] = stepsInput.map((s, index) => ({
+      const steps: PlanStep[] = stepInput.steps.map((s, index) => ({
         id: `step_${index + 1}_${Date.now().toString(36)}`,
         order: index + 1,
         description: s.description,
-        tools: s.tools ?? [],
-        expectedOutcome: s.expectedOutcome ?? "",
+        tools: s.tools,
+        expectedOutcome: s.expectedOutcome,
         dependencies: [],
         parallelizable: false,
         status: "pending" as const,
@@ -427,7 +437,7 @@ export class PlanToolServer extends BaseToolServer {
     }
 
     try {
-      const limit = (args.limit as number) ?? 10;
+      const limit = normalizeLimit(args.limit, 10, 50);
       const history = await this.persistence.listHistory();
 
       if (history.length === 0) {
@@ -506,7 +516,13 @@ export class PlanToolServer extends BaseToolServer {
     }
 
     try {
-      const stepNumber = args.stepNumber as number;
+      const stepNumber = normalizePositiveInt(args.stepNumber);
+      if (!stepNumber) {
+        return errorResult(
+          "INVALID_ARGUMENTS",
+          "stepNumber must be a positive integer starting at 1."
+        );
+      }
       const status = args.status as PlanStep["status"];
 
       const plan = await this.persistence.loadCurrent();
@@ -608,16 +624,10 @@ export class PlanToolServer extends BaseToolServer {
     }
 
     try {
-      const goal = args.goal as string | undefined;
-      const add_steps = args.add_steps as
-        | Array<{
-            description: string;
-            tools?: string[];
-            expectedOutcome?: string;
-            insertAfter?: number;
-          }>
-        | undefined;
-      const remove_steps = args.remove_steps as number[] | undefined;
+      const updateInputs = parsePlanUpdateInputs(args);
+      if (updateInputs.error) {
+        return errorResult("INVALID_ARGUMENTS", updateInputs.error);
+      }
 
       const plan = await this.persistence.loadCurrent();
 
@@ -626,43 +636,15 @@ export class PlanToolServer extends BaseToolServer {
       }
 
       // Update goal if provided
-      if (goal) {
-        plan.goal = goal;
+      if (updateInputs.goal) {
+        plan.goal = updateInputs.goal;
       }
 
       // Remove steps
-      if (remove_steps && remove_steps.length > 0) {
-        plan.steps = plan.steps.filter((s) => !remove_steps.includes(s.order));
-        // Renumber remaining steps
-        plan.steps.forEach((s, index) => {
-          s.order = index + 1;
-        });
-      }
+      applyStepRemovals(plan, updateInputs.removeSteps);
 
       // Add steps
-      if (add_steps && add_steps.length > 0) {
-        for (const newStep of add_steps) {
-          const insertAfter = newStep.insertAfter ?? plan.steps.length;
-          const step: PlanStep = {
-            id: `step_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
-            order: insertAfter + 1,
-            description: newStep.description,
-            tools: newStep.tools ?? [],
-            expectedOutcome: newStep.expectedOutcome ?? "",
-            dependencies: [],
-            parallelizable: false,
-            status: "pending",
-          };
-
-          // Insert at position
-          plan.steps.splice(insertAfter, 0, step);
-        }
-
-        // Renumber all steps
-        plan.steps.forEach((s, index) => {
-          s.order = index + 1;
-        });
-      }
+      applyStepInsertions(plan, updateInputs.addSteps);
 
       await this.persistence.saveCurrent(plan);
 
@@ -723,6 +705,208 @@ export class PlanToolServer extends BaseToolServer {
 
     return textResult(output);
   }
+}
+
+type NormalizedPlanStepInput = {
+  description: string;
+  tools: string[];
+  expectedOutcome: string;
+  insertAfter?: number;
+};
+
+type PlanUpdateInputs = {
+  goal?: string;
+  addSteps: NormalizedPlanStepInput[];
+  removeSteps: number[];
+  error?: string;
+};
+
+function normalizeRequiredString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeOptionalString(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+}
+
+function normalizePositiveInt(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return null;
+  }
+  const intValue = Math.floor(value);
+  return intValue >= 1 ? intValue : null;
+}
+
+function normalizeLimit(value: unknown, fallback: number, max: number): number {
+  const intValue = normalizePositiveInt(value);
+  if (!intValue) {
+    return fallback;
+  }
+  return Math.min(intValue, max);
+}
+
+function normalizeInsertAfter(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    return undefined;
+  }
+  return Math.floor(value);
+}
+
+function normalizeNumberArray(value: unknown): number[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .filter((item): item is number => typeof item === "number" && Number.isFinite(item))
+    .map((item) => Math.floor(item))
+    .filter((item) => item >= 1);
+}
+
+function normalizePlanSteps(value: unknown): {
+  steps: NormalizedPlanStepInput[];
+  invalidCount: number;
+} {
+  if (!Array.isArray(value)) {
+    return { steps: [], invalidCount: 0 };
+  }
+
+  const steps: NormalizedPlanStepInput[] = [];
+  let invalidCount = 0;
+
+  for (const raw of value) {
+    if (!raw || typeof raw !== "object") {
+      invalidCount += 1;
+      continue;
+    }
+
+    const record = raw as Record<string, unknown>;
+    const description = normalizeRequiredString(record.description);
+    if (!description) {
+      invalidCount += 1;
+      continue;
+    }
+
+    const tools = normalizeStringArray(record.tools);
+    const expectedOutcome = normalizeOptionalString(record.expectedOutcome) ?? "";
+    const insertAfter = normalizeInsertAfter(record.insertAfter);
+
+    const normalizedStep: NormalizedPlanStepInput = {
+      description,
+      tools,
+      expectedOutcome,
+    };
+    if (insertAfter !== undefined) {
+      normalizedStep.insertAfter = insertAfter;
+    }
+
+    steps.push(normalizedStep);
+  }
+
+  return { steps, invalidCount };
+}
+
+function isRiskAssessment(value: unknown): value is ExecutionPlan["riskAssessment"] {
+  return value === "low" || value === "medium" || value === "high";
+}
+
+function hasOwn(args: Record<string, unknown>, key: string): boolean {
+  return Object.hasOwn(args, key);
+}
+
+function parsePlanUpdateInputs(args: Record<string, unknown>): PlanUpdateInputs {
+  const hasGoal = hasOwn(args, "goal");
+  const goal = normalizeOptionalString(args.goal);
+  if (hasGoal && !goal) {
+    return { addSteps: [], removeSteps: [], error: "Plan goal must be a non-empty string." };
+  }
+
+  const hasAddSteps = hasOwn(args, "add_steps");
+  const addStepsInput = normalizePlanSteps(args.add_steps);
+  if (addStepsInput.invalidCount > 0) {
+    return {
+      addSteps: [],
+      removeSteps: [],
+      error: "Each added step must include a non-empty description.",
+    };
+  }
+  if (hasAddSteps && addStepsInput.steps.length === 0) {
+    return {
+      addSteps: [],
+      removeSteps: [],
+      error: "add_steps must include at least one step.",
+    };
+  }
+
+  const hasRemoveSteps = hasOwn(args, "remove_steps");
+  const removeSteps = normalizeNumberArray(args.remove_steps);
+  if (hasRemoveSteps && removeSteps.length === 0) {
+    return {
+      addSteps: [],
+      removeSteps: [],
+      error: "remove_steps must include at least one step number.",
+    };
+  }
+
+  return {
+    goal,
+    addSteps: addStepsInput.steps,
+    removeSteps,
+  };
+}
+
+function applyStepRemovals(plan: ExecutionPlan, removeSteps: number[]): void {
+  if (removeSteps.length === 0) {
+    return;
+  }
+
+  plan.steps = plan.steps.filter((s) => !removeSteps.includes(s.order));
+  plan.steps.forEach((s, index) => {
+    s.order = index + 1;
+  });
+}
+
+function applyStepInsertions(plan: ExecutionPlan, addSteps: NormalizedPlanStepInput[]): void {
+  if (addSteps.length === 0) {
+    return;
+  }
+
+  for (const newStep of addSteps) {
+    const insertAfter = newStep.insertAfter ?? plan.steps.length;
+    const step: PlanStep = {
+      id: `step_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
+      order: insertAfter + 1,
+      description: newStep.description,
+      tools: newStep.tools,
+      expectedOutcome: newStep.expectedOutcome,
+      dependencies: [],
+      parallelizable: false,
+      status: "pending",
+    };
+
+    plan.steps.splice(insertAfter, 0, step);
+  }
+
+  plan.steps.forEach((s, index) => {
+    s.order = index + 1;
+  });
 }
 
 // ============================================================================
