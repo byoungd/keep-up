@@ -38,4 +38,32 @@ describe("SessionStore", () => {
     expect(sessions[0].toolCalls).toEqual([]);
     expect(sessions[0].approvals).toEqual([]);
   });
+
+  it("returns all sessions when limit is zero", async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "keepup-tooling-"));
+    const store = new SessionStore({ baseDir: tempDir, fileName: "sessions.json" });
+
+    await store.save({
+      id: "session-1",
+      title: "First",
+      createdAt: 1,
+      updatedAt: 2,
+      messages: [],
+      toolCalls: [],
+      approvals: [],
+    });
+    await store.save({
+      id: "session-2",
+      title: "Second",
+      createdAt: 3,
+      updatedAt: 4,
+      messages: [],
+      toolCalls: [],
+      approvals: [],
+    });
+
+    const sessions = await store.list(0);
+    expect(sessions).toHaveLength(2);
+    expect(sessions[0].id).toBe("session-2");
+  });
 });
