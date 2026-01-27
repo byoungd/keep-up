@@ -80,6 +80,57 @@ describe("PlanToolServer", () => {
     });
   });
 
+  it("rejects empty goals", async () => {
+    await withTempDir(async (dir) => {
+      const persistence = createPlanPersistence({ workingDirectory: dir });
+      const server = new PlanToolServer({ persistence });
+      const context = createContext({ workingDirectory: dir, filePermission: "workspace" });
+
+      const result = await server.callTool(
+        { name: "save", arguments: { goal: "   ", steps: [{ description: "Step" }] } },
+        context
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe("INVALID_ARGUMENTS");
+    });
+  });
+
+  it("sanitizes plan inputs", async () => {
+    await withTempDir(async (dir) => {
+      const persistence = createPlanPersistence({ workingDirectory: dir });
+      const server = new PlanToolServer({ persistence });
+      const context = createContext({ workingDirectory: dir, filePermission: "workspace" });
+
+      const saveResult = await server.callTool(
+        {
+          name: "save",
+          arguments: {
+            goal: "  Goal  ",
+            steps: [
+              {
+                description: "  Step 1  ",
+                tools: [" tool-a ", ""],
+                expectedOutcome: "  done  ",
+              },
+            ],
+            successCriteria: [" ok ", ""],
+          },
+        },
+        context
+      );
+
+      expect(saveResult.success).toBe(true);
+
+      const plan = await persistence.loadCurrent();
+      expect(plan?.goal).toBe("Goal");
+      expect(plan?.steps[0].description).toBe("Step 1");
+      expect(plan?.steps[0].tools).toEqual(["tool-a"]);
+      expect(plan?.steps[0].expectedOutcome).toBe("done");
+      expect(plan?.successCriteria).toEqual(["ok"]);
+    });
+  });
+
   it("truncates large outputs", async () => {
     await withTempDir(async (dir) => {
       const persistence = createPlanPersistence({ workingDirectory: dir });
