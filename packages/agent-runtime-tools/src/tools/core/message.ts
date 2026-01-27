@@ -184,12 +184,34 @@ The frontend will render different UI based on the type and suggested_action.`,
     context: ToolContext
   ): Promise<MCPToolResult> {
     try {
-      const type = args.type as MessageType;
-      const message = args.message as string;
-      const suggested_action = args.suggested_action as SuggestedAction | undefined;
-      const attachments = args.attachments as string[] | undefined;
-      const summary = args.summary as string | undefined;
-      const messageContext = args.context as string | undefined;
+      const typeValue = typeof args.type === "string" ? args.type : "";
+      if (!this.isMessageType(typeValue)) {
+        return errorResult("INVALID_ARGUMENTS", "Message type must be one of: info, ask, result.");
+      }
+      const type = typeValue as MessageType;
+      const message = typeof args.message === "string" ? args.message.trim() : "";
+      if (!message) {
+        return errorResult("INVALID_ARGUMENTS", "Message content must be a non-empty string.");
+      }
+
+      const suggested_action =
+        typeof args.suggested_action === "string" && this.isSuggestedAction(args.suggested_action)
+          ? (args.suggested_action as SuggestedAction)
+          : undefined;
+      const attachments = Array.isArray(args.attachments)
+        ? (args.attachments as unknown[])
+            .filter((item) => typeof item === "string")
+            .map((item) => (item as string).trim())
+            .filter((item) => item.length > 0)
+        : undefined;
+      const summary =
+        typeof args.summary === "string" && args.summary.trim().length > 0
+          ? args.summary.trim()
+          : undefined;
+      const messageContext =
+        typeof args.context === "string" && args.context.trim().length > 0
+          ? args.context.trim()
+          : undefined;
 
       const normalized = this.normalizeMetadata(type, {
         suggested_action,
@@ -226,6 +248,19 @@ The frontend will render different UI based on the type and suggested_action.`,
       const errorMessage = err instanceof Error ? err.message : String(err);
       return errorResult("EXECUTION_FAILED", `Failed to send message: ${errorMessage}`);
     }
+  }
+
+  private isMessageType(value: string): value is MessageType {
+    return value === "info" || value === "ask" || value === "result";
+  }
+
+  private isSuggestedAction(value: string): value is SuggestedAction {
+    return (
+      value === "none" ||
+      value === "confirm_browser_operation" ||
+      value === "take_over_browser" ||
+      value === "upgrade_to_unlock_feature"
+    );
   }
 
   /**
