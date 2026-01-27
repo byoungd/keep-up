@@ -8,6 +8,7 @@ import type {
   AgentType,
   IAgentManager,
   MCPToolResult,
+  SpawnAgentOptions,
   ToolContext,
 } from "@ku0/agent-runtime-core";
 import { SECURITY_PRESETS } from "@ku0/agent-runtime-core";
@@ -38,25 +39,36 @@ function createProfile(type: AgentType): AgentProfile {
   };
 }
 
-function createManager(output: string): IAgentManager {
+function createManager(
+  output: string,
+  handlers?: {
+    onSpawn?: (options: SpawnAgentOptions) => void;
+    onSpawnParallel?: (options: SpawnAgentOptions[]) => void;
+  }
+): IAgentManager {
   return {
-    spawn: async (options): Promise<AgentResult> => ({
-      agentId: "agent-1",
-      type: options.type,
-      success: true,
-      output,
-      turns: 1,
-      durationMs: 5,
-    }),
-    spawnParallel: async (options) =>
-      options.map((opt, index) => ({
+    spawn: async (options): Promise<AgentResult> => {
+      handlers?.onSpawn?.(options);
+      return {
+        agentId: "agent-1",
+        type: options.type,
+        success: true,
+        output,
+        turns: 1,
+        durationMs: 5,
+      };
+    },
+    spawnParallel: async (options) => {
+      handlers?.onSpawnParallel?.(options);
+      return options.map((opt, index) => ({
         agentId: `agent-${index + 1}`,
         type: opt.type,
         success: true,
         output,
         turns: 1,
         durationMs: 5,
-      })),
+      }));
+    },
     getAvailableTypes: () => ["code", "research"],
     getProfile: (type) => createProfile(type),
     stop: async () => undefined,
@@ -82,6 +94,71 @@ describe("SubagentToolServer", () => {
     const text = getText(result);
     expect(result.success).toBe(true);
     expect(text).toContain("Output truncated");
+  });
+
+  it("rejects empty tasks", async () => {
+    const manager = createManager("ok");
+    const server = new SubagentToolServer(manager);
+    const context = createContext();
+
+    const result = await server.callTool(
+      { name: "spawn", arguments: { type: "code", task: "   " } },
+      context
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error?.code).toBe("INVALID_ARGUMENTS");
+  });
+
+  it("sanitizes allowed tools", async () => {
+    let captured: SpawnAgentOptions | undefined;
+    const manager = createManager("ok", {
+      onSpawn: (options) => {
+        captured = options;
+      },
+    });
+    const server = new SubagentToolServer(manager);
+    const context = createContext();
+
+    const result = await server.callTool(
+      {
+        name: "spawn",
+        arguments: {
+          type: "code",
+          task: "Do work",
+          scope: { allowedTools: [" file:read ", "  "] },
+        },
+      },
+      context
+    );
+
+    expect(result.success).toBe(true);
+    expect(captured?.allowedTools).toEqual(["file:read"]);
+  });
+
+  it("rejects dependency lists without IDs", async () => {
+    const manager = createManager("ok");
+    const server = new SubagentToolServer(manager);
+    const context = createContext();
+
+    const result = await server.callTool(
+      {
+        name: "spawn_parallel",
+        arguments: {
+          tasks: [
+            {
+              type: "code",
+              task: "Do work",
+              dependencies: ["task-a"],
+            },
+          ],
+        },
+      },
+      context
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error?.code).toBe("INVALID_ARGUMENTS");
   });
 
   it("truncates types output", async () => {
