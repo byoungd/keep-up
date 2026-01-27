@@ -254,6 +254,26 @@ export class MessageCompressor {
     }
   }
 
+  /**
+   * Compress message history with a temporary token budget override (async).
+   */
+  async compressWithMaxTokensAsync(
+    messages: AgentMessage[],
+    maxTokens: number
+  ): Promise<CompressionResult> {
+    if (maxTokens === this.config.maxTokens) {
+      return this.compressAsync(messages);
+    }
+
+    const previousMaxTokens = this.config.maxTokens;
+    this.config.maxTokens = maxTokens;
+    try {
+      return await this.compressAsync(messages);
+    } finally {
+      this.config.maxTokens = previousMaxTokens;
+    }
+  }
+
   private tryIncrementalCompression(messages: AgentMessage[]): CompressionResult | null {
     if (!this.config.incremental || !this.lastSnapshot) {
       return null;

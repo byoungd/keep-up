@@ -15,11 +15,13 @@ import { loadProjectInstructions } from "../utils/projectInstructions";
 import { runPromptWithStreaming } from "../utils/promptRunner";
 import { createRuntimeResources } from "../utils/runtimeClient";
 import {
+  resolveContextCompressionConfig,
   resolveOutput,
   resolveRuntimeConfigString,
   resolveSandboxMode,
 } from "../utils/runtimeOptions";
 import { type SessionMessage, type SessionRecord, SessionStore } from "../utils/sessionStore";
+import { extractConversationSummary, upsertConversationSummary } from "../utils/sessionSummary";
 import { readStdin, writeStderr, writeStdout } from "../utils/terminal";
 import {
   resolveTuiBinary,
@@ -103,6 +105,9 @@ function tuiCommand(): Command {
         policies: config.approvalPolicies,
         workspacePaths: config.approvalWorkspacePaths,
       });
+      const contextCompression = resolveContextCompressionConfig(
+        config.context ?? config.contextCompression
+      );
       const instructions = await loadProjectInstructions({
         override: options.instructions,
       });
@@ -141,6 +146,7 @@ function tuiCommand(): Command {
           sandbox,
           autoApproval,
           instructions,
+          contextCompression,
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -197,6 +203,9 @@ async function runPromptCommand(
     policies: config.approvalPolicies,
     workspacePaths: config.approvalWorkspacePaths,
   });
+  const contextCompression = resolveContextCompressionConfig(
+    config.context ?? config.contextCompression
+  );
 
   const sessionStore = new SessionStore();
   const sessionId = resolveSessionId(options, config);
@@ -222,6 +231,7 @@ async function runPromptCommand(
       initialMessages: session.messages,
       instructions,
       sandbox,
+      contextCompression,
     });
 
     const result = await runPromptWithStreaming({
@@ -307,6 +317,10 @@ function shouldPromptForApproval(mode: ReturnType<typeof resolveApprovalMode>): 
 }
 
 function updateSessionFromRun(session: SessionRecord, prompt: string, state: AgentState): void {
+  const summary = extractConversationSummary(state);
+  if (summary) {
+    upsertConversationSummary(session, summary);
+  }
   const assistantText = extractAssistantText(state);
   const messageLog = createMessageLog(prompt, assistantText);
   session.messages.push(...messageLog);

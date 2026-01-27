@@ -26,13 +26,30 @@ import type { IMetricsCollector, SpanContext } from "@ku0/agent-runtime-telemetr
 import { AGENT_METRICS } from "@ku0/agent-runtime-telemetry/telemetry";
 import type { SkillRegistry } from "@ku0/agent-runtime-tools";
 import { SkillPromptAdapter, type SkillPromptOptions } from "@ku0/agent-runtime-tools";
-import type { ContextFrameBuilder, ContextFrameOutput, ContextItem } from "../context";
+import {
+  type ContextCompactor,
+  type ContextFrameBuilder,
+  type ContextFrameOutput,
+  type ContextItem,
+  type ContextManager,
+  type ContextMessage,
+  type ContextToolCall,
+  type ContextToolResult,
+  createContextCompactor,
+} from "../context";
 import type { KnowledgeMatchResult, KnowledgeRegistry } from "../knowledge";
 import type { SymbolContextProvider } from "../lsp";
 import { AGENTS_GUIDE_PROMPT } from "../prompts/agentGuidelines";
 import { getModelCapabilityCache } from "../routing/modelCapabilityCache";
 import type { ModelRouter, ModelRoutingDecision } from "../routing/modelRouter";
-import type { AgentMessage, AgentState, MCPToolCall, TokenUsageStats } from "../types";
+import type {
+  AgentMessage,
+  AgentState,
+  AuditLogger,
+  ContextCompressionConfig,
+  MCPToolCall,
+  TokenUsageStats,
+} from "../types";
 import type { AgentLLMRequest, AgentLLMResponse, AgentToolDefinition, IAgentLLM } from "./llmTypes";
 import type { MessageCompressor } from "./messageCompression";
 import type { RequestCache } from "./requestCache";
@@ -112,6 +129,18 @@ export interface TurnExecutorDependencies {
   readonly skillPromptAdapter?: SkillPromptAdapter;
   /** Optional metrics collector for observability */
   readonly metrics?: IMetricsCollector;
+  /** Optional context manager for compaction scratchpad updates */
+  readonly contextManager?: ContextManager;
+  /** Optional context ID provider for compaction */
+  readonly getContextId?: () => string | undefined;
+  /** Optional context compression configuration */
+  readonly contextCompression?: ContextCompressionConfig;
+  /** Optional audit logger for compaction events */
+  readonly auditLogger?: AuditLogger;
+  /** Optional session ID provider for audit logging */
+  readonly getSessionId?: () => string | undefined;
+  /** Optional correlation ID provider for audit logging */
+  readonly getCorrelationId?: () => string | undefined;
   /** Optional model ID provider for context window guard */
   readonly getModelId?: () => string | undefined;
   /** Optional model routing decision provider */
@@ -159,11 +188,21 @@ export interface ITurnExecutor {
 
 const DEFAULT_TEMPERATURE = 0.7;
 const DEFAULT_MAX_KNOWLEDGE_ITEMS = 5;
-const CONTEXT_WINDOW_BUFFER_RATIO = 0.8;
+const DEFAULT_CONTEXT_COMPRESSION_THRESHOLD = 0.8;
+const DEFAULT_CONTEXT_PRESERVE_COUNT = 3;
+const DEFAULT_CONTEXT_COMPRESSION_STRATEGY = "hybrid";
 
 /** Internal mutable version of TurnMetrics for accumulating during execution */
 type MutableTurnMetrics = {
   -readonly [K in keyof TurnMetrics]: TurnMetrics[K];
+};
+
+type CompressionSettings = {
+  maxTokens: number;
+  threshold: number;
+  budgetTokens?: number;
+  preserveCount: number;
+  strategy: "summarize" | "truncate" | "hybrid";
 };
 
 // ============================================================================
@@ -202,40 +241,42 @@ export class TurnExecutor implements ITurnExecutor {
 
     try {
       const modelDecision = this.deps.getModelDecision?.();
+      const contextModelId = modelDecision?.resolved ?? this.deps.getModelId?.();
 
-      // Step 1: Compress message history
-      const contextModelId = this.deps.getModelDecision?.()?.resolved ?? this.deps.getModelId?.();
-      const compressorMaxTokens = this.deps.messageCompressor.getMaxTokens();
-      const contextWindowBudget = this.resolveContextWindowBudget(contextModelId, span);
-      const fallbackBudget = Math.floor(compressorMaxTokens * CONTEXT_WINDOW_BUFFER_RATIO);
-      const compressionMaxTokens =
-        contextWindowBudget && contextWindowBudget < compressorMaxTokens
-          ? contextWindowBudget
-          : fallbackBudget > 0 && fallbackBudget < compressorMaxTokens
-            ? fallbackBudget
-            : undefined;
-      const compressionResult = this.compressMessages(state.messages, span, compressionMaxTokens);
-      metrics.compressionRatio = compressionResult.ratio;
-      metrics.compressionTimeMs = compressionResult.timeMs;
-
-      // Step 2: Match relevant knowledge and symbol context
+      // Step 1: Match relevant knowledge and symbol context
       const knowledgeContent = this.matchKnowledge(state, span);
       const symbolContext = this.matchSymbolContext(state, span);
       metrics.knowledgeMatched = knowledgeContent ? 1 : 0;
 
-      // Step 3: Build LLM request
+      // Step 2: Build LLM prompt context
       const contextFrame = this.buildContextFrame();
       const skillPrompt = this.buildSkillPrompt();
-      const request = this.buildRequest(
-        compressionResult.messages,
+      const systemPrompt = this.buildSystemPrompt(
         knowledgeContent,
         symbolContext,
         skillPrompt,
-        contextFrame?.content,
+        contextFrame?.content
+      );
+
+      // Step 3: Compress message history
+      const compressionSettings = this.resolveCompressionSettings(contextModelId, span);
+      const compressionResult = await this.compressMessages(
+        state.messages,
+        span,
+        compressionSettings,
+        systemPrompt
+      );
+      metrics.compressionRatio = compressionResult.ratio;
+      metrics.compressionTimeMs = compressionResult.timeMs;
+
+      // Step 4: Build LLM request
+      const request = this.buildRequest(
+        compressionResult.messages,
+        systemPrompt,
         modelDecision?.resolved
       );
 
-      // Step 4: Get LLM response (with caching)
+      // Step 5: Get LLM response (with caching)
       const { response, cacheHit, cacheTimeMs, modelId } = await this.getResponse(
         request,
         modelDecision,
@@ -244,10 +285,10 @@ export class TurnExecutor implements ITurnExecutor {
       metrics.cacheHit = cacheHit;
       metrics.cacheTimeMs = cacheTimeMs;
 
-      // Step 5: Build assistant message
+      // Step 6: Build assistant message
       const assistantMessage = this.buildAssistantMessage(response);
 
-      // Step 6: Determine outcome
+      // Step 7: Determine outcome
       metrics.totalTimeMs = performance.now() - turnStart;
 
       const outcomeBase = {
@@ -283,15 +324,28 @@ export class TurnExecutor implements ITurnExecutor {
   // Private Methods
   // ==========================================================================
 
-  private compressMessages(
+  private async compressMessages(
     messages: AgentMessage[],
-    span?: SpanContext,
-    maxTokensOverride?: number
-  ): { messages: AgentMessage[]; ratio: number; timeMs: number } {
+    span: SpanContext | undefined,
+    settings: CompressionSettings,
+    systemPrompt: string
+  ): Promise<{ messages: AgentMessage[]; ratio: number; timeMs: number }> {
     const start = performance.now();
-    const result = maxTokensOverride
-      ? this.deps.messageCompressor.compressWithMaxTokens(messages, maxTokensOverride)
-      : this.deps.messageCompressor.compress(messages);
+    const compactor = this.createContextCompactor(settings);
+    const thresholdCheck = compactor.checkThreshold(
+      this.toCompactorMessages(messages),
+      systemPrompt
+    );
+    span?.setAttribute("compaction.threshold", settings.threshold);
+    span?.setAttribute("compaction.tokens", thresholdCheck.currentTokens);
+    span?.setAttribute("compaction.limit", thresholdCheck.maxTokens);
+
+    const result = settings.budgetTokens
+      ? await this.deps.messageCompressor.compressWithMaxTokensAsync(
+          messages,
+          settings.budgetTokens
+        )
+      : await this.deps.messageCompressor.compressAsync(messages);
     const timeMs = performance.now() - start;
 
     if (result.compressionRatio > 0) {
@@ -303,8 +357,18 @@ export class TurnExecutor implements ITurnExecutor {
       span?.setAttribute("compression.ratio", result.compressionRatio);
       span?.setAttribute("compression.removed", result.removedCount);
     }
-    if (maxTokensOverride) {
-      span?.setAttribute("compression.max_tokens_override", maxTokensOverride);
+    if (settings.budgetTokens) {
+      span?.setAttribute("compression.max_tokens_override", settings.budgetTokens);
+    }
+
+    if (result.summarizedCount > 0 && result.metadata?.summary) {
+      this.applyCompactionSummary({
+        summary: result.metadata.summary,
+        compactor,
+        originalMessages: messages,
+        compressedMessages: result.messages,
+        span,
+      });
     }
 
     return {
@@ -314,7 +378,37 @@ export class TurnExecutor implements ITurnExecutor {
     };
   }
 
-  private resolveContextWindowBudget(
+  private resolveCompressionSettings(
+    modelId: string | undefined,
+    span?: SpanContext
+  ): CompressionSettings {
+    const configuredMaxTokens =
+      this.deps.contextCompression?.maxTokens ?? this.deps.messageCompressor.getMaxTokens();
+    const threshold = this.normalizeCompressionThreshold(
+      this.deps.contextCompression?.compressionThreshold ?? DEFAULT_CONTEXT_COMPRESSION_THRESHOLD
+    );
+    const preserveCount =
+      this.deps.contextCompression?.preserveCount ?? DEFAULT_CONTEXT_PRESERVE_COUNT;
+    const strategy = this.resolveCompactionStrategy(this.deps.contextCompression?.strategy);
+
+    const modelContextWindow = this.resolveContextWindowLimit(modelId, span);
+    const maxTokens = modelContextWindow
+      ? Math.min(modelContextWindow, configuredMaxTokens)
+      : configuredMaxTokens;
+    const budgetTokens = Math.floor(maxTokens * threshold);
+
+    span?.setAttribute("context.window.budget", budgetTokens);
+
+    return {
+      maxTokens,
+      threshold,
+      budgetTokens: budgetTokens > 0 && budgetTokens < maxTokens ? budgetTokens : undefined,
+      preserveCount,
+      strategy,
+    };
+  }
+
+  private resolveContextWindowLimit(
     modelId: string | undefined,
     span?: SpanContext
   ): number | undefined {
@@ -327,14 +421,154 @@ export class TurnExecutor implements ITurnExecutor {
       return undefined;
     }
 
-    const budget = Math.floor(capability.contextWindow * CONTEXT_WINDOW_BUFFER_RATIO);
-    if (budget <= 0) {
-      return undefined;
+    span?.setAttribute("context.window", capability.contextWindow);
+    return capability.contextWindow;
+  }
+
+  private normalizeCompressionThreshold(value: number): number {
+    if (!Number.isFinite(value)) {
+      return DEFAULT_CONTEXT_COMPRESSION_THRESHOLD;
+    }
+    if (value <= 0) {
+      return DEFAULT_CONTEXT_COMPRESSION_THRESHOLD;
+    }
+    if (value > 1) {
+      return 1;
+    }
+    return value;
+  }
+
+  private resolveCompactionStrategy(
+    strategy: ContextCompressionConfig["strategy"] | undefined
+  ): CompressionSettings["strategy"] {
+    if (strategy === "summarize" || strategy === "truncate" || strategy === "hybrid") {
+      return strategy;
+    }
+    if (strategy === "sliding_window") {
+      return "truncate";
+    }
+    return DEFAULT_CONTEXT_COMPRESSION_STRATEGY;
+  }
+
+  private createContextCompactor(settings: CompressionSettings): ContextCompactor {
+    return createContextCompactor({
+      contextConfig: {
+        maxTokens: settings.maxTokens,
+        compressionThreshold: settings.threshold,
+        preserveLastN: settings.preserveCount,
+        compressionStrategy: settings.strategy,
+      },
+    });
+  }
+
+  private applyCompactionSummary(input: {
+    summary: string;
+    compactor: ContextCompactor;
+    originalMessages: AgentMessage[];
+    compressedMessages: AgentMessage[];
+    span?: SpanContext;
+  }): void {
+    const contextManager = this.deps.contextManager;
+    const contextId = this.deps.getContextId?.();
+    if (!contextManager || !contextId) {
+      return;
     }
 
-    span?.setAttribute("context.window", capability.contextWindow);
-    span?.setAttribute("context.window.budget", budget);
-    return budget;
+    const result = input.compactor.applyCompaction(
+      contextManager,
+      contextId,
+      input.summary,
+      this.toCompactorMessages(input.compressedMessages),
+      this.toCompactorMessages(input.originalMessages)
+    );
+
+    if (result.metrics) {
+      this.deps.metrics?.increment(
+        AGENT_METRICS.contextCompactionTokensSaved.name,
+        undefined,
+        result.metrics.tokensSaved
+      );
+      this.deps.metrics?.observe(
+        AGENT_METRICS.contextCompactionRatio.name,
+        result.metrics.compressionRatio
+      );
+      this.deps.metrics?.observe(
+        AGENT_METRICS.contextCompactionTime.name,
+        result.metrics.compressionTimeMs
+      );
+      input.span?.setAttribute("compaction.tokens_saved", result.metrics.tokensSaved);
+      input.span?.setAttribute("compaction.ratio", result.metrics.compressionRatio);
+      input.span?.setAttribute("compaction.time_ms", result.metrics.compressionTimeMs);
+    }
+
+    contextManager.updateMetadata(contextId, {
+      lastCompaction: {
+        at: new Date().toISOString(),
+        summaryLength: input.summary.length,
+        messagesBefore: result.messagesBefore,
+        messagesAfter: result.messagesAfter,
+        tokensSaved: result.metrics?.tokensSaved,
+      },
+    });
+
+    this.deps.auditLogger?.log({
+      timestamp: Date.now(),
+      toolName: "context:compaction",
+      action: "result",
+      sessionId: this.deps.getSessionId?.(),
+      correlationId: this.deps.getCorrelationId?.(),
+      input: {
+        messagesBefore: result.messagesBefore,
+        messagesAfter: result.messagesAfter,
+        summaryLength: input.summary.length,
+      },
+      output: result.metrics ?? undefined,
+      sandboxed: false,
+    });
+  }
+
+  private toCompactorMessages(messages: AgentMessage[]): ContextMessage[] {
+    const converted: ContextMessage[] = [];
+    let toolIndex = 0;
+
+    for (const message of messages) {
+      if (message.role === "tool") {
+        const callId = `${message.toolName ?? "tool"}-${toolIndex}`;
+        toolIndex += 1;
+        const toolResult: ContextToolResult = {
+          callId,
+          result: message.result,
+          size: undefined,
+        };
+        converted.push({
+          role: "assistant",
+          content: "",
+          toolResults: [toolResult],
+        });
+        continue;
+      }
+
+      if (message.role === "assistant") {
+        const toolCalls: ContextToolCall[] | undefined = message.toolCalls?.map((call, index) => ({
+          id: call.id ?? `call-${index}`,
+          name: call.name,
+          arguments: call.arguments,
+        }));
+        converted.push({
+          role: "assistant",
+          content: message.content,
+          toolCalls,
+        });
+        continue;
+      }
+
+      converted.push({
+        role: message.role,
+        content: message.content,
+      });
+    }
+
+    return converted;
   }
 
   private matchKnowledge(state: AgentState, span?: SpanContext): string | undefined {
@@ -395,14 +629,12 @@ export class TurnExecutor implements ITurnExecutor {
     }
   }
 
-  private buildRequest(
-    messages: AgentMessage[],
+  private buildSystemPrompt(
     knowledgeContent?: string,
     symbolContext?: string,
     skillPrompt?: string,
-    contextFrameContent?: string,
-    modelId?: string
-  ): AgentLLMRequest {
+    contextFrameContent?: string
+  ): string {
     const basePrompt = this.config.systemPrompt ?? AGENTS_GUIDE_PROMPT;
     const promptParts = [basePrompt];
     if (skillPrompt) {
@@ -417,8 +649,14 @@ export class TurnExecutor implements ITurnExecutor {
     if (knowledgeContent) {
       promptParts.push(`## Relevant Knowledge\n\n${knowledgeContent}`);
     }
-    const systemPrompt = promptParts.join("\n\n");
+    return promptParts.join("\n\n");
+  }
 
+  private buildRequest(
+    messages: AgentMessage[],
+    systemPrompt: string,
+    modelId?: string
+  ): AgentLLMRequest {
     return {
       messages,
       tools: this.deps.getToolDefinitions(),
