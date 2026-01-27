@@ -99,6 +99,14 @@ struct SessionMessage {
     content: String,
 }
 
+#[derive(Debug, Clone)]
+struct PendingApproval {
+    id: String,
+    tool_name: String,
+    risk: Option<String>,
+    reason: Option<String>,
+}
+
 #[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 #[allow(dead_code)]
@@ -251,6 +259,8 @@ struct App {
     pending_runtime_init: Option<String>,
     pending_hello: Option<String>,
     pending_interrupt: Option<String>,
+    pending_approval: Option<PendingApproval>,
+    pending_approval_resolve: Option<String>,
     host_caps: Option<HostCapabilities>,
     session_id: Option<String>,
     session_title: Option<String>,
@@ -394,6 +404,8 @@ impl App {
             pending_runtime_init: None,
             pending_hello: None,
             pending_interrupt: None,
+            pending_approval: None,
+            pending_approval_resolve: None,
             host_caps: None,
             session_id: None,
             session_title: None,
@@ -494,6 +506,35 @@ impl App {
         let id = host.send_op("agent.interrupt", None)?;
         self.pending_interrupt = Some(id);
         self.status = "Interrupting...".to_string();
+        Ok(())
+    }
+
+    fn request_approval_resolve(&mut self, host: &HostClient, approved: bool) -> Result<()> {
+        if self.pending_approval_resolve.is_some() {
+            return Ok(());
+        }
+        if !host_supports_op(self, "approval.resolve") {
+            self.status = "Approval resolution not supported by host.".to_string();
+            return Ok(());
+        }
+        let approval = match self.pending_approval.as_ref() {
+            Some(pending) => pending,
+            None => {
+                self.status = "No approval pending.".to_string();
+                return Ok(());
+            }
+        };
+        let payload = json!({
+            "approvalId": approval.id,
+            "approved": approved,
+        });
+        let id = host.send_op("approval.resolve", Some(payload))?;
+        self.pending_approval_resolve = Some(id);
+        self.status = if approved {
+            "Approval submitted (approved).".to_string()
+        } else {
+            "Approval submitted (rejected).".to_string()
+        };
         Ok(())
     }
 
@@ -895,6 +936,21 @@ fn handle_inbound(app: &mut App, host: &HostClient) -> Result<()> {
                     } else {
                         app.status = error_message(error);
                     }
+                } else if op == "approval.resolve"
+                    && app.pending_approval_resolve.as_deref() == Some(id.as_str())
+                {
+                    app.pending_approval_resolve = None;
+                    if ok {
+                        app.pending_approval = None;
+                        let status = payload
+                            .as_ref()
+                            .and_then(|value| value.get("status"))
+                            .and_then(|value| value.as_str())
+                            .unwrap_or("sent");
+                        app.status = format!("Approval {status}.");
+                    } else {
+                        app.status = error_message(error);
+                    }
                 }
             }
             InboundMessage::Message(WireMessage::Event {
@@ -972,10 +1028,30 @@ fn handle_event(app: &mut App, event: String, payload: Option<Value>) {
         }
     }
 
+    if event == "approval.requested" {
+        if let Some(pending) = parse_pending_approval(payload.as_ref()) {
+            app.pending_approval = Some(pending);
+            app.pending_approval_resolve = None;
+        }
+    } else if event == "approval.resolved" {
+        if should_clear_pending_approval(app, payload.as_ref()) {
+            app.pending_approval = None;
+            app.pending_approval_resolve = None;
+        }
+    }
+
     if event == "approval.requested" || event == "approval.resolved" {
         if let Some(message) = format_approval_event(&event, payload.as_ref()) {
             app.push_system_message(message.clone());
-            app.status = message;
+            if event == "approval.requested" {
+                if let Some(pending) = app.pending_approval.as_ref() {
+                    app.status = approval_prompt(pending);
+                } else {
+                    app.status = message;
+                }
+            } else {
+                app.status = message;
+            }
             return;
         }
     }
@@ -1100,6 +1176,69 @@ fn format_approval_event(event: &str, payload: Option<&Value>) -> Option<String>
     None
 }
 
+fn parse_pending_approval(payload: Option<&Value>) -> Option<PendingApproval> {
+    let payload = payload?;
+    let data = payload.get("data")?;
+    let tool_name = data
+        .get("toolName")
+        .and_then(|value| value.as_str())
+        .unwrap_or("unknown")
+        .to_string();
+    let risk = data
+        .get("risk")
+        .and_then(|value| value.as_str())
+        .map(|value| value.to_string());
+    let reason = data
+        .get("reason")
+        .and_then(|value| value.as_str())
+        .or_else(|| data.get("description").and_then(|value| value.as_str()))
+        .map(|value| value.to_string());
+    let approval_id = data
+        .get("approvalId")
+        .and_then(|value| value.as_str())
+        .map(|value| value.to_string())
+        .or_else(|| {
+            payload
+                .get("timestamp")
+                .and_then(|value| value.as_i64())
+                .map(|timestamp| format!("approval_{timestamp}"))
+        })?;
+
+    Some(PendingApproval {
+        id: approval_id,
+        tool_name,
+        risk,
+        reason,
+    })
+}
+
+fn should_clear_pending_approval(app: &App, payload: Option<&Value>) -> bool {
+    let pending = match app.pending_approval.as_ref() {
+        Some(value) => value,
+        None => return false,
+    };
+    if let Some(approval_id) = payload
+        .and_then(|value| value.get("data"))
+        .and_then(|value| value.get("approvalId"))
+        .and_then(|value| value.as_str())
+    {
+        return approval_id == pending.id;
+    }
+    true
+}
+
+fn approval_prompt(approval: &PendingApproval) -> String {
+    let mut message = format!("Approval required: {}", approval.tool_name);
+    if let Some(risk) = &approval.risk {
+        message.push_str(&format!(" ({risk})"));
+    }
+    if let Some(reason) = &approval.reason {
+        message.push_str(&format!(" — {reason}"));
+    }
+    message.push_str(". Press y to approve, n to reject.");
+    message
+}
+
 fn should_ignore_agent_event(app: &App, event: &str) -> bool {
     if host_supports(app, "tool-events")
         && (event.ends_with("tool:calling") || event.ends_with("tool:result"))
@@ -1118,6 +1257,13 @@ fn host_supports(app: &App, feature: &str) -> bool {
     app.host_caps
         .as_ref()
         .map(|caps| caps.features.iter().any(|item| item == feature))
+        .unwrap_or(false)
+}
+
+fn host_supports_op(app: &App, op: &str) -> bool {
+    app.host_caps
+        .as_ref()
+        .map(|caps| caps.ops.iter().any(|item| item == op))
         .unwrap_or(false)
 }
 
@@ -1281,6 +1427,23 @@ fn handle_picker_key(app: &mut App, host: &HostClient, key: KeyEvent) -> Result<
 fn handle_chat_key(app: &mut App, host: &HostClient, key: KeyEvent) -> Result<()> {
     let now = Instant::now();
     app.paste_burst.clear_if_idle(now);
+
+    if app.pending_approval.is_some()
+        && !key.modifiers.contains(KeyModifiers::CONTROL)
+        && !key.modifiers.contains(KeyModifiers::ALT)
+    {
+        match key.code {
+            KeyCode::Char('y') | KeyCode::Char('Y') => {
+                app.request_approval_resolve(host, true)?;
+                return Ok(());
+            }
+            KeyCode::Char('n') | KeyCode::Char('N') => {
+                app.request_approval_resolve(host, false)?;
+                return Ok(());
+            }
+            _ => {}
+        }
+    }
 
     let is_plain_char = matches!(key.code, KeyCode::Char(_))
         && !key.modifiers.contains(KeyModifiers::CONTROL)
@@ -1884,6 +2047,7 @@ fn draw_help(frame: &mut ratatui::Frame, _app: &App) {
         Line::from("  Ctrl+Home  Jump to top"),
         Line::from("  Ctrl+End   Jump to bottom"),
         Line::from("  F2         Jump to latest"),
+        Line::from("  y / n      Approve / reject pending tool"),
         Line::from(""),
         Line::from("General"),
         Line::from("  F1         Toggle help"),
