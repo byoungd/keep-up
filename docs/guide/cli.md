@@ -63,6 +63,7 @@ Environment overrides:
 - `KEEPUP_OUTPUT`
 - `KEEPUP_SESSION`
 - `KEEPUP_APPROVAL_MODE`
+- `KEEPUP_SANDBOX`
 
 ## Sessions
 
