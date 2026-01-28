@@ -156,4 +156,23 @@ describe("GitToolServer", () => {
     expect(result.content[0]?.type).toBe("text");
     expect(result.content[0]?.text).toContain("Git error: boom");
   });
+
+  it("formats branches without upstream", async () => {
+    const executor = createExecutor();
+    executor.branches = vi.fn(async () => [
+      {
+        name: "main",
+        current: true,
+        remote: "origin",
+      },
+    ]);
+    const server = new GitToolServer({}, executor as unknown as IGitExecutor);
+
+    const result = await server.callTool({ name: "branches", arguments: {} }, context);
+
+    expect(result.success).toBe(true);
+    expect(result.content[0]?.type).toBe("text");
+    expect(result.content[0]?.text).toContain("* main -> origin");
+    expect(result.content[0]?.text).not.toContain("undefined");
+  });
 });
