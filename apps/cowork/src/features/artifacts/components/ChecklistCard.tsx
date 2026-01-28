@@ -28,7 +28,13 @@ export function ChecklistCard({ payload }: ChecklistCardProps) {
               aria-hidden="true"
             >
               {item.checked && (
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg
+                  className="w-3 h-3"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  aria-hidden="true"
+                >
                   <title>Checked</title>
                   <path
                     strokeLinecap="round"
