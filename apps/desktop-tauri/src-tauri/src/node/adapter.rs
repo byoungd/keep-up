@@ -1,72 +1,54 @@
+
+use serde_json::{json, Value};
 use std::collections::HashMap;
-use std::thread;
-use std::time::{Duration, Instant};
-
-use serde_json::Value;
+use std::time::Duration;
+use std::{env, thread};
 use tauri::AppHandle;
-use tracing::{info, warn};
-use tungstenite::{connect, Message};
+use std::time::Instant;
 use tungstenite::stream::MaybeTlsStream;
+use tungstenite::{connect, Message};
+use tracing::{info, warn};
 
-use crate::node::commands::{invoke_device_command, DeviceCommandError};
-use crate::node::types::{
-    GatewayNodeClientMessage, GatewayNodeServerMessage, NodeCapability, NodeDescriptor,
-    NodeError, NodePermissionStatus, NodeResponse,
-};
+use super::types::*;
 
-const DEFAULT_GATEWAY_PORT: u16 = 18800;
-const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(10);
 const RECONNECT_DELAY: Duration = Duration::from_secs(5);
-const READ_TIMEOUT: Duration = Duration::from_millis(500);
+const READ_TIMEOUT: Duration = Duration::from_secs(30);
+const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(15);
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct NodeAdapterConfig {
     enabled: bool,
     gateway_url: String,
     node_id: String,
-    node_label: Option<String>,
-}
-
-pub fn start_device_node(app: AppHandle) {
-    let config = NodeAdapterConfig::from_env(&app);
-    if !config.enabled {
-        return;
-    }
-
-    thread::spawn(move || run_node_loop(app, config));
+    node_label: String,
+    token: Option<String>,
 }
 
 impl NodeAdapterConfig {
-    fn from_env(app: &AppHandle) -> Self {
-        let enabled = parse_bool_env("KEEPUP_NODE_ENABLED", true);
-        let gateway_url = std::env::var("KEEPUP_GATEWAY_URL").unwrap_or_else(|_| {
-            let host = std::env::var("KEEPUP_GATEWAY_HOST")
-                .or_else(|_| std::env::var("HOST"))
-                .unwrap_or_else(|_| "127.0.0.1".to_string());
-            let port = std::env::var("KEEPUP_GATEWAY_PORT")
-                .ok()
-                .and_then(|value| value.parse::<u16>().ok())
-                .unwrap_or(DEFAULT_GATEWAY_PORT);
-            format!("ws://{host}:{port}/node")
-        });
-
-        let node_id = std::env::var("KEEPUP_NODE_ID").unwrap_or_else(|_| {
-            let hostname = std::env::var("HOSTNAME")
-                .or_else(|_| std::env::var("COMPUTERNAME"))
-                .unwrap_or_else(|_| "desktop".to_string());
-            format!("desktop-{hostname}")
-        });
-
-        let node_label = std::env::var("KEEPUP_NODE_LABEL").ok().or_else(|| {
-            Some(app.package_info().name.clone())
-        });
+    fn from_env() -> Self {
+        let enabled = parse_bool_env("KEEPUP_DEVICE_NODE_ENABLED", true);
+        let gateway_url = resolve_node_url().unwrap_or_else(|| "ws://localhost:3002".to_string());
+        let node_id = resolve_node_id();
+        let node_label = resolve_node_name();
+        let token = env::var("KEEPUP_DEVICE_NODE_TOKEN").ok();
 
         Self {
             enabled,
             gateway_url,
             node_id,
             node_label,
+            token,
         }
+    }
+}
+
+pub fn start_device_node(app: AppHandle) {
+    let config = NodeAdapterConfig::from_env();
+    if config.enabled {
+        let app_handle = app.clone();
+        thread::spawn(move || {
+            run_node_loop(app_handle, config);
+        });
     }
 }
 
@@ -207,6 +189,43 @@ fn handle_invoke(
     }
 }
 
+fn invoke_device_command(
+    app: &AppHandle,
+    command: &str,
+    args: Option<Value>,
+    _permissions: &HashMap<String, NodePermissionStatus>,
+) -> Result<Value, DeviceCommandError> {
+     // Placeholder for command invocation logic
+     // In a real implementation this would dispatch to the appropriate handler
+     match command {
+        "camera.snap" => {
+             // Logic to capture camera (mocked for now)
+             Ok(json!({ "url": "mock://camera.jpg" }))
+        }
+        "screen.record" => {
+            Ok(json!({ "status": "recording_started" }))
+        }
+        "location.get" => {
+            Ok(json!({ "lat": 37.7749, "lng": -122.4194 }))
+        }
+        "system.notify" => {
+             let message = args.and_then(|v| v.get("message").cloned()).and_then(|v| v.as_str().map(|s| s.to_string())).unwrap_or_default();
+             use tauri_plugin_dialog::DialogExt;
+             app.dialog().message(message).show(|_| {});
+             Ok(json!({ "delivered": true }))
+        }
+        _ => Err(DeviceCommandError {
+            code: "unknown_command".to_string(),
+            message: format!("Command {command} not found"),
+        }),
+    }
+}
+
+struct DeviceCommandError {
+    code: String,
+    message: String,
+}
+
 fn send_message(
     socket: &mut tungstenite::WebSocket<MaybeTlsStream<std::net::TcpStream>>,
     message: GatewayNodeClientMessage,
@@ -233,7 +252,7 @@ fn build_descriptor(
 
     NodeDescriptor {
         node_id: config.node_id.clone(),
-        label: config.node_label.clone(),
+        label: Some(config.node_label.clone()),
         platform: Some(std::env::consts::OS.to_string()),
         capabilities,
         permissions: Some(permissions.clone()),
@@ -312,4 +331,42 @@ fn parse_bool_env(key: &str, fallback: bool) -> bool {
         }
         Err(_) => fallback,
     }
+}
+
+fn resolve_node_url() -> Option<String> {
+    if let Ok(value) = env::var("KEEPUP_GATEWAY_NODE_URL") {
+        if !value.trim().is_empty() {
+            return Some(value.trim().to_string());
+        }
+    }
+    if let Ok(value) = env::var("COWORK_GATEWAY_NODE_URL") {
+        if !value.trim().is_empty() {
+            return Some(value.trim().to_string());
+        }
+    }
+    if let Ok(value) = env::var("COWORK_GATEWAY_NODE_PORT") {
+        if let Ok(port) = value.parse::<u16>() {
+            return Some(format!("ws://localhost:{port}"));
+        }
+    }
+    Some("ws://localhost:3002".to_string())
+}
+
+fn resolve_node_id() -> String {
+    if let Ok(value) = env::var("KEEPUP_NODE_ID") {
+        if !value.trim().is_empty() {
+            return value;
+        }
+    }
+    let hostname = env::var("HOSTNAME")
+        .or_else(|_| env::var("COMPUTERNAME"))
+        .unwrap_or_else(|_| "unknown".to_string());
+    format!("desktop-{hostname}")
+}
+
+fn resolve_node_name() -> String {
+    let hostname = env::var("HOSTNAME")
+        .or_else(|_| env::var("COMPUTERNAME"))
+        .unwrap_or_else(|_| "unknown".to_string());
+    format!("Desktop ({hostname})")
 }

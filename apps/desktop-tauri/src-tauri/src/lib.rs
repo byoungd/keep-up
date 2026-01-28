@@ -3,6 +3,7 @@ mod deeplink;
 mod enclave;
 mod logs;
 mod menu;
+mod node;
 mod terminal;
 mod vectorstore;
 mod watcher;
@@ -28,6 +29,8 @@ pub fn run() {
                 std::io::Error::new(std::io::ErrorKind::Other, error)
             })?;
             app.manage(vector_store);
+
+            node::start_node_adapter(app_handle.clone());
 
             if let Some(url) = deeplink::extract_startup_deeplink() {
                 deeplink::store_and_emit(&app_handle, url);

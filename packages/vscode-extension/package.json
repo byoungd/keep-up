@@ -33,7 +33,17 @@
         "command": "keepup.applyChanges",
         "title": "Keep-Up: Apply Changes"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Keep-Up",
+      "properties": {
+        "keepup.coworkBaseUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Base URL for the Cowork API (defaults to http://localhost:3000 when empty)."
+        }
+      }
+    }
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

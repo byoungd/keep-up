@@ -14,6 +14,13 @@ import {
   TelegramAdapter,
 } from "@ku0/gateway-control";
 import { startGatewayControlNodeServer } from "@ku0/gateway-control/node";
+import {
+  type NodeDescriptor,
+  NodeRegistry,
+  type NodeRegistryStatus,
+  type NodeResponse,
+  startGatewayNodeServer,
+} from "@ku0/nodes";
 import type {
   CoworkDiscordConfig,
   CoworkGatewayControlConfig,
@@ -30,11 +37,13 @@ export interface GatewayControlRuntime {
   start: () => Promise<void>;
   stop: () => Promise<void>;
   getStatus: () => GatewayControlStatus;
+  nodes?: GatewayNodeRuntime;
 }
 
 export interface GatewayControlStatus {
   enabled: boolean;
   port: number;
+  nodePort: number;
   authMode: "none" | "token";
   started: boolean;
   clients: number;
@@ -49,6 +58,12 @@ export interface GatewayControlStatus {
     healthyCount: number;
     items: ChannelStatus[];
   };
+  nodes?: {
+    enabled: boolean;
+    online: number;
+    offline: number;
+    total: number;
+  };
 }
 
 export interface GatewayControlRuntimeConfig {
@@ -60,12 +75,25 @@ export interface GatewayControlRuntimeConfig {
   logger?: Logger;
 }
 
+export interface GatewayNodeRuntime {
+  port: number;
+  list: () => NodeDescriptor[];
+  describe: (nodeId: string) => NodeDescriptor | undefined;
+  invoke: (
+    nodeId: string,
+    command: string,
+    args?: Record<string, unknown>
+  ) => Promise<NodeResponse>;
+  getStatus: () => NodeRegistryStatus;
+}
+
 export function createGatewayControlRuntime(
   config: GatewayControlRuntimeConfig
 ): GatewayControlRuntime {
   const eventBus = config.eventBus ?? createEventBus();
   const logger = config.logger ?? createSubsystemLogger("cowork", "gateway");
   const channelLogger = createSubsystemLogger("cowork", "channels");
+  const nodeLogger = createSubsystemLogger("cowork", "nodes");
   const sessionManager = createGatewaySessionManager(config.taskRuntime);
   const gatewayServer = createGatewayControlServer({
     eventBus,
@@ -74,6 +102,10 @@ export function createGatewayControlRuntime(
     sessionManager,
   });
   const channelRegistry = new ChannelRegistry({ logger: channelLogger });
+  const nodeRegistry = new NodeRegistry({
+    logger: nodeLogger,
+    authToken: config.gateway.auth.mode === "token" ? config.gateway.auth.token : undefined,
+  });
 
   if (config.telegram.enabled && config.telegram.token) {
     channelRegistry.register(
@@ -129,6 +161,7 @@ export function createGatewayControlRuntime(
   });
 
   let serverHandle: Awaited<ReturnType<typeof startGatewayControlNodeServer>> | null = null;
+  let nodeServerHandle: Awaited<ReturnType<typeof startGatewayNodeServer>> | null = null;
   let channelsStarted = false;
   let presenceTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -167,6 +200,13 @@ export function createGatewayControlRuntime(
       });
       startPresence();
     }
+    if (config.gateway.enabled && !nodeServerHandle) {
+      nodeServerHandle = startGatewayNodeServer({
+        port: config.gateway.nodePort,
+        registry: nodeRegistry,
+        logger: nodeLogger,
+      });
+    }
 
     if (!channelsStarted && channelRegistry.listAdapters().length > 0) {
       await channelRegistry.startAll();
@@ -183,15 +223,21 @@ export function createGatewayControlRuntime(
       await serverHandle.close();
       serverHandle = null;
     }
+    if (nodeServerHandle) {
+      await nodeServerHandle.close();
+      nodeServerHandle = null;
+    }
     stopPresence();
   };
 
   const getStatus = (): GatewayControlStatus => {
     const stats = gatewayServer.getStats();
     const channelStatus = channelRegistry.getStatus();
+    const nodeStatus = nodeRegistry.getStatus();
     return {
       enabled: config.gateway.enabled,
       port: config.gateway.port,
+      nodePort: config.gateway.nodePort,
       authMode: config.gateway.auth.mode,
       started: Boolean(serverHandle),
       clients: stats.connectedClients,
@@ -206,10 +252,24 @@ export function createGatewayControlRuntime(
         healthyCount: channelStatus.healthy,
         items: channelStatus.channels,
       },
+      nodes: {
+        enabled: config.gateway.enabled,
+        online: nodeStatus.online,
+        offline: nodeStatus.offline,
+        total: nodeStatus.total,
+      },
     };
   };
 
-  return { eventBus, start, stop, getStatus };
+  const nodes: GatewayNodeRuntime = {
+    port: config.gateway.nodePort,
+    list: () => nodeRegistry.listNodes(),
+    describe: (nodeId) => nodeRegistry.describeNode(nodeId),
+    invoke: (nodeId, command, args) => nodeRegistry.invokeNode(nodeId, command, args),
+    getStatus: () => nodeRegistry.getStatus(),
+  };
+
+  return { eventBus, start, stop, getStatus, nodes };
 }
 
 function createGatewaySessionManager(taskRuntime: CoworkTaskRuntime): GatewayControlSessionManager {

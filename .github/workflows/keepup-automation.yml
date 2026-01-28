@@ -1,0 +1,259 @@
+name: Keep-Up Automation
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  keepup:
+    if: >-
+      github.event.issue.pull_request &&
+      startsWith(github.event.comment.body, '/keepup')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch Keep-Up task
+        uses: actions/github-script@v7
+        env:
+          KEEPUP_COWORK_URL: ${{ vars.KEEPUP_COWORK_URL || secrets.KEEPUP_COWORK_URL }}
+          COWORK_URL: ${{ vars.COWORK_URL || secrets.COWORK_URL }}
+          KEEPUP_GATEWAY_URL: ${{ vars.KEEPUP_GATEWAY_URL || secrets.KEEPUP_GATEWAY_URL }}
+        with:
+          script: |
+            const comment = context.payload.comment;
+            if (!comment?.body) {
+              return;
+            }
+
+            if (comment.user?.type === "Bot") {
+              return;
+            }
+
+            const allowedAssociations = ["OWNER", "MEMBER", "COLLABORATOR"];
+            if (!allowedAssociations.includes(comment.author_association)) {
+              return;
+            }
+
+            const body = comment.body.trim();
+            const [firstLine, ...restLines] = body.split(/\r?\n/);
+            if (!firstLine.startsWith("/keepup")) {
+              return;
+            }
+
+            const parts = firstLine.trim().split(/\s+/);
+            const subcommand = (parts[1] || "review").toLowerCase();
+            const extraPrompt = [...parts.slice(2), ...restLines].join(" ").trim();
+
+            if (subcommand === "help") {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.issue.number,
+                body: [
+                  "Keep-Up slash commands:",
+                  "- `/keepup review` - Request an automated review.",
+                  "- `/keepup plan` - Request a validation plan.",
+                  "- `/keepup run <instructions>` - Run a custom task.",
+                  "",
+                  "Configure KEEPUP_COWORK_URL (repo vars or secrets) to enable dispatch.",
+                ].join("\n"),
+              });
+              return;
+            }
+
+            const supported = new Set(["review", "plan", "run", "build"]);
+            if (!supported.has(subcommand)) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.issue.number,
+                body: `Unknown Keep-Up command: ${subcommand}. Use /keepup help for options.`,
+              });
+              return;
+            }
+
+            const baseUrl =
+              process.env.KEEPUP_COWORK_URL ||
+              process.env.COWORK_URL ||
+              process.env.KEEPUP_GATEWAY_URL;
+
+            if (!baseUrl) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.issue.number,
+                body: "Keep-Up automation is not configured. Set KEEPUP_COWORK_URL in repo vars or secrets.",
+              });
+              return;
+            }
+
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const prNumber = context.payload.issue.number;
+
+            let pr;
+            try {
+              const response = await github.rest.pulls.get({
+                owner,
+                repo,
+                pull_number: prNumber,
+              });
+              pr = response.data;
+            } catch (error) {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: prNumber,
+                body: "Keep-Up could not load the pull request metadata.",
+              });
+              return;
+            }
+
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner,
+              repo,
+              pull_number: prNumber,
+              per_page: 100,
+            });
+
+            const maxFiles = 50;
+            const fileLines = files.slice(0, maxFiles).map((file) => {
+              const status = file.status || "modified";
+              const changes = typeof file.changes === "number" ? `${file.changes} changes` : "changes";
+              return `- ${file.filename} (${status}, ${changes})`;
+            });
+            if (files.length > maxFiles) {
+              fileLines.push(`- ...and ${files.length - maxFiles} more`);
+            }
+
+            const maxPatchChars = 12000;
+            let remaining = maxPatchChars;
+            let patch = "";
+
+            for (const file of files) {
+              if (!file.patch) {
+                continue;
+              }
+              const header = `### ${file.filename}\n`;
+              const chunk = `${header}${file.patch}\n\n`;
+              if (chunk.length > remaining) {
+                patch += chunk.slice(0, Math.max(0, remaining));
+                break;
+              }
+              patch += chunk;
+              remaining -= chunk.length;
+              if (remaining <= 0) {
+                break;
+              }
+            }
+
+            const instructions =
+              extraPrompt ||
+              (subcommand === "review"
+                ? "Review this pull request for correctness, regressions, and missing tests. Provide a list of issues with severity and suggested fixes."
+                : subcommand === "plan"
+                  ? "Create a validation plan for this pull request, focusing on risks, required tests, and manual checks."
+                  : "Handle the requested task for this pull request. If no extra instructions are provided, summarize changes and call out risks.");
+
+            const contextLines = [
+              `PR #${pr.number}: ${pr.title}`,
+              `Author: ${pr.user?.login || "unknown"}`,
+              `Base: ${pr.base?.ref || "unknown"} -> Head: ${pr.head?.ref || "unknown"}`,
+            ];
+            const description = pr.body ? `\nDescription:\n${pr.body}` : "\nDescription:\n(no description)";
+            const filesSection = fileLines.length ? `\nChanged files:\n${fileLines.join("\n")}` : "";
+            const diffSection = patch
+              ? `\nDiff (truncated):\n\`\`\`diff\n${patch.trim()}\n\`\`\``
+              : "";
+
+            const prompt = `${instructions}\n\n${contextLines.join("\n")}${description}${filesSection}${diffSection}`;
+            const mode = subcommand === "review" ? "review" : subcommand === "plan" ? "plan" : "build";
+
+            const sessionResponse = await fetch(`${baseUrl}/api/sessions`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                userId: "github-actions",
+                deviceId: "github-actions",
+                title: `PR #${prNumber}: ${pr.title}`,
+              }),
+            });
+
+            let sessionPayload = null;
+            try {
+              sessionPayload = await sessionResponse.json();
+            } catch {
+              sessionPayload = null;
+            }
+
+            if (!sessionResponse.ok || !sessionPayload?.session?.sessionId) {
+              const errorText = sessionPayload?.error || sessionResponse.statusText;
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: prNumber,
+                body: `Keep-Up failed to create a session: ${errorText}`,
+              });
+              return;
+            }
+
+            const sessionId = sessionPayload.session.sessionId;
+
+            try {
+              await fetch(`${baseUrl}/api/sessions/${sessionId}/mode`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ mode }),
+              });
+            } catch {
+              // Ignore mode failures
+            }
+
+            const taskResponse = await fetch(`${baseUrl}/api/sessions/${sessionId}/tasks`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                title: `GitHub ${subcommand} #${prNumber}`,
+                prompt,
+                metadata: {
+                  source: "github",
+                  command: subcommand,
+                  repo: `${owner}/${repo}`,
+                  pullRequest: prNumber,
+                },
+              }),
+            });
+
+            let taskPayload = null;
+            try {
+              taskPayload = await taskResponse.json();
+            } catch {
+              taskPayload = null;
+            }
+
+            if (!taskResponse.ok || !taskPayload?.task?.taskId) {
+              const errorText = taskPayload?.error || taskResponse.statusText;
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: prNumber,
+                body: `Keep-Up failed to queue the task: ${errorText}`,
+              });
+              return;
+            }
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: prNumber,
+              body: [
+                "Keep-Up task queued.",
+                `- Mode: ${mode}`,
+                `- Session: ${sessionId}`,
+                `- Task: ${taskPayload.task.taskId}`,
+              ].join("\n"),
+            });
