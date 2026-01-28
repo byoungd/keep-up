@@ -1823,6 +1823,9 @@ fn draw_ui(frame: &mut ratatui::Frame, app: &mut App) {
     if app.show_help {
         draw_help(frame, app);
     }
+    if let Some(pending) = app.pending_approval.as_ref() {
+        draw_approval_dialog(frame, pending);
+    }
 }
 
 fn app_header(app: &App) -> Text<'_> {
@@ -2372,6 +2375,35 @@ fn draw_help(frame: &mut ratatui::Frame, _app: &App) {
 
     let paragraph = Paragraph::new(lines)
         .block(Block::default().title("Help").borders(Borders::ALL))
+        .wrap(Wrap { trim: true });
+    frame.render_widget(paragraph, area);
+}
+
+fn draw_approval_dialog(frame: &mut ratatui::Frame, approval: &PendingApproval) {
+    let area = centered_rect(70, 40, frame.size());
+    frame.render_widget(Clear, area);
+
+    let mut lines = vec![
+        Line::from(vec![Span::styled(
+            "Approval Required",
+            Style::default().add_modifier(Modifier::BOLD),
+        )]),
+        Line::from(""),
+        Line::from(format!("Tool: {}", approval.tool_name)),
+    ];
+
+    if let Some(risk) = &approval.risk {
+        lines.push(Line::from(format!("Risk: {risk}")));
+    }
+    if let Some(reason) = &approval.reason {
+        lines.push(Line::from(format!("Reason: {reason}")));
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::from("Press y to approve, n to reject."));
+
+    let paragraph = Paragraph::new(lines)
+        .block(Block::default().title("Approval").borders(Borders::ALL))
         .wrap(Wrap { trim: true });
     frame.render_widget(paragraph, area);
 }
