@@ -153,7 +153,11 @@ export const ResizableThreePaneLayout = React.forwardRef<
                 : "bg-canvas"
             )}
           >
-            <div className={cn("h-full w-full overflow-auto scroll-smooth", centerPanelClassName)}>
+            <div
+              className={cn("h-full w-full overflow-auto scroll-smooth", centerPanelClassName)}
+              // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+              tabIndex={0}
+            >
               {centerPanel}
             </div>
           </div>
