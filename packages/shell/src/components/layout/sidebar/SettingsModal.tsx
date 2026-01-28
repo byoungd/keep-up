@@ -130,7 +130,11 @@ export function SettingsModal({ open, onClose, userConfig, onSave, groups }: Set
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto scrollbar-auto-hide px-5 py-4 space-y-3 focus-visible:outline-none">
+          <div
+            className="flex-1 overflow-y-auto scrollbar-auto-hide px-5 py-4 space-y-3 focus-visible:outline-none"
+            // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+            tabIndex={0}
+          >
             <AppearanceSection t={t} />
 
             <AIPanelSection

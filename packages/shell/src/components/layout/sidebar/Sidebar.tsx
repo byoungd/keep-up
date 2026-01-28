@@ -176,6 +176,8 @@ export const Sidebar = React.memo(function Sidebar({
         className={cn(
           "flex-1 overflow-y-auto scrollbar-auto-hide px-3 py-2 space-y-4 outline-none"
         )}
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+        tabIndex={0}
       >
         {state.groups
           .filter((g) => g.id !== "pinned")
