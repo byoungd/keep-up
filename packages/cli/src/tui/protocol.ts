@@ -4,6 +4,8 @@ export const HOST_OPS = [
   "client.hello",
   "session.list",
   "session.create",
+  "session.export",
+  "session.delete",
   "runtime.init",
   "agent.prompt",
   "approval.resolve",
