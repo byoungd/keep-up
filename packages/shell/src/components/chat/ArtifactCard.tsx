@@ -212,7 +212,11 @@ function DiffDetails({
         {artifact.files.map((file) => (
           <div key={file.path} className="rounded-lg border border-border/40 bg-surface-2/40 p-2">
             <div className="text-fine font-medium text-foreground">{file.path}</div>
-            <pre className="mt-2 max-h-64 overflow-auto rounded bg-surface-3/60 p-2 text-fine text-foreground/90">
+            <pre
+              className="mt-2 max-h-64 overflow-auto rounded bg-surface-3/60 p-2 text-fine text-foreground/90"
+              // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+              tabIndex={0}
+            >
               {file.diff}
             </pre>
           </div>

@@ -78,7 +78,11 @@ export function PreviewDialog({ open, onOpenChange, artifact }: PreviewDialogPro
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto scrollbar-auto-hide bg-surface-2/30 relative">
+      <div
+        className="flex-1 overflow-y-auto scrollbar-auto-hide bg-surface-2/30 relative"
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+        tabIndex={0}
+      >
         <div className="max-w-4xl mx-auto p-8 min-h-full">{renderContent(artifact)}</div>
       </div>
 
@@ -194,7 +198,11 @@ function renderContent(artifact: ArtifactItem) {
               <div className="w-3 h-3 rounded-full bg-success/20" />
             </div>
           </div>
-          <pre className="p-4 overflow-x-auto text-sm font-mono leading-relaxed bg-transparent">
+          <pre
+            className="p-4 overflow-x-auto text-sm font-mono leading-relaxed bg-transparent"
+            // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+            tabIndex={0}
+          >
             <code>{artifact.content || "No content available."}</code>
           </pre>
         </div>

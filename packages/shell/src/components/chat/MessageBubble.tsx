@@ -61,7 +61,11 @@ export const MessageBubble = React.memo(function MessageBubble({
             </h3>
           ),
           pre: ({ children }: { children: React.ReactNode }) => (
-            <pre className="rounded-lg bg-surface-2/70 p-3 text-fine text-foreground/90 overflow-x-auto border border-border/40">
+            <pre
+              className="rounded-lg bg-surface-2/70 p-3 text-fine text-foreground/90 overflow-x-auto border border-border/40"
+              // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+              tabIndex={0}
+            >
               {children}
             </pre>
           ),
@@ -112,7 +116,11 @@ export const MessageBubble = React.memo(function MessageBubble({
             <em className="text-foreground/80">{children}</em>
           ),
           table: ({ children }: { children: React.ReactNode }) => (
-            <div className="overflow-x-auto">
+            <div
+              className="overflow-x-auto"
+              // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+              tabIndex={0}
+            >
               <table className="w-full border-collapse">{children}</table>
             </div>
           ),
@@ -139,7 +147,11 @@ export const MessageBubble = React.memo(function MessageBubble({
             </h3>
           ),
           pre: ({ children }: { children: React.ReactNode }) => (
-            <pre className="rounded-lg bg-surface-2/70 p-3 text-xs text-foreground/90 overflow-x-auto border border-border/40">
+            <pre
+              className="rounded-lg bg-surface-2/70 p-3 text-xs text-foreground/90 overflow-x-auto border border-border/40"
+              // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+              tabIndex={0}
+            >
               {children}
             </pre>
           ),
@@ -190,7 +202,11 @@ export const MessageBubble = React.memo(function MessageBubble({
             <em className="text-foreground/80">{children}</em>
           ),
           table: ({ children }: { children: React.ReactNode }) => (
-            <div className="overflow-x-auto">
+            <div
+              className="overflow-x-auto"
+              // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+              tabIndex={0}
+            >
               <table className="w-full border-collapse">{children}</table>
             </div>
           ),

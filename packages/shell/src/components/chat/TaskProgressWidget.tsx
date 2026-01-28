@@ -102,7 +102,11 @@ function TaskDetails({
 
       {/* Phase List (Spec 2.1.1 Refined) */}
       {phases && phases.length > 0 && (
-        <div className="px-4 py-3 border-b border-border/5 flex items-center gap-2 overflow-x-auto no-scrollbar mask-linear-fade">
+        <div
+          className="px-4 py-3 border-b border-border/5 flex items-center gap-2 overflow-x-auto no-scrollbar mask-linear-fade"
+          // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+          tabIndex={0}
+        >
           {phases.map((phase, idx) => {
             const isActive = phase.id === currentPhaseId;
             const isCompleted = phase.status === "completed";
