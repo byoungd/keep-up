@@ -1,5 +1,6 @@
+import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { delimiter, join, relative, resolve } from "node:path";
 import type {
   AgentState,
   AIEnvelopeGateway,
@@ -683,12 +684,67 @@ export class CoworkTaskRuntime {
       roots.push({ path: skillRoot, source: "org" });
     }
 
-    const globalRoot = resolveGlobalSkillsRoot();
-    if (!seen.has(globalRoot)) {
+    const globalRoots = resolveGlobalSkillRoots();
+    for (const globalRoot of globalRoots) {
+      if (seen.has(globalRoot)) {
+        continue;
+      }
+      seen.add(globalRoot);
       roots.push({ path: globalRoot, source: "user" });
     }
 
     return roots;
+  }
+
+  private resolveInstructionRoots(session: CoworkSession): string[] {
+    const roots: string[] = [];
+    const seen = new Set<string>();
+
+    for (const grant of session.grants ?? []) {
+      if (!grant.rootPath) {
+        continue;
+      }
+      const rootPath = resolve(grant.rootPath);
+      if (seen.has(rootPath)) {
+        continue;
+      }
+      seen.add(rootPath);
+      roots.push(rootPath);
+    }
+
+    return roots;
+  }
+
+  private async loadInstructionFiles(session: CoworkSession): Promise<string | undefined> {
+    const roots = this.resolveInstructionRoots(session);
+    if (roots.length === 0) {
+      return undefined;
+    }
+
+    const contents: string[] = [];
+    const seen = new Set<string>();
+
+    for (const root of roots) {
+      for (const filename of INSTRUCTION_FILES) {
+        const filePath = join(root, filename);
+        if (seen.has(filePath)) {
+          continue;
+        }
+        seen.add(filePath);
+        try {
+          const content = await readFile(filePath, "utf8");
+          const trimmed = content.trim();
+          if (trimmed.length > 0) {
+            const label = formatInstructionLabel(filePath);
+            contents.push(`${label}\n\n${trimmed}`);
+          }
+        } catch {
+          // Ignore missing or unreadable instruction files.
+        }
+      }
+    }
+
+    return contents.length > 0 ? contents.join("\n\n---\n\n") : undefined;
   }
 
   private async buildSkillComponents(
@@ -1030,9 +1086,11 @@ export class CoworkTaskRuntime {
       rawProjectContext && projectBudget > 0
         ? truncateToTokenBudget(rawProjectContext, projectBudget)
         : "";
+    const instructionFiles = await this.loadInstructionFiles(session);
 
     const addition = combinePromptAdditions(
       projectContext ? projectContext : undefined,
+      instructionFiles,
       packPrompt.prompt,
       modeManager.getSystemPromptAddition()
     );
@@ -1857,6 +1915,7 @@ function resolveArtifactSourcePath(payload: CoworkArtifactPayload): string | und
 
 const DEFAULT_DOCKER_IMAGE = "node:20-alpine";
 const DEFAULT_CONTEXT_PACK_TOKEN_BUDGET = 1500;
+const INSTRUCTION_FILES = ["AGENTS.md", "CLAUDE.md"] as const;
 
 function resolveRuntimeAssetDir(): string {
   return process.env.COWORK_RUNTIME_ASSET_DIR
@@ -1873,6 +1932,37 @@ function resolveGlobalSkillsRoot(): string {
     ? resolve(process.env.KEEPUP_STATE_DIR)
     : join(homedir(), ".keep-up");
   return join(baseDir, "skills");
+}
+
+function resolveGlobalSkillRoots(): string[] {
+  const override = process.env.COWORK_SKILLS_DIRS ?? process.env.KEEPUP_SKILLS_DIRS;
+  if (override && override.trim().length > 0) {
+    return parseEnvPathList(override).map((entry) => resolve(entry));
+  }
+  return [resolveGlobalSkillsRoot()];
+}
+
+function parseEnvPathList(value: string): string[] {
+  const entries = value
+    .split(delimiter)
+    .flatMap((entry) => entry.split(","))
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+  const unique: string[] = [];
+  const seen = new Set<string>();
+  for (const entry of entries) {
+    if (seen.has(entry)) {
+      continue;
+    }
+    seen.add(entry);
+    unique.push(entry);
+  }
+  return unique;
+}
+
+function formatInstructionLabel(filePath: string): string {
+  const rel = relative(process.cwd(), filePath);
+  return rel.length > 0 ? rel : filePath;
 }
 
 function parseBooleanEnv(value: string | undefined, fallback: boolean): boolean {
