@@ -23,6 +23,7 @@ export function ReportCard({ title = "Report", content }: ReportCardProps) {
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
+            aria-hidden="true"
           >
             <title>Report icon</title>
             <path
@@ -39,6 +40,7 @@ export function ReportCard({ title = "Report", content }: ReportCardProps) {
           onClick={handleCopy}
           className="p-1.5 rounded-lg border border-border bg-surface-1 text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-all duration-fast"
           title="Copy report to clipboard"
+          aria-label={copied ? "Report copied" : "Copy report to clipboard"}
         >
           {copied ? (
             <svg
@@ -46,6 +48,7 @@ export function ReportCard({ title = "Report", content }: ReportCardProps) {
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
+              aria-hidden="true"
             >
               <title>Copied</title>
               <path
@@ -56,7 +59,13 @@ export function ReportCard({ title = "Report", content }: ReportCardProps) {
               />
             </svg>
           ) : (
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg
+              className="w-3.5 h-3.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden="true"
+            >
               <title>Copy</title>
               <path
                 strokeLinecap="round"

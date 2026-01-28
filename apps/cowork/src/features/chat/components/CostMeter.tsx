@@ -41,6 +41,7 @@ export function CostMeter({ usage, modelId }: CostMeterProps) {
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
+          aria-hidden="true"
         >
           <title>Input Tokens</title>
           <path
@@ -58,6 +59,7 @@ export function CostMeter({ usage, modelId }: CostMeterProps) {
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
+          aria-hidden="true"
         >
           <title>Output Tokens</title>
           <path
@@ -76,7 +78,7 @@ export function CostMeter({ usage, modelId }: CostMeterProps) {
           }`}
           title={`Context Usage: ${utilization.toFixed(1)}%`}
         >
-          <span className="i-lucide-alert-triangle w-3 h-3" />
+          <span className="i-lucide-alert-triangle w-3 h-3" aria-hidden="true" />
           <span>{utilization.toFixed(0)}%</span>
         </div>
       )}

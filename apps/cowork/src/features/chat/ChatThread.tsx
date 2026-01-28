@@ -555,7 +555,7 @@ export function ChatThread({ sessionId }: { sessionId: string }) {
               className="h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-surface-2/60"
               aria-label="Export chat"
             >
-              <Download className="h-4 w-4" />
+              <Download className="h-4 w-4" aria-hidden="true" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" sideOffset={6} className="w-44 rounded-lg p-1">
