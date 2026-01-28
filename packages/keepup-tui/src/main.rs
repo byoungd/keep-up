@@ -116,8 +116,14 @@ struct PendingApproval {
 #[derive(Debug, Clone)]
 struct GitChanges {
     summary: String,
-    files: Vec<String>,
+    files: Vec<GitChangeEntry>,
     error: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct GitChangeEntry {
+    status: String,
+    path: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -1854,6 +1860,13 @@ fn handle_chat_key(app: &mut App, host: &HostClient, key: KeyEvent) -> Result<()
                 .unwrap_or_else(|| "Changes refreshed.".to_string());
             app.status = status;
         }
+        KeyCode::Char('o') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            let result = open_first_changed_file(app);
+            app.status = match result {
+                Ok(message) => message,
+                Err(error) => format!("Open failed: {error}"),
+            };
+        }
         KeyCode::Home if key.modifiers.contains(KeyModifiers::CONTROL) => {
             app.chat_scroll = 0;
             app.follow_tail = false;
@@ -2189,10 +2202,15 @@ fn draw_changes_panel(frame: &mut ratatui::Frame, app: &App, area: Rect) {
                 lines.push(Line::from(format!("Git error: {error}")));
             } else {
                 lines.push(Line::from(changes.summary.clone()));
+                lines.push(Line::from("Ctrl+O to open first change"));
                 if !changes.files.is_empty() {
                     lines.push(Line::from(""));
                     for file in &changes.files {
-                        lines.push(Line::from(file.clone()));
+                        if file.status.is_empty() {
+                            lines.push(Line::from(file.path.clone()));
+                        } else {
+                            lines.push(Line::from(format!("{} {}", file.status, file.path)));
+                        }
                     }
                 }
             }
@@ -2590,6 +2608,7 @@ fn draw_help(frame: &mut ratatui::Frame, _app: &App) {
         Line::from("  F2         Jump to latest"),
         Line::from("  y / n      Approve / reject pending tool"),
         Line::from("  Ctrl+G     Refresh change summary"),
+        Line::from("  Ctrl+O     Open first changed file"),
         Line::from(""),
         Line::from("General"),
         Line::from("  F1         Toggle help"),
@@ -2712,6 +2731,12 @@ fn resolve_node_bin() -> String {
     env_value("KEEPUP_NODE_BIN").unwrap_or_else(|| "node".to_string())
 }
 
+fn resolve_editor() -> Option<String> {
+    env_value("KEEPUP_TUI_EDITOR")
+        .or_else(|| env_value("EDITOR"))
+        .or_else(|| env_value("VISUAL"))
+}
+
 fn env_value(key: &str) -> Option<String> {
     match std::env::var(key) {
         Ok(value) if !value.trim().is_empty() => Some(value),
@@ -2770,6 +2795,29 @@ fn resolve_home_dir() -> Option<PathBuf> {
         .map(PathBuf::from)
 }
 
+fn open_first_changed_file(app: &App) -> Result<String> {
+    let Some(changes) = app.git_changes.as_ref() else {
+        return Err(anyhow::anyhow!("No change data. Press Ctrl+G first."));
+    };
+    if let Some(error) = &changes.error {
+        return Err(anyhow::anyhow!(error.clone()));
+    }
+    let entry = changes
+        .files
+        .iter()
+        .find(|entry| !entry.path.starts_with('…'))
+        .ok_or_else(|| anyhow::anyhow!("No changed files to open."))?;
+    let editor = resolve_editor().ok_or_else(|| {
+        anyhow::anyhow!("No editor configured. Set KEEPUP_TUI_EDITOR or EDITOR.")
+    })?;
+
+    Command::new(editor)
+        .arg(&entry.path)
+        .spawn()
+        .context("launch editor")?;
+    Ok(format!("Opened {}", entry.path))
+}
+
 fn load_git_changes() -> GitChanges {
     let output = Command::new("git").args(["status", "--porcelain"]).output();
     let output = match output {
@@ -2813,7 +2861,10 @@ fn load_git_changes() -> GitChanges {
         let file = line[3..].trim();
         if status == "??" {
             untracked += 1;
-            files.push(format!("?? {file}"));
+            files.push(GitChangeEntry {
+                status: status.to_string(),
+                path: normalize_git_path(file),
+            });
             continue;
         }
         if status.contains('M') {
@@ -2828,7 +2879,10 @@ fn load_git_changes() -> GitChanges {
         if status.contains('R') {
             renamed += 1;
         }
-        files.push(format!("{status} {file}"));
+        files.push(GitChangeEntry {
+            status: status.to_string(),
+            path: normalize_git_path(file),
+        });
     }
 
     if files.is_empty() {
@@ -2845,7 +2899,10 @@ fn load_git_changes() -> GitChanges {
     if files.len() > MAX_CHANGE_FILES {
         let extra = files.len().saturating_sub(MAX_CHANGE_FILES);
         files.truncate(MAX_CHANGE_FILES);
-        files.push(format!("… and {extra} more"));
+        files.push(GitChangeEntry {
+            status: String::new(),
+            path: format!("… and {extra} more"),
+        });
     }
 
     GitChanges {
@@ -2853,4 +2910,11 @@ fn load_git_changes() -> GitChanges {
         files,
         error: None,
     }
+}
+
+fn normalize_git_path(raw: &str) -> String {
+    if let Some((_, new_path)) = raw.rsplit_once(" -> ") {
+        return new_path.trim().to_string();
+    }
+    raw.trim_matches('"').to_string()
 }
