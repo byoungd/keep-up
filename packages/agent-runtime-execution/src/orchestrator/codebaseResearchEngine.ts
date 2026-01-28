@@ -11,6 +11,9 @@
  * 4. Summarize findings for LLM context
  */
 
+import { readdir, readFile, stat } from "node:fs/promises";
+import { basename, join, relative } from "node:path";
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -115,6 +118,9 @@ export interface CodebaseResearchConfig {
 
   /** Timeout for research operations (ms) */
   timeoutMs: number;
+
+  /** Optional workspace root override */
+  workspaceRoot?: string;
 }
 
 export const DEFAULT_RESEARCH_CONFIG: CodebaseResearchConfig = {
@@ -237,18 +243,266 @@ export class CodebaseResearchEngineImpl implements CodebaseResearchEngine {
    * file operations should be performed by the orchestrator using
    * available tools (grep, view_file, etc.).
    */
-  async executeResearch(_strategy: ResearchStrategy): Promise<ResearchFinding[]> {
-    // This is a stub implementation. In practice, the orchestrator
-    // would call this engine and then use tools to execute searches,
-    // feeding results back via addFinding().
-    //
-    // The actual research flow:
-    // 1. Orchestrator calls analyzeRequest() to get strategy
-    // 2. Orchestrator uses grep_search, view_file, etc. based on strategy
-    // 3. Orchestrator calls addFinding() for each relevant result
-    // 4. Orchestrator calls summarizeFindings() to get final context
+  async executeResearch(strategy: ResearchStrategy): Promise<ResearchFinding[]> {
+    const startTime = Date.now();
+    const rootDir = this.config.workspaceRoot ?? process.cwd();
+    const excludeDirs = new Set(strategy.excludeDirs.map((dir) => dir.toLowerCase()));
 
-    return this.findings;
+    const searchTerms = new Set(
+      [...strategy.searchQueries, ...strategy.symbolNames]
+        .map((term) => term.trim())
+        .filter(Boolean)
+    );
+    const symbolTerms = new Set(strategy.symbolNames.filter(Boolean));
+    const allowTests = this.config.includeTests && strategy.focusAreas.includes("tests");
+    const allowDocs = this.config.includeDocs && strategy.focusAreas.includes("docs");
+    const allowConfig = strategy.focusAreas.includes("config");
+    const patterns = strategy.filePatterns.filter(Boolean);
+
+    const isTimedOut = () => Date.now() - startTime > this.config.timeoutMs;
+
+    const isTestFile = (filePath: string) =>
+      /(?:^|\/)(__tests__|__test__|test|spec)(?:\/|\.|$)/i.test(filePath) ||
+      /\.(test|spec)\./i.test(filePath);
+
+    const isDocFile = (filePath: string) =>
+      /(?:^|\/)docs?\//i.test(filePath) ||
+      /readme/i.test(basename(filePath)) ||
+      /\.md$/i.test(filePath);
+
+    const isConfigFile = (filePath: string) =>
+      /(?:^|\/)config\//i.test(filePath) ||
+      /\.config\./i.test(filePath) ||
+      /\.(json|ya?ml|toml)$/i.test(filePath);
+
+    const matchesPatterns = (filePath: string) => {
+      if (patterns.length === 0) {
+        return /\.(ts|tsx|js|jsx|json|ya?ml|toml|md|mdx|css|scss|html)$/i.test(filePath);
+      }
+      return patterns.some((pattern) => {
+        const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*");
+        const regex = new RegExp(`^${escaped}$`, "i");
+        return regex.test(basename(filePath));
+      });
+    };
+
+    const shouldIncludeFile = (filePath: string) => {
+      if (!matchesPatterns(filePath)) {
+        return false;
+      }
+      if (!allowTests && isTestFile(filePath)) {
+        return false;
+      }
+      if (!allowDocs && isDocFile(filePath)) {
+        return false;
+      }
+      if (!allowConfig && isConfigFile(filePath)) {
+        return false;
+      }
+      return true;
+    };
+
+    const findFirstMatch = (content: string) => {
+      let matchIndex = -1;
+      let matchedTerm = "";
+      let relevance: RelevanceLevel = "low";
+
+      for (const term of symbolTerms) {
+        const idx = content.indexOf(term);
+        if (idx !== -1) {
+          matchIndex = idx;
+          matchedTerm = term;
+          relevance = "high";
+          break;
+        }
+      }
+
+      if (matchIndex === -1) {
+        const lower = content.toLowerCase();
+        for (const term of searchTerms) {
+          const idx = lower.indexOf(term.toLowerCase());
+          if (idx !== -1) {
+            matchIndex = idx;
+            matchedTerm = term;
+            relevance = "medium";
+            break;
+          }
+        }
+      }
+
+      return { matchIndex, matchedTerm, relevance };
+    };
+
+    const buildSnippet = (content: string, matchIndex: number) => {
+      if (matchIndex < 0) {
+        return { snippet: undefined, lineRange: undefined };
+      }
+      const lineStart = content.lastIndexOf("\n", matchIndex) + 1;
+      const lineEnd = content.indexOf("\n", matchIndex);
+      const end = lineEnd === -1 ? content.length : lineEnd;
+      const snippet = content.slice(lineStart, end).trim();
+      const lineRange = {
+        start: content.slice(0, lineStart).split("\n").length,
+        end: content.slice(0, end).split("\n").length,
+      };
+      return { snippet, lineRange };
+    };
+
+    const findings: ResearchFinding[] = [];
+    const visited = new Set<string>();
+    let scannedFiles = 0;
+
+    const shouldStop = () =>
+      isTimedOut() ||
+      scannedFiles >= strategy.maxFiles ||
+      findings.length >= this.config.maxFindings;
+
+    const readDirSafe = async (dir: string) => {
+      try {
+        return await readdir(dir, { withFileTypes: true });
+      } catch {
+        return [];
+      }
+    };
+
+    const statSafe = async (filePath: string) => {
+      try {
+        return await stat(filePath);
+      } catch {
+        return null;
+      }
+    };
+
+    const readFileSafe = async (filePath: string) => {
+      try {
+        return await readFile(filePath, "utf8");
+      } catch {
+        return null;
+      }
+    };
+
+    const shouldProcessFile = (filePath: string) =>
+      shouldIncludeFile(filePath) && !visited.has(filePath);
+
+    const withinSizeLimit = async (filePath: string) => {
+      const fileStat = await statSafe(filePath);
+      if (!fileStat) {
+        return false;
+      }
+      return fileStat.size <= this.config.maxFileSize;
+    };
+
+    const resolveFindingType = (filePath: string): FindingType => {
+      if (isTestFile(filePath)) {
+        return "test";
+      }
+      if (isConfigFile(filePath)) {
+        return "config";
+      }
+      if (isDocFile(filePath)) {
+        return "documentation";
+      }
+      return "file";
+    };
+
+    const buildSummary = (relativePath: string, matchedTerm: string) =>
+      matchedTerm.length > 0
+        ? `Matched "${matchedTerm}" in ${relativePath}`
+        : `Relevant file ${relativePath}`;
+
+    const createFindingFromContent = (filePath: string, content: string) => {
+      const match = findFirstMatch(content);
+      if (match.matchIndex === -1 && searchTerms.size > 0) {
+        return null;
+      }
+
+      const { snippet, lineRange } = buildSnippet(content, match.matchIndex);
+      const relativePath = relative(rootDir, filePath);
+      const summary = buildSummary(relativePath, match.matchedTerm);
+      const finding = this.addFinding({
+        type: resolveFindingType(filePath),
+        path: relativePath,
+        summary,
+        relevance: match.relevance,
+        codeSnippet: snippet,
+        lineRange,
+        reason: match.matchedTerm ? `Contains "${match.matchedTerm}"` : undefined,
+      });
+
+      return finding.id ? finding : null;
+    };
+
+    const scanFileIfEligible = async (filePath: string) => {
+      if (!shouldProcessFile(filePath)) {
+        return null;
+      }
+
+      visited.add(filePath);
+      scannedFiles += 1;
+
+      const isWithinLimit = await withinSizeLimit(filePath);
+      if (!isWithinLimit) {
+        return null;
+      }
+
+      const content = await readFileSafe(filePath);
+      if (!content) {
+        return null;
+      }
+
+      const finding = createFindingFromContent(filePath, content);
+      if (!finding) {
+        return null;
+      }
+
+      findings.push(finding);
+      return finding;
+    };
+
+    const scanEntry = async (
+      dir: string,
+      entry: { name: string; isDirectory: () => boolean; isFile: () => boolean }
+    ) => {
+      const fullPath = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        const lowerName = entry.name.toLowerCase();
+        if (!excludeDirs.has(lowerName)) {
+          await scanDirectory(fullPath);
+        }
+        return;
+      }
+      if (entry.isFile()) {
+        await scanFileIfEligible(fullPath);
+      }
+    };
+
+    const scanDirectory = async (dir: string): Promise<void> => {
+      if (shouldStop()) {
+        return;
+      }
+      const entries = await readDirSafe(dir);
+      for (const entry of entries) {
+        if (shouldStop()) {
+          return;
+        }
+        await scanEntry(dir, entry);
+      }
+    };
+
+    const priorityDirs = strategy.priorityDirs.filter(Boolean);
+    if (priorityDirs.length > 0) {
+      for (const dir of priorityDirs) {
+        const fullDir = join(rootDir, dir);
+        await scanDirectory(fullDir);
+        if (shouldStop()) {
+          break;
+        }
+      }
+    } else {
+      await scanDirectory(rootDir);
+    }
+
+    return findings.length > 0 ? findings : this.findings;
   }
 
   /**
