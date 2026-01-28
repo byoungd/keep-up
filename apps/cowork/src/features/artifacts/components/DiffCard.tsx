@@ -79,6 +79,7 @@ export function DiffCard({ file, diff, status, appliedAt, onApply, onRevert }: D
             onClick={handleCopy}
             className="p-1.5 rounded-lg border border-border bg-surface-1 text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-all duration-fast flex items-center gap-1.5"
             title="Copy diff to clipboard"
+            aria-label="Copy diff to clipboard"
           >
             {copied ? (
               <svg

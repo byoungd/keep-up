@@ -39,6 +39,7 @@ export function ReportCard({ title = "Report", content }: ReportCardProps) {
           onClick={handleCopy}
           className="p-1.5 rounded-lg border border-border bg-surface-1 text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-all duration-fast"
           title="Copy report to clipboard"
+          aria-label="Copy report to clipboard"
         >
           {copied ? (
             <svg
