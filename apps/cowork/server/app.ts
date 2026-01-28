@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { jsonError } from "./http";
 import { serverLogger } from "./logger";
+import { createRequestLoggingMiddleware } from "./middleware/requestLogging";
 import type { PipelineRunner } from "./pipelines/pipelineRunner";
 import type { PipelineStore } from "./pipelines/pipelineStore";
 import { createAgentProtocolRoutes } from "./routes/agentProtocol";
@@ -85,7 +86,7 @@ export function createCoworkApp(deps: CoworkAppDeps) {
   const providerKeys =
     deps.providerKeys ?? new ProviderKeyService(deps.storage.configStore, logger);
 
-  const app = new Hono();
+  const app = new Hono<{ Variables: { requestId: string } }>();
 
   app.use(
     "*",
@@ -95,6 +96,7 @@ export function createCoworkApp(deps: CoworkAppDeps) {
       allowHeaders: ["Content-Type", "Last-Event-ID"],
     })
   );
+  app.use("*", createRequestLoggingMiddleware(logger));
 
   app.get("/api/health", (c) => c.json({ ok: true, timestamp: Date.now() }));
 
@@ -301,7 +303,8 @@ export function createCoworkApp(deps: CoworkAppDeps) {
   }
 
   app.onError((error, c) => {
-    logger.error("Server error", error);
+    const requestId = c.get("requestId");
+    logger.error("Server error", error, requestId ? { requestId } : undefined);
     return jsonError(c, 500, "Internal server error");
   });
   // Project context routes (AGENTS.md analysis and generation)
