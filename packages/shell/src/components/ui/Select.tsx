@@ -54,7 +54,10 @@ const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
         >
           {children}
         </select>
-        <ChevronDown className={cn("absolute opacity-50 pointer-events-none", iconSizes[size])} />
+        <ChevronDown
+          className={cn("absolute opacity-50 pointer-events-none", iconSizes[size])}
+          aria-hidden="true"
+        />
       </div>
     );
   }

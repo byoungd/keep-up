@@ -65,8 +65,9 @@ export function AppearanceMenu({ onClose }: AppearanceMenuProps) {
           type="button"
           onClick={onClose}
           className="h-5 w-5 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground hover:bg-surface-2 transition-colors duration-fast"
+          aria-label={t("close")}
         >
-          <X className="h-3 w-3" />
+          <X className="h-3 w-3" aria-hidden="true" />
         </button>
       </div>
 
@@ -77,9 +78,21 @@ export function AppearanceMenu({ onClose }: AppearanceMenuProps) {
             value={theme || "system"}
             onValueChange={setTheme}
             items={[
-              { value: "light", label: t("light"), icon: <Sun className="h-3.5 w-3.5" /> },
-              { value: "system", label: t("auto"), icon: <Monitor className="h-3.5 w-3.5" /> },
-              { value: "dark", label: t("dark"), icon: <Moon className="h-3.5 w-3.5" /> },
+              {
+                value: "light",
+                label: t("light"),
+                icon: <Sun className="h-3.5 w-3.5" aria-hidden="true" />,
+              },
+              {
+                value: "system",
+                label: t("auto"),
+                icon: <Monitor className="h-3.5 w-3.5" aria-hidden="true" />,
+              },
+              {
+                value: "dark",
+                label: t("dark"),
+                icon: <Moon className="h-3.5 w-3.5" aria-hidden="true" />,
+              },
             ]}
           />
         </Section>
@@ -121,6 +134,7 @@ export function AppearanceMenu({ onClose }: AppearanceMenuProps) {
                 type="button"
                 onClick={() => setCanvas(bg.value)}
                 title={bg.label}
+                aria-label={bg.label}
                 aria-pressed={canvas === bg.value}
                 className={cn(
                   "h-6 w-6 rounded-full transition-all duration-fast",

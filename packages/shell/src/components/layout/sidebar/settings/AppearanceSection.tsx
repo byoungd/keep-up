@@ -25,21 +25,21 @@ export function AppearanceSection({ t }: AppearanceSectionProps) {
           description={t("themeLightDesc", "Classic light")}
           selected={mounted && theme === "light"}
           onSelect={() => setTheme("light")}
-          preview={<Sun className="h-5 w-5" />}
+          preview={<Sun className="h-5 w-5" aria-hidden="true" />}
         />
         <OptionCard
           title={t("themeSystem", "System")}
           description={t("themeSystemDesc", "Follow OS")}
           selected={mounted && theme === "system"}
           onSelect={() => setTheme("system")}
-          preview={<Monitor className="h-5 w-5" />}
+          preview={<Monitor className="h-5 w-5" aria-hidden="true" />}
         />
         <OptionCard
           title={t("themeDark", "Dark")}
           description={t("themeDarkDesc", "Classic dark")}
           selected={mounted && theme === "dark"}
           onSelect={() => setTheme("dark")}
-          preview={<Moon className="h-5 w-5" />}
+          preview={<Moon className="h-5 w-5" aria-hidden="true" />}
         />
       </div>
     </SettingsSection>
