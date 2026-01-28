@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -12,81 +11,66 @@ pub struct NodeCapability {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct NodeDescriptor {
-    pub node_id: String,
-    pub label: Option<String>,
-    pub platform: Option<String>,
-    pub capabilities: Vec<NodeCapability>,
-    pub permissions: Option<HashMap<String, NodePermissionStatus>>,
-    pub metadata: Option<HashMap<String, String>>,
+pub struct NodePermissionStatus {
+    pub name: String,
+    pub status: PermissionStatus,
+    pub details: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum NodePermissionStatus {
+pub enum PermissionStatus {
     Granted,
     Denied,
     Prompt,
-    Unsupported,
     Unknown,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NodeError {
-    pub code: String,
     pub message: String,
-    pub details: Option<HashMap<String, Value>>,
+    pub code: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct NodeResponse {
-    pub request_id: String,
-    pub node_id: String,
-    pub success: bool,
-    pub result: Option<Value>,
-    pub error: Option<NodeError>,
-}
-
-#[derive(Debug, Serialize)]
 #[serde(tag = "type")]
-pub enum GatewayNodeClientMessage {
-    #[serde(rename = "hello")]
-    Hello { node: NodeDescriptor },
-    #[serde(rename = "describe")]
-    Describe { node: NodeDescriptor },
-    #[serde(rename = "heartbeat")]
-    Heartbeat { #[serde(rename = "nodeId")] node_id: String },
-    #[serde(rename = "response")]
-    Response { response: NodeResponse },
-    #[serde(rename = "ping")]
-    Ping { nonce: Option<String> },
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(tag = "type")]
-pub enum GatewayNodeServerMessage {
-    #[serde(rename = "welcome")]
-    Welcome {
+pub enum NodeMessage {
+    #[serde(rename = "node.hello")]
+    Hello {
         #[serde(rename = "nodeId")]
         node_id: String,
-        #[serde(rename = "serverTime")]
-        server_time: u64,
+        name: Option<String>,
+        kind: Option<String>,
+        capabilities: Vec<NodeCapability>,
+        permissions: Option<Vec<NodePermissionStatus>>,
+        token: Option<String>,
     },
-    #[serde(rename = "invoke")]
+    #[serde(rename = "node.heartbeat")]
+    Heartbeat {
+        #[serde(rename = "nodeId")]
+        node_id: String,
+    },
+    #[serde(rename = "node.invoke")]
     Invoke {
         #[serde(rename = "requestId")]
         request_id: String,
         command: String,
         args: Option<Value>,
     },
-    #[serde(rename = "error")]
-    Error { code: String, message: String },
-    #[serde(rename = "pong")]
-    Pong {
-        nonce: Option<String>,
-        #[serde(rename = "serverTime")]
-        server_time: u64,
+    #[serde(rename = "node.result")]
+    Result {
+        #[serde(rename = "requestId")]
+        request_id: String,
+        success: bool,
+        result: Option<Value>,
+        error: Option<NodeError>,
+    },
+    #[serde(rename = "node.error")]
+    Error {
+        code: String,
+        message: String,
+        #[serde(rename = "requestId")]
+        request_id: Option<String>,
     },
 }
