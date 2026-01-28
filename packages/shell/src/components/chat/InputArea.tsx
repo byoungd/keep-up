@@ -385,7 +385,7 @@ function AttachmentErrorBlock({ message }: { message?: string }) {
   }
   return (
     <div className="mb-2 text-fine font-medium text-destructive flex items-center gap-2 px-2 py-1.5 rounded-lg bg-destructive/5 border border-destructive/10">
-      <AlertTriangle className="h-3.5 w-3.5" />
+      <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
       <span>{message}</span>
     </div>
   );
@@ -427,9 +427,11 @@ function AttachmentList({
             {att.name}
           </span>
           {(att.status === "processing" || att.status === "sending") && (
-            <Loader2 className="h-2.5 w-2.5 text-primary/60" />
+            <Loader2 className="h-2.5 w-2.5 text-primary/60" aria-hidden="true" />
           )}
-          {att.status === "error" && <AlertTriangle className="h-2.5 w-2.5 text-destructive" />}
+          {att.status === "error" && (
+            <AlertTriangle className="h-2.5 w-2.5 text-destructive" aria-hidden="true" />
+          )}
           <button
             type="button"
             onClick={() => onRemove(att.id)}
@@ -437,7 +439,7 @@ function AttachmentList({
             aria-label={translations.removeAttachment}
             disabled={isBusy}
           >
-            <X className="h-2.5 w-2.5" />
+            <X className="h-2.5 w-2.5" aria-hidden="true" />
           </button>
         </div>
       ))}

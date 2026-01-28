@@ -67,7 +67,7 @@ export function AIPanelHeader({
           onClick={onClear}
           aria-label={translations.newChat}
         >
-          <Plus className="h-3.5 w-3.5" />
+          <Plus className="h-3.5 w-3.5" aria-hidden="true" />
         </Button>
 
         <Button
@@ -78,7 +78,7 @@ export function AIPanelHeader({
           disabled={!onHistory}
           aria-label="History"
         >
-          <History className="h-3.5 w-3.5" />
+          <History className="h-3.5 w-3.5" aria-hidden="true" />
         </Button>
 
         <DropdownMenu>
@@ -89,7 +89,7 @@ export function AIPanelHeader({
               className="h-7 w-7 rounded-lg text-muted-foreground/50 hover:text-foreground hover:bg-surface-2/60 transition-colors duration-100"
               aria-label="More"
             >
-              <MoreHorizontal className="h-3.5 w-3.5" />
+              <MoreHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent
@@ -100,7 +100,7 @@ export function AIPanelHeader({
               onClick={onExport}
               className="gap-2 cursor-pointer text-xs focus:bg-surface-2/60"
             >
-              <Download className="h-3.5 w-3.5 text-muted-foreground" />
+              <Download className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
               <span>{translations.exportChat}</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -114,7 +114,7 @@ export function AIPanelHeader({
             onClick={onClose}
             aria-label={translations.closePanel}
           >
-            <PanelRightClose className="h-4 w-4" />
+            <PanelRightClose className="h-4 w-4" aria-hidden="true" />
           </Button>
         )}
       </div>

@@ -92,7 +92,7 @@ export function SlashCommandMenu({
             aria-selected={isSelected}
           >
             <div className="flex h-5 w-5 items-center justify-center rounded bg-background/50 border border-border/30">
-              {Icon && <Icon className="h-3 w-3" />}
+              {Icon && <Icon className="h-3 w-3" aria-hidden="true" />}
             </div>
             <div className="flex flex-col items-start overflow-hidden">
               <span className="truncate font-medium leading-none">{prompt.label}</span>
