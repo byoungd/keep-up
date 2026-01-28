@@ -124,6 +124,7 @@ describe("Cost routes", () => {
       deviceId: "device-1",
       platform: "macos",
       mode: "cowork",
+      isolationLevel: "main",
       grants: [],
       connectors: [],
       createdAt: Date.now(),

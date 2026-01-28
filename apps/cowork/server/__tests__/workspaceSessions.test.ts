@@ -146,6 +146,7 @@ function createCoworkSession(): CoworkSession {
     deviceId: "device-1",
     platform: "macos",
     mode: "cowork",
+    isolationLevel: "main",
     grants: [
       {
         id: "grant-1",

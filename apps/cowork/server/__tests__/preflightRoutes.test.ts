@@ -120,6 +120,7 @@ describe("Preflight routes", () => {
       deviceId: "device-1",
       platform: "macos",
       mode: "cowork",
+      isolationLevel: "main",
       grants: [
         {
           id: "grant-1",
@@ -223,6 +224,7 @@ describe("Preflight routes", () => {
       deviceId: "device-1",
       platform: "macos",
       mode: "cowork",
+      isolationLevel: "main",
       agentMode: "plan",
       grants: [
         {
@@ -256,6 +258,7 @@ describe("Preflight routes", () => {
       deviceId: "device-1",
       platform: "macos",
       mode: "cowork",
+      isolationLevel: "main",
       agentMode: "review",
       grants: [
         {
