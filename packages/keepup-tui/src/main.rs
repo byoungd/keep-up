@@ -158,6 +158,12 @@ enum AppMode {
     Chat,
 }
 
+#[derive(Debug, Clone, Copy)]
+enum SettingsMode {
+    Model,
+    Provider,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum MessageRole {
     User,
@@ -275,6 +281,9 @@ struct App {
     filter_active: bool,
     session_filter: String,
     session_filter_cursor: usize,
+    settings_mode: Option<SettingsMode>,
+    settings_input: String,
+    settings_cursor: usize,
     should_exit: bool,
 }
 
@@ -425,6 +434,9 @@ impl App {
             filter_active: false,
             session_filter: String::new(),
             session_filter_cursor: 0,
+            settings_mode: None,
+            settings_input: String::new(),
+            settings_cursor: 0,
             should_exit: false,
         }
     }
@@ -582,6 +594,15 @@ impl App {
         self.session_filter_cursor += text.len();
     }
 
+    fn insert_settings_input(&mut self, text: &str) {
+        if text.is_empty() {
+            return;
+        }
+        self.settings_input
+            .insert_str(self.settings_cursor, text);
+        self.settings_cursor += text.len();
+    }
+
     fn delete_session_filter_back(&mut self) {
         if self.session_filter_cursor == 0 {
             return;
@@ -598,9 +619,42 @@ impl App {
         self.session_filter.remove(self.session_filter_cursor);
     }
 
+    fn delete_settings_input_back(&mut self) {
+        if self.settings_cursor == 0 {
+            return;
+        }
+        let remove_at = self.settings_cursor.saturating_sub(1);
+        self.settings_input.remove(remove_at);
+        self.settings_cursor = remove_at;
+    }
+
+    fn delete_settings_input_forward(&mut self) {
+        if self.settings_cursor >= self.settings_input.len() {
+            return;
+        }
+        self.settings_input.remove(self.settings_cursor);
+    }
+
     fn clear_session_filter(&mut self) {
         self.session_filter.clear();
         self.session_filter_cursor = 0;
+    }
+
+    fn clear_settings_input(&mut self) {
+        self.settings_input.clear();
+        self.settings_cursor = 0;
+    }
+
+    fn open_settings(&mut self, mode: SettingsMode) {
+        let current = match mode {
+            SettingsMode::Model => self.model.clone().unwrap_or_default(),
+            SettingsMode::Provider => self.provider.clone().unwrap_or_default(),
+        };
+        self.settings_mode = Some(mode);
+        self.settings_input = current;
+        self.settings_cursor = self.settings_input.len();
+        self.pending_delete_session_id = None;
+        self.filter_active = false;
     }
 
     fn set_input(&mut self, text: String) {
@@ -1482,6 +1536,82 @@ fn sanitize_paste_text(text: &str) -> String {
 }
 
 fn handle_picker_key(app: &mut App, host: &HostClient, key: KeyEvent) -> Result<()> {
+    if let Some(mode) = app.settings_mode {
+        let is_plain_char = matches!(key.code, KeyCode::Char(_))
+            && !key.modifiers.contains(KeyModifiers::CONTROL)
+            && !key.modifiers.contains(KeyModifiers::ALT);
+        match key.code {
+            KeyCode::Esc => {
+                app.settings_mode = None;
+                app.status = "Settings canceled.".to_string();
+                return Ok(());
+            }
+            KeyCode::Enter => {
+                let value = app.settings_input.trim();
+                let normalized = if value.is_empty() || value.eq_ignore_ascii_case("auto") {
+                    None
+                } else {
+                    Some(value.to_string())
+                };
+                match mode {
+                    SettingsMode::Model => {
+                        app.model = normalized.clone();
+                        app.status = match &app.model {
+                            Some(model) => format!("Model set to {model}."),
+                            None => "Model reset to auto.".to_string(),
+                        };
+                    }
+                    SettingsMode::Provider => {
+                        app.provider = normalized.clone();
+                        app.status = match &app.provider {
+                            Some(provider) => format!("Provider set to {provider}."),
+                            None => "Provider reset to auto.".to_string(),
+                        };
+                    }
+                }
+                app.settings_mode = None;
+                return Ok(());
+            }
+            KeyCode::Backspace => {
+                app.delete_settings_input_back();
+                return Ok(());
+            }
+            KeyCode::Delete => {
+                app.delete_settings_input_forward();
+                return Ok(());
+            }
+            KeyCode::Left => {
+                app.settings_cursor = app.settings_cursor.saturating_sub(1);
+                return Ok(());
+            }
+            KeyCode::Right => {
+                if app.settings_cursor < app.settings_input.len() {
+                    app.settings_cursor += 1;
+                }
+                return Ok(());
+            }
+            KeyCode::Home => {
+                app.settings_cursor = 0;
+                return Ok(());
+            }
+            KeyCode::End => {
+                app.settings_cursor = app.settings_input.len();
+                return Ok(());
+            }
+            KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                app.clear_settings_input();
+                return Ok(());
+            }
+            _ if is_plain_char => {
+                if let KeyCode::Char(ch) = key.code {
+                    app.insert_settings_input(&ch.to_string());
+                }
+                return Ok(());
+            }
+            _ => {}
+        }
+    }
+
     if let Some(pending_id) = app.pending_delete_session_id.clone() {
         match key.code {
             KeyCode::Char('y') | KeyCode::Char('Y') => {
@@ -1591,6 +1721,14 @@ fn handle_picker_key(app: &mut App, host: &HostClient, key: KeyEvent) -> Result<
             app.session_filter_cursor = app.session_filter.len();
             app.pending_delete_session_id = None;
             app.status = "Filter sessions. Type to search.".to_string();
+        }
+        KeyCode::Char('m') | KeyCode::Char('M') => {
+            app.open_settings(SettingsMode::Model);
+            app.status = "Edit model. Enter to save, Esc to cancel.".to_string();
+        }
+        KeyCode::Char('p') | KeyCode::Char('P') => {
+            app.open_settings(SettingsMode::Provider);
+            app.status = "Edit provider. Enter to save, Esc to cancel.".to_string();
         }
         KeyCode::Char('n') => {
             app.pending_delete_session_id = None;
@@ -1825,6 +1963,9 @@ fn draw_ui(frame: &mut ratatui::Frame, app: &mut App) {
     }
     if let Some(pending) = app.pending_approval.as_ref() {
         draw_approval_dialog(frame, pending);
+    }
+    if let Some(mode) = app.settings_mode {
+        draw_settings_dialog(frame, app, mode);
     }
 }
 
@@ -2349,6 +2490,7 @@ fn draw_help(frame: &mut ratatui::Frame, _app: &App) {
         Line::from("  n          New session (picker)"),
         Line::from("  d          Delete session (picker, confirm y/n)"),
         Line::from("  /          Filter sessions (picker)"),
+        Line::from("  m / p      Edit model / provider (picker)"),
         Line::from("  Ctrl+R     Refresh sessions (picker)"),
         Line::from("  Esc        Switch session (chat) / Quit (picker)"),
         Line::from("  q          Quit (picker)"),
@@ -2406,6 +2548,42 @@ fn draw_approval_dialog(frame: &mut ratatui::Frame, approval: &PendingApproval) 
         .block(Block::default().title("Approval").borders(Borders::ALL))
         .wrap(Wrap { trim: true });
     frame.render_widget(paragraph, area);
+}
+
+fn draw_settings_dialog(frame: &mut ratatui::Frame, app: &App, mode: SettingsMode) {
+    let area = centered_rect(70, 40, frame.size());
+    frame.render_widget(Clear, area);
+
+    let label = match mode {
+        SettingsMode::Model => "Model",
+        SettingsMode::Provider => "Provider",
+    };
+    let input_prefix = format!("{label}: ");
+    let input_line = format!("{input_prefix}{}", app.settings_input);
+
+    let lines = vec![
+        Line::from(vec![Span::styled(
+            format!("Set {label}"),
+            Style::default().add_modifier(Modifier::BOLD),
+        )]),
+        Line::from(""),
+        Line::from(input_line),
+        Line::from(""),
+        Line::from("Enter to save, Esc to cancel."),
+    ];
+
+    let paragraph = Paragraph::new(lines)
+        .block(Block::default().title("Settings").borders(Borders::ALL))
+        .wrap(Wrap { trim: true });
+    frame.render_widget(paragraph, area);
+
+    let cursor_line = 2usize;
+    let cursor_x_offset = display_width(&input_prefix)
+        + display_width(&app.settings_input[..app.settings_cursor.min(app.settings_input.len())]);
+    let cursor_x = area.x + 1 + cursor_x_offset as u16;
+    let max_x = area.x + area.width.saturating_sub(2);
+    let cursor_y = area.y + 1 + cursor_line as u16;
+    frame.set_cursor(cursor_x.min(max_x), cursor_y);
 }
 
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
