@@ -39,6 +39,7 @@ export function PreflightCard({ payload }: PreflightCardProps) {
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
+            aria-hidden="true"
           >
             <title>Preflight icon</title>
             <path
