@@ -144,7 +144,8 @@ async function handleSessionExport(message: OpMessage): Promise<void> {
     sendError(message.id, message.op, "sessionId is required.", "BAD_REQUEST");
     return;
   }
-  const session = await sessionStore.get(sessionId);
+  const session =
+    state.session?.id === sessionId ? state.session : await sessionStore.get(sessionId);
   if (!session) {
     sendError(message.id, message.op, "Session not found.", "SESSION_NOT_FOUND");
     return;
