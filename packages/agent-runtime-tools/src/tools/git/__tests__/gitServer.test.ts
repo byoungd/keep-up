@@ -141,4 +141,19 @@ describe("GitToolServer", () => {
     expect(result.error?.code).toBe("INVALID_ARGUMENTS");
     expect(executor.diff).not.toHaveBeenCalled();
   });
+
+  it("maps executor errors to execution_failed responses", async () => {
+    const executor = createExecutor();
+    executor.status = vi.fn(async () => {
+      throw new Error("boom");
+    });
+    const server = new GitToolServer({}, executor as unknown as IGitExecutor);
+
+    const result = await server.callTool({ name: "status", arguments: {} }, context);
+
+    expect(result.success).toBe(false);
+    expect(result.error?.code).toBe("EXECUTION_FAILED");
+    expect(result.content[0]?.type).toBe("text");
+    expect(result.content[0]?.text).toContain("Git error: boom");
+  });
 });
