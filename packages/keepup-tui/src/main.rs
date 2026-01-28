@@ -26,6 +26,8 @@ use uuid::Uuid;
 const DEFAULT_SESSION_LIMIT: u64 = 20;
 const INPUT_PREFIX: &str = "> ";
 const INPUT_INDENT: &str = "  ";
+const FILTER_PREFIX: &str = "/ ";
+const FILTER_INDENT: &str = "  ";
 const MIN_INPUT_HEIGHT: u16 = 3;
 const MAX_INPUT_HEIGHT: u16 = 8;
 const TAB_WIDTH: usize = 4;
@@ -270,6 +272,9 @@ struct App {
     provider: Option<String>,
     session_override: Option<String>,
     loading_sessions: bool,
+    filter_active: bool,
+    session_filter: String,
+    session_filter_cursor: usize,
     should_exit: bool,
 }
 
@@ -417,6 +422,9 @@ impl App {
             provider: env_value("KEEPUP_TUI_PROVIDER"),
             session_override: env_value("KEEPUP_TUI_SESSION"),
             loading_sessions: false,
+            filter_active: false,
+            session_filter: String::new(),
+            session_filter_cursor: 0,
             should_exit: false,
         }
     }
@@ -563,6 +571,36 @@ impl App {
         }
         self.input.insert_str(self.cursor, text);
         self.cursor += text.len();
+    }
+
+    fn insert_session_filter(&mut self, text: &str) {
+        if text.is_empty() {
+            return;
+        }
+        self.session_filter
+            .insert_str(self.session_filter_cursor, text);
+        self.session_filter_cursor += text.len();
+    }
+
+    fn delete_session_filter_back(&mut self) {
+        if self.session_filter_cursor == 0 {
+            return;
+        }
+        let remove_at = self.session_filter_cursor.saturating_sub(1);
+        self.session_filter.remove(remove_at);
+        self.session_filter_cursor = remove_at;
+    }
+
+    fn delete_session_filter_forward(&mut self) {
+        if self.session_filter_cursor >= self.session_filter.len() {
+            return;
+        }
+        self.session_filter.remove(self.session_filter_cursor);
+    }
+
+    fn clear_session_filter(&mut self) {
+        self.session_filter.clear();
+        self.session_filter_cursor = 0;
     }
 
     fn set_input(&mut self, text: String) {
@@ -878,6 +916,7 @@ fn handle_inbound(app: &mut App, host: &HostClient) -> Result<()> {
                             let parsed: Vec<SessionSummary> =
                                 serde_json::from_value(list).unwrap_or_default();
                             app.sessions = parsed;
+                            clamp_picker_selection(app);
                             if app.mode == AppMode::Picker {
                                 app.selected = 0;
                                 app.status = "Select a session.".to_string();
@@ -1462,25 +1501,96 @@ fn handle_picker_key(app: &mut App, host: &HostClient, key: KeyEvent) -> Result<
         }
     }
 
+    if app.filter_active {
+        let is_plain_char = matches!(key.code, KeyCode::Char(_))
+            && !key.modifiers.contains(KeyModifiers::CONTROL)
+            && !key.modifiers.contains(KeyModifiers::ALT);
+        match key.code {
+            KeyCode::Esc => {
+                app.filter_active = false;
+                app.session_filter_cursor = app.session_filter.len();
+                app.status = "Filter closed.".to_string();
+                return Ok(());
+            }
+            KeyCode::Backspace => {
+                app.delete_session_filter_back();
+                app.pending_delete_session_id = None;
+                clamp_picker_selection(app);
+                return Ok(());
+            }
+            KeyCode::Delete => {
+                app.delete_session_filter_forward();
+                app.pending_delete_session_id = None;
+                clamp_picker_selection(app);
+                return Ok(());
+            }
+            KeyCode::Left => {
+                app.session_filter_cursor = app.session_filter_cursor.saturating_sub(1);
+                return Ok(());
+            }
+            KeyCode::Right => {
+                if app.session_filter_cursor < app.session_filter.len() {
+                    app.session_filter_cursor += 1;
+                }
+                return Ok(());
+            }
+            KeyCode::Home => {
+                app.session_filter_cursor = 0;
+                return Ok(());
+            }
+            KeyCode::End => {
+                app.session_filter_cursor = app.session_filter.len();
+                return Ok(());
+            }
+            KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                app.clear_session_filter();
+                app.pending_delete_session_id = None;
+                clamp_picker_selection(app);
+                return Ok(());
+            }
+            _ if is_plain_char => {
+                if let KeyCode::Char(ch) = key.code {
+                    app.insert_session_filter(&ch.to_string());
+                    app.pending_delete_session_id = None;
+                    clamp_picker_selection(app);
+                }
+                return Ok(());
+            }
+            _ => {}
+        }
+    }
+
     match key.code {
         KeyCode::Char('q') | KeyCode::Esc => app.should_exit = true,
         KeyCode::Up => {
-            if app.selected > 0 {
+            let filtered_len = filtered_session_indices(app).len();
+            if filtered_len > 0 && app.selected > 0 {
                 app.selected -= 1;
                 app.pending_delete_session_id = None;
             }
         }
         KeyCode::Down => {
-            if app.selected + 1 < app.sessions.len() {
+            let filtered_len = filtered_session_indices(app).len();
+            if app.selected + 1 < filtered_len {
                 app.selected += 1;
                 app.pending_delete_session_id = None;
             }
         }
         KeyCode::Enter => {
-            if let Some(session) = app.sessions.get(app.selected) {
-                app.pending_delete_session_id = None;
-                app.request_runtime_init(host, session.id.clone())?;
+            let filtered = filtered_session_indices(app);
+            if let Some(index) = filtered.get(app.selected) {
+                if let Some(session) = app.sessions.get(*index) {
+                    app.pending_delete_session_id = None;
+                    app.filter_active = false;
+                    app.request_runtime_init(host, session.id.clone())?;
+                }
             }
+        }
+        KeyCode::Char('/') => {
+            app.filter_active = true;
+            app.session_filter_cursor = app.session_filter.len();
+            app.pending_delete_session_id = None;
+            app.status = "Filter sessions. Type to search.".to_string();
         }
         KeyCode::Char('n') => {
             app.pending_delete_session_id = None;
@@ -1491,12 +1601,15 @@ fn handle_picker_key(app: &mut App, host: &HostClient, key: KeyEvent) -> Result<
                 app.status = "Session deletion not supported by host.".to_string();
                 return Ok(());
             }
-            if let Some(session) = app.sessions.get(app.selected) {
-                app.pending_delete_session_id = Some(session.id.clone());
-                app.status = format!(
-                    "Delete session {}? Press y to confirm, n to cancel.",
-                    session.id
-                );
+            let filtered = filtered_session_indices(app);
+            if let Some(index) = filtered.get(app.selected) {
+                if let Some(session) = app.sessions.get(*index) {
+                    app.pending_delete_session_id = Some(session.id.clone());
+                    app.status = format!(
+                        "Delete session {}? Press y to confirm, n to cancel.",
+                        session.id
+                    );
+                }
             }
         }
         KeyCode::Char('r') if key.modifiers.contains(KeyModifiers::CONTROL) => {
@@ -1541,6 +1654,9 @@ fn handle_chat_key(app: &mut App, host: &HostClient, key: KeyEvent) -> Result<()
     match key.code {
         KeyCode::Esc => {
             app.mode = AppMode::Picker;
+            app.filter_active = false;
+            app.session_filter_cursor = app.session_filter.len();
+            app.pending_delete_session_id = None;
             app.request_session_list(host)?;
         }
         KeyCode::Up => {
@@ -1620,6 +1736,9 @@ fn handle_chat_key(app: &mut App, host: &HostClient, key: KeyEvent) -> Result<()
         }
         KeyCode::Char('s') if key.modifiers.contains(KeyModifiers::CONTROL) => {
             app.mode = AppMode::Picker;
+            app.filter_active = false;
+            app.session_filter_cursor = app.session_filter.len();
+            app.pending_delete_session_id = None;
             app.request_session_list(host)?;
         }
         KeyCode::Left => {
@@ -1742,15 +1861,21 @@ fn draw_picker(frame: &mut ratatui::Frame, app: &App, area: Rect) {
     };
     let block = Block::default().title(title).borders(Borders::ALL);
 
-    if app.sessions.is_empty() && !app.loading_sessions {
-        let empty = Paragraph::new("No sessions. Press n to create one.").block(block);
+    let filtered = filtered_session_indices(app);
+    if filtered.is_empty() && !app.loading_sessions {
+        let message = if app.session_filter.trim().is_empty() {
+            "No sessions. Press n to create one."
+        } else {
+            "No sessions match the filter."
+        };
+        let empty = Paragraph::new(message).block(block);
         frame.render_widget(empty, area);
         return;
     }
 
-    let items: Vec<ListItem> = app
-        .sessions
+    let items: Vec<ListItem> = filtered
         .iter()
+        .filter_map(|index| app.sessions.get(*index))
         .map(|session| {
             let title = if session.title.is_empty() {
                 "(untitled)"
@@ -1783,7 +1908,43 @@ fn draw_picker(frame: &mut ratatui::Frame, app: &App, area: Rect) {
         .highlight_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
         .highlight_symbol("> ");
 
-    frame.render_stateful_widget(list, area, &mut list_state(app.selected));
+    let selected = if filtered.is_empty() {
+        0
+    } else {
+        app.selected.min(filtered.len().saturating_sub(1))
+    };
+    frame.render_stateful_widget(list, area, &mut list_state(selected));
+}
+
+fn filtered_session_indices(app: &App) -> Vec<usize> {
+    let query = app.session_filter.trim().to_lowercase();
+    if query.is_empty() {
+        return (0..app.sessions.len()).collect();
+    }
+    app.sessions
+        .iter()
+        .enumerate()
+        .filter_map(|(index, session)| {
+            let haystack_id = session.id.to_lowercase();
+            let haystack_title = session.title.to_lowercase();
+            if haystack_id.contains(&query) || haystack_title.contains(&query) {
+                Some(index)
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+fn clamp_picker_selection(app: &mut App) {
+    let filtered = filtered_session_indices(app);
+    if filtered.is_empty() {
+        app.selected = 0;
+        return;
+    }
+    if app.selected >= filtered.len() {
+        app.selected = filtered.len().saturating_sub(1);
+    }
 }
 
 fn draw_chat(frame: &mut ratatui::Frame, app: &mut App, area: Rect) {
@@ -1820,6 +1981,49 @@ fn draw_chat(frame: &mut ratatui::Frame, app: &mut App, area: Rect) {
 }
 
 fn draw_input(frame: &mut ratatui::Frame, app: &App, area: Rect) {
+    if matches!(app.mode, AppMode::Picker) {
+        if !app.filter_active && app.session_filter.trim().is_empty() {
+            let block = Block::default().title("Filter").borders(Borders::ALL);
+            let hint = Paragraph::new("Press / to filter sessions.")
+                .block(block)
+                .style(Style::default().add_modifier(Modifier::DIM))
+                .wrap(Wrap { trim: true });
+            frame.render_widget(hint, area);
+            return;
+        }
+
+        let block = Block::default().title("Filter").borders(Borders::ALL);
+        let inner_width = area.width.saturating_sub(2) as usize;
+        let available = inner_width
+            .saturating_sub(display_width(FILTER_PREFIX))
+            .max(1);
+        let layout = build_filter_layout(
+            &app.session_filter,
+            app.session_filter_cursor,
+            available,
+        );
+        let visible_height = area.height.saturating_sub(2) as usize;
+        let scroll_offset = compute_input_scroll(layout.cursor_line, visible_height);
+        let scroll = scroll_offset.min(u16::MAX as usize) as u16;
+        let paragraph = Paragraph::new(Text::from(layout.lines))
+            .block(block)
+            .wrap(Wrap { trim: false })
+            .scroll((scroll, 0));
+        frame.render_widget(paragraph, area);
+
+        if app.filter_active {
+            let cursor_line = layout.cursor_line.saturating_sub(scroll_offset);
+            if cursor_line < visible_height {
+                let cursor_x =
+                    area.x + 1 + display_width(FILTER_PREFIX) as u16 + layout.cursor_col as u16;
+                let max_x = area.x + area.width.saturating_sub(2);
+                let cursor_y = area.y + 1 + cursor_line as u16;
+                frame.set_cursor(cursor_x.min(max_x), cursor_y);
+            }
+        }
+        return;
+    }
+
     let block = Block::default().title("Input").borders(Borders::ALL);
     let inner_width = area.width.saturating_sub(2) as usize;
     let available = inner_width
@@ -1835,15 +2039,13 @@ fn draw_input(frame: &mut ratatui::Frame, app: &App, area: Rect) {
         .scroll((scroll, 0));
     frame.render_widget(paragraph, area);
 
-    if app.mode == AppMode::Chat {
-        let cursor_line = layout.cursor_line.saturating_sub(scroll_offset);
-        if cursor_line < visible_height {
-            let cursor_x =
-                area.x + 1 + display_width(INPUT_PREFIX) as u16 + layout.cursor_col as u16;
-            let max_x = area.x + area.width.saturating_sub(2);
-            let cursor_y = area.y + 1 + cursor_line as u16;
-            frame.set_cursor(cursor_x.min(max_x), cursor_y);
-        }
+    let cursor_line = layout.cursor_line.saturating_sub(scroll_offset);
+    if cursor_line < visible_height {
+        let cursor_x =
+            area.x + 1 + display_width(INPUT_PREFIX) as u16 + layout.cursor_col as u16;
+        let max_x = area.x + area.width.saturating_sub(2);
+        let cursor_y = area.y + 1 + cursor_line as u16;
+        frame.set_cursor(cursor_x.min(max_x), cursor_y);
     }
 }
 
@@ -1916,10 +2118,13 @@ struct InputLayout {
 
 fn desired_input_height(app: &App, area: Rect) -> u16 {
     let inner_width = area.width.saturating_sub(2) as usize;
-    let available = inner_width
-        .saturating_sub(display_width(INPUT_PREFIX))
-        .max(1);
-    let line_count = count_wrapped_lines(&app.input, available);
+    let (content, prefix) = if matches!(app.mode, AppMode::Picker) {
+        (app.session_filter.as_str(), FILTER_PREFIX)
+    } else {
+        (app.input.as_str(), INPUT_PREFIX)
+    };
+    let available = inner_width.saturating_sub(display_width(prefix)).max(1);
+    let line_count = count_wrapped_lines(content, available);
     let desired = (line_count + 2) as u16;
     let max_by_frame = area.height.saturating_sub(2);
     let max_height = std::cmp::min(MAX_INPUT_HEIGHT, max_by_frame);
@@ -1939,13 +2144,27 @@ fn count_wrapped_lines(input: &str, available: usize) -> usize {
 }
 
 fn build_input_layout(input: &str, cursor: usize, available: usize) -> InputLayout {
+    build_prefixed_layout(input, cursor, available, INPUT_PREFIX, INPUT_INDENT)
+}
+
+fn build_filter_layout(input: &str, cursor: usize, available: usize) -> InputLayout {
+    build_prefixed_layout(input, cursor, available, FILTER_PREFIX, FILTER_INDENT)
+}
+
+fn build_prefixed_layout(
+    input: &str,
+    cursor: usize,
+    available: usize,
+    prefix: &str,
+    indent: &str,
+) -> InputLayout {
     let available = available.max(1);
     let mut lines = Vec::new();
     let mut first = true;
     for line in input.split('\n') {
         let segments = wrap_line_by_width(line, available, available);
         for segment in segments {
-            let prefix = if first { INPUT_PREFIX } else { INPUT_INDENT };
+            let prefix = if first { prefix } else { indent };
             lines.push(Line::from(format!("{prefix}{segment}")));
             first = false;
         }
@@ -2126,6 +2345,7 @@ fn draw_help(frame: &mut ratatui::Frame, _app: &App) {
         Line::from("  Enter      Select session / send message"),
         Line::from("  n          New session (picker)"),
         Line::from("  d          Delete session (picker, confirm y/n)"),
+        Line::from("  /          Filter sessions (picker)"),
         Line::from("  Ctrl+R     Refresh sessions (picker)"),
         Line::from("  Esc        Switch session (chat) / Quit (picker)"),
         Line::from("  q          Quit (picker)"),
