@@ -202,7 +202,8 @@ export class NodeRegistry {
           serverTime: this.now(),
         };
       default:
-        this.logger.warn("Unhandled node message", { messageType: message.type });
+        // biome-ignore lint/suspicious/noExplicitAny: runtime type check for unknown messages
+        this.logger.warn("Unhandled node message", { messageType: (message as any).type });
         return null;
     }
   }

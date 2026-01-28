@@ -174,3 +174,35 @@
   color: #fff;
   background: var(--accent-primary, #6366f1);
 }
+
+.model-selector--compact .model-selector__trigger {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  border-radius: 0.4rem;
+}
+
+.model-selector--compact .model-selector__selected-label {
+  max-width: 7.5rem;
+}
+
+.model-selector--compact .model-selector__dropdown {
+  left: auto;
+  right: 0;
+  min-width: 14rem;
+}
+
+.model-selector--compact .model-selector__group-header {
+  padding: 0.5rem 0.65rem;
+  font-size: 0.6875rem;
+}
+
+.model-selector--compact .model-selector__model-item {
+  padding: 0.45rem 0.65rem 0.45rem 1rem;
+  font-size: 0.75rem;
+}
+
+.model-selector--compact .model-selector__badge {
+  width: 1rem;
+  height: 1rem;
+  font-size: 0.5rem;
+}

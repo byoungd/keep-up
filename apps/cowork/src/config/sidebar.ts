@@ -1,5 +1,5 @@
 import type { SidebarGroupDefinition } from "@ku0/shell";
-import { Brain, LayoutTemplate, Library, Search, SquarePen } from "lucide-react";
+import { Brain, LayoutTemplate, Library, Search, Sparkles, SquarePen } from "lucide-react";
 
 export const COWORK_SIDEBAR_GROUPS: SidebarGroupDefinition[] = [
   {
@@ -29,6 +29,14 @@ export const COWORK_SIDEBAR_GROUPS: SidebarGroupDefinition[] = [
         label: "Library",
         icon: Library,
         route: "/library",
+        defaultVisibility: "ALWAYS",
+        locked: true,
+      },
+      {
+        id: "market",
+        label: "Market",
+        icon: Sparkles,
+        route: "/market",
         defaultVisibility: "ALWAYS",
         locked: true,
       },

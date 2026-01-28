@@ -120,6 +120,12 @@ type ThemeSectionProps = {
   disabled: boolean;
 };
 
+type DataSovereigntySectionProps = {
+  settings: CoworkSettings;
+  isSaving: boolean;
+  onImport: (patch: Partial<CoworkSettings>) => Promise<void>;
+};
+
 type GymReportSectionProps = {
   gymState: GymState;
 };
@@ -150,6 +156,51 @@ type CheckpointSectionProps = {
   onRestore: (checkpointId: string) => void;
   onDelete: (checkpointId: string) => void;
 };
+
+const SETTINGS_TABS = [
+  {
+    id: "providers",
+    label: "Providers",
+    description: "Keys and connectivity",
+  },
+  {
+    id: "models",
+    label: "Models",
+    description: "Defaults and memory",
+  },
+  {
+    id: "appearance",
+    label: "Appearance",
+    description: "Theme and canvas",
+  },
+  {
+    id: "data",
+    label: "Data",
+    description: "Import and export",
+  },
+  {
+    id: "policy",
+    label: "Policy",
+    description: "Governance and rules",
+  },
+  {
+    id: "audit",
+    label: "Audit",
+    description: "Logs and approvals",
+  },
+  {
+    id: "checkpoints",
+    label: "Checkpoints",
+    description: "Snapshots and restore",
+  },
+  {
+    id: "diagnostics",
+    label: "Diagnostics",
+    description: "Benchmarks and health",
+  },
+] as const;
+
+type SettingsTabId = (typeof SETTINGS_TABS)[number]["id"];
 
 function ProviderKeyCard({
   provider,
@@ -439,6 +490,102 @@ function ThemeSection({ theme, onChange, disabled }: ThemeSectionProps) {
           </button>
         ))}
       </div>
+    </section>
+  );
+}
+
+function DataSovereigntySection({ settings, isSaving, onImport }: DataSovereigntySectionProps) {
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const [status, setStatus] = React.useState<{ type: "success" | "error"; message: string } | null>(
+    null
+  );
+
+  const handleExport = () => {
+    downloadJsonFile("cowork-settings.json", {
+      app: "Open Wrap",
+      exportedAt: new Date().toISOString(),
+      settings,
+    });
+    setStatus({ type: "success", message: "Settings exported to cowork-settings.json." });
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text) as unknown;
+      const patch = parseSettingsImport(parsed);
+      if (!patch) {
+        setStatus({ type: "error", message: "No valid settings found in file." });
+        return;
+      }
+      await onImport(patch);
+      setStatus({ type: "success", message: "Settings imported successfully." });
+    } catch (err) {
+      setStatus({
+        type: "error",
+        message: err instanceof Error ? err.message : "Failed to import settings.",
+      });
+    } finally {
+      event.target.value = "";
+    }
+  };
+
+  return (
+    <section className="card-panel space-y-4">
+      <div>
+        <p className="text-sm font-semibold text-foreground">Data Sovereignty</p>
+        <p className="text-xs text-muted-foreground">
+          Export your Cowork settings or import a curated configuration.
+        </p>
+      </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="application/json"
+        aria-label="Import settings JSON"
+        className="hidden"
+        onChange={handleImport}
+      />
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={handleExport}
+          disabled={isSaving}
+        >
+          Export settings
+        </button>
+        <button
+          type="button"
+          className="primary-button"
+          onClick={handleImportClick}
+          disabled={isSaving}
+        >
+          Import settings
+        </button>
+      </div>
+      {status ? (
+        <div
+          className={cn(
+            "text-xs font-medium",
+            status.type === "error" ? "text-destructive" : "text-success"
+          )}
+        >
+          {status.message}
+        </div>
+      ) : null}
+      <p className="text-xs text-muted-foreground">
+        Importing will apply supported keys only (model, theme, memory, policy, and compaction
+        settings).
+      </p>
     </section>
   );
 }
@@ -898,6 +1045,88 @@ function formatPolicySource(source: CoworkPolicySource | null): string | null {
     default:
       return source;
   }
+}
+
+function downloadJsonFile(filename: string, payload: unknown) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function getSettingsPayload(value: unknown): Record<string, unknown> | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const root = value as Record<string, unknown>;
+  const settingsCandidate = root.settings;
+  if (isRecord(settingsCandidate)) {
+    return settingsCandidate;
+  }
+  return root;
+}
+
+function maybeDefaultModel(payload: Record<string, unknown>): Partial<CoworkSettings> {
+  return typeof payload.defaultModel === "string" ? { defaultModel: payload.defaultModel } : {};
+}
+
+function maybeTheme(payload: Record<string, unknown>): Partial<CoworkSettings> {
+  return payload.theme === "light" || payload.theme === "dark" ? { theme: payload.theme } : {};
+}
+
+function maybeMemoryProfile(payload: Record<string, unknown>): Partial<CoworkSettings> {
+  return typeof payload.memoryProfile === "string"
+    ? { memoryProfile: payload.memoryProfile as CoworkSettings["memoryProfile"] }
+    : {};
+}
+
+function maybePolicy(payload: Record<string, unknown>): Partial<CoworkSettings> {
+  if (!("policy" in payload)) {
+    return {};
+  }
+  const policy = payload.policy;
+  return policy === null || typeof policy === "object"
+    ? { policy: policy as CoworkSettings["policy"] }
+    : {};
+}
+
+function maybeCaseInsensitivePaths(payload: Record<string, unknown>): Partial<CoworkSettings> {
+  return typeof payload.caseInsensitivePaths === "boolean"
+    ? { caseInsensitivePaths: payload.caseInsensitivePaths }
+    : {};
+}
+
+function maybeContextCompression(payload: Record<string, unknown>): Partial<CoworkSettings> {
+  return payload.contextCompression && typeof payload.contextCompression === "object"
+    ? { contextCompression: payload.contextCompression as CoworkSettings["contextCompression"] }
+    : {};
+}
+
+function parseSettingsImport(value: unknown): Partial<CoworkSettings> | null {
+  const payload = getSettingsPayload(value);
+  if (!payload) {
+    return null;
+  }
+
+  const patch: Partial<CoworkSettings> = {
+    ...maybeDefaultModel(payload),
+    ...maybeTheme(payload),
+    ...maybeMemoryProfile(payload),
+    ...maybePolicy(payload),
+    ...maybeCaseInsensitivePaths(payload),
+    ...maybeContextCompression(payload),
+  };
+
+  return Object.keys(patch).length > 0 ? patch : null;
 }
 
 function useSettingsState() {
@@ -1376,7 +1605,13 @@ export function SettingsPage() {
     restore: restoreCheckpointById,
     remove: deleteCheckpointById,
   } = useCheckpointState();
+  const [activeTab, setActiveTab] = React.useState<SettingsTabId>("providers");
   const [policyEditorError, setPolicyEditorError] = React.useState<string | null>(null);
+  const tabs = React.useMemo(
+    () =>
+      config.devTools ? SETTINGS_TABS : SETTINGS_TABS.filter((tab) => tab.id !== "diagnostics"),
+    []
+  );
 
   const handlePolicySave = React.useCallback(async () => {
     setPolicyEditorError(null);
@@ -1397,99 +1632,243 @@ export function SettingsPage() {
     void refresh();
   }, [handleUpdate, markClean, refresh]);
 
-  if (state.isLoading) {
-    return (
-      <div className="page-grid">
+  const handleTabKeyDown = React.useCallback(
+    (event: React.KeyboardEvent, index: number) => {
+      let nextIndex = index;
+
+      switch (event.key) {
+        case "ArrowUp":
+        case "ArrowLeft":
+          event.preventDefault();
+          nextIndex = (index - 1 + tabs.length) % tabs.length;
+          break;
+        case "ArrowDown":
+        case "ArrowRight":
+          event.preventDefault();
+          nextIndex = (index + 1) % tabs.length;
+          break;
+        case "Home":
+          event.preventDefault();
+          nextIndex = 0;
+          break;
+        case "End":
+          event.preventDefault();
+          nextIndex = tabs.length - 1;
+          break;
+        default:
+          return;
+      }
+
+      setActiveTab(tabs[nextIndex]?.id ?? "providers");
+    },
+    [tabs]
+  );
+
+  const handleImportSettings = React.useCallback(
+    async (patch: Partial<CoworkSettings>) => {
+      const { theme: importTheme, ...rest } = patch;
+      if (importTheme) {
+        handleThemeChange(importTheme);
+      }
+      if (Object.keys(rest).length > 0) {
+        await handleUpdate(rest);
+      }
+    },
+    [handleThemeChange, handleUpdate]
+  );
+
+  const tabContent = React.useMemo(() => {
+    if (state.isLoading) {
+      return (
         <section className="card-panel flex items-center justify-center py-12">
           <div className="h-5 w-5 border-2 border-primary/30 border-t-primary rounded-full" />
         </section>
-      </div>
-    );
-  }
+      );
+    }
+
+    switch (activeTab) {
+      case "providers":
+        return (
+          <ProvidersSection
+            state={providerState}
+            onInputChange={handleProviderInputChange}
+            onSave={handleProviderSave}
+            onDelete={handleProviderDelete}
+          />
+        );
+      case "models":
+        return (
+          <>
+            <ModelSection
+              value={state.data.defaultModel ?? "gpt-4.1"}
+              onChange={(value) => handleUpdate({ defaultModel: value })}
+              disabled={state.isSaving}
+            />
+            <ContextCompressionSection
+              value={state.data.contextCompression}
+              onChange={(value) => handleUpdate({ contextCompression: value })}
+              disabled={state.isSaving}
+            />
+            <section className="card-panel space-y-4">
+              <div>
+                <p className="text-sm font-semibold text-foreground">Memory Profile</p>
+                <p className="text-xs text-muted-foreground">
+                  Choose which lesson set the agent should load by default.
+                </p>
+              </div>
+              <select
+                className="text-input"
+                aria-label="Memory profile"
+                value={state.data.memoryProfile ?? "default"}
+                onChange={(event) =>
+                  handleUpdate({
+                    memoryProfile: event.target.value as SettingsState["data"]["memoryProfile"],
+                  })
+                }
+                disabled={state.isSaving}
+              >
+                <option value="default">Default</option>
+                <option value="strict-reviewer">Strict Reviewer</option>
+                <option value="creative-prototyper">Creative Prototyper</option>
+              </select>
+            </section>
+            <LocalVectorStoreSection />
+          </>
+        );
+      case "appearance":
+        return (
+          <ThemeSection theme={theme} onChange={handleThemeChange} disabled={state.isSaving} />
+        );
+      case "data":
+        return (
+          <DataSovereigntySection
+            settings={state.data}
+            isSaving={state.isSaving}
+            onImport={handleImportSettings}
+          />
+        );
+      case "policy":
+        return (
+          <PolicySection
+            policyState={policyState}
+            caseInsensitivePaths={state.data.caseInsensitivePaths ?? false}
+            isSaving={state.isSaving}
+            editorError={policyEditorError}
+            onDraftChange={setDraft}
+            onSave={handlePolicySave}
+            onClear={handlePolicyClear}
+            onExport={exportPolicy}
+            onToggleCaseInsensitive={(value) => handleUpdate({ caseInsensitivePaths: value })}
+          />
+        );
+      case "audit":
+        return (
+          <AuditLogSection
+            auditState={auditState}
+            onSessionChange={updateSessionId}
+            onActionChange={updateAction}
+            onRefresh={refreshAudit}
+          />
+        );
+      case "checkpoints":
+        return (
+          <CheckpointSection
+            checkpointState={checkpointState}
+            onSessionChange={updateCheckpointSessionId}
+            onRefresh={refreshCheckpoints}
+            onRestore={restoreCheckpointById}
+            onDelete={deleteCheckpointById}
+          />
+        );
+      case "diagnostics":
+        return <GymReportSection gymState={gymState} />;
+      default:
+        return null;
+    }
+  }, [
+    activeTab,
+    auditState,
+    checkpointState,
+    deleteCheckpointById,
+    exportPolicy,
+    gymState,
+    handleImportSettings,
+    handlePolicyClear,
+    handlePolicySave,
+    handleProviderDelete,
+    handleProviderInputChange,
+    handleProviderSave,
+    handleThemeChange,
+    handleUpdate,
+    policyEditorError,
+    policyState,
+    providerState,
+    refreshAudit,
+    refreshCheckpoints,
+    restoreCheckpointById,
+    setDraft,
+    state.data,
+    state.isLoading,
+    state.isSaving,
+    theme,
+    updateAction,
+    updateCheckpointSessionId,
+    updateSessionId,
+  ]);
 
   return (
-    <div className="page-grid">
-      <SettingsErrors
-        settingsError={state.error}
-        saveError={state.saveError}
-        providerError={providerState.error}
-      />
-
-      <ProvidersSection
-        state={providerState}
-        onInputChange={handleProviderInputChange}
-        onSave={handleProviderSave}
-        onDelete={handleProviderDelete}
-      />
-
-      <ModelSection
-        value={state.data.defaultModel ?? "gpt-4.1"}
-        onChange={(value) => handleUpdate({ defaultModel: value })}
-        disabled={state.isSaving}
-      />
-
-      <ContextCompressionSection
-        value={state.data.contextCompression}
-        onChange={(value) => handleUpdate({ contextCompression: value })}
-        disabled={state.isSaving}
-      />
-
-      <section className="card-panel space-y-4">
-        <div>
-          <p className="text-sm font-semibold text-foreground">Memory Profile</p>
+    <div className="h-full grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
+      <aside className="card-panel space-y-4">
+        <div className="space-y-2">
+          <p className="text-sm font-semibold text-foreground">Settings</p>
           <p className="text-xs text-muted-foreground">
-            Choose which lesson set the agent should load by default.
+            Configure providers, policies, and workspace preferences.
           </p>
         </div>
-        <select
-          className="text-input"
-          aria-label="Memory profile"
-          value={state.data.memoryProfile ?? "default"}
-          onChange={(event) =>
-            handleUpdate({
-              memoryProfile: event.target.value as SettingsState["data"]["memoryProfile"],
-            })
-          }
-          disabled={state.isSaving}
-        >
-          <option value="default">Default</option>
-          <option value="strict-reviewer">Strict Reviewer</option>
-          <option value="creative-prototyper">Creative Prototyper</option>
-        </select>
-      </section>
+        <div role="tablist" aria-orientation="vertical" className="space-y-2">
+          {tabs.map((tab, index) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                id={`tab-${tab.id}`}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                aria-controls={`tabpanel-${tab.id}`}
+                tabIndex={isActive ? 0 : -1}
+                onClick={() => setActiveTab(tab.id)}
+                onKeyDown={(event) => handleTabKeyDown(event, index)}
+                className={cn(
+                  "w-full rounded-xl border px-3 py-2 text-left transition-colors",
+                  isActive
+                    ? "border-foreground/30 bg-surface-1 text-foreground shadow-sm"
+                    : "border-border/60 text-muted-foreground hover:border-foreground/30 hover:text-foreground"
+                )}
+              >
+                <div className="text-sm font-semibold">{tab.label}</div>
+                <div className="text-xs text-muted-foreground">{tab.description}</div>
+              </button>
+            );
+          })}
+        </div>
+      </aside>
 
-      <LocalVectorStoreSection />
-
-      <ThemeSection theme={theme} onChange={handleThemeChange} disabled={state.isSaving} />
-
-      <PolicySection
-        policyState={policyState}
-        caseInsensitivePaths={state.data.caseInsensitivePaths ?? false}
-        isSaving={state.isSaving}
-        editorError={policyEditorError}
-        onDraftChange={setDraft}
-        onSave={handlePolicySave}
-        onClear={handlePolicyClear}
-        onExport={exportPolicy}
-        onToggleCaseInsensitive={(value) => handleUpdate({ caseInsensitivePaths: value })}
-      />
-
-      <AuditLogSection
-        auditState={auditState}
-        onSessionChange={updateSessionId}
-        onActionChange={updateAction}
-        onRefresh={refreshAudit}
-      />
-
-      <CheckpointSection
-        checkpointState={checkpointState}
-        onSessionChange={updateCheckpointSessionId}
-        onRefresh={refreshCheckpoints}
-        onRestore={restoreCheckpointById}
-        onDelete={deleteCheckpointById}
-      />
-
-      <GymReportSection gymState={gymState} />
+      <div
+        id={`tabpanel-${activeTab}`}
+        role="tabpanel"
+        aria-labelledby={`tab-${activeTab}`}
+        className="page-grid min-h-0"
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+        tabIndex={0}
+      >
+        <SettingsErrors
+          settingsError={state.error}
+          saveError={state.saveError}
+          providerError={providerState.error}
+        />
+        {tabContent}
+      </div>
     </div>
   );
 }

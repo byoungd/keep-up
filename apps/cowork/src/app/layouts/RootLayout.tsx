@@ -65,6 +65,7 @@ const STATIC_DEEPLINKS: Record<string, string> = {
   search: "/search",
   settings: "/settings",
   library: "/library",
+  market: "/market",
   lessons: "/lessons",
 };
 
