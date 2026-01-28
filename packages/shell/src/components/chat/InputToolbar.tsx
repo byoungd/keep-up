@@ -68,7 +68,7 @@ export function InputToolbar({
           aria-label={translations.addImage}
           title={translations.addImage}
         >
-          <Plus className="h-4 w-4" />
+          <Plus className="h-4 w-4" aria-hidden="true" />
         </Button>
 
         <div className="h-4 w-px bg-border/40 mx-1" />
