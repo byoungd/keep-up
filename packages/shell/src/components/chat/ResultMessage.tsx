@@ -22,7 +22,7 @@ export function ResultMessage({ content, artifacts, onPreview }: ResultMessagePr
         <div className="p-5 flex gap-4">
           <div className="shrink-0">
             <div className="w-8 h-8 rounded-full bg-success/10 flex items-center justify-center text-success">
-              <CheckCircle2 className="w-5 h-5" />
+              <CheckCircle2 className="w-5 h-5" aria-hidden="true" />
             </div>
           </div>
           <div className="flex-1 space-y-2">
@@ -65,7 +65,7 @@ function AttachmentCard({ artifact, onClick }: { artifact: ArtifactItem; onClick
       className="flex items-center gap-3 p-3 bg-surface-1 border border-border/40 rounded-lg hover:border-primary/30 hover:bg-surface-1/80 hover:shadow-md transition-all duration-normal group cursor-pointer active:scale-[0.99]"
     >
       <div className="w-10 h-10 rounded-md bg-surface-2 group-hover:bg-primary/5 flex items-center justify-center text-muted-foreground group-hover:text-primary transition-colors duration-fast border border-border/10">
-        <Icon className="w-5 h-5" />
+        <Icon className="w-5 h-5" aria-hidden="true" />
       </div>
       <div className="flex-1 min-w-0">
         <div className="text-sm font-medium truncate group-hover:text-foreground transition-colors duration-fast text-foreground/80">
@@ -91,7 +91,7 @@ function AttachmentCard({ artifact, onClick }: { artifact: ArtifactItem; onClick
         className="p-2 text-muted-foreground/50 hover:text-primary hover:bg-primary/10 rounded-md opacity-0 group-hover:opacity-100 transition-all duration-fast translate-x-2 group-hover:translate-x-0"
         aria-hidden="true"
       >
-        <Download className="w-4 h-4" />
+        <Download className="w-4 h-4" aria-hidden="true" />
       </span>
     </motion.button>
   );

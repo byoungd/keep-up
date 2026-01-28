@@ -8,23 +8,23 @@ import type { MessageStatus } from "./types";
 const STATUS_META: Record<MessageStatus, { className: string; icon: React.ReactNode }> = {
   streaming: {
     className: "text-primary/50",
-    icon: <div className="h-1.5 w-1.5 rounded-full bg-current" />,
+    icon: <div className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />,
   },
   done: {
     className: "text-success",
-    icon: <CheckCircle2 className="h-3 w-3" />,
+    icon: <CheckCircle2 className="h-3 w-3" aria-hidden="true" />,
   },
   error: {
     className: "text-destructive",
-    icon: <AlertTriangle className="h-3 w-3" />,
+    icon: <AlertTriangle className="h-3 w-3" aria-hidden="true" />,
   },
   canceled: {
     className: "text-muted-foreground",
-    icon: <Square className="h-3 w-3" />,
+    icon: <Square className="h-3 w-3" aria-hidden="true" />,
   },
   pending: {
     className: "text-muted-foreground/50",
-    icon: <div className="h-1.5 w-1.5 rounded-full bg-current opacity-50" />,
+    icon: <div className="h-1.5 w-1.5 rounded-full bg-current opacity-50" aria-hidden="true" />,
   },
 };
 

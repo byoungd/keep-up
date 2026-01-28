@@ -53,17 +53,17 @@ export const MessageActions = React.memo(function MessageActions({
         <>
           <ActionButton
             label={translations.actionEdit}
-            icon={<Edit3 className="h-3.5 w-3.5" />}
+            icon={<Edit3 className="h-3.5 w-3.5" aria-hidden="true" />}
             onClick={() => onEdit(messageId)}
           />
           <ActionButton
             label={translations.actionBranch}
-            icon={<GitBranch className="h-3.5 w-3.5" />}
+            icon={<GitBranch className="h-3.5 w-3.5" aria-hidden="true" />}
             onClick={() => onBranch(messageId)}
           />
           <ActionButton
             label={translations.actionQuote}
-            icon={<Quote className="h-3.5 w-3.5" />}
+            icon={<Quote className="h-3.5 w-3.5" aria-hidden="true" />}
             onClick={() => onQuote(content)}
           />
         </>
@@ -71,18 +71,24 @@ export const MessageActions = React.memo(function MessageActions({
         <>
           <ActionButton
             label={isCopied ? "Copied" : translations.actionCopy}
-            icon={isCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+            icon={
+              isCopied ? (
+                <Check className="h-3.5 w-3.5" aria-hidden="true" />
+              ) : (
+                <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+              )
+            }
             onClick={handleCopy}
             active={isCopied}
           />
           <ActionButton
             label={translations.actionQuote}
-            icon={<Quote className="h-3.5 w-3.5" />}
+            icon={<Quote className="h-3.5 w-3.5" aria-hidden="true" />}
             onClick={() => onQuote(content)}
           />
           <ActionButton
             label={translations.actionRetry}
-            icon={<RefreshCcw className="h-3.5 w-3.5" />}
+            icon={<RefreshCcw className="h-3.5 w-3.5" aria-hidden="true" />}
             onClick={() => onRetry(messageId)}
           />
         </>
