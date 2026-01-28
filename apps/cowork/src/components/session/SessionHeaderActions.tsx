@@ -222,7 +222,7 @@ export function SessionHeaderActions({ className }: SessionHeaderActionsProps) {
             className={cn("h-7 w-7 text-muted-foreground hover:text-foreground", className)}
             aria-label="Session actions"
           >
-            <MoreHorizontal className="h-4 w-4" />
+            <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent
@@ -268,7 +268,7 @@ export function SessionHeaderActions({ className }: SessionHeaderActionsProps) {
 
           <DropdownMenuSub>
             <DropdownMenuSubTrigger className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none data-[state=open]:bg-foreground/5 data-[state=open]:text-foreground">
-              <Folder className="h-4 w-4" />
+              <Folder className="h-4 w-4" aria-hidden="true" />
               <span>Move to project</span>
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent className="w-56 rounded-lg p-1">
