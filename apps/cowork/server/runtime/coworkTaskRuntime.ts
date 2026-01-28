@@ -122,6 +122,7 @@ import {
   resolveSessionToolDenylist,
   truncateToTokenBudget,
 } from "./utils";
+import { PersistenceQueue, type PersistenceQueueEvent } from "./utils/persistenceQueue";
 import { createWebSearchProvider } from "./webSearchProvider";
 
 type Logger = Pick<Console, "info" | "warn" | "error" | "debug">;
@@ -169,6 +170,7 @@ type SessionRuntime = {
   fallbackNotice: string | null;
   contextPackKey: string | null;
   eventQueue: Promise<void>;
+  persistenceQueue: PersistenceQueue;
   unsubscribeQueue: () => void;
   unsubscribeOrchestrator: () => void;
   unsubscribeEventBus: () => void;
@@ -581,7 +583,12 @@ export class CoworkTaskRuntime {
     if (runtime) {
       try {
         const state = runtime.runtime.orchestrator.getState();
-        await this.persistAgentState(runtime, state);
+        runtime.persistenceQueue.enqueue({
+          kind: "session_state",
+          meta: { sessionId },
+          run: () => this.persistAgentState(runtime, state),
+        });
+        await runtime.persistenceQueue.flush();
       } catch (error) {
         this.logger.warn("Failed to persist session state on shutdown", error);
       }
@@ -1497,6 +1504,10 @@ export class CoworkTaskRuntime {
       fallbackNotice: runtimeResult.fallbackNotice,
       contextPackKey: runtimeResult.contextPackKey,
       eventQueue: Promise.resolve(),
+      persistenceQueue: new PersistenceQueue({
+        logger: this.logger,
+        emit: (event) => this.emitPersistenceEvent(event),
+      }),
       unsubscribeQueue: noop,
       unsubscribeOrchestrator: noop,
       unsubscribeEventBus: noop,
@@ -1520,13 +1531,17 @@ export class CoworkTaskRuntime {
       const result = await originalWaitForTask(taskId);
       await runtimeState.eventQueue.catch(() => undefined);
       if (runtimeState.checkpointStorage && result?.state) {
-        await this.persistTaskCheckpoint(runtimeState, taskId, result.state).catch((err) => {
-          this.logger.warn("Failed to persist task checkpoint", err);
+        runtimeState.persistenceQueue.enqueue({
+          kind: "checkpoint",
+          meta: { sessionId, taskId },
+          run: () => this.persistTaskCheckpoint(runtimeState, taskId, result.state),
         });
       }
       if (result?.state) {
-        await this.persistAgentState(runtimeState, result.state).catch((err) => {
-          this.logger.warn("Failed to persist session state", err);
+        runtimeState.persistenceQueue.enqueue({
+          kind: "session_state",
+          meta: { sessionId },
+          run: () => this.persistAgentState(runtimeState, result.state),
         });
       }
       return result;
@@ -1601,6 +1616,26 @@ export class CoworkTaskRuntime {
 
     runtimeState.unsubscribeEventBus = this.subscribeToRuntimeArtifacts(runtimeState);
     runtimeState.unsubscribeSkills = this.subscribeToRuntimeSkills(runtimeState);
+  }
+
+  private emitPersistenceEvent(event: PersistenceQueueEvent): void {
+    if (!this.runtimeEventBus) {
+      return;
+    }
+    this.runtimeEventBus.emit(
+      "persistence.updated",
+      {
+        sessionId: event.sessionId,
+        taskId: event.taskId,
+        kind: event.kind,
+        status: event.status,
+        attempts: event.attempts,
+        error: event.error,
+        nextRetryAt: event.nextRetryAt,
+        updatedAt: Date.now(),
+      },
+      { source: "cowork", priority: "low" }
+    );
   }
 
   private subscribeToRuntimeArtifacts(runtimeState: SessionRuntime): () => void {
@@ -2224,8 +2259,10 @@ export class CoworkTaskRuntime {
       restoredAt,
       currentStep: restoredState.turn,
     });
-    await this.persistAgentState(runtimeState, restoredState).catch((err) => {
-      this.logger.warn("Failed to persist session state after checkpoint restore", err);
+    runtimeState.persistenceQueue.enqueue({
+      kind: "session_state",
+      meta: { sessionId, taskId },
+      run: () => this.persistAgentState(runtimeState, restoredState),
     });
 
     return {
