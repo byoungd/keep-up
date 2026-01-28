@@ -495,6 +495,7 @@ export class PlanModeController {
     this.emitEvent("research_started");
 
     if (this.researchEngine) {
+      this.researchEngine.clear();
       const strategy = await this.researchEngine.analyzeRequest(
         this.state.userRequest,
         this.getClarificationContext()
