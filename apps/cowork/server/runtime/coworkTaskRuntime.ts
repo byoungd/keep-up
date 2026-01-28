@@ -205,6 +205,28 @@ type RuntimeBuildResult = {
   skillWatcherStop?: () => void;
 };
 
+export type CoworkGatewaySessionInput = {
+  sessionId?: string;
+  userId?: string;
+  deviceId?: string;
+  title?: string;
+  projectId?: string;
+  workspaceId?: string;
+  isolationLevel?: CoworkSession["isolationLevel"];
+  expiresAt?: number;
+  grants?: CoworkSession["grants"];
+  connectors?: CoworkSession["connectors"];
+};
+
+export type CoworkGatewaySessionUpdate = {
+  title?: string | null;
+  projectId?: string | null;
+  workspaceId?: string | null;
+  isolationLevel?: CoworkSession["isolationLevel"];
+  endedAt?: number | null;
+  expiresAt?: number | null;
+};
+
 type CheckpointRestoreResult = {
   checkpointId: string;
   taskId?: string;
@@ -216,6 +238,17 @@ const noop = () => undefined;
 const DEFAULT_REFERENCE_VERIFIER: ReferenceVerificationProvider = {
   verifyReference: () => ({ ok: true }),
 };
+
+function resolveNullableUpdate<T>(
+  current: T | undefined,
+  next: T | null | undefined
+): T | undefined {
+  if (next === undefined) {
+    return current;
+  }
+  return next ?? undefined;
+}
+
 export class CoworkTaskRuntime {
   private readonly runtimes = new Map<string, SessionRuntime>();
   private readonly runtimeFactory?: RuntimeFactory;
@@ -336,6 +369,80 @@ export class CoworkTaskRuntime {
         logger.warn("Failed to initialize Mem0 memory adapter", err);
       }
     }
+  }
+
+  async listSessions(): Promise<CoworkSession[]> {
+    return this.sessionManager.getAllSessions();
+  }
+
+  async getSession(sessionId: string): Promise<CoworkSession | null> {
+    return this.sessionManager.getSession(sessionId);
+  }
+
+  async createSession(input: CoworkGatewaySessionInput): Promise<CoworkSession> {
+    const now = Date.now();
+    const sessionId = input.sessionId ?? crypto.randomUUID();
+    const isolationLevel = resolveSessionIsolation({ isolationLevel: input.isolationLevel });
+    const grants = (input.grants ?? []).map((grant) => ({
+      ...grant,
+      id: grant.id ?? crypto.randomUUID(),
+    }));
+    const connectors = (input.connectors ?? []).map((connector) => ({
+      ...connector,
+      id: connector.id ?? crypto.randomUUID(),
+    }));
+    const session: CoworkSession = {
+      sessionId,
+      userId: input.userId ?? "gateway-user",
+      deviceId: input.deviceId ?? "gateway-device",
+      platform: "macos",
+      mode: "cowork",
+      isolationLevel,
+      grants,
+      connectors,
+      createdAt: now,
+      updatedAt: now,
+      expiresAt: input.expiresAt,
+      title: input.title,
+      projectId: input.projectId,
+      workspaceId: input.workspaceId,
+    };
+
+    return this.sessionManager.createSession(session);
+  }
+
+  async updateSession(
+    sessionId: string,
+    updates: CoworkGatewaySessionUpdate
+  ): Promise<CoworkSession | null> {
+    const updatedAt = Date.now();
+    return this.sessionManager.updateSession(sessionId, (session) => {
+      const isolationLevel =
+        updates.isolationLevel !== undefined
+          ? resolveSessionIsolation({ isolationLevel: updates.isolationLevel })
+          : session.isolationLevel;
+
+      return {
+        ...session,
+        title: resolveNullableUpdate(session.title, updates.title),
+        projectId: resolveNullableUpdate(session.projectId, updates.projectId),
+        workspaceId: resolveNullableUpdate(session.workspaceId, updates.workspaceId),
+        endedAt: resolveNullableUpdate(session.endedAt, updates.endedAt),
+        expiresAt: resolveNullableUpdate(session.expiresAt, updates.expiresAt),
+        isolationLevel,
+        updatedAt,
+      };
+    });
+  }
+
+  async endSession(sessionId: string): Promise<boolean> {
+    const updated = await this.sessionManager.updateSession(sessionId, (session) => {
+      if (session.endedAt) {
+        return session;
+      }
+      return { ...session, endedAt: Date.now(), updatedAt: Date.now() };
+    });
+    return Boolean(updated);
   }
 
   /**
@@ -1153,10 +1260,7 @@ export class CoworkTaskRuntime {
     return typeof value === "string" ? value : undefined;
   }
 
-  private buildRuntimeSecurityPolicy(
-    executionMode: ExecutionSandboxMode,
-    session: CoworkSession
-  ) {
+  private buildRuntimeSecurityPolicy(executionMode: ExecutionSandboxMode, session: CoworkSession) {
     const basePolicy =
       executionMode === "docker"
         ? buildDockerSecurityPolicy()
