@@ -17,7 +17,13 @@ export function PlanCard({ steps }: PlanCardProps) {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <div className="p-1.5 bg-info/10 rounded text-info">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden="true"
+            >
               <title>Plan icon</title>
               <path
                 strokeLinecap="round"
@@ -56,6 +62,7 @@ export function PlanCard({ steps }: PlanCardProps) {
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
+                  aria-hidden="true"
                 >
                   <title>Completed step icon</title>
                   <path

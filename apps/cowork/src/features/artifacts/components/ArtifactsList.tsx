@@ -26,7 +26,13 @@ export function ArtifactsList({ artifacts, onApply, onRevert }: ArtifactsListPro
     return (
       <div className="flex flex-col items-center justify-center p-12 text-center space-y-4 animate-in fade-in duration-700">
         <div className="w-16 h-16 rounded-2xl bg-surface-1 border border-border/40 flex items-center justify-center text-muted-foreground/20">
-          <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg
+            className="w-8 h-8"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            aria-hidden="true"
+          >
             <title>Empty artifacts icon</title>
             <path
               strokeLinecap="round"
