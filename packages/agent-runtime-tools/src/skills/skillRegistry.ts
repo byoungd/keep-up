@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { type FSWatcher, watch as fsWatch } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { AuditLogger, SkillIndexEntry, SkillSource } from "@ku0/agent-runtime-core";
@@ -51,9 +52,9 @@ type FileStat = {
 };
 
 const SOURCE_PRIORITY: Record<SkillSource, number> = {
-  builtin: 4,
+  user: 4,
   org: 3,
-  user: 2,
+  builtin: 2,
   third_party: 1,
 };
 
@@ -135,6 +136,143 @@ export class SkillRegistry {
 
   getErrors(): SkillValidationError[] {
     return [...this.errors];
+  }
+
+  watchWorkspaceSkills(options?: {
+    debounceMs?: number;
+    onUpdate?: (result: SkillDiscoveryResult) => void;
+    roots?: string[];
+  }): () => void {
+    const debounceMs = Math.max(0, options?.debounceMs ?? 30000);
+    const watchedRoots =
+      options?.roots?.map((root) => path.resolve(root)) ??
+      this.roots.filter((root) => root.source === "user").map((root) => path.resolve(root.path));
+
+    if (watchedRoots.length === 0) {
+      return () => undefined;
+    }
+
+    let closed = false;
+    let timer: NodeJS.Timeout | null = null;
+    let running = false;
+    let pending = false;
+    const watchers: FSWatcher[] = [];
+    const watchedPaths = new Set<string>();
+    const recursiveRoots = new Set<string>();
+
+    const scheduleRefresh = () => {
+      if (closed) {
+        return;
+      }
+      if (timer) {
+        clearTimeout(timer);
+      }
+      if (debounceMs === 0) {
+        void runRefresh();
+        return;
+      }
+      timer = setTimeout(() => {
+        void runRefresh();
+      }, debounceMs);
+    };
+
+    const runRefresh = async () => {
+      if (closed) {
+        return;
+      }
+      if (running) {
+        pending = true;
+        return;
+      }
+      running = true;
+      pending = false;
+      try {
+        const result = await this.discover();
+        options?.onUpdate?.(result);
+        for (const root of watchedRoots) {
+          if (!recursiveRoots.has(root)) {
+            void watchShallow(root);
+          }
+        }
+      } catch {
+        // Ignore refresh failures; next change will retry.
+      } finally {
+        running = false;
+        if (pending) {
+          scheduleRefresh();
+        }
+      }
+    };
+
+    const watchPath = (watchPath: string): boolean => {
+      if (watchedPaths.has(watchPath)) {
+        return true;
+      }
+      try {
+        watchers.push(fsWatch(watchPath, () => scheduleRefresh()));
+        watchedPaths.add(watchPath);
+        return true;
+      } catch {
+        // Ignore watcher failures.
+        return false;
+      }
+    };
+
+    const watchRecursiveRoot = (root: string): boolean => {
+      if (recursiveRoots.has(root)) {
+        return true;
+      }
+      if (watchedPaths.has(root)) {
+        return false;
+      }
+      try {
+        watchers.push(fsWatch(root, { recursive: true }, () => scheduleRefresh()));
+        watchedPaths.add(root);
+        recursiveRoots.add(root);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    const watchShallow = async (root: string) => {
+      watchPath(root);
+      try {
+        const entries = await fs.readdir(root, { withFileTypes: true });
+        for (const entry of entries) {
+          if (!entry.isDirectory()) {
+            continue;
+          }
+          const dirPath = path.join(root, entry.name);
+          watchPath(dirPath);
+        }
+      } catch {
+        // Ignore directory listing errors.
+      }
+    };
+
+    const watchRoot = async (root: string) => {
+      const success = watchRecursiveRoot(root);
+      if (success) {
+        return;
+      }
+      await watchShallow(root);
+    };
+
+    for (const root of watchedRoots) {
+      void watchRoot(root);
+    }
+
+    return () => {
+      closed = true;
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      for (const watcher of watchers) {
+        watcher.close();
+      }
+    };
   }
 
   private async resolveSkillDirectories(rootPath: string): Promise<string[]> {

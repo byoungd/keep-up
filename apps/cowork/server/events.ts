@@ -10,6 +10,8 @@ import type {
   CoworkWorkspaceSession,
   ToolActivity,
 } from "@ku0/agent-runtime";
+import type { SkillActivation, SkillIndexEntry } from "@ku0/agent-runtime-core";
+import type { SkillValidationError } from "@ku0/agent-runtime-tools/skills";
 
 export const COWORK_EVENTS = {
   // Session lifecycle
@@ -47,8 +49,10 @@ export const COWORK_EVENTS = {
   AGENT_TURN_START: "agent.turn.start",
   AGENT_TURN_END: "agent.turn.end",
   POLICY_DECISION: "policy.decision",
+  SKILLS_UPDATED: "skills.updated",
   CHECKPOINT_CREATED: "checkpoint.created",
   CHECKPOINT_RESTORED: "checkpoint.restored",
+  CONTEXT_COMPACTION: "context.compaction",
   CLARIFICATION_REQUESTED: "clarification.requested",
   CLARIFICATION_ANSWERED: "clarification.answered",
 
@@ -57,6 +61,10 @@ export const COWORK_EVENTS = {
 } as const;
 
 export type CoworkEventType = (typeof COWORK_EVENTS)[keyof typeof COWORK_EVENTS];
+
+export type CoworkSkillSummary = SkillIndexEntry & {
+  disabled?: boolean;
+};
 
 /**
  * Type-safe event payload definitions
@@ -222,6 +230,13 @@ export interface CoworkEventPayloads {
     reason?: string;
     taskId?: string;
   };
+  [COWORK_EVENTS.SKILLS_UPDATED]: {
+    sessionId: string;
+    skills: CoworkSkillSummary[];
+    activeSkills?: SkillActivation[];
+    errors?: SkillValidationError[];
+    updatedAt: number;
+  };
   [COWORK_EVENTS.CHECKPOINT_CREATED]: {
     checkpointId: string;
     taskId?: string;
@@ -234,6 +249,19 @@ export interface CoworkEventPayloads {
     taskId?: string;
     restoredAt: number;
     currentStep: number;
+  };
+  [COWORK_EVENTS.CONTEXT_COMPACTION]: {
+    taskId?: string;
+    messagesBefore?: number;
+    messagesAfter?: number;
+    summaryLength?: number;
+    tokensSaved?: number;
+    compressionRatio?: number;
+    compressionTimeMs?: number;
+    strategy?: string;
+    qualityScore?: number;
+    messagesSummarized?: number;
+    toolResultsPruned?: number;
   };
   [COWORK_EVENTS.CLARIFICATION_REQUESTED]: {
     request: ClarificationRequest;

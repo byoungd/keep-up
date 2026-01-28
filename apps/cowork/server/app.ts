@@ -23,6 +23,7 @@ import { createProjectRoutes } from "./routes/projects";
 import { createProviderRoutes } from "./routes/providers";
 import { createSessionRoutes } from "./routes/sessions";
 import { createSettingsRoutes } from "./routes/settings";
+import { createSkillRoutes } from "./routes/skills";
 import { createStreamRoutes } from "./routes/stream";
 import { createUserRoutes } from "./routes/user";
 import { createWorkflowRoutes } from "./routes/workflows";
@@ -251,6 +252,14 @@ export function createCoworkApp(deps: CoworkAppDeps) {
     "/api",
     createClarificationRoutes({
       taskRuntime,
+    })
+  );
+
+  app.route(
+    "/api",
+    createSkillRoutes({
+      taskRuntime,
+      sessions: deps.storage.sessionStore,
     })
   );
 

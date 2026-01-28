@@ -108,6 +108,12 @@ type ModelSectionProps = {
   disabled: boolean;
 };
 
+type ContextCompressionSectionProps = {
+  value?: CoworkSettings["contextCompression"];
+  onChange: (value: CoworkSettings["contextCompression"]) => void;
+  disabled: boolean;
+};
+
 type ThemeSectionProps = {
   theme: "light" | "dark";
   onChange: (theme: "light" | "dark") => void;
@@ -279,6 +285,134 @@ function ModelSection({ value, onChange, disabled }: ModelSectionProps) {
         <option value="gemini-3-pro-high">Gemini 3 Pro High</option>
         <option value="gemini-3-flash">Gemini 3 Flash</option>
       </select>
+    </section>
+  );
+}
+
+function ContextCompressionSection({ value, onChange, disabled }: ContextCompressionSectionProps) {
+  const config = value ?? {};
+
+  const updateConfig = React.useCallback(
+    (partial: Partial<NonNullable<CoworkSettings["contextCompression"]>>) => {
+      const next: Record<string, unknown> = { ...config, ...partial };
+      for (const key of Object.keys(next)) {
+        if (next[key] === undefined || next[key] === null || next[key] === "") {
+          delete next[key];
+        }
+      }
+      onChange(Object.keys(next).length > 0 ? (next as CoworkSettings["contextCompression"]) : {});
+    },
+    [config, onChange]
+  );
+
+  const parseNumber = (raw: string): number | undefined => {
+    if (!raw.trim()) {
+      return undefined;
+    }
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  };
+
+  return (
+    <section className="card-panel space-y-4">
+      <div>
+        <p className="text-sm font-semibold text-foreground">Context Compaction</p>
+        <p className="text-xs text-muted-foreground">
+          Configure when long sessions are summarized to stay within model limits.
+        </p>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2">
+        <label className="space-y-1 text-xs text-muted-foreground">
+          <span>Max tokens</span>
+          <input
+            aria-label="Context max tokens"
+            type="number"
+            inputMode="numeric"
+            className="text-input"
+            placeholder="Auto"
+            value={config.maxTokens ?? ""}
+            onChange={(event) => updateConfig({ maxTokens: parseNumber(event.target.value) })}
+            disabled={disabled}
+          />
+        </label>
+        <label className="space-y-1 text-xs text-muted-foreground">
+          <span>Compression threshold (0-1)</span>
+          <input
+            aria-label="Context compression threshold"
+            type="number"
+            step="0.05"
+            min="0"
+            max="1"
+            className="text-input"
+            placeholder="0.8"
+            value={config.compressionThreshold ?? ""}
+            onChange={(event) =>
+              updateConfig({ compressionThreshold: parseNumber(event.target.value) })
+            }
+            disabled={disabled}
+          />
+        </label>
+        <label className="space-y-1 text-xs text-muted-foreground">
+          <span>Preserve last N messages</span>
+          <input
+            aria-label="Context preserve count"
+            type="number"
+            inputMode="numeric"
+            className="text-input"
+            placeholder="3"
+            value={config.preserveCount ?? ""}
+            onChange={(event) => updateConfig({ preserveCount: parseNumber(event.target.value) })}
+            disabled={disabled}
+          />
+        </label>
+        <label className="space-y-1 text-xs text-muted-foreground">
+          <span>Minimum messages after compression</span>
+          <input
+            aria-label="Context minimum messages"
+            type="number"
+            inputMode="numeric"
+            className="text-input"
+            placeholder="5"
+            value={config.minMessages ?? ""}
+            onChange={(event) => updateConfig({ minMessages: parseNumber(event.target.value) })}
+            disabled={disabled}
+          />
+        </label>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2">
+        <label className="space-y-1 text-xs text-muted-foreground">
+          <span>Strategy</span>
+          <select
+            aria-label="Context compaction strategy"
+            className="text-input"
+            value={config.strategy ?? "hybrid"}
+            onChange={(event) =>
+              updateConfig({
+                strategy: event.target.value as NonNullable<
+                  CoworkSettings["contextCompression"]
+                >["strategy"],
+              })
+            }
+            disabled={disabled}
+          >
+            <option value="hybrid">Hybrid</option>
+            <option value="summarize">Summarize</option>
+            <option value="truncate">Truncate</option>
+            <option value="sliding_window">Sliding window</option>
+          </select>
+        </label>
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          <input
+            aria-label="Enable compaction summarization"
+            type="checkbox"
+            className="h-4 w-4"
+            checked={config.enableSummarization ?? true}
+            onChange={(event) => updateConfig({ enableSummarization: event.target.checked })}
+            disabled={disabled}
+          />
+          Enable summarization
+        </label>
+      </div>
     </section>
   );
 }
@@ -1291,6 +1425,12 @@ export function SettingsPage() {
       <ModelSection
         value={state.data.defaultModel ?? "gpt-4.1"}
         onChange={(value) => handleUpdate({ defaultModel: value })}
+        disabled={state.isSaving}
+      />
+
+      <ContextCompressionSection
+        value={state.data.contextCompression}
+        onChange={(value) => handleUpdate({ contextCompression: value })}
         disabled={state.isSaving}
       />
 

@@ -15,6 +15,35 @@ const toolCallSchema = z.object({
 export function createMcpAppsRoutes(deps: McpAppsRouteDeps) {
   const app = new Hono();
 
+  app.get("/mcp/config", async (c) => {
+    try {
+      const config = await deps.mcpServers.getConfig();
+      return c.json({ ok: true, config });
+    } catch (error) {
+      return jsonError(
+        c,
+        500,
+        "Failed to load MCP config",
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  });
+
+  app.put("/mcp/config", async (c) => {
+    const body = await readJsonBody(c);
+    try {
+      const config = await deps.mcpServers.updateConfig(body);
+      return c.json({ ok: true, config });
+    } catch (error) {
+      return jsonError(
+        c,
+        400,
+        "Invalid MCP config",
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  });
+
   app.get("/mcp/servers", (c) => {
     const servers = deps.mcpServers.listServers();
     return c.json({ ok: true, servers });
@@ -51,6 +80,29 @@ export function createMcpAppsRoutes(deps: McpAppsRouteDeps) {
         c,
         500,
         "Failed to call MCP tool",
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  });
+
+  app.post("/mcp/servers/:server/test", async (c) => {
+    const serverName = c.req.param("server");
+    try {
+      const tools = await deps.mcpServers.listTools(serverName);
+      const status =
+        deps.mcpServers.listServers().find((server) => server.name === serverName)?.status ?? null;
+      return c.json({
+        ok: true,
+        server: serverName,
+        status,
+        toolCount: tools.length,
+        tools,
+      });
+    } catch (error) {
+      return jsonError(
+        c,
+        500,
+        "Failed to test MCP server",
         error instanceof Error ? error.message : String(error)
       );
     }

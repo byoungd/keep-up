@@ -1,5 +1,6 @@
 import type {
   AgentState,
+  ContextCompressionConfig,
   CoworkPolicyConfig,
   CoworkRiskTag,
   CoworkWorkflowTemplate,
@@ -80,6 +81,7 @@ export interface CoworkSettings {
   memoryProfile?: LessonProfile;
   policy?: CoworkPolicyConfig | null;
   caseInsensitivePaths?: boolean;
+  contextCompression?: ContextCompressionConfig;
 }
 
 export type CoworkProviderId = "openai" | "anthropic" | "gemini" | "ollama" | "deepseek";

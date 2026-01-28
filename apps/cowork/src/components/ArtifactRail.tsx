@@ -1,6 +1,7 @@
 import { ArtifactsList } from "../features/artifacts/components/ArtifactsList";
 import { ClarificationPanel } from "../features/clarifications/components/ClarificationPanel";
 import type { TaskGraph } from "../features/tasks/types";
+import { SkillsPanel } from "./session/SkillsPanel";
 
 interface ArtifactRailProps {
   sessionId: string;
@@ -34,6 +35,11 @@ export function ArtifactRail({
           // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
           tabIndex={0}
         >
+          <SkillsPanel
+            skills={graph.skills}
+            activeSkills={graph.activeSkills}
+            errors={graph.skillErrors}
+          />
           {graph.clarifications.length > 0 && onAnswerClarification && (
             <ClarificationPanel
               clarifications={graph.clarifications}

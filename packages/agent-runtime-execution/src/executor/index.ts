@@ -1138,6 +1138,8 @@ export class ToolExecutionPipeline
   }
 
   private auditCall(call: MCPToolCall, context: ToolContext, toolCallId?: string): void {
+    const tool = this.resolveTool(call.name);
+    const input = this.buildAuditInput(call, tool);
     this.audit?.log({
       entryId: toolCallId ? `${toolCallId}:call` : undefined,
       timestamp: Date.now(),
@@ -1147,7 +1149,7 @@ export class ToolExecutionPipeline
       taskId: context.taskNodeId,
       userId: context.userId,
       correlationId: context.correlationId,
-      input: call.arguments,
+      input,
       sandboxed: context.security.sandbox.type !== "none",
     });
   }
@@ -1170,6 +1172,35 @@ export class ToolExecutionPipeline
       output: result.success ? result.content : result.error,
       sandboxed: context.security.sandbox.type !== "none",
     });
+  }
+
+  private buildAuditInput(call: MCPToolCall, tool?: MCPTool): Record<string, unknown> {
+    const args = call.arguments ?? {};
+    const metadata = this.resolveMcpAuditMetadata(tool);
+    if (!metadata) {
+      return args;
+    }
+    return { ...args, __mcp: metadata };
+  }
+
+  private resolveMcpAuditMetadata(
+    tool?: MCPTool
+  ): { server: string; scopes?: string[]; transport?: string } | null {
+    const metadata = tool?.metadata;
+    if (!metadata || typeof metadata !== "object") {
+      return null;
+    }
+    const server = metadata.mcpServer;
+    if (typeof server !== "string" || server.length === 0) {
+      return null;
+    }
+    const transport = typeof metadata.mcpTransport === "string" ? metadata.mcpTransport : undefined;
+    const scopes =
+      Array.isArray(tool?.annotations?.requiredScopes) &&
+      tool.annotations?.requiredScopes.length > 0
+        ? tool.annotations.requiredScopes
+        : undefined;
+    return { server, scopes, transport };
   }
 
   private auditPolicyDecision(

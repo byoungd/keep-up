@@ -7,6 +7,8 @@ import type {
   TokenUsageStats,
   ToolActivity,
 } from "@ku0/agent-runtime";
+import type { SkillActivation, SkillIndexEntry } from "@ku0/agent-runtime-core";
+import type { SkillValidationError } from "@ku0/agent-runtime-tools/skills";
 import { z } from "zod";
 
 export enum TaskStatus {
@@ -241,7 +243,8 @@ export type TaskNodeType =
   | "task_status"
   | "turn_marker"
   | "policy_decision"
-  | "checkpoint";
+  | "checkpoint"
+  | "context_compaction";
 
 export interface BaseNode {
   id: string;
@@ -331,6 +334,20 @@ export interface CheckpointNode extends BaseNode {
   action: "created" | "restored";
 }
 
+export interface ContextCompactionNode extends BaseNode {
+  type: "context_compaction";
+  messagesBefore?: number;
+  messagesAfter?: number;
+  summaryLength?: number;
+  tokensSaved?: number;
+  compressionRatio?: number;
+  compressionTimeMs?: number;
+  strategy?: string;
+  qualityScore?: number;
+  messagesSummarized?: number;
+  toolResultsPruned?: number;
+}
+
 export type TaskNode =
   | ThinkingNode
   | ToolCallNode
@@ -340,7 +357,12 @@ export type TaskNode =
   | TaskStatusNode
   | TurnMarkerNode
   | PolicyDecisionNode
-  | CheckpointNode;
+  | CheckpointNode
+  | ContextCompactionNode;
+
+export type SkillSummary = SkillIndexEntry & {
+  disabled?: boolean;
+};
 
 export interface TaskGraph {
   sessionId: string;
@@ -355,6 +377,9 @@ export interface TaskGraph {
   messageUsage?: Record<string, MessageUsage>;
   workspaceSessions?: Record<string, CoworkWorkspaceSession>;
   workspaceEvents?: Record<string, CoworkWorkspaceEvent[]>;
+  skills?: SkillSummary[];
+  activeSkills?: SkillActivation[];
+  skillErrors?: SkillValidationError[];
 }
 
 export type MessageUsage = TokenUsageStats & {

@@ -297,7 +297,7 @@ export class RuntimeKernel implements Kernel {
     const skillRegistry = skillOptions?.registry;
     const skillSession =
       skillOptions?.session ??
-      (skillRegistry ? createSkillSession(skillRegistry, audit) : undefined);
+      (skillRegistry ? createSkillSession(skillRegistry, { audit }) : undefined);
     const skillPromptAdapter =
       skillOptions?.promptAdapter ?? (skillRegistry ? createSkillPromptAdapter() : undefined);
     return { skillRegistry, skillSession, skillPromptAdapter };

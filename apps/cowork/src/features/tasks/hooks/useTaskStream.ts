@@ -17,6 +17,7 @@ import {
   listApprovals,
   listClarifications,
   listSessionArtifacts,
+  listSessionSkills,
   listTasks,
   listWorkspaceSessions,
   resolveApproval,
@@ -329,6 +330,9 @@ export function useTaskStream(sessionId: string) {
     messageUsage: {},
     workspaceSessions: {},
     workspaceEvents: {},
+    skills: [],
+    activeSkills: [],
+    skillErrors: [],
   });
 
   const [isConnected, setIsConnected] = useState(false);
@@ -347,6 +351,28 @@ export function useTaskStream(sessionId: string) {
   useEffect(() => {
     graphRef.current = graph;
   }, [graph]);
+
+  useEffect(() => {
+    let active = true;
+    listSessionSkills(sessionId)
+      .then((data) => {
+        if (!active) {
+          return;
+        }
+        setGraph((prev) => ({
+          ...prev,
+          skills: data.skills ?? prev.skills,
+          activeSkills: data.activeSkills ?? prev.activeSkills,
+          skillErrors: data.errors ?? prev.skillErrors,
+        }));
+      })
+      .catch(() => {
+        // Ignore skill loading errors; SSE updates will retry.
+      });
+    return () => {
+      active = false;
+    };
+  }, [sessionId]);
 
   useEffect(() => {
     // Try to restore from localStorage first
@@ -890,8 +916,10 @@ const EVENT_HANDLERS: Record<string, EventHandler> = {
   "agent.turn.start": handleTurnStart,
   "agent.turn.end": handleTurnEnd,
   "policy.decision": handlePolicyDecision,
+  "skills.updated": handleSkillsUpdated,
   "checkpoint.created": handleCheckpointCreated,
   "checkpoint.restored": handleCheckpointRestored,
+  "context.compaction": handleContextCompaction,
   "session.usage.updated": handleUsageUpdated,
   "token.usage": handleTokenUsage,
 };
@@ -1415,6 +1443,36 @@ function handlePolicyDecision(
   };
 }
 
+function handleSkillsUpdated(
+  prev: TaskGraph,
+  _id: string,
+  data: unknown,
+  _now: string,
+  _taskTitles: Map<string, string>,
+  _taskPrompts: Map<string, string>,
+  _taskMetadata: Map<string, Record<string, unknown>>,
+  _toolCallIndex: Map<string, string>
+): TaskGraph {
+  if (!isRecord(data) || !Array.isArray(data.skills)) {
+    return prev;
+  }
+
+  const skills = data.skills as TaskGraph["skills"];
+  const activeSkills = Array.isArray(data.activeSkills)
+    ? (data.activeSkills as TaskGraph["activeSkills"])
+    : prev.activeSkills;
+  const skillErrors = Array.isArray(data.errors)
+    ? (data.errors as TaskGraph["skillErrors"])
+    : prev.skillErrors;
+
+  return {
+    ...prev,
+    skills,
+    activeSkills,
+    skillErrors,
+  };
+}
+
 function handleCheckpointCreated(
   prev: TaskGraph,
   id: string,
@@ -1476,6 +1534,47 @@ function handleCheckpointRestored(
       action: "restored",
       taskId,
       timestamp: restoredAt,
+    }),
+  };
+}
+
+function handleContextCompaction(
+  prev: TaskGraph,
+  id: string,
+  data: unknown,
+  now: string,
+  _taskTitles: Map<string, string>,
+  _taskPrompts: Map<string, string>,
+  _taskMetadata: Map<string, Record<string, unknown>>,
+  _toolCallIndex: Map<string, string>
+): TaskGraph {
+  if (!isRecord(data)) {
+    return prev;
+  }
+
+  const taskId = typeof data.taskId === "string" ? data.taskId : undefined;
+
+  return {
+    ...prev,
+    nodes: appendNode(prev.nodes, {
+      id: `context-compaction-${id}`,
+      type: "context_compaction",
+      taskId,
+      messagesBefore: typeof data.messagesBefore === "number" ? data.messagesBefore : undefined,
+      messagesAfter: typeof data.messagesAfter === "number" ? data.messagesAfter : undefined,
+      summaryLength: typeof data.summaryLength === "number" ? data.summaryLength : undefined,
+      tokensSaved: typeof data.tokensSaved === "number" ? data.tokensSaved : undefined,
+      compressionRatio:
+        typeof data.compressionRatio === "number" ? data.compressionRatio : undefined,
+      compressionTimeMs:
+        typeof data.compressionTimeMs === "number" ? data.compressionTimeMs : undefined,
+      strategy: typeof data.strategy === "string" ? data.strategy : undefined,
+      qualityScore: typeof data.qualityScore === "number" ? data.qualityScore : undefined,
+      messagesSummarized:
+        typeof data.messagesSummarized === "number" ? data.messagesSummarized : undefined,
+      toolResultsPruned:
+        typeof data.toolResultsPruned === "number" ? data.toolResultsPruned : undefined,
+      timestamp: now,
     }),
   };
 }
