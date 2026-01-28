@@ -25,6 +25,7 @@ const HMAC_TAG_LENGTH = 16;
 const CHECKSUM_LENGTH = 4;
 /** Default HMAC key (placeholder until policy wiring) */
 const DEFAULT_HMAC_KEY = "lfcc-anchor-hmac-key";
+let hmacKeyOverride: Uint8Array | null = null;
 
 // ============================================================================
 // Types
@@ -215,7 +216,22 @@ function computeHmacSha256(key: Uint8Array, msg: Uint8Array): Uint8Array {
 }
 
 function defaultHmacKey(): Uint8Array {
+  if (hmacKeyOverride) {
+    return hmacKeyOverride;
+  }
   return utf8Encode(DEFAULT_HMAC_KEY);
+}
+
+export function setAnchorHmacKey(key: Uint8Array | string): void {
+  if (typeof key === "string") {
+    hmacKeyOverride = utf8Encode(key);
+  } else {
+    hmacKeyOverride = key.slice();
+  }
+}
+
+export function resetAnchorHmacKey(): void {
+  hmacKeyOverride = null;
 }
 
 // ============================================================================

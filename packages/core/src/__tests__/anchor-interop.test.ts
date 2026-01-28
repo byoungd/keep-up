@@ -5,17 +5,23 @@
  * Tests interoperability between core and bridge anchor encoding.
  */
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   type AnchorData,
   CODEC_VERSION,
   computeCRC32,
   decodeAnchorV2,
   encodeAnchorV2,
+  resetAnchorHmacKey,
+  setAnchorHmacKey,
   verifyCRC32,
 } from "../anchors/codec.js";
 
 describe("Unified Anchor Codec", () => {
+  afterEach(() => {
+    resetAnchorHmacKey();
+  });
+
   describe("encodeAnchorV2 / decodeAnchorV2", () => {
     it("should round-trip anchor data correctly", () => {
       const data: AnchorData = {
@@ -28,6 +34,25 @@ describe("Unified Anchor Codec", () => {
       const decoded = decodeAnchorV2(encoded.bytes);
 
       expect(decoded).toEqual(data);
+    });
+
+    it("should honor configurable HMAC keys", () => {
+      const data: AnchorData = {
+        blockId: "block-override",
+        offset: 7,
+        bias: "after",
+      };
+
+      setAnchorHmacKey("custom-hmac-key");
+      const encoded = encodeAnchorV2(data);
+      const decodedWithOverride = decodeAnchorV2(encoded.bytes);
+
+      expect(decodedWithOverride).toEqual(data);
+
+      resetAnchorHmacKey();
+      const decodedWithDefault = decodeAnchorV2(encoded.bytes);
+
+      expect(decodedWithDefault).toBeNull();
     });
 
     it("should round-trip via base64 string", () => {
