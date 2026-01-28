@@ -197,7 +197,11 @@ export function ProviderListView({ onSelectProvider }: ProviderListViewProps) {
       </div>
 
       {/* Provider list */}
-      <div className="flex-1 overflow-y-auto scrollbar-auto-hide">
+      <div
+        className="flex-1 overflow-y-auto scrollbar-auto-hide"
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+        tabIndex={0}
+      >
         <div className="p-2 space-y-1">
           {PROVIDER_META.map((provider) => {
             const Icon = provider.icon;
@@ -358,7 +362,11 @@ export function ProviderDetailView({ providerId, onBack, onClose }: ProviderDeta
       </div>
 
       {/* Form content */}
-      <div className="flex-1 overflow-y-auto scrollbar-auto-hide p-4 space-y-5">
+      <div
+        className="flex-1 overflow-y-auto scrollbar-auto-hide p-4 space-y-5"
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+        tabIndex={0}
+      >
         {/* API Key field */}
         <div className="space-y-2">
           <label
