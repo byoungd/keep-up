@@ -194,6 +194,7 @@ function SpacesSection({
               "h-3 w-3 opacity-0 group-hover:opacity-100 transition-all duration-fast",
               !isExpanded && "-rotate-90"
             )}
+            aria-hidden="true"
           />
         </button>
         <Tooltip content="New workspace" side="top">
@@ -204,7 +205,7 @@ function SpacesSection({
             aria-label="New workspace"
             onClick={handleNewSpace}
           >
-            <Plus className="h-4 w-4" />
+            <Plus className="h-4 w-4" aria-hidden="true" />
           </Button>
         </Tooltip>
       </div>
@@ -414,6 +415,7 @@ function ProjectsSection({
                 "h-3 w-3 opacity-0 group-hover:opacity-100 transition-all duration-fast",
                 !isProjectsExpanded && "-rotate-90"
               )}
+              aria-hidden="true"
             />
           </button>
           <Tooltip content="Create project" side="top">
@@ -424,7 +426,7 @@ function ProjectsSection({
               aria-label="Create project"
               onClick={() => setIsDialogOpen(true)}
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-4 w-4" aria-hidden="true" />
             </Button>
           </Tooltip>
         </div>
@@ -677,7 +679,7 @@ function ProjectRow({
               )}
               aria-label="Project actions"
             >
-              <MoreHorizontal className="h-3.5 w-3.5" />
+              <MoreHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent
@@ -692,23 +694,23 @@ function ProjectRow({
             >
               {isPinned ? (
                 <>
-                  <PinOff className="h-3.5 w-3.5" />
+                  <PinOff className="h-3.5 w-3.5" aria-hidden="true" />
                   <span>Unpin</span>
                 </>
               ) : (
                 <>
-                  <Pin className="h-3.5 w-3.5" />
+                  <Pin className="h-3.5 w-3.5" aria-hidden="true" />
                   <span>Pin</span>
                 </>
               )}
             </DropdownMenuItem>
             <DropdownMenuItem className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none">
-              <PencilLine className="h-3.5 w-3.5" />
+              <PencilLine className="h-3.5 w-3.5" aria-hidden="true" />
               <span>Edit</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator className="mx-1" />
             <DropdownMenuItem className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] text-destructive focus:text-destructive focus:bg-surface-hover cursor-pointer outline-none">
-              <Trash2 className="h-3.5 w-3.5" />
+              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
               <span>Delete</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -1227,6 +1229,7 @@ function TasksHeader({
             "h-3 w-3 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all duration-fast",
             !isExpanded && "-rotate-90"
           )}
+          aria-hidden="true"
         />
       </button>
 
@@ -1238,7 +1241,7 @@ function TasksHeader({
             className="h-6 w-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-surface-hover data-[state=open]:bg-foreground/[0.08] data-[state=open]:text-foreground"
             aria-label="Session filters"
           >
-            <ListFilter className="h-4 w-4" />
+            <ListFilter className="h-4 w-4" aria-hidden="true" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-44 rounded-lg p-1">
@@ -1251,9 +1254,9 @@ function TasksHeader({
                 : "text-muted-foreground"
             )}
           >
-            <ListTodo className="h-4 w-4" />
+            <ListTodo className="h-4 w-4" aria-hidden="true" />
             Sessions
-            {taskFilter === "all" ? <Check className="ml-auto h-3 w-3" /> : null}
+            {taskFilter === "all" ? <Check className="ml-auto h-3 w-3" aria-hidden="true" /> : null}
           </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={() => onSelectFilter("favorites")}
@@ -1264,9 +1267,11 @@ function TasksHeader({
                 : "text-muted-foreground"
             )}
           >
-            <Star className="h-4 w-4" />
+            <Star className="h-4 w-4" aria-hidden="true" />
             Pinned
-            {taskFilter === "favorites" ? <Check className="ml-auto h-3 w-3" /> : null}
+            {taskFilter === "favorites" ? (
+              <Check className="ml-auto h-3 w-3" aria-hidden="true" />
+            ) : null}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -1303,7 +1308,7 @@ function FilterPill({ icon, label, ariaLabel, onClear }: FilterPillProps) {
         aria-label={ariaLabel}
         onClick={onClear}
       >
-        <X className="h-3.5 w-3.5" />
+        <X className="h-3.5 w-3.5" aria-hidden="true" />
       </Button>
     </div>
   );
@@ -1488,6 +1493,7 @@ function SessionGroup({
             "ml-auto h-3 w-3 transition-transform duration-fast",
             !isExpanded && "-rotate-90"
           )}
+          aria-hidden="true"
         />
       </button>
       <div
@@ -1574,7 +1580,7 @@ function SidebarSessionRow({
             )}
             aria-label="More options"
           >
-            <MoreHorizontal className="h-3.5 w-3.5" />
+            <MoreHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent
@@ -1620,7 +1626,7 @@ function SidebarSessionRow({
 
           <DropdownMenuSub>
             <DropdownMenuSubTrigger className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none data-[state=open]:bg-foreground/5 data-[state=open]:text-foreground">
-              <Folder className="h-4 w-4" />
+              <Folder className="h-4 w-4" aria-hidden="true" />
               <span>Move to project</span>
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent className="w-56 rounded-lg p-1">
@@ -1636,7 +1642,9 @@ function SidebarSessionRow({
                     className="gap-2.5 rounded-md px-3 py-1.5 text-[13px] focus:bg-surface-hover focus:text-foreground cursor-pointer outline-none"
                   >
                     <span>{project.name}</span>
-                    {session.projectId === project.id && <Check className="ml-auto h-4 w-4" />}
+                    {session.projectId === project.id && (
+                      <Check className="ml-auto h-4 w-4" aria-hidden="true" />
+                    )}
                   </DropdownMenuItem>
                 ))
               )}
