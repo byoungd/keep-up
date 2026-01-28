@@ -7,6 +7,7 @@ export interface GatewayConfig {
   sessionId?: string;
   source?: string;
   subscriptions: string[];
+  token?: string;
   userAgent?: string;
   clientId?: string;
 }
@@ -29,6 +30,7 @@ type GatewayOutboundMessage =
       clientId?: string;
       subscriptions?: string[];
       userAgent?: string;
+      token?: string;
     }
   | {
       type: "subscribe";
@@ -53,10 +55,17 @@ type GatewayInboundMessage =
       clientId: string;
       serverTime: number;
       subscriptions: string[];
+      authRequired?: boolean;
+      authenticated?: boolean;
     }
   | {
       type: "event";
       event: RuntimeEvent;
+    }
+  | {
+      type: "auth_ok";
+      clientId: string;
+      serverTime: number;
     }
   | {
       type: "error";
@@ -72,44 +81,66 @@ type GatewayInboundMessage =
   | {
       type: "subscribed";
       patterns: string[];
-    }
-  | {
-      type: string;
-      [key: string]: unknown;
     };
 
 const DEFAULT_SUBSCRIPTIONS = [
   "stream:event",
+  "agent:*",
   "artifact:emitted",
   "tool:*",
   "plan:*",
   "execution:*",
+  "task:*",
   "context:file-stale",
 ];
 
-export function resolveGatewayConfig(): GatewayConfig | null {
-  const mode = process.env.KEEPUP_GATEWAY_MODE;
-  const enabled =
-    mode === "gateway" ||
-    mode === "true" ||
-    mode === "1" ||
-    Boolean(process.env.KEEPUP_GATEWAY_URL);
+export type GatewayConfigOverrides = Partial<GatewayConfig> & { enabled?: boolean };
+
+export function resolveGatewayConfig(overrides: GatewayConfigOverrides = {}): GatewayConfig | null {
+  const enabled = overrides.enabled ?? resolveGatewayEnabled();
   if (!enabled) {
     return null;
   }
 
-  const port = Number.parseInt(process.env.KEEPUP_GATEWAY_PORT ?? "", 10);
-  const host = process.env.KEEPUP_GATEWAY_HOST ?? "127.0.0.1";
-  const url =
-    process.env.KEEPUP_GATEWAY_URL ?? `ws://${host}:${Number.isFinite(port) ? port : 18800}`;
+  const url = resolveGatewayUrl(overrides);
+  const subscriptions = resolveGatewaySubscriptions(overrides);
 
   return {
     url,
-    sessionId: process.env.KEEPUP_SESSION ?? process.env.COWORK_SESSION_ID,
-    source: process.env.KEEPUP_GATEWAY_SOURCE ?? "vscode-extension",
-    subscriptions: DEFAULT_SUBSCRIPTIONS,
-    userAgent: "keepup-vscode",
+    sessionId: overrides.sessionId ?? process.env.KEEPUP_SESSION ?? process.env.COWORK_SESSION_ID,
+    source: overrides.source ?? process.env.KEEPUP_GATEWAY_SOURCE ?? "vscode-extension",
+    subscriptions,
+    token: resolveGatewayToken(overrides),
+    userAgent: overrides.userAgent ?? "keepup-vscode",
+    clientId: overrides.clientId,
   };
+}
+
+function resolveGatewayEnabled(): boolean {
+  const mode = process.env.KEEPUP_GATEWAY_MODE;
+  return (
+    mode === "gateway" || mode === "true" || mode === "1" || Boolean(process.env.KEEPUP_GATEWAY_URL)
+  );
+}
+
+function resolveGatewayUrl(overrides: GatewayConfigOverrides): string {
+  const overrideUrl = overrides.url?.trim();
+  if (overrideUrl) {
+    return overrideUrl;
+  }
+  const port = Number.parseInt(process.env.KEEPUP_GATEWAY_PORT ?? "", 10);
+  const host = process.env.KEEPUP_GATEWAY_HOST ?? "127.0.0.1";
+  return process.env.KEEPUP_GATEWAY_URL ?? `ws://${host}:${Number.isFinite(port) ? port : 18800}`;
+}
+
+function resolveGatewaySubscriptions(overrides: GatewayConfigOverrides): string[] {
+  return overrides.subscriptions && overrides.subscriptions.length > 0
+    ? overrides.subscriptions
+    : DEFAULT_SUBSCRIPTIONS;
+}
+
+function resolveGatewayToken(overrides: GatewayConfigOverrides): string | undefined {
+  return overrides.token ?? process.env.KEEPUP_GATEWAY_TOKEN;
 }
 
 export class GatewayClient {
@@ -145,6 +176,7 @@ export class GatewayClient {
           clientId: this.clientId,
           userAgent: this.config.userAgent,
           subscriptions: this.config.subscriptions,
+          token: this.config.token,
         };
         socket.send(JSON.stringify(hello));
         for (const message of this.pending) {
@@ -155,17 +187,17 @@ export class GatewayClient {
         resolve();
       });
 
-      socket.on("message", (data) => {
+      socket.on("message", (data: unknown) => {
         this.handleMessage(data);
       });
 
-      socket.on("error", (error) => {
+      socket.on("error", (error: unknown) => {
         const message = error instanceof Error ? error.message : String(error);
         this.handlers.onError?.(`Gateway error: ${message}`);
         reject(error instanceof Error ? error : new Error(message));
       });
 
-      socket.on("close", (code, reason) => {
+      socket.on("close", (code: number, reason: Buffer) => {
         const reasonText = reason ? reason.toString() : "";
         this.handlers.onStatus?.(
           `Gateway disconnected (${code}${reasonText ? `: ${reasonText}` : ""})`
@@ -201,24 +233,39 @@ export class GatewayClient {
     this.pending.length = 0;
   }
 
-  private handleMessage(data: WebSocket.RawData): void {
-    let parsed: GatewayInboundMessage;
+  private handleMessage(data: unknown): void {
+    const parsed = this.parseInboundMessage(data);
+    if (!parsed) {
+      return;
+    }
+    this.dispatchInboundMessage(parsed);
+  }
+
+  private parseInboundMessage(data: unknown): GatewayInboundMessage | null {
     try {
-      const text = typeof data === "string" ? data : data.toString();
-      parsed = JSON.parse(text) as GatewayInboundMessage;
+      const text = formatGatewayPayload(data);
+      const parsed = JSON.parse(text) as GatewayInboundMessage;
+      if (!parsed || typeof parsed !== "object" || typeof parsed.type !== "string") {
+        return null;
+      }
+      return parsed;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.handlers.onError?.(`Gateway message parse error: ${message}`);
-      return;
+      return null;
     }
+  }
 
-    if (!parsed || typeof parsed !== "object" || typeof parsed.type !== "string") {
-      return;
-    }
-
+  private dispatchInboundMessage(parsed: GatewayInboundMessage): void {
     switch (parsed.type) {
       case "welcome":
+        if (parsed.authRequired && !parsed.authenticated) {
+          this.handlers.onStatus?.("Gateway auth required");
+        }
         this.handlers.onStatus?.(`Gateway ready (${parsed.clientId})`);
+        break;
+      case "auth_ok":
+        this.handlers.onStatus?.(`Gateway authenticated (${parsed.clientId})`);
         break;
       case "event":
         if (parsed.event) {
@@ -239,4 +286,14 @@ export class GatewayClient {
         break;
     }
   }
+}
+
+function formatGatewayPayload(data: unknown): string {
+  if (typeof data === "string") {
+    return data;
+  }
+  if (data instanceof Buffer) {
+    return data.toString();
+  }
+  return String(data);
 }
