@@ -170,7 +170,7 @@ export function Dialog({
                       className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors duration-fast"
                       aria-label="Close dialog"
                     >
-                      <X className="h-4 w-4" />
+                      <X className="h-4 w-4" aria-hidden="true" />
                     </button>
                   )}
                 </div>

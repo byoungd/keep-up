@@ -58,7 +58,7 @@ export const SidebarGroup = React.memo(function SidebarGroup({
               !collapsed && "rotate-90"
             )}
           >
-            <ChevronRight className="h-3 w-3" />
+            <ChevronRight className="h-3 w-3" aria-hidden="true" />
           </span>
           <span>{label}</span>
         </button>

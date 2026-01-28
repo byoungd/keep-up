@@ -66,7 +66,7 @@ export function AIPanelSection({
               description={t(config.descriptionKey, config.defaultDescription)}
               selected={position === option}
               onSelect={() => setPosition(option)}
-              preview={<Icon className="h-5 w-5" />}
+              preview={<Icon className="h-5 w-5" aria-hidden="true" />}
             />
           );
         })}

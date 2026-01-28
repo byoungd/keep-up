@@ -114,9 +114,9 @@ export const SidebarHeader = React.memo(function SidebarHeader({
             }
           >
             {isIconFilled ? (
-              <SidebarLeftFilledIcon className="h-4 w-4" />
+              <SidebarLeftFilledIcon className="h-4 w-4" aria-hidden="true" />
             ) : (
-              <SidebarLeftIcon className="h-4 w-4" />
+              <SidebarLeftIcon className="h-4 w-4" aria-hidden="true" />
             )}
           </Button>
         </Tooltip>
