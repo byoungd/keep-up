@@ -104,11 +104,13 @@ const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
             indeterminate && "peer-checked:opacity-0",
             iconSizes[size]
           )}
+          aria-hidden="true"
         />
         {/* Minus icon - shown when indeterminate */}
         {indeterminate && (
           <Minus
             className={cn("pointer-events-none absolute text-primary-foreground", iconSizes[size])}
+            aria-hidden="true"
           />
         )}
       </div>
