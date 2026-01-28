@@ -1,7 +1,7 @@
 # Track BC: Core Toolchain Parity (File/Bash/Patch/Browser/Web)
 
 > Priority: P0
-> Status: Proposed
+> Status: Completed
 > Owner: Agent Runtime Tools
 > Dependencies: Track BA
 > Source: docs/roadmap/phase-10-coding-agent-parity/README.md

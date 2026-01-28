@@ -1,10 +1,11 @@
 # Track BJ: IDE + GitHub Integration Surfaces
 
 > Priority: P2
-> Status: Proposed
+> Status: Active
 > Owner: Integrations
 > Dependencies: Tracks BA, BD
 > Source: docs/roadmap/phase-10-coding-agent-parity/README.md
+> **Continued in**: Phase 11 Track CK (track-ck-ide-integration.md)
 
 ---
 

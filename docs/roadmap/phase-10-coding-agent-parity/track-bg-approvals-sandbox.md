@@ -1,7 +1,7 @@
 # Track BG: Sandbox + Approval UX Parity
 
 > Priority: P1
-> Status: Proposed
+> Status: Completed
 > Owner: Security + DX
 > Dependencies: Tracks BA, BC
 > Source: docs/roadmap/phase-10-coding-agent-parity/README.md

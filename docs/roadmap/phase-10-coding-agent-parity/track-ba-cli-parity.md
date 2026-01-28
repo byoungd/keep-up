@@ -1,7 +1,7 @@
 # Track BA: CLI Parity + Non-Interactive Agent Mode
 
 > Priority: P0
-> Status: Proposed
+> Status: Completed
 > Owner: Developer Experience
 > Dependencies: Phase 9 convergence, Agent Runtime Spec v2026.1
 > Source: docs/roadmap/phase-10-coding-agent-parity/README.md

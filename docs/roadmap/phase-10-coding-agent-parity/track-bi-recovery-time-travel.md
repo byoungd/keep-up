@@ -1,10 +1,11 @@
 # Track BI: Persistence, Recovery, and Time Travel
 
 > Priority: P2
-> Status: Proposed
+> Status: Active
 > Owner: Runtime Persistence
 > Dependencies: Tracks BA, BG
 > Source: docs/roadmap/phase-10-coding-agent-parity/README.md
+> **Continued in**: Phase 11 Track CJ (track-cj-checkpoint-recovery.md)
 
 ---
 

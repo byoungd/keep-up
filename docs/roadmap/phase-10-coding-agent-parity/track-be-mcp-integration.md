@@ -1,10 +1,11 @@
 # Track BE: MCP Integration + Governance
 
 > Priority: P1
-> Status: Proposed
+> Status: Active
 > Owner: Agent Runtime Tools
 > Dependencies: Tracks BC, BD
 > Source: docs/roadmap/phase-10-coding-agent-parity/README.md
+> **Continued in**: Phase 11 Track CH (track-ch-mcp-governance.md)
 
 ---
 

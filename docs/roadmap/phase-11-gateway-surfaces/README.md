@@ -15,12 +15,16 @@ drawing from Moltbot's mature patterns. The focus is on WebSocket control plane 
 multi-channel routing, layered skills system, device node capabilities, session isolation,
 and a pluggable policy engine.
 
-Work is fully parallelized into 6 tracks. Tracks CA, CC, and CD can start immediately
-with no dependencies. Tracks CB, CE, and CF follow in sequence.
+Additionally, Phase 11 incorporates remaining work from Phase 10 tracks (BB, BE, BH, BI, BJ)
+as tracks CG-CK, enabling unified development alongside new Gateway features.
+
+Work is parallelized into 11 tracks across 4 weeks.
 
 ---
 
 ## Track Index (Parallelizable)
+
+### Core Gateway Tracks (New)
 
 | Track | Focus | Priority | Dependencies | Document |
 | --- | --- | --- | --- | --- |
@@ -30,6 +34,16 @@ with no dependencies. Tracks CB, CE, and CF follow in sequence.
 | CD | Desktop/Mobile Device Nodes | P1 | None | track-cd-desktop-device-nodes.md |
 | CE | Session Isolation & Sandboxing | P1 | Track CA | track-ce-session-isolation.md |
 | CF | Pluggable Policy Engine | P2 | Track CE | track-cf-policy-engine.md |
+
+### Merged Phase 10 Tracks
+
+| Track | Focus | Priority | Dependencies | Document |
+| --- | --- | --- | --- | --- |
+| CG | TUI Experience Enhancement | P1 | Track CA, Phase 10 BB | track-cg-tui-experience.md |
+| CH | MCP Governance & Integration | P1 | Tracks CA, CF, Phase 10 BE | track-ch-mcp-governance.md |
+| CI | Context Compaction & Memory | P2 | Track CA, Phase 10 BH | track-ci-context-compaction.md |
+| CJ | Checkpoint & Recovery | P2 | Tracks CA, CE, Phase 10 BI | track-cj-checkpoint-recovery.md |
+| CK | IDE & GitHub Integration | P2 | Tracks CA, CD, Phase 10 BJ | track-ck-ide-integration.md |
 
 ---
 
@@ -41,12 +55,19 @@ Week 1: CA + CC + CD (no dependencies, immediate start)
         ├── CC: Skills layering (bundled/managed/workspace)
         └── CD: Device node protocol & Tauri integration
 
-Week 2: CB + CE (depend on CA session model)
+Week 2: CB + CE + CG (depend on CA)
         ├── CB: Channel routing contracts & plugin interface
-        └── CE: Main/Non-main session isolation
+        ├── CE: Main/Non-main session isolation
+        └── CG: TUI experience enhancement
 
-Week 3: CF (depends on CE security model)
-        └── CF: Policy engine with allow/deny/ask_user rules
+Week 3: CF + CH + CI (depend on CE/CA)
+        ├── CF: Policy engine with allow/deny/ask_user rules
+        ├── CH: MCP governance via Gateway
+        └── CI: Context compaction with Gateway telemetry
+
+Week 4: CJ + CK (depend on CE/CD)
+        ├── CJ: Checkpoint and recovery via Gateway
+        └── CK: IDE and GitHub integration
 ```
 
 ---

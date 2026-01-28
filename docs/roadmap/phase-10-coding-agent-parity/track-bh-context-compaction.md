@@ -1,10 +1,11 @@
 # Track BH: Context Compaction + Memory Continuity
 
 > Priority: P2
-> Status: Proposed
+> Status: Active
 > Owner: Runtime Cognition
 > Dependencies: Tracks BA, BC
 > Source: docs/roadmap/phase-10-coding-agent-parity/README.md
+> **Continued in**: Phase 11 Track CI (track-ci-context-compaction.md)
 
 ---
 

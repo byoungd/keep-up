@@ -1,7 +1,7 @@
 # Track BD: Plugin Ecosystem + Commands + Hooks + Skills
 
 > Priority: P1
-> Status: Proposed
+> Status: Completed
 > Owner: Agent Runtime Tools
 > Dependencies: Tracks BA, BC
 > Source: docs/roadmap/phase-10-coding-agent-parity/README.md

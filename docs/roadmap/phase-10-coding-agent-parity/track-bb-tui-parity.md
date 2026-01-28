@@ -1,10 +1,11 @@
 # Track BB: TUI Parity + Session UX
 
 > Priority: P0
-> Status: Proposed
+> Status: Active
 > Owner: Desktop/TUI
 > Dependencies: Track BA
 > Source: docs/roadmap/phase-10-coding-agent-parity/README.md
+> **Continued in**: Phase 11 Track CG (track-cg-tui-experience.md)
 
 ---
 

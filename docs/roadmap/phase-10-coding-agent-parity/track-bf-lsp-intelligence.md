@@ -1,7 +1,7 @@
 # Track BF: LSP Code Intelligence Parity
 
 > Priority: P1
-> Status: Proposed
+> Status: Completed
 > Owner: Agent Runtime Tools
 > Dependencies: Track BC
 > Source: docs/roadmap/phase-10-coding-agent-parity/README.md

@@ -95,6 +95,11 @@ cowork initiatives. Use this index to navigate the active tracks and supporting 
 - docs/roadmap/phase-11-gateway-surfaces/track-cd-desktop-device-nodes.md
 - docs/roadmap/phase-11-gateway-surfaces/track-ce-session-isolation.md
 - docs/roadmap/phase-11-gateway-surfaces/track-cf-policy-engine.md
+- docs/roadmap/phase-11-gateway-surfaces/track-cg-tui-experience.md
+- docs/roadmap/phase-11-gateway-surfaces/track-ch-mcp-governance.md
+- docs/roadmap/phase-11-gateway-surfaces/track-ci-context-compaction.md
+- docs/roadmap/phase-11-gateway-surfaces/track-cj-checkpoint-recovery.md
+- docs/roadmap/phase-11-gateway-surfaces/track-ck-ide-integration.md
 
 ## Parallel Product Tracks (UI & Cowork)
 - docs/roadmap/ui-cowork-cowork/README.md
