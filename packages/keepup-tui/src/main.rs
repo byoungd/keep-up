@@ -38,6 +38,7 @@ const TAB_WIDTH: usize = 4;
 const PASTE_BURST_WINDOW_MS: u64 = 60;
 const PASTE_BURST_ACTIVE_MS: u64 = 240;
 const PASTE_BURST_THRESHOLD: usize = 8;
+const MAX_ARG_PREVIEW_WIDTH: usize = 120;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -111,6 +112,7 @@ struct PendingApproval {
     tool_name: String,
     risk: Option<String>,
     reason: Option<String>,
+    arguments: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -1358,6 +1360,10 @@ fn parse_pending_approval(payload: Option<&Value>) -> Option<PendingApproval> {
         .and_then(|value| value.as_str())
         .or_else(|| data.get("description").and_then(|value| value.as_str()))
         .map(|value| value.to_string());
+    let arguments = data
+        .get("arguments")
+        .map(|value| value.to_string())
+        .filter(|value| value != "{}");
     let approval_id = data
         .get("approvalId")
         .and_then(|value| value.as_str())
@@ -1374,6 +1380,7 @@ fn parse_pending_approval(payload: Option<&Value>) -> Option<PendingApproval> {
         tool_name,
         risk,
         reason,
+        arguments,
     })
 }
 
@@ -2640,6 +2647,10 @@ fn draw_approval_dialog(frame: &mut ratatui::Frame, approval: &PendingApproval) 
     }
     if let Some(reason) = &approval.reason {
         lines.push(Line::from(format!("Reason: {reason}")));
+    }
+    if let Some(arguments) = &approval.arguments {
+        let preview = truncate_to_width(arguments, MAX_ARG_PREVIEW_WIDTH);
+        lines.push(Line::from(format!("Args: {preview}")));
     }
 
     lines.push(Line::from(""));
