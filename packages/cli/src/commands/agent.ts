@@ -54,7 +54,7 @@ export function runCommand(): Command {
     .option("--prompt <text>", "The prompt to execute")
     .option("-m, --model <model>", "Model to use", "auto")
     .option("-p, --provider <provider>", "Provider to use (auto, openai, claude, gemini, etc.)")
-    .option("-o, --output <format>", "Output format: text, json, markdown", "text")
+    .option("-o, --output <format>", "Output format: text, json, markdown")
     .option("--format <format>", "Output format: text, json, markdown")
     .option("--json", "Output json")
     .option("-q, --quiet", "Suppress progress output", false)
@@ -77,7 +77,7 @@ function tuiCommand(): Command {
     .description("Start interactive TUI session")
     .option("-m, --model <model>", "Model to use", "auto")
     .option("-p, --provider <provider>", "Provider to use (auto, openai, claude, gemini, etc.)")
-    .option("-o, --output <format>", "Output format: text, json, markdown", "text")
+    .option("-o, --output <format>", "Output format: text, json, markdown")
     .option("--format <format>", "Output format: text, json, markdown")
     .option("-q, --quiet", "Suppress progress output", false)
     .option("--session <id>", "Resume existing session")
@@ -100,6 +100,11 @@ function tuiCommand(): Command {
           config.output,
           "KEEPUP_OUTPUT"
         ) ?? "text"
+      );
+      const sessionId = resolveRuntimeConfigString(
+        options.session,
+        config.session,
+        "KEEPUP_SESSION"
       );
       const approvalMode = resolveApprovalMode(
         options.approval,
@@ -128,7 +133,7 @@ function tuiCommand(): Command {
             tuiHost,
             model,
             provider,
-            sessionId: options.session,
+            sessionId,
           });
           return;
         }
@@ -144,7 +149,7 @@ function tuiCommand(): Command {
         }
 
         await runInteractiveSession({
-          sessionId: options.session,
+          sessionId,
           model,
           provider,
           output,
@@ -306,7 +311,7 @@ function resolveRunConfig(options: RunOptions, config: CliConfig): ResolvedRunCo
     config.approvalMode,
     "KEEPUP_APPROVAL_MODE"
   );
-  const quiet = options.quiet || options.stream === false;
+  const quiet = options.quiet || options.stream === false || output !== "text";
 
   return {
     model,
