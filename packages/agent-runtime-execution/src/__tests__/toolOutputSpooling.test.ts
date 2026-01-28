@@ -18,6 +18,7 @@ import type {
   MCPToolServer,
   ToolContent,
   ToolContext,
+  ToolOutputSpooler,
 } from "../types";
 
 class MockToolRegistry {
@@ -169,5 +170,63 @@ describe("ToolExecutionPipeline spooling integration", () => {
     const payload = await readFile(result.meta?.outputSpool?.uri ?? "", "utf8");
     const record = JSON.parse(payload) as { content: ToolContent[] };
     expect(record.content[0]?.type).toBe("text");
+  });
+
+  it("skips spooling when output spooling is disabled", async () => {
+    tmpRoot = await mkdtemp(join(tmpdir(), "tool-spool-disabled-"));
+    const registry = new MockToolRegistry("big-output", {
+      success: true,
+      content: [{ type: "text", text: "alpha\nbeta\ngamma\ndelta\nepsilon\nzeta" }],
+    });
+
+    const policy = createSecurityPolicy("balanced");
+    const executor = new ToolExecutionPipeline({
+      registry,
+      policy: createPermissionChecker(policy),
+      outputSpooler: createFileToolOutputSpooler({ rootDir: tmpRoot }),
+      outputSpoolPolicy: { maxBytes: 40, maxLines: 2 },
+      outputSpoolingEnabled: false,
+    });
+
+    const context: ToolContext = { security: policy };
+    const result = await executor.execute(
+      { id: "call-no-spool", name: "big-output", arguments: {} },
+      context
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.meta?.outputSpool).toBeUndefined();
+    expect(result.content.some((item) => item.type === "resource")).toBe(false);
+  });
+
+  it("returns original output when spooler throws", async () => {
+    const registry = new MockToolRegistry("big-output", {
+      success: true,
+      content: [{ type: "text", text: "alpha\nbeta\ngamma\ndelta\nepsilon\nzeta" }],
+    });
+
+    const policy = createSecurityPolicy("balanced");
+    const throwingSpooler: ToolOutputSpooler = {
+      spool: async () => {
+        throw new Error("spool failed");
+      },
+    };
+
+    const executor = new ToolExecutionPipeline({
+      registry,
+      policy: createPermissionChecker(policy),
+      outputSpooler: throwingSpooler,
+      outputSpoolPolicy: { maxBytes: 40, maxLines: 2 },
+    });
+
+    const context: ToolContext = { security: policy };
+    const result = await executor.execute(
+      { id: "call-spool-error", name: "big-output", arguments: {} },
+      context
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.meta?.outputSpool).toBeUndefined();
+    expect(result.content.some((item) => item.type === "resource")).toBe(false);
   });
 });
