@@ -167,7 +167,13 @@ export function Sheet({
               )}
 
               {/* Content */}
-              <div className="flex-1 overflow-y-auto scrollbar-auto-hide">{children}</div>
+              <div
+                className="flex-1 overflow-y-auto scrollbar-auto-hide"
+                // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+                tabIndex={0}
+              >
+                {children}
+              </div>
             </motion.div>
           </div>
         </Wrapper>

@@ -109,6 +109,8 @@ export function RailTabPanel({ id, activeTab, children, className }: RailTabPane
       role="tabpanel"
       aria-labelledby={id}
       className={cn("flex-1 overflow-y-auto scrollbar-auto-hide", className)}
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+      tabIndex={0}
     >
       {children}
     </div>

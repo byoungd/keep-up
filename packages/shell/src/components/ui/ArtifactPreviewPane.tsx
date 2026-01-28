@@ -74,7 +74,11 @@ export function ArtifactPreviewPane({ item, onClose, className }: ArtifactPrevie
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto scrollbar-auto-hide p-4 bg-surface-2/5">
+      <div
+        className="flex-1 overflow-y-auto scrollbar-auto-hide p-4 bg-surface-2/5"
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+        tabIndex={0}
+      >
         {item.type === "image" ? (
           <div className="flex items-center justify-center min-h-full">
             <img

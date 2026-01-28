@@ -49,7 +49,11 @@ export function ArtifactView({ item }: { item: ArtifactItem }) {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto scrollbar-auto-hide p-6 bg-surface-2/5 relative">
+      <div
+        className="flex-1 overflow-y-auto scrollbar-auto-hide p-6 bg-surface-2/5 relative"
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+        tabIndex={0}
+      >
         {item.type === "image" ? (
           <div className="flex items-center justify-center min-h-full">
             <img
@@ -71,7 +75,11 @@ export function ArtifactView({ item }: { item: ArtifactItem }) {
           </div>
         ) : (
           /* Doc / Text Preview */
-          <div className="w-full max-w-3xl mx-auto bg-surface-1 border border-border/10 rounded-xl p-8 shadow-sm h-full overflow-y-auto scrollbar-auto-hide">
+          <div
+            className="w-full max-w-3xl mx-auto bg-surface-1 border border-border/10 rounded-xl p-8 shadow-sm h-full overflow-y-auto scrollbar-auto-hide"
+            // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+            tabIndex={0}
+          >
             {item.content ? (
               <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-foreground/80">
                 {item.content}
@@ -122,7 +130,11 @@ export function ArtifactPreview({
       <div className="flex flex-1 h-full min-h-0">
         {/* Sidebar List (if multiple) */}
         {items.length > 1 && (
-          <div className="w-64 border-r border-border/10 bg-surface-2/10 flex flex-col overflow-y-auto scrollbar-auto-hide">
+          <div
+            className="w-64 border-r border-border/10 bg-surface-2/10 flex flex-col overflow-y-auto scrollbar-auto-hide"
+            // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+            tabIndex={0}
+          >
             <div className="px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
               {items.length} Items
             </div>
