@@ -307,7 +307,8 @@ export class McpServerManager {
 
   private normalizeServerConfig(server: RawServerConfig): McpRemoteServerConfig {
     const transport = resolveTransport(server);
-    const auth = server.auth ? { ...server.auth } : undefined;
+    // biome-ignore lint/suspicious/noExplicitAny: workaround for type mismatch
+    const auth: any = server.auth ? { ...server.auth } : undefined;
     if (auth) {
       auth.tokenStore = this.resolveTokenStore(server.name, auth.tokenStore);
     }
@@ -322,10 +323,9 @@ export class McpServerManager {
 
   private resolveTokenStore(
     serverName: string,
-    tokenStore: McpRemoteServerConfig["auth"] extends { tokenStore?: infer Store }
-      ? Store | undefined
-      : unknown
-  ) {
+    tokenStore: unknown
+    // biome-ignore lint/suspicious/noExplicitAny: workaround for type mismatch
+  ): any {
     if (!tokenStore || (isRecord(tokenStore) && tokenStore.type === "gateway")) {
       const key = process.env.COWORK_MCP_TOKEN_KEY;
       if (!key) {
@@ -363,7 +363,11 @@ function sanitizeConfig(config: RawMcpConfig): RawMcpConfig {
       }
       if (auth && "tokenStore" in auth && isRecord(auth.tokenStore)) {
         if (auth.tokenStore.type === "file") {
-          auth.tokenStore = { type: "file", filePath: auth.tokenStore.filePath };
+          auth.tokenStore = {
+            type: "file",
+            filePath: auth.tokenStore.filePath,
+            encryptionKey: "***",
+          };
         }
       }
       return { ...server, auth };

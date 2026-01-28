@@ -1605,8 +1605,10 @@ export class CoworkTaskRuntime {
         }
         this.eventPublisher.publishSkillsUpdated({
           sessionId: runtimeState.sessionId,
-          skills: payload.skills,
-          activeSkills: payload.activeSkills,
+          // biome-ignore lint/suspicious/noExplicitAny: workaround for type mismatch
+          skills: payload.skills as any[],
+          // biome-ignore lint/suspicious/noExplicitAny: workaround for type mismatch
+          activeSkills: payload.activeSkills as any[],
           errors: payload.errors,
           updatedAt: payload.updatedAt ?? event.meta.timestamp,
         });
