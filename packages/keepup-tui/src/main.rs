@@ -2037,6 +2037,8 @@ fn app_header(app: &App) -> Text<'_> {
         .as_ref()
         .map(|caps| format!("v{}", caps.protocol_version))
         .unwrap_or_else(|| "v?".to_string());
+    let model = app.model.as_deref().unwrap_or("auto");
+    let provider = app.provider.as_deref().unwrap_or("auto");
     let scroll_hint = if app.mode == AppMode::Chat {
         if app.chat_unseen {
             " | New"
@@ -2049,7 +2051,7 @@ fn app_header(app: &App) -> Text<'_> {
         ""
     };
     Text::from(vec![Line::from(format!(
-        "Keep-Up TUI {proto} | {session} | {}{scroll_hint}",
+        "Keep-Up TUI {proto} | {session} | Model: {model} | Provider: {provider} | {}{scroll_hint}",
         app.status
     ))])
 }
