@@ -31,6 +31,7 @@ const FILTER_PREFIX: &str = "/ ";
 const FILTER_INDENT: &str = "  ";
 const CLI_CONFIG_FILE: &str = "cli-config.json";
 const DEFAULT_STATE_DIR: &str = ".keep-up";
+const MAX_CHANGE_FILES: usize = 12;
 const MIN_INPUT_HEIGHT: u16 = 3;
 const MAX_INPUT_HEIGHT: u16 = 8;
 const TAB_WIDTH: usize = 4;
@@ -110,6 +111,13 @@ struct PendingApproval {
     tool_name: String,
     risk: Option<String>,
     reason: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct GitChanges {
+    summary: String,
+    files: Vec<String>,
+    error: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -287,6 +295,7 @@ struct App {
     settings_mode: Option<SettingsMode>,
     settings_input: String,
     settings_cursor: usize,
+    git_changes: Option<GitChanges>,
     should_exit: bool,
 }
 
@@ -440,6 +449,7 @@ impl App {
             settings_mode: None,
             settings_input: String::new(),
             settings_cursor: 0,
+            git_changes: None,
             should_exit: false,
         }
     }
@@ -658,6 +668,10 @@ impl App {
         self.settings_cursor = self.settings_input.len();
         self.pending_delete_session_id = None;
         self.filter_active = false;
+    }
+
+    fn refresh_git_changes(&mut self) {
+        self.git_changes = Some(load_git_changes());
     }
 
     fn set_input(&mut self, text: String) {
@@ -1041,6 +1055,7 @@ fn handle_inbound(app: &mut App, host: &HostClient) -> Result<()> {
                                 app.reset_chat_scroll();
                                 app.chat_unseen = false;
                                 app.status = "Session loaded.".to_string();
+                                app.refresh_git_changes();
                             }
                         }
                     } else {
@@ -1068,6 +1083,7 @@ fn handle_inbound(app: &mut App, host: &HostClient) -> Result<()> {
                         app.status = error_message(error);
                         app.push_system_message(app.status.clone());
                     }
+                    app.refresh_git_changes();
                 } else if op == "agent.interrupt"
                     && app.pending_interrupt.as_deref() == Some(id.as_str())
                 {
@@ -1828,6 +1844,16 @@ fn handle_chat_key(app: &mut App, host: &HostClient, key: KeyEvent) -> Result<()
                 app.chat_unseen = false;
             }
         }
+        KeyCode::Char('g') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            app.refresh_git_changes();
+            let status = app
+                .git_changes
+                .as_ref()
+                .and_then(|changes| changes.error.as_ref())
+                .map(|error| format!("Git refresh failed: {error}"))
+                .unwrap_or_else(|| "Changes refreshed.".to_string());
+            app.status = status;
+        }
         KeyCode::Home if key.modifiers.contains(KeyModifiers::CONTROL) => {
             app.chat_scroll = 0;
             app.follow_tail = false;
@@ -1964,7 +1990,7 @@ fn draw_ui(frame: &mut ratatui::Frame, app: &mut App) {
 
     match app.mode {
         AppMode::Picker => draw_picker(frame, app, chunks[1]),
-        AppMode::Chat => draw_chat(frame, app, chunks[1]),
+        AppMode::Chat => draw_chat_with_sidebar(frame, app, chunks[1]),
     }
 
     draw_input(frame, app, chunks[2]);
@@ -2133,6 +2159,50 @@ fn draw_chat(frame: &mut ratatui::Frame, app: &mut App, area: Rect) {
         };
         draw_chat_indicator(frame, area, label);
     }
+}
+
+fn draw_chat_with_sidebar(frame: &mut ratatui::Frame, app: &mut App, area: Rect) {
+    if area.width < 80 {
+        draw_chat(frame, app, area);
+        return;
+    }
+
+    let chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(68), Constraint::Percentage(32)])
+        .split(area);
+
+    draw_chat(frame, app, chunks[0]);
+    draw_changes_panel(frame, app, chunks[1]);
+}
+
+fn draw_changes_panel(frame: &mut ratatui::Frame, app: &App, area: Rect) {
+    let block = Block::default().title("Changes").borders(Borders::ALL);
+
+    let mut lines = Vec::new();
+    match app.git_changes.as_ref() {
+        None => {
+            lines.push(Line::from("Press Ctrl+G to refresh changes."));
+        }
+        Some(changes) => {
+            if let Some(error) = &changes.error {
+                lines.push(Line::from(format!("Git error: {error}")));
+            } else {
+                lines.push(Line::from(changes.summary.clone()));
+                if !changes.files.is_empty() {
+                    lines.push(Line::from(""));
+                    for file in &changes.files {
+                        lines.push(Line::from(file.clone()));
+                    }
+                }
+            }
+        }
+    }
+
+    let paragraph = Paragraph::new(lines)
+        .block(block)
+        .wrap(Wrap { trim: true });
+    frame.render_widget(paragraph, area);
 }
 
 fn draw_input(frame: &mut ratatui::Frame, app: &App, area: Rect) {
@@ -2519,6 +2589,7 @@ fn draw_help(frame: &mut ratatui::Frame, _app: &App) {
         Line::from("  Ctrl+End   Jump to bottom"),
         Line::from("  F2         Jump to latest"),
         Line::from("  y / n      Approve / reject pending tool"),
+        Line::from("  Ctrl+G     Refresh change summary"),
         Line::from(""),
         Line::from("General"),
         Line::from("  F1         Toggle help"),
@@ -2697,4 +2768,89 @@ fn resolve_home_dir() -> Option<PathBuf> {
     env_value("HOME")
         .or_else(|| env_value("USERPROFILE"))
         .map(PathBuf::from)
+}
+
+fn load_git_changes() -> GitChanges {
+    let output = Command::new("git").args(["status", "--porcelain"]).output();
+    let output = match output {
+        Ok(output) => output,
+        Err(error) => {
+            return GitChanges {
+                summary: "Git status unavailable.".to_string(),
+                files: Vec::new(),
+                error: Some(error.to_string()),
+            };
+        }
+    };
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        let message = if stderr.is_empty() {
+            "Git status failed.".to_string()
+        } else {
+            stderr
+        };
+        return GitChanges {
+            summary: "Git status unavailable.".to_string(),
+            files: Vec::new(),
+            error: Some(message),
+        };
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut modified = 0;
+    let mut added = 0;
+    let mut deleted = 0;
+    let mut renamed = 0;
+    let mut untracked = 0;
+    let mut files = Vec::new();
+
+    for line in stdout.lines() {
+        if line.len() < 3 {
+            continue;
+        }
+        let status = &line[..2];
+        let file = line[3..].trim();
+        if status == "??" {
+            untracked += 1;
+            files.push(format!("?? {file}"));
+            continue;
+        }
+        if status.contains('M') {
+            modified += 1;
+        }
+        if status.contains('A') {
+            added += 1;
+        }
+        if status.contains('D') {
+            deleted += 1;
+        }
+        if status.contains('R') {
+            renamed += 1;
+        }
+        files.push(format!("{status} {file}"));
+    }
+
+    if files.is_empty() {
+        return GitChanges {
+            summary: "Clean working tree.".to_string(),
+            files,
+            error: None,
+        };
+    }
+
+    let summary = format!(
+        "Modified {modified}, Added {added}, Deleted {deleted}, Renamed {renamed}, Untracked {untracked}"
+    );
+    if files.len() > MAX_CHANGE_FILES {
+        let extra = files.len().saturating_sub(MAX_CHANGE_FILES);
+        files.truncate(MAX_CHANGE_FILES);
+        files.push(format!("… and {extra} more"));
+    }
+
+    GitChanges {
+        summary,
+        files,
+        error: None,
+    }
 }
