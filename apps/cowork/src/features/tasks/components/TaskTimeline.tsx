@@ -91,6 +91,7 @@ export function TaskTimeline({ graph, isConnected, approveTool, rejectTool }: Ta
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
+                aria-hidden="true"
               >
                 <title>Waiting</title>
                 <path
@@ -154,7 +155,13 @@ export function TaskTimeline({ graph, isConnected, approveTool, rejectTool }: Ta
           onClick={scrollToBottom}
           className="absolute bottom-6 right-6 bg-foreground text-background rounded-full p-2 shadow-lg hover:scale-105 active:scale-95 z-20 transition-transform duration-fast"
         >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            aria-hidden="true"
+          >
             <title>Scroll to bottom icon</title>
             <path
               strokeLinecap="round"

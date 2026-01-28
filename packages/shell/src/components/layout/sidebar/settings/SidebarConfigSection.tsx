@@ -129,9 +129,9 @@ function SortableSidebarRow({
         onKeyDown={handleKeyDown}
         aria-keyshortcuts="Alt+ArrowUp,Alt+ArrowDown"
       >
-        <GripVertical className="h-4 w-4" />
+        <GripVertical className="h-4 w-4" aria-hidden="true" />
       </button>
-      <item.icon className="h-4 w-4 text-muted-foreground" />
+      <item.icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
       <label htmlFor={selectId} className="text-sm text-foreground flex-1">
         {item.label}
       </label>

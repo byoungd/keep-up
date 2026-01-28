@@ -182,15 +182,17 @@ export class Mem0MemoryAdapter implements IMemoryManager {
    * Trigger memory consolidation
    */
   async consolidate(): Promise<ConsolidationResult> {
-    // Mem0 handles consolidation internally
-    // We just return a stub result
+    const start = Date.now();
+    const stats = await this.getStats();
+
+    // Mem0 handles consolidation internally, so we return current stats.
     return {
-      memoriesBefore: this.stats.total,
-      memoriesAfter: this.stats.total,
+      memoriesBefore: stats.total,
+      memoriesAfter: stats.total,
       deleted: 0,
       merged: 0,
       summaries: [],
-      durationMs: 0,
+      durationMs: Date.now() - start,
     };
   }
 
