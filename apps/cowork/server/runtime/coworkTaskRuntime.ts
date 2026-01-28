@@ -1153,10 +1153,7 @@ export class CoworkTaskRuntime {
     return typeof value === "string" ? value : undefined;
   }
 
-  private buildRuntimeSecurityPolicy(
-    executionMode: ExecutionSandboxMode,
-    session: CoworkSession
-  ) {
+  private buildRuntimeSecurityPolicy(executionMode: ExecutionSandboxMode, session: CoworkSession) {
     const basePolicy =
       executionMode === "docker"
         ? buildDockerSecurityPolicy()

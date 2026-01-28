@@ -5,7 +5,9 @@ import { approvalsCommand } from "./commands/approvals";
 import { checkpointCommand } from "./commands/checkpoint";
 import { completionCommand } from "./commands/completion";
 import { doctorCommand } from "./commands/doctor";
+import { gitCommand } from "./commands/git";
 import { mcpCommand } from "./commands/mcp";
+import { nodeCommand } from "./commands/node";
 import { writeStderr } from "./utils/terminal";
 
 const program = new Command();
@@ -18,7 +20,9 @@ program.addCommand(approvalsCommand());
 program.addCommand(checkpointCommand());
 program.addCommand(doctorCommand());
 program.addCommand(completionCommand());
+program.addCommand(gitCommand());
 program.addCommand(mcpCommand());
+program.addCommand(nodeCommand());
 
 program.parseAsync(process.argv).catch((error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);

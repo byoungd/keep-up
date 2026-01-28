@@ -15,6 +15,7 @@ import { createClarificationRoutes } from "./routes/clarifications";
 import { createContextRoutes } from "./routes/context";
 import { createCostRoutes } from "./routes/cost";
 import { createGatewayHealthRoutes } from "./routes/gatewayHealth";
+import { createGatewayNodeRoutes } from "./routes/gatewayNodes";
 import { createLessonRoutes } from "./routes/lessons";
 import { createMcpAppsRoutes } from "./routes/mcpApps";
 import { createPipelineRoutes } from "./routes/pipelines";
@@ -100,6 +101,12 @@ export function createCoworkApp(deps: CoworkAppDeps) {
   app.route(
     "/api",
     createGatewayHealthRoutes({
+      gateway: deps.gatewayRuntime,
+    })
+  );
+  app.route(
+    "/api",
+    createGatewayNodeRoutes({
       gateway: deps.gatewayRuntime,
     })
   );

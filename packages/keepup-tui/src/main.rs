@@ -3,7 +3,7 @@ use std::io::{self, BufRead, BufReader, BufWriter, Write};
 use std::path::PathBuf;
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::{mpsc, Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use anyhow::{bail, Context, Result};
 use crossterm::event::{
@@ -112,7 +112,18 @@ struct PendingApproval {
     tool_name: String,
     risk: Option<String>,
     reason: Option<String>,
+    description: Option<String>,
+    reason_code: Option<String>,
+    risk_tags: Vec<String>,
+    task_node_id: Option<String>,
+    escalation: Option<String>,
     arguments: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct ToolEvent {
+    label: String,
+    timestamp: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -292,6 +303,7 @@ struct App {
     pending_interrupt: Option<String>,
     pending_approval: Option<PendingApproval>,
     pending_approval_resolve: Option<String>,
+    tool_events: Vec<ToolEvent>,
     host_caps: Option<HostCapabilities>,
     session_id: Option<String>,
     session_title: Option<String>,
@@ -448,6 +460,7 @@ impl App {
             pending_interrupt: None,
             pending_approval: None,
             pending_approval_resolve: None,
+            tool_events: Vec::new(),
             host_caps: None,
             session_id: None,
             session_title: None,
@@ -484,6 +497,15 @@ impl App {
 
     fn push_system_message(&mut self, content: impl Into<String>) {
         self.push_message(MessageRole::System, content);
+    }
+
+    fn push_tool_event(&mut self, label: String, timestamp: u64) {
+        self.tool_events.push(ToolEvent { label, timestamp });
+        const MAX_EVENTS: usize = 8;
+        if self.tool_events.len() > MAX_EVENTS {
+            let overflow = self.tool_events.len() - MAX_EVENTS;
+            self.tool_events.drain(0..overflow);
+        }
     }
 
     fn request_session_list(&mut self, host: &HostClient) -> Result<()> {
@@ -1106,6 +1128,7 @@ fn handle_inbound(app: &mut App, host: &HostClient) -> Result<()> {
                                     .into_iter()
                                     .map(map_session_message)
                                     .collect();
+                                app.tool_events.clear();
                                 app.streaming_text.clear();
                                 app.reset_chat_scroll();
                                 app.chat_unseen = false;
@@ -1236,6 +1259,12 @@ fn handle_event(app: &mut App, event: String, payload: Option<Value>) {
 
     if event == "tool.calling" || event == "tool.result" {
         if let Some(message) = format_tool_event(&event, payload.as_ref()) {
+            let timestamp = payload
+                .as_ref()
+                .and_then(|value| value.get("timestamp"))
+                .and_then(|value| value.as_u64())
+                .unwrap_or_else(now_ms);
+            app.push_tool_event(message.clone(), timestamp);
             app.push_system_message(message.clone());
             app.status = message;
             return;
@@ -1405,7 +1434,33 @@ fn parse_pending_approval(payload: Option<&Value>) -> Option<PendingApproval> {
     let reason = data
         .get("reason")
         .and_then(|value| value.as_str())
-        .or_else(|| data.get("description").and_then(|value| value.as_str()))
+        .map(|value| value.to_string());
+    let description = data
+        .get("description")
+        .and_then(|value| value.as_str())
+        .map(|value| value.to_string());
+    let reason_code = data
+        .get("reasonCode")
+        .and_then(|value| value.as_str())
+        .map(|value| value.to_string());
+    let risk_tags = data
+        .get("riskTags")
+        .and_then(|value| value.as_array())
+        .map(|values| {
+            values
+                .iter()
+                .filter_map(|value| value.as_str())
+                .map(|value| value.to_string())
+                .collect::<Vec<String>>()
+        })
+        .unwrap_or_default();
+    let task_node_id = data
+        .get("taskNodeId")
+        .and_then(|value| value.as_str())
+        .map(|value| value.to_string());
+    let escalation = data
+        .get("escalation")
+        .filter(|value| !value.is_null())
         .map(|value| value.to_string());
     let arguments = data
         .get("arguments")
@@ -1427,6 +1482,11 @@ fn parse_pending_approval(payload: Option<&Value>) -> Option<PendingApproval> {
         tool_name,
         risk,
         reason,
+        description,
+        reason_code,
+        risk_tags,
+        task_node_id,
+        escalation,
         arguments,
     })
 }
@@ -1453,6 +1513,8 @@ fn approval_prompt(approval: &PendingApproval) -> String {
     }
     if let Some(reason) = &approval.reason {
         message.push_str(&format!(" — {reason}"));
+    } else if let Some(description) = &approval.description {
+        message.push_str(&format!(" — {description}"));
     }
     message.push_str(". Press y to approve, n to reject.");
     message
@@ -2074,7 +2136,7 @@ fn draw_ui(frame: &mut ratatui::Frame, app: &mut App) {
         draw_help(frame, app);
     }
     if let Some(pending) = app.pending_approval.as_ref() {
-        draw_approval_dialog(frame, pending);
+        draw_approval_dialog(frame, pending, &app.tool_events);
     }
     if let Some(mode) = app.settings_mode {
         draw_settings_dialog(frame, app, mode);
@@ -2687,7 +2749,11 @@ fn draw_help(frame: &mut ratatui::Frame, _app: &App) {
     frame.render_widget(paragraph, area);
 }
 
-fn draw_approval_dialog(frame: &mut ratatui::Frame, approval: &PendingApproval) {
+fn draw_approval_dialog(
+    frame: &mut ratatui::Frame,
+    approval: &PendingApproval,
+    tool_events: &[ToolEvent],
+) {
     let area = centered_rect(70, 40, frame.size());
     frame.render_widget(Clear, area);
 
@@ -2706,9 +2772,44 @@ fn draw_approval_dialog(frame: &mut ratatui::Frame, approval: &PendingApproval) 
     if let Some(reason) = &approval.reason {
         lines.push(Line::from(format!("Reason: {reason}")));
     }
+    if let Some(description) = &approval.description {
+        if approval
+            .reason
+            .as_ref()
+            .map(|reason| reason != description)
+            .unwrap_or(true)
+        {
+            lines.push(Line::from(format!("Description: {description}")));
+        }
+    }
+    if let Some(reason_code) = &approval.reason_code {
+        lines.push(Line::from(format!("Reason code: {reason_code}")));
+    }
+    if !approval.risk_tags.is_empty() {
+        lines.push(Line::from(format!(
+            "Risk tags: {}",
+            approval.risk_tags.join(", ")
+        )));
+    }
+    if let Some(task_node_id) = &approval.task_node_id {
+        lines.push(Line::from(format!("Task node: {task_node_id}")));
+    }
+    if let Some(escalation) = &approval.escalation {
+        let preview = truncate_to_width(escalation, MAX_ARG_PREVIEW_WIDTH);
+        lines.push(Line::from(format!("Escalation: {preview}")));
+    }
     if let Some(arguments) = &approval.arguments {
         let preview = truncate_to_width(arguments, MAX_ARG_PREVIEW_WIDTH);
         lines.push(Line::from(format!("Args: {preview}")));
+    }
+
+    if !tool_events.is_empty() {
+        lines.push(Line::from(""));
+        lines.push(Line::from("Recent tool activity:"));
+        let start = tool_events.len().saturating_sub(5);
+        for event in tool_events.iter().skip(start) {
+            lines.push(Line::from(format_tool_event_line(event)));
+        }
     }
 
     lines.push(Line::from(""));
@@ -2718,6 +2819,18 @@ fn draw_approval_dialog(frame: &mut ratatui::Frame, approval: &PendingApproval) 
         .block(Block::default().title("Approval").borders(Borders::ALL))
         .wrap(Wrap { trim: true });
     frame.render_widget(paragraph, area);
+}
+
+fn format_tool_event_line(event: &ToolEvent) -> String {
+    let elapsed_ms = now_ms().saturating_sub(event.timestamp);
+    let elapsed = if elapsed_ms >= 60_000 {
+        format!("{}m ago", elapsed_ms / 60_000)
+    } else if elapsed_ms >= 1_000 {
+        format!("{}s ago", elapsed_ms / 1_000)
+    } else {
+        "just now".to_string()
+    };
+    format!("  - {} ({elapsed})", event.label)
 }
 
 fn draw_settings_dialog(frame: &mut ratatui::Frame, app: &App, mode: SettingsMode) {
@@ -2864,6 +2977,13 @@ fn resolve_home_dir() -> Option<PathBuf> {
         .map(PathBuf::from)
 }
 
+fn now_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|value| value.as_millis() as u64)
+        .unwrap_or(0)
+}
+
 fn open_first_changed_file(app: &App) -> Result<String> {
     let Some(changes) = app.git_changes.as_ref() else {
         return Err(anyhow::anyhow!("No change data. Press Ctrl+G first."));
@@ -2962,9 +3082,15 @@ fn load_git_changes() -> GitChanges {
         };
     }
 
-    let summary = format!(
+    let base_summary = format!(
         "Modified {modified}, Added {added}, Deleted {deleted}, Renamed {renamed}, Untracked {untracked}"
     );
+    let diff_summary = load_git_diff_summary();
+    let summary = if diff_summary.is_empty() {
+        base_summary
+    } else {
+        format!("{base_summary} | {diff_summary}")
+    };
     if files.len() > MAX_CHANGE_FILES {
         let extra = files.len().saturating_sub(MAX_CHANGE_FILES);
         files.truncate(MAX_CHANGE_FILES);
@@ -2979,6 +3105,18 @@ fn load_git_changes() -> GitChanges {
         files,
         error: None,
     }
+}
+
+fn load_git_diff_summary() -> String {
+    let output = Command::new("git").args(["diff", "--shortstat"]).output();
+    let output = match output {
+        Ok(output) => output,
+        Err(_) => return String::new(),
+    };
+    if !output.status.success() {
+        return String::new();
+    }
+    String::from_utf8_lossy(&output.stdout).trim().to_string()
 }
 
 fn normalize_git_path(raw: &str) -> String {

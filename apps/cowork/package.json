@@ -17,6 +17,7 @@
     "@ku0/agent-runtime-telemetry": "workspace:*",
     "@ku0/agent-runtime-tools": "workspace:*",
     "@ku0/gateway-control": "workspace:*",
+    "@ku0/nodes": "workspace:*",
     "@ku0/ai-core": "workspace:*",
     "@ku0/app": "workspace:*",
     "@ku0/context-index": "workspace:*",
