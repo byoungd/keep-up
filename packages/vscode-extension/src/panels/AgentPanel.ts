@@ -1,4 +1,5 @@
 import path from "node:path";
+import type { RuntimeEvent } from "@ku0/agent-runtime";
 import { applyPatch } from "diff";
 import * as vscode from "vscode";
 import {
@@ -8,9 +9,16 @@ import {
   getCoworkSession,
   resolveCoworkApproval,
   resolveCoworkBaseUrl,
+  setCoworkSessionMode,
   submitCoworkClarification,
 } from "../runtime/coworkGateway";
 import { type CoworkEvent, CoworkStreamClient } from "../runtime/coworkStream";
+import {
+  GatewayClient,
+  type GatewayConfig,
+  type GatewayConfigOverrides,
+  resolveGatewayConfig,
+} from "../runtime/gatewayClient";
 
 const SESSION_ID_KEY = "keepupSessionId";
 const BASE_URL_KEY = "keepupCoworkBaseUrl";
@@ -22,6 +30,8 @@ export class AgentPanel {
   private coworkSessionId?: string;
   private coworkBaseUrl?: string;
   private coworkStream?: CoworkStreamClient;
+  private gatewayClient?: GatewayClient;
+  private gatewayConfig?: GatewayConfig;
   private lastEventId?: string | null;
   private readonly pendingApprovals = new Set<string>();
   private readonly pendingClarifications = new Set<string>();
@@ -66,9 +76,11 @@ export class AgentPanel {
     );
 
     this.panel.webview.html = this.getHtml();
+    this.startGateway();
     this.panel.onDidDispose(() => {
       this.panel = undefined;
       this.stopStream();
+      this.stopGateway();
       this.coworkSessionId = undefined;
       this.pendingDiffs.clear();
       this.pendingApprovals.clear();
@@ -85,6 +97,9 @@ export class AgentPanel {
           break;
         case "previewDiff":
           await this.showDiffPreview(message.filePath);
+          break;
+        case "setMode":
+          await this.setSessionMode(message.mode);
           break;
         default:
           break;
@@ -197,6 +212,19 @@ export class AgentPanel {
     }
   }
 
+  async setSessionMode(mode: "plan" | "build" | "review") {
+    try {
+      const sessionId = await this.ensureSession();
+      const updated = await setCoworkSessionMode(sessionId, mode, {
+        baseUrl: this.coworkBaseUrl,
+      });
+      this.postMessage({ type: "system", text: `Mode set to ${updated}` });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.postMessage({ type: "error", text: message });
+    }
+  }
+
   private async ensureSession(): Promise<string> {
     const baseUrl = this.resolveBaseUrl();
     if (this.coworkBaseUrl && this.coworkBaseUrl !== baseUrl) {
@@ -281,6 +309,42 @@ export class AgentPanel {
     this.coworkStream = undefined;
   }
 
+  private startGateway(): void {
+    const overrides = this.resolveGatewayOverrides();
+    const nextConfig = resolveGatewayConfig(overrides ?? {});
+    if (!nextConfig) {
+      this.stopGateway();
+      return;
+    }
+
+    if (this.gatewayConfig && isSameGatewayConfig(this.gatewayConfig, nextConfig)) {
+      return;
+    }
+
+    this.stopGateway();
+    this.gatewayConfig = nextConfig;
+    this.gatewayClient = new GatewayClient(nextConfig, {
+      onEvent: (event) => this.handleGatewayEvent(event),
+      onError: (message) => {
+        this.postMessage({ type: "error", text: `[gateway] ${message}` });
+      },
+      onStatus: (message) => {
+        this.postMessage({ type: "system", text: `[gateway] ${message}` });
+      },
+    });
+
+    void this.gatewayClient.connect().catch((error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      this.postMessage({ type: "error", text: `[gateway] ${message}` });
+    });
+  }
+
+  private stopGateway(): void {
+    this.gatewayClient?.close();
+    this.gatewayClient = undefined;
+    this.gatewayConfig = undefined;
+  }
+
   private async resetSession(options: { clearStored?: boolean } = {}) {
     this.stopStream();
     this.coworkSessionId = undefined;
@@ -291,6 +355,42 @@ export class AgentPanel {
       await this.context.workspaceState.update(SESSION_ID_KEY, undefined);
       await this.context.workspaceState.update(BASE_URL_KEY, undefined);
     }
+  }
+
+  private resolveGatewayOverrides(): GatewayConfigOverrides | undefined {
+    const config = vscode.workspace.getConfiguration("keepup");
+    const overrides: GatewayConfigOverrides = {};
+
+    const enabled = readConfigValue<boolean>(config, "gatewayEnabled");
+    if (enabled !== undefined) {
+      overrides.enabled = enabled;
+    }
+
+    const url = readConfigValue<string>(config, "gatewayUrl");
+    if (url?.trim()) {
+      overrides.url = url.trim();
+    }
+
+    const token = readConfigValue<string>(config, "gatewayToken");
+    if (token?.trim()) {
+      overrides.token = token.trim();
+    }
+
+    const subscriptions = readConfigValue<string[]>(config, "gatewaySubscriptions");
+    if (Array.isArray(subscriptions) && subscriptions.length > 0) {
+      overrides.subscriptions = subscriptions;
+    }
+
+    return Object.keys(overrides).length > 0 ? overrides : undefined;
+  }
+
+  private handleGatewayEvent(event: RuntimeEvent): void {
+    const payload = event.payload;
+    const summary = formatGatewayEvent(event.type, payload);
+    this.postMessage({
+      type: "progress",
+      text: `[gateway] ${summary ?? event.type}`,
+    });
   }
 
   private handleCoworkEvent(event: CoworkEvent): void {
@@ -650,6 +750,11 @@ export class AgentPanel {
     <button id="send" type="button">Send</button>
     <button id="apply" type="button">Apply Pending</button>
   </div>
+  <div>
+    <button id="mode-plan" type="button">Plan Mode</button>
+    <button id="mode-build" type="button">Build Mode</button>
+    <button id="mode-review" type="button">Review Mode</button>
+  </div>
   <div id="diffs"></div>
   <script>
     const vscode = acquireVsCodeApi();
@@ -675,6 +780,18 @@ export class AgentPanel {
 
     document.getElementById('apply').addEventListener('click', () => {
       vscode.postMessage({ type: 'applyPending' });
+    });
+
+    document.getElementById('mode-plan').addEventListener('click', () => {
+      vscode.postMessage({ type: 'setMode', mode: 'plan' });
+    });
+
+    document.getElementById('mode-build').addEventListener('click', () => {
+      vscode.postMessage({ type: 'setMode', mode: 'build' });
+    });
+
+    document.getElementById('mode-review').addEventListener('click', () => {
+      vscode.postMessage({ type: 'setMode', mode: 'review' });
     });
 
     window.addEventListener('message', (event) => {
@@ -749,6 +866,7 @@ type WebviewMessage =
   | { type: "sendPrompt"; text: string }
   | { type: "applyPending" }
   | { type: "previewDiff"; filePath: string }
+  | { type: "setMode"; mode: "plan" | "build" | "review" }
   | { type: "assistant"; text: string }
   | { type: "progress"; text: string }
   | { type: "error"; text: string }
@@ -982,4 +1100,108 @@ function asNumber(value: unknown): number | undefined {
 
 function asArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
+}
+
+function readConfigValue<T>(config: vscode.WorkspaceConfiguration, key: string): T | undefined {
+  const inspected = config.inspect<T>(key);
+  return (
+    inspected?.workspaceFolderValue ??
+    inspected?.workspaceValue ??
+    inspected?.globalValue ??
+    undefined
+  );
+}
+
+function isSameGatewayConfig(a: GatewayConfig, b: GatewayConfig): boolean {
+  return (
+    a.url === b.url &&
+    a.token === b.token &&
+    a.userAgent === b.userAgent &&
+    a.clientId === b.clientId &&
+    arraysEqual(a.subscriptions, b.subscriptions)
+  );
+}
+
+function arraysEqual<T>(left: T[], right: T[]): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+  for (let i = 0; i < left.length; i += 1) {
+    if (left[i] !== right[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+type GatewayEventFormatter = (payload: unknown) => string;
+
+const GATEWAY_EVENT_FORMATTERS: Record<string, GatewayEventFormatter> = {
+  "tool:called": formatGatewayToolCalled,
+  "tool:completed": formatGatewayToolCompleted,
+  "tool:failed": formatGatewayToolFailed,
+  "task:started": formatGatewayTaskStarted,
+  "task:completed": formatGatewayTaskCompleted,
+  "task:failed": formatGatewayTaskFailed,
+  "agent:spawned": formatGatewayAgentSpawned,
+  "agent:completed": formatGatewayAgentCompleted,
+  "agent:failed": formatGatewayAgentFailed,
+};
+
+function formatGatewayEvent(type: string, payload: unknown): string | null {
+  const formatter = GATEWAY_EVENT_FORMATTERS[type];
+  return formatter ? formatter(payload) : null;
+}
+
+function formatGatewayToolCalled(payload: unknown): string {
+  if (!isRecord(payload)) {
+    return "tool called";
+  }
+  const toolName = asString(payload.toolName) ?? "unknown";
+  const args = isRecord(payload.args) ? formatArgs(payload.args) : "{}";
+  return `tool ${toolName} called -> ${args}`;
+}
+
+function formatGatewayToolCompleted(payload: unknown): string {
+  const toolName = isRecord(payload) ? asString(payload.toolName) : undefined;
+  const duration = isRecord(payload) ? asNumber(payload.durationMs) : undefined;
+  return `tool ${toolName ?? "unknown"} completed${duration ? ` (${duration}ms)` : ""}`;
+}
+
+function formatGatewayToolFailed(payload: unknown): string {
+  const toolName = isRecord(payload) ? asString(payload.toolName) : undefined;
+  const error = isRecord(payload) ? asString(payload.error) : undefined;
+  return `tool ${toolName ?? "unknown"} failed${error ? `: ${error}` : ""}`;
+}
+
+function formatGatewayTaskStarted(payload: unknown): string {
+  const taskId = isRecord(payload) ? asString(payload.taskId) : undefined;
+  return `task started${taskId ? ` (${taskId})` : ""}`;
+}
+
+function formatGatewayTaskCompleted(payload: unknown): string {
+  const taskId = isRecord(payload) ? asString(payload.taskId) : undefined;
+  return `task completed${taskId ? ` (${taskId})` : ""}`;
+}
+
+function formatGatewayTaskFailed(payload: unknown): string {
+  const taskId = isRecord(payload) ? asString(payload.taskId) : undefined;
+  const error = isRecord(payload) ? asString(payload.error) : undefined;
+  return `task failed${taskId ? ` (${taskId})` : ""}${error ? `: ${error}` : ""}`;
+}
+
+function formatGatewayAgentSpawned(payload: unknown): string {
+  const agentId = isRecord(payload) ? asString(payload.agentId) : undefined;
+  return `agent spawned${agentId ? ` (${agentId})` : ""}`;
+}
+
+function formatGatewayAgentCompleted(payload: unknown): string {
+  const agentId = isRecord(payload) ? asString(payload.agentId) : undefined;
+  return `agent completed${agentId ? ` (${agentId})` : ""}`;
+}
+
+function formatGatewayAgentFailed(payload: unknown): string {
+  const agentId = isRecord(payload) ? asString(payload.agentId) : undefined;
+  const error = isRecord(payload) ? asString(payload.error) : undefined;
+  return `agent failed${agentId ? ` (${agentId})` : ""}${error ? `: ${error}` : ""}`;
 }

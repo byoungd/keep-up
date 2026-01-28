@@ -13,7 +13,10 @@
     "onCommand:keepup.newTask",
     "onCommand:keepup.continueTask",
     "onCommand:keepup.showDiff",
-    "onCommand:keepup.applyChanges"
+    "onCommand:keepup.applyChanges",
+    "onCommand:keepup.setModePlan",
+    "onCommand:keepup.setModeBuild",
+    "onCommand:keepup.setModeReview"
   ],
   "contributes": {
     "commands": [
@@ -32,6 +35,18 @@
       {
         "command": "keepup.applyChanges",
         "title": "Keep-Up: Apply Changes"
+      },
+      {
+        "command": "keepup.setModePlan",
+        "title": "Keep-Up: Set Mode to Plan"
+      },
+      {
+        "command": "keepup.setModeBuild",
+        "title": "Keep-Up: Set Mode to Build"
+      },
+      {
+        "command": "keepup.setModeReview",
+        "title": "Keep-Up: Set Mode to Review"
       }
     ],
     "configuration": {
@@ -41,6 +56,29 @@
           "type": "string",
           "default": "",
           "description": "Base URL for the Cowork API (defaults to http://localhost:3000 when empty)."
+        },
+        "keepup.gatewayEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable Gateway WebSocket integration for runtime events."
+        },
+        "keepup.gatewayUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Override the Gateway WebSocket URL (defaults to KEEPUP_GATEWAY_URL or ws://127.0.0.1:18800)."
+        },
+        "keepup.gatewayToken": {
+          "type": "string",
+          "default": "",
+          "description": "Optional Gateway auth token (uses KEEPUP_GATEWAY_TOKEN when empty)."
+        },
+        "keepup.gatewaySubscriptions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Event subscription patterns for Gateway (leave empty to use defaults)."
         }
       }
     }
@@ -55,11 +93,13 @@
     "@ku0/ai-core": "workspace:*",
     "@ku0/agent-runtime": "workspace:*",
     "@ku0/tooling-session": "workspace:*",
-    "diff": "^5.2.0"
+    "diff": "^5.2.0",
+    "ws": "^8.18.3"
   },
   "devDependencies": {
     "@types/diff": "^5.2.0",
     "@types/node": "^22.10.2",
+    "@types/ws": "^8.18.1",
     "@types/vscode": "^1.86.0",
     "typescript": "^5.7.3"
   }

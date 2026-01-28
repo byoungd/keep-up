@@ -18,6 +18,18 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("keepup.applyChanges", () => {
       void agentPanel.applyPendingChanges();
     }),
+    vscode.commands.registerCommand("keepup.setModePlan", () => {
+      agentPanel.show();
+      void agentPanel.setSessionMode("plan");
+    }),
+    vscode.commands.registerCommand("keepup.setModeBuild", () => {
+      agentPanel.show();
+      void agentPanel.setSessionMode("build");
+    }),
+    vscode.commands.registerCommand("keepup.setModeReview", () => {
+      agentPanel.show();
+      void agentPanel.setSessionMode("review");
+    }),
     vscode.commands.registerCommand("keepup.explainFile", async (uri: vscode.Uri) => {
       const content = await vscode.workspace.fs.readFile(uri);
       agentPanel.show();
