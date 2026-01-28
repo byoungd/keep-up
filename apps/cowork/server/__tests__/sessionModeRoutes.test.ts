@@ -2,6 +2,7 @@ import type { CoworkSession, CoworkTask } from "@ku0/agent-runtime";
 import type { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createSessionRoutes } from "../routes/sessions";
+import type { CoworkTaskRuntime } from "../runtime/coworkTaskRuntime";
 import type { SessionStoreLike, TaskStoreLike } from "../storage/contracts";
 import { COWORK_EVENTS, SessionEventHub } from "../streaming/eventHub";
 
@@ -100,7 +101,7 @@ describe("Session mode routes", () => {
   let sessionStore: MockSessionStore;
   let taskStore: MockTaskStore;
   let eventHub: SessionEventHub;
-  const taskRuntime = { updateSessionMode: vi.fn() };
+  const taskRuntime = { updateSessionMode: vi.fn() } as unknown as CoworkTaskRuntime;
 
   beforeEach(async () => {
     sessionStore = new MockSessionStore();
