@@ -161,7 +161,13 @@ export function MessageList({
   // Empty state
   if (messages.length === 0) {
     return (
-      <div className={containerClass} ref={listRef} onScroll={handleScroll}>
+      <div
+        className={containerClass}
+        ref={listRef}
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+        tabIndex={0}
+        onScroll={handleScroll}
+      >
         <StartupView
           title={translations.emptyTitle}
           description={translations.emptyDescription}
@@ -175,7 +181,13 @@ export function MessageList({
   // Virtualized rendering
   if (shouldVirtualize) {
     return (
-      <div className={containerClass} ref={listRef} onScroll={handleScroll}>
+      <div
+        className={containerClass}
+        ref={listRef}
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+        tabIndex={0}
+        onScroll={handleScroll}
+      >
         <div
           style={{
             height: `${rowVirtualizer.getTotalSize()}px`,
@@ -225,7 +237,13 @@ export function MessageList({
   }
 
   return (
-    <div className={cn(containerClass, "space-y-5")} ref={listRef} onScroll={handleScroll}>
+    <div
+      className={cn(containerClass, "space-y-5")}
+      ref={listRef}
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+      tabIndex={0}
+      onScroll={handleScroll}
+    >
       {messages.map(renderMessage)}
       {showLoadingStatus ? <AILoadingStatus state={loadingState} className="mt-2" /> : null}
     </div>
