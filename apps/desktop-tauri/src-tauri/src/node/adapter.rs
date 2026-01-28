@@ -1,10 +1,8 @@
 
 use serde_json::{json, Value};
-use std::collections::HashMap;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use std::{env, thread};
 use tauri::AppHandle;
-use std::time::Instant;
 use tungstenite::stream::MaybeTlsStream;
 use tungstenite::{connect, Message};
 use tracing::{info, warn};
@@ -30,7 +28,9 @@ impl NodeAdapterConfig {
         let gateway_url = resolve_node_url().unwrap_or_else(|| "ws://localhost:3002".to_string());
         let node_id = resolve_node_id();
         let node_label = resolve_node_name();
-        let token = env::var("KEEPUP_DEVICE_NODE_TOKEN").ok();
+        let token = env::var("KEEPUP_DEVICE_NODE_TOKEN")
+            .ok()
+            .or_else(|| env::var("KEEPUP_GATEWAY_TOKEN").ok());
 
         Self {
             enabled,
@@ -74,11 +74,11 @@ fn connect_and_run(app: &AppHandle, config: &NodeAdapterConfig) -> Result<(), St
     }
 
     let permissions = resolve_permissions();
-    let descriptor = build_descriptor(app, config, &permissions);
+    let hello = build_hello_message(config, &permissions);
 
-    send_message(&mut socket, GatewayNodeClientMessage::Hello { node: descriptor.clone() })?;
+    send_message(&mut socket, hello)?;
 
-    info!(node_id = %descriptor.node_id, "Device node connected");
+    info!(node_id = %config.node_id, "Device node connected");
 
     let mut last_heartbeat = Instant::now();
 
@@ -86,8 +86,8 @@ fn connect_and_run(app: &AppHandle, config: &NodeAdapterConfig) -> Result<(), St
         if last_heartbeat.elapsed() >= HEARTBEAT_INTERVAL {
             send_message(
                 &mut socket,
-                GatewayNodeClientMessage::Heartbeat {
-                    node_id: descriptor.node_id.clone(),
+                NodeMessage::Heartbeat {
+                    node_id: config.node_id.clone(),
                 },
             )?;
             last_heartbeat = Instant::now();
@@ -95,16 +95,13 @@ fn connect_and_run(app: &AppHandle, config: &NodeAdapterConfig) -> Result<(), St
 
         match socket.read() {
             Ok(Message::Text(text)) => {
-                if let Err(error) =
-                    handle_server_message(app, &permissions, &descriptor, &mut socket, text)
-                {
+                if let Err(error) = handle_server_message(app, &permissions, &mut socket, text) {
                     warn!("Device node message error: {error}");
                 }
             }
             Ok(Message::Binary(payload)) => {
                 if let Ok(text) = String::from_utf8(payload) {
-                    if let Err(error) =
-                        handle_server_message(app, &permissions, &descriptor, &mut socket, text)
+                    if let Err(error) = handle_server_message(app, &permissions, &mut socket, text)
                     {
                         warn!("Device node message error: {error}");
                     }
@@ -130,30 +127,29 @@ fn connect_and_run(app: &AppHandle, config: &NodeAdapterConfig) -> Result<(), St
 
 fn handle_server_message(
     app: &AppHandle,
-    permissions: &HashMap<String, NodePermissionStatus>,
-    descriptor: &NodeDescriptor,
+    permissions: &[NodePermissionStatus],
     socket: &mut tungstenite::WebSocket<MaybeTlsStream<std::net::TcpStream>>,
     payload: String,
 ) -> Result<(), String> {
-    let message: GatewayNodeServerMessage =
-        serde_json::from_str(&payload).map_err(|error| error.to_string())?;
+    let message: NodeMessage = serde_json::from_str(&payload).map_err(|error| error.to_string())?;
 
     match message {
-        GatewayNodeServerMessage::Welcome { node_id, .. } => {
-            info!(node_id = %node_id, "Gateway acknowledged node");
-        }
-        GatewayNodeServerMessage::Invoke {
+        NodeMessage::Invoke {
             request_id,
             command,
             args,
         } => {
-            let response = handle_invoke(app, permissions, descriptor, request_id, command, args);
-            send_message(socket, GatewayNodeClientMessage::Response { response })?;
+            let response = handle_invoke(app, permissions, request_id, command, args);
+            send_message(socket, response)?;
         }
-        GatewayNodeServerMessage::Error { code, message } => {
+        NodeMessage::Error {
+            code,
+            message,
+            request_id: _,
+        } => {
             warn!("Gateway node error: {code} {message}");
         }
-        GatewayNodeServerMessage::Pong { .. } => {}
+        _ => {}
     }
 
     Ok(())
@@ -161,29 +157,25 @@ fn handle_server_message(
 
 fn handle_invoke(
     app: &AppHandle,
-    permissions: &HashMap<String, NodePermissionStatus>,
-    descriptor: &NodeDescriptor,
+    permissions: &[NodePermissionStatus],
     request_id: String,
     command: String,
     args: Option<Value>,
-) -> NodeResponse {
+) -> NodeMessage {
     match invoke_device_command(app, &command, args, permissions) {
-        Ok(result) => NodeResponse {
+        Ok(result) => NodeMessage::Result {
             request_id,
-            node_id: descriptor.node_id.clone(),
             success: true,
             result: Some(result),
             error: None,
         },
-        Err(DeviceCommandError { code, message }) => NodeResponse {
+        Err(DeviceCommandError { code, message }) => NodeMessage::Result {
             request_id,
-            node_id: descriptor.node_id.clone(),
             success: false,
             result: None,
             error: Some(NodeError {
-                code,
                 message,
-                details: None,
+                code: Some(code),
             }),
         },
     }
@@ -193,29 +185,44 @@ fn invoke_device_command(
     app: &AppHandle,
     command: &str,
     args: Option<Value>,
-    _permissions: &HashMap<String, NodePermissionStatus>,
+    permissions: &[NodePermissionStatus],
 ) -> Result<Value, DeviceCommandError> {
-     // Placeholder for command invocation logic
-     // In a real implementation this would dispatch to the appropriate handler
-     match command {
+    if let Some(permission) = required_permission(command) {
+        ensure_permission(permissions, permission)?;
+    }
+
+    match command {
         "camera.snap" => {
-             // Logic to capture camera (mocked for now)
-             Ok(json!({ "url": "mock://camera.jpg" }))
+            Ok(json!({ "url": "mock://camera.jpg" }))
         }
         "screen.record" => {
-            Ok(json!({ "status": "recording_started" }))
+            let action = args
+                .as_ref()
+                .and_then(|value| value.get("action"))
+                .and_then(|value| value.as_str())
+                .unwrap_or("start");
+            let status = if action.eq_ignore_ascii_case("stop") {
+                "recording_stopped"
+            } else {
+                "recording_started"
+            };
+            Ok(json!({ "status": status }))
         }
         "location.get" => {
             Ok(json!({ "lat": 37.7749, "lng": -122.4194 }))
         }
         "system.notify" => {
-             let message = args.and_then(|v| v.get("message").cloned()).and_then(|v| v.as_str().map(|s| s.to_string())).unwrap_or_default();
-             use tauri_plugin_dialog::DialogExt;
-             app.dialog().message(message).show(|_| {});
-             Ok(json!({ "delivered": true }))
+            let message = args
+                .as_ref()
+                .and_then(|value| value.get("message"))
+                .and_then(|value| value.as_str())
+                .unwrap_or("Notification");
+            use tauri_plugin_dialog::DialogExt;
+            app.dialog().message(message).show(|_| {});
+            Ok(json!({ "delivered": true }))
         }
         _ => Err(DeviceCommandError {
-            code: "unknown_command".to_string(),
+            code: "UNKNOWN_COMMAND".to_string(),
             message: format!("Command {command} not found"),
         }),
     }
@@ -226,9 +233,44 @@ struct DeviceCommandError {
     message: String,
 }
 
+fn required_permission(command: &str) -> Option<&'static str> {
+    match command {
+        "camera.snap" => Some("camera"),
+        "screen.record" => Some("screen"),
+        "location.get" => Some("location"),
+        "system.notify" => Some("notifications"),
+        _ => None,
+    }
+}
+
+fn ensure_permission(
+    permissions: &[NodePermissionStatus],
+    permission: &str,
+) -> Result<(), DeviceCommandError> {
+    if let Some(status) = permission_status(permissions, permission) {
+        if matches!(status, PermissionStatus::Denied) {
+            return Err(DeviceCommandError {
+                code: "PERMISSION_MISSING".to_string(),
+                message: format!("Permission {permission} denied"),
+            });
+        }
+    }
+    Ok(())
+}
+
+fn permission_status(
+    permissions: &[NodePermissionStatus],
+    permission: &str,
+) -> Option<&PermissionStatus> {
+    permissions
+        .iter()
+        .find(|entry| entry.name == permission)
+        .map(|entry| &entry.status)
+}
+
 fn send_message(
     socket: &mut tungstenite::WebSocket<MaybeTlsStream<std::net::TcpStream>>,
-    message: GatewayNodeClientMessage,
+    message: NodeMessage,
 ) -> Result<(), String> {
     let payload = serde_json::to_string(&message).map_err(|error| error.to_string())?;
     socket
@@ -236,27 +278,18 @@ fn send_message(
         .map_err(|error| error.to_string())
 }
 
-fn build_descriptor(
-    app: &AppHandle,
+fn build_hello_message(
     config: &NodeAdapterConfig,
-    permissions: &HashMap<String, NodePermissionStatus>,
-) -> NodeDescriptor {
+    permissions: &[NodePermissionStatus],
+) -> NodeMessage {
     let capabilities = capabilities();
-    let metadata = Some(HashMap::from([
-        (
-            "appVersion".to_string(),
-            app.package_info().version.to_string(),
-        ),
-        ("appName".to_string(), app.package_info().name.clone()),
-    ]));
-
-    NodeDescriptor {
+    NodeMessage::Hello {
         node_id: config.node_id.clone(),
-        label: Some(config.node_label.clone()),
-        platform: Some(std::env::consts::OS.to_string()),
+        name: Some(config.node_label.clone()),
+        kind: Some(format!("desktop-{}", std::env::consts::OS)),
         capabilities,
-        permissions: Some(permissions.clone()),
-        metadata,
+        permissions: Some(permissions.to_vec()),
+        token: config.token.clone(),
     }
 }
 
@@ -285,38 +318,42 @@ fn capabilities() -> Vec<NodeCapability> {
     ]
 }
 
-fn resolve_permissions() -> HashMap<String, NodePermissionStatus> {
-    let mut permissions = HashMap::new();
-    permissions.insert(
-        "camera".to_string(),
-        parse_permission_env("KEEPUP_DEVICE_PERMISSION_CAMERA", NodePermissionStatus::Unsupported),
-    );
-    permissions.insert(
-        "screen".to_string(),
-        parse_permission_env("KEEPUP_DEVICE_PERMISSION_SCREEN", NodePermissionStatus::Unsupported),
-    );
-    permissions.insert(
-        "location".to_string(),
-        parse_permission_env("KEEPUP_DEVICE_PERMISSION_LOCATION", NodePermissionStatus::Unsupported),
-    );
-    permissions.insert(
-        "notifications".to_string(),
-        parse_permission_env(
-            "KEEPUP_DEVICE_PERMISSION_NOTIFICATIONS",
-            NodePermissionStatus::Granted,
-        ),
-    );
-    permissions
+fn resolve_permissions() -> Vec<NodePermissionStatus> {
+    vec![
+        NodePermissionStatus {
+            name: "camera".to_string(),
+            status: parse_permission_env("KEEPUP_DEVICE_PERMISSION_CAMERA", PermissionStatus::Unknown),
+            details: None,
+        },
+        NodePermissionStatus {
+            name: "screen".to_string(),
+            status: parse_permission_env("KEEPUP_DEVICE_PERMISSION_SCREEN", PermissionStatus::Unknown),
+            details: None,
+        },
+        NodePermissionStatus {
+            name: "location".to_string(),
+            status: parse_permission_env("KEEPUP_DEVICE_PERMISSION_LOCATION", PermissionStatus::Unknown),
+            details: None,
+        },
+        NodePermissionStatus {
+            name: "notifications".to_string(),
+            status: parse_permission_env(
+                "KEEPUP_DEVICE_PERMISSION_NOTIFICATIONS",
+                PermissionStatus::Granted,
+            ),
+            details: None,
+        },
+    ]
 }
 
-fn parse_permission_env(key: &str, fallback: NodePermissionStatus) -> NodePermissionStatus {
+fn parse_permission_env(key: &str, fallback: PermissionStatus) -> PermissionStatus {
     match std::env::var(key) {
         Ok(value) => match value.trim().to_lowercase().as_str() {
-            "granted" => NodePermissionStatus::Granted,
-            "denied" => NodePermissionStatus::Denied,
-            "prompt" => NodePermissionStatus::Prompt,
-            "unsupported" => NodePermissionStatus::Unsupported,
-            "unknown" => NodePermissionStatus::Unknown,
+            "granted" => PermissionStatus::Granted,
+            "denied" => PermissionStatus::Denied,
+            "prompt" => PermissionStatus::Prompt,
+            "unsupported" => PermissionStatus::Unknown,
+            "unknown" => PermissionStatus::Unknown,
             _ => fallback,
         },
         Err(_) => fallback,
