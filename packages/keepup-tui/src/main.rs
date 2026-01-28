@@ -257,6 +257,7 @@ struct App {
     pending_session_list: Option<String>,
     pending_session_create: Option<String>,
     pending_session_delete: Option<String>,
+    pending_delete_session_id: Option<String>,
     pending_runtime_init: Option<String>,
     pending_hello: Option<String>,
     pending_interrupt: Option<String>,
@@ -403,6 +404,7 @@ impl App {
             pending_session_list: None,
             pending_session_create: None,
             pending_session_delete: None,
+            pending_delete_session_id: None,
             pending_runtime_init: None,
             pending_hello: None,
             pending_interrupt: None,
@@ -870,6 +872,7 @@ fn handle_inbound(app: &mut App, host: &HostClient) -> Result<()> {
                 {
                     app.pending_session_list = None;
                     app.loading_sessions = false;
+                    app.pending_delete_session_id = None;
                     if ok {
                         if let Some(list) = payload.and_then(|value| value.get("sessions").cloned()) {
                             let parsed: Vec<SessionSummary> =
@@ -900,6 +903,7 @@ fn handle_inbound(app: &mut App, host: &HostClient) -> Result<()> {
                     && app.pending_session_delete.as_deref() == Some(id.as_str())
                 {
                     app.pending_session_delete = None;
+                    app.pending_delete_session_id = None;
                     if ok {
                         let deleted_id = payload
                             .and_then(|value| value.get("sessionId").cloned())
@@ -925,6 +929,7 @@ fn handle_inbound(app: &mut App, host: &HostClient) -> Result<()> {
                     && app.pending_runtime_init.as_deref() == Some(id.as_str())
                 {
                     app.pending_runtime_init = None;
+                    app.pending_delete_session_id = None;
                     if ok {
                         if let Some(session) = payload.and_then(|value| value.get("session").cloned()) {
                             if let Ok(record) = serde_json::from_value::<SessionRecord>(session) {
@@ -1438,32 +1443,64 @@ fn sanitize_paste_text(text: &str) -> String {
 }
 
 fn handle_picker_key(app: &mut App, host: &HostClient, key: KeyEvent) -> Result<()> {
+    if let Some(pending_id) = app.pending_delete_session_id.clone() {
+        match key.code {
+            KeyCode::Char('y') | KeyCode::Char('Y') => {
+                app.pending_delete_session_id = None;
+                app.request_session_delete(host, pending_id)?;
+                return Ok(());
+            }
+            KeyCode::Char('n') | KeyCode::Char('N') => {
+                app.pending_delete_session_id = None;
+                app.status = "Delete canceled.".to_string();
+                return Ok(());
+            }
+            KeyCode::Char('d') | KeyCode::Char('D') => {}
+            _ => {
+                app.pending_delete_session_id = None;
+            }
+        }
+    }
+
     match key.code {
         KeyCode::Char('q') | KeyCode::Esc => app.should_exit = true,
         KeyCode::Up => {
             if app.selected > 0 {
                 app.selected -= 1;
+                app.pending_delete_session_id = None;
             }
         }
         KeyCode::Down => {
             if app.selected + 1 < app.sessions.len() {
                 app.selected += 1;
+                app.pending_delete_session_id = None;
             }
         }
         KeyCode::Enter => {
             if let Some(session) = app.sessions.get(app.selected) {
+                app.pending_delete_session_id = None;
                 app.request_runtime_init(host, session.id.clone())?;
             }
         }
         KeyCode::Char('n') => {
+            app.pending_delete_session_id = None;
             app.request_session_create(host)?;
         }
-        KeyCode::Char('d') => {
+        KeyCode::Char('d') | KeyCode::Char('D') => {
+            if !host_supports_op(app, "session.delete") {
+                app.status = "Session deletion not supported by host.".to_string();
+                return Ok(());
+            }
             if let Some(session) = app.sessions.get(app.selected) {
-                app.request_session_delete(host, session.id.clone())?;
+                app.pending_delete_session_id = Some(session.id.clone());
+                app.status = format!(
+                    "Delete session {}? Press y to confirm, n to cancel.",
+                    session.id
+                );
             }
         }
         KeyCode::Char('r') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            app.pending_delete_session_id = None;
             app.request_session_list(host)?;
         }
         _ => {}
@@ -2078,7 +2115,7 @@ fn draw_help(frame: &mut ratatui::Frame, _app: &App) {
         Line::from("  ↑/↓        Move selection (picker) / history (chat)"),
         Line::from("  Enter      Select session / send message"),
         Line::from("  n          New session (picker)"),
-        Line::from("  d          Delete session (picker)"),
+        Line::from("  d          Delete session (picker, confirm y/n)"),
         Line::from("  Ctrl+R     Refresh sessions (picker)"),
         Line::from("  Esc        Switch session (chat) / Quit (picker)"),
         Line::from("  q          Quit (picker)"),
