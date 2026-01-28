@@ -261,11 +261,11 @@ fn ensure_permission(
 fn permission_status(
     permissions: &[NodePermissionStatus],
     permission: &str,
-) -> Option<&PermissionStatus> {
+) -> Option<PermissionStatus> {
     permissions
         .iter()
         .find(|entry| entry.name == permission)
-        .map(|entry| &entry.status)
+        .map(|entry| entry.status)
 }
 
 fn send_message(

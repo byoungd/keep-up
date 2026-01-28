@@ -17,7 +17,7 @@ pub struct NodePermissionStatus {
     pub details: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum PermissionStatus {
     Granted,
