@@ -137,6 +137,40 @@ async function handleSessionCreate(message: OpMessage): Promise<void> {
   sendResult(message.id, message.op, { session });
 }
 
+async function handleSessionExport(message: OpMessage): Promise<void> {
+  const sessionId =
+    typeof message.payload?.sessionId === "string" ? message.payload.sessionId : undefined;
+  if (!sessionId) {
+    sendError(message.id, message.op, "sessionId is required.", "BAD_REQUEST");
+    return;
+  }
+  const session = await sessionStore.get(sessionId);
+  if (!session) {
+    sendError(message.id, message.op, "Session not found.", "SESSION_NOT_FOUND");
+    return;
+  }
+  sendResult(message.id, message.op, { session });
+}
+
+async function handleSessionDelete(message: OpMessage): Promise<void> {
+  const sessionId =
+    typeof message.payload?.sessionId === "string" ? message.payload.sessionId : undefined;
+  if (!sessionId) {
+    sendError(message.id, message.op, "sessionId is required.", "BAD_REQUEST");
+    return;
+  }
+  if (state.session?.id === sessionId) {
+    sendError(message.id, message.op, "Session is active in the host.", "SESSION_ACTIVE");
+    return;
+  }
+  const deleted = await sessionStore.delete(sessionId);
+  if (!deleted) {
+    sendError(message.id, message.op, "Session not found.", "SESSION_NOT_FOUND");
+    return;
+  }
+  sendResult(message.id, message.op, { sessionId, status: "deleted" });
+}
+
 async function initRuntime(message: OpMessage): Promise<void> {
   const sessionId =
     typeof message.payload?.sessionId === "string" ? message.payload.sessionId : undefined;
@@ -642,6 +676,12 @@ async function handleOp(message: OpMessage): Promise<void> {
       return;
     case "session.create":
       await handleSessionCreate(message);
+      return;
+    case "session.export":
+      await handleSessionExport(message);
+      return;
+    case "session.delete":
+      await handleSessionDelete(message);
       return;
     case "runtime.init":
       await initRuntime(message);
