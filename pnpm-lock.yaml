@@ -101,6 +101,9 @@ importers:
       '@ku0/lfcc-bridge':
         specifier: workspace:*
         version: link:../../packages/lfcc-bridge
+      '@ku0/nodes':
+        specifier: workspace:*
+        version: link:../../packages/nodes
       '@ku0/project-context':
         specifier: workspace:*
         version: link:../../packages/project-context
@@ -448,6 +451,9 @@ importers:
       '@ku0/storage-engine-rs':
         specifier: workspace:*
         version: link:../storage-engine-rs
+      '@ku0/tokenizer-rs':
+        specifier: workspace:*
+        version: link:../tokenizer-rs
       '@msgpack/msgpack':
         specifier: ^3.1.3
         version: 3.1.3
@@ -464,6 +470,9 @@ importers:
       '@types/node':
         specifier: ^22.10.2
         version: 22.19.3
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
@@ -681,6 +690,9 @@ importers:
       '@types/node':
         specifier: ^22.10.2
         version: 22.19.3
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
@@ -970,6 +982,28 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
+  packages/gateway:
+    dependencies:
+      '@ku0/agent-runtime-telemetry':
+        specifier: workspace:*
+        version: link:../agent-runtime-telemetry
+      ws:
+        specifier: ^8.18.3
+        version: 8.19.0
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.19.3
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.1
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.0.0
+        version: 4.0.16(@opentelemetry/api@1.9.0)(@types/node@22.19.3)(jiti@2.6.1)(jsdom@26.1.0)(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2)
+
   packages/gateway-control:
     dependencies:
       '@ku0/agent-runtime-control':
@@ -1003,6 +1037,9 @@ importers:
       '@types/node':
         specifier: ^22.10.2
         version: 22.19.3
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
@@ -1081,6 +1118,9 @@ importers:
       '@types/node':
         specifier: ^22.10.2
         version: 22.19.3
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
@@ -1162,6 +1202,28 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
+  packages/nodes:
+    dependencies:
+      '@ku0/agent-runtime-telemetry':
+        specifier: workspace:*
+        version: link:../agent-runtime-telemetry
+      ws:
+        specifier: ^8.18.3
+        version: 8.19.0
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.19.3
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.1
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.0.0
+        version: 4.0.16(@opentelemetry/api@1.9.0)(@types/node@22.19.3)(jiti@2.6.1)(jsdom@26.1.0)(lightningcss@1.30.2)(terser@5.44.1)(tsx@4.21.0)(yaml@2.8.2)
+
   packages/overlay:
     dependencies:
       '@ku0/app':
@@ -1208,6 +1270,9 @@ importers:
       '@types/node':
         specifier: ^22.10.2
         version: 22.19.3
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
@@ -1386,6 +1451,9 @@ importers:
       '@types/node':
         specifier: ^22.10.2
         version: 22.19.3
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
@@ -9367,7 +9435,7 @@ snapshots:
 
   '@types/better-sqlite3@7.6.13':
     dependencies:
-      '@types/node': 22.19.3
+      '@types/node': 20.19.27
 
   '@types/cacheable-request@6.0.3':
     dependencies:
