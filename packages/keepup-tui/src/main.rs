@@ -1,3 +1,4 @@
+use std::fs;
 use std::io::{self, BufRead, BufReader, BufWriter, Write};
 use std::path::PathBuf;
 use std::process::{Child, ChildStdin, Command, Stdio};
@@ -26,6 +27,10 @@ use uuid::Uuid;
 const DEFAULT_SESSION_LIMIT: u64 = 20;
 const INPUT_PREFIX: &str = "> ";
 const INPUT_INDENT: &str = "  ";
+const FILTER_PREFIX: &str = "/ ";
+const FILTER_INDENT: &str = "  ";
+const CLI_CONFIG_FILE: &str = "cli-config.json";
+const DEFAULT_STATE_DIR: &str = ".keep-up";
 const MIN_INPUT_HEIGHT: u16 = 3;
 const MAX_INPUT_HEIGHT: u16 = 8;
 const TAB_WIDTH: usize = 4;
@@ -156,6 +161,12 @@ enum AppMode {
     Chat,
 }
 
+#[derive(Debug, Clone, Copy)]
+enum SettingsMode {
+    Model,
+    Provider,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum MessageRole {
     User,
@@ -270,6 +281,12 @@ struct App {
     provider: Option<String>,
     session_override: Option<String>,
     loading_sessions: bool,
+    filter_active: bool,
+    session_filter: String,
+    session_filter_cursor: usize,
+    settings_mode: Option<SettingsMode>,
+    settings_input: String,
+    settings_cursor: usize,
     should_exit: bool,
 }
 
@@ -413,10 +430,16 @@ impl App {
             host_caps: None,
             session_id: None,
             session_title: None,
-            model: env_value("KEEPUP_TUI_MODEL"),
-            provider: env_value("KEEPUP_TUI_PROVIDER"),
+            model: env_value("KEEPUP_TUI_MODEL").or_else(|| load_cli_config_value("model")),
+            provider: env_value("KEEPUP_TUI_PROVIDER").or_else(|| load_cli_config_value("provider")),
             session_override: env_value("KEEPUP_TUI_SESSION"),
             loading_sessions: false,
+            filter_active: false,
+            session_filter: String::new(),
+            session_filter_cursor: 0,
+            settings_mode: None,
+            settings_input: String::new(),
+            settings_cursor: 0,
             should_exit: false,
         }
     }
@@ -563,6 +586,78 @@ impl App {
         }
         self.input.insert_str(self.cursor, text);
         self.cursor += text.len();
+    }
+
+    fn insert_session_filter(&mut self, text: &str) {
+        if text.is_empty() {
+            return;
+        }
+        self.session_filter
+            .insert_str(self.session_filter_cursor, text);
+        self.session_filter_cursor += text.len();
+    }
+
+    fn insert_settings_input(&mut self, text: &str) {
+        if text.is_empty() {
+            return;
+        }
+        self.settings_input
+            .insert_str(self.settings_cursor, text);
+        self.settings_cursor += text.len();
+    }
+
+    fn delete_session_filter_back(&mut self) {
+        if self.session_filter_cursor == 0 {
+            return;
+        }
+        let remove_at = self.session_filter_cursor.saturating_sub(1);
+        self.session_filter.remove(remove_at);
+        self.session_filter_cursor = remove_at;
+    }
+
+    fn delete_session_filter_forward(&mut self) {
+        if self.session_filter_cursor >= self.session_filter.len() {
+            return;
+        }
+        self.session_filter.remove(self.session_filter_cursor);
+    }
+
+    fn delete_settings_input_back(&mut self) {
+        if self.settings_cursor == 0 {
+            return;
+        }
+        let remove_at = self.settings_cursor.saturating_sub(1);
+        self.settings_input.remove(remove_at);
+        self.settings_cursor = remove_at;
+    }
+
+    fn delete_settings_input_forward(&mut self) {
+        if self.settings_cursor >= self.settings_input.len() {
+            return;
+        }
+        self.settings_input.remove(self.settings_cursor);
+    }
+
+    fn clear_session_filter(&mut self) {
+        self.session_filter.clear();
+        self.session_filter_cursor = 0;
+    }
+
+    fn clear_settings_input(&mut self) {
+        self.settings_input.clear();
+        self.settings_cursor = 0;
+    }
+
+    fn open_settings(&mut self, mode: SettingsMode) {
+        let current = match mode {
+            SettingsMode::Model => self.model.clone().unwrap_or_default(),
+            SettingsMode::Provider => self.provider.clone().unwrap_or_default(),
+        };
+        self.settings_mode = Some(mode);
+        self.settings_input = current;
+        self.settings_cursor = self.settings_input.len();
+        self.pending_delete_session_id = None;
+        self.filter_active = false;
     }
 
     fn set_input(&mut self, text: String) {
@@ -878,6 +973,7 @@ fn handle_inbound(app: &mut App, host: &HostClient) -> Result<()> {
                             let parsed: Vec<SessionSummary> =
                                 serde_json::from_value(list).unwrap_or_default();
                             app.sessions = parsed;
+                            clamp_picker_selection(app);
                             if app.mode == AppMode::Picker {
                                 app.selected = 0;
                                 app.status = "Select a session.".to_string();
@@ -1443,6 +1539,90 @@ fn sanitize_paste_text(text: &str) -> String {
 }
 
 fn handle_picker_key(app: &mut App, host: &HostClient, key: KeyEvent) -> Result<()> {
+    if let Some(mode) = app.settings_mode {
+        let is_plain_char = matches!(key.code, KeyCode::Char(_))
+            && !key.modifiers.contains(KeyModifiers::CONTROL)
+            && !key.modifiers.contains(KeyModifiers::ALT);
+        match key.code {
+            KeyCode::Esc => {
+                app.settings_mode = None;
+                app.status = "Settings canceled.".to_string();
+                return Ok(());
+            }
+            KeyCode::Enter => {
+                let value = app.settings_input.trim();
+                let normalized = if value.is_empty() || value.eq_ignore_ascii_case("auto") {
+                    None
+                } else {
+                    Some(value.to_string())
+                };
+                match mode {
+                    SettingsMode::Model => {
+                        app.model = normalized.clone();
+                        let mut status = match &app.model {
+                            Some(model) => format!("Model set to {model}."),
+                            None => "Model reset to auto.".to_string(),
+                        };
+                        if let Err(error) = save_cli_config_value("model", app.model.clone()) {
+                            status = format!("Failed to save model: {error}");
+                        }
+                        app.status = status;
+                    }
+                    SettingsMode::Provider => {
+                        app.provider = normalized.clone();
+                        let mut status = match &app.provider {
+                            Some(provider) => format!("Provider set to {provider}."),
+                            None => "Provider reset to auto.".to_string(),
+                        };
+                        if let Err(error) = save_cli_config_value("provider", app.provider.clone()) {
+                            status = format!("Failed to save provider: {error}");
+                        }
+                        app.status = status;
+                    }
+                }
+                app.settings_mode = None;
+                return Ok(());
+            }
+            KeyCode::Backspace => {
+                app.delete_settings_input_back();
+                return Ok(());
+            }
+            KeyCode::Delete => {
+                app.delete_settings_input_forward();
+                return Ok(());
+            }
+            KeyCode::Left => {
+                app.settings_cursor = app.settings_cursor.saturating_sub(1);
+                return Ok(());
+            }
+            KeyCode::Right => {
+                if app.settings_cursor < app.settings_input.len() {
+                    app.settings_cursor += 1;
+                }
+                return Ok(());
+            }
+            KeyCode::Home => {
+                app.settings_cursor = 0;
+                return Ok(());
+            }
+            KeyCode::End => {
+                app.settings_cursor = app.settings_input.len();
+                return Ok(());
+            }
+            KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                app.clear_settings_input();
+                return Ok(());
+            }
+            _ if is_plain_char => {
+                if let KeyCode::Char(ch) = key.code {
+                    app.insert_settings_input(&ch.to_string());
+                }
+                return Ok(());
+            }
+            _ => {}
+        }
+    }
+
     if let Some(pending_id) = app.pending_delete_session_id.clone() {
         match key.code {
             KeyCode::Char('y') | KeyCode::Char('Y') => {
@@ -1462,25 +1642,104 @@ fn handle_picker_key(app: &mut App, host: &HostClient, key: KeyEvent) -> Result<
         }
     }
 
+    if app.filter_active {
+        let is_plain_char = matches!(key.code, KeyCode::Char(_))
+            && !key.modifiers.contains(KeyModifiers::CONTROL)
+            && !key.modifiers.contains(KeyModifiers::ALT);
+        match key.code {
+            KeyCode::Esc => {
+                app.filter_active = false;
+                app.session_filter_cursor = app.session_filter.len();
+                app.status = "Filter closed.".to_string();
+                return Ok(());
+            }
+            KeyCode::Backspace => {
+                app.delete_session_filter_back();
+                app.pending_delete_session_id = None;
+                clamp_picker_selection(app);
+                return Ok(());
+            }
+            KeyCode::Delete => {
+                app.delete_session_filter_forward();
+                app.pending_delete_session_id = None;
+                clamp_picker_selection(app);
+                return Ok(());
+            }
+            KeyCode::Left => {
+                app.session_filter_cursor = app.session_filter_cursor.saturating_sub(1);
+                return Ok(());
+            }
+            KeyCode::Right => {
+                if app.session_filter_cursor < app.session_filter.len() {
+                    app.session_filter_cursor += 1;
+                }
+                return Ok(());
+            }
+            KeyCode::Home => {
+                app.session_filter_cursor = 0;
+                return Ok(());
+            }
+            KeyCode::End => {
+                app.session_filter_cursor = app.session_filter.len();
+                return Ok(());
+            }
+            KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                app.clear_session_filter();
+                app.pending_delete_session_id = None;
+                clamp_picker_selection(app);
+                return Ok(());
+            }
+            _ if is_plain_char => {
+                if let KeyCode::Char(ch) = key.code {
+                    app.insert_session_filter(&ch.to_string());
+                    app.pending_delete_session_id = None;
+                    clamp_picker_selection(app);
+                }
+                return Ok(());
+            }
+            _ => {}
+        }
+    }
+
     match key.code {
         KeyCode::Char('q') | KeyCode::Esc => app.should_exit = true,
         KeyCode::Up => {
-            if app.selected > 0 {
+            let filtered_len = filtered_session_indices(app).len();
+            if filtered_len > 0 && app.selected > 0 {
                 app.selected -= 1;
                 app.pending_delete_session_id = None;
             }
         }
         KeyCode::Down => {
-            if app.selected + 1 < app.sessions.len() {
+            let filtered_len = filtered_session_indices(app).len();
+            if app.selected + 1 < filtered_len {
                 app.selected += 1;
                 app.pending_delete_session_id = None;
             }
         }
         KeyCode::Enter => {
-            if let Some(session) = app.sessions.get(app.selected) {
-                app.pending_delete_session_id = None;
-                app.request_runtime_init(host, session.id.clone())?;
+            let filtered = filtered_session_indices(app);
+            if let Some(index) = filtered.get(app.selected) {
+                if let Some(session) = app.sessions.get(*index) {
+                    app.pending_delete_session_id = None;
+                    app.filter_active = false;
+                    app.request_runtime_init(host, session.id.clone())?;
+                }
             }
+        }
+        KeyCode::Char('/') => {
+            app.filter_active = true;
+            app.session_filter_cursor = app.session_filter.len();
+            app.pending_delete_session_id = None;
+            app.status = "Filter sessions. Type to search.".to_string();
+        }
+        KeyCode::Char('m') | KeyCode::Char('M') => {
+            app.open_settings(SettingsMode::Model);
+            app.status = "Edit model. Enter to save, Esc to cancel.".to_string();
+        }
+        KeyCode::Char('p') | KeyCode::Char('P') => {
+            app.open_settings(SettingsMode::Provider);
+            app.status = "Edit provider. Enter to save, Esc to cancel.".to_string();
         }
         KeyCode::Char('n') => {
             app.pending_delete_session_id = None;
@@ -1491,12 +1750,15 @@ fn handle_picker_key(app: &mut App, host: &HostClient, key: KeyEvent) -> Result<
                 app.status = "Session deletion not supported by host.".to_string();
                 return Ok(());
             }
-            if let Some(session) = app.sessions.get(app.selected) {
-                app.pending_delete_session_id = Some(session.id.clone());
-                app.status = format!(
-                    "Delete session {}? Press y to confirm, n to cancel.",
-                    session.id
-                );
+            let filtered = filtered_session_indices(app);
+            if let Some(index) = filtered.get(app.selected) {
+                if let Some(session) = app.sessions.get(*index) {
+                    app.pending_delete_session_id = Some(session.id.clone());
+                    app.status = format!(
+                        "Delete session {}? Press y to confirm, n to cancel.",
+                        session.id
+                    );
+                }
             }
         }
         KeyCode::Char('r') if key.modifiers.contains(KeyModifiers::CONTROL) => {
@@ -1541,6 +1803,9 @@ fn handle_chat_key(app: &mut App, host: &HostClient, key: KeyEvent) -> Result<()
     match key.code {
         KeyCode::Esc => {
             app.mode = AppMode::Picker;
+            app.filter_active = false;
+            app.session_filter_cursor = app.session_filter.len();
+            app.pending_delete_session_id = None;
             app.request_session_list(host)?;
         }
         KeyCode::Up => {
@@ -1620,6 +1885,9 @@ fn handle_chat_key(app: &mut App, host: &HostClient, key: KeyEvent) -> Result<()
         }
         KeyCode::Char('s') if key.modifiers.contains(KeyModifiers::CONTROL) => {
             app.mode = AppMode::Picker;
+            app.filter_active = false;
+            app.session_filter_cursor = app.session_filter.len();
+            app.pending_delete_session_id = None;
             app.request_session_list(host)?;
         }
         KeyCode::Left => {
@@ -1704,6 +1972,12 @@ fn draw_ui(frame: &mut ratatui::Frame, app: &mut App) {
     if app.show_help {
         draw_help(frame, app);
     }
+    if let Some(pending) = app.pending_approval.as_ref() {
+        draw_approval_dialog(frame, pending);
+    }
+    if let Some(mode) = app.settings_mode {
+        draw_settings_dialog(frame, app, mode);
+    }
 }
 
 fn app_header(app: &App) -> Text<'_> {
@@ -1742,15 +2016,21 @@ fn draw_picker(frame: &mut ratatui::Frame, app: &App, area: Rect) {
     };
     let block = Block::default().title(title).borders(Borders::ALL);
 
-    if app.sessions.is_empty() && !app.loading_sessions {
-        let empty = Paragraph::new("No sessions. Press n to create one.").block(block);
+    let filtered = filtered_session_indices(app);
+    if filtered.is_empty() && !app.loading_sessions {
+        let message = if app.session_filter.trim().is_empty() {
+            "No sessions. Press n to create one."
+        } else {
+            "No sessions match the filter."
+        };
+        let empty = Paragraph::new(message).block(block);
         frame.render_widget(empty, area);
         return;
     }
 
-    let items: Vec<ListItem> = app
-        .sessions
+    let items: Vec<ListItem> = filtered
         .iter()
+        .filter_map(|index| app.sessions.get(*index))
         .map(|session| {
             let title = if session.title.is_empty() {
                 "(untitled)"
@@ -1783,7 +2063,43 @@ fn draw_picker(frame: &mut ratatui::Frame, app: &App, area: Rect) {
         .highlight_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
         .highlight_symbol("> ");
 
-    frame.render_stateful_widget(list, area, &mut list_state(app.selected));
+    let selected = if filtered.is_empty() {
+        0
+    } else {
+        app.selected.min(filtered.len().saturating_sub(1))
+    };
+    frame.render_stateful_widget(list, area, &mut list_state(selected));
+}
+
+fn filtered_session_indices(app: &App) -> Vec<usize> {
+    let query = app.session_filter.trim().to_lowercase();
+    if query.is_empty() {
+        return (0..app.sessions.len()).collect();
+    }
+    app.sessions
+        .iter()
+        .enumerate()
+        .filter_map(|(index, session)| {
+            let haystack_id = session.id.to_lowercase();
+            let haystack_title = session.title.to_lowercase();
+            if haystack_id.contains(&query) || haystack_title.contains(&query) {
+                Some(index)
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+fn clamp_picker_selection(app: &mut App) {
+    let filtered = filtered_session_indices(app);
+    if filtered.is_empty() {
+        app.selected = 0;
+        return;
+    }
+    if app.selected >= filtered.len() {
+        app.selected = filtered.len().saturating_sub(1);
+    }
 }
 
 fn draw_chat(frame: &mut ratatui::Frame, app: &mut App, area: Rect) {
@@ -1820,6 +2136,49 @@ fn draw_chat(frame: &mut ratatui::Frame, app: &mut App, area: Rect) {
 }
 
 fn draw_input(frame: &mut ratatui::Frame, app: &App, area: Rect) {
+    if matches!(app.mode, AppMode::Picker) {
+        if !app.filter_active && app.session_filter.trim().is_empty() {
+            let block = Block::default().title("Filter").borders(Borders::ALL);
+            let hint = Paragraph::new("Press / to filter sessions.")
+                .block(block)
+                .style(Style::default().add_modifier(Modifier::DIM))
+                .wrap(Wrap { trim: true });
+            frame.render_widget(hint, area);
+            return;
+        }
+
+        let block = Block::default().title("Filter").borders(Borders::ALL);
+        let inner_width = area.width.saturating_sub(2) as usize;
+        let available = inner_width
+            .saturating_sub(display_width(FILTER_PREFIX))
+            .max(1);
+        let layout = build_filter_layout(
+            &app.session_filter,
+            app.session_filter_cursor,
+            available,
+        );
+        let visible_height = area.height.saturating_sub(2) as usize;
+        let scroll_offset = compute_input_scroll(layout.cursor_line, visible_height);
+        let scroll = scroll_offset.min(u16::MAX as usize) as u16;
+        let paragraph = Paragraph::new(Text::from(layout.lines))
+            .block(block)
+            .wrap(Wrap { trim: false })
+            .scroll((scroll, 0));
+        frame.render_widget(paragraph, area);
+
+        if app.filter_active {
+            let cursor_line = layout.cursor_line.saturating_sub(scroll_offset);
+            if cursor_line < visible_height {
+                let cursor_x =
+                    area.x + 1 + display_width(FILTER_PREFIX) as u16 + layout.cursor_col as u16;
+                let max_x = area.x + area.width.saturating_sub(2);
+                let cursor_y = area.y + 1 + cursor_line as u16;
+                frame.set_cursor(cursor_x.min(max_x), cursor_y);
+            }
+        }
+        return;
+    }
+
     let block = Block::default().title("Input").borders(Borders::ALL);
     let inner_width = area.width.saturating_sub(2) as usize;
     let available = inner_width
@@ -1835,15 +2194,13 @@ fn draw_input(frame: &mut ratatui::Frame, app: &App, area: Rect) {
         .scroll((scroll, 0));
     frame.render_widget(paragraph, area);
 
-    if app.mode == AppMode::Chat {
-        let cursor_line = layout.cursor_line.saturating_sub(scroll_offset);
-        if cursor_line < visible_height {
-            let cursor_x =
-                area.x + 1 + display_width(INPUT_PREFIX) as u16 + layout.cursor_col as u16;
-            let max_x = area.x + area.width.saturating_sub(2);
-            let cursor_y = area.y + 1 + cursor_line as u16;
-            frame.set_cursor(cursor_x.min(max_x), cursor_y);
-        }
+    let cursor_line = layout.cursor_line.saturating_sub(scroll_offset);
+    if cursor_line < visible_height {
+        let cursor_x =
+            area.x + 1 + display_width(INPUT_PREFIX) as u16 + layout.cursor_col as u16;
+        let max_x = area.x + area.width.saturating_sub(2);
+        let cursor_y = area.y + 1 + cursor_line as u16;
+        frame.set_cursor(cursor_x.min(max_x), cursor_y);
     }
 }
 
@@ -1916,10 +2273,13 @@ struct InputLayout {
 
 fn desired_input_height(app: &App, area: Rect) -> u16 {
     let inner_width = area.width.saturating_sub(2) as usize;
-    let available = inner_width
-        .saturating_sub(display_width(INPUT_PREFIX))
-        .max(1);
-    let line_count = count_wrapped_lines(&app.input, available);
+    let (content, prefix) = if matches!(app.mode, AppMode::Picker) {
+        (app.session_filter.as_str(), FILTER_PREFIX)
+    } else {
+        (app.input.as_str(), INPUT_PREFIX)
+    };
+    let available = inner_width.saturating_sub(display_width(prefix)).max(1);
+    let line_count = count_wrapped_lines(content, available);
     let desired = (line_count + 2) as u16;
     let max_by_frame = area.height.saturating_sub(2);
     let max_height = std::cmp::min(MAX_INPUT_HEIGHT, max_by_frame);
@@ -1939,13 +2299,27 @@ fn count_wrapped_lines(input: &str, available: usize) -> usize {
 }
 
 fn build_input_layout(input: &str, cursor: usize, available: usize) -> InputLayout {
+    build_prefixed_layout(input, cursor, available, INPUT_PREFIX, INPUT_INDENT)
+}
+
+fn build_filter_layout(input: &str, cursor: usize, available: usize) -> InputLayout {
+    build_prefixed_layout(input, cursor, available, FILTER_PREFIX, FILTER_INDENT)
+}
+
+fn build_prefixed_layout(
+    input: &str,
+    cursor: usize,
+    available: usize,
+    prefix: &str,
+    indent: &str,
+) -> InputLayout {
     let available = available.max(1);
     let mut lines = Vec::new();
     let mut first = true;
     for line in input.split('\n') {
         let segments = wrap_line_by_width(line, available, available);
         for segment in segments {
-            let prefix = if first { INPUT_PREFIX } else { INPUT_INDENT };
+            let prefix = if first { prefix } else { indent };
             lines.push(Line::from(format!("{prefix}{segment}")));
             first = false;
         }
@@ -2126,6 +2500,8 @@ fn draw_help(frame: &mut ratatui::Frame, _app: &App) {
         Line::from("  Enter      Select session / send message"),
         Line::from("  n          New session (picker)"),
         Line::from("  d          Delete session (picker, confirm y/n)"),
+        Line::from("  /          Filter sessions (picker)"),
+        Line::from("  m / p      Edit model / provider (picker)"),
         Line::from("  Ctrl+R     Refresh sessions (picker)"),
         Line::from("  Esc        Switch session (chat) / Quit (picker)"),
         Line::from("  q          Quit (picker)"),
@@ -2154,6 +2530,71 @@ fn draw_help(frame: &mut ratatui::Frame, _app: &App) {
         .block(Block::default().title("Help").borders(Borders::ALL))
         .wrap(Wrap { trim: true });
     frame.render_widget(paragraph, area);
+}
+
+fn draw_approval_dialog(frame: &mut ratatui::Frame, approval: &PendingApproval) {
+    let area = centered_rect(70, 40, frame.size());
+    frame.render_widget(Clear, area);
+
+    let mut lines = vec![
+        Line::from(vec![Span::styled(
+            "Approval Required",
+            Style::default().add_modifier(Modifier::BOLD),
+        )]),
+        Line::from(""),
+        Line::from(format!("Tool: {}", approval.tool_name)),
+    ];
+
+    if let Some(risk) = &approval.risk {
+        lines.push(Line::from(format!("Risk: {risk}")));
+    }
+    if let Some(reason) = &approval.reason {
+        lines.push(Line::from(format!("Reason: {reason}")));
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::from("Press y to approve, n to reject."));
+
+    let paragraph = Paragraph::new(lines)
+        .block(Block::default().title("Approval").borders(Borders::ALL))
+        .wrap(Wrap { trim: true });
+    frame.render_widget(paragraph, area);
+}
+
+fn draw_settings_dialog(frame: &mut ratatui::Frame, app: &App, mode: SettingsMode) {
+    let area = centered_rect(70, 40, frame.size());
+    frame.render_widget(Clear, area);
+
+    let label = match mode {
+        SettingsMode::Model => "Model",
+        SettingsMode::Provider => "Provider",
+    };
+    let input_prefix = format!("{label}: ");
+    let input_line = format!("{input_prefix}{}", app.settings_input);
+
+    let lines = vec![
+        Line::from(vec![Span::styled(
+            format!("Set {label}"),
+            Style::default().add_modifier(Modifier::BOLD),
+        )]),
+        Line::from(""),
+        Line::from(input_line),
+        Line::from(""),
+        Line::from("Enter to save, Esc to cancel."),
+    ];
+
+    let paragraph = Paragraph::new(lines)
+        .block(Block::default().title("Settings").borders(Borders::ALL))
+        .wrap(Wrap { trim: true });
+    frame.render_widget(paragraph, area);
+
+    let cursor_line = 2usize;
+    let cursor_x_offset = display_width(&input_prefix)
+        + display_width(&app.settings_input[..app.settings_cursor.min(app.settings_input.len())]);
+    let cursor_x = area.x + 1 + cursor_x_offset as u16;
+    let max_x = area.x + area.width.saturating_sub(2);
+    let cursor_y = area.y + 1 + cursor_line as u16;
+    frame.set_cursor(cursor_x.min(max_x), cursor_y);
 }
 
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
@@ -2205,4 +2646,55 @@ fn env_value(key: &str) -> Option<String> {
         Ok(value) if !value.trim().is_empty() => Some(value),
         _ => None,
     }
+}
+
+fn load_cli_config_value(key: &str) -> Option<String> {
+    let path = resolve_cli_config_path()?;
+    let data = fs::read_to_string(path).ok()?;
+    let json: Value = serde_json::from_str(&data).ok()?;
+    json.get(key)
+        .and_then(|value| value.as_str())
+        .map(|value| value.to_string())
+}
+
+fn save_cli_config_value(key: &str, value: Option<String>) -> Result<()> {
+    let path = resolve_cli_config_path().context("resolve config path")?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).context("create config directory")?;
+    }
+    let mut config = if path.exists() {
+        let data = fs::read_to_string(&path).unwrap_or_else(|_| "{}".to_string());
+        serde_json::from_str::<Value>(&data).unwrap_or_else(|_| json!({}))
+    } else {
+        json!({})
+    };
+
+    if let Some(map) = config.as_object_mut() {
+        match value {
+            Some(value) => {
+                map.insert(key.to_string(), Value::String(value));
+            }
+            None => {
+                map.remove(key);
+            }
+        }
+    }
+
+    let serialized = serde_json::to_string_pretty(&config).context("serialize config")?;
+    fs::write(&path, serialized).context("write config")?;
+    Ok(())
+}
+
+fn resolve_cli_config_path() -> Option<PathBuf> {
+    if let Some(override_dir) = env_value("KEEPUP_STATE_DIR") {
+        return Some(PathBuf::from(override_dir).join(CLI_CONFIG_FILE));
+    }
+    let home_dir = resolve_home_dir()?;
+    Some(home_dir.join(DEFAULT_STATE_DIR).join(CLI_CONFIG_FILE))
+}
+
+fn resolve_home_dir() -> Option<PathBuf> {
+    env_value("HOME")
+        .or_else(|| env_value("USERPROFILE"))
+        .map(PathBuf::from)
 }
