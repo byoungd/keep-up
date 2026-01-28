@@ -152,7 +152,13 @@ export function ProjectContextPanel({ onClose }: { onClose: () => void }) {
             </>
           ) : (
             <>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                aria-hidden="true"
+              >
                 <title>Regenerate Icon</title>
                 <path
                   strokeLinecap="round"
