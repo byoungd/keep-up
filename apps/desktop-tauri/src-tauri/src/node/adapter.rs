@@ -1,310 +1,338 @@
+use crate::logs::LogEntry;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::env;
-use std::thread;
-use std::time::{Duration, Instant};
-use tauri::AppHandle;
-use tracing::{error, info, warn};
-use tungstenite::{connect, Message};
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
+use std::{env, thread};
+use tauri::{AppHandle, Manager};
+use tokio::time::Instant;
 use tungstenite::stream::MaybeTlsStream;
-use url::Url;
+use tungstenite::{connect, Message};
+use tracing::{info, warn, error};
 
-const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
-const RECONNECT_DELAY: Duration = Duration::from_secs(3);
-const READ_TIMEOUT: Duration = Duration::from_millis(250);
+use super::types::*;
 
-pub fn spawn_node_adapter(app: AppHandle) {
-    let config = match NodeConfig::from_env(&app) {
-        Some(config) => config,
-        None => {
-            info!("Gateway node adapter disabled");
-            return;
-        }
-    };
+const RECONNECT_DELAY: Duration = Duration::from_secs(5);
+const READ_TIMEOUT: Duration = Duration::from_secs(30);
+const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(15);
 
-    thread::spawn(move || {
-        run_adapter(app, config);
-    });
-}
-
-struct NodeConfig {
-    url: String,
+#[derive(Clone, Debug)]
+struct NodeAdapterConfig {
+    enabled: bool,
+    gateway_url: String,
     node_id: String,
-    name: String,
-    kind: String,
+    node_label: String,
     token: Option<String>,
 }
 
-impl NodeConfig {
-    fn from_env(app: &AppHandle) -> Option<Self> {
-        if env_flag_disabled("KEEPUP_NODE_ENABLED") {
-            return None;
-        }
-
-        let url = resolve_node_url()?;
+impl NodeAdapterConfig {
+    fn from_env() -> Self {
+        let enabled = parse_bool_env("KEEPUP_DEVICE_NODE_ENABLED", true);
+        let gateway_url = resolve_node_url().unwrap_or_else(|| "ws://localhost:3002".to_string());
         let node_id = resolve_node_id();
-        let name = resolve_node_name(app);
-        let kind = "desktop".to_string();
-        let token = env::var("KEEPUP_GATEWAY_TOKEN").ok().filter(|value| !value.is_empty());
+        let node_label = resolve_node_name();
+        let token = env::var("KEEPUP_DEVICE_NODE_TOKEN").ok();
 
-        Some(Self {
-            url,
+        Self {
+            enabled,
+            gateway_url,
             node_id,
-            name,
-            kind,
+            node_label,
             token,
-        })
+        }
     }
 }
 
-fn run_adapter(app: AppHandle, config: NodeConfig) {
+pub fn start_device_node(app: AppHandle) {
+    let config = NodeAdapterConfig::from_env();
+    if config.enabled {
+        let app_handle = app.clone();
+        thread::spawn(move || {
+            run_node_loop(app_handle, config);
+        });
+    }
+}
+
+fn run_node_loop(app: AppHandle, config: NodeAdapterConfig) {
     loop {
-        let url = match Url::parse(&config.url) {
-            Ok(url) => url,
-            Err(error) => {
-                error!("Invalid gateway node url: {}", error);
-                return;
-            }
-        };
-
-        info!("Connecting to gateway node server: {}", config.url);
-        match connect(url.as_str()) {
-            Ok((mut socket, _)) => {
-                configure_timeouts(&socket);
-                if let Err(error) = send_hello(&mut socket, &config) {
-                    warn!("Failed to send node hello: {}", error);
-                    sleep_backoff();
-                    continue;
-                }
-
-                let mut last_heartbeat = Instant::now();
-                loop {
-                    if last_heartbeat.elapsed() >= HEARTBEAT_INTERVAL {
-                        if let Err(error) = send_heartbeat(&mut socket, &config) {
-                            warn!("Heartbeat failed: {}", error);
-                            break;
-                        }
-                        last_heartbeat = Instant::now();
-                    }
-
-                    match socket.read() {
-                        Ok(message) => {
-                            if let Err(error) = handle_message(&app, &config, &mut socket, message) {
-                                warn!("Node message handling failed: {}", error);
-                            }
-                        }
-                        Err(tungstenite::Error::Io(error))
-                            if error.kind() == std::io::ErrorKind::WouldBlock
-                                || error.kind() == std::io::ErrorKind::TimedOut =>
-                        {
-                            continue;
-                        }
-                        Err(tungstenite::Error::ConnectionClosed) => {
-                            info!("Gateway node connection closed");
-                            break;
-                        }
-                        Err(error) => {
-                            warn!("Gateway node connection error: {}", error);
-                            break;
-                        }
-                    }
-                }
+        match connect_and_run(&app, &config) {
+            Ok(()) => {
+                warn!("Device node connection closed");
             }
             Err(error) => {
-                warn!("Gateway node connection failed: {}", error);
+                warn!("Device node disconnected: {error}");
             }
         }
-
-        sleep_backoff();
+        thread::sleep(RECONNECT_DELAY);
     }
 }
 
-fn configure_timeouts(socket: &tungstenite::WebSocket<MaybeTlsStream<std::net::TcpStream>>) {
-    if let MaybeTlsStream::Plain(stream) = socket.get_ref() {
+fn connect_and_run(app: &AppHandle, config: &NodeAdapterConfig) -> Result<(), String> {
+    let (mut socket, _) = connect(config.gateway_url.as_str()).map_err(|error| error.to_string())?;
+
+    if let MaybeTlsStream::Plain(stream) = socket.get_mut() {
         let _ = stream.set_read_timeout(Some(READ_TIMEOUT));
     }
-}
 
-fn handle_message(
-    app: &AppHandle,
-    config: &NodeConfig,
-    socket: &mut tungstenite::WebSocket<MaybeTlsStream<std::net::TcpStream>>,
-    message: Message,
-) -> Result<(), String> {
-    match message {
-        Message::Text(text) => handle_text_message(app, config, socket, &text),
-        Message::Binary(binary) => {
-            let text = String::from_utf8_lossy(&binary);
-            handle_text_message(app, config, socket, &text)
+    let permissions = resolve_permissions();
+    let descriptor = build_descriptor(app, config, &permissions);
+
+    send_message(&mut socket, GatewayNodeClientMessage::Hello { node: descriptor.clone() })?;
+
+    info!(node_id = %descriptor.node_id, "Device node connected");
+
+    let mut last_heartbeat = Instant::now();
+
+    loop {
+        if last_heartbeat.elapsed() >= HEARTBEAT_INTERVAL {
+            send_message(
+                &mut socket,
+                GatewayNodeClientMessage::Heartbeat {
+                    node_id: descriptor.node_id.clone(),
+                },
+            )?;
+            last_heartbeat = Instant::now();
         }
-        Message::Close(_) => Err("Connection closed".to_string()),
-        _ => Ok(()),
+
+        match socket.read() {
+            Ok(Message::Text(text)) => {
+                if let Err(error) =
+                    handle_server_message(app, &permissions, &descriptor, &mut socket, text)
+                {
+                    warn!("Device node message error: {error}");
+                }
+            }
+            Ok(Message::Binary(payload)) => {
+                if let Ok(text) = String::from_utf8(payload) {
+                    if let Err(error) =
+                        handle_server_message(app, &permissions, &descriptor, &mut socket, text)
+                    {
+                        warn!("Device node message error: {error}");
+                    }
+                }
+            }
+            Ok(Message::Ping(payload)) => {
+                socket
+                    .send(Message::Pong(payload))
+                    .map_err(|error| error.to_string())?;
+            }
+            Ok(Message::Pong(_)) => {}
+            Ok(Message::Close(_)) => return Ok(()),
+            Err(tungstenite::Error::Io(error))
+                if error.kind() == std::io::ErrorKind::WouldBlock
+                    || error.kind() == std::io::ErrorKind::TimedOut => {}
+            Err(error) => {
+                return Err(error.to_string());
+            }
+            _ => {}
+        }
     }
 }
 
-fn handle_text_message(
+fn handle_server_message(
     app: &AppHandle,
-    _config: &NodeConfig,
+    permissions: &HashMap<String, NodePermissionStatus>,
+    descriptor: &NodeDescriptor,
     socket: &mut tungstenite::WebSocket<MaybeTlsStream<std::net::TcpStream>>,
-    text: &str,
+    payload: String,
 ) -> Result<(), String> {
-    let payload: Value = serde_json::from_str(text).map_err(|error| error.to_string())?;
-    let message_type = payload
-        .get("type")
-        .and_then(|value| value.as_str())
-        .ok_or_else(|| "Missing message type".to_string())?;
+    let message: GatewayNodeServerMessage =
+        serde_json::from_str(&payload).map_err(|error| error.to_string())?;
 
-    match message_type {
-        "node.invoke" => handle_invoke(app, socket, payload),
-        _ => Ok(()),
+    match message {
+        GatewayNodeServerMessage::Welcome { node_id, .. } => {
+            info!(node_id = %node_id, "Gateway acknowledged node");
+        }
+        GatewayNodeServerMessage::Invoke {
+            request_id,
+            command,
+            args,
+        } => {
+            let response = handle_invoke(app, permissions, descriptor, request_id, command, args);
+            send_message(socket, GatewayNodeClientMessage::Response { response })?;
+        }
+        GatewayNodeServerMessage::Error { code, message } => {
+            warn!("Gateway node error: {code} {message}");
+        }
+        GatewayNodeServerMessage::Pong { .. } => {}
     }
+
+    Ok(())
 }
 
 fn handle_invoke(
     app: &AppHandle,
-    socket: &mut tungstenite::WebSocket<MaybeTlsStream<std::net::TcpStream>>,
-    payload: Value,
-) -> Result<(), String> {
-    let request_id = payload
-        .get("requestId")
-        .and_then(|value| value.as_str())
-        .ok_or_else(|| "Missing requestId".to_string())?;
-    let command = payload
-        .get("command")
-        .and_then(|value| value.as_str())
-        .ok_or_else(|| "Missing command".to_string())?;
-    let args = payload.get("args").cloned();
-
-    let response = execute_command(app, command, args);
-    let message = json!({
-        "type": "node.result",
-        "requestId": request_id,
-        "success": response.get("success").and_then(|value| value.as_bool()).unwrap_or(false),
-        "result": response.get("result"),
-        "error": response.get("error"),
-    });
-
-    socket
-        .send(Message::Text(message.to_string()))
-        .map_err(|error| error.to_string())?;
-    Ok(())
-}
-
-fn execute_command(app: &AppHandle, command: &str, args: Option<Value>) -> Value {
-    match command {
-        "system.notify" => handle_notify(app, args),
-        "camera.snap" => error_response("PERMISSION_MISSING", "Camera permission not granted"),
-        "screen.record" => error_response("PERMISSION_MISSING", "Screen recording permission not granted"),
-        "location.get" => error_response("PERMISSION_MISSING", "Location permission not granted"),
-        _ => error_response("UNSUPPORTED", "Unsupported command"),
+    permissions: &HashMap<String, NodePermissionStatus>,
+    descriptor: &NodeDescriptor,
+    request_id: String,
+    command: String,
+    args: Option<Value>,
+) -> NodeResponse {
+    match invoke_device_command(app, &command, args, permissions) {
+        Ok(result) => NodeResponse {
+            request_id,
+            node_id: descriptor.node_id.clone(),
+            success: true,
+            result: Some(result),
+            error: None,
+        },
+        Err(DeviceCommandError { code, message }) => NodeResponse {
+            request_id,
+            node_id: descriptor.node_id.clone(),
+            success: false,
+            result: None,
+            error: Some(NodeError {
+                code,
+                message,
+                details: None,
+            }),
+        },
     }
 }
 
-fn handle_notify(_app: &AppHandle, args: Option<Value>) -> Value {
-    let message = args
-        .and_then(|value| value.get("message").cloned())
-        .and_then(|value| value.as_str().map(|value| value.to_string()))
-        .unwrap_or_else(|| "Notification triggered".to_string());
-    info!("Node notify: {}", message);
-    json!({
-        "success": true,
-        "result": {
-            "delivered": false,
-            "message": message,
+fn invoke_device_command(
+    app: &AppHandle,
+    command: &str,
+    args: Option<Value>,
+    permissions: &HashMap<String, NodePermissionStatus>,
+) -> Result<Value, DeviceCommandError> {
+     // Placeholder for command invocation logic
+     // In a real implementation this would dispatch to the appropriate handler
+     match command {
+        "camera.snap" => {
+             // Logic to capture camera (mocked for now)
+             Ok(json!({ "url": "mock://camera.jpg" }))
         }
-    })
-}
-
-fn error_response(code: &str, message: &str) -> Value {
-    json!({
-        "success": false,
-        "error": {
-            "code": code,
-            "message": message,
+        "screen.record" => {
+            Ok(json!({ "status": "recording_started" }))
         }
-    })
+        "location.get" => {
+            Ok(json!({ "lat": 37.7749, "lng": -122.4194 }))
+        }
+        "system.notify" => {
+             let message = args.and_then(|v| v.get("message").cloned()).and_then(|v| v.as_str().map(|s| s.to_string())).unwrap_or_default();
+             use tauri_plugin_dialog::DialogExt;
+             app.dialog().message(message).show(|_| {});
+             Ok(json!({ "delivered": true }))
+        }
+        _ => Err(DeviceCommandError {
+            code: "unknown_command".to_string(),
+            message: format!("Command {command} not found"),
+        }),
+    }
 }
 
-fn send_hello(
+struct DeviceCommandError {
+    code: String,
+    message: String,
+}
+
+fn send_message(
     socket: &mut tungstenite::WebSocket<MaybeTlsStream<std::net::TcpStream>>,
-    config: &NodeConfig,
+    message: GatewayNodeClientMessage,
 ) -> Result<(), String> {
-    let message = json!({
-        "type": "node.hello",
-        "nodeId": &config.node_id,
-        "name": &config.name,
-        "kind": &config.kind,
-        "capabilities": build_capabilities(),
-        "permissions": build_permissions(),
-        "token": config.token.as_deref(),
-    });
-
+    let payload = serde_json::to_string(&message).map_err(|error| error.to_string())?;
     socket
-        .send(Message::Text(message.to_string()))
-        .map_err(|error| error.to_string())?;
-    Ok(())
+        .send(Message::Text(payload))
+        .map_err(|error| error.to_string())
 }
 
-fn send_heartbeat(
-    socket: &mut tungstenite::WebSocket<MaybeTlsStream<std::net::TcpStream>>,
-    config: &NodeConfig,
-) -> Result<(), String> {
-    let message = json!({
-        "type": "node.heartbeat",
-        "nodeId": &config.node_id,
-    });
-    socket
-        .send(Message::Text(message.to_string()))
-        .map_err(|error| error.to_string())?;
-    Ok(())
+fn build_descriptor(
+    app: &AppHandle,
+    config: &NodeAdapterConfig,
+    permissions: &HashMap<String, NodePermissionStatus>,
+) -> NodeDescriptor {
+    let capabilities = capabilities();
+    let metadata = Some(HashMap::from([
+        (
+            "appVersion".to_string(),
+            app.package_info().version.to_string(),
+        ),
+        ("appName".to_string(), app.package_info().name.clone()),
+    ]));
+
+    NodeDescriptor {
+        node_id: config.node_id.clone(),
+        label: config.node_label.clone(),
+        platform: Some(std::env::consts::OS.to_string()),
+        capabilities,
+        permissions: Some(permissions.clone()),
+        metadata,
+    }
 }
 
-fn build_capabilities() -> Vec<Value> {
+fn capabilities() -> Vec<NodeCapability> {
     vec![
-        json!({
-            "command": "camera.snap",
-            "description": "Capture a camera snapshot",
-            "permissions": ["camera"],
-        }),
-        json!({
-            "command": "screen.record",
-            "description": "Record the screen",
-            "permissions": ["screen"],
-        }),
-        json!({
-            "command": "location.get",
-            "description": "Get current location",
-            "permissions": ["location"],
-        }),
-        json!({
-            "command": "system.notify",
-            "description": "Post a system notification",
-            "permissions": ["notifications"],
-        }),
+        NodeCapability {
+            command: "camera.snap".to_string(),
+            description: Some("Capture a photo from the camera".to_string()),
+            permissions: Some(vec!["camera".to_string()]),
+        },
+        NodeCapability {
+            command: "screen.record".to_string(),
+            description: Some("Start or stop a screen recording".to_string()),
+            permissions: Some(vec!["screen".to_string()]),
+        },
+        NodeCapability {
+            command: "location.get".to_string(),
+            description: Some("Read the current device location".to_string()),
+            permissions: Some(vec!["location".to_string()]),
+        },
+        NodeCapability {
+            command: "system.notify".to_string(),
+            description: Some("Show a desktop notification".to_string()),
+            permissions: Some(vec!["notifications".to_string()]),
+        },
     ]
 }
 
-fn build_permissions() -> Vec<Value> {
-    vec![
-        json!({
-            "name": "camera",
-            "status": "denied",
-            "details": "Camera permission not configured",
-        }),
-        json!({
-            "name": "screen",
-            "status": "denied",
-            "details": "Screen recording permission not configured",
-        }),
-        json!({
-            "name": "location",
-            "status": "denied",
-            "details": "Location permission not configured",
-        }),
-        json!({
-            "name": "notifications",
-            "status": "granted",
-        }),
-    ]
+fn resolve_permissions() -> HashMap<String, NodePermissionStatus> {
+    let mut permissions = HashMap::new();
+    permissions.insert(
+        "camera".to_string(),
+        parse_permission_env("KEEPUP_DEVICE_PERMISSION_CAMERA", NodePermissionStatus::Unsupported),
+    );
+    permissions.insert(
+        "screen".to_string(),
+        parse_permission_env("KEEPUP_DEVICE_PERMISSION_SCREEN", NodePermissionStatus::Unsupported),
+    );
+    permissions.insert(
+        "location".to_string(),
+        parse_permission_env("KEEPUP_DEVICE_PERMISSION_LOCATION", NodePermissionStatus::Unsupported),
+    );
+    permissions.insert(
+        "notifications".to_string(),
+        parse_permission_env(
+            "KEEPUP_DEVICE_PERMISSION_NOTIFICATIONS",
+            NodePermissionStatus::Granted,
+        ),
+    );
+    permissions
+}
+
+fn parse_permission_env(key: &str, fallback: NodePermissionStatus) -> NodePermissionStatus {
+    match std::env::var(key) {
+        Ok(value) => match value.trim().to_lowercase().as_str() {
+            "granted" => NodePermissionStatus::Granted,
+            "denied" => NodePermissionStatus::Denied,
+            "prompt" => NodePermissionStatus::Prompt,
+            "unsupported" => NodePermissionStatus::Unsupported,
+            "unknown" => NodePermissionStatus::Unknown,
+            _ => fallback,
+        },
+        Err(_) => fallback,
+    }
+}
+
+fn parse_bool_env(key: &str, fallback: bool) -> bool {
+    match std::env::var(key) {
+        Ok(value) => {
+            let normalized = value.trim().to_lowercase();
+            matches!(normalized.as_str(), "1" | "true" | "yes" | "on")
+        }
+        Err(_) => fallback,
+    }
 }
 
 fn resolve_node_url() -> Option<String> {
@@ -338,21 +366,9 @@ fn resolve_node_id() -> String {
     format!("desktop-{hostname}")
 }
 
-fn resolve_node_name(app: &AppHandle) -> String {
-    let package = app.package_info().name.clone();
+fn resolve_node_name() -> String {
     let hostname = env::var("HOSTNAME")
         .or_else(|_| env::var("COMPUTERNAME"))
         .unwrap_or_else(|_| "unknown".to_string());
-    format!("{package} ({hostname})")
-}
-
-fn env_flag_disabled(key: &str) -> bool {
-    match env::var(key) {
-        Ok(value) => matches!(value.to_lowercase().as_str(), "0" | "false" | "no" | "off"),
-        Err(_) => false,
-    }
-}
-
-fn sleep_backoff() {
-    thread::sleep(RECONNECT_DELAY);
+    format!("Desktop ({hostname})")
 }

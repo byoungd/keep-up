@@ -32,6 +32,31 @@ export type GatewayControlInboundMessage =
   | {
       type: "ping";
       nonce?: string;
+    }
+  | {
+      type: "session.list";
+      requestId?: string;
+    }
+  | {
+      type: "session.get";
+      sessionId: string;
+      requestId?: string;
+    }
+  | {
+      type: "session.create";
+      session: GatewayControlSessionCreateInput;
+      requestId?: string;
+    }
+  | {
+      type: "session.update";
+      sessionId: string;
+      updates: GatewayControlSessionUpdateInput;
+      requestId?: string;
+    }
+  | {
+      type: "session.end";
+      sessionId: string;
+      requestId?: string;
     };
 
 export type GatewayControlOutboundMessage =
@@ -54,8 +79,9 @@ export type GatewayControlOutboundMessage =
     }
   | {
       type: "error";
-      code: "INVALID_MESSAGE" | "UNSUPPORTED" | "UNAUTHORIZED";
+      code: "INVALID_MESSAGE" | "UNSUPPORTED" | "UNAUTHORIZED" | "NOT_FOUND" | "FAILED";
       message: string;
+      requestId?: string;
     }
   | {
       type: "pong";
@@ -65,6 +91,32 @@ export type GatewayControlOutboundMessage =
   | {
       type: "subscribed";
       patterns: string[];
+    }
+  | {
+      type: "session.list";
+      sessions: GatewayControlSessionSummary[];
+      requestId?: string;
+    }
+  | {
+      type: "session.get";
+      session?: GatewayControlSessionSummary;
+      requestId?: string;
+    }
+  | {
+      type: "session.created";
+      session: GatewayControlSessionSummary;
+      requestId?: string;
+    }
+  | {
+      type: "session.updated";
+      session?: GatewayControlSessionSummary;
+      requestId?: string;
+    }
+  | {
+      type: "session.ended";
+      sessionId: string;
+      ok: boolean;
+      requestId?: string;
     };
 
 export interface GatewayWebSocketLike {
@@ -95,6 +147,56 @@ export interface GatewayControlStats {
   lastMessageAt?: number;
 }
 
+export interface GatewayControlSessionSummary {
+  sessionId: string;
+  userId?: string;
+  deviceId?: string;
+  title?: string;
+  projectId?: string;
+  workspaceId?: string;
+  isolationLevel?: "main" | "sandbox";
+  createdAt?: number;
+  updatedAt?: number;
+  endedAt?: number;
+  expiresAt?: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface GatewayControlSessionCreateInput {
+  sessionId?: string;
+  userId?: string;
+  deviceId?: string;
+  title?: string;
+  projectId?: string;
+  workspaceId?: string;
+  isolationLevel?: "main" | "sandbox";
+  expiresAt?: number;
+  grants?: unknown[];
+  connectors?: unknown[];
+  metadata?: Record<string, unknown>;
+}
+
+export interface GatewayControlSessionUpdateInput {
+  title?: string | null;
+  projectId?: string | null;
+  workspaceId?: string | null;
+  isolationLevel?: "main" | "sandbox";
+  endedAt?: number | null;
+  expiresAt?: number | null;
+  metadata?: Record<string, unknown> | null;
+}
+
+export interface GatewayControlSessionManager {
+  list: () => Promise<GatewayControlSessionSummary[]>;
+  get: (sessionId: string) => Promise<GatewayControlSessionSummary | null>;
+  create: (input: GatewayControlSessionCreateInput) => Promise<GatewayControlSessionSummary>;
+  update?: (
+    sessionId: string,
+    updates: GatewayControlSessionUpdateInput
+  ) => Promise<GatewayControlSessionSummary | null>;
+  end?: (sessionId: string) => Promise<boolean>;
+}
+
 export interface GatewayControlServerConfig {
   eventBus: RuntimeEventBus;
   logger?: Logger;
@@ -102,6 +204,7 @@ export interface GatewayControlServerConfig {
   allowPublish?: boolean;
   source?: string;
   auth?: GatewayControlAuthConfig;
+  sessionManager?: GatewayControlSessionManager;
 }
 
 export interface GatewayConnectionHandle {

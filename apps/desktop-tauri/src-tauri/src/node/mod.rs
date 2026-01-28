@@ -1,7 +1,5 @@
 mod adapter;
+mod commands;
+pub mod types;
 
-use tauri::AppHandle;
-
-pub fn start_node_adapter(app: AppHandle) {
-    adapter::spawn_node_adapter(app);
-}
+pub use adapter::start_device_node as start_node_adapter;

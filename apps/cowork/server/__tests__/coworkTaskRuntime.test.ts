@@ -58,6 +58,7 @@ function createSession(rootPath: string): CoworkSession {
     deviceId: "device-1",
     platform: "macos",
     mode: "cowork",
+    isolationLevel: "main",
     grants: [
       {
         id: crypto.randomUUID(),

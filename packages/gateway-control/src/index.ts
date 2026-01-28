@@ -30,6 +30,10 @@ export type {
   GatewayControlInboundMessage,
   GatewayControlOutboundMessage,
   GatewayControlServerConfig,
+  GatewayControlSessionCreateInput,
+  GatewayControlSessionManager,
+  GatewayControlSessionSummary,
+  GatewayControlSessionUpdateInput,
   GatewayControlStats,
   GatewayWebSocketLike,
 } from "./controlPlane/types";

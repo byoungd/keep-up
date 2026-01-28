@@ -1,3 +1,4 @@
+import type { CoworkSession } from "@ku0/agent-runtime";
 import { createEventBus, type RuntimeEventBus } from "@ku0/agent-runtime-control";
 import { createSubsystemLogger, type Logger } from "@ku0/agent-runtime-telemetry/logging";
 import {
@@ -6,6 +7,10 @@ import {
   type ChannelStatus,
   createGatewayControlServer,
   DiscordAdapter,
+  type GatewayControlSessionCreateInput,
+  type GatewayControlSessionManager,
+  type GatewayControlSessionSummary,
+  type GatewayControlSessionUpdateInput,
   TelegramAdapter,
 } from "@ku0/gateway-control";
 import { startGatewayControlNodeServer } from "@ku0/gateway-control/node";
@@ -21,7 +26,11 @@ import type {
   CoworkGatewayControlConfig,
   CoworkTelegramConfig,
 } from "../config";
-import type { CoworkTaskRuntime } from "./coworkTaskRuntime";
+import type {
+  CoworkGatewaySessionInput,
+  CoworkGatewaySessionUpdate,
+  CoworkTaskRuntime,
+} from "./coworkTaskRuntime";
 
 export interface GatewayControlRuntime {
   eventBus: RuntimeEventBus;
@@ -85,10 +94,12 @@ export function createGatewayControlRuntime(
   const logger = config.logger ?? createSubsystemLogger("cowork", "gateway");
   const channelLogger = createSubsystemLogger("cowork", "channels");
   const nodeLogger = createSubsystemLogger("cowork", "nodes");
+  const sessionManager = createGatewaySessionManager(config.taskRuntime);
   const gatewayServer = createGatewayControlServer({
     eventBus,
     logger,
     auth: config.gateway.auth,
+    sessionManager,
   });
   const channelRegistry = new ChannelRegistry({ logger: channelLogger });
   const nodeRegistry = new NodeRegistry({
@@ -259,4 +270,79 @@ export function createGatewayControlRuntime(
   };
 
   return { eventBus, start, stop, getStatus, nodes };
+}
+
+function createGatewaySessionManager(taskRuntime: CoworkTaskRuntime): GatewayControlSessionManager {
+  return {
+    list: async () => {
+      const sessions = await taskRuntime.listSessions();
+      return sessions.map(toGatewaySession);
+    },
+    get: async (sessionId) => {
+      const session = await taskRuntime.getSession(sessionId);
+      return session ? toGatewaySession(session) : null;
+    },
+    create: async (input) => {
+      const session = await taskRuntime.createSession(normalizeCoworkSessionInput(input));
+      return toGatewaySession(session);
+    },
+    update: async (sessionId, updates) => {
+      const session = await taskRuntime.updateSession(
+        sessionId,
+        normalizeCoworkSessionUpdate(updates)
+      );
+      return session ? toGatewaySession(session) : null;
+    },
+    end: async (sessionId) => taskRuntime.endSession(sessionId),
+  };
+}
+
+function toGatewaySession(session: CoworkSession): GatewayControlSessionSummary {
+  return {
+    sessionId: session.sessionId,
+    userId: session.userId,
+    deviceId: session.deviceId,
+    title: session.title,
+    projectId: session.projectId,
+    workspaceId: session.workspaceId,
+    isolationLevel: session.isolationLevel,
+    createdAt: session.createdAt,
+    updatedAt: session.updatedAt,
+    endedAt: session.endedAt,
+    expiresAt: session.expiresAt,
+  };
+}
+
+function normalizeCoworkSessionInput(
+  input: GatewayControlSessionCreateInput
+): CoworkGatewaySessionInput {
+  const grants = Array.isArray(input.grants) ? (input.grants as CoworkSession["grants"]) : [];
+  const connectors = Array.isArray(input.connectors)
+    ? (input.connectors as CoworkSession["connectors"])
+    : [];
+  return {
+    sessionId: input.sessionId,
+    userId: input.userId,
+    deviceId: input.deviceId,
+    title: input.title,
+    projectId: input.projectId,
+    workspaceId: input.workspaceId,
+    isolationLevel: input.isolationLevel,
+    expiresAt: input.expiresAt,
+    grants,
+    connectors,
+  };
+}
+
+function normalizeCoworkSessionUpdate(
+  updates: GatewayControlSessionUpdateInput
+): CoworkGatewaySessionUpdate {
+  return {
+    title: updates.title,
+    projectId: updates.projectId,
+    workspaceId: updates.workspaceId,
+    isolationLevel: updates.isolationLevel,
+    endedAt: updates.endedAt,
+    expiresAt: updates.expiresAt,
+  };
 }
