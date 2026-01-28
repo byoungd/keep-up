@@ -7,6 +7,7 @@
  * Now uses chokidar for production-ready file watching.
  */
 
+import { spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
 import chokidar, { type FSWatcher } from "chokidar";
 
@@ -17,9 +18,13 @@ import type {
   GhostCheckType,
   GhostEvent,
   GhostEventHandler,
+  GhostIssue,
   IGhostAgent,
   ToastSuggestion,
 } from "./types";
+
+const DEFAULT_CHECK_TIMEOUT_MS = 5 * 60 * 1000;
+const MAX_CHECK_OUTPUT_CHARS = 4000;
 
 const DEFAULT_CONFIG: GhostAgentConfig = {
   enableWatcher: true,
@@ -27,8 +32,77 @@ const DEFAULT_CONFIG: GhostAgentConfig = {
   ignorePatterns: ["**/node_modules/**", "**/dist/**", "**/.git/**"],
   debounceMs: 1000,
   enabledChecks: ["typecheck", "lint"],
+  checkCommands: {},
+  checkTimeoutMs: DEFAULT_CHECK_TIMEOUT_MS,
   showToasts: true,
 };
+
+type CommandResult = {
+  exitCode: number | null;
+  signal: NodeJS.Signals | null;
+  stdout: string;
+  stderr: string;
+  timedOut: boolean;
+  error?: Error;
+};
+
+function trimOutput(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed.length <= MAX_CHECK_OUTPUT_CHARS) {
+    return trimmed;
+  }
+  return `${trimmed.slice(0, MAX_CHECK_OUTPUT_CHARS)}...`;
+}
+
+async function runCommand(command: string, cwd: string, timeoutMs: number): Promise<CommandResult> {
+  return new Promise((resolve) => {
+    const child = spawn(command, { cwd, shell: true });
+    let stdout = "";
+    let stderr = "";
+    let timedOut = false;
+    let error: Error | undefined;
+    let resolved = false;
+
+    const finalize = (result: CommandResult) => {
+      if (resolved) {
+        return;
+      }
+      resolved = true;
+      resolve(result);
+    };
+
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill("SIGKILL");
+    }, timeoutMs);
+
+    child.stdout?.on("data", (chunk) => {
+      stdout += String(chunk);
+    });
+
+    child.stderr?.on("data", (chunk) => {
+      stderr += String(chunk);
+    });
+
+    child.on("error", (err) => {
+      error = err;
+      clearTimeout(timer);
+      finalize({ exitCode: null, signal: null, stdout, stderr, timedOut, error });
+    });
+
+    child.on("close", (code, signal) => {
+      clearTimeout(timer);
+      finalize({
+        exitCode: code,
+        signal: signal ?? null,
+        stdout,
+        stderr,
+        timedOut,
+        error,
+      });
+    });
+  });
+}
 
 /**
  * Ghost Agent implementation with chokidar file watching
@@ -182,17 +256,73 @@ export class GhostAgent extends EventEmitter implements IGhostAgent {
     this.emitEvent("check:started", { type });
 
     const startTime = Date.now();
+    const command = this.config.checkCommands?.[type];
+    const timestamp = new Date();
+    let result: GhostCheckResult;
 
-    // TODO: Implement actual check execution via shell commands
-    // For now, return a placeholder result
-    const result: GhostCheckResult = {
-      type,
-      passed: true,
-      issueCount: 0,
-      summary: `${type} check completed`,
-      executionTime: Date.now() - startTime,
-      timestamp: new Date(),
-    };
+    if (!command) {
+      result = {
+        type,
+        passed: true,
+        issueCount: 0,
+        summary: `${type} check skipped (no command configured)`,
+        executionTime: Date.now() - startTime,
+        timestamp,
+      };
+    } else {
+      const timeoutMs = this.config.checkTimeoutMs ?? DEFAULT_CHECK_TIMEOUT_MS;
+      const commandResult = await runCommand(command, this.workspacePath, timeoutMs);
+      const output = trimOutput(
+        [commandResult.stdout, commandResult.stderr, commandResult.error?.message]
+          .filter(Boolean)
+          .join("\n")
+      );
+
+      if (commandResult.timedOut) {
+        const summary = `${type} check timed out after ${timeoutMs}ms`;
+        const issues: GhostIssue[] = [
+          {
+            severity: "error",
+            message: output || summary,
+          },
+        ];
+        result = {
+          type,
+          passed: false,
+          issueCount: issues.length,
+          summary,
+          issues,
+          executionTime: Date.now() - startTime,
+          timestamp,
+        };
+      } else if (commandResult.exitCode === 0 && !commandResult.error) {
+        result = {
+          type,
+          passed: true,
+          issueCount: 0,
+          summary: `${type} check passed`,
+          executionTime: Date.now() - startTime,
+          timestamp,
+        };
+      } else {
+        const summary = `${type} check failed (exit code ${commandResult.exitCode ?? "unknown"})`;
+        const issues: GhostIssue[] = [
+          {
+            severity: "error",
+            message: output || summary,
+          },
+        ];
+        result = {
+          type,
+          passed: false,
+          issueCount: issues.length,
+          summary,
+          issues,
+          executionTime: Date.now() - startTime,
+          timestamp,
+        };
+      }
+    }
 
     this.recentResults.unshift(result);
     if (this.recentResults.length > 50) {
