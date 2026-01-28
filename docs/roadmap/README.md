@@ -87,6 +87,15 @@ cowork initiatives. Use this index to navigate the active tracks and supporting 
 - docs/roadmap/phase-10-coding-agent-parity/track-bi-recovery-time-travel.md
 - docs/roadmap/phase-10-coding-agent-parity/track-bj-ide-github.md
 
+## Phase 11: Gateway Architecture & Multi-Surface Integration (Q3 2028)
+- docs/roadmap/phase-11-gateway-surfaces/README.md
+- docs/roadmap/phase-11-gateway-surfaces/track-ca-gateway-control-plane.md
+- docs/roadmap/phase-11-gateway-surfaces/track-cb-multi-channel-routing.md
+- docs/roadmap/phase-11-gateway-surfaces/track-cc-skills-layering.md
+- docs/roadmap/phase-11-gateway-surfaces/track-cd-desktop-device-nodes.md
+- docs/roadmap/phase-11-gateway-surfaces/track-ce-session-isolation.md
+- docs/roadmap/phase-11-gateway-surfaces/track-cf-policy-engine.md
+
 ## Parallel Product Tracks (UI & Cowork)
 - docs/roadmap/ui-cowork-cowork/README.md
 - docs/roadmap/ui-cowork-cowork/track-1-foundation.md
