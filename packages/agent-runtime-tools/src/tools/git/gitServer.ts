@@ -556,7 +556,12 @@ export class GitToolServer implements MCPToolServer, IGitOperations {
 
     const lines = branches.map((b) => {
       const current = b.current ? "* " : "  ";
-      const remote = b.remote ? ` -> ${b.remote}/${b.upstream}` : "";
+      const remote =
+        b.remote && b.upstream
+          ? ` -> ${b.remote}/${b.upstream}`
+          : b.remote
+            ? ` -> ${b.remote}`
+            : "";
       const sync =
         b.ahead !== undefined || b.behind !== undefined
           ? ` [${b.ahead ?? 0}↑ ${b.behind ?? 0}↓]`
