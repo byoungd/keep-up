@@ -1757,14 +1757,24 @@ fn draw_picker(frame: &mut ratatui::Frame, app: &App, area: Rect) {
             } else {
                 session.title.as_str()
             };
-            ListItem::new(format!(
-                "{} - {} ({} messages, {} tools, {} approvals)",
+            let pending_delete = app
+                .pending_delete_session_id
+                .as_deref()
+                .is_some_and(|id| id == session.id);
+            let label = format!(
+                "{} - {} ({} messages, {} tools, {} approvals){}",
                 session.id,
                 title,
                 session.message_count,
                 session.tool_call_count,
-                session.approval_count
-            ))
+                session.approval_count,
+                if pending_delete { " [delete?]" } else { "" }
+            );
+            let mut item = ListItem::new(label);
+            if pending_delete {
+                item = item.style(Style::default().fg(Color::Red));
+            }
+            item
         })
         .collect();
 
