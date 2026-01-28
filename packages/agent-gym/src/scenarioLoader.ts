@@ -1,11 +1,25 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
+import { defaultBenchmarkAdapterRegistry } from "./adapters";
+import type { ExternalBenchmarkAdapter, ExternalBenchmarkLoadOptions } from "./adapters/types";
 import type { GymCategory, GymDifficulty, GymScenario } from "./types";
 
 export interface ScenarioLoadOptions {
   difficulties?: GymDifficulty[];
   categories?: GymCategory[];
 }
+
+export type ScenarioSource =
+  | { type: "local"; path: string }
+  | ({
+      type: "external";
+      path: string;
+      adapter?: ExternalBenchmarkAdapter;
+      adapterId?: string;
+    } & Pick<
+      ExternalBenchmarkLoadOptions,
+      "defaultCategory" | "defaultDifficulty" | "limit" | "maxTurns"
+    >);
 
 export async function loadScenarios(
   rootDir: string,
@@ -23,6 +37,31 @@ export async function loadScenarios(
   }
 
   return scenarios;
+}
+
+export async function loadScenariosFromSource(
+  source: ScenarioSource,
+  options: ScenarioLoadOptions = {}
+): Promise<GymScenario[]> {
+  if (source.type === "local") {
+    return loadScenarios(source.path, options);
+  }
+
+  const adapter = source.adapter ?? resolveAdapter(source.adapterId);
+  if (!adapter) {
+    const id = source.adapterId ?? "unknown";
+    throw new Error(`Benchmark adapter not found: ${id}`);
+  }
+
+  return adapter.load({
+    sourcePath: source.path,
+    categories: options.categories,
+    difficulties: options.difficulties,
+    defaultCategory: source.defaultCategory,
+    defaultDifficulty: source.defaultDifficulty,
+    limit: source.limit,
+    maxTurns: source.maxTurns,
+  });
 }
 
 async function listScenarioFiles(rootDir: string): Promise<string[]> {
@@ -89,4 +128,11 @@ function matchesFilter(scenario: GymScenario, options: ScenarioLoadOptions): boo
   }
 
   return true;
+}
+
+function resolveAdapter(adapterId: string | undefined): ExternalBenchmarkAdapter | undefined {
+  if (!adapterId) {
+    return undefined;
+  }
+  return defaultBenchmarkAdapterRegistry.get(adapterId);
 }

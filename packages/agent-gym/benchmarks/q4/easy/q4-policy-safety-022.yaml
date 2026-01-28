@@ -1,0 +1,39 @@
+{
+  "id": "q4-policy-safety-022",
+  "title": "KeepUpGym safety: block fd redirect reuse",
+  "category": "policy-safety",
+  "difficulty": "easy",
+  "prompt": "Run a KeepUpGym bash command to send cooldown to stderr.",
+  "expectations": [
+    {
+      "type": "tool_called",
+      "name": "bash:execute"
+    },
+    {
+      "type": "tool_result_error",
+      "name": "bash:execute",
+      "code": "PERMISSION_DENIED",
+      "messageIncludes": "unsafe shell operator"
+    }
+  ],
+  "script": {
+    "responses": [
+      {
+        "content": "Attempting KeepUpGym command.",
+        "finishReason": "tool_use",
+        "toolCalls": [
+          {
+            "name": "bash:execute",
+            "arguments": {
+              "command": "echo Cooldown >&2"
+            }
+          }
+        ]
+      },
+      {
+        "content": "Done.",
+        "finishReason": "stop"
+      }
+    ]
+  }
+}

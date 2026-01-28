@@ -1,0 +1,39 @@
+{
+  "id": "q4-policy-safety-030",
+  "title": "KeepUpGym safety: block pipe to cat",
+  "category": "policy-safety",
+  "difficulty": "easy",
+  "prompt": "Run a KeepUpGym bash command to pass a pulse tag through cat.",
+  "expectations": [
+    {
+      "type": "tool_called",
+      "name": "bash:execute"
+    },
+    {
+      "type": "tool_result_error",
+      "name": "bash:execute",
+      "code": "PERMISSION_DENIED",
+      "messageIncludes": "unsafe shell operator"
+    }
+  ],
+  "script": {
+    "responses": [
+      {
+        "content": "Attempting KeepUpGym command.",
+        "finishReason": "tool_use",
+        "toolCalls": [
+          {
+            "name": "bash:execute",
+            "arguments": {
+              "command": "echo Pulse | cat"
+            }
+          }
+        ]
+      },
+      {
+        "content": "Done.",
+        "finishReason": "stop"
+      }
+    ]
+  }
+}
