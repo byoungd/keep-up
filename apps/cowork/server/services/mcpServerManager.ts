@@ -55,15 +55,23 @@ const transportSchema = z.discriminatedUnion("type", [
     .passthrough(),
 ]);
 
+const tokenSelectorSchema = z.object({
+  tokenKey: z.string().min(1).optional(),
+  accountId: z.string().min(1).optional(),
+  workspaceId: z.string().min(1).optional(),
+});
+
 const tokenStoreSchema = z.union([
-  z.object({ type: z.literal("memory") }),
-  z.object({ type: z.literal("gateway") }),
-  z.object({
-    type: z.literal("file"),
-    filePath: z.string().min(1),
-    encryptionKey: z.string().min(1),
-    keyEncoding: z.enum(["hex", "base64"]).optional(),
-  }),
+  z.object({ type: z.literal("memory") }).merge(tokenSelectorSchema),
+  z.object({ type: z.literal("gateway") }).merge(tokenSelectorSchema),
+  z
+    .object({
+      type: z.literal("file"),
+      filePath: z.string().min(1),
+      encryptionKey: z.string().min(1),
+      keyEncoding: z.enum(["hex", "base64"]).optional(),
+    })
+    .merge(tokenSelectorSchema),
 ]);
 
 const authSchema = z
@@ -336,12 +344,14 @@ export class McpServerManager {
         }
         return tokenStore && isRecord(tokenStore) ? { type: "memory" } : tokenStore;
       }
+      const selectors = resolveTokenSelectors(tokenStore);
       const keyEncoding = process.env.COWORK_MCP_TOKEN_KEY_ENCODING as "hex" | "base64" | undefined;
       return {
         type: "file",
         filePath: join(this.stateDir, "mcp-tokens", `${serverName}.json`),
         encryptionKey: key,
         keyEncoding,
+        ...selectors,
       };
     }
     return tokenStore;
@@ -364,8 +374,7 @@ function sanitizeConfig(config: RawMcpConfig): RawMcpConfig {
       if (auth && "tokenStore" in auth && isRecord(auth.tokenStore)) {
         if (auth.tokenStore.type === "file") {
           auth.tokenStore = {
-            type: "file",
-            filePath: auth.tokenStore.filePath,
+            ...auth.tokenStore,
             encryptionKey: "***",
           };
         }
@@ -377,6 +386,21 @@ function sanitizeConfig(config: RawMcpConfig): RawMcpConfig {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function resolveTokenSelectors(tokenStore: unknown): {
+  tokenKey?: string;
+  accountId?: string;
+  workspaceId?: string;
+} {
+  if (!isRecord(tokenStore)) {
+    return {};
+  }
+  const tokenKey = typeof tokenStore.tokenKey === "string" ? tokenStore.tokenKey : undefined;
+  const accountId = typeof tokenStore.accountId === "string" ? tokenStore.accountId : undefined;
+  const workspaceId =
+    typeof tokenStore.workspaceId === "string" ? tokenStore.workspaceId : undefined;
+  return { tokenKey, accountId, workspaceId };
 }
 
 function resolveTransport(server: RawServerConfig): McpTransportConfig {
