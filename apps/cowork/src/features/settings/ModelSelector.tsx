@@ -5,7 +5,7 @@
  * Shows available providers, their models, and key status.
  */
 
-import { useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import "./ModelSelector.css";
 
 interface ModelCapability {
@@ -42,7 +42,13 @@ interface ModelSelectorProps {
   disabled?: boolean;
 }
 
-function CapabilityBadge({ label, active }: { label: string; active: boolean }) {
+const CapabilityBadge = memo(function CapabilityBadge({
+  label,
+  active,
+}: {
+  label: string;
+  active: boolean;
+}) {
   return (
     <span
       className={`model-selector__badge ${active ? "model-selector__badge--active" : ""}`}
@@ -51,9 +57,9 @@ function CapabilityBadge({ label, active }: { label: string; active: boolean }) 
       {label}
     </span>
   );
-}
+});
 
-function ProviderGroup({
+const ProviderGroup = memo(function ProviderGroup({
   provider,
   selectedModelId,
   onSelectModel,
@@ -120,7 +126,7 @@ function ProviderGroup({
       )}
     </div>
   );
-}
+});
 
 export function ModelSelector({
   providers,
@@ -129,6 +135,8 @@ export function ModelSelector({
   disabled,
 }: ModelSelectorProps) {
   const [open, setOpen] = useState(false);
+
+  const toggleOpen = useCallback(() => setOpen((prev) => !prev), []);
 
   const selectedModel = useMemo(() => {
     for (const provider of providers) {
@@ -153,7 +161,7 @@ export function ModelSelector({
       <button
         type="button"
         className="model-selector__trigger"
-        onClick={() => setOpen((prev) => !prev)}
+        onClick={toggleOpen}
         disabled={disabled}
       >
         <span className="model-selector__selected-label">
