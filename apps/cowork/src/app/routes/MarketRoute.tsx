@@ -54,7 +54,11 @@ const AGENT_CATALOG = [
   },
 ] as const;
 
-type Agent = (typeof AGENT_CATALOG)[number];
+type CatalogItem = (typeof AGENT_CATALOG)[number];
+type Agent = Omit<CatalogItem, "installed" | "tags"> & {
+  installed: boolean;
+  tags: readonly string[];
+};
 
 type AgentCardProps = {
   agent: Agent;
