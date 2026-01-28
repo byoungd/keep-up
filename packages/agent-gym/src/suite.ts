@@ -3,7 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { buildReport } from "./report";
 import { runScenario } from "./runner";
-import { loadScenarios } from "./scenarioLoader";
+import { loadScenariosFromSource, type ScenarioSource } from "./scenarioLoader";
 import type { GymCategory, GymDifficulty, GymReport, GymScenarioRun } from "./types";
 
 export interface SuiteRunOptions {
@@ -12,6 +12,7 @@ export interface SuiteRunOptions {
   categories: GymCategory[];
   preserveWorkspace?: boolean;
   now?: () => number;
+  benchmarkSource?: ScenarioSource;
 }
 
 export interface SuiteRunResult {
@@ -22,7 +23,10 @@ export interface SuiteRunResult {
 export async function runSuite(options: SuiteRunOptions): Promise<SuiteRunResult> {
   const now = options.now ?? (() => Date.now());
   const startedAt = new Date(now());
-  const scenarios = await loadScenarios(options.benchmarksPath, {
+  const source: ScenarioSource =
+    options.benchmarkSource ??
+    ({ type: "local", path: options.benchmarksPath } satisfies ScenarioSource);
+  const scenarios = await loadScenariosFromSource(source, {
     difficulties: options.difficulties,
     categories: options.categories,
   });
