@@ -148,6 +148,19 @@ Suppress progress output entirely:
 keepup agent run "Summarize tests" --quiet
 ```
 
+View approval records across sessions:
+
+```bash
+keepup approvals list --all
+keepup approvals list --status requested
+```
+
+Resolve an approval record manually:
+
+```bash
+keepup approvals resolve <session-id> <approval-id> --status rejected --reason "Denied by policy"
+```
+
 ## Exit Codes
 
 - `0`: success
