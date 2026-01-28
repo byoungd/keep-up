@@ -121,6 +121,7 @@ export function StepItem({
                     !isCollapsed && "rotate-180",
                     "opacity-0 group-hover/step:opacity-100"
                   )}
+                  aria-hidden="true"
                 />
               )}
             </div>
@@ -139,9 +140,9 @@ export function StepItem({
               >
                 <span className="mt-[3px] opacity-40 shrink-0">
                   {action.status === "running" ? (
-                    <Loader2 className="h-2.5 w-2.5" />
+                    <Loader2 className="h-2.5 w-2.5" aria-hidden="true" />
                   ) : (
-                    <Terminal className="h-2.5 w-2.5" />
+                    <Terminal className="h-2.5 w-2.5" aria-hidden="true" />
                   )}
                 </span>
                 <span className="break-all">{action.label}</span>
@@ -160,7 +161,7 @@ export function StepItem({
                 }}
                 className="flex items-center gap-2 text-fine text-foreground/80 hover:text-primary hover:underline transition-colors duration-fast w-full text-left font-sans py-0.5"
               >
-                <FileText className="h-3 w-3 opacity-60" />
+                <FileText className="h-3 w-3 opacity-60" aria-hidden="true" />
                 {art.title}
               </motion.button>
             ))}
@@ -174,13 +175,13 @@ export function StepItem({
 // Local StepIcon to reduce import complexity
 function StepIcon({ status }: { status: TaskStep["status"] }) {
   if (status === "running") {
-    return <Loader2 className="h-3.5 w-3.5 text-warning" />;
+    return <Loader2 className="h-3.5 w-3.5 text-warning" aria-hidden="true" />;
   }
   if (status === "failed") {
-    return <AlertCircle className="h-3.5 w-3.5 text-error" />;
+    return <AlertCircle className="h-3.5 w-3.5 text-error" aria-hidden="true" />;
   }
   if (status === "completed") {
-    return <CheckCircle2 className="h-3.5 w-3.5 text-primary/60" />;
+    return <CheckCircle2 className="h-3.5 w-3.5 text-primary/60" aria-hidden="true" />;
   }
-  return <Circle className="h-3.5 w-3.5 text-muted-foreground/30" />;
+  return <Circle className="h-3.5 w-3.5 text-muted-foreground/30" aria-hidden="true" />;
 }

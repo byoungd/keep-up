@@ -88,7 +88,7 @@ export function getStatusMeta(status: AgentTask["status"]) {
     case "running":
       return {
         label: "In Progress",
-        icon: <Loader2 className="h-3.5 w-3.5" />,
+        icon: <Loader2 className="h-3.5 w-3.5" aria-hidden="true" />,
         textClass: TASK_THEME.status.running.text,
         bgClass: TASK_THEME.status.running.bg,
         badgeBg: TASK_THEME.status.running.badge,
@@ -96,7 +96,7 @@ export function getStatusMeta(status: AgentTask["status"]) {
     case "queued":
       return {
         label: "Queued",
-        icon: <Circle className="h-3.5 w-3.5" />,
+        icon: <Circle className="h-3.5 w-3.5" aria-hidden="true" />,
         textClass: TASK_THEME.status.queued.text,
         bgClass: TASK_THEME.status.queued.bg,
         badgeBg: TASK_THEME.status.queued.badge,
@@ -104,7 +104,7 @@ export function getStatusMeta(status: AgentTask["status"]) {
     case "completed":
       return {
         label: "Done",
-        icon: <CheckCircle2 className="h-3.5 w-3.5" />,
+        icon: <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />,
         textClass: TASK_THEME.status.completed.text,
         bgClass: TASK_THEME.status.completed.bg,
         badgeBg: TASK_THEME.status.completed.badge,
@@ -112,7 +112,7 @@ export function getStatusMeta(status: AgentTask["status"]) {
     case "failed":
       return {
         label: "Failed",
-        icon: <LucideAlertCircle className="h-3.5 w-3.5" />,
+        icon: <LucideAlertCircle className="h-3.5 w-3.5" aria-hidden="true" />,
         textClass: TASK_THEME.status.failed.text,
         bgClass: TASK_THEME.status.failed.bg,
         badgeBg: TASK_THEME.status.failed.badge,
@@ -120,7 +120,12 @@ export function getStatusMeta(status: AgentTask["status"]) {
     case "paused": // Review state
       return {
         label: "Review",
-        icon: <div className="h-2.5 w-2.5 rounded-full border-[2.5px] border-warning" />,
+        icon: (
+          <div
+            className="h-2.5 w-2.5 rounded-full border-[2.5px] border-warning"
+            aria-hidden="true"
+          />
+        ),
         textClass: TASK_THEME.status.paused.text,
         bgClass: TASK_THEME.status.paused.bg,
         badgeBg: TASK_THEME.status.paused.badge,
@@ -128,7 +133,7 @@ export function getStatusMeta(status: AgentTask["status"]) {
     default:
       return {
         label: "Working",
-        icon: <Circle className="h-3.5 w-3.5 opacity-50" />,
+        icon: <Circle className="h-3.5 w-3.5 opacity-50" aria-hidden="true" />,
         textClass: "text-muted-foreground",
         bgClass: "bg-surface-2",
         badgeBg: "bg-surface-2",

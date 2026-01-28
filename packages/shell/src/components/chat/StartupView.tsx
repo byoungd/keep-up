@@ -44,9 +44,15 @@ export function StartupView({
                 onClick={() => onSuggestionClick(label)}
                 className="group inline-flex items-center gap-2 rounded-full border border-border/50 bg-surface-1/70 px-4 py-2 text-xs font-medium text-foreground/80 hover:text-foreground hover:border-border/80 hover:bg-surface-2/70 transition-colors duration-fast"
               >
-                <Icon className="h-4 w-4 text-muted-foreground group-hover:text-foreground/80" />
+                <Icon
+                  className="h-4 w-4 text-muted-foreground group-hover:text-foreground/80"
+                  aria-hidden="true"
+                />
                 <span>{label}</span>
-                <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/30 group-hover:text-foreground/70 transition-colors duration-fast" />
+                <ArrowRight
+                  className="h-3.5 w-3.5 text-muted-foreground/30 group-hover:text-foreground/70 transition-colors duration-fast"
+                  aria-hidden="true"
+                />
               </button>
             );
           })}
