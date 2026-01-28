@@ -15,9 +15,24 @@ export type McpServerSummary = {
   name: string;
   description: string;
   status: McpRemoteToolServer["getStatus"] extends () => infer Status ? Status : unknown;
+  health: McpServerHealth;
 };
 
 type LoggerLike = Pick<Logger, "info" | "warn" | "error">;
+
+export type McpServerHealthStatus = "healthy" | "degraded" | "cooldown";
+
+export type McpServerHealth = {
+  status: McpServerHealthStatus;
+  failures: number;
+  lastError?: string;
+  lastAttemptAt?: number;
+  lastSuccessAt?: number;
+  nextRetryAt?: number;
+};
+
+const BASE_RETRY_DELAY_MS = 1000;
+const MAX_RETRY_DELAY_MS = 30_000;
 
 const fallbackLogger: LoggerLike = {
   info: (_message, _meta) => undefined,
@@ -127,6 +142,7 @@ export class McpServerManager {
   private readonly servers = new Map<string, McpRemoteToolServer>();
   private readonly initialized = new Set<string>();
   private readonly initializing = new Map<string, Promise<void>>();
+  private readonly health = new Map<string, McpServerHealth>();
   private readonly configPath: string;
   private readonly stateDir: string;
   private readonly eventBus?: RuntimeEventBus;
@@ -163,6 +179,7 @@ export class McpServerManager {
     this.servers.clear();
     this.initialized.clear();
     this.initializing.clear();
+    this.health.clear();
 
     for (const serverConfig of config.servers) {
       try {
@@ -173,6 +190,7 @@ export class McpServerManager {
           auditLogger: this.auditLogger,
         });
         this.servers.set(normalized.name, server);
+        this.health.set(normalized.name, buildDefaultHealth());
         void this.ensureInitialized(server).catch(() => undefined);
       } catch (error) {
         this.logger.warn(
@@ -210,6 +228,7 @@ export class McpServerManager {
       name: server.name,
       description: server.description,
       status: server.getStatus(),
+      health: this.getHealth(server.name),
     }));
   }
 
@@ -255,6 +274,19 @@ export class McpServerManager {
     return server;
   }
 
+  private getHealth(serverName: string): McpServerHealth {
+    return this.health.get(serverName) ?? buildDefaultHealth();
+  }
+
+  private updateHealth(serverName: string, next: McpServerHealth): void {
+    this.health.set(serverName, next);
+    this.eventBus?.emit(
+      "mcp.health",
+      { server: serverName, health: next, updatedAt: Date.now() },
+      { source: "cowork", priority: "normal" }
+    );
+  }
+
   private async ensureInitialized(server: McpRemoteToolServer): Promise<void> {
     if (this.initialized.has(server.name)) {
       return;
@@ -265,12 +297,52 @@ export class McpServerManager {
       return;
     }
 
+    const now = Date.now();
+    const currentHealth = this.getHealth(server.name);
+    if (
+      currentHealth.status === "cooldown" &&
+      currentHealth.nextRetryAt &&
+      now < currentHealth.nextRetryAt
+    ) {
+      throw new Error(
+        `MCP server "${server.name}" is cooling down until ${new Date(
+          currentHealth.nextRetryAt
+        ).toISOString()}`
+      );
+    }
+
+    this.updateHealth(server.name, {
+      ...currentHealth,
+      status: "degraded",
+      lastAttemptAt: now,
+    });
+
     const initPromise = server
       .initialize()
       .then(() => {
         this.initialized.add(server.name);
+        this.updateHealth(server.name, {
+          status: "healthy",
+          failures: 0,
+          lastSuccessAt: Date.now(),
+          lastError: undefined,
+          nextRetryAt: undefined,
+        });
       })
       .catch((error) => {
+        const failureCount = currentHealth.failures + 1;
+        const delayMs = Math.min(
+          BASE_RETRY_DELAY_MS * 2 ** Math.max(0, failureCount - 1),
+          MAX_RETRY_DELAY_MS
+        );
+        const nextRetryAt = Date.now() + delayMs;
+        this.updateHealth(server.name, {
+          status: "cooldown",
+          failures: failureCount,
+          lastError: error instanceof Error ? error.message : String(error),
+          nextRetryAt,
+          lastAttemptAt: Date.now(),
+        });
         this.logger.error(
           `Failed to initialize MCP server ${server.name}`,
           error instanceof Error ? error : new Error(String(error))
@@ -424,4 +496,8 @@ function resolveTransport(server: RawServerConfig): McpTransportConfig {
     };
   }
   throw new Error(`MCP server "${server.name}" is missing transport configuration.`);
+}
+
+function buildDefaultHealth(): McpServerHealth {
+  return { status: "degraded", failures: 0 };
 }
