@@ -27,6 +27,7 @@ export interface CoworkSessionSeed {
   connectors: CoworkSession["connectors"];
   sessionId?: string;
   expiresAt?: number;
+  isolationLevel?: CoworkSession["isolationLevel"];
 }
 
 export interface CoworkSessionManagerConfig {
@@ -61,6 +62,7 @@ export class CoworkSessionManager {
       deviceId: seed.deviceId,
       platform: this.config.platform,
       mode: this.config.mode,
+      isolationLevel: seed.isolationLevel ?? "main",
       grants: seed.grants,
       connectors: seed.connectors,
       createdAt: Date.now(),

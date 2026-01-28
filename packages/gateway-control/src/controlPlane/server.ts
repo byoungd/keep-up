@@ -6,10 +6,13 @@ import {
 } from "@ku0/agent-runtime-telemetry/logging";
 import type {
   GatewayConnectionHandle,
+  GatewayControlAuthConfig,
+  GatewayControlAuthMode,
   GatewayControlClient,
   GatewayControlInboundMessage,
   GatewayControlOutboundMessage,
   GatewayControlServerConfig,
+  GatewayControlStats,
   GatewayWebSocketLike,
 } from "./types";
 
@@ -26,7 +29,13 @@ export class GatewayControlServer {
   private readonly maxSubscriptions: number;
   private readonly allowPublish: boolean;
   private readonly source?: string;
+  private readonly authMode: GatewayControlAuthMode;
+  private readonly authToken?: string;
   private clientCounter = 0;
+  private totalConnections = 0;
+  private messagesIn = 0;
+  private messagesOut = 0;
+  private lastMessageAt?: number;
 
   constructor(config: GatewayControlServerConfig) {
     this.eventBus = config.eventBus;
@@ -34,6 +43,9 @@ export class GatewayControlServer {
     this.maxSubscriptions = config.maxSubscriptions ?? 50;
     this.allowPublish = config.allowPublish ?? false;
     this.source = config.source;
+    const auth = normalizeAuthConfig(config.auth);
+    this.authMode = auth.mode;
+    this.authToken = auth.token;
   }
 
   handleConnection(
@@ -45,21 +57,22 @@ export class GatewayControlServer {
       id: clientId,
       userAgent: options?.userAgent,
       subscriptions: new Set(),
+      authenticated: !this.isAuthRequired(),
     };
 
     const state: ClientState = { client, socket, subscriptions: [] };
     this.clients.set(clientId, state);
+    this.totalConnections += 1;
 
     if (options?.subscriptions && options.subscriptions.length > 0) {
-      this.addSubscriptions(state, options.subscriptions);
+      if (this.isAuthenticated(state)) {
+        this.addSubscriptions(state, options.subscriptions);
+      } else {
+        this.sendUnauthorized(state.socket, "Authentication required");
+      }
     }
 
-    this.sendMessage(socket, {
-      type: "welcome",
-      clientId,
-      serverTime: Date.now(),
-      subscriptions: Array.from(state.client.subscriptions),
-    });
+    this.sendWelcome(state);
 
     this.logger.info("Gateway client connected", {
       clientId,
@@ -92,19 +105,31 @@ export class GatewayControlServer {
       return;
     }
 
+    this.messagesIn += 1;
+    this.lastMessageAt = Date.now();
+
     switch (message.type) {
       case "hello":
+        if (message.token) {
+          this.tryAuthenticate(state, message.token);
+        }
+        if (!this.isAuthenticated(state)) {
+          this.sendUnauthorized(state.socket, "Authentication required");
+          return;
+        }
         if (message.subscriptions?.length) {
           this.addSubscriptions(state, message.subscriptions);
         }
-        this.sendMessage(state.socket, {
-          type: "welcome",
-          clientId: state.client.id,
-          serverTime: Date.now(),
-          subscriptions: Array.from(state.client.subscriptions),
-        });
+        this.sendWelcome(state);
+        return;
+      case "auth":
+        this.tryAuthenticate(state, message.token);
         return;
       case "subscribe":
+        if (!this.isAuthenticated(state)) {
+          this.sendUnauthorized(state.socket, "Authentication required");
+          return;
+        }
         this.addSubscriptions(state, message.patterns);
         this.sendMessage(state.socket, {
           type: "subscribed",
@@ -112,6 +137,10 @@ export class GatewayControlServer {
         });
         return;
       case "publish":
+        if (!this.isAuthenticated(state)) {
+          this.sendUnauthorized(state.socket, "Authentication required");
+          return;
+        }
         if (!this.allowPublish) {
           this.sendMessage(state.socket, {
             type: "error",
@@ -208,6 +237,65 @@ export class GatewayControlServer {
     return parsed as GatewayControlInboundMessage;
   }
 
+  getStats(): GatewayControlStats {
+    let totalSubscriptions = 0;
+    for (const state of this.clients.values()) {
+      totalSubscriptions += state.client.subscriptions.size;
+    }
+
+    return {
+      connectedClients: this.clients.size,
+      totalConnections: this.totalConnections,
+      totalSubscriptions,
+      messagesIn: this.messagesIn,
+      messagesOut: this.messagesOut,
+      lastMessageAt: this.lastMessageAt,
+    };
+  }
+
+  private sendWelcome(state: ClientState): void {
+    this.sendMessage(state.socket, {
+      type: "welcome",
+      clientId: state.client.id,
+      serverTime: Date.now(),
+      subscriptions: Array.from(state.client.subscriptions),
+      authRequired: this.isAuthRequired(),
+      authenticated: state.client.authenticated,
+    });
+  }
+
+  private isAuthRequired(): boolean {
+    return this.authMode === "token";
+  }
+
+  private isAuthenticated(state: ClientState): boolean {
+    return !this.isAuthRequired() || state.client.authenticated;
+  }
+
+  private tryAuthenticate(state: ClientState, token: string | undefined): void {
+    if (!this.isAuthRequired()) {
+      state.client.authenticated = true;
+      this.sendMessage(state.socket, {
+        type: "auth_ok",
+        clientId: state.client.id,
+        serverTime: Date.now(),
+      });
+      return;
+    }
+
+    if (!token || token !== this.authToken) {
+      this.sendUnauthorized(state.socket, "Invalid token");
+      return;
+    }
+
+    state.client.authenticated = true;
+    this.sendMessage(state.socket, {
+      type: "auth_ok",
+      clientId: state.client.id,
+      serverTime: Date.now(),
+    });
+  }
+
   private sendMessage(
     socket: GatewayWebSocketLike | undefined,
     message: GatewayControlOutboundMessage
@@ -217,9 +305,18 @@ export class GatewayControlServer {
     }
     try {
       socket.send(JSON.stringify(message));
+      this.messagesOut += 1;
     } catch (error) {
       this.logger.warn("Failed to send gateway message", { error: String(error) });
     }
+  }
+
+  private sendUnauthorized(socket: GatewayWebSocketLike, message: string): void {
+    this.sendMessage(socket, {
+      type: "error",
+      code: "UNAUTHORIZED",
+      message,
+    });
   }
 
   private generateClientId(): string {
@@ -244,4 +341,14 @@ export function attachGatewayWebSocket(
 
 export function resolveGatewayLogger(logger?: Logger): Logger {
   return logger ?? getLogger("gateway-control");
+}
+
+function normalizeAuthConfig(config?: GatewayControlAuthConfig): GatewayControlAuthConfig {
+  if (!config) {
+    return { mode: "none" };
+  }
+  if (config.mode === "token" && config.token) {
+    return config;
+  }
+  return { mode: "none" };
 }

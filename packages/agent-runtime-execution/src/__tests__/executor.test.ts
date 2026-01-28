@@ -665,6 +665,73 @@ describe("ToolExecutionPipeline", () => {
       expect(requiresConfirmation).toBe(true);
     });
 
+    it("denies tools when governance rules block execution", async () => {
+      registry.setTools([createMockTool("file:write")]);
+      const toolExecutionContext: ToolExecutionContext = {
+        policy: "interactive",
+        allowedTools: ["*"],
+        requiresApproval: [],
+        maxParallel: 1,
+        governanceRules: [
+          {
+            id: "deny-file-write",
+            action: "deny",
+            toolPatterns: ["file:write"],
+            reason: "File writes are blocked",
+          },
+        ],
+      };
+      const policyEngine = createToolGovernancePolicyEngine(
+        createToolPolicyEngine(policy),
+        toolExecutionContext
+      );
+      pipeline = new ToolExecutionPipeline({ registry, policy, policyEngine });
+
+      const result = await pipeline.execute(
+        createMockCall("file:write", { path: "/workspace/blocked.txt" }),
+        context
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe("PERMISSION_DENIED");
+      expect(result.error?.message).toBe("File writes are blocked");
+    });
+
+    it("requests confirmation when governance rules ask user", async () => {
+      registry.setTools([createMockTool("file:write")]);
+      const toolExecutionContext: ToolExecutionContext = {
+        policy: "interactive",
+        allowedTools: ["*"],
+        requiresApproval: [],
+        maxParallel: 1,
+        governanceRules: [
+          {
+            id: "ask-file-write",
+            action: "ask_user",
+            toolPatterns: ["file:write"],
+            reason: "Confirm file writes",
+          },
+        ],
+      };
+      const policyEngine = createToolGovernancePolicyEngine(
+        createToolPolicyEngine(policy),
+        toolExecutionContext
+      );
+      pipeline = new ToolExecutionPipeline({ registry, policy, policyEngine });
+
+      const requiresConfirmation = pipeline.requiresConfirmation(
+        createMockCall("file:write", { path: "/workspace/confirm.txt" }),
+        context
+      );
+      const details = pipeline.getConfirmationDetails(
+        createMockCall("file:write", { path: "/workspace/confirm.txt" }),
+        context
+      );
+
+      expect(requiresConfirmation).toBe(true);
+      expect(details.reason).toBe("Confirm file writes");
+    });
+
     it("allows unqualified tools when the registry resolves the server", async () => {
       registry.setTools([createMockTool("read")]);
       registry.setToolServer("read", "file");

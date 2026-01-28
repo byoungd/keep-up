@@ -5,7 +5,7 @@
  */
 
 import type { AgentMode } from "../modes";
-import type { TokenUsageStats } from "../types";
+import type { CoworkSessionIsolationLevel, TokenUsageStats } from "../types";
 import type { WorkflowContext, WorkflowPhase, WorkflowTemplate } from "../workflows";
 import type { CoworkRiskTag } from "./policy";
 
@@ -13,6 +13,7 @@ export type { CoworkRiskTag };
 
 export type CoworkPlatform = "macos";
 export type CoworkMode = "cowork";
+export type CoworkIsolationLevel = CoworkSessionIsolationLevel;
 
 export interface CoworkSession {
   sessionId: string;
@@ -20,6 +21,7 @@ export interface CoworkSession {
   deviceId: string;
   platform: CoworkPlatform;
   mode: CoworkMode;
+  isolationLevel: CoworkIsolationLevel;
   grants: CoworkFolderGrant[];
   connectors: CoworkConnectorGrant[];
   createdAt: number;

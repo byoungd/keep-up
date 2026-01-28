@@ -4,7 +4,13 @@
  * Caches tool results at the task node level for repeatable executions.
  */
 
-import type { MCPToolCall, MCPToolResult, ToolContext } from "../types";
+import type {
+  MCPToolCall,
+  MCPToolResult,
+  ToolContext,
+  ToolGovernancePolicyRule,
+  ToolSafetyCheckerLike,
+} from "../types";
 
 export interface NodeResultCacheConfig {
   ttlMs?: number;
@@ -90,6 +96,9 @@ export class NodeResultCache {
       allowedTools: [...policy.allowedTools].sort(),
       requiresApproval: [...policy.requiresApproval].sort(),
       maxParallel: policy.maxParallel,
+      governanceDefaultAction: policy.governanceDefaultAction,
+      governanceRules: serializeGovernanceRules(policy.governanceRules),
+      safetyCheckers: serializeSafetyCheckers(policy.safetyCheckers),
     };
 
     return `${base}:${JSON.stringify(policyKey)}`;
@@ -111,4 +120,40 @@ function stableSort(value: unknown): unknown {
   }
 
   return result;
+}
+
+function serializeGovernanceRules(rules: ToolGovernancePolicyRule[] | undefined): unknown {
+  if (!rules || rules.length === 0) {
+    return undefined;
+  }
+  return rules.map((rule) => ({
+    id: rule.id,
+    action: rule.action,
+    tools: rule.tools,
+    toolPatterns: rule.toolPatterns,
+    tool: rule.tool,
+    conditions: rule.conditions?.map((condition) => ({
+      path: condition.path,
+      operator: condition.operator,
+      value: condition.value instanceof RegExp ? condition.value.toString() : condition.value,
+    })),
+    priority: rule.priority,
+    reason: rule.reason,
+    reasonCode: rule.reasonCode,
+    riskTags: rule.riskTags,
+  }));
+}
+
+function serializeSafetyCheckers(
+  checkers: ToolSafetyCheckerLike[] | undefined
+): string[] | undefined {
+  if (!checkers || checkers.length === 0) {
+    return undefined;
+  }
+  return checkers.map((checker, index) => {
+    if (typeof checker === "function") {
+      return `fn:${checker.name || "anonymous"}:${index}`;
+    }
+    return `id:${checker.id}`;
+  });
 }

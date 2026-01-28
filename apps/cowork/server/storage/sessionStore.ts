@@ -1,4 +1,5 @@
 import type { CoworkSession } from "@ku0/agent-runtime";
+import { resolveSessionIsolation } from "../runtime/utils";
 import { JsonStore } from "./jsonStore";
 
 export class SessionStore {
@@ -12,23 +13,32 @@ export class SessionStore {
     });
   }
 
-  getAll(): Promise<CoworkSession[]> {
-    return this.store.getAll();
+  private normalizeSession(session: CoworkSession): CoworkSession {
+    const isolationLevel = resolveSessionIsolation(session);
+    return session.isolationLevel === isolationLevel ? session : { ...session, isolationLevel };
   }
 
-  getById(sessionId: string): Promise<CoworkSession | null> {
-    return this.store.getById(sessionId);
+  async getAll(): Promise<CoworkSession[]> {
+    const sessions = await this.store.getAll();
+    return sessions.map((session) => this.normalizeSession(session));
+  }
+
+  async getById(sessionId: string): Promise<CoworkSession | null> {
+    const session = await this.store.getById(sessionId);
+    return session ? this.normalizeSession(session) : null;
   }
 
   create(session: CoworkSession): Promise<CoworkSession> {
-    return this.store.upsert(session);
+    return this.store.upsert(this.normalizeSession(session));
   }
 
   update(
     sessionId: string,
     updater: (session: CoworkSession) => CoworkSession
   ): Promise<CoworkSession | null> {
-    return this.store.update(sessionId, updater);
+    return this.store.update(sessionId, (session) =>
+      this.normalizeSession(updater(this.normalizeSession(session)))
+    );
   }
 
   delete(sessionId: string): Promise<boolean> {

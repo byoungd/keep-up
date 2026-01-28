@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { formatZodError, jsonError, readJsonBody } from "../http";
 import { getLogger } from "../logger";
 import type { CoworkTaskRuntime } from "../runtime/coworkTaskRuntime";
+import { resolveSessionIsolation } from "../runtime/utils";
 import {
   createSessionSchema,
   createTaskSchema,
@@ -31,14 +32,16 @@ export function createSessionRoutes(deps: SessionRouteDeps) {
       return jsonError(c, 400, "Invalid session payload", formatZodError(parsed.error));
     }
 
-    const { userId, deviceId, grants, connectors, title } = parsed.data;
+    const { userId, deviceId, grants, connectors, title, isolationLevel } = parsed.data;
     const requestUserId = resolveCurrentUserId(c);
+    const resolvedIsolationLevel = resolveSessionIsolation({ isolationLevel });
     const session: CoworkSession = {
       sessionId: crypto.randomUUID(),
       userId: userId ?? requestUserId ?? "local-user",
       deviceId: deviceId ?? "local-device",
       platform: "macos",
       mode: "cowork",
+      isolationLevel: resolvedIsolationLevel,
       grants: grants.map((grant) => ({
         ...grant,
         id: grant.id ?? crypto.randomUUID(),
@@ -173,7 +176,7 @@ export function createSessionRoutes(deps: SessionRouteDeps) {
       return jsonError(c, 400, "Invalid session update", formatZodError(parsed.error));
     }
 
-    const { title, projectId, endedAt } = parsed.data;
+    const { title, projectId, endedAt, isolationLevel } = parsed.data;
 
     const updated = await deps.sessionStore.update(sessionId, (prev) => {
       const next: CoworkSession = { ...prev };
@@ -185,6 +188,9 @@ export function createSessionRoutes(deps: SessionRouteDeps) {
       }
       if (endedAt !== undefined) {
         next.endedAt = endedAt;
+      }
+      if (isolationLevel !== undefined) {
+        next.isolationLevel = resolveSessionIsolation({ isolationLevel });
       }
       return next;
     });

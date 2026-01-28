@@ -2,7 +2,7 @@
  * Utility functions for session and task metadata
  */
 
-import type { CoworkSession } from "@ku0/agent-runtime";
+import type { CoworkIsolationLevel, CoworkSession } from "@ku0/agent-runtime";
 
 /**
  * Collect output roots from session grants
@@ -56,4 +56,41 @@ export function isErrno(error: unknown, code: string): boolean {
     "code" in error &&
     (error as { code?: string }).code === code
   );
+}
+
+const SESSION_ISOLATION_ENV_KEYS = [
+  "COWORK_SESSION_ISOLATION_LEVEL",
+  "COWORK_SESSION_ISOLATION",
+  "COWORK_ISOLATION_LEVEL",
+] as const;
+
+export type SessionIsolationSource = "env" | "default";
+
+export type SessionIsolationStatus = {
+  level: CoworkIsolationLevel;
+  source: SessionIsolationSource;
+  envKey?: (typeof SESSION_ISOLATION_ENV_KEYS)[number];
+};
+
+export function resolveDefaultIsolationLevel(): SessionIsolationStatus {
+  for (const key of SESSION_ISOLATION_ENV_KEYS) {
+    const raw = process.env[key]?.trim().toLowerCase();
+    if (raw === "main" || raw === "sandbox") {
+      return { level: raw, source: "env", envKey: key };
+    }
+  }
+  return { level: "main", source: "default" };
+}
+
+export function resolveSessionIsolation(
+  session?: { isolationLevel?: CoworkIsolationLevel | null } | null
+): CoworkIsolationLevel {
+  if (session?.isolationLevel === "main" || session?.isolationLevel === "sandbox") {
+    return session.isolationLevel;
+  }
+  return resolveDefaultIsolationLevel().level;
+}
+
+export function isSandboxSession(session: CoworkSession): boolean {
+  return resolveSessionIsolation(session) === "sandbox";
 }

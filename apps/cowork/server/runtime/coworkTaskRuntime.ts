@@ -107,6 +107,7 @@ import {
   collectOutputRoots,
   combinePromptAdditions,
   estimateTokens,
+  resolveSessionIsolation,
   truncateToTokenBudget,
 } from "./utils";
 import { createWebSearchProvider } from "./webSearchProvider";
@@ -832,7 +833,10 @@ export class CoworkTaskRuntime {
       sessionId: session.sessionId,
     });
     const caseInsensitivePaths = settings.caseInsensitivePaths ?? false;
-    const securityPolicy = this.buildRuntimeSecurityPolicy(toolRegistryResult.executionMode);
+    const securityPolicy = this.buildRuntimeSecurityPolicy(
+      toolRegistryResult.executionMode,
+      session
+    );
     const fileSandbox = securityPolicy ? createRustSandboxManager(securityPolicy.sandbox) : null;
     await toolRegistry.register(
       fileSandbox ? createFileToolServer({ sandbox: fileSandbox }) : createFileToolServer()
@@ -956,7 +960,7 @@ export class CoworkTaskRuntime {
     };
   }
 
-  private buildRuntimeSecurityPolicy(executionMode: ExecutionSandboxMode) {
+  private buildRuntimeSecurityPolicy(executionMode: ExecutionSandboxMode, session: CoworkSession) {
     const basePolicy =
       executionMode === "docker"
         ? buildDockerSecurityPolicy()
@@ -964,13 +968,17 @@ export class CoworkTaskRuntime {
           ? buildRustSecurityPolicy(process.cwd())
           : createSecurityPolicy("balanced");
 
+    const isolationLevel = resolveSessionIsolation(session);
+    const isolationPolicy =
+      isolationLevel === "sandbox" ? applySandboxIsolation(basePolicy) : basePolicy;
+
     if (!this.isLfccGatewayConfigured()) {
-      return executionMode === "process" ? undefined : basePolicy;
+      return executionMode === "process" ? undefined : isolationPolicy;
     }
 
     return {
-      ...basePolicy,
-      permissions: { ...basePolicy.permissions, lfcc: "write" as const },
+      ...isolationPolicy,
+      permissions: { ...isolationPolicy.permissions, lfcc: "write" as const },
     };
   }
 
@@ -1355,7 +1363,9 @@ export class CoworkTaskRuntime {
     workspacePath: string;
     assetManager: RuntimeAssetManager;
   }): Promise<ExecutionSandboxMode> {
-    const requestedMode = resolveSandboxMode();
+    const isolationLevel = resolveSessionIsolation(input.session);
+    const rawMode = resolveSandboxMode();
+    const requestedMode = isolationLevel === "sandbox" && rawMode === "process" ? "auto" : rawMode;
 
     if (requestedMode === "process") {
       await input.registry.register(createBashToolServer());
@@ -1387,6 +1397,12 @@ export class CoworkTaskRuntime {
       this.logDockerFallback(dockerStatus, dockerImage);
       await input.registry.register(createBashToolServer());
       await input.registry.register(createCodeToolServer());
+      if (isolationLevel === "sandbox") {
+        this.logger.warn(
+          "Sandbox session running without docker/rust isolation; falling back to process.",
+          { sessionId: input.session.sessionId }
+        );
+      }
       return "process";
     }
 
@@ -1863,6 +1879,22 @@ function buildRustSecurityPolicy(workspacePath: string) {
       type: "rust" as const,
       workingDirectory: workspacePath,
     },
+  };
+}
+
+function applySandboxIsolation(
+  basePolicy: ReturnType<typeof createSecurityPolicy>
+): ReturnType<typeof createSecurityPolicy> {
+  const restricted = createSecurityPolicy("safe");
+  return {
+    ...basePolicy,
+    sandbox: {
+      ...basePolicy.sandbox,
+      networkAccess: restricted.sandbox.networkAccess,
+      fsIsolation: restricted.sandbox.fsIsolation,
+    },
+    permissions: { ...basePolicy.permissions, ...restricted.permissions },
+    limits: { ...basePolicy.limits, ...restricted.limits },
   };
 }
 

@@ -7,6 +7,11 @@ export type GatewayControlInboundMessage =
       clientId?: string;
       subscriptions?: string[];
       userAgent?: string;
+      token?: string;
+    }
+  | {
+      type: "auth";
+      token: string;
     }
   | {
       type: "subscribe";
@@ -35,10 +40,17 @@ export type GatewayControlOutboundMessage =
       clientId: string;
       serverTime: number;
       subscriptions: string[];
+      authRequired?: boolean;
+      authenticated?: boolean;
     }
   | {
       type: "event";
       event: RuntimeEvent;
+    }
+  | {
+      type: "auth_ok";
+      clientId: string;
+      serverTime: number;
     }
   | {
       type: "error";
@@ -64,6 +76,23 @@ export interface GatewayControlClient {
   id: string;
   userAgent?: string;
   subscriptions: Set<string>;
+  authenticated: boolean;
+}
+
+export type GatewayControlAuthMode = "none" | "token";
+
+export interface GatewayControlAuthConfig {
+  mode: GatewayControlAuthMode;
+  token?: string;
+}
+
+export interface GatewayControlStats {
+  connectedClients: number;
+  totalConnections: number;
+  totalSubscriptions: number;
+  messagesIn: number;
+  messagesOut: number;
+  lastMessageAt?: number;
 }
 
 export interface GatewayControlServerConfig {
@@ -72,6 +101,7 @@ export interface GatewayControlServerConfig {
   maxSubscriptions?: number;
   allowPublish?: boolean;
   source?: string;
+  auth?: GatewayControlAuthConfig;
 }
 
 export interface GatewayConnectionHandle {

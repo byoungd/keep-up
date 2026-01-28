@@ -2,6 +2,8 @@ import { createEventBus, type RuntimeEventBus } from "@ku0/agent-runtime-control
 import { createSubsystemLogger, type Logger } from "@ku0/agent-runtime-telemetry/logging";
 import {
   ChannelRegistry,
+  ChannelRouter,
+  type ChannelStatus,
   createGatewayControlServer,
   DiscordAdapter,
   TelegramAdapter,
@@ -18,6 +20,26 @@ export interface GatewayControlRuntime {
   eventBus: RuntimeEventBus;
   start: () => Promise<void>;
   stop: () => Promise<void>;
+  getStatus: () => GatewayControlStatus;
+}
+
+export interface GatewayControlStatus {
+  enabled: boolean;
+  port: number;
+  authMode: "none" | "token";
+  started: boolean;
+  clients: number;
+  subscriptions: number;
+  messagesIn: number;
+  messagesOut: number;
+  lastMessageAt?: number;
+  channels: {
+    total: number;
+    running: boolean;
+    runningCount: number;
+    healthyCount: number;
+    items: ChannelStatus[];
+  };
 }
 
 export interface GatewayControlRuntimeConfig {
@@ -35,7 +57,11 @@ export function createGatewayControlRuntime(
   const eventBus = config.eventBus ?? createEventBus();
   const logger = config.logger ?? createSubsystemLogger("cowork", "gateway");
   const channelLogger = createSubsystemLogger("cowork", "channels");
-  const gatewayServer = createGatewayControlServer({ eventBus, logger });
+  const gatewayServer = createGatewayControlServer({
+    eventBus,
+    logger,
+    auth: config.gateway.auth,
+  });
   const channelRegistry = new ChannelRegistry({ logger: channelLogger });
 
   if (config.telegram.enabled && config.telegram.token) {
@@ -63,37 +89,63 @@ export function createGatewayControlRuntime(
     logger.warn("Discord adapter enabled but missing token or channel id.");
   }
 
-  channelRegistry.onMessage(async (message) => {
-    const sessionId = config.telegram.sessionId;
-    if (!sessionId) {
-      logger.warn("Channel message dropped: missing session id", {
-        channel: message.channel,
-        conversationId: message.conversationId,
-      });
-      return;
-    }
+  const channelRouter = new ChannelRouter({
+    registry: channelRegistry,
+    logger: channelLogger,
+    defaultSessionId: config.telegram.sessionId,
+  });
 
-    try {
-      await config.taskRuntime.enqueueTask(sessionId, {
-        prompt: message.text,
-        title: `Channel ${message.channel}`,
-        metadata: {
-          channel: message.channel,
-          conversationId: message.conversationId,
-          senderId: message.senderId,
-          timestamp: message.timestamp,
-        },
-      });
-    } catch (error) {
-      logger.error("Failed to enqueue channel task", error, {
-        sessionId,
-        channel: message.channel,
-      });
-    }
+  channelRegistry.onMessage((message) => {
+    void channelRouter.handleMessage(message, async (sessionId, payload) => {
+      try {
+        await config.taskRuntime.enqueueTask(sessionId, {
+          prompt: payload.text,
+          title: `Channel ${payload.channel}`,
+          metadata: {
+            channel: payload.channel,
+            conversationId: payload.conversationId,
+            senderId: payload.senderId,
+            timestamp: payload.timestamp,
+          },
+        });
+      } catch (error) {
+        logger.error("Failed to enqueue channel task", error, {
+          sessionId,
+          channel: payload.channel,
+        });
+      }
+    });
   });
 
   let serverHandle: Awaited<ReturnType<typeof startGatewayControlNodeServer>> | null = null;
   let channelsStarted = false;
+  let presenceTimer: ReturnType<typeof setInterval> | null = null;
+
+  const startPresence = () => {
+    if (presenceTimer) {
+      return;
+    }
+    presenceTimer = setInterval(() => {
+      const stats = gatewayServer.getStats();
+      eventBus.emitRaw(
+        "presence.tick",
+        {
+          timestamp: Date.now(),
+          clients: stats.connectedClients,
+          subscriptions: stats.totalSubscriptions,
+        },
+        { source: "gateway-control" }
+      );
+    }, 5000);
+  };
+
+  const stopPresence = () => {
+    if (!presenceTimer) {
+      return;
+    }
+    clearInterval(presenceTimer);
+    presenceTimer = null;
+  };
 
   const start = async () => {
     if (config.gateway.enabled && !serverHandle) {
@@ -102,11 +154,12 @@ export function createGatewayControlRuntime(
         server: gatewayServer,
         logger,
       });
+      startPresence();
     }
 
     if (!channelsStarted && channelRegistry.listAdapters().length > 0) {
       await channelRegistry.startAll();
-      channelsStarted = true;
+      channelsStarted = channelRegistry.getStatus().running > 0;
     }
   };
 
@@ -119,7 +172,31 @@ export function createGatewayControlRuntime(
       await serverHandle.close();
       serverHandle = null;
     }
+    stopPresence();
   };
 
-  return { eventBus, start, stop };
+  const getStatus = (): GatewayControlStatus => {
+    const stats = gatewayServer.getStats();
+    const channelStatus = channelRegistry.getStatus();
+    return {
+      enabled: config.gateway.enabled,
+      port: config.gateway.port,
+      authMode: config.gateway.auth.mode,
+      started: Boolean(serverHandle),
+      clients: stats.connectedClients,
+      subscriptions: stats.totalSubscriptions,
+      messagesIn: stats.messagesIn,
+      messagesOut: stats.messagesOut,
+      lastMessageAt: stats.lastMessageAt,
+      channels: {
+        total: channelStatus.total,
+        running: channelsStarted,
+        runningCount: channelStatus.running,
+        healthyCount: channelStatus.healthy,
+        items: channelStatus.channels,
+      },
+    };
+  };
+
+  return { eventBus, start, stop, getStatus };
 }

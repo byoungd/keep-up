@@ -77,6 +77,7 @@ const app = createCoworkApp({
   logger: serverLogger,
   events: eventHub,
   taskRuntime,
+  gatewayRuntime,
   contextIndexManager,
   pipelineStore,
   pipelineRunner,
