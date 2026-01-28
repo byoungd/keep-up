@@ -1,15 +1,13 @@
-use crate::logs::LogEntry;
-use serde::{Deserialize, Serialize};
+
 use serde_json::{json, Value};
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use std::{env, thread};
-use tauri::{AppHandle, Manager};
-use tokio::time::Instant;
+use tauri::AppHandle;
+use std::time::Instant;
 use tungstenite::stream::MaybeTlsStream;
 use tungstenite::{connect, Message};
-use tracing::{info, warn, error};
+use tracing::{info, warn};
 
 use super::types::*;
 
@@ -195,7 +193,7 @@ fn invoke_device_command(
     app: &AppHandle,
     command: &str,
     args: Option<Value>,
-    permissions: &HashMap<String, NodePermissionStatus>,
+    _permissions: &HashMap<String, NodePermissionStatus>,
 ) -> Result<Value, DeviceCommandError> {
      // Placeholder for command invocation logic
      // In a real implementation this would dispatch to the appropriate handler
@@ -254,7 +252,7 @@ fn build_descriptor(
 
     NodeDescriptor {
         node_id: config.node_id.clone(),
-        label: config.node_label.clone(),
+        label: Some(config.node_label.clone()),
         platform: Some(std::env::consts::OS.to_string()),
         capabilities,
         permissions: Some(permissions.clone()),
