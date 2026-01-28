@@ -48,6 +48,32 @@ Token stores can be configured as:
 - `type: "memory"` for non-persistent development use.
 - `type: "file"` with AES-256-GCM encryption using `FileMcpOAuthTokenStore`.
 
+### Multi-Account Token Scoping
+
+When connecting to providers that support multiple accounts (e.g., Codex), scope tokens per account
+or workspace to avoid collisions. The token store accepts these optional selectors:
+
+- `tokenKey`: Explicit namespace key (highest precedence).
+- `accountId`: Account identifier.
+- `workspaceId`: Workspace identifier.
+
+If `tokenKey` is omitted, the store builds a key from `accountId`/`workspaceId`.
+
+Example:
+```ts
+auth: {
+  tokenStore: {
+    type: "file",
+    filePath: "/var/lib/keep-up/mcp/acme.tokens",
+    encryptionKey: process.env.MCP_OAUTH_ENCRYPTION_KEY ?? "",
+    accountId: "acct-123",
+    workspaceId: "ws-456",
+  },
+}
+```
+
+For Cowork's gateway-backed store, use `type: "gateway"` with the same selectors.
+
 If you already have an OAuth provider instance, pass it directly:
 
 ```ts

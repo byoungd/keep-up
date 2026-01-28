@@ -29,18 +29,23 @@ export interface McpOAuthTokenStore {
 }
 
 export class InMemoryMcpOAuthTokenStore implements McpOAuthTokenStore {
-  private tokens?: OAuthTokens;
+  private payload?: TokenStorePayload;
+  private readonly entryKey?: string;
+
+  constructor(config: TokenStoreSelectorConfig = {}) {
+    this.entryKey = resolveTokenStoreKey(config);
+  }
 
   async getTokens(): Promise<OAuthTokens | undefined> {
-    return this.tokens;
+    return resolveTokens(this.payload, this.entryKey);
   }
 
   async saveTokens(tokens: OAuthTokens): Promise<void> {
-    this.tokens = tokens;
+    this.payload = mergeTokens(this.payload, tokens, this.entryKey);
   }
 
   async clear(): Promise<void> {
-    this.tokens = undefined;
+    this.payload = removeTokens(this.payload, this.entryKey);
   }
 }
 
@@ -52,30 +57,46 @@ interface EncryptedTokenPayload {
   ciphertext: string;
 }
 
-export interface FileMcpOAuthTokenStoreConfig {
+const DEFAULT_TOKEN_KEY = "__default__";
+
+interface TokenStoreSelectorConfig {
+  tokenKey?: string;
+  accountId?: string;
+  workspaceId?: string;
+}
+
+interface TokenStoreEntriesPayload {
+  entries: Record<string, OAuthTokens>;
+}
+
+type TokenStorePayload = OAuthTokens | TokenStoreEntriesPayload;
+
+export interface FileMcpOAuthTokenStoreConfig extends TokenStoreSelectorConfig {
   filePath: string;
   encryptionKey: string | Uint8Array;
   keyEncoding?: "hex" | "base64";
 }
 
 export type McpOAuthTokenStoreConfig =
-  | { type: "memory" }
+  | ({ type: "memory" } & TokenStoreSelectorConfig)
   | ({ type: "file" } & FileMcpOAuthTokenStoreConfig);
 
 export class FileMcpOAuthTokenStore implements McpOAuthTokenStore {
   private readonly filePath: string;
   private readonly key: Buffer;
+  private readonly entryKey?: string;
 
   constructor(config: FileMcpOAuthTokenStoreConfig) {
     this.filePath = config.filePath;
     this.key = resolveEncryptionKey(config.encryptionKey, config.keyEncoding);
+    this.entryKey = resolveTokenStoreKey(config);
   }
 
   async getTokens(): Promise<OAuthTokens | undefined> {
     try {
       const payload = await readFile(this.filePath, "utf-8");
       const decrypted = decryptPayload(payload, this.key);
-      return decrypted;
+      return resolveTokens(decrypted, this.entryKey);
     } catch (error) {
       const code = (error as NodeJS.ErrnoException).code;
       if (code === "ENOENT") {
@@ -87,11 +108,36 @@ export class FileMcpOAuthTokenStore implements McpOAuthTokenStore {
 
   async saveTokens(tokens: OAuthTokens): Promise<void> {
     await mkdir(dirname(this.filePath), { recursive: true });
-    const payload = encryptPayload(tokens, this.key);
+    const existing = await this.readPayload();
+    const payload = encryptPayload(mergeTokens(existing, tokens, this.entryKey), this.key);
     await writeFile(this.filePath, payload, { mode: 0o600 });
   }
 
   async clear(): Promise<void> {
+    const existing = await this.readPayload();
+    const next = removeTokens(existing, this.entryKey);
+    if (!next) {
+      await this.deleteFile();
+      return;
+    }
+    const payload = encryptPayload(next, this.key);
+    await writeFile(this.filePath, payload, { mode: 0o600 });
+  }
+
+  private async readPayload(): Promise<TokenStorePayload | undefined> {
+    try {
+      const payload = await readFile(this.filePath, "utf-8");
+      return decryptPayload(payload, this.key);
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === "ENOENT") {
+        return undefined;
+      }
+      throw error;
+    }
+  }
+
+  private async deleteFile(): Promise<void> {
     try {
       await unlink(this.filePath);
     } catch (error) {
@@ -111,7 +157,7 @@ export function resolveMcpOAuthTokenStore(
   }
   if ("type" in store) {
     return store.type === "memory"
-      ? new InMemoryMcpOAuthTokenStore()
+      ? new InMemoryMcpOAuthTokenStore(store)
       : new FileMcpOAuthTokenStore(store);
   }
   return store;
@@ -308,7 +354,7 @@ function decodeKeyString(value: string, encoding?: "hex" | "base64"): Buffer {
   return Buffer.from(trimmed, isHex ? "hex" : "base64");
 }
 
-function encryptPayload(tokens: OAuthTokens, key: Buffer): string {
+function encryptPayload(tokens: TokenStorePayload, key: Buffer): string {
   const iv = randomBytes(12);
   const cipher = createCipheriv("aes-256-gcm", key, iv);
   const plaintext = Buffer.from(JSON.stringify(tokens), "utf-8");
@@ -326,7 +372,7 @@ function encryptPayload(tokens: OAuthTokens, key: Buffer): string {
   return JSON.stringify(payload);
 }
 
-function decryptPayload(payload: string, key: Buffer): OAuthTokens {
+function decryptPayload(payload: string, key: Buffer): TokenStorePayload {
   const parsed = JSON.parse(payload) as EncryptedTokenPayload;
   if (parsed.version !== 1 || parsed.algorithm !== "aes-256-gcm") {
     throw new Error("Unsupported MCP OAuth token payload.");
@@ -341,5 +387,138 @@ function decryptPayload(payload: string, key: Buffer): OAuthTokens {
     "utf-8"
   );
 
-  return JSON.parse(plaintext) as OAuthTokens;
+  const raw = JSON.parse(plaintext) as unknown;
+  if (isTokenEntriesPayload(raw)) {
+    return raw;
+  }
+  if (isOAuthTokens(raw)) {
+    return raw;
+  }
+  throw new Error("Unsupported MCP OAuth token payload.");
+}
+
+function resolveTokenStoreKey(config: {
+  tokenKey?: string;
+  accountId?: string;
+  workspaceId?: string;
+}): string | undefined {
+  const tokenKey = config.tokenKey?.trim();
+  if (tokenKey) {
+    return tokenKey;
+  }
+  const accountId = config.accountId?.trim();
+  const workspaceId = config.workspaceId?.trim();
+  if (accountId && workspaceId) {
+    return `account:${accountId}|workspace:${workspaceId}`;
+  }
+  if (accountId) {
+    return `account:${accountId}`;
+  }
+  if (workspaceId) {
+    return `workspace:${workspaceId}`;
+  }
+  return undefined;
+}
+
+function resolveTokens(
+  payload: TokenStorePayload | undefined,
+  entryKey: string | undefined
+): OAuthTokens | undefined {
+  if (!payload) {
+    return undefined;
+  }
+  if (!entryKey) {
+    if (isTokenEntriesPayload(payload)) {
+      const defaultEntry = payload.entries[DEFAULT_TOKEN_KEY];
+      if (defaultEntry) {
+        return defaultEntry;
+      }
+      const keys = Object.keys(payload.entries);
+      if (keys.length === 1) {
+        return payload.entries[keys[0]];
+      }
+      return undefined;
+    }
+    return payload;
+  }
+  if (isTokenEntriesPayload(payload)) {
+    return payload.entries[entryKey];
+  }
+  return entryKey === DEFAULT_TOKEN_KEY ? payload : undefined;
+}
+
+function mergeTokens(
+  existing: TokenStorePayload | undefined,
+  tokens: OAuthTokens,
+  entryKey: string | undefined
+): TokenStorePayload {
+  if (!entryKey) {
+    if (existing && isTokenEntriesPayload(existing)) {
+      return {
+        entries: {
+          ...existing.entries,
+          [DEFAULT_TOKEN_KEY]: tokens,
+        },
+      };
+    }
+    return tokens;
+  }
+  if (existing && isTokenEntriesPayload(existing)) {
+    return {
+      entries: {
+        ...existing.entries,
+        [entryKey]: tokens,
+      },
+    };
+  }
+  if (!existing) {
+    return { entries: { [entryKey]: tokens } };
+  }
+  if (entryKey === DEFAULT_TOKEN_KEY) {
+    return tokens;
+  }
+  return { entries: { [DEFAULT_TOKEN_KEY]: existing, [entryKey]: tokens } };
+}
+
+function removeTokens(
+  existing: TokenStorePayload | undefined,
+  entryKey: string | undefined
+): TokenStorePayload | undefined {
+  if (!existing) {
+    return undefined;
+  }
+  if (!entryKey) {
+    return undefined;
+  }
+  if (!isTokenEntriesPayload(existing)) {
+    return entryKey === DEFAULT_TOKEN_KEY ? undefined : existing;
+  }
+  const entries = { ...existing.entries };
+  delete entries[entryKey];
+  const remainingKeys = Object.keys(entries);
+  if (remainingKeys.length === 0) {
+    return undefined;
+  }
+  return { entries };
+}
+
+function isTokenEntriesPayload(value: unknown): value is TokenStoreEntriesPayload {
+  if (!isRecord(value)) {
+    return false;
+  }
+  if (!("entries" in value)) {
+    return false;
+  }
+  return isRecord(value.entries);
+}
+
+function isOAuthTokens(value: unknown): value is OAuthTokens {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return Object.keys(value).length > 0;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
