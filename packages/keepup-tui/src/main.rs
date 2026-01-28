@@ -31,12 +31,14 @@ const FILTER_PREFIX: &str = "/ ";
 const FILTER_INDENT: &str = "  ";
 const CLI_CONFIG_FILE: &str = "cli-config.json";
 const DEFAULT_STATE_DIR: &str = ".keep-up";
+const MAX_CHANGE_FILES: usize = 12;
 const MIN_INPUT_HEIGHT: u16 = 3;
 const MAX_INPUT_HEIGHT: u16 = 8;
 const TAB_WIDTH: usize = 4;
 const PASTE_BURST_WINDOW_MS: u64 = 60;
 const PASTE_BURST_ACTIVE_MS: u64 = 240;
 const PASTE_BURST_THRESHOLD: usize = 8;
+const MAX_ARG_PREVIEW_WIDTH: usize = 120;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -110,6 +112,20 @@ struct PendingApproval {
     tool_name: String,
     risk: Option<String>,
     reason: Option<String>,
+    arguments: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct GitChanges {
+    summary: String,
+    files: Vec<GitChangeEntry>,
+    error: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct GitChangeEntry {
+    status: String,
+    path: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -269,6 +285,8 @@ struct App {
     pending_session_create: Option<String>,
     pending_session_delete: Option<String>,
     pending_delete_session_id: Option<String>,
+    pending_session_export: Option<String>,
+    pending_export_path: Option<PathBuf>,
     pending_runtime_init: Option<String>,
     pending_hello: Option<String>,
     pending_interrupt: Option<String>,
@@ -287,6 +305,7 @@ struct App {
     settings_mode: Option<SettingsMode>,
     settings_input: String,
     settings_cursor: usize,
+    git_changes: Option<GitChanges>,
     should_exit: bool,
 }
 
@@ -422,6 +441,8 @@ impl App {
             pending_session_create: None,
             pending_session_delete: None,
             pending_delete_session_id: None,
+            pending_session_export: None,
+            pending_export_path: None,
             pending_runtime_init: None,
             pending_hello: None,
             pending_interrupt: None,
@@ -440,6 +461,7 @@ impl App {
             settings_mode: None,
             settings_input: String::new(),
             settings_cursor: 0,
+            git_changes: None,
             should_exit: false,
         }
     }
@@ -510,6 +532,26 @@ impl App {
         let id = host.send_op("session.delete", Some(payload))?;
         self.pending_session_delete = Some(id);
         self.status = "Deleting session...".to_string();
+        Ok(())
+    }
+
+    fn request_session_export(&mut self, host: &HostClient, session_id: String) -> Result<()> {
+        if self.pending_session_export.is_some() {
+            return Ok(());
+        }
+        if !host_supports_op(self, "session.export") {
+            self.status = "Session export not supported by host.".to_string();
+            return Ok(());
+        }
+        let filename = format!("keepup-session-{session_id}.json");
+        let path = std::env::current_dir()
+            .context("resolve cwd")?
+            .join(filename);
+        let payload = json!({ "sessionId": session_id });
+        let id = host.send_op("session.export", Some(payload))?;
+        self.pending_session_export = Some(id);
+        self.pending_export_path = Some(path);
+        self.status = "Exporting session...".to_string();
         Ok(())
     }
 
@@ -658,6 +700,10 @@ impl App {
         self.settings_cursor = self.settings_input.len();
         self.pending_delete_session_id = None;
         self.filter_active = false;
+    }
+
+    fn refresh_git_changes(&mut self) {
+        self.git_changes = Some(load_git_changes());
     }
 
     fn set_input(&mut self, text: String) {
@@ -1021,6 +1067,29 @@ fn handle_inbound(app: &mut App, host: &HostClient) -> Result<()> {
                     } else {
                         app.status = error_message(error);
                     }
+                } else if op == "session.export"
+                    && app.pending_session_export.as_deref() == Some(id.as_str())
+                {
+                    app.pending_session_export = None;
+                    let path = app.pending_export_path.take();
+                    if ok {
+                        if let (Some(path), Some(session)) = (
+                            path,
+                            payload.and_then(|value| value.get("session").cloned()),
+                        ) {
+                            let serialized =
+                                serde_json::to_string_pretty(&session).unwrap_or_default();
+                            if let Err(error) = fs::write(&path, serialized) {
+                                app.status = format!("Export failed: {error}");
+                            } else {
+                                app.status = format!("Exported session to {}", path.display());
+                            }
+                        } else {
+                            app.status = "Export failed: missing session data.".to_string();
+                        }
+                    } else {
+                        app.status = error_message(error);
+                    }
                 } else if op == "runtime.init"
                     && app.pending_runtime_init.as_deref() == Some(id.as_str())
                 {
@@ -1041,6 +1110,7 @@ fn handle_inbound(app: &mut App, host: &HostClient) -> Result<()> {
                                 app.reset_chat_scroll();
                                 app.chat_unseen = false;
                                 app.status = "Session loaded.".to_string();
+                                app.refresh_git_changes();
                             }
                         }
                     } else {
@@ -1068,6 +1138,7 @@ fn handle_inbound(app: &mut App, host: &HostClient) -> Result<()> {
                         app.status = error_message(error);
                         app.push_system_message(app.status.clone());
                     }
+                    app.refresh_git_changes();
                 } else if op == "agent.interrupt"
                     && app.pending_interrupt.as_deref() == Some(id.as_str())
                 {
@@ -1336,6 +1407,10 @@ fn parse_pending_approval(payload: Option<&Value>) -> Option<PendingApproval> {
         .and_then(|value| value.as_str())
         .or_else(|| data.get("description").and_then(|value| value.as_str()))
         .map(|value| value.to_string());
+    let arguments = data
+        .get("arguments")
+        .map(|value| value.to_string())
+        .filter(|value| value != "{}");
     let approval_id = data
         .get("approvalId")
         .and_then(|value| value.as_str())
@@ -1352,6 +1427,7 @@ fn parse_pending_approval(payload: Option<&Value>) -> Option<PendingApproval> {
         tool_name,
         risk,
         reason,
+        arguments,
     })
 }
 
@@ -1745,6 +1821,14 @@ fn handle_picker_key(app: &mut App, host: &HostClient, key: KeyEvent) -> Result<
             app.pending_delete_session_id = None;
             app.request_session_create(host)?;
         }
+        KeyCode::Char('e') | KeyCode::Char('E') => {
+            let filtered = filtered_session_indices(app);
+            if let Some(index) = filtered.get(app.selected) {
+                if let Some(session) = app.sessions.get(*index) {
+                    app.request_session_export(host, session.id.clone())?;
+                }
+            }
+        }
         KeyCode::Char('d') | KeyCode::Char('D') => {
             if !host_supports_op(app, "session.delete") {
                 app.status = "Session deletion not supported by host.".to_string();
@@ -1827,6 +1911,23 @@ fn handle_chat_key(app: &mut App, host: &HostClient, key: KeyEvent) -> Result<()
             if app.follow_tail {
                 app.chat_unseen = false;
             }
+        }
+        KeyCode::Char('g') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            app.refresh_git_changes();
+            let status = app
+                .git_changes
+                .as_ref()
+                .and_then(|changes| changes.error.as_ref())
+                .map(|error| format!("Git refresh failed: {error}"))
+                .unwrap_or_else(|| "Changes refreshed.".to_string());
+            app.status = status;
+        }
+        KeyCode::Char('o') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            let result = open_first_changed_file(app);
+            app.status = match result {
+                Ok(message) => message,
+                Err(error) => format!("Open failed: {error}"),
+            };
         }
         KeyCode::Home if key.modifiers.contains(KeyModifiers::CONTROL) => {
             app.chat_scroll = 0;
@@ -1964,7 +2065,7 @@ fn draw_ui(frame: &mut ratatui::Frame, app: &mut App) {
 
     match app.mode {
         AppMode::Picker => draw_picker(frame, app, chunks[1]),
-        AppMode::Chat => draw_chat(frame, app, chunks[1]),
+        AppMode::Chat => draw_chat_with_sidebar(frame, app, chunks[1]),
     }
 
     draw_input(frame, app, chunks[2]);
@@ -1991,6 +2092,8 @@ fn app_header(app: &App) -> Text<'_> {
         .as_ref()
         .map(|caps| format!("v{}", caps.protocol_version))
         .unwrap_or_else(|| "v?".to_string());
+    let model = app.model.as_deref().unwrap_or("auto");
+    let provider = app.provider.as_deref().unwrap_or("auto");
     let scroll_hint = if app.mode == AppMode::Chat {
         if app.chat_unseen {
             " | New"
@@ -2003,7 +2106,7 @@ fn app_header(app: &App) -> Text<'_> {
         ""
     };
     Text::from(vec![Line::from(format!(
-        "Keep-Up TUI {proto} | {session} | {}{scroll_hint}",
+        "Keep-Up TUI {proto} | {session} | Model: {model} | Provider: {provider} | {}{scroll_hint}",
         app.status
     ))])
 }
@@ -2133,6 +2236,55 @@ fn draw_chat(frame: &mut ratatui::Frame, app: &mut App, area: Rect) {
         };
         draw_chat_indicator(frame, area, label);
     }
+}
+
+fn draw_chat_with_sidebar(frame: &mut ratatui::Frame, app: &mut App, area: Rect) {
+    if area.width < 80 {
+        draw_chat(frame, app, area);
+        return;
+    }
+
+    let chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(68), Constraint::Percentage(32)])
+        .split(area);
+
+    draw_chat(frame, app, chunks[0]);
+    draw_changes_panel(frame, app, chunks[1]);
+}
+
+fn draw_changes_panel(frame: &mut ratatui::Frame, app: &App, area: Rect) {
+    let block = Block::default().title("Changes").borders(Borders::ALL);
+
+    let mut lines = Vec::new();
+    match app.git_changes.as_ref() {
+        None => {
+            lines.push(Line::from("Press Ctrl+G to refresh changes."));
+        }
+        Some(changes) => {
+            if let Some(error) = &changes.error {
+                lines.push(Line::from(format!("Git error: {error}")));
+            } else {
+                lines.push(Line::from(changes.summary.clone()));
+                lines.push(Line::from("Ctrl+O to open first change"));
+                if !changes.files.is_empty() {
+                    lines.push(Line::from(""));
+                    for file in &changes.files {
+                        if file.status.is_empty() {
+                            lines.push(Line::from(file.path.clone()));
+                        } else {
+                            lines.push(Line::from(format!("{} {}", file.status, file.path)));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let paragraph = Paragraph::new(lines)
+        .block(block)
+        .wrap(Wrap { trim: true });
+    frame.render_widget(paragraph, area);
 }
 
 fn draw_input(frame: &mut ratatui::Frame, app: &App, area: Rect) {
@@ -2502,6 +2654,7 @@ fn draw_help(frame: &mut ratatui::Frame, _app: &App) {
         Line::from("  d          Delete session (picker, confirm y/n)"),
         Line::from("  /          Filter sessions (picker)"),
         Line::from("  m / p      Edit model / provider (picker)"),
+        Line::from("  e          Export session (picker)"),
         Line::from("  Ctrl+R     Refresh sessions (picker)"),
         Line::from("  Esc        Switch session (chat) / Quit (picker)"),
         Line::from("  q          Quit (picker)"),
@@ -2519,6 +2672,8 @@ fn draw_help(frame: &mut ratatui::Frame, _app: &App) {
         Line::from("  Ctrl+End   Jump to bottom"),
         Line::from("  F2         Jump to latest"),
         Line::from("  y / n      Approve / reject pending tool"),
+        Line::from("  Ctrl+G     Refresh change summary"),
+        Line::from("  Ctrl+O     Open first changed file"),
         Line::from(""),
         Line::from("General"),
         Line::from("  F1         Toggle help"),
@@ -2550,6 +2705,10 @@ fn draw_approval_dialog(frame: &mut ratatui::Frame, approval: &PendingApproval) 
     }
     if let Some(reason) = &approval.reason {
         lines.push(Line::from(format!("Reason: {reason}")));
+    }
+    if let Some(arguments) = &approval.arguments {
+        let preview = truncate_to_width(arguments, MAX_ARG_PREVIEW_WIDTH);
+        lines.push(Line::from(format!("Args: {preview}")));
     }
 
     lines.push(Line::from(""));
@@ -2641,6 +2800,12 @@ fn resolve_node_bin() -> String {
     env_value("KEEPUP_NODE_BIN").unwrap_or_else(|| "node".to_string())
 }
 
+fn resolve_editor() -> Option<String> {
+    env_value("KEEPUP_TUI_EDITOR")
+        .or_else(|| env_value("EDITOR"))
+        .or_else(|| env_value("VISUAL"))
+}
+
 fn env_value(key: &str) -> Option<String> {
     match std::env::var(key) {
         Ok(value) if !value.trim().is_empty() => Some(value),
@@ -2697,4 +2862,128 @@ fn resolve_home_dir() -> Option<PathBuf> {
     env_value("HOME")
         .or_else(|| env_value("USERPROFILE"))
         .map(PathBuf::from)
+}
+
+fn open_first_changed_file(app: &App) -> Result<String> {
+    let Some(changes) = app.git_changes.as_ref() else {
+        return Err(anyhow::anyhow!("No change data. Press Ctrl+G first."));
+    };
+    if let Some(error) = &changes.error {
+        return Err(anyhow::anyhow!(error.clone()));
+    }
+    let entry = changes
+        .files
+        .iter()
+        .find(|entry| !entry.path.starts_with('…'))
+        .ok_or_else(|| anyhow::anyhow!("No changed files to open."))?;
+    let editor = resolve_editor().ok_or_else(|| {
+        anyhow::anyhow!("No editor configured. Set KEEPUP_TUI_EDITOR or EDITOR.")
+    })?;
+
+    Command::new(editor)
+        .arg(&entry.path)
+        .spawn()
+        .context("launch editor")?;
+    Ok(format!("Opened {}", entry.path))
+}
+
+fn load_git_changes() -> GitChanges {
+    let output = Command::new("git").args(["status", "--porcelain"]).output();
+    let output = match output {
+        Ok(output) => output,
+        Err(error) => {
+            return GitChanges {
+                summary: "Git status unavailable.".to_string(),
+                files: Vec::new(),
+                error: Some(error.to_string()),
+            };
+        }
+    };
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        let message = if stderr.is_empty() {
+            "Git status failed.".to_string()
+        } else {
+            stderr
+        };
+        return GitChanges {
+            summary: "Git status unavailable.".to_string(),
+            files: Vec::new(),
+            error: Some(message),
+        };
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut modified = 0;
+    let mut added = 0;
+    let mut deleted = 0;
+    let mut renamed = 0;
+    let mut untracked = 0;
+    let mut files = Vec::new();
+
+    for line in stdout.lines() {
+        if line.len() < 3 {
+            continue;
+        }
+        let status = &line[..2];
+        let file = line[3..].trim();
+        if status == "??" {
+            untracked += 1;
+            files.push(GitChangeEntry {
+                status: status.to_string(),
+                path: normalize_git_path(file),
+            });
+            continue;
+        }
+        if status.contains('M') {
+            modified += 1;
+        }
+        if status.contains('A') {
+            added += 1;
+        }
+        if status.contains('D') {
+            deleted += 1;
+        }
+        if status.contains('R') {
+            renamed += 1;
+        }
+        files.push(GitChangeEntry {
+            status: status.to_string(),
+            path: normalize_git_path(file),
+        });
+    }
+
+    if files.is_empty() {
+        return GitChanges {
+            summary: "Clean working tree.".to_string(),
+            files,
+            error: None,
+        };
+    }
+
+    let summary = format!(
+        "Modified {modified}, Added {added}, Deleted {deleted}, Renamed {renamed}, Untracked {untracked}"
+    );
+    if files.len() > MAX_CHANGE_FILES {
+        let extra = files.len().saturating_sub(MAX_CHANGE_FILES);
+        files.truncate(MAX_CHANGE_FILES);
+        files.push(GitChangeEntry {
+            status: String::new(),
+            path: format!("… and {extra} more"),
+        });
+    }
+
+    GitChanges {
+        summary,
+        files,
+        error: None,
+    }
+}
+
+fn normalize_git_path(raw: &str) -> String {
+    if let Some((_, new_path)) = raw.rsplit_once(" -> ") {
+        return new_path.trim().to_string();
+    }
+    raw.trim_matches('"').to_string()
 }
