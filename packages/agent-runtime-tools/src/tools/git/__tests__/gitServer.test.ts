@@ -93,11 +93,39 @@ describe("GitToolServer", () => {
     expect(executor.commit).not.toHaveBeenCalled();
   });
 
+  it("rejects commit when boolean flags are invalid", async () => {
+    const executor = createExecutor();
+    const server = new GitToolServer({}, executor as unknown as IGitExecutor);
+
+    const result = await server.callTool(
+      { name: "commit", arguments: { message: "ok", all: "yes" } },
+      context
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error?.code).toBe("INVALID_ARGUMENTS");
+    expect(executor.commit).not.toHaveBeenCalled();
+  });
+
   it("rejects checkout when branch is missing", async () => {
     const executor = createExecutor();
     const server = new GitToolServer({}, executor as unknown as IGitExecutor);
 
     const result = await server.callTool({ name: "checkout", arguments: { branch: "" } }, context);
+
+    expect(result.success).toBe(false);
+    expect(result.error?.code).toBe("INVALID_ARGUMENTS");
+    expect(executor.checkout).not.toHaveBeenCalled();
+  });
+
+  it("rejects checkout when create flag is invalid", async () => {
+    const executor = createExecutor();
+    const server = new GitToolServer({}, executor as unknown as IGitExecutor);
+
+    const result = await server.callTool(
+      { name: "checkout", arguments: { branch: "main", create: "yes" } },
+      context
+    );
 
     expect(result.success).toBe(false);
     expect(result.error?.code).toBe("INVALID_ARGUMENTS");
@@ -136,6 +164,17 @@ describe("GitToolServer", () => {
     const server = new GitToolServer({}, executor as unknown as IGitExecutor);
 
     const result = await server.callTool({ name: "diff", arguments: { file: 123 } }, context);
+
+    expect(result.success).toBe(false);
+    expect(result.error?.code).toBe("INVALID_ARGUMENTS");
+    expect(executor.diff).not.toHaveBeenCalled();
+  });
+
+  it("rejects diff when staged flag is invalid", async () => {
+    const executor = createExecutor();
+    const server = new GitToolServer({}, executor as unknown as IGitExecutor);
+
+    const result = await server.callTool({ name: "diff", arguments: { staged: "no" } }, context);
 
     expect(result.success).toBe(false);
     expect(result.error?.code).toBe("INVALID_ARGUMENTS");
