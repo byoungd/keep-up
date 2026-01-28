@@ -64,6 +64,7 @@ export function AppearanceMenu({ onClose }: AppearanceMenuProps) {
         <button
           type="button"
           onClick={onClose}
+          aria-label={t("close")}
           className="h-5 w-5 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground hover:bg-surface-2 transition-colors duration-fast"
         >
           <X className="h-3 w-3" />
@@ -121,6 +122,7 @@ export function AppearanceMenu({ onClose }: AppearanceMenuProps) {
                 type="button"
                 onClick={() => setCanvas(bg.value)}
                 title={bg.label}
+                aria-label={bg.label}
                 aria-pressed={canvas === bg.value}
                 className={cn(
                   "h-6 w-6 rounded-full transition-all duration-fast",
