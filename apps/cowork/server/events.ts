@@ -6,6 +6,7 @@
 import type {
   ClarificationRequest,
   ClarificationResponse,
+  CoworkSession,
   CoworkWorkspaceEvent,
   CoworkWorkspaceSession,
   ToolActivity,
@@ -73,15 +74,27 @@ export interface CoworkEventPayloads {
   [COWORK_EVENTS.SESSION_CREATED]: {
     sessionId: string;
     createdAt: number;
+    isolationLevel?: CoworkSession["isolationLevel"];
+    sandboxMode?: CoworkSession["sandboxMode"];
+    toolAllowlist?: CoworkSession["toolAllowlist"];
+    toolDenylist?: CoworkSession["toolDenylist"];
   };
   [COWORK_EVENTS.SESSION_UPDATED]: {
     sessionId: string;
     agentMode?: "plan" | "build" | "review";
     title?: string;
+    isolationLevel?: CoworkSession["isolationLevel"];
+    sandboxMode?: CoworkSession["sandboxMode"];
+    toolAllowlist?: CoworkSession["toolAllowlist"];
+    toolDenylist?: CoworkSession["toolDenylist"];
   };
   [COWORK_EVENTS.SESSION_ENDED]: {
     sessionId: string;
     endedAt: number;
+    isolationLevel?: CoworkSession["isolationLevel"];
+    sandboxMode?: CoworkSession["sandboxMode"];
+    toolAllowlist?: CoworkSession["toolAllowlist"];
+    toolDenylist?: CoworkSession["toolDenylist"];
   };
   [COWORK_EVENTS.SESSION_DELETED]: {
     sessionId: string;

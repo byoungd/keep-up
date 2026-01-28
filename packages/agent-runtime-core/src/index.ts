@@ -285,12 +285,17 @@ export interface CoworkConnectorGrantLike {
   provider?: string;
 }
 
-export type CoworkSessionIsolationLevel = "main" | "sandbox";
+export type CoworkSessionIsolationLevel = "main" | "sandbox" | "restricted";
+
+export type CoworkSandboxMode = "none" | "workspace-write" | "docker";
 
 export interface CoworkSessionLike {
   grants: CoworkFolderGrantLike[];
   connectors: CoworkConnectorGrantLike[];
   isolationLevel?: CoworkSessionIsolationLevel;
+  sandboxMode?: CoworkSandboxMode;
+  toolAllowlist?: string[];
+  toolDenylist?: string[];
 }
 
 export const COWORK_POLICY_ACTIONS = [

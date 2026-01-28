@@ -6,6 +6,7 @@
 import type {
   ClarificationRequest,
   ClarificationResponse,
+  CoworkSession,
   CoworkWorkspaceEvent,
   CoworkWorkspaceSession,
   TokenUsageStats,
@@ -14,6 +15,40 @@ import { COWORK_EVENTS, type SessionEventHub } from "../../streaming/eventHub";
 
 export class EventStreamPublisher {
   constructor(private readonly events: SessionEventHub) {}
+
+  publishSessionCreated(session: CoworkSession) {
+    this.events.publish(session.sessionId, COWORK_EVENTS.SESSION_CREATED, {
+      sessionId: session.sessionId,
+      createdAt: session.createdAt,
+      isolationLevel: session.isolationLevel,
+      sandboxMode: session.sandboxMode,
+      toolAllowlist: session.toolAllowlist,
+      toolDenylist: session.toolDenylist,
+    });
+  }
+
+  publishSessionUpdated(session: CoworkSession) {
+    this.events.publish(session.sessionId, COWORK_EVENTS.SESSION_UPDATED, {
+      sessionId: session.sessionId,
+      title: session.title,
+      agentMode: session.agentMode,
+      isolationLevel: session.isolationLevel,
+      sandboxMode: session.sandboxMode,
+      toolAllowlist: session.toolAllowlist,
+      toolDenylist: session.toolDenylist,
+    });
+  }
+
+  publishSessionEnded(session: CoworkSession, endedAt: number) {
+    this.events.publish(session.sessionId, COWORK_EVENTS.SESSION_ENDED, {
+      sessionId: session.sessionId,
+      endedAt,
+      isolationLevel: session.isolationLevel,
+      sandboxMode: session.sandboxMode,
+      toolAllowlist: session.toolAllowlist,
+      toolDenylist: session.toolDenylist,
+    });
+  }
 
   publishTaskCreated(data: {
     sessionId: string;

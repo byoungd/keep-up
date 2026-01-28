@@ -1,7 +1,7 @@
 import type { CoworkSession, CoworkTask } from "@ku0/agent-runtime";
 import { Hono } from "hono";
 import { formatZodError, jsonError, readJsonBody } from "../http";
-import { resolveSessionIsolation } from "../runtime/utils";
+import { resolveSessionIsolationConfig } from "../runtime/utils";
 import {
   agentProtocolArtifactSchema,
   agentProtocolStepSchema,
@@ -302,14 +302,17 @@ async function ensureProtocolSession(
   }
 
   const now = Date.now();
-  const isolationLevel = resolveSessionIsolation();
+  const resolvedConfig = resolveSessionIsolationConfig();
   const session: CoworkSession = {
     sessionId,
     userId: "agent-protocol",
     deviceId: "agent-protocol",
     platform: "macos",
     mode: "cowork",
-    isolationLevel,
+    isolationLevel: resolvedConfig.isolationLevel,
+    sandboxMode: resolvedConfig.sandboxMode,
+    toolAllowlist: resolvedConfig.toolAllowlist,
+    toolDenylist: resolvedConfig.toolDenylist,
     grants: [],
     connectors: [],
     createdAt: now,

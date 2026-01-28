@@ -1,5 +1,5 @@
 import type { CoworkSession } from "@ku0/agent-runtime";
-import { resolveSessionIsolation } from "../runtime/utils";
+import { resolveSessionIsolationConfig } from "../runtime/utils";
 import { JsonStore } from "./jsonStore";
 
 export class SessionStore {
@@ -14,8 +14,14 @@ export class SessionStore {
   }
 
   private normalizeSession(session: CoworkSession): CoworkSession {
-    const isolationLevel = resolveSessionIsolation(session);
-    return session.isolationLevel === isolationLevel ? session : { ...session, isolationLevel };
+    const resolved = resolveSessionIsolationConfig(session);
+    return {
+      ...session,
+      isolationLevel: resolved.isolationLevel,
+      sandboxMode: resolved.sandboxMode,
+      toolAllowlist: resolved.toolAllowlist,
+      toolDenylist: resolved.toolDenylist,
+    };
   }
 
   async getAll(): Promise<CoworkSession[]> {

@@ -4,7 +4,7 @@
  */
 
 import type { CoworkSession } from "@ku0/agent-runtime";
-import { resolveSessionIsolation } from "../runtime/utils";
+import { resolveSessionIsolationConfig } from "../runtime/utils";
 import { getDatabase } from "./database";
 
 export interface SqliteSessionStore {
@@ -22,8 +22,38 @@ export async function createSqliteSessionStore(): Promise<SqliteSessionStore> {
   const db = await getDatabase();
 
   const insertStmt = db.prepare(`
-    INSERT INTO sessions (session_id, user_id, device_id, platform, mode, grants, connectors, created_at, updated_at, project_id, isolation_level)
-    VALUES ($sessionId, $userId, $deviceId, $platform, $mode, $grants, $connectors, $createdAt, $updatedAt, $projectId, $isolationLevel)
+    INSERT INTO sessions (
+      session_id,
+      user_id,
+      device_id,
+      platform,
+      mode,
+      grants,
+      connectors,
+      created_at,
+      updated_at,
+      project_id,
+      isolation_level,
+      sandbox_mode,
+      tool_allowlist,
+      tool_denylist
+    )
+    VALUES (
+      $sessionId,
+      $userId,
+      $deviceId,
+      $platform,
+      $mode,
+      $grants,
+      $connectors,
+      $createdAt,
+      $updatedAt,
+      $projectId,
+      $isolationLevel,
+      $sandboxMode,
+      $toolAllowlist,
+      $toolDenylist
+    )
   `);
 
   const selectAllStmt = db.prepare(`
@@ -38,7 +68,8 @@ export async function createSqliteSessionStore(): Promise<SqliteSessionStore> {
     UPDATE sessions
     SET user_id = $userId, device_id = $deviceId, platform = $platform,
         mode = $mode, grants = $grants, connectors = $connectors, updated_at = $updatedAt,
-        ended_at = $endedAt, project_id = $projectId, isolation_level = $isolationLevel
+        ended_at = $endedAt, project_id = $projectId, isolation_level = $isolationLevel,
+        sandbox_mode = $sandboxMode, tool_allowlist = $toolAllowlist, tool_denylist = $toolDenylist
     WHERE session_id = $sessionId
   `);
 
@@ -46,9 +77,28 @@ export async function createSqliteSessionStore(): Promise<SqliteSessionStore> {
     DELETE FROM sessions WHERE session_id = $sessionId
   `);
 
+  function parseOptionalJsonArray(raw: unknown): string[] | undefined {
+    if (raw === null || raw === undefined) {
+      return undefined;
+    }
+    if (typeof raw !== "string") {
+      return undefined;
+    }
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      return Array.isArray(parsed) ? (parsed as string[]) : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
   function rowToSession(row: Record<string, unknown>): CoworkSession {
-    const isolationLevel = resolveSessionIsolation({
+    const resolved = resolveSessionIsolationConfig({
       isolationLevel: row.isolation_level as CoworkSession["isolationLevel"] | undefined,
+      sandboxMode: row.sandbox_mode as CoworkSession["sandboxMode"] | undefined,
+      toolAllowlist: parseOptionalJsonArray(row.tool_allowlist),
+      toolDenylist: parseOptionalJsonArray(row.tool_denylist),
+      userId: row.user_id as string,
     });
     return {
       sessionId: row.session_id as string,
@@ -61,7 +111,10 @@ export async function createSqliteSessionStore(): Promise<SqliteSessionStore> {
       createdAt: row.created_at as number,
       updatedAt: row.updated_at as number,
       projectId: (row.project_id as string) || undefined,
-      isolationLevel,
+      isolationLevel: resolved.isolationLevel,
+      sandboxMode: resolved.sandboxMode,
+      toolAllowlist: resolved.toolAllowlist,
+      toolDenylist: resolved.toolDenylist,
     };
   }
 
@@ -81,7 +134,7 @@ export async function createSqliteSessionStore(): Promise<SqliteSessionStore> {
     },
 
     async create(session: CoworkSession): Promise<CoworkSession> {
-      const isolationLevel = resolveSessionIsolation(session);
+      const resolved = resolveSessionIsolationConfig(session);
       insertStmt.run({
         $sessionId: session.sessionId,
         $userId: session.userId,
@@ -93,7 +146,10 @@ export async function createSqliteSessionStore(): Promise<SqliteSessionStore> {
         $createdAt: session.createdAt,
         $updatedAt: session.updatedAt || session.createdAt,
         $projectId: session.projectId || null,
-        $isolationLevel: isolationLevel,
+        $isolationLevel: resolved.isolationLevel,
+        $sandboxMode: resolved.sandboxMode,
+        $toolAllowlist: JSON.stringify(resolved.toolAllowlist ?? []),
+        $toolDenylist: JSON.stringify(resolved.toolDenylist ?? []),
       });
       return session;
     },
@@ -108,7 +164,7 @@ export async function createSqliteSessionStore(): Promise<SqliteSessionStore> {
       }
 
       const updated = updater(existing);
-      const isolationLevel = resolveSessionIsolation(updated);
+      const resolved = resolveSessionIsolationConfig(updated);
       updateStmt.run({
         $sessionId: updated.sessionId,
         $userId: updated.userId,
@@ -120,7 +176,10 @@ export async function createSqliteSessionStore(): Promise<SqliteSessionStore> {
         $updatedAt: Date.now(),
         $endedAt: updated.endedAt || null,
         $projectId: updated.projectId || null,
-        $isolationLevel: isolationLevel,
+        $isolationLevel: resolved.isolationLevel,
+        $sandboxMode: resolved.sandboxMode,
+        $toolAllowlist: JSON.stringify(resolved.toolAllowlist ?? []),
+        $toolDenylist: JSON.stringify(resolved.toolDenylist ?? []),
       });
       return updated;
     },

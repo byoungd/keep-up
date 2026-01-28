@@ -154,7 +154,10 @@ export interface GatewayControlSessionSummary {
   title?: string;
   projectId?: string;
   workspaceId?: string;
-  isolationLevel?: "main" | "sandbox";
+  isolationLevel?: "main" | "sandbox" | "restricted";
+  sandboxMode?: "none" | "workspace-write" | "docker";
+  toolAllowlist?: string[];
+  toolDenylist?: string[];
   createdAt?: number;
   updatedAt?: number;
   endedAt?: number;
@@ -169,7 +172,10 @@ export interface GatewayControlSessionCreateInput {
   title?: string;
   projectId?: string;
   workspaceId?: string;
-  isolationLevel?: "main" | "sandbox";
+  isolationLevel?: "main" | "sandbox" | "restricted";
+  sandboxMode?: "none" | "workspace-write" | "docker";
+  toolAllowlist?: string[];
+  toolDenylist?: string[];
   expiresAt?: number;
   grants?: unknown[];
   connectors?: unknown[];
@@ -180,7 +186,10 @@ export interface GatewayControlSessionUpdateInput {
   title?: string | null;
   projectId?: string | null;
   workspaceId?: string | null;
-  isolationLevel?: "main" | "sandbox";
+  isolationLevel?: "main" | "sandbox" | "restricted";
+  sandboxMode?: "none" | "workspace-write" | "docker" | null;
+  toolAllowlist?: string[] | null;
+  toolDenylist?: string[] | null;
   endedAt?: number | null;
   expiresAt?: number | null;
   metadata?: Record<string, unknown> | null;

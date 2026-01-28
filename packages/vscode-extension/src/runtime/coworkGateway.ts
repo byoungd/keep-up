@@ -21,6 +21,10 @@ export type CoworkSessionRecord = {
   title?: string;
   agentMode?: "plan" | "build" | "review";
   grants: CoworkFolderGrant[];
+  isolationLevel?: "main" | "sandbox" | "restricted";
+  sandboxMode?: "none" | "workspace-write" | "docker";
+  toolAllowlist?: string[];
+  toolDenylist?: string[];
 };
 
 export type CoworkTaskRecord = {
@@ -39,7 +43,10 @@ export type CoworkCreateSessionPayload = {
   grants?: CoworkFolderGrant[];
   connectors?: CoworkConnectorGrant[];
   title?: string;
-  isolationLevel?: "main" | "sandbox";
+  isolationLevel?: "main" | "sandbox" | "restricted";
+  sandboxMode?: "none" | "workspace-write" | "docker";
+  toolAllowlist?: string[];
+  toolDenylist?: string[];
 };
 
 export type CoworkCreateTaskPayload = {

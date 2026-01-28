@@ -59,10 +59,16 @@ function initSchema(database: DatabaseInstance): void {
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
       ended_at INTEGER,
-      isolation_level TEXT NOT NULL DEFAULT 'main'
+      isolation_level TEXT NOT NULL DEFAULT 'main',
+      sandbox_mode TEXT DEFAULT 'none',
+      tool_allowlist TEXT NOT NULL DEFAULT '[]',
+      tool_denylist TEXT NOT NULL DEFAULT '[]'
     )
   `);
   safeExec("ALTER TABLE sessions ADD COLUMN isolation_level TEXT DEFAULT 'main'");
+  safeExec("ALTER TABLE sessions ADD COLUMN sandbox_mode TEXT DEFAULT 'none'");
+  safeExec("ALTER TABLE sessions ADD COLUMN tool_allowlist TEXT DEFAULT '[]'");
+  safeExec("ALTER TABLE sessions ADD COLUMN tool_denylist TEXT DEFAULT '[]'");
 
   database.exec(`
     CREATE TABLE IF NOT EXISTS tasks (

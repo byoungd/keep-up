@@ -399,6 +399,10 @@ export type CreateSessionPayload = {
     scopes?: string[];
     allowActions?: boolean;
   }>;
+  isolationLevel?: CoworkSession["isolationLevel"];
+  sandboxMode?: CoworkSession["sandboxMode"];
+  toolAllowlist?: CoworkSession["toolAllowlist"];
+  toolDenylist?: CoworkSession["toolDenylist"];
 };
 
 export type CreateTaskPayload = {
@@ -1248,7 +1252,15 @@ export async function getProject(projectId: string): Promise<CoworkProject> {
 
 export async function updateSession(
   sessionId: string,
-  payload: { title?: string; projectId?: string | null; endedAt?: number }
+  payload: {
+    title?: string;
+    projectId?: string | null;
+    endedAt?: number;
+    isolationLevel?: CoworkSession["isolationLevel"];
+    sandboxMode?: CoworkSession["sandboxMode"] | null;
+    toolAllowlist?: CoworkSession["toolAllowlist"] | null;
+    toolDenylist?: CoworkSession["toolDenylist"] | null;
+  }
 ): Promise<CoworkSession> {
   const data = await fetchJson<ApiResult<unknown>>(`/api/sessions/${sessionId}`, {
     method: "PATCH",

@@ -120,8 +120,8 @@ export async function migrateJsonToSqlite(
   const db = await getDatabase();
   const insertSession = db.prepare(`
     INSERT OR REPLACE INTO sessions
-    (session_id, user_id, device_id, platform, mode, grants, connectors, created_at, ended_at, isolation_level)
-    VALUES ($sessionId, $userId, $deviceId, $platform, $mode, $grants, $connectors, $createdAt, $endedAt, $isolationLevel)
+    (session_id, user_id, device_id, platform, mode, grants, connectors, created_at, ended_at, isolation_level, sandbox_mode, tool_allowlist, tool_denylist)
+    VALUES ($sessionId, $userId, $deviceId, $platform, $mode, $grants, $connectors, $createdAt, $endedAt, $isolationLevel, $sandboxMode, $toolAllowlist, $toolDenylist)
   `);
 
   const insertTask = db.prepare(`
@@ -235,6 +235,9 @@ function insertSessions(
     platform: string;
     mode: string;
     isolationLevel?: string;
+    sandboxMode?: string;
+    toolAllowlist?: string[];
+    toolDenylist?: string[];
     grants: unknown[];
     connectors: unknown[];
     createdAt: number;
@@ -252,6 +255,9 @@ function insertSessions(
       $createdAt: session.createdAt,
       $endedAt: null,
       $isolationLevel: session.isolationLevel ?? "main",
+      $sandboxMode: session.sandboxMode ?? null,
+      $toolAllowlist: JSON.stringify(session.toolAllowlist ?? []),
+      $toolDenylist: JSON.stringify(session.toolDenylist ?? []),
     });
   }
 }
