@@ -40,6 +40,8 @@ interface ModelSelectorProps {
   selectedModelId?: string;
   onSelectModel: (modelId: string, providerId: string) => void;
   disabled?: boolean;
+  variant?: "default" | "compact";
+  className?: string;
 }
 
 const CapabilityBadge = memo(function CapabilityBadge({
@@ -133,6 +135,8 @@ export function ModelSelector({
   selectedModelId,
   onSelectModel,
   disabled,
+  variant = "default",
+  className,
 }: ModelSelectorProps) {
   const [open, setOpen] = useState(false);
 
@@ -156,8 +160,17 @@ export function ModelSelector({
     [onSelectModel]
   );
 
+  const rootClasses = [
+    "model-selector",
+    variant === "compact" ? "model-selector--compact" : "",
+    disabled ? "model-selector--disabled" : "",
+    className ?? "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <div className={`model-selector ${disabled ? "model-selector--disabled" : ""}`}>
+    <div className={rootClasses}>
       <button
         type="button"
         className="model-selector__trigger"

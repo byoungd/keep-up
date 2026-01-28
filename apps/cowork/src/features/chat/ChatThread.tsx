@@ -17,10 +17,17 @@ import {
 import { useNavigate } from "@tanstack/react-router";
 import { Download } from "lucide-react";
 import React, { useCallback, useMemo } from "react";
-import { type ChatAttachmentRef, updateSettings, uploadChatAttachment } from "../../api/coworkApi";
+import {
+  type ChatAttachmentRef,
+  type CoworkProvider,
+  listProviders,
+  updateSettings,
+  uploadChatAttachment,
+} from "../../api/coworkApi";
 import { useWorkspace } from "../../app/providers/WorkspaceProvider";
 import { detectIntent } from "../../lib/intentDetector";
 import { parseSlashCommand } from "../../lib/slashCommands";
+import { ModelSelector } from "../settings/ModelSelector";
 import { CostMeter } from "./components/CostMeter";
 import { ModeToggle } from "./components/ModeToggle";
 import { useChatSession } from "./hooks/useChatSession";
@@ -94,6 +101,38 @@ const TRANSLATIONS = {
   },
 } as const;
 
+const SESSION_MODEL_STORAGE_KEY = "cowork-session-model-v1";
+
+function readSessionModel(sessionId: string): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  try {
+    const stored = window.localStorage.getItem(SESSION_MODEL_STORAGE_KEY);
+    if (!stored) {
+      return null;
+    }
+    const parsed = JSON.parse(stored) as Record<string, string>;
+    return parsed?.[sessionId] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function writeSessionModel(sessionId: string, modelId: string) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    const stored = window.localStorage.getItem(SESSION_MODEL_STORAGE_KEY);
+    const parsed = stored ? (JSON.parse(stored) as Record<string, string>) : {};
+    parsed[sessionId] = modelId;
+    window.localStorage.setItem(SESSION_MODEL_STORAGE_KEY, JSON.stringify(parsed));
+  } catch {
+    // Ignore storage failures (private mode, quota, etc.)
+  }
+}
+
 function isAgentTask(value: unknown): value is AgentTask {
   if (!value || typeof value !== "object") {
     return false;
@@ -121,6 +160,8 @@ export function ChatThread({ sessionId }: { sessionId: string }) {
   } = useChatSession(sessionId);
   const [input, setInput] = React.useState("");
   const [model, setModel] = React.useState(getDefaultModelId());
+  const [providers, setProviders] = React.useState<CoworkProvider[]>([]);
+  const [providersLoading, setProvidersLoading] = React.useState(false);
   const [branchParentId, setBranchParentId] = React.useState<string | null>(null);
   const [editingMessageId, setEditingMessageId] = React.useState<string | null>(null);
   const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
@@ -132,6 +173,51 @@ export function ChatThread({ sessionId }: { sessionId: string }) {
   const attachmentsRef = React.useRef<PanelAttachment[]>([]);
 
   useSafeAutoFocus(inputRef, [sessionId]);
+
+  React.useEffect(() => {
+    let isActive = true;
+    setProvidersLoading(true);
+    listProviders()
+      .then((data) => {
+        if (!isActive) {
+          return;
+        }
+        setProviders(data);
+      })
+      .catch(() => {
+        if (!isActive) {
+          return;
+        }
+        setProviders([]);
+      })
+      .finally(() => {
+        if (!isActive) {
+          return;
+        }
+        setProvidersLoading(false);
+      });
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  React.useEffect(() => {
+    const storedModel = readSessionModel(sessionId);
+    const normalized = storedModel ? (normalizeModelId(storedModel) ?? storedModel) : null;
+    const resolved = normalized ? getModelCapability(normalized) : null;
+    if (resolved?.id) {
+      setModel(resolved.id);
+      return;
+    }
+    setModel(getDefaultModelId());
+  }, [sessionId]);
+
+  React.useEffect(() => {
+    if (!model) {
+      return;
+    }
+    writeSessionModel(sessionId, model);
+  }, [model, sessionId]);
 
   // Keyboard shortcuts
   useKeyboardShortcuts({
@@ -149,6 +235,10 @@ export function ChatThread({ sessionId }: { sessionId: string }) {
   });
 
   const filteredModels = useMemo(() => MODEL_CATALOG, []);
+  const providerOptions = useMemo(
+    () => providers.filter((provider) => provider.models.length > 0),
+    [providers]
+  );
   const backgroundTasks = useMemo(() => {
     const tasks = new Map<string, AgentTask>();
     for (const message of messages) {
@@ -545,6 +635,13 @@ export function ChatThread({ sessionId }: { sessionId: string }) {
       </div>
       <div className="flex items-center gap-2">
         <BackgroundTaskIndicator tasks={backgroundTasks} />
+        <ModelSelector
+          providers={providerOptions}
+          selectedModelId={model}
+          onSelectModel={(modelId) => handleSetModel(modelId)}
+          disabled={providersLoading || providerOptions.length === 0}
+          variant="compact"
+        />
         <CostMeter usage={usage} modelId={model} />
         <div className="h-4 w-px bg-border mx-1" />
         <ModeToggle mode={agentMode} onChange={setMode} />

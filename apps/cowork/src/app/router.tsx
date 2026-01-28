@@ -5,6 +5,7 @@ import { FoundationRoute } from "./routes/FoundationRoute";
 import { HomeRoute } from "./routes/HomeRoute";
 import { LessonsRoute } from "./routes/LessonsRoute";
 import { LibraryRoute } from "./routes/LibraryRoute";
+import { MarketRoute } from "./routes/MarketRoute";
 import { NewSessionRoute } from "./routes/NewSessionRoute";
 import { SearchRoute } from "./routes/SearchRoute";
 import { SessionRoute } from "./routes/SessionRoute";
@@ -52,6 +53,12 @@ const libraryRoute = createRoute({
   component: LibraryRoute,
 });
 
+const marketRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/market",
+  component: MarketRoute,
+});
+
 const lessonsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/lessons",
@@ -71,6 +78,7 @@ const routeTree = rootRoute.addChildren([
   searchRoute,
   foundationRoute,
   libraryRoute,
+  marketRoute,
   lessonsRoute,
   settingsRoute,
 ]);

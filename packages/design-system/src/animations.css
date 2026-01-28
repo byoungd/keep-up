@@ -150,7 +150,7 @@
   @keyframes enter-fade-slide {
     from {
       opacity: 0;
-      transform: translateY(10px);
+      transform: translateY(8px);
     }
 
     to {
@@ -183,7 +183,7 @@
   @keyframes ai-message-enter {
     from {
       opacity: 0;
-      transform: translateY(8px) scale(0.98);
+      transform: translateY(6px) scale(0.98);
     }
     to {
       opacity: 1;
@@ -193,7 +193,7 @@
 
   .ai-button-press:active {
     transform: scale(0.96);
-    transition: transform 0.1s ease;
+    transition: transform var(--duration-fast) var(--ease-smooth);
   }
 
   .ai-gradient-shimmer {
