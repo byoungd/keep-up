@@ -860,12 +860,14 @@ export async function sendChatMessage(
   sessionId: string,
   payload: SendChatPayload,
   onChunk?: (chunk: string) => void,
-  onMeta?: (meta: ChatStreamMeta) => void
+  onMeta?: (meta: ChatStreamMeta) => void,
+  signal?: AbortSignal
 ): Promise<ChatMessage> {
   const response = await fetch(apiUrl(`/api/sessions/${sessionId}/chat`), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+    signal,
   });
 
   if (!response.ok) {

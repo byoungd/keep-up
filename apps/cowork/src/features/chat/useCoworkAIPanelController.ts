@@ -64,6 +64,7 @@ export function useCoworkAIPanelController() {
     isLoading,
     isConnected,
     isLive,
+    abort: abortMessage,
     editMessage,
     retryMessage,
     agentMode,
@@ -541,9 +542,7 @@ export function useCoworkAIPanelController() {
     filteredModels,
     handleSend,
     handleRunBackground,
-    handleAbort: () => {
-      /* Not implemented yet */
-    },
+    handleAbort: abortMessage,
     handleTaskAction: sendAction,
     approvalBusy: false,
     approvalError: null,
