@@ -1,5 +1,5 @@
 import type { Message } from "@ku0/shell";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   type ChatAttachmentRef,
   type ChatMessage,
@@ -25,6 +25,8 @@ export function useChatSession(sessionId: string | undefined) {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const activeChatRef = useRef<{ userMessageId: string; assistantId: string } | null>(null);
 
   // Subscribe to the real-time task stream
   const { graph, isConnected, isLive } = useTaskStream(sessionId ?? "");
@@ -164,10 +166,12 @@ export function useChatSession(sessionId: string | undefined) {
       clientRequestId: string,
       modelId?: string,
       parentId?: string,
-      attachments?: ChatAttachmentRef[]
+      attachments?: ChatAttachmentRef[],
+      signal?: AbortSignal
     ) => {
       const now = Date.now();
       const assistantId = `assistant-${clientRequestId}`;
+      activeChatRef.current = { userMessageId, assistantId };
       const assistantMetadata = {
         requestId: clientRequestId,
         ...(parentId ? { parentId } : {}),
@@ -246,7 +250,8 @@ export function useChatSession(sessionId: string | undefined) {
                   : m
               )
             );
-          }
+          },
+          signal
         );
       } finally {
         // Cleanup rAF on finish
@@ -297,6 +302,28 @@ export function useChatSession(sessionId: string | undefined) {
     [markMessageStalled, updateMessageId]
   );
 
+  const handleAbort = useCallback(() => {
+    const controller = abortControllerRef.current;
+    if (!controller || controller.signal.aborted) {
+      return;
+    }
+    controller.abort();
+
+    const activeChat = activeChatRef.current;
+    if (!activeChat) {
+      return;
+    }
+
+    setHistoryMessages((prev) =>
+      prev.map((m) => {
+        if (m.id === activeChat.assistantId || m.id === activeChat.userMessageId) {
+          return { ...m, status: "canceled" as const };
+        }
+        return m;
+      })
+    );
+  }, []);
+
   const editMessage = useCallback(
     async (messageId: string, newContent: string) => {
       if (!sessionId) {
@@ -315,6 +342,61 @@ export function useChatSession(sessionId: string | undefined) {
       }
     },
     [sessionId]
+  );
+
+  const updateMessageStatus = useCallback((userMessageId: string, status: Message["status"]) => {
+    setHistoryMessages((prev) =>
+      prev.map((m) =>
+        m.id === userMessageId || (m.role === "assistant" && m.status === "streaming")
+          ? { ...m, status }
+          : m
+      )
+    );
+  }, []);
+
+  const handleSendError = useCallback(
+    (err: unknown, userMessageId: string) => {
+      const error = err instanceof Error ? err : null;
+      if (error?.name === "AbortError") {
+        setError(null);
+        updateMessageStatus(userMessageId, "canceled");
+        return;
+      }
+      const errorDetail = error?.message ?? "Unknown error";
+      setError(`Failed to send message: ${errorDetail}`);
+      updateMessageStatus(userMessageId, "error");
+    },
+    [updateMessageStatus]
+  );
+
+  const sendChatRequest = useCallback(
+    async (
+      content: string,
+      userMessageId: string,
+      clientRequestId: string,
+      options?: {
+        modelId?: string;
+        parentId?: string;
+        attachments?: ChatAttachmentRef[];
+      }
+    ) => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+      await handleSendChat(
+        sessionId ?? "",
+        content,
+        userMessageId,
+        clientRequestId,
+        options?.modelId,
+        options?.parentId,
+        options?.attachments,
+        controller.signal
+      );
+    },
+    [handleSendChat, sessionId]
   );
 
   const sendMessage = useCallback(
@@ -356,31 +438,21 @@ export function useChatSession(sessionId: string | undefined) {
             options?.metadata
           );
         } else {
-          await handleSendChat(
-            sessionId,
-            content,
-            userMessageId,
-            clientRequestId,
-            options?.modelId,
-            options?.parentId,
-            options?.attachments
-          );
+          await sendChatRequest(content, userMessageId, clientRequestId, {
+            modelId: options?.modelId,
+            parentId: options?.parentId,
+            attachments: options?.attachments,
+          });
         }
       } catch (err) {
-        const errorDetail = err instanceof Error ? err.message : "Unknown error";
-        setError(`Failed to send message: ${errorDetail}`);
-        setHistoryMessages((prev) =>
-          prev.map((m) =>
-            m.id === userMessageId || (m.role === "assistant" && m.status === "streaming")
-              ? { ...m, status: "error" as const }
-              : m
-          )
-        );
+        handleSendError(err, userMessageId);
       } finally {
         setIsSending(false);
+        abortControllerRef.current = null;
+        activeChatRef.current = null;
       }
     },
-    [sessionId, handleSendTask, handleSendChat, addOptimisticMessage]
+    [sessionId, handleSendTask, sendChatRequest, addOptimisticMessage, handleSendError]
   );
 
   const branchMessage = useCallback(
@@ -511,6 +583,7 @@ export function useChatSession(sessionId: string | undefined) {
     editMessage,
     branchMessage,
     retryMessage,
+    abort: handleAbort,
     agentMode: graph.agentMode ?? "build",
     setMode,
     toggleMode: useCallback(async () => {
