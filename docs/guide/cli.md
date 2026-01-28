@@ -46,12 +46,14 @@ Common keys:
 - `provider`: `auto`, `openai`, `claude`, `gemini`, etc.
 - `model`: model identifier or `auto`
 - `output`: `text`, `json`, `markdown`
+- `session`: default session ID for run/tui
 - `approvalMode`: `ask`, `auto`, `deny`
 - `sandbox`: `auto` (future use)
 
 Set and unset values:
 
 ```bash
+keepup agent config show
 keepup agent config set provider openai
 keepup agent config set output json
 keepup agent config unset output
@@ -79,16 +81,35 @@ List all sessions:
 keepup agent session list --all
 ```
 
+Limit session list:
+
+```bash
+keepup agent session list --limit 25
+```
+
 Resume a session:
 
 ```bash
 keepup agent session resume <session-id>
 ```
 
+Continue a session directly:
+
+```bash
+keepup agent run --session <session-id> "Continue where we left off"
+keepup agent tui --session <session-id>
+```
+
 Export a session record:
 
 ```bash
 keepup agent session export <session-id> --output session.json
+```
+
+Delete a session:
+
+```bash
+keepup agent session delete <session-id>
 ```
 
 ## Approvals
@@ -106,6 +127,9 @@ Use `--json` for machine-readable output:
 keepup agent run "Summarize tests" --json
 ```
 
+JSON output includes `sessionId`, the full `state`, `toolCalls`, and `approvals`.
+Non-text outputs suppress progress logs to keep output machine-readable.
+
 Use `--format markdown` for a structured markdown response:
 
 ```bash
@@ -117,6 +141,19 @@ Disable streaming progress output:
 ```bash
 keepup agent run "Summarize tests" --no-stream
 ```
+
+Suppress progress output entirely:
+
+```bash
+keepup agent run "Summarize tests" --quiet
+```
+
+## Exit Codes
+
+- `0`: success
+- `2`: agent runtime error
+- `3`: approval rejected or timed out
+- `4`: tool call failed
 
 ## Project Instructions (AGENTS.md / CLAUDE.md)
 
@@ -132,6 +169,10 @@ Include instructions from multiple directories (repeatable):
 ```bash
 keepup agent run "Review the API" --add-dir ../shared --add-dir ~/work/standards
 ```
+
+Instructions are concatenated in order (current directory first, then `--add-dir`),
+deduplicated by file path, and labeled with their relative path. Each file is
+separated by `---`.
 
 ## Doctor and Completion
 
