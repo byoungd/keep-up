@@ -139,7 +139,11 @@ export function DiffCard({ file, diff, status, appliedAt, onApply, onRevert }: D
       </div>
 
       {/* Mock Diff Viewer - in production use Shiki/Prism */}
-      <div className="overflow-x-auto p-0 text-fine font-mono bg-surface-1 leading-relaxed">
+      <div
+        className="overflow-x-auto p-0 text-fine font-mono bg-surface-1 leading-relaxed"
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+        tabIndex={0}
+      >
         <table className="w-full border-collapse">
           <tbody>
             {diff.split("\n").map((line, cur) => {
