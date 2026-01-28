@@ -50,4 +50,5 @@ export interface NativeTokenizer {
     minBytes: number,
     level?: number
   ) => CompressedPayload | null;
+  decompressPayloadZstd?: (data: Uint8Array) => Uint8Array | null;
 }
