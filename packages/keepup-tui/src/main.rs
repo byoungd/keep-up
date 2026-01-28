@@ -256,6 +256,7 @@ struct App {
     pending_prompt: Option<String>,
     pending_session_list: Option<String>,
     pending_session_create: Option<String>,
+    pending_session_delete: Option<String>,
     pending_runtime_init: Option<String>,
     pending_hello: Option<String>,
     pending_interrupt: Option<String>,
@@ -401,6 +402,7 @@ impl App {
             pending_prompt: None,
             pending_session_list: None,
             pending_session_create: None,
+            pending_session_delete: None,
             pending_runtime_init: None,
             pending_hello: None,
             pending_interrupt: None,
@@ -468,6 +470,21 @@ impl App {
         let id = host.send_op("session.create", None)?;
         self.pending_session_create = Some(id);
         self.status = "Creating session...".to_string();
+        Ok(())
+    }
+
+    fn request_session_delete(&mut self, host: &HostClient, session_id: String) -> Result<()> {
+        if self.pending_session_delete.is_some() {
+            return Ok(());
+        }
+        if !host_supports_op(self, "session.delete") {
+            self.status = "Session deletion not supported by host.".to_string();
+            return Ok(());
+        }
+        let payload = json!({ "sessionId": session_id });
+        let id = host.send_op("session.delete", Some(payload))?;
+        self.pending_session_delete = Some(id);
+        self.status = "Deleting session...".to_string();
         Ok(())
     }
 
@@ -875,6 +892,31 @@ fn handle_inbound(app: &mut App, host: &HostClient) -> Result<()> {
                             if let Ok(record) = serde_json::from_value::<SessionRecord>(session) {
                                 app.request_runtime_init(host, record.id)?;
                             }
+                        }
+                    } else {
+                        app.status = error_message(error);
+                    }
+                } else if op == "session.delete"
+                    && app.pending_session_delete.as_deref() == Some(id.as_str())
+                {
+                    app.pending_session_delete = None;
+                    if ok {
+                        let deleted_id = payload
+                            .and_then(|value| value.get("sessionId").cloned())
+                            .and_then(|value| value.as_str().map(|value| value.to_string()));
+                        if let Some(deleted_id) = deleted_id {
+                            app.sessions.retain(|session| session.id != deleted_id);
+                            if app.sessions.is_empty() {
+                                app.selected = 0;
+                                app.status = "No sessions. Press n to create one.".to_string();
+                            } else if app.selected >= app.sessions.len() {
+                                app.selected = app.sessions.len().saturating_sub(1);
+                                app.status = format!("Deleted session {deleted_id}.");
+                            } else {
+                                app.status = format!("Deleted session {deleted_id}.");
+                            }
+                        } else {
+                            app.status = "Session deleted.".to_string();
                         }
                     } else {
                         app.status = error_message(error);
@@ -1415,6 +1457,11 @@ fn handle_picker_key(app: &mut App, host: &HostClient, key: KeyEvent) -> Result<
         }
         KeyCode::Char('n') => {
             app.request_session_create(host)?;
+        }
+        KeyCode::Char('d') => {
+            if let Some(session) = app.sessions.get(app.selected) {
+                app.request_session_delete(host, session.id.clone())?;
+            }
         }
         KeyCode::Char('r') if key.modifiers.contains(KeyModifiers::CONTROL) => {
             app.request_session_list(host)?;
@@ -2031,6 +2078,7 @@ fn draw_help(frame: &mut ratatui::Frame, _app: &App) {
         Line::from("  ↑/↓        Move selection (picker) / history (chat)"),
         Line::from("  Enter      Select session / send message"),
         Line::from("  n          New session (picker)"),
+        Line::from("  d          Delete session (picker)"),
         Line::from("  Ctrl+R     Refresh sessions (picker)"),
         Line::from("  Esc        Switch session (chat) / Quit (picker)"),
         Line::from("  q          Quit (picker)"),
