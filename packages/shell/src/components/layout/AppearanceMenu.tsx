@@ -64,6 +64,7 @@ export function AppearanceMenu({ onClose }: AppearanceMenuProps) {
         <button
           type="button"
           onClick={onClose}
+          aria-label={t("close")}
           className="h-5 w-5 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground hover:bg-surface-2 transition-colors duration-fast"
           aria-label={t("close")}
         >
