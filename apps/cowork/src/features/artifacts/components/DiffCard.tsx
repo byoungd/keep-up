@@ -54,6 +54,7 @@ export function DiffCard({ file, diff, status, appliedAt, onApply, onRevert }: D
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
+              aria-hidden="true"
             >
               <title>File icon</title>
               <path
@@ -79,7 +80,7 @@ export function DiffCard({ file, diff, status, appliedAt, onApply, onRevert }: D
             onClick={handleCopy}
             className="p-1.5 rounded-lg border border-border bg-surface-1 text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-all duration-fast flex items-center gap-1.5"
             title="Copy diff to clipboard"
-            aria-label="Copy diff to clipboard"
+            aria-label={copied ? "Diff copied" : "Copy diff to clipboard"}
           >
             {copied ? (
               <svg
@@ -87,6 +88,7 @@ export function DiffCard({ file, diff, status, appliedAt, onApply, onRevert }: D
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
+                aria-hidden="true"
               >
                 <title>Copied</title>
                 <path
@@ -97,7 +99,13 @@ export function DiffCard({ file, diff, status, appliedAt, onApply, onRevert }: D
                 />
               </svg>
             ) : (
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                aria-hidden="true"
+              >
                 <title>Copy</title>
                 <path
                   strokeLinecap="round"
