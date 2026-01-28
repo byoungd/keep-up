@@ -285,6 +285,8 @@ struct App {
     pending_session_create: Option<String>,
     pending_session_delete: Option<String>,
     pending_delete_session_id: Option<String>,
+    pending_session_export: Option<String>,
+    pending_export_path: Option<PathBuf>,
     pending_runtime_init: Option<String>,
     pending_hello: Option<String>,
     pending_interrupt: Option<String>,
@@ -439,6 +441,8 @@ impl App {
             pending_session_create: None,
             pending_session_delete: None,
             pending_delete_session_id: None,
+            pending_session_export: None,
+            pending_export_path: None,
             pending_runtime_init: None,
             pending_hello: None,
             pending_interrupt: None,
@@ -528,6 +532,26 @@ impl App {
         let id = host.send_op("session.delete", Some(payload))?;
         self.pending_session_delete = Some(id);
         self.status = "Deleting session...".to_string();
+        Ok(())
+    }
+
+    fn request_session_export(&mut self, host: &HostClient, session_id: String) -> Result<()> {
+        if self.pending_session_export.is_some() {
+            return Ok(());
+        }
+        if !host_supports_op(self, "session.export") {
+            self.status = "Session export not supported by host.".to_string();
+            return Ok(());
+        }
+        let filename = format!("keepup-session-{session_id}.json");
+        let path = std::env::current_dir()
+            .context("resolve cwd")?
+            .join(filename);
+        let payload = json!({ "sessionId": session_id });
+        let id = host.send_op("session.export", Some(payload))?;
+        self.pending_session_export = Some(id);
+        self.pending_export_path = Some(path);
+        self.status = "Exporting session...".to_string();
         Ok(())
     }
 
@@ -1039,6 +1063,29 @@ fn handle_inbound(app: &mut App, host: &HostClient) -> Result<()> {
                             }
                         } else {
                             app.status = "Session deleted.".to_string();
+                        }
+                    } else {
+                        app.status = error_message(error);
+                    }
+                } else if op == "session.export"
+                    && app.pending_session_export.as_deref() == Some(id.as_str())
+                {
+                    app.pending_session_export = None;
+                    let path = app.pending_export_path.take();
+                    if ok {
+                        if let (Some(path), Some(session)) = (
+                            path,
+                            payload.and_then(|value| value.get("session").cloned()),
+                        ) {
+                            let serialized =
+                                serde_json::to_string_pretty(&session).unwrap_or_default();
+                            if let Err(error) = fs::write(&path, serialized) {
+                                app.status = format!("Export failed: {error}");
+                            } else {
+                                app.status = format!("Exported session to {}", path.display());
+                            }
+                        } else {
+                            app.status = "Export failed: missing session data.".to_string();
                         }
                     } else {
                         app.status = error_message(error);
@@ -1773,6 +1820,14 @@ fn handle_picker_key(app: &mut App, host: &HostClient, key: KeyEvent) -> Result<
         KeyCode::Char('n') => {
             app.pending_delete_session_id = None;
             app.request_session_create(host)?;
+        }
+        KeyCode::Char('e') | KeyCode::Char('E') => {
+            let filtered = filtered_session_indices(app);
+            if let Some(index) = filtered.get(app.selected) {
+                if let Some(session) = app.sessions.get(*index) {
+                    app.request_session_export(host, session.id.clone())?;
+                }
+            }
         }
         KeyCode::Char('d') | KeyCode::Char('D') => {
             if !host_supports_op(app, "session.delete") {
@@ -2599,6 +2654,7 @@ fn draw_help(frame: &mut ratatui::Frame, _app: &App) {
         Line::from("  d          Delete session (picker, confirm y/n)"),
         Line::from("  /          Filter sessions (picker)"),
         Line::from("  m / p      Edit model / provider (picker)"),
+        Line::from("  e          Export session (picker)"),
         Line::from("  Ctrl+R     Refresh sessions (picker)"),
         Line::from("  Esc        Switch session (chat) / Quit (picker)"),
         Line::from("  q          Quit (picker)"),
