@@ -20,6 +20,10 @@ export {
   INITIAL_DRAG_STATE,
   isPointInHandle,
 } from "./dragHandle";
+export {
+  DragHandleControllerProvider,
+  useDragHandleController,
+} from "./dragHandleContext";
 // Mock Adapter
 export {
   createMockAdapter,

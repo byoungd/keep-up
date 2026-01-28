@@ -342,11 +342,10 @@ export function generateHandleCss(): string {
 }
 
 /**
- * Create a singleton drag handle controller
+ * Singleton fallback for non-React usage.
+ * Prefer DragHandleControllerProvider for injected instances.
  */
 let globalController: DragHandleController | null = null;
-
-// TODO: Replace with Context/Dependency Injection in the future
 export function getDragHandleController(): DragHandleController {
   if (!globalController) {
     globalController = new DragHandleController();
