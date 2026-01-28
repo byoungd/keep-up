@@ -115,7 +115,11 @@ export const SidebarRail = React.memo(function SidebarRail({
         </Button>
       </Tooltip>
 
-      <div className="flex flex-1 flex-col items-center gap-2 overflow-y-auto scrollbar-auto-hide">
+      <div
+        className="flex flex-1 flex-col items-center gap-2 overflow-y-auto scrollbar-auto-hide"
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+        tabIndex={0}
+      >
         {state.groups.map((group, groupIndex) => {
           if (group.mainItems.length === 0) {
             return null;
