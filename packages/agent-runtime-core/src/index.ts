@@ -285,9 +285,12 @@ export interface CoworkConnectorGrantLike {
   provider?: string;
 }
 
+export type CoworkSessionIsolationLevel = "main" | "sandbox";
+
 export interface CoworkSessionLike {
   grants: CoworkFolderGrantLike[];
   connectors: CoworkConnectorGrantLike[];
+  isolationLevel?: CoworkSessionIsolationLevel;
 }
 
 export const COWORK_POLICY_ACTIONS = [
@@ -1414,6 +1417,12 @@ export interface ToolExecutionContext {
   approvalTimeoutMs?: number;
   /** Node-level caching configuration */
   nodeCache?: NodeCachePolicy;
+  /** Governance rules for tool calls (Track CF). */
+  governanceRules?: ToolGovernancePolicyRule[];
+  /** Default action when no governance rule matches. */
+  governanceDefaultAction?: ToolGovernancePolicyAction;
+  /** Optional safety checkers that can deny or request confirmation. */
+  safetyCheckers?: ToolSafetyCheckerLike[];
 }
 
 export interface NodeCachePolicy {
@@ -2331,6 +2340,33 @@ export interface ToolPolicyEngine {
   evaluate(context: ToolPolicyContext): ToolPolicyDecision;
 }
 
+export type ToolGovernancePolicyAction = "allow" | "deny" | "ask_user";
+
+export interface ToolGovernanceRuleCondition {
+  /** Dot-delimited path into tool arguments. */
+  path: string;
+  operator: "equals" | "contains" | "matches" | "lessThan" | "greaterThan";
+  value: string | number | boolean | RegExp;
+}
+
+export interface ToolGovernancePolicyRule {
+  id: string;
+  action: ToolGovernancePolicyAction;
+  /** Tool name patterns (ex: "file:*", "bash:execute"). */
+  tools?: string[];
+  /** Alternate pattern list (merged with tools). */
+  toolPatterns?: string[];
+  /** Single tool pattern alias. */
+  tool?: string;
+  /** Optional argument conditions. */
+  conditions?: ToolGovernanceRuleCondition[];
+  /** Rule priority (higher wins). */
+  priority?: number;
+  reason?: string;
+  reasonCode?: string;
+  riskTags?: string[];
+}
+
 export type ToolSafetyDecision = "allow" | "deny" | "ask_user";
 
 export interface ToolSafetyCheckResult {
@@ -2338,15 +2374,28 @@ export interface ToolSafetyCheckResult {
   reason?: string;
   reasonCode?: string;
   riskTags?: string[];
+  checkerId?: string;
 }
 
 export type ToolSafetyChecker = (
   context: ToolPolicyContext
 ) => ToolSafetyCheckResult | null | undefined;
 
+export interface ToolSafetyCheckerSpec {
+  id: string;
+  description?: string;
+  check: ToolSafetyChecker;
+  /** Decision to use if the checker throws. Defaults to deny. */
+  onError?: ToolSafetyDecision;
+  /** Risk tags applied when the checker yields a non-allow decision. */
+  riskTags?: string[];
+}
+
+export type ToolSafetyCheckerLike = ToolSafetyChecker | ToolSafetyCheckerSpec;
+
 export interface ToolExecutionContext {
   /** Optional safety checkers that can deny or request confirmation. */
-  safetyCheckers?: ToolSafetyChecker[];
+  safetyCheckers?: ToolSafetyCheckerLike[];
 }
 
 // ============================================================================

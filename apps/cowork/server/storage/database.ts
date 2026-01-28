@@ -58,9 +58,11 @@ function initSchema(database: DatabaseInstance): void {
       connectors TEXT NOT NULL DEFAULT '[]',
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
-      ended_at INTEGER
+      ended_at INTEGER,
+      isolation_level TEXT NOT NULL DEFAULT 'main'
     )
   `);
+  safeExec("ALTER TABLE sessions ADD COLUMN isolation_level TEXT DEFAULT 'main'");
 
   database.exec(`
     CREATE TABLE IF NOT EXISTS tasks (
@@ -360,6 +362,12 @@ function initSchema(database: DatabaseInstance): void {
 
   try {
     database.exec("ALTER TABLE sessions ADD COLUMN project_id TEXT");
+  } catch {
+    // Column likely exists
+  }
+
+  try {
+    database.exec("ALTER TABLE sessions ADD COLUMN isolation_level TEXT DEFAULT 'main'");
   } catch {
     // Column likely exists
   }

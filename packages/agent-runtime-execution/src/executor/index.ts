@@ -1190,6 +1190,7 @@ export class ToolExecutionPipeline
       correlationId: context.correlationId,
       policyDecision,
       policyRuleId: decision.policyRuleId,
+      riskTags: decision.riskTags,
       riskScore: computeCoworkRiskScore(decision.riskTags, policyDecision),
       reason: decision.reason,
       sandboxed: context.security.sandbox.type !== "none",

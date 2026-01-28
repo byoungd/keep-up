@@ -20,6 +20,12 @@ export interface CoworkRuntimePersistenceConfig {
 export interface CoworkGatewayControlConfig {
   enabled: boolean;
   port: number;
+  auth: CoworkGatewayAuthConfig;
+}
+
+export interface CoworkGatewayAuthConfig {
+  mode: "none" | "token";
+  token?: string;
 }
 
 export interface CoworkTelegramConfig {
@@ -87,6 +93,7 @@ function parseNumberEnv(value: string | undefined): number | undefined {
 
 const port = Number(process.env.PORT ?? 3000);
 const gatewayControlPort = parseNumberEnv(process.env.COWORK_GATEWAY_CONTROL_PORT) ?? port + 1;
+const gatewayAuthToken = process.env.KEEPUP_GATEWAY_TOKEN;
 const telegramToken = process.env.COWORK_TELEGRAM_TOKEN;
 const discordToken = process.env.COWORK_DISCORD_TOKEN;
 const discordChannelId = process.env.COWORK_DISCORD_CHANNEL_ID;
@@ -99,6 +106,7 @@ export const serverConfig: CoworkServerConfig = {
   gatewayControl: {
     enabled: parseBooleanEnv(process.env.COWORK_GATEWAY_CONTROL_ENABLED, false),
     port: gatewayControlPort,
+    auth: gatewayAuthToken ? { mode: "token", token: gatewayAuthToken } : { mode: "none" },
   },
   telegram: {
     enabled: parseBooleanEnv(process.env.COWORK_TELEGRAM_ENABLED, Boolean(telegramToken)),

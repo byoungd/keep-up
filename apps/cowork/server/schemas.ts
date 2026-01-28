@@ -22,12 +22,14 @@ export const createSessionSchema = z.object({
   grants: z.array(folderGrantSchema).optional().default([]),
   connectors: z.array(connectorGrantSchema).optional().default([]),
   title: z.string().min(1).optional(),
+  isolationLevel: z.enum(["main", "sandbox"]).optional(),
 });
 
 export const updateSessionSchema = z.object({
   title: z.string().min(1).optional(),
   projectId: z.string().nullable().optional(), // Nullable to remove from project
   endedAt: z.number().optional(),
+  isolationLevel: z.enum(["main", "sandbox"]).optional(),
 });
 
 export const createProjectSchema = z.object({

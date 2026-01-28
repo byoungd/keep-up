@@ -14,6 +14,7 @@ import { createCheckpointRoutes } from "./routes/checkpoints";
 import { createClarificationRoutes } from "./routes/clarifications";
 import { createContextRoutes } from "./routes/context";
 import { createCostRoutes } from "./routes/cost";
+import { createGatewayHealthRoutes } from "./routes/gatewayHealth";
 import { createLessonRoutes } from "./routes/lessons";
 import { createMcpAppsRoutes } from "./routes/mcpApps";
 import { createPipelineRoutes } from "./routes/pipelines";
@@ -29,6 +30,7 @@ import { createWorkspaceSessionRoutes } from "./routes/workspaceSessions";
 import { createWorkspaceRoutes } from "./routes/workspaces";
 import { CoworkRuntimeBridge } from "./runtime/coworkRuntime";
 import type { CoworkTaskRuntime } from "./runtime/coworkTaskRuntime";
+import type { GatewayControlRuntime } from "./runtime/gatewayControl";
 import { WorkspaceSessionRuntime } from "./runtime/services/WorkspaceSessionRuntime";
 import type { ContextIndexManager } from "./services/contextIndexManager";
 import type { McpServerManager } from "./services/mcpServerManager";
@@ -42,6 +44,7 @@ export interface CoworkAppDeps {
   events?: SessionEventHub;
   runtime?: CoworkRuntimeBridge;
   taskRuntime?: CoworkTaskRuntime;
+  gatewayRuntime?: GatewayControlRuntime;
   contextIndexManager?: ContextIndexManager;
   providerKeys?: ProviderKeyService;
   pipelineStore?: PipelineStore;
@@ -92,6 +95,13 @@ export function createCoworkApp(deps: CoworkAppDeps) {
   );
 
   app.get("/api/health", (c) => c.json({ ok: true, timestamp: Date.now() }));
+
+  app.route(
+    "/api",
+    createGatewayHealthRoutes({
+      gateway: deps.gatewayRuntime,
+    })
+  );
 
   app.route(
     "/api",

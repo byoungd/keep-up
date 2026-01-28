@@ -4,8 +4,16 @@ export { TelegramAdapter, type TelegramAdapterConfig } from "./channels/telegram
 export type {
   ChannelAdapter,
   ChannelAdapterContext,
+  ChannelAllowFrom,
+  ChannelConfig,
+  ChannelDmPolicy,
+  ChannelGatewayMethod,
+  ChannelHealth,
   ChannelMessage,
   ChannelMessageHandler,
+  ChannelPlugin,
+  ChannelRegistryStatus,
+  ChannelStatus,
   ChannelTarget,
 } from "./channels/types";
 export {
@@ -16,10 +24,13 @@ export {
 } from "./controlPlane/server";
 export type {
   GatewayConnectionHandle,
+  GatewayControlAuthConfig,
+  GatewayControlAuthMode,
   GatewayControlClient,
   GatewayControlInboundMessage,
   GatewayControlOutboundMessage,
   GatewayControlServerConfig,
+  GatewayControlStats,
   GatewayWebSocketLike,
 } from "./controlPlane/types";
 export {
@@ -27,3 +38,4 @@ export {
   type GatewayNodeServerHandle,
   startGatewayControlNodeServer,
 } from "./node";
+export { type ChannelRouteHandler, type ChannelRouteResult, ChannelRouter } from "./routing/router";

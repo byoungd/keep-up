@@ -61,4 +61,40 @@ describe("GatewayControlServer", () => {
 
     expect(events).toEqual(["custom:event"]);
   });
+
+  it("requires auth when token mode is enabled", () => {
+    const eventBus = createEventBus();
+    const server = new GatewayControlServer({
+      eventBus,
+      auth: { mode: "token", token: "secret" },
+    });
+    const socket = new MockSocket();
+    const handle = server.handleConnection(socket, { clientId: "client-3" });
+
+    handle.onMessage(
+      JSON.stringify({
+        type: "subscribe",
+        patterns: ["tool:called"],
+      })
+    );
+
+    handle.onMessage(
+      JSON.stringify({
+        type: "auth",
+        token: "secret",
+      })
+    );
+
+    handle.onMessage(
+      JSON.stringify({
+        type: "subscribe",
+        patterns: ["tool:called"],
+      })
+    );
+
+    const messages = socket.sent.map((payload) => JSON.parse(payload) as { type: string });
+    expect(messages.some((msg) => msg.type === "error")).toBe(true);
+    expect(messages.some((msg) => msg.type === "auth_ok")).toBe(true);
+    expect(messages.some((msg) => msg.type === "subscribed")).toBe(true);
+  });
 });
