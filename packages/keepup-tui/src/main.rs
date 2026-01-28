@@ -1,3 +1,4 @@
+use std::fs;
 use std::io::{self, BufRead, BufReader, BufWriter, Write};
 use std::path::PathBuf;
 use std::process::{Child, ChildStdin, Command, Stdio};
@@ -28,6 +29,8 @@ const INPUT_PREFIX: &str = "> ";
 const INPUT_INDENT: &str = "  ";
 const FILTER_PREFIX: &str = "/ ";
 const FILTER_INDENT: &str = "  ";
+const CLI_CONFIG_FILE: &str = "cli-config.json";
+const DEFAULT_STATE_DIR: &str = ".keep-up";
 const MIN_INPUT_HEIGHT: u16 = 3;
 const MAX_INPUT_HEIGHT: u16 = 8;
 const TAB_WIDTH: usize = 4;
@@ -427,8 +430,8 @@ impl App {
             host_caps: None,
             session_id: None,
             session_title: None,
-            model: env_value("KEEPUP_TUI_MODEL"),
-            provider: env_value("KEEPUP_TUI_PROVIDER"),
+            model: env_value("KEEPUP_TUI_MODEL").or_else(|| load_cli_config_value("model")),
+            provider: env_value("KEEPUP_TUI_PROVIDER").or_else(|| load_cli_config_value("provider")),
             session_override: env_value("KEEPUP_TUI_SESSION"),
             loading_sessions: false,
             filter_active: false,
@@ -1556,17 +1559,25 @@ fn handle_picker_key(app: &mut App, host: &HostClient, key: KeyEvent) -> Result<
                 match mode {
                     SettingsMode::Model => {
                         app.model = normalized.clone();
-                        app.status = match &app.model {
+                        let mut status = match &app.model {
                             Some(model) => format!("Model set to {model}."),
                             None => "Model reset to auto.".to_string(),
                         };
+                        if let Err(error) = save_cli_config_value("model", app.model.clone()) {
+                            status = format!("Failed to save model: {error}");
+                        }
+                        app.status = status;
                     }
                     SettingsMode::Provider => {
                         app.provider = normalized.clone();
-                        app.status = match &app.provider {
+                        let mut status = match &app.provider {
                             Some(provider) => format!("Provider set to {provider}."),
                             None => "Provider reset to auto.".to_string(),
                         };
+                        if let Err(error) = save_cli_config_value("provider", app.provider.clone()) {
+                            status = format!("Failed to save provider: {error}");
+                        }
+                        app.status = status;
                     }
                 }
                 app.settings_mode = None;
@@ -2635,4 +2646,55 @@ fn env_value(key: &str) -> Option<String> {
         Ok(value) if !value.trim().is_empty() => Some(value),
         _ => None,
     }
+}
+
+fn load_cli_config_value(key: &str) -> Option<String> {
+    let path = resolve_cli_config_path()?;
+    let data = fs::read_to_string(path).ok()?;
+    let json: Value = serde_json::from_str(&data).ok()?;
+    json.get(key)
+        .and_then(|value| value.as_str())
+        .map(|value| value.to_string())
+}
+
+fn save_cli_config_value(key: &str, value: Option<String>) -> Result<()> {
+    let path = resolve_cli_config_path().context("resolve config path")?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).context("create config directory")?;
+    }
+    let mut config = if path.exists() {
+        let data = fs::read_to_string(&path).unwrap_or_else(|_| "{}".to_string());
+        serde_json::from_str::<Value>(&data).unwrap_or_else(|_| json!({}))
+    } else {
+        json!({})
+    };
+
+    if let Some(map) = config.as_object_mut() {
+        match value {
+            Some(value) => {
+                map.insert(key.to_string(), Value::String(value));
+            }
+            None => {
+                map.remove(key);
+            }
+        }
+    }
+
+    let serialized = serde_json::to_string_pretty(&config).context("serialize config")?;
+    fs::write(&path, serialized).context("write config")?;
+    Ok(())
+}
+
+fn resolve_cli_config_path() -> Option<PathBuf> {
+    if let Some(override_dir) = env_value("KEEPUP_STATE_DIR") {
+        return Some(PathBuf::from(override_dir).join(CLI_CONFIG_FILE));
+    }
+    let home_dir = resolve_home_dir()?;
+    Some(home_dir.join(DEFAULT_STATE_DIR).join(CLI_CONFIG_FILE))
+}
+
+fn resolve_home_dir() -> Option<PathBuf> {
+    env_value("HOME")
+        .or_else(|| env_value("USERPROFILE"))
+        .map(PathBuf::from)
 }
