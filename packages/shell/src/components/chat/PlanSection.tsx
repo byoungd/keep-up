@@ -31,7 +31,7 @@ export function PlanSection({
         onClick={() => onPreview?.(artifact)}
         className="text-fine font-medium text-muted-foreground hover:text-foreground transition-colors duration-fast mb-1.5 flex items-center gap-1.5 select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 rounded-sm"
       >
-        <FileText className="h-3 w-3" />
+        <FileText className="h-3 w-3" aria-hidden="true" />
         Execution Strategy
       </motion.button>
       <div className="pl-0.5 space-y-1">

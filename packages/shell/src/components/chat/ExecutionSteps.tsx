@@ -95,19 +95,19 @@ function StepsSummary({ steps }: { steps: ExecutionStep[] }) {
     <div className="flex items-center gap-2 text-micro">
       {statusCounts.success > 0 && (
         <span className="flex items-center gap-1 text-success">
-          <CheckCircle2 className="h-2.5 w-2.5" />
+          <CheckCircle2 className="h-2.5 w-2.5" aria-hidden="true" />
           {statusCounts.success}
         </span>
       )}
       {statusCounts.executing > 0 && (
         <span className="flex items-center gap-1 text-primary">
-          <Loader2 className="h-2.5 w-2.5" />
+          <Loader2 className="h-2.5 w-2.5" aria-hidden="true" />
           {statusCounts.executing}
         </span>
       )}
       {statusCounts.error > 0 && (
         <span className="flex items-center gap-1 text-destructive">
-          <AlertCircle className="h-2.5 w-2.5" />
+          <AlertCircle className="h-2.5 w-2.5" aria-hidden="true" />
           {statusCounts.error}
         </span>
       )}

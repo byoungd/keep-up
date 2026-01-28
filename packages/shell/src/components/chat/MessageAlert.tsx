@@ -49,9 +49,9 @@ export const MessageAlert = React.memo(function MessageAlert({
         <div className="flex items-start gap-2">
           <span className="mt-0.5">
             {isError ? (
-              <AlertTriangle className="h-3.5 w-3.5" />
+              <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
             ) : (
-              <Square className="h-3.5 w-3.5" />
+              <Square className="h-3.5 w-3.5" aria-hidden="true" />
             )}
           </span>
           <div className="space-y-1">

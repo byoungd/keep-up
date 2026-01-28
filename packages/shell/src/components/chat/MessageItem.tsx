@@ -276,7 +276,11 @@ export const MessageItem = React.memo(function MessageItem({
           message.type === "task_stream" && "text-muted-foreground/60"
         )}
       >
-        {isUser ? <User className="h-3 w-3" /> : <Bot className="h-3 w-3" />}
+        {isUser ? (
+          <User className="h-3 w-3" aria-hidden="true" />
+        ) : (
+          <Bot className="h-3 w-3" aria-hidden="true" />
+        )}
       </div>
 
       {/* Message Content */}

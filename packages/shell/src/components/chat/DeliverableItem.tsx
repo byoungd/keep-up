@@ -30,7 +30,7 @@ export function DeliverableItem({
     >
       <div className="flex items-center gap-2 w-full">
         <div className="h-7 w-7 rounded-md bg-background flex items-center justify-center text-muted-foreground group-hover:text-foreground group-hover:shadow-sm transition-all duration-fast">
-          <Icon className="h-3.5 w-3.5" />
+          <Icon className="h-3.5 w-3.5" aria-hidden="true" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-xs font-medium text-foreground truncate group-hover:text-primary transition-colors duration-fast">
@@ -50,7 +50,7 @@ export function DeliverableItem({
             {statusLabel}
           </span>
         )}
-        {isPrimary && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+        {isPrimary && <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />}
       </div>
 
       {/* Content Preview if text */}
