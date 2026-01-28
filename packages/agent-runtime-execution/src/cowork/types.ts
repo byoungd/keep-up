@@ -5,7 +5,7 @@
  */
 
 import type { AgentMode } from "../modes";
-import type { CoworkSessionIsolationLevel, TokenUsageStats } from "../types";
+import type { CoworkSandboxMode, CoworkSessionIsolationLevel, TokenUsageStats } from "../types";
 import type { WorkflowContext, WorkflowPhase, WorkflowTemplate } from "../workflows";
 import type { CoworkRiskTag } from "./policy";
 
@@ -22,6 +22,9 @@ export interface CoworkSession {
   platform: CoworkPlatform;
   mode: CoworkMode;
   isolationLevel: CoworkIsolationLevel;
+  sandboxMode?: CoworkSandboxMode;
+  toolAllowlist?: string[];
+  toolDenylist?: string[];
   grants: CoworkFolderGrant[];
   connectors: CoworkConnectorGrant[];
   createdAt: number;

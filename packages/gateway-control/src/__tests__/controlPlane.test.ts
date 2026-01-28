@@ -44,6 +44,9 @@ class MockSessionManager implements GatewayControlSessionManager {
       projectId: input.projectId,
       workspaceId: input.workspaceId,
       isolationLevel: input.isolationLevel,
+      sandboxMode: input.sandboxMode,
+      toolAllowlist: input.toolAllowlist,
+      toolDenylist: input.toolDenylist,
       createdAt: now,
       updatedAt: now,
       expiresAt: input.expiresAt,
@@ -59,7 +62,10 @@ class MockSessionManager implements GatewayControlSessionManager {
       title?: string | null;
       projectId?: string | null;
       workspaceId?: string | null;
-      isolationLevel?: "main" | "sandbox";
+      isolationLevel?: "main" | "sandbox" | "restricted";
+      sandboxMode?: "none" | "workspace-write" | "docker" | null;
+      toolAllowlist?: string[] | null;
+      toolDenylist?: string[] | null;
       endedAt?: number | null;
       expiresAt?: number | null;
       metadata?: Record<string, unknown> | null;
@@ -75,6 +81,9 @@ class MockSessionManager implements GatewayControlSessionManager {
       projectId: updates.projectId ?? existing.projectId,
       workspaceId: updates.workspaceId ?? existing.workspaceId,
       isolationLevel: updates.isolationLevel ?? existing.isolationLevel,
+      sandboxMode: updates.sandboxMode ?? existing.sandboxMode,
+      toolAllowlist: updates.toolAllowlist ?? existing.toolAllowlist,
+      toolDenylist: updates.toolDenylist ?? existing.toolDenylist,
       endedAt: updates.endedAt ?? existing.endedAt,
       expiresAt: updates.expiresAt ?? existing.expiresAt,
       metadata: updates.metadata ?? existing.metadata,

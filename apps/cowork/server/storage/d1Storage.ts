@@ -9,6 +9,7 @@ import type {
   CoworkWorkspaceSession,
 } from "@ku0/agent-runtime";
 import { parseCoworkPolicyConfig } from "@ku0/agent-runtime";
+import { resolveSessionIsolationConfig } from "../runtime/utils";
 import type {
   AgentStateCheckpointStoreLike,
   ApprovalStoreLike,
@@ -70,7 +71,10 @@ async function ensureSchema(db: D1Database): Promise<void> {
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL,
         ended_at INTEGER,
-        isolation_level TEXT NOT NULL DEFAULT 'main'
+        isolation_level TEXT NOT NULL DEFAULT 'main',
+        sandbox_mode TEXT DEFAULT 'none',
+        tool_allowlist TEXT NOT NULL DEFAULT '[]',
+        tool_denylist TEXT NOT NULL DEFAULT '[]'
       )
     `,
     `
@@ -308,6 +312,9 @@ async function ensureSchema(db: D1Database): Promise<void> {
     "ALTER TABLE tasks ADD COLUMN metadata TEXT DEFAULT '{}'",
     "ALTER TABLE audit_logs ADD COLUMN risk_score INTEGER",
     "ALTER TABLE sessions ADD COLUMN isolation_level TEXT DEFAULT 'main'",
+    "ALTER TABLE sessions ADD COLUMN sandbox_mode TEXT DEFAULT 'none'",
+    "ALTER TABLE sessions ADD COLUMN tool_allowlist TEXT DEFAULT '[]'",
+    "ALTER TABLE sessions ADD COLUMN tool_denylist TEXT DEFAULT '[]'",
   ];
 
   for (const statement of optionalStatements) {
@@ -349,6 +356,14 @@ function parseJsonArray<T>(raw: unknown): T[] {
   } catch {
     return [];
   }
+}
+
+function parseOptionalJsonArray<T>(raw: unknown): T[] | undefined {
+  if (typeof raw !== "string") {
+    return undefined;
+  }
+  const parsed = parseJsonArray<T>(raw);
+  return parsed;
 }
 
 function parseJsonObject(raw: unknown): Record<string, unknown> {
@@ -453,13 +468,23 @@ function isStringSettingKey(
 }
 
 function rowToSession(row: Record<string, unknown>): CoworkSession {
+  const resolved = resolveSessionIsolationConfig({
+    isolationLevel: row.isolation_level as CoworkSession["isolationLevel"] | undefined,
+    sandboxMode: row.sandbox_mode as CoworkSession["sandboxMode"] | undefined,
+    toolAllowlist: parseOptionalJsonArray<string>(row.tool_allowlist),
+    toolDenylist: parseOptionalJsonArray<string>(row.tool_denylist),
+    userId: row.user_id ? String(row.user_id) : undefined,
+  });
   return {
     sessionId: String(row.session_id),
     userId: String(row.user_id),
     deviceId: String(row.device_id),
     platform: row.platform as CoworkSession["platform"],
     mode: row.mode as CoworkSession["mode"],
-    isolationLevel: (row.isolation_level as CoworkSession["isolationLevel"]) ?? "main",
+    isolationLevel: resolved.isolationLevel,
+    sandboxMode: resolved.sandboxMode,
+    toolAllowlist: resolved.toolAllowlist,
+    toolDenylist: resolved.toolDenylist,
     grants: parseJsonArray<CoworkFolderGrant>(row.grants),
     connectors: parseJsonArray<CoworkConnectorGrant>(row.connectors),
     createdAt: Number(row.created_at),
@@ -616,11 +641,12 @@ async function createD1SessionStore(db: D1Database): Promise<SessionStoreLike> {
     },
 
     async create(session: CoworkSession): Promise<CoworkSession> {
+      const resolved = resolveSessionIsolationConfig(session);
       await prepare(
         db,
         `INSERT INTO sessions
-          (session_id, user_id, device_id, platform, mode, grants, connectors, created_at, updated_at, isolation_level)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          (session_id, user_id, device_id, platform, mode, grants, connectors, created_at, updated_at, isolation_level, sandbox_mode, tool_allowlist, tool_denylist)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           session.sessionId,
           session.userId,
@@ -631,7 +657,10 @@ async function createD1SessionStore(db: D1Database): Promise<SessionStoreLike> {
           JSON.stringify(session.connectors ?? []),
           session.createdAt,
           session.updatedAt || session.createdAt,
-          session.isolationLevel ?? "main",
+          resolved.isolationLevel,
+          resolved.sandboxMode,
+          JSON.stringify(resolved.toolAllowlist ?? []),
+          JSON.stringify(resolved.toolDenylist ?? []),
         ]
       ).run();
       return session;
@@ -648,10 +677,11 @@ async function createD1SessionStore(db: D1Database): Promise<SessionStoreLike> {
         return null;
       }
       const updated = updater(rowToSession(existing));
+      const resolved = resolveSessionIsolationConfig(updated);
       await prepare(
         db,
         `UPDATE sessions
-          SET user_id = ?, device_id = ?, platform = ?, mode = ?, grants = ?, connectors = ?, updated_at = ?, ended_at = ?, isolation_level = ?
+          SET user_id = ?, device_id = ?, platform = ?, mode = ?, grants = ?, connectors = ?, updated_at = ?, ended_at = ?, isolation_level = ?, sandbox_mode = ?, tool_allowlist = ?, tool_denylist = ?
           WHERE session_id = ?`,
         [
           updated.userId,
@@ -662,7 +692,10 @@ async function createD1SessionStore(db: D1Database): Promise<SessionStoreLike> {
           JSON.stringify(updated.connectors ?? []),
           Date.now(),
           updated.endedAt || null,
-          updated.isolationLevel ?? "main",
+          resolved.isolationLevel,
+          resolved.sandboxMode,
+          JSON.stringify(resolved.toolAllowlist ?? []),
+          JSON.stringify(resolved.toolDenylist ?? []),
           updated.sessionId,
         ]
       ).run();

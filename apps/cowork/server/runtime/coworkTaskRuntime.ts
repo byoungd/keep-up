@@ -21,6 +21,7 @@ import type {
   RuntimeEventBus,
   TaskGraphStore,
   ToastSuggestion,
+  ToolGovernancePolicyRule,
 } from "@ku0/agent-runtime";
 import {
   AgentManager,
@@ -115,6 +116,10 @@ import {
   combinePromptAdditions,
   estimateTokens,
   resolveSessionIsolation,
+  resolveSessionIsolationConfig,
+  resolveSessionSandboxMode,
+  resolveSessionToolAllowlist,
+  resolveSessionToolDenylist,
   truncateToTokenBudget,
 } from "./utils";
 import { createWebSearchProvider } from "./webSearchProvider";
@@ -213,6 +218,9 @@ export type CoworkGatewaySessionInput = {
   projectId?: string;
   workspaceId?: string;
   isolationLevel?: CoworkSession["isolationLevel"];
+  sandboxMode?: CoworkSession["sandboxMode"];
+  toolAllowlist?: CoworkSession["toolAllowlist"];
+  toolDenylist?: CoworkSession["toolDenylist"];
   expiresAt?: number;
   grants?: CoworkSession["grants"];
   connectors?: CoworkSession["connectors"];
@@ -223,6 +231,9 @@ export type CoworkGatewaySessionUpdate = {
   projectId?: string | null;
   workspaceId?: string | null;
   isolationLevel?: CoworkSession["isolationLevel"];
+  sandboxMode?: CoworkSession["sandboxMode"] | null;
+  toolAllowlist?: CoworkSession["toolAllowlist"] | null;
+  toolDenylist?: CoworkSession["toolDenylist"] | null;
   endedAt?: number | null;
   expiresAt?: number | null;
 };
@@ -382,7 +393,13 @@ export class CoworkTaskRuntime {
   async createSession(input: CoworkGatewaySessionInput): Promise<CoworkSession> {
     const now = Date.now();
     const sessionId = input.sessionId ?? crypto.randomUUID();
-    const isolationLevel = resolveSessionIsolation({ isolationLevel: input.isolationLevel });
+    const resolvedConfig = resolveSessionIsolationConfig({
+      isolationLevel: input.isolationLevel,
+      sandboxMode: input.sandboxMode,
+      toolAllowlist: input.toolAllowlist,
+      toolDenylist: input.toolDenylist,
+      userId: input.userId,
+    });
     const grants = (input.grants ?? []).map((grant) => ({
       ...grant,
       id: grant.id ?? crypto.randomUUID(),
@@ -397,7 +414,10 @@ export class CoworkTaskRuntime {
       deviceId: input.deviceId ?? "gateway-device",
       platform: "macos",
       mode: "cowork",
-      isolationLevel,
+      isolationLevel: resolvedConfig.isolationLevel,
+      sandboxMode: resolvedConfig.sandboxMode,
+      toolAllowlist: resolvedConfig.toolAllowlist,
+      toolDenylist: resolvedConfig.toolDenylist,
       grants,
       connectors,
       createdAt: now,
@@ -408,7 +428,9 @@ export class CoworkTaskRuntime {
       workspaceId: input.workspaceId,
     };
 
-    return this.sessionManager.createSession(session);
+    const created = await this.sessionManager.createSession(session);
+    this.eventPublisher.publishSessionCreated(created);
+    return created;
   }
 
   async updateSession(
@@ -416,11 +438,21 @@ export class CoworkTaskRuntime {
     updates: CoworkGatewaySessionUpdate
   ): Promise<CoworkSession | null> {
     const updatedAt = Date.now();
-    return this.sessionManager.updateSession(sessionId, (session) => {
-      const isolationLevel =
-        updates.isolationLevel !== undefined
-          ? resolveSessionIsolation({ isolationLevel: updates.isolationLevel })
-          : session.isolationLevel;
+    const updatedSession = await this.sessionManager.updateSession(sessionId, (session) => {
+      const resolvedConfig = resolveSessionIsolationConfig({
+        isolationLevel: updates.isolationLevel ?? session.isolationLevel,
+        sandboxMode:
+          updates.sandboxMode === null ? undefined : (updates.sandboxMode ?? session.sandboxMode),
+        toolAllowlist:
+          updates.toolAllowlist === null
+            ? undefined
+            : (updates.toolAllowlist ?? session.toolAllowlist),
+        toolDenylist:
+          updates.toolDenylist === null
+            ? undefined
+            : (updates.toolDenylist ?? session.toolDenylist),
+        userId: session.userId,
+      });
 
       return {
         ...session,
@@ -429,10 +461,17 @@ export class CoworkTaskRuntime {
         workspaceId: resolveNullableUpdate(session.workspaceId, updates.workspaceId),
         endedAt: resolveNullableUpdate(session.endedAt, updates.endedAt),
         expiresAt: resolveNullableUpdate(session.expiresAt, updates.expiresAt),
-        isolationLevel,
+        isolationLevel: resolvedConfig.isolationLevel,
+        sandboxMode: resolvedConfig.sandboxMode,
+        toolAllowlist: resolvedConfig.toolAllowlist,
+        toolDenylist: resolvedConfig.toolDenylist,
         updatedAt,
       };
     });
+    if (updatedSession) {
+      this.eventPublisher.publishSessionUpdated(updatedSession);
+    }
+    return updatedSession;
   }
 
   async endSession(sessionId: string): Promise<boolean> {
@@ -442,6 +481,9 @@ export class CoworkTaskRuntime {
       }
       return { ...session, endedAt: Date.now(), updatedAt: Date.now() };
     });
+    if (updated?.endedAt) {
+      this.eventPublisher.publishSessionEnded(updated, updated.endedAt);
+    }
     return Boolean(updated);
   }
 
@@ -1270,10 +1312,13 @@ export class CoworkTaskRuntime {
 
     const isolationLevel = resolveSessionIsolation(session);
     const isolationPolicy =
-      isolationLevel === "sandbox" ? applySandboxIsolation(basePolicy) : basePolicy;
+      isolationLevel === "main" ? basePolicy : applySandboxIsolation(basePolicy);
 
     if (!this.isLfccGatewayConfigured()) {
-      return executionMode === "process" ? undefined : isolationPolicy;
+      if (executionMode === "process" && isolationLevel === "main") {
+        return undefined;
+      }
+      return isolationPolicy;
     }
 
     return {
@@ -1318,8 +1363,16 @@ export class CoworkTaskRuntime {
       }
     }
 
-    const toolExecutionContext =
-      mcpApprovalPatterns.length > 0 ? { requiresApproval: mcpApprovalPatterns } : undefined;
+    const allowedTools = resolveSessionToolAllowlist(session);
+    const toolDenylist = resolveSessionToolDenylist(session);
+    const governanceRules = buildToolDenylistRules(toolDenylist);
+    const toolExecutionContext: Partial<ToolExecutionContext> = {
+      allowedTools,
+      governanceRules: governanceRules.length > 0 ? governanceRules : undefined,
+    };
+    if (mcpApprovalPatterns.length > 0) {
+      toolExecutionContext.requiresApproval = mcpApprovalPatterns;
+    }
 
     return { registry: toolRegistry, executionMode, toolExecutionContext };
   }
@@ -1806,8 +1859,13 @@ export class CoworkTaskRuntime {
     assetManager: RuntimeAssetManager;
   }): Promise<ExecutionSandboxMode> {
     const isolationLevel = resolveSessionIsolation(input.session);
+    const sessionSandboxMode = resolveSessionSandboxMode({
+      isolationLevel,
+      sandboxMode: input.session.sandboxMode,
+    });
     const rawMode = resolveSandboxMode();
-    const requestedMode = isolationLevel === "sandbox" && rawMode === "process" ? "auto" : rawMode;
+    const requestedMode: RequestedSandboxMode =
+      sessionSandboxMode === "docker" ? "docker" : rawMode === "rust" ? "rust" : "process";
 
     if (requestedMode === "process") {
       await input.registry.register(createBashToolServer());
@@ -1839,7 +1897,7 @@ export class CoworkTaskRuntime {
       this.logDockerFallback(dockerStatus, dockerImage);
       await input.registry.register(createBashToolServer());
       await input.registry.register(createCodeToolServer());
-      if (isolationLevel === "sandbox") {
+      if (sessionSandboxMode === "docker") {
         this.logger.warn(
           "Sandbox session running without docker/rust isolation; falling back to process.",
           { sessionId: input.session.sessionId }
@@ -2439,6 +2497,23 @@ function applySandboxIsolation(
   };
 }
 
+function buildToolDenylistRules(toolDenylist: string[]): ToolGovernancePolicyRule[] {
+  if (toolDenylist.length === 0) {
+    return [];
+  }
+  return [
+    {
+      id: "session:denylist",
+      action: "deny",
+      toolPatterns: toolDenylist,
+      reason: "Tool denied by session tool denylist",
+      reasonCode: "policy:denylist",
+      riskTags: ["policy:denylist"],
+      priority: 100,
+    },
+  ];
+}
+
 function resolveSandboxMode(): RequestedSandboxMode {
   const raw = process.env.COWORK_SANDBOX_MODE?.trim().toLowerCase();
   if (!raw) {
@@ -2446,6 +2521,9 @@ function resolveSandboxMode(): RequestedSandboxMode {
   }
   if (raw === "docker" || raw === "process" || raw === "rust") {
     return raw;
+  }
+  if (raw === "none" || raw === "workspace-write" || raw === "workspace_write") {
+    return "process";
   }
   return "auto";
 }

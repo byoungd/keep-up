@@ -497,6 +497,9 @@ function resolveSandboxMode(): RequestedSandboxMode {
   if (raw === "docker" || raw === "process" || raw === "rust") {
     return raw;
   }
+  if (raw === "none" || raw === "workspace-write" || raw === "workspace_write") {
+    return "process";
+  }
   return "auto";
 }
 

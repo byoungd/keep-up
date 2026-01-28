@@ -22,14 +22,20 @@ export const createSessionSchema = z.object({
   grants: z.array(folderGrantSchema).optional().default([]),
   connectors: z.array(connectorGrantSchema).optional().default([]),
   title: z.string().min(1).optional(),
-  isolationLevel: z.enum(["main", "sandbox"]).optional(),
+  isolationLevel: z.enum(["main", "sandbox", "restricted"]).optional(),
+  sandboxMode: z.enum(["none", "workspace-write", "docker"]).optional(),
+  toolAllowlist: z.array(z.string().min(1)).optional(),
+  toolDenylist: z.array(z.string().min(1)).optional(),
 });
 
 export const updateSessionSchema = z.object({
   title: z.string().min(1).optional(),
   projectId: z.string().nullable().optional(), // Nullable to remove from project
   endedAt: z.number().optional(),
-  isolationLevel: z.enum(["main", "sandbox"]).optional(),
+  isolationLevel: z.enum(["main", "sandbox", "restricted"]).optional(),
+  sandboxMode: z.enum(["none", "workspace-write", "docker"]).nullable().optional(),
+  toolAllowlist: z.array(z.string().min(1)).nullable().optional(),
+  toolDenylist: z.array(z.string().min(1)).nullable().optional(),
 });
 
 export const createProjectSchema = z.object({

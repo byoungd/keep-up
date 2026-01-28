@@ -102,6 +102,7 @@ export function createCoworkApp(deps: CoworkAppDeps) {
     "/api",
     createGatewayHealthRoutes({
       gateway: deps.gatewayRuntime,
+      taskRuntime,
     })
   );
   app.route(

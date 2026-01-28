@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { formatZodError, jsonError, readJsonBody } from "../http";
 import { getLogger } from "../logger";
 import type { CoworkTaskRuntime } from "../runtime/coworkTaskRuntime";
-import { resolveSessionIsolation } from "../runtime/utils";
+import { resolveSessionIsolationConfig } from "../runtime/utils";
 import {
   createSessionSchema,
   createTaskSchema,
@@ -21,6 +21,16 @@ interface SessionRouteDeps {
   taskRuntime?: CoworkTaskRuntime;
 }
 
+type SessionPatchInput = {
+  title?: string;
+  projectId?: string | null;
+  endedAt?: number;
+  isolationLevel?: CoworkSession["isolationLevel"];
+  sandboxMode?: CoworkSession["sandboxMode"] | null;
+  toolAllowlist?: CoworkSession["toolAllowlist"] | null;
+  toolDenylist?: CoworkSession["toolDenylist"] | null;
+};
+
 export function createSessionRoutes(deps: SessionRouteDeps) {
   const app = new Hono();
   const logger = getLogger("sessions");
@@ -32,16 +42,36 @@ export function createSessionRoutes(deps: SessionRouteDeps) {
       return jsonError(c, 400, "Invalid session payload", formatZodError(parsed.error));
     }
 
-    const { userId, deviceId, grants, connectors, title, isolationLevel } = parsed.data;
+    const {
+      userId,
+      deviceId,
+      grants,
+      connectors,
+      title,
+      isolationLevel,
+      sandboxMode,
+      toolAllowlist,
+      toolDenylist,
+    } = parsed.data;
     const requestUserId = resolveCurrentUserId(c);
-    const resolvedIsolationLevel = resolveSessionIsolation({ isolationLevel });
+    const resolvedConfig = resolveSessionIsolationConfig({
+      isolationLevel,
+      sandboxMode,
+      toolAllowlist,
+      toolDenylist,
+      userId: userId ?? requestUserId ?? undefined,
+      currentUserId: requestUserId,
+    });
     const session: CoworkSession = {
       sessionId: crypto.randomUUID(),
       userId: userId ?? requestUserId ?? "local-user",
       deviceId: deviceId ?? "local-device",
       platform: "macos",
       mode: "cowork",
-      isolationLevel: resolvedIsolationLevel,
+      isolationLevel: resolvedConfig.isolationLevel,
+      sandboxMode: resolvedConfig.sandboxMode,
+      toolAllowlist: resolvedConfig.toolAllowlist,
+      toolDenylist: resolvedConfig.toolDenylist,
       grants: grants.map((grant) => ({
         ...grant,
         id: grant.id ?? crypto.randomUUID(),
@@ -63,6 +93,10 @@ export function createSessionRoutes(deps: SessionRouteDeps) {
     deps.events.publish(session.sessionId, COWORK_EVENTS.SESSION_CREATED, {
       sessionId: session.sessionId,
       createdAt: session.createdAt,
+      isolationLevel: session.isolationLevel,
+      sandboxMode: session.sandboxMode,
+      toolAllowlist: session.toolAllowlist,
+      toolDenylist: session.toolDenylist,
     });
 
     return c.json({ ok: true, session }, 201);
@@ -176,28 +210,22 @@ export function createSessionRoutes(deps: SessionRouteDeps) {
       return jsonError(c, 400, "Invalid session update", formatZodError(parsed.error));
     }
 
-    const { title, projectId, endedAt, isolationLevel } = parsed.data;
-
-    const updated = await deps.sessionStore.update(sessionId, (prev) => {
-      const next: CoworkSession = { ...prev };
-      if (title !== undefined) {
-        next.title = title;
-      }
-      if (projectId !== undefined) {
-        next.projectId = projectId ?? undefined;
-      }
-      if (endedAt !== undefined) {
-        next.endedAt = endedAt;
-      }
-      if (isolationLevel !== undefined) {
-        next.isolationLevel = resolveSessionIsolation({ isolationLevel });
-      }
-      return next;
-    });
+    const updated = await deps.sessionStore.update(sessionId, (prev) =>
+      applySessionPatch(prev, parsed.data)
+    );
 
     if (!updated) {
       return jsonError(c, 404, "Session not found");
     }
+
+    deps.events.publish(sessionId, COWORK_EVENTS.SESSION_UPDATED, {
+      sessionId,
+      title: updated.title,
+      isolationLevel: updated.isolationLevel,
+      sandboxMode: updated.sandboxMode,
+      toolAllowlist: updated.toolAllowlist,
+      toolDenylist: updated.toolDenylist,
+    });
 
     return c.json({ ok: true, session: updated });
   });
@@ -317,6 +345,32 @@ export function createSessionRoutes(deps: SessionRouteDeps) {
   });
 
   return app;
+}
+
+function applySessionPatch(prev: CoworkSession, input: SessionPatchInput): CoworkSession {
+  const next: CoworkSession = {
+    ...prev,
+    title: input.title !== undefined ? input.title : prev.title,
+    projectId: input.projectId === undefined ? prev.projectId : (input.projectId ?? undefined),
+    endedAt: input.endedAt !== undefined ? input.endedAt : prev.endedAt,
+  };
+  const resolvedConfig = resolveSessionIsolationConfig({
+    isolationLevel: input.isolationLevel ?? prev.isolationLevel,
+    sandboxMode: input.sandboxMode === null ? undefined : (input.sandboxMode ?? prev.sandboxMode),
+    toolAllowlist:
+      input.toolAllowlist === null ? undefined : (input.toolAllowlist ?? prev.toolAllowlist),
+    toolDenylist:
+      input.toolDenylist === null ? undefined : (input.toolDenylist ?? prev.toolDenylist),
+    userId: prev.userId,
+  });
+
+  return {
+    ...next,
+    isolationLevel: resolvedConfig.isolationLevel,
+    sandboxMode: resolvedConfig.sandboxMode,
+    toolAllowlist: resolvedConfig.toolAllowlist,
+    toolDenylist: resolvedConfig.toolDenylist,
+  };
 }
 
 function deriveSessionTitle(grants: Array<{ rootPath: string }>): string {

@@ -28,6 +28,9 @@ export interface CoworkSessionSeed {
   sessionId?: string;
   expiresAt?: number;
   isolationLevel?: CoworkSession["isolationLevel"];
+  sandboxMode?: CoworkSession["sandboxMode"];
+  toolAllowlist?: CoworkSession["toolAllowlist"];
+  toolDenylist?: CoworkSession["toolDenylist"];
 }
 
 export interface CoworkSessionManagerConfig {
@@ -63,6 +66,9 @@ export class CoworkSessionManager {
       platform: this.config.platform,
       mode: this.config.mode,
       isolationLevel: seed.isolationLevel ?? "main",
+      sandboxMode: seed.sandboxMode,
+      toolAllowlist: seed.toolAllowlist,
+      toolDenylist: seed.toolDenylist,
       grants: seed.grants,
       connectors: seed.connectors,
       createdAt: Date.now(),
