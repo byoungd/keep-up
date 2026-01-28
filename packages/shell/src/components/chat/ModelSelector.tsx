@@ -937,7 +937,11 @@ export function ModelSelector({
                     </div>
 
                     {/* Feature filters - Compact Single Line */}
-                    <div className="flex items-center gap-1 overflow-x-auto py-2.5 px-3 scrollbar-none snap-x [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] border-b border-border/20 bg-surface-1/30">
+                    <div
+                      className="flex items-center gap-1 overflow-x-auto py-2.5 px-3 scrollbar-none snap-x [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] border-b border-border/20 bg-surface-1/30"
+                      // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+                      tabIndex={0}
+                    >
                       {featureDefinitions.map((feature) => {
                         const isActive = activeFilters.has(feature.id);
                         const Icon = feature.icon;
@@ -963,7 +967,11 @@ export function ModelSelector({
                   </div>
 
                   {/* Model list */}
-                  <div className="flex-1 overflow-y-auto scrollbar-auto-hide min-h-0 p-2 space-y-1">
+                  <div
+                    className="flex-1 overflow-y-auto scrollbar-auto-hide min-h-0 p-2 space-y-1"
+                    // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+                    tabIndex={0}
+                  >
                     {showFavoritesEmpty ? (
                       <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground/50">
                         <Star className="h-8 w-8 mb-3 opacity-20" />
