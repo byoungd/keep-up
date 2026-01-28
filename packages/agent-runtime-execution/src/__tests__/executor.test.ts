@@ -431,6 +431,37 @@ describe("ToolExecutionPipeline", () => {
       expect(result.error?.code).toBe("EXECUTION_FAILED");
       expect(result.error?.message).toBe("Unexpected crash");
     });
+
+    it("applies context overrides to tool execution", async () => {
+      const overrides: Partial<ToolContext> = {
+        userId: "override-user",
+        sessionId: "override-session",
+        correlationId: "override-correlation",
+        taskNodeId: "override-task",
+      };
+
+      pipeline = new ToolExecutionPipeline({
+        registry,
+        policy,
+        contextOverrides: overrides,
+      });
+
+      const call = createMockCall("test_tool", { input: "hello" });
+      const baseContext = createMockContext({
+        userId: "base-user",
+        sessionId: "base-session",
+        correlationId: "base-correlation",
+        taskNodeId: "base-task",
+      });
+
+      await pipeline.execute(call, baseContext);
+
+      expect(registry.lastContext?.userId).toBe("override-user");
+      expect(registry.lastContext?.sessionId).toBe("override-session");
+      expect(registry.lastContext?.correlationId).toBe("override-correlation");
+      expect(registry.lastContext?.taskNodeId).toBe("override-task");
+      expect(registry.lastContext?.security).toBe(baseContext.security);
+    });
   });
 
   describe("policy enforcement", () => {
