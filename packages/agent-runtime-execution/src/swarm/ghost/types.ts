@@ -117,6 +117,10 @@ export interface GhostAgentConfig {
   debounceMs: number;
   /** Checks to run on file changes */
   enabledChecks: GhostCheckType[];
+  /** Optional command overrides per check type */
+  checkCommands?: Partial<Record<GhostCheckType, string>>;
+  /** Timeout for check commands (ms) */
+  checkTimeoutMs?: number;
   /** Whether to show toast suggestions */
   showToasts: boolean;
 }
