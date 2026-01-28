@@ -191,7 +191,11 @@ export function ToolInput({ input, className, ...props }: ToolInputProps) {
       {...props}
     >
       <div className="mb-2 text-fine font-semibold text-muted-foreground">Input</div>
-      <pre className="max-h-64 overflow-auto whitespace-pre-wrap text-fine text-foreground/80">
+      <pre
+        className="max-h-64 overflow-auto whitespace-pre-wrap text-fine text-foreground/80"
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+        tabIndex={0}
+      >
         {formattedInput.text}
       </pre>
     </div>
@@ -224,7 +228,11 @@ export function ToolOutput({ output, errorText, className, ...props }: ToolOutpu
       ) : outputIsNode ? (
         <div className="text-fine text-foreground/80 whitespace-pre-wrap">{output}</div>
       ) : formattedOutput.kind === "json" ? (
-        <pre className="max-h-64 overflow-auto whitespace-pre-wrap text-fine text-foreground/80">
+        <pre
+          className="max-h-64 overflow-auto whitespace-pre-wrap text-fine text-foreground/80"
+          // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+          tabIndex={0}
+        >
           {formattedOutput.text}
         </pre>
       ) : formattedOutput.kind === "empty" ? (

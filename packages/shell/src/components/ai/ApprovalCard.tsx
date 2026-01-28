@@ -59,7 +59,11 @@ export function ApprovalCard({
         ) : null}
       </CardHeader>
       <CardContent className="pt-3">
-        <pre className="text-xs bg-surface-2/60 border border-border/40 p-2.5 rounded-lg overflow-x-auto text-muted-foreground">
+        <pre
+          className="text-xs bg-surface-2/60 border border-border/40 p-2.5 rounded-lg overflow-x-auto text-muted-foreground"
+          // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+          tabIndex={0}
+        >
           {formattedParameters}
         </pre>
       </CardContent>
