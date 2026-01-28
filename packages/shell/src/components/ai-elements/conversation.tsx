@@ -107,6 +107,8 @@ export function Conversation({ children, className, onScroll, ...props }: Conver
           "relative flex-1 overflow-y-auto overflow-x-hidden scrollbar-auto-hide",
           className
         )}
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+        tabIndex={0}
         onScroll={handleScroll}
         {...props}
       >

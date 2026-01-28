@@ -13,6 +13,8 @@ export function Suggestions({ className, ...props }: SuggestionsProps) {
         "flex items-center gap-2 overflow-x-auto whitespace-nowrap scrollbar-auto-hide",
         className
       )}
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs keyboard access.
+      tabIndex={0}
       {...props}
     />
   );
