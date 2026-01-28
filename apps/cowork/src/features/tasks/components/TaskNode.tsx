@@ -161,7 +161,13 @@ function ToolCallNodeDisplay({ node }: { node: TaskNode & { type: "tool_call" } 
       <div className="flex items-center justify-between mb-1.5">
         <div className="flex items-center gap-2">
           <div className="p-1 bg-info/10 rounded-lg">
-            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg
+              className="w-3 h-3"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden="true"
+            >
               <title>Tool</title>
               <path
                 strokeLinecap="round"
@@ -211,7 +217,13 @@ function ToolOutputDisplay({ node }: { node: TaskNode & { type: "tool_output" } 
     >
       <div className="flex items-center gap-2 mb-1.5">
         <div className={`p-1 rounded-lg ${node.isError ? "bg-error/10" : "bg-success/10"}`}>
-          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg
+            className="w-3 h-3"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            aria-hidden="true"
+          >
             <title>Output</title>
             <path
               strokeLinecap="round"
@@ -295,7 +307,7 @@ function ErrorNodeDisplay({ node }: { node: TaskNode & { type: "error" } }) {
     >
       <div className="flex items-center gap-2 mb-1.5 uppercase font-black tracking-tighter text-tiny">
         <div className="p-1 bg-white/20 rounded-lg">
-          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
             <title>Error icon</title>
             <path
               fillRule="evenodd"
