@@ -74,7 +74,7 @@ function ActionButtons({
           onClick={() => onAction?.("approve")}
           className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-warning text-warning-foreground rounded-lg hover:bg-warning/90 transition-all duration-fast hover:scale-[1.02] active:scale-[0.98] shadow-md shadow-warning/20 text-sm font-medium"
         >
-          <Check className="w-4 h-4" />
+          <Check className="w-4 h-4" aria-hidden="true" />
           Allow
         </button>
         <button
@@ -82,7 +82,7 @@ function ActionButtons({
           onClick={() => onAction?.("deny")}
           className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-surface-2 hover:bg-surface-3 transition-colors duration-fast rounded-lg text-sm text-muted-foreground hover:text-foreground border border-transparent hover:border-border/10"
         >
-          <X className="w-4 h-4" />
+          <X className="w-4 h-4" aria-hidden="true" />
           Deny
         </button>
       </div>
@@ -96,7 +96,7 @@ function ActionButtons({
         onClick={() => onAction?.("launch_browser")}
         className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-info text-info-foreground rounded-lg hover:bg-info/90 transition-all duration-fast hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-info/20 text-sm font-medium group-hover:shadow-info/30"
       >
-        <MonitorPlay className="w-4 h-4" />
+        <MonitorPlay className="w-4 h-4" aria-hidden="true" />
         Launch Browser Control
       </button>
     );
@@ -109,7 +109,7 @@ function ActionButtons({
         onClick={() => onAction?.("upgrade")}
         className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-linear-to-r from-accent-violet to-accent-rose text-white rounded-lg hover:opacity-90 transition-all duration-fast hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-accent-violet/25 text-sm font-medium"
       >
-        <Lock className="w-4 h-4" />
+        <Lock className="w-4 h-4" aria-hidden="true" />
         Upgrade to Pro
       </button>
     );
@@ -160,13 +160,13 @@ const IconWrapper = ({ suggestedAction }: { suggestedAction: string }) => {
       )}
     >
       {suggestedAction === "upgrade_to_unlock_feature" ? (
-        <Lock className="w-5 h-5" />
+        <Lock className="w-5 h-5" aria-hidden="true" />
       ) : suggestedAction === "confirm_browser_operation" ? (
-        <Globe className="w-5 h-5" />
+        <Globe className="w-5 h-5" aria-hidden="true" />
       ) : suggestedAction === "take_over_browser" ? (
-        <MonitorPlay className="w-5 h-5" />
+        <MonitorPlay className="w-5 h-5" aria-hidden="true" />
       ) : (
-        <AlertCircle className="w-5 h-5" />
+        <AlertCircle className="w-5 h-5" aria-hidden="true" />
       )}
     </div>
   );
