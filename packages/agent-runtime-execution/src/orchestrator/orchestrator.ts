@@ -59,6 +59,8 @@ import {
 import type { IntentRegistry } from "@ku0/core";
 import { createIntentRegistry } from "@ku0/core";
 import {
+  type AgentContext,
+  type CompactionResult,
   type ContextCompactor,
   type ContextFrameBuilder,
   type ContextItem,
@@ -130,6 +132,7 @@ import type {
   WorkspaceEventKind,
 } from "../types";
 import { ToolResultCache, type ToolResultCacheOptions } from "../utils/cache";
+import { countTokens } from "../utils/tokenCounter";
 import {
   type AgentLoopStateMachine,
   createAgentLoopStateMachine,
@@ -197,6 +200,8 @@ export type OrchestratorEventType =
   | "control:step"
   | "control:injected"
   | "history:rewind"
+  | "context:compaction_triggered"
+  | "context:compacted"
   | "recovery"
   | "completion"
   | "error"
@@ -1942,6 +1947,7 @@ export class AgentOrchestrator {
     this.statusController.setStatus(this.state, "thinking");
     this.emit("turn:start", { turn: this.state.turn });
     await this.ensureCheckpointReady();
+    await this.maybeCompactContext();
 
     const turnStart = Date.now();
     const isRecoveryTurn = this.shouldEnterRecoveryTurn();
@@ -2075,61 +2081,255 @@ export class AgentOrchestrator {
     this.loopStateMachine.transitionToDecision(thinkingResult);
   }
 
-  private compactContextIfNeeded(): void {
-    if (this.state.messages.length === 0) {
-      return;
+  private async maybeCompactContext(): Promise<void> {
+    try {
+      if (this.state.messages.length === 0) {
+        return;
+      }
+
+      const systemMessages = this.state.messages.filter(
+        (message) =>
+          message.role === "system" && !message.content.trim().startsWith(CONTEXT_SUMMARY_PREFIX)
+      );
+      const nonSystemMessages = this.state.messages.filter((message) => message.role !== "system");
+      if (nonSystemMessages.length === 0) {
+        return;
+      }
+
+      const contextMessages = this.toContextMessages(nonSystemMessages);
+      const systemPrompt = systemMessages.map((message) => message.content).join("\n");
+      const threshold = this.contextCompactor.checkThreshold(contextMessages, systemPrompt);
+      if (!threshold.needsCompression) {
+        return;
+      }
+
+      this.emit("context:compaction_triggered", {
+        ...threshold,
+        messageCount: contextMessages.length,
+      });
+
+      const { preserved, toSummarize } =
+        this.contextCompactor.getMessagesToPreserve(contextMessages);
+      if (toSummarize.length === 0) {
+        return;
+      }
+
+      const fallbackCount = Math.min(5, contextMessages.length);
+      const effectivePreserved =
+        preserved.length > 0 ? preserved : contextMessages.slice(-fallbackCount);
+      const compactionStart = performance.now();
+      const { summary, usedFallback } = await this.generateCompactionSummary(toSummarize);
+      const resolvedSummary = summary.trim() || "Conversation history compacted.";
+      const summaryMessage: AgentMessage = {
+        role: "system",
+        content: `${CONTEXT_SUMMARY_PREFIX}\n${resolvedSummary}`.trim(),
+      };
+
+      const preservedMessages = this.resolvePreservedMessages(
+        nonSystemMessages,
+        contextMessages,
+        effectivePreserved
+      );
+
+      this.state.messages = [...systemMessages, summaryMessage, ...preservedMessages];
+      this.sessionState?.setState(this.state);
+
+      const compactionResult = this.applyContextCompaction(
+        resolvedSummary,
+        effectivePreserved,
+        contextMessages
+      );
+      const metrics = this.resolveCompactionMetrics({
+        summary: resolvedSummary,
+        preserved: effectivePreserved,
+        original: contextMessages,
+        result: compactionResult,
+        durationMs: performance.now() - compactionStart,
+      });
+
+      this.emit("context:compacted", {
+        messagesBefore: contextMessages.length,
+        messagesAfter: effectivePreserved.length,
+        summaryLength: resolvedSummary.length,
+        tokensSaved: metrics.tokensSaved,
+        compressionRatio: metrics.compressionRatio,
+        compressionTimeMs: metrics.compressionTimeMs,
+        usedFallback,
+      });
+    } catch (err) {
+      this.emit("error", {
+        error: {
+          code: "CONTEXT_COMPACTION_FAILED",
+          message: err instanceof Error ? err.message : "Context compaction failed.",
+        },
+        stage: "compaction",
+      });
     }
+  }
 
-    const systemMessages = this.state.messages.filter(
-      (message) =>
-        message.role === "system" && !message.content.trim().startsWith(CONTEXT_SUMMARY_PREFIX)
-    );
-    const nonSystemMessages = this.state.messages.filter((message) => message.role !== "system");
-    if (nonSystemMessages.length === 0) {
-      return;
-    }
-
-    const contextMessages = this.toContextMessages(nonSystemMessages);
-    if (!this.contextCompactor.needsCompaction(contextMessages)) {
-      return;
-    }
-
-    const { preserved, toSummarize } = this.contextCompactor.getMessagesToPreserve(contextMessages);
-    if (toSummarize.length === 0) {
-      return;
-    }
-
-    const summary = this.buildCompactionSummary(toSummarize);
-    const summaryMessage: AgentMessage = {
-      role: "system",
-      content: `${CONTEXT_SUMMARY_PREFIX}\n${summary}`.trim(),
-    };
-
-    const fallbackCount = 5;
-    const hasPreserved = preserved.length > 0;
-    const preservedIndices = hasPreserved
-      ? preserved.map((message) => contextMessages.indexOf(message)).filter((idx) => idx >= 0)
-      : contextMessages.map((_, index) => index).slice(-fallbackCount);
-    const preservedMessages =
-      preservedIndices.length > 0
-        ? preservedIndices.map((idx) => nonSystemMessages[idx])
-        : nonSystemMessages.slice(-fallbackCount);
-
-    this.state.messages = [...systemMessages, summaryMessage, ...preservedMessages];
-    this.sessionState?.setState(this.state);
-
+  private resolveCompactionContext(): AgentContext {
     const contextManager = this.sessionState?.context;
     const contextId = this.sessionState?.getContextId();
-    if (contextManager && contextId) {
-      const recentMessages = hasPreserved ? preserved : contextMessages.slice(-fallbackCount);
-      this.contextCompactor.applyCompaction(
+    const context = contextId && contextManager ? contextManager.get(contextId) : undefined;
+    if (context) {
+      return context;
+    }
+
+    return {
+      id: `compaction-${Date.now()}`,
+      createdAt: Date.now(),
+      metadata: {},
+      facts: [],
+      touchedFiles: new Set(),
+      resultCache: new Map(),
+      scratchpad: "",
+      progress: {
+        completedSteps: [],
+        pendingSteps: [],
+        currentObjective: "",
+      },
+    };
+  }
+
+  private async generateCompactionSummary(
+    messages: ContextMessage[]
+  ): Promise<{ summary: string; usedFallback: boolean }> {
+    const summaryPrompt = this.contextCompactor.generateSummaryPrompt(
+      messages,
+      this.resolveCompactionContext()
+    );
+
+    try {
+      const response = await this.llm.complete({
+        messages: [{ role: "user", content: summaryPrompt }],
+        tools: [],
+        temperature: 0.2,
+      });
+      const content = response.content?.trim();
+      if (content) {
+        return { summary: content, usedFallback: false };
+      }
+    } catch (err) {
+      this.emit("error", {
+        error: {
+          code: "CONTEXT_COMPACTION_FAILED",
+          message: err instanceof Error ? err.message : "Context compaction summary failed.",
+        },
+        stage: "summary",
+      });
+    }
+
+    return { summary: this.buildCompactionSummary(messages), usedFallback: true };
+  }
+
+  private resolvePreservedMessages(
+    nonSystemMessages: AgentMessage[],
+    contextMessages: ContextMessage[],
+    preserved: ContextMessage[]
+  ): AgentMessage[] {
+    const fallbackCount = Math.min(5, nonSystemMessages.length);
+    if (preserved.length === 0) {
+      return nonSystemMessages.slice(-fallbackCount);
+    }
+
+    const preservedIndices = preserved
+      .map((message) => contextMessages.indexOf(message))
+      .filter((idx) => idx >= 0);
+    if (preservedIndices.length === 0) {
+      return nonSystemMessages.slice(-fallbackCount);
+    }
+
+    return preservedIndices
+      .map((idx) => nonSystemMessages[idx])
+      .filter((message): message is AgentMessage => Boolean(message));
+  }
+
+  private applyContextCompaction(
+    summary: string,
+    preserved: ContextMessage[],
+    original: ContextMessage[]
+  ): CompactionResult | undefined {
+    const contextManager = this.sessionState?.context;
+    const contextId = this.sessionState?.getContextId();
+    if (!contextManager || !contextId) {
+      return undefined;
+    }
+
+    try {
+      const result = this.contextCompactor.applyCompaction(
         contextManager,
         contextId,
         summary,
-        recentMessages,
-        contextMessages
+        preserved,
+        original
       );
+
+      if (result.metrics) {
+        this.metrics?.increment(
+          AGENT_METRICS.contextCompactionTokensSaved.name,
+          undefined,
+          result.metrics.tokensSaved
+        );
+        this.metrics?.observe(
+          AGENT_METRICS.contextCompactionRatio.name,
+          result.metrics.compressionRatio
+        );
+        this.metrics?.observe(
+          AGENT_METRICS.contextCompactionTime.name,
+          result.metrics.compressionTimeMs
+        );
+      }
+
+      contextManager.updateMetadata(contextId, {
+        lastCompaction: {
+          at: new Date().toISOString(),
+          summaryLength: summary.length,
+          messagesBefore: result.messagesBefore,
+          messagesAfter: result.messagesAfter,
+          tokensSaved: result.metrics?.tokensSaved,
+        },
+      });
+
+      return result;
+    } catch (err) {
+      this.emit("error", {
+        error: {
+          code: "CONTEXT_COMPACTION_FAILED",
+          message: err instanceof Error ? err.message : "Context compaction apply failed.",
+        },
+        stage: "apply",
+      });
+      return undefined;
     }
+  }
+
+  private resolveCompactionMetrics(input: {
+    summary: string;
+    preserved: ContextMessage[];
+    original: ContextMessage[];
+    result: CompactionResult | undefined;
+    durationMs: number;
+  }): { tokensSaved: number; compressionRatio: number; compressionTimeMs: number } {
+    if (input.result?.metrics) {
+      return {
+        tokensSaved: input.result.metrics.tokensSaved,
+        compressionRatio: input.result.metrics.compressionRatio,
+        compressionTimeMs: input.result.metrics.compressionTimeMs,
+      };
+    }
+
+    const originalTokens = this.contextCompactor.estimateTokens(input.original);
+    const summaryTokens = countTokens(input.summary);
+    const preservedTokens = this.contextCompactor.estimateTokens(input.preserved);
+    const compressedTokens = summaryTokens + preservedTokens;
+    const tokensSaved = Math.max(0, originalTokens - compressedTokens);
+    const compressionRatio = originalTokens > 0 ? tokensSaved / originalTokens : 0;
+
+    return {
+      tokensSaved,
+      compressionRatio,
+      compressionTimeMs: input.durationMs,
+    };
   }
 
   private toContextMessages(messages: AgentMessage[]): ContextMessage[] {
@@ -2229,7 +2429,6 @@ export class AgentOrchestrator {
       await this.handleToolUseOutcome(outcome.toolCalls, turnStart, turnSpan);
     }
 
-    this.compactContextIfNeeded();
     this.emitTurnSuccess(turnSpan);
   }
 

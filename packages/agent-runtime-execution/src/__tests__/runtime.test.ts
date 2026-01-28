@@ -411,7 +411,17 @@ describe("AgentOrchestrator", () => {
     });
 
     let callCount = 0;
-    llm.complete = async () => {
+    llm.complete = async (request) => {
+      const lastUserMessage = [...request.messages].reverse().find((message) => {
+        return message.role === "user";
+      });
+      if (lastUserMessage?.content.includes("CONVERSATION TO SUMMARIZE")) {
+        return {
+          content: "- Summary of conversation",
+          finishReason: "stop" as const,
+        };
+      }
+
       callCount += 1;
       if (callCount === 1) {
         return {
