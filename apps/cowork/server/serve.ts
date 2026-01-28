@@ -58,6 +58,7 @@ const taskRuntime = new CoworkTaskRuntime({
   contextIndexManager,
   runtimePersistence: serverConfig.runtimePersistence,
   lessonStore,
+  mcpServers,
 });
 const gatewayRuntime = createGatewayControlRuntime({
   gateway: serverConfig.gatewayControl,

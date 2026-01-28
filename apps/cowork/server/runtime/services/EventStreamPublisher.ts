@@ -186,6 +186,22 @@ export class EventStreamPublisher {
     });
   }
 
+  publishSkillsUpdated(data: {
+    sessionId: string;
+    skills: Array<Record<string, unknown>>;
+    activeSkills?: Array<Record<string, unknown>>;
+    errors?: Array<Record<string, unknown>>;
+    updatedAt: number;
+  }) {
+    this.events.publish(data.sessionId, COWORK_EVENTS.SKILLS_UPDATED, {
+      sessionId: data.sessionId,
+      skills: data.skills,
+      activeSkills: data.activeSkills,
+      errors: data.errors,
+      updatedAt: data.updatedAt,
+    });
+  }
+
   publishCheckpointCreated(data: {
     sessionId: string;
     checkpointId: string;
@@ -215,6 +231,35 @@ export class EventStreamPublisher {
       taskId: data.taskId,
       restoredAt: data.restoredAt,
       currentStep: data.currentStep,
+    });
+  }
+
+  publishContextCompaction(data: {
+    sessionId: string;
+    taskId?: string;
+    messagesBefore?: number;
+    messagesAfter?: number;
+    summaryLength?: number;
+    tokensSaved?: number;
+    compressionRatio?: number;
+    compressionTimeMs?: number;
+    strategy?: string;
+    qualityScore?: number;
+    messagesSummarized?: number;
+    toolResultsPruned?: number;
+  }) {
+    this.events.publish(data.sessionId, COWORK_EVENTS.CONTEXT_COMPACTION, {
+      taskId: data.taskId,
+      messagesBefore: data.messagesBefore,
+      messagesAfter: data.messagesAfter,
+      summaryLength: data.summaryLength,
+      tokensSaved: data.tokensSaved,
+      compressionRatio: data.compressionRatio,
+      compressionTimeMs: data.compressionTimeMs,
+      strategy: data.strategy,
+      qualityScore: data.qualityScore,
+      messagesSummarized: data.messagesSummarized,
+      toolResultsPruned: data.toolResultsPruned,
     });
   }
 

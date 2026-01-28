@@ -20,6 +20,12 @@ import type {
   PreflightReport,
 } from "@ku0/agent-runtime";
 import type {
+  ContextCompressionConfig,
+  SkillActivation,
+  SkillIndexEntry,
+} from "@ku0/agent-runtime-core";
+import type { SkillValidationError } from "@ku0/agent-runtime-tools/skills";
+import type {
   CallToolResult,
   ListResourcesResult,
   ListResourceTemplatesResult,
@@ -44,9 +50,16 @@ export type ApiResult<T> = {
   checkpoints?: CheckpointSummary[];
   checkpoint?: Checkpoint;
   removed?: boolean;
+  checkpointId?: string;
   taskId?: string;
   restoredAt?: number;
   currentStep?: number;
+  createdAt?: number;
+  status?: string;
+  success?: boolean;
+  skippedSteps?: number;
+  stepsToReplay?: number;
+  error?: string;
   projects?: CoworkProject[];
   project?: CoworkProject;
   workspaces?: CoworkWorkspace[];
@@ -119,6 +132,17 @@ export type CoworkSettings = {
   memoryProfile?: LessonProfile;
   policy?: CoworkPolicyConfig | null;
   caseInsensitivePaths?: boolean;
+  contextCompression?: ContextCompressionConfig;
+};
+
+export type CoworkSkillSummary = SkillIndexEntry & {
+  disabled?: boolean;
+};
+
+export type CoworkSkillsResult = {
+  skills: CoworkSkillSummary[];
+  activeSkills?: SkillActivation[];
+  errors?: SkillValidationError[];
 };
 
 export type CoworkPolicySource = "repo" | "settings" | "default" | "deny_all";
@@ -173,6 +197,22 @@ export type CoworkCheckpointRestoreResult = {
   taskId?: string;
   restoredAt: number;
   currentStep: number;
+};
+
+export type CoworkCheckpointCreateResult = {
+  checkpointId: string;
+  taskId?: string;
+  status: CheckpointStatus;
+  currentStep: number;
+  createdAt: number;
+};
+
+export type CoworkCheckpointReplayResult = {
+  success: boolean;
+  checkpoint: Checkpoint;
+  skippedSteps: number;
+  stepsToReplay: number;
+  error?: string;
 };
 
 export type CoworkLesson = Omit<Lesson, "embedding">;
@@ -772,6 +812,26 @@ export async function restoreCheckpoint(
   };
 }
 
+export async function createCheckpoint(sessionId: string): Promise<CoworkCheckpointCreateResult> {
+  const data = await fetchJson<ApiResult<unknown>>(`/api/sessions/${sessionId}/checkpoints`, {
+    method: "POST",
+  });
+  if (typeof data.checkpointId !== "string") {
+    throw new Error("Checkpoint not returned");
+  }
+  return {
+    checkpointId: data.checkpointId,
+    taskId: typeof data.taskId === "string" ? data.taskId : undefined,
+    status:
+      typeof data.status === "string" &&
+      ["pending", "completed", "failed", "cancelled"].includes(data.status)
+        ? (data.status as CheckpointStatus)
+        : "pending",
+    currentStep: typeof data.currentStep === "number" ? data.currentStep : 0,
+    createdAt: typeof data.createdAt === "number" ? data.createdAt : Date.now(),
+  };
+}
+
 export async function deleteCheckpoint(
   sessionId: string,
   checkpointId: string
@@ -783,6 +843,25 @@ export async function deleteCheckpoint(
     }
   );
   return { removed: Boolean(data.removed) };
+}
+
+export async function replayCheckpoint(
+  sessionId: string,
+  checkpointId: string
+): Promise<CoworkCheckpointReplayResult> {
+  const data = await fetchJson<ApiResult<unknown>>(
+    `/api/sessions/${sessionId}/checkpoints/${checkpointId}/replay`,
+    {
+      method: "POST",
+    }
+  );
+  return {
+    success: typeof data.success === "boolean" ? data.success : true,
+    checkpoint: data.checkpoint as Checkpoint,
+    skippedSteps: typeof data.skippedSteps === "number" ? data.skippedSteps : 0,
+    stepsToReplay: typeof data.stepsToReplay === "number" ? data.stepsToReplay : 0,
+    error: typeof data.error === "string" ? data.error : undefined,
+  };
 }
 
 export type ChatMessage = {
@@ -965,6 +1044,20 @@ export async function listApprovals(sessionId: string): Promise<CoworkApproval[]
 export async function listClarifications(sessionId: string): Promise<CoworkClarification[]> {
   const data = await fetchJson<ApiResult<unknown>>(`/api/sessions/${sessionId}/clarifications`);
   return data.clarifications ?? [];
+}
+
+export async function listSessionSkills(sessionId: string): Promise<CoworkSkillsResult> {
+  const data = await fetchJson<{
+    ok: boolean;
+    skills?: CoworkSkillSummary[];
+    activeSkills?: SkillActivation[];
+    errors?: SkillValidationError[];
+  }>(`/api/sessions/${sessionId}/skills`);
+  return {
+    skills: data.skills ?? [],
+    activeSkills: data.activeSkills,
+    errors: data.errors,
+  };
 }
 
 export async function listSessionArtifacts(sessionId: string): Promise<CoworkArtifact[]> {

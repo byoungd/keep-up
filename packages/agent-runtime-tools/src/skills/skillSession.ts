@@ -1,14 +1,21 @@
 import type { AuditLogger, SkillActivation, ToolContext } from "@ku0/agent-runtime-core";
 import type { SkillRegistry } from "./skillRegistry";
 
+export type SkillSessionOptions = {
+  audit?: AuditLogger;
+  onActivate?: (activation: SkillActivation, context: ToolContext) => void;
+};
+
 export class SkillSession {
   private readonly registry: SkillRegistry;
   private readonly audit?: AuditLogger;
+  private readonly onActivate?: SkillSessionOptions["onActivate"];
   private activeSkills = new Map<string, SkillActivation>();
 
-  constructor(registry: SkillRegistry, audit?: AuditLogger) {
+  constructor(registry: SkillRegistry, options?: SkillSessionOptions) {
     this.registry = registry;
-    this.audit = audit;
+    this.audit = options?.audit;
+    this.onActivate = options?.onActivate;
   }
 
   activate(skillId: string, context: ToolContext): SkillActivation | null {
@@ -43,6 +50,8 @@ export class SkillSession {
       sandboxed: context.security.sandbox.type !== "none",
     });
 
+    this.onActivate?.(activation, context);
+
     return activation;
   }
 
@@ -59,6 +68,9 @@ export class SkillSession {
   }
 }
 
-export function createSkillSession(registry: SkillRegistry, audit?: AuditLogger): SkillSession {
-  return new SkillSession(registry, audit);
+export function createSkillSession(
+  registry: SkillRegistry,
+  options?: SkillSessionOptions
+): SkillSession {
+  return new SkillSession(registry, options);
 }

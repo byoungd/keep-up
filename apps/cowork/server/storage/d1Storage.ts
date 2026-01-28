@@ -373,6 +373,7 @@ const ALLOWED_SETTINGS = new Set<keyof CoworkSettings>([
   "memoryProfile",
   "policy",
   "caseInsensitivePaths",
+  "contextCompression",
 ]);
 
 type SettingHandler = (settings: CoworkSettings, value: unknown) => void;
@@ -406,6 +407,11 @@ const SETTING_HANDLERS: Partial<Record<keyof CoworkSettings, SettingHandler>> = 
   caseInsensitivePaths: (settings, value) => {
     if (typeof value === "boolean") {
       settings.caseInsensitivePaths = value;
+    }
+  },
+  contextCompression: (settings, value) => {
+    if (isRecord(value)) {
+      settings.contextCompression = value as CoworkSettings["contextCompression"];
     }
   },
 };

@@ -401,6 +401,38 @@ function CheckpointNodeDisplay({ node }: { node: TaskNode & { type: "checkpoint"
   );
 }
 
+function ContextCompactionNodeDisplay({
+  node,
+}: {
+  node: TaskNode & { type: "context_compaction" };
+}) {
+  const ratio =
+    typeof node.compressionRatio === "number" ? `${Math.round(node.compressionRatio * 100)}%` : "—";
+  const tokensSaved =
+    typeof node.tokensSaved === "number" ? node.tokensSaved.toLocaleString() : "—";
+  const messageWindow =
+    typeof node.messagesBefore === "number" && typeof node.messagesAfter === "number"
+      ? `${node.messagesAfter}/${node.messagesBefore} msgs`
+      : "—";
+
+  return (
+    <div
+      className={`${BASE_NODE_CLASSES} bg-accent-emerald/10 border-accent-emerald/30 text-accent-emerald`}
+    >
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="font-black uppercase tracking-widest text-micro">Context Compacted</span>
+        <span className="text-nano font-mono opacity-70">{messageWindow}</span>
+      </div>
+      <div className="text-micro opacity-80">
+        Saved {tokensSaved} tokens · {ratio} ratio
+      </div>
+      <div className="text-nano opacity-70 mt-1">
+        {node.strategy ? `Strategy: ${node.strategy}` : "Strategy: default"}
+      </div>
+    </div>
+  );
+}
+
 // --- Main Entry ---
 
 export function TaskNodeDisplay({ node, duration }: { node: TaskNode; duration?: string }) {
@@ -421,6 +453,8 @@ export function TaskNodeDisplay({ node, duration }: { node: TaskNode; duration?:
       return <PolicyDecisionDisplay node={node} />;
     case "checkpoint":
       return <CheckpointNodeDisplay node={node} />;
+    case "context_compaction":
+      return <ContextCompactionNodeDisplay node={node} />;
     default:
       return null;
   }

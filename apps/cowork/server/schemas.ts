@@ -101,6 +101,17 @@ export const clarificationAnswerSchema = z.object({
   selectedOption: z.number().int().nonnegative().optional(),
 });
 
+const contextCompressionSchema = z
+  .object({
+    maxTokens: z.number().int().positive().optional(),
+    compressionThreshold: z.number().min(0).max(1).optional(),
+    preserveCount: z.number().int().positive().optional(),
+    minMessages: z.number().int().positive().optional(),
+    strategy: z.enum(["sliding_window", "summarize", "truncate", "hybrid"]).optional(),
+    enableSummarization: z.boolean().optional(),
+  })
+  .strict();
+
 export const settingsPatchSchema = z
   .object({
     openAiKey: z.string().min(1).optional(),
@@ -111,6 +122,7 @@ export const settingsPatchSchema = z
     memoryProfile: z.enum(["default", "strict-reviewer", "creative-prototyper"]).optional(),
     caseInsensitivePaths: z.boolean().optional(),
     policy: z.unknown().nullable().optional(),
+    contextCompression: contextCompressionSchema.optional(),
   })
   .strict();
 

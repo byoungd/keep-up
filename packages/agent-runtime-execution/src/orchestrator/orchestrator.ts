@@ -4162,7 +4162,7 @@ function resolveSkillComponents(
   const skillSession =
     options.skills?.session ??
     options.components?.skillSession ??
-    (skillRegistry ? createSkillSession(skillRegistry, auditLogger) : undefined);
+    (skillRegistry ? createSkillSession(skillRegistry, { audit: auditLogger }) : undefined);
   const skillPromptAdapter =
     options.skills?.promptAdapter ??
     options.components?.skillPromptAdapter ??

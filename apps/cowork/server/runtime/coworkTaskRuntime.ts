@@ -6,6 +6,7 @@ import type {
   AIEnvelopeGateway,
   ArtifactEnvelope,
   ArtifactEvents,
+  AuditEntry,
   Checkpoint,
   CheckpointFilter,
   CheckpointStatus,
@@ -39,6 +40,7 @@ import {
   createCodeToolServer,
   createCompletionToolServer,
   createCoworkRuntime,
+  createCoworkSessionState,
   createCoworkToolExecutor,
   createDockerBashExecutor,
   createEventBus,
@@ -70,13 +72,17 @@ import {
   RuntimeAssetManager,
   RustBashExecutor,
   RustCheckpointStorage,
+  type SessionState,
   type SkillDirectoryConfig,
   type SkillRegistry,
   type SkillSession,
+  type SkillValidationError,
   SubagentManager,
+  type ToolExecutionContext,
   ToolResultCache,
   toSemanticMemoryRecord,
 } from "@ku0/agent-runtime";
+import type { SkillActivation, SkillIndexEntry } from "@ku0/agent-runtime-core";
 import { normalizeModelId } from "@ku0/ai-core";
 import {
   LoroReferenceStore,
@@ -88,10 +94,11 @@ import { DEFAULT_PROJECT_CONTEXT_TOKEN_BUDGET, isRecord } from "@ku0/shared";
 import { getLogger } from "../logger";
 import { ApprovalService } from "../services/approvalService";
 import type { ContextIndexManager } from "../services/contextIndexManager";
+import type { McpServerManager } from "../services/mcpServerManager";
 import { ProviderKeyService } from "../services/providerKeyService";
 import type { StorageLayer } from "../storage/contracts";
 import { resolveStateDir } from "../storage/statePaths";
-import type { CoworkArtifactPayload, CoworkSettings } from "../storage/types";
+import type { CoworkArtifactPayload, CoworkAuditEntry, CoworkSettings } from "../storage/types";
 import type { SessionEventHub } from "../streaming/eventHub";
 import { CoworkAuditLogger } from "./auditLogger";
 import { resolveCoworkPolicyConfig } from "./policyResolver";
@@ -123,6 +130,17 @@ export type RuntimePersistenceConfig = {
   checkpointDir?: string;
 };
 
+type PersistedContextSnapshot = {
+  scratchpad?: string;
+  metadata?: Record<string, unknown>;
+};
+
+type PersistedCoworkState = AgentState & {
+  __cowork?: {
+    context?: PersistedContextSnapshot;
+  };
+};
+
 type LfccRuntimeConfig = {
   aiEnvelopeGateway?: AIEnvelopeGateway;
   aiEnvelopeGatewayResolver?: (docId: string) => AIEnvelopeGateway | undefined;
@@ -140,6 +158,7 @@ type SessionRuntime = {
   eventBus?: RuntimeEventBus;
   eventSource?: string;
   activeTaskId: string | null;
+  lastTaskId: string | null;
   modelId: string | null;
   providerId: string | null;
   fallbackNotice: string | null;
@@ -148,8 +167,12 @@ type SessionRuntime = {
   unsubscribeQueue: () => void;
   unsubscribeOrchestrator: () => void;
   unsubscribeEventBus: () => void;
+  unsubscribeSkills: () => void;
   checkpointStorage?: ICheckpointStorage;
   checkpointManager?: ICheckpointManager;
+  sessionState?: SessionState;
+  skillComponents?: SkillComponents;
+  skillWatcherStop?: () => void;
   ghostAgent?: GhostAgent;
   ghostWorkspaceSessionId?: string;
   ghostEventUnsubscribe?: () => void;
@@ -163,6 +186,7 @@ type RuntimeFactory = (
 type SkillComponents = {
   registry: SkillRegistry;
   session: SkillSession;
+  watcherStop?: () => void;
 };
 
 type RuntimeBuildResult = {
@@ -176,6 +200,9 @@ type RuntimeBuildResult = {
   clarificationManager?: ClarificationManager;
   checkpointStorage?: ICheckpointStorage;
   checkpointManager?: ICheckpointManager;
+  sessionState?: SessionState;
+  skillComponents?: SkillComponents;
+  skillWatcherStop?: () => void;
 };
 
 type CheckpointRestoreResult = {
@@ -197,6 +224,7 @@ export class CoworkTaskRuntime {
   private readonly toolResultCache?: ToolResultCache;
   private readonly lfccConfig?: LfccRuntimeConfig;
   private readonly runtimeEventBus?: RuntimeEventBus;
+  private readonly mcpServers?: McpServerManager;
   private readonly subagentAutomation: { enabled: boolean; maxConcurrent: number };
   private readonly referenceStores = new Map<string, LoroReferenceStore>();
   private readonly referenceVerifier: ReferenceVerificationProvider;
@@ -215,6 +243,7 @@ export class CoworkTaskRuntime {
   private readonly auditLogStore: StorageLayer["auditLogStore"];
   private readonly workspaceSessionStore: StorageLayer["workspaceSessionStore"];
   private readonly workspaceEventStore: StorageLayer["workspaceEventStore"];
+  private readonly agentStateStore: StorageLayer["agentStateStore"];
   private readonly lessonStore: LessonStore;
   // Optional Advanced Services (enabled per ARCHITECTURE.md standards)
   private memoryAdapter?: Mem0MemoryAdapter;
@@ -231,15 +260,18 @@ export class CoworkTaskRuntime {
     runtimePersistence?: RuntimePersistenceConfig;
     lfcc?: LfccRuntimeConfig;
     lessonStore?: LessonStore;
+    mcpServers?: McpServerManager;
   }) {
     this.logger = deps.logger ?? getLogger("runtime");
     const logger = this.logger;
     this.runtimeFactory = deps.runtimeFactory;
     this.runtimeEventBus = deps.eventBus;
+    this.mcpServers = deps.mcpServers;
     this.configStore = deps.storage.configStore;
     this.auditLogStore = deps.storage.auditLogStore;
     this.workspaceSessionStore = deps.storage.workspaceSessionStore;
     this.workspaceEventStore = deps.storage.workspaceEventStore;
+    this.agentStateStore = deps.storage.agentStateStore;
     this.runtimePersistence = deps.runtimePersistence;
     this.lfccConfig = deps.lfcc;
     this.referenceVerifier = deps.lfcc?.referenceVerifier ?? DEFAULT_REFERENCE_VERIFIER;
@@ -318,12 +350,14 @@ export class CoworkTaskRuntime {
     const initialSession = await this.getSessionOrThrow(sessionId);
     const modeManager = new AgentModeManager(initialSession.agentMode ?? "build");
     const requestedModel = normalizeModelId(settings.defaultModel ?? undefined) ?? null;
+    const persistedState = await this.loadPersistedSessionState(sessionId);
 
     const runtimeResult = await this.buildRuntime(
       initialSession,
       settings,
       modeManager,
-      requestedModel
+      requestedModel,
+      persistedState
     );
     const runtimeState = this.createRuntimeState(sessionId, runtimeResult, modeManager);
     this.attachRuntimeHandlers(runtimeState);
@@ -396,9 +430,17 @@ export class CoworkTaskRuntime {
   async stopSessionRuntime(sessionId: string) {
     const runtime = this.runtimes.get(sessionId);
     if (runtime) {
+      try {
+        const state = runtime.runtime.orchestrator.getState();
+        await this.persistAgentState(runtime, state);
+      } catch (error) {
+        this.logger.warn("Failed to persist session state on shutdown", error);
+      }
       runtime.unsubscribeQueue();
       runtime.unsubscribeOrchestrator();
       runtime.unsubscribeEventBus();
+      runtime.unsubscribeSkills();
+      runtime.skillWatcherStop?.();
       this.runtimes.delete(sessionId);
     }
 
@@ -609,6 +651,19 @@ export class CoworkTaskRuntime {
     return session;
   }
 
+  private async loadPersistedSessionState(sessionId: string): Promise<PersistedCoworkState | null> {
+    try {
+      const records = await this.agentStateStore.getBySession(sessionId);
+      if (records.length === 0) {
+        return null;
+      }
+      return records[records.length - 1].state as PersistedCoworkState;
+    } catch (error) {
+      this.logger.warn("Failed to load persisted session state", error);
+      return null;
+    }
+  }
+
   private async appendLessonContext(params: {
     session: CoworkSession;
     prompt: string;
@@ -673,16 +728,31 @@ export class CoworkTaskRuntime {
     const roots: SkillDirectoryConfig[] = [];
     const seen = new Set<string>();
 
+    const bundledRoot = resolveBundledSkillsRoot();
+    if (!seen.has(bundledRoot)) {
+      seen.add(bundledRoot);
+      roots.push({ path: bundledRoot, source: "builtin" });
+    }
+
+    const managedRoots = resolveManagedSkillRoots();
+    for (const managedRoot of managedRoots) {
+      if (seen.has(managedRoot)) {
+        continue;
+      }
+      seen.add(managedRoot);
+      roots.push({ path: managedRoot, source: "org" });
+    }
+
     for (const grant of session.grants ?? []) {
       if (!grant.rootPath) {
         continue;
       }
-      const skillRoot = join(resolve(grant.rootPath), ".keep-up", "skills");
+      const skillRoot = join(resolve(grant.rootPath), "skills");
       if (seen.has(skillRoot)) {
         continue;
       }
       seen.add(skillRoot);
-      roots.push({ path: skillRoot, source: "org" });
+      roots.push({ path: skillRoot, source: "user" });
     }
 
     const globalRoots = resolveGlobalSkillRoots();
@@ -692,6 +762,25 @@ export class CoworkTaskRuntime {
       }
       seen.add(globalRoot);
       roots.push({ path: globalRoot, source: "user" });
+    }
+
+    return roots;
+  }
+
+  private resolveWorkspaceSkillRoots(session: CoworkSession): string[] {
+    const roots: string[] = [];
+    const seen = new Set<string>();
+
+    for (const grant of session.grants ?? []) {
+      if (!grant.rootPath) {
+        continue;
+      }
+      const skillRoot = join(resolve(grant.rootPath), "skills");
+      if (seen.has(skillRoot)) {
+        continue;
+      }
+      seen.add(skillRoot);
+      roots.push(skillRoot);
     }
 
     return roots;
@@ -750,12 +839,48 @@ export class CoworkTaskRuntime {
 
   private async buildSkillComponents(
     session: CoworkSession,
-    auditLogger: CoworkAuditLogger
+    auditLogger: CoworkAuditLogger,
+    options?: { eventBus?: RuntimeEventBus; eventSource?: string }
   ): Promise<SkillComponents> {
     const roots = this.resolveSkillRoots(session);
     const registry = createSkillRegistry({ roots });
-    const skillSession = createSkillSession(registry, auditLogger);
-    return { registry, session: skillSession };
+    let skillSession: SkillSession;
+
+    const emitUpdate = (result: { errors: SkillValidationError[] }) => {
+      if (!options?.eventBus) {
+        return;
+      }
+      const skills = registry.list({ includeDisabled: true });
+      options.eventBus.emit(
+        "skills.updated",
+        {
+          sessionId: session.sessionId,
+          skills: buildSkillSummaries(registry, skills),
+          activeSkills: skillSession.getActiveSkills(),
+          errors: result.errors,
+          updatedAt: Date.now(),
+        },
+        { source: options.eventSource, priority: "low" }
+      );
+    };
+
+    skillSession = createSkillSession(registry, {
+      audit: auditLogger,
+      onActivate: () => {
+        emitUpdate({ errors: registry.getErrors() });
+      },
+    });
+
+    const discovery = await registry.discover();
+    emitUpdate({ errors: discovery.errors });
+
+    const watcherStop = registry.watchWorkspaceSkills({
+      debounceMs: 30000,
+      onUpdate: emitUpdate,
+      roots: this.resolveWorkspaceSkillRoots(session),
+    });
+
+    return { registry, session: skillSession, watcherStop };
   }
 
   private async registerSkillTools(options: {
@@ -791,7 +916,8 @@ export class CoworkTaskRuntime {
     session: CoworkSession,
     settings: CoworkSettings,
     modeManager: AgentModeManager,
-    requestedModel: string | null
+    requestedModel: string | null,
+    persistedState?: PersistedCoworkState | null
   ): Promise<RuntimeBuildResult> {
     if (this.runtimeFactory) {
       const runtime = await this.runtimeFactory(session, settings);
@@ -809,6 +935,9 @@ export class CoworkTaskRuntime {
         clarificationManager: undefined,
         checkpointStorage,
         checkpointManager: undefined,
+        sessionState: undefined,
+        skillComponents: undefined,
+        skillWatcherStop: undefined,
       };
     }
 
@@ -844,25 +973,13 @@ export class CoworkTaskRuntime {
     const auditLogger = new CoworkAuditLogger({
       auditLogStore: this.auditLogStore,
       onEntry: (entry, mapped) => {
-        if (entry.action !== "policy") {
-          return;
-        }
-        if (!mapped.sessionId) {
-          return;
-        }
-        this.eventPublisher.publishPolicyDecision({
-          sessionId: mapped.sessionId,
-          toolName: mapped.toolName,
-          decision: mapped.policyDecision,
-          policyRuleId: mapped.policyRuleId,
-          riskTags: mapped.riskTags ?? undefined,
-          riskScore: mapped.riskScore,
-          reason: mapped.reason,
-          taskId: mapped.taskId,
-        });
+        this.handleAuditEntry(entry, mapped);
       },
     });
-    const skillComponents = await this.buildSkillComponents(session, auditLogger);
+    const skillComponents = await this.buildSkillComponents(session, auditLogger, {
+      eventBus,
+      eventSource,
+    });
     await this.registerSkillTools({
       registry: toolRegistry,
       session,
@@ -877,6 +994,14 @@ export class CoworkTaskRuntime {
       model: modelId || undefined,
     });
     const contextManager = new ContextManager();
+    const { state: initialState, context: persistedContext } =
+      this.extractPersistedState(persistedState);
+    const sessionState = createCoworkSessionState({
+      id: session.sessionId,
+      contextManager,
+      initialState,
+    });
+    this.applyContextSnapshot(sessionState, persistedContext);
     const agentManager = new AgentManager({
       llm: adapter,
       registry: toolRegistry,
@@ -907,6 +1032,7 @@ export class CoworkTaskRuntime {
     const orchestratorComponents = {
       ...(components ?? {}),
       artifactPipeline,
+      sessionState,
     };
 
     const toolkitServer = createAgentToolkitToolServer({ artifactEmitter: artifactPipeline });
@@ -926,6 +1052,7 @@ export class CoworkTaskRuntime {
         securityPolicy,
         policy: policyResolution.config,
         caseInsensitivePaths,
+        toolExecutionContext: toolRegistryResult.toolExecutionContext,
       },
       caseInsensitivePaths,
       taskQueueConfig: { maxConcurrent: 1 },
@@ -936,6 +1063,7 @@ export class CoworkTaskRuntime {
           enabled: modeManager.isPlanMode(),
           autoExecuteLowRisk: false,
         },
+        contextCompression: settings.contextCompression,
         components: orchestratorComponents,
         eventBus,
         skills: {
@@ -957,10 +1085,78 @@ export class CoworkTaskRuntime {
       clarificationManager,
       checkpointStorage,
       checkpointManager,
+      sessionState,
+      skillComponents,
+      skillWatcherStop: skillComponents.watcherStop,
     };
   }
 
-  private buildRuntimeSecurityPolicy(executionMode: ExecutionSandboxMode, session: CoworkSession) {
+  private handleAuditEntry(entry: AuditEntry, mapped: CoworkAuditEntry): void {
+    if (mapped.action === "policy_decision") {
+      this.publishPolicyDecisionFromAudit(mapped);
+      return;
+    }
+    this.publishContextCompactionFromAudit(entry);
+  }
+
+  private publishPolicyDecisionFromAudit(mapped: CoworkAuditEntry): void {
+    this.eventPublisher.publishPolicyDecision({
+      sessionId: mapped.sessionId,
+      toolName: mapped.toolName,
+      decision: mapped.policyDecision,
+      policyRuleId: mapped.policyRuleId,
+      riskTags: mapped.riskTags ?? undefined,
+      riskScore: mapped.riskScore,
+      reason: mapped.reason,
+      taskId: mapped.taskId,
+    });
+  }
+
+  private publishContextCompactionFromAudit(entry: AuditEntry): void {
+    if (entry.toolName !== "context:compaction" || entry.action !== "result") {
+      return;
+    }
+    if (!entry.sessionId) {
+      return;
+    }
+
+    const input = this.readAuditRecord(entry.input);
+    const output = this.readAuditRecord(entry.output);
+
+    this.eventPublisher.publishContextCompaction({
+      sessionId: entry.sessionId,
+      taskId: entry.taskId,
+      messagesBefore: this.readNumberField(input, "messagesBefore"),
+      messagesAfter: this.readNumberField(input, "messagesAfter"),
+      summaryLength: this.readNumberField(input, "summaryLength"),
+      tokensSaved: this.readNumberField(output, "tokensSaved"),
+      compressionRatio: this.readNumberField(output, "compressionRatio"),
+      compressionTimeMs: this.readNumberField(output, "compressionTimeMs"),
+      strategy: this.readStringField(output, "strategy"),
+      qualityScore: this.readNumberField(output, "qualityScore"),
+      messagesSummarized: this.readNumberField(output, "messagesSummarized"),
+      toolResultsPruned: this.readNumberField(output, "toolResultsPruned"),
+    });
+  }
+
+  private readAuditRecord(value: unknown): Record<string, unknown> {
+    return isRecord(value) ? value : {};
+  }
+
+  private readNumberField(record: Record<string, unknown>, key: string): number | undefined {
+    const value = record[key];
+    return typeof value === "number" ? value : undefined;
+  }
+
+  private readStringField(record: Record<string, unknown>, key: string): string | undefined {
+    const value = record[key];
+    return typeof value === "string" ? value : undefined;
+  }
+
+  private buildRuntimeSecurityPolicy(
+    executionMode: ExecutionSandboxMode,
+    session: CoworkSession
+  ) {
     const basePolicy =
       executionMode === "docker"
         ? buildDockerSecurityPolicy()
@@ -991,6 +1187,7 @@ export class CoworkTaskRuntime {
   private async buildToolRegistry(session: CoworkSession): Promise<{
     registry: ReturnType<typeof createToolRegistry>;
     executionMode: ExecutionSandboxMode;
+    toolExecutionContext?: Partial<ToolExecutionContext>;
   }> {
     const toolRegistry = createToolRegistry();
     await toolRegistry.register(createCompletionToolServer());
@@ -1005,7 +1202,22 @@ export class CoworkTaskRuntime {
     });
     await toolRegistry.register(createWebSearchToolServer(createWebSearchProvider(this.logger)));
     await this.registerBrowserTools(toolRegistry, assetManager);
-    return { registry: toolRegistry, executionMode };
+    const mcpApprovalPatterns: string[] = [];
+    if (this.mcpServers) {
+      for (const server of this.mcpServers.listServerInstances()) {
+        try {
+          await toolRegistry.register(server);
+          mcpApprovalPatterns.push(`${server.name}:*`);
+        } catch (error) {
+          this.logger.warn("Failed to register MCP server tools", error);
+        }
+      }
+    }
+
+    const toolExecutionContext =
+      mcpApprovalPatterns.length > 0 ? { requiresApproval: mcpApprovalPatterns } : undefined;
+
+    return { registry: toolRegistry, executionMode, toolExecutionContext };
   }
 
   private async registerLfccTools(
@@ -1122,6 +1334,7 @@ export class CoworkTaskRuntime {
       eventBus: runtimeResult.eventBus,
       eventSource: runtimeResult.eventSource,
       activeTaskId: null,
+      lastTaskId: null,
       modelId: runtimeResult.modelId,
       providerId: runtimeResult.providerId,
       fallbackNotice: runtimeResult.fallbackNotice,
@@ -1130,8 +1343,12 @@ export class CoworkTaskRuntime {
       unsubscribeQueue: noop,
       unsubscribeOrchestrator: noop,
       unsubscribeEventBus: noop,
+      unsubscribeSkills: noop,
       checkpointStorage: runtimeResult.checkpointStorage,
       checkpointManager: runtimeResult.checkpointManager,
+      sessionState: runtimeResult.sessionState,
+      skillComponents: runtimeResult.skillComponents,
+      skillWatcherStop: runtimeResult.skillWatcherStop,
       ghostAgent: undefined,
       ghostWorkspaceSessionId: undefined,
       ghostEventUnsubscribe: undefined,
@@ -1148,6 +1365,11 @@ export class CoworkTaskRuntime {
       if (runtimeState.checkpointStorage && result?.state) {
         await this.persistTaskCheckpoint(runtimeState, taskId, result.state).catch((err) => {
           this.logger.warn("Failed to persist task checkpoint", err);
+        });
+      }
+      if (result?.state) {
+        await this.persistAgentState(runtimeState, result.state).catch((err) => {
+          this.logger.warn("Failed to persist session state", err);
         });
       }
       return result;
@@ -1196,6 +1418,9 @@ export class CoworkTaskRuntime {
       } else {
         runtimeState.activeTaskId = event.taskId;
       }
+      if (event.taskId) {
+        runtimeState.lastTaskId = event.taskId;
+      }
       runtimeState.eventQueue = runtimeState.eventQueue
         .then(() => this.taskOrchestrator.handleTaskEvent({ ...event, taskId: event.taskId }))
         .catch((err) => this.logger.error("Task event error", err));
@@ -1218,6 +1443,7 @@ export class CoworkTaskRuntime {
     });
 
     runtimeState.unsubscribeEventBus = this.subscribeToRuntimeArtifacts(runtimeState);
+    runtimeState.unsubscribeSkills = this.subscribeToRuntimeSkills(runtimeState);
   }
 
   private subscribeToRuntimeArtifacts(runtimeState: SessionRuntime): () => void {
@@ -1249,6 +1475,37 @@ export class CoworkTaskRuntime {
             )
           )
           .catch((err) => this.logger.error("Artifact event error", err));
+      },
+      eventSource
+        ? {
+            filter: (event) => event.meta.source === eventSource,
+          }
+        : undefined
+    );
+
+    return subscription.unsubscribe;
+  }
+
+  private subscribeToRuntimeSkills(runtimeState: SessionRuntime): () => void {
+    const eventBus = runtimeState.eventBus;
+    if (!eventBus) {
+      return noop;
+    }
+    const eventSource = runtimeState.eventSource;
+    const subscription = eventBus.subscribe(
+      "skills.updated",
+      (event) => {
+        const payload = event.payload as SkillsUpdatedPayload;
+        if (!payload || !Array.isArray(payload.skills)) {
+          return;
+        }
+        this.eventPublisher.publishSkillsUpdated({
+          sessionId: runtimeState.sessionId,
+          skills: payload.skills,
+          activeSkills: payload.activeSkills,
+          errors: payload.errors,
+          updatedAt: payload.updatedAt ?? event.meta.timestamp,
+        });
       },
       eventSource
         ? {
@@ -1307,6 +1564,85 @@ export class CoworkTaskRuntime {
       currentStep: checkpoint.currentStep,
       createdAt: checkpoint.createdAt,
     });
+  }
+
+  private async persistAgentState(runtimeState: SessionRuntime, state: AgentState): Promise<void> {
+    const contextSnapshot = this.captureContextSnapshot(runtimeState.sessionState);
+    const persistedState = this.attachContextSnapshot(state, contextSnapshot);
+    const now = Date.now();
+    await this.agentStateStore.create({
+      checkpointId: crypto.randomUUID(),
+      sessionId: runtimeState.sessionId,
+      state: persistedState,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  private extractPersistedState(persistedState?: PersistedCoworkState | null): {
+    state?: AgentState;
+    context?: PersistedContextSnapshot;
+  } {
+    if (!persistedState) {
+      return {};
+    }
+    const { __cowork, ...rest } = persistedState;
+    return { state: rest, context: __cowork?.context };
+  }
+
+  private attachContextSnapshot(
+    state: AgentState,
+    contextSnapshot?: PersistedContextSnapshot
+  ): PersistedCoworkState {
+    if (!contextSnapshot) {
+      return state as PersistedCoworkState;
+    }
+    return {
+      ...state,
+      __cowork: {
+        context: contextSnapshot,
+      },
+    };
+  }
+
+  private captureContextSnapshot(
+    sessionState?: SessionState
+  ): PersistedContextSnapshot | undefined {
+    const contextManager = sessionState?.context;
+    const contextId = sessionState?.getContextId();
+    if (!contextManager || !contextId) {
+      return undefined;
+    }
+    const context = contextManager.get(contextId);
+    if (!context) {
+      return undefined;
+    }
+    const metadata = Object.keys(context.metadata).length > 0 ? { ...context.metadata } : undefined;
+    const scratchpad = context.scratchpad || undefined;
+    if (!metadata && !scratchpad) {
+      return undefined;
+    }
+    return { scratchpad, metadata };
+  }
+
+  private applyContextSnapshot(
+    sessionState: SessionState,
+    snapshot?: PersistedContextSnapshot
+  ): void {
+    if (!snapshot) {
+      return;
+    }
+    const contextManager = sessionState.context;
+    if (!contextManager) {
+      return;
+    }
+    const contextId = sessionState.getContextId();
+    if (snapshot.scratchpad) {
+      contextManager.updateScratchpad(contextId, snapshot.scratchpad, "replace");
+    }
+    if (snapshot.metadata && Object.keys(snapshot.metadata).length > 0) {
+      contextManager.updateMetadata(contextId, snapshot.metadata);
+    }
   }
 
   private async ensureRuntimeForTask(
@@ -1634,6 +1970,55 @@ export class CoworkTaskRuntime {
     return storage.delete(checkpointId);
   }
 
+  async createCheckpoint(sessionId: string): Promise<{
+    checkpointId: string;
+    taskId?: string;
+    status: CheckpointStatus;
+    currentStep: number;
+    createdAt: number;
+  }> {
+    const storage = this.resolveCheckpointStorage(sessionId);
+    if (!storage) {
+      throw new Error("Checkpoint storage not configured.");
+    }
+
+    const session = await this.getSessionOrThrow(sessionId);
+    const settings = await this.configStore.get();
+    const requestedModel = normalizeModelId(settings.defaultModel ?? undefined) ?? null;
+    const runtimeState = await this.ensureRuntimeForTask(
+      sessionId,
+      session,
+      settings,
+      requestedModel
+    );
+
+    const state = runtimeState.runtime.orchestrator.getState();
+    const taskId =
+      runtimeState.activeTaskId ?? runtimeState.lastTaskId ?? session.projectId ?? sessionId;
+    const checkpoint = buildCheckpointFromState(
+      { ...state, checkpointId: undefined },
+      { sessionId, taskId }
+    );
+
+    await storage.save(checkpoint);
+    this.eventPublisher.publishCheckpointCreated({
+      sessionId,
+      checkpointId: checkpoint.id,
+      taskId: runtimeState.activeTaskId ?? runtimeState.lastTaskId ?? undefined,
+      status: checkpoint.status,
+      currentStep: checkpoint.currentStep,
+      createdAt: checkpoint.createdAt,
+    });
+
+    return {
+      checkpointId: checkpoint.id,
+      taskId: runtimeState.activeTaskId ?? runtimeState.lastTaskId ?? undefined,
+      status: checkpoint.status,
+      currentStep: checkpoint.currentStep,
+      createdAt: checkpoint.createdAt,
+    };
+  }
+
   async restoreCheckpoint(
     sessionId: string,
     checkpointId: string
@@ -1675,6 +2060,9 @@ export class CoworkTaskRuntime {
       restoredAt,
       currentStep: restoredState.turn,
     });
+    await this.persistAgentState(runtimeState, restoredState).catch((err) => {
+      this.logger.warn("Failed to persist session state after checkpoint restore", err);
+    });
 
     return {
       checkpointId,
@@ -1684,9 +2072,56 @@ export class CoworkTaskRuntime {
     };
   }
 
+  async replayCheckpoint(sessionId: string, checkpointId: string) {
+    const session = await this.getSessionOrThrow(sessionId);
+    const settings = await this.configStore.get();
+    const requestedModel = normalizeModelId(settings.defaultModel ?? undefined) ?? null;
+    const runtimeState = await this.ensureRuntimeForTask(
+      sessionId,
+      session,
+      settings,
+      requestedModel
+    );
+    if (!runtimeState.checkpointManager) {
+      throw new Error("Checkpoint manager not configured.");
+    }
+
+    const recovery = await runtimeState.checkpointManager.prepareRecovery(checkpointId);
+    if (!recovery.success) {
+      throw new Error(recovery.error ?? "Checkpoint not recoverable.");
+    }
+    return recovery;
+  }
+
   listClarifications(sessionId: string) {
     const runtimeState = this.runtimes.get(sessionId);
     return runtimeState?.clarificationManager?.getPending(sessionId) ?? [];
+  }
+
+  async listSkills(
+    sessionId: string,
+    session: CoworkSession
+  ): Promise<{
+    skills: CoworkSkillSummary[];
+    activeSkills?: SkillActivation[];
+    errors?: SkillValidationError[];
+  }> {
+    const runtimeState = this.runtimes.get(sessionId);
+    if (runtimeState?.skillComponents) {
+      const registry = runtimeState.skillComponents.registry;
+      return {
+        skills: buildSkillSummaries(registry, registry.list({ includeDisabled: true })),
+        activeSkills: runtimeState.skillComponents.session.getActiveSkills(),
+        errors: registry.getErrors(),
+      };
+    }
+
+    const registry = createSkillRegistry({ roots: this.resolveSkillRoots(session) });
+    const result = await registry.discover();
+    return {
+      skills: buildSkillSummaries(registry, result.skills),
+      errors: result.errors,
+    };
   }
 
   submitClarification(input: { requestId: string; answer: string; selectedOption?: number }) {
@@ -1945,6 +2380,28 @@ function resolveArtifactSourcePath(payload: CoworkArtifactPayload): string | und
   }
 }
 
+type CoworkSkillSummary = SkillIndexEntry & {
+  disabled?: boolean;
+};
+
+type SkillsUpdatedPayload = {
+  sessionId: string;
+  skills: CoworkSkillSummary[];
+  activeSkills?: SkillActivation[];
+  errors?: SkillValidationError[];
+  updatedAt?: number;
+};
+
+function buildSkillSummaries(
+  registry: SkillRegistry,
+  skills: SkillIndexEntry[]
+): CoworkSkillSummary[] {
+  return skills.map((entry) => ({
+    ...entry,
+    disabled: registry.isDisabled(entry.skillId),
+  }));
+}
+
 const DEFAULT_DOCKER_IMAGE = "node:20-alpine";
 const DEFAULT_CONTEXT_PACK_TOKEN_BUDGET = 1500;
 const INSTRUCTION_FILES = ["AGENTS.md", "CLAUDE.md"] as const;
@@ -1953,6 +2410,26 @@ function resolveRuntimeAssetDir(): string {
   return process.env.COWORK_RUNTIME_ASSET_DIR
     ? resolve(process.env.COWORK_RUNTIME_ASSET_DIR)
     : join(resolveStateDir(), "runtime-assets");
+}
+
+function resolveBundledSkillsRoot(): string {
+  return join(process.cwd(), "packages", "skills", "bundled");
+}
+
+function resolveManagedSkillsRoot(): string {
+  const override = process.env.COWORK_MANAGED_SKILLS_DIR ?? process.env.KEEPUP_MANAGED_SKILLS_DIR;
+  if (override && override.trim().length > 0) {
+    return resolve(override);
+  }
+  return join(homedir(), ".ku0", "skills", "managed");
+}
+
+function resolveManagedSkillRoots(): string[] {
+  const override = process.env.COWORK_MANAGED_SKILLS_DIRS ?? process.env.KEEPUP_MANAGED_SKILLS_DIRS;
+  if (override && override.trim().length > 0) {
+    return parseEnvPathList(override).map((entry) => resolve(entry));
+  }
+  return [resolveManagedSkillsRoot()];
 }
 
 function resolveGlobalSkillsRoot(): string {

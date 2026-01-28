@@ -63,6 +63,7 @@ const taskRuntime = new CoworkTaskRuntime({
   runtimePersistence: serverConfig.runtimePersistence,
   lfcc: aiEnvelopeGateway ? { aiEnvelopeGateway } : undefined,
   lessonStore,
+  mcpServers,
 });
 const gatewayRuntime = createGatewayControlRuntime({
   gateway: serverConfig.gatewayControl,

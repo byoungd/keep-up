@@ -1,5 +1,5 @@
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
 import type { RuntimeEventBus } from "@ku0/agent-runtime-control";
 import type { AuditLogger, MCPTool } from "@ku0/agent-runtime-core";
 import {
@@ -57,6 +57,7 @@ const transportSchema = z.discriminatedUnion("type", [
 
 const tokenStoreSchema = z.union([
   z.object({ type: z.literal("memory") }),
+  z.object({ type: z.literal("gateway") }),
   z.object({
     type: z.literal("file"),
     filePath: z.string().min(1),
@@ -119,6 +120,7 @@ export class McpServerManager {
   private readonly initialized = new Set<string>();
   private readonly initializing = new Map<string, Promise<void>>();
   private readonly configPath: string;
+  private readonly stateDir: string;
   private readonly eventBus?: RuntimeEventBus;
   private readonly auditLogger?: AuditLogger;
   private readonly logger: LoggerLike;
@@ -130,6 +132,7 @@ export class McpServerManager {
     auditLogger?: AuditLogger;
     logger?: LoggerLike;
   }) {
+    this.stateDir = options.stateDir;
     const envPath = process.env.COWORK_MCP_SETTINGS_PATH;
     this.configPath =
       options.configPath ??
@@ -171,6 +174,27 @@ export class McpServerManager {
         );
       }
     }
+  }
+
+  async getConfig(): Promise<RawMcpConfig> {
+    const config = await this.loadConfig();
+    return sanitizeConfig(config);
+  }
+
+  async updateConfig(payload: unknown): Promise<RawMcpConfig> {
+    const parsed = configSchema.parse(payload);
+    await this.saveConfig(parsed);
+    await this.initialize();
+    return sanitizeConfig(parsed);
+  }
+
+  async reload(): Promise<RawMcpConfig> {
+    await this.initialize();
+    return this.getConfig();
+  }
+
+  listServerInstances(): McpRemoteToolServer[] {
+    return Array.from(this.servers.values());
   }
 
   listServers(): McpServerSummary[] {
@@ -273,16 +297,82 @@ export class McpServerManager {
     }
   }
 
+  private async saveConfig(config: RawMcpConfig): Promise<void> {
+    const dir = dirname(this.configPath);
+    await mkdir(dir, { recursive: true });
+    const tempPath = `${this.configPath}.${Date.now()}-${Math.random().toString(36).slice(2, 8)}.tmp`;
+    await writeFile(tempPath, `${JSON.stringify(config, null, 2)}\n`, "utf-8");
+    await rename(tempPath, this.configPath);
+  }
+
   private normalizeServerConfig(server: RawServerConfig): McpRemoteServerConfig {
     const transport = resolveTransport(server);
+    const auth = server.auth ? { ...server.auth } : undefined;
+    if (auth) {
+      auth.tokenStore = this.resolveTokenStore(server.name, auth.tokenStore);
+    }
     return {
       name: server.name,
       description: server.description ?? server.name,
       transport,
       toolScopes: server.toolScopes,
-      auth: server.auth,
+      auth,
     };
   }
+
+  private resolveTokenStore(
+    serverName: string,
+    tokenStore: McpRemoteServerConfig["auth"] extends { tokenStore?: infer Store }
+      ? Store | undefined
+      : unknown
+  ) {
+    if (!tokenStore || (isRecord(tokenStore) && tokenStore.type === "gateway")) {
+      const key = process.env.COWORK_MCP_TOKEN_KEY;
+      if (!key) {
+        if (tokenStore && this.logger) {
+          this.logger.warn(
+            `MCP token store for ${serverName} requires COWORK_MCP_TOKEN_KEY; falling back to memory.`
+          );
+        }
+        return tokenStore && isRecord(tokenStore) ? { type: "memory" } : tokenStore;
+      }
+      const keyEncoding = process.env.COWORK_MCP_TOKEN_KEY_ENCODING as "hex" | "base64" | undefined;
+      return {
+        type: "file",
+        filePath: join(this.stateDir, "mcp-tokens", `${serverName}.json`),
+        encryptionKey: key,
+        keyEncoding,
+      };
+    }
+    return tokenStore;
+  }
+}
+
+function sanitizeConfig(config: RawMcpConfig): RawMcpConfig {
+  return {
+    servers: config.servers.map((server) => {
+      if (!server.auth) {
+        return { ...server };
+      }
+      const auth = { ...server.auth } as RawServerConfig["auth"];
+      if (auth?.client && typeof auth.client === "object") {
+        auth.client = { ...auth.client, clientSecret: undefined };
+      }
+      if (auth && "authorizationCode" in auth) {
+        auth.authorizationCode = undefined;
+      }
+      if (auth && "tokenStore" in auth && isRecord(auth.tokenStore)) {
+        if (auth.tokenStore.type === "file") {
+          auth.tokenStore = { type: "file", filePath: auth.tokenStore.filePath };
+        }
+      }
+      return { ...server, auth };
+    }),
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function resolveTransport(server: RawServerConfig): McpTransportConfig {

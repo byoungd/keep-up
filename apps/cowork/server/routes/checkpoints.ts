@@ -29,6 +29,29 @@ export function createCheckpointRoutes(deps: CheckpointRouteDeps) {
     return c.json({ ok: true, checkpoints });
   });
 
+  app.post("/sessions/:sessionId/checkpoints", async (c) => {
+    const sessionId = c.req.param("sessionId");
+    const session = await deps.sessions.getById(sessionId);
+    if (!session) {
+      return jsonError(c, 404, "Session not found");
+    }
+    if (!deps.taskRuntime) {
+      return jsonError(c, 503, "Cowork runtime is unavailable");
+    }
+
+    try {
+      const result = await deps.taskRuntime.createCheckpoint(sessionId);
+      return c.json({ ok: true, ...result });
+    } catch (error) {
+      return jsonError(
+        c,
+        409,
+        "Failed to create checkpoint",
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  });
+
   app.get("/sessions/:sessionId/checkpoints/:checkpointId", async (c) => {
     const sessionId = c.req.param("sessionId");
     const checkpointId = c.req.param("checkpointId");
@@ -81,6 +104,26 @@ export function createCheckpointRoutes(deps: CheckpointRouteDeps) {
       return c.json({ ok: true, ...result });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to restore checkpoint";
+      return jsonError(c, 409, message);
+    }
+  });
+
+  app.post("/sessions/:sessionId/checkpoints/:checkpointId/replay", async (c) => {
+    const sessionId = c.req.param("sessionId");
+    const checkpointId = c.req.param("checkpointId");
+    const session = await deps.sessions.getById(sessionId);
+    if (!session) {
+      return jsonError(c, 404, "Session not found");
+    }
+    if (!deps.taskRuntime) {
+      return jsonError(c, 503, "Cowork runtime is unavailable");
+    }
+
+    try {
+      const result = await deps.taskRuntime.replayCheckpoint(sessionId, checkpointId);
+      return c.json({ ok: true, ...result });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to replay checkpoint";
       return jsonError(c, 409, message);
     }
   });
