@@ -12,6 +12,7 @@ import type {
   GatewayControlInboundMessage,
   GatewayControlOutboundMessage,
   GatewayControlServerConfig,
+  GatewayControlSessionManager,
   GatewayControlStats,
   GatewayWebSocketLike,
 } from "./types";
@@ -31,6 +32,7 @@ export class GatewayControlServer {
   private readonly source?: string;
   private readonly authMode: GatewayControlAuthMode;
   private readonly authToken?: string;
+  private readonly sessionManager?: GatewayControlSessionManager;
   private clientCounter = 0;
   private totalConnections = 0;
   private messagesIn = 0;
@@ -46,6 +48,7 @@ export class GatewayControlServer {
     const auth = normalizeAuthConfig(config.auth);
     this.authMode = auth.mode;
     this.authToken = auth.token;
+    this.sessionManager = config.sessionManager;
   }
 
   handleConnection(
@@ -161,6 +164,21 @@ export class GatewayControlServer {
           nonce: message.nonce,
           serverTime: Date.now(),
         });
+        return;
+      case "session.list":
+        void this.handleSessionList(state, message.requestId);
+        return;
+      case "session.get":
+        void this.handleSessionGet(state, message.sessionId, message.requestId);
+        return;
+      case "session.create":
+        void this.handleSessionCreate(state, message.session, message.requestId);
+        return;
+      case "session.update":
+        void this.handleSessionUpdate(state, message.sessionId, message.updates, message.requestId);
+        return;
+      case "session.end":
+        void this.handleSessionEnd(state, message.sessionId, message.requestId);
         return;
       default:
         this.sendMessage(state.socket, {
@@ -317,6 +335,163 @@ export class GatewayControlServer {
       code: "UNAUTHORIZED",
       message,
     });
+  }
+
+  private sendError(
+    socket: GatewayWebSocketLike,
+    code: "INVALID_MESSAGE" | "UNSUPPORTED" | "UNAUTHORIZED" | "NOT_FOUND" | "FAILED",
+    message: string,
+    requestId?: string
+  ): void {
+    this.sendMessage(socket, {
+      type: "error",
+      code,
+      message,
+      requestId,
+    });
+  }
+
+  private ensureSessionManager(
+    state: ClientState,
+    requestId?: string
+  ): GatewayControlSessionManager | null {
+    if (!this.isAuthenticated(state)) {
+      this.sendError(state.socket, "UNAUTHORIZED", "Authentication required", requestId);
+      return null;
+    }
+    if (!this.sessionManager) {
+      this.sendError(state.socket, "UNSUPPORTED", "Session management is disabled", requestId);
+      return null;
+    }
+    return this.sessionManager;
+  }
+
+  private async handleSessionList(state: ClientState, requestId?: string): Promise<void> {
+    const manager = this.ensureSessionManager(state, requestId);
+    if (!manager) {
+      return;
+    }
+    try {
+      const sessions = await manager.list();
+      this.sendMessage(state.socket, {
+        type: "session.list",
+        sessions,
+        requestId,
+      });
+    } catch (error) {
+      this.logger.warn("Failed to list gateway sessions", { error: String(error) });
+      this.sendError(state.socket, "FAILED", "Failed to list sessions", requestId);
+    }
+  }
+
+  private async handleSessionGet(
+    state: ClientState,
+    sessionId: string,
+    requestId?: string
+  ): Promise<void> {
+    const manager = this.ensureSessionManager(state, requestId);
+    if (!manager) {
+      return;
+    }
+    try {
+      const session = await manager.get(sessionId);
+      if (!session) {
+        this.sendError(state.socket, "NOT_FOUND", "Session not found", requestId);
+        return;
+      }
+      this.sendMessage(state.socket, {
+        type: "session.get",
+        session,
+        requestId,
+      });
+    } catch (error) {
+      this.logger.warn("Failed to fetch gateway session", { error: String(error), sessionId });
+      this.sendError(state.socket, "FAILED", "Failed to fetch session", requestId);
+    }
+  }
+
+  private async handleSessionCreate(
+    state: ClientState,
+    session: Parameters<GatewayControlSessionManager["create"]>[0],
+    requestId?: string
+  ): Promise<void> {
+    const manager = this.ensureSessionManager(state, requestId);
+    if (!manager) {
+      return;
+    }
+    try {
+      const created = await manager.create(session);
+      this.sendMessage(state.socket, {
+        type: "session.created",
+        session: created,
+        requestId,
+      });
+    } catch (error) {
+      this.logger.warn("Failed to create gateway session", { error: String(error) });
+      this.sendError(state.socket, "FAILED", "Failed to create session", requestId);
+    }
+  }
+
+  private async handleSessionUpdate(
+    state: ClientState,
+    sessionId: string,
+    updates: Parameters<NonNullable<GatewayControlSessionManager["update"]>>[1],
+    requestId?: string
+  ): Promise<void> {
+    const manager = this.ensureSessionManager(state, requestId);
+    if (!manager) {
+      return;
+    }
+    if (!manager.update) {
+      this.sendError(state.socket, "UNSUPPORTED", "Session update is disabled", requestId);
+      return;
+    }
+    try {
+      const updated = await manager.update(sessionId, updates);
+      if (!updated) {
+        this.sendError(state.socket, "NOT_FOUND", "Session not found", requestId);
+        return;
+      }
+      this.sendMessage(state.socket, {
+        type: "session.updated",
+        session: updated,
+        requestId,
+      });
+    } catch (error) {
+      this.logger.warn("Failed to update gateway session", { error: String(error), sessionId });
+      this.sendError(state.socket, "FAILED", "Failed to update session", requestId);
+    }
+  }
+
+  private async handleSessionEnd(
+    state: ClientState,
+    sessionId: string,
+    requestId?: string
+  ): Promise<void> {
+    const manager = this.ensureSessionManager(state, requestId);
+    if (!manager) {
+      return;
+    }
+    if (!manager.end) {
+      this.sendError(state.socket, "UNSUPPORTED", "Session termination is disabled", requestId);
+      return;
+    }
+    try {
+      const ok = await manager.end(sessionId);
+      if (!ok) {
+        this.sendError(state.socket, "NOT_FOUND", "Session not found", requestId);
+        return;
+      }
+      this.sendMessage(state.socket, {
+        type: "session.ended",
+        sessionId,
+        ok,
+        requestId,
+      });
+    } catch (error) {
+      this.logger.warn("Failed to end gateway session", { error: String(error), sessionId });
+      this.sendError(state.socket, "FAILED", "Failed to end session", requestId);
+    }
   }
 
   private generateClientId(): string {
