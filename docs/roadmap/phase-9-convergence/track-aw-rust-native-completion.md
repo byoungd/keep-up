@@ -35,7 +35,7 @@ These are already delivered and should not be re-implemented:
 | --- | --- | --- | --- |
 | AD | Implemented (Cowork runtime) | `packages/sandbox-rs`, `apps/cowork/server/runtime/coworkTaskRuntime.ts` | OS parity + policy matrix still needed. |
 | AE | Implemented | `packages/storage-engine-rs`, `packages/agent-runtime-persistence/src/checkpoint/rustCheckpointStorage.ts` | P99 targets not met yet (see baseline). |
-| AF | Partially implemented | `packages/tokenizer-rs`, `packages/agent-runtime-execution/src/orchestrator/messageCompression.ts` | `compressPayloadZstd` not wired; perf targets unmet. |
+| AF | Partially implemented | `packages/tokenizer-rs`, `packages/agent-runtime-execution/src/orchestrator/messageCompression.ts`, `packages/agent-runtime-persistence/src/checkpoint/sqliteSaver.ts` | `compressPayloadZstd` wired for checkpoint storage; perf targets unmet. |
 | AG | Implemented | `packages/symbol-index-rs`, `packages/agent-runtime-execution/src/lsp/lspService.ts` | P99 target unmet. |
 | AH | Implemented | `packages/diff-rs`, `packages/agent-runtime-tools/src/tools/code/editor.ts` | P99 target unmet. |
 | AI | Implemented | `packages/vector-similarity-rs`, `packages/context-index/src/contextIndex.ts` | Perf tuning pending. |
@@ -45,7 +45,7 @@ These are already delivered and should not be re-implemented:
 ## Scope (Remaining)
 
 - Close performance gaps to Phase 6 targets (AE/AF/AG/AH/AI).
-- Wire Zstd payload compression + thresholds (`compressPayloadZstd`) in hot paths.
+- Validate Zstd payload compression + thresholds (`compressPayloadZstd`) across hot paths and benchmarks.
 - Finalize cross-platform sandbox policy matrix + approvals.
 - Document N-API packaging strategy for all rust crates (macOS/Linux/Windows).
 - Rollout plan and feature flags for progressive enablement.
