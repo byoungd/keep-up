@@ -12,6 +12,7 @@
       "@ku0/ai-core": ["../../packages/ai-core/src"],
       "@ku0/agent-runtime-telemetry": ["../../packages/agent-runtime-telemetry/src"],
       "@ku0/agent-runtime-telemetry/*": ["../../packages/agent-runtime-telemetry/src/*"],
+      "@ku0/tokenizer-rs": ["../../packages/tokenizer-rs/src"],
       "ws": ["../../packages/gateway-control/src/types/ws.d.ts"]
     }
   },

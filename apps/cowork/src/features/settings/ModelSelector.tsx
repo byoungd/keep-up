@@ -5,7 +5,7 @@
  * Shows available providers, their models, and key status.
  */
 
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useId, useMemo, useState } from "react";
 import "./ModelSelector.css";
 
 interface ModelCapability {
@@ -72,6 +72,12 @@ const ProviderGroup = memo(function ProviderGroup({
 
   const toggleExpand = useCallback(() => setExpanded((prev) => !prev), []);
 
+  useEffect(() => {
+    if (provider.models.some((model) => model.id === selectedModelId)) {
+      setExpanded(true);
+    }
+  }, [provider.models, selectedModelId]);
+
   return (
     <div className="model-selector__group">
       <button
@@ -135,8 +141,15 @@ export function ModelSelector({
   disabled,
 }: ModelSelectorProps) {
   const [open, setOpen] = useState(false);
+  const dropdownId = useId();
 
   const toggleOpen = useCallback(() => setOpen((prev) => !prev), []);
+
+  useEffect(() => {
+    if (disabled && open) {
+      setOpen(false);
+    }
+  }, [disabled, open]);
 
   const selectedModel = useMemo(() => {
     for (const provider of providers) {
@@ -163,6 +176,9 @@ export function ModelSelector({
         className="model-selector__trigger"
         onClick={toggleOpen}
         disabled={disabled}
+        aria-expanded={open}
+        aria-controls={open ? dropdownId : undefined}
+        aria-haspopup="listbox"
       >
         <span className="model-selector__selected-label">
           {selectedModel
@@ -172,7 +188,7 @@ export function ModelSelector({
         <span className="model-selector__dropdown-icon">▾</span>
       </button>
       {open && (
-        <div className="model-selector__dropdown">
+        <div className="model-selector__dropdown" id={dropdownId} role="listbox">
           {providers.map((provider) => (
             <ProviderGroup
               key={provider.id}
