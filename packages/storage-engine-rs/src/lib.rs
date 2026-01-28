@@ -506,6 +506,7 @@ fn big_int_from_u64(value: u64) -> BigInt {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::ErrorKind;
     use tempfile::tempdir;
 
     #[test]
@@ -583,5 +584,87 @@ mod tests {
         // Pruning again with older seq should return 0
         let removed_again = engine.prune_event_log(1).unwrap();
         assert_eq!(removed_again, 0);
+    }
+
+    fn assert_lock_conflict_try(error: &std::fs::TryLockError) {
+        match error {
+            std::fs::TryLockError::WouldBlock => {}
+            std::fs::TryLockError::Error(err) => {
+                let kind = err.kind();
+                let allowed = matches!(kind, ErrorKind::PermissionDenied);
+                assert!(
+                    allowed,
+                    "expected lock contention error, got {:?}: {}",
+                    kind,
+                    err
+                );
+            }
+        }
+    }
+
+    fn assert_lock_conflict_io(error: &std::io::Error) {
+        let kind = error.kind();
+        let allowed = matches!(kind, ErrorKind::WouldBlock | ErrorKind::PermissionDenied);
+        assert!(
+            allowed,
+            "expected lock contention error, got {:?}: {}",
+            kind,
+            error
+        );
+    }
+
+    #[test]
+    fn test_exclusive_lock_blocks_shared_and_exclusive() {
+        let dir = tempdir().unwrap();
+        let lock_path = dir.path().join(LOCK_FILE);
+        let lock = lock_file(&lock_path, true).unwrap();
+
+        let probe = OpenOptions::new()
+            .create(true)
+            .read(true)
+            .write(true)
+            .open(&lock_path)
+            .unwrap();
+
+        let shared_error = probe.try_lock_shared().expect_err("shared lock should be blocked");
+        assert_lock_conflict_try(&shared_error);
+
+        let exclusive_error = probe
+            .try_lock_exclusive()
+            .expect_err("exclusive lock should be blocked");
+        assert_lock_conflict_io(&exclusive_error);
+
+        drop(lock);
+        probe.lock_shared().unwrap();
+        probe.unlock().unwrap();
+    }
+
+    #[test]
+    fn test_shared_lock_allows_shared_blocks_exclusive() {
+        let dir = tempdir().unwrap();
+        let lock_path = dir.path().join(LOCK_FILE);
+
+        let shared_lock = lock_file(&lock_path, false).unwrap();
+        let shared_probe = OpenOptions::new()
+            .create(true)
+            .read(true)
+            .write(true)
+            .open(&lock_path)
+            .unwrap();
+        shared_probe.try_lock_shared().unwrap();
+
+        let exclusive_probe = OpenOptions::new()
+            .create(true)
+            .read(true)
+            .write(true)
+            .open(&lock_path)
+            .unwrap();
+        let exclusive_error = exclusive_probe
+            .try_lock_exclusive()
+            .expect_err("exclusive lock should be blocked");
+        assert_lock_conflict_io(&exclusive_error);
+
+        drop(shared_lock);
+        shared_probe.unlock().unwrap();
     }
 }
