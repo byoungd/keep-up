@@ -112,6 +112,7 @@ export function ChatThread({ sessionId }: { sessionId: string }) {
     isLoading,
     retryMessage,
     editMessage,
+    abort: abortMessage,
     agentMode,
     setMode,
     toggleMode,
@@ -625,9 +626,7 @@ export function ChatThread({ sessionId }: { sessionId: string }) {
         onRunBackground={() => {
           /* no-op */
         }}
-        onAbort={() => {
-          /* no-op */
-        }}
+        onAbort={abortMessage}
         onTaskAction={(action, metadata) => sendAction(action, { approvalId: metadata.approvalId })}
         attachments={attachments}
         onAddAttachment={handleAddAttachment}
