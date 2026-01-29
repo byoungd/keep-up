@@ -176,6 +176,14 @@ export type MarkdownFrontmatterBlock = {
   parsed?: { keys: FrontmatterKey[] };
 };
 
+export type MarkdownCodeSymbol = {
+  block_id: string;
+  language?: string;
+  name: string;
+  kind: string;
+  line_range: LineRange;
+};
+
 export type MarkdownBlock =
   | MarkdownHeadingBlock
   | MarkdownCodeFenceBlock
@@ -221,6 +229,7 @@ export type MarkdownSemanticIndex = {
     language?: string;
     info_string?: string;
   }>;
+  symbols?: MarkdownCodeSymbol[];
   frontmatter?: {
     kind: "frontmatter";
     line_range: LineRange;
@@ -247,9 +256,40 @@ export type MarkdownFrontmatterPolicy = {
   max_frontmatter_bytes?: number;
 };
 
+export type PerformancePolicyV1 = {
+  enabled: boolean;
+  incremental_index: {
+    enabled: boolean;
+    max_edit_log_entries: number;
+    dirty_region_merge_threshold: number;
+  };
+  cache: {
+    enabled: boolean;
+    max_entries: number;
+    ttl_seconds?: number;
+  };
+  parallel: {
+    enabled: boolean;
+    max_threads: number;
+    batch_threshold: number;
+  };
+  ast_parsing: {
+    enabled: boolean;
+    languages: string[];
+    max_parse_bytes: number;
+  };
+  streaming: {
+    enabled: boolean;
+    chunk_size_bytes: number;
+    memory_limit_bytes: number;
+    overlap_lines: number;
+  };
+};
+
 export type MarkdownApplyOptions = {
   targetingPolicy?: MarkdownTargetingPolicyV1;
   frontmatterPolicy?: MarkdownFrontmatterPolicy;
+  performancePolicy?: PerformancePolicyV1;
 };
 
 export type MarkdownContentHashOptions = {
@@ -281,7 +321,10 @@ export type NativeMarkdownContentBinding = {
   splitMarkdownLines: (text: string) => string[];
   computeMarkdownLineHash: (lines: string[], range: LineRange) => string;
   computeMarkdownContentHash: (content: string, options?: MarkdownContentHashOptions) => string;
-  buildMarkdownSemanticIndex: (lines: string[]) => MarkdownSemanticIndex;
+  buildMarkdownSemanticIndex: (
+    lines: string[],
+    options?: { performancePolicy?: PerformancePolicyV1 }
+  ) => MarkdownSemanticIndex;
   resolveMarkdownSemanticTarget: (
     semantic: MarkdownSemanticTarget,
     index: MarkdownSemanticIndex,

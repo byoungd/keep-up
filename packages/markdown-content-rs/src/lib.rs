@@ -6,6 +6,23 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
+use std::sync::RwLock;
+
+use lru::LruCache;
+use xxhash_rust::xxh64::Xxh64;
+
+#[cfg(not(target_arch = "wasm32"))]
+use rayon::{prelude::*, ThreadPoolBuilder};
+#[cfg(not(target_arch = "wasm32"))]
+use tree_sitter::{Node, Parser};
+#[cfg(not(target_arch = "wasm32"))]
+use tree_sitter_go::language as language_go;
+#[cfg(not(target_arch = "wasm32"))]
+use tree_sitter_python::language as language_python;
+#[cfg(not(target_arch = "wasm32"))]
+use tree_sitter_rust::language as language_rust;
+#[cfg(not(target_arch = "wasm32"))]
+use tree_sitter_typescript::language_typescript;
 
 // =============================================================================
 // Types
@@ -241,6 +258,133 @@ struct MarkdownApplyOptions {
     targeting_policy: Option<MarkdownTargetingPolicyV1>,
     #[serde(rename = "frontmatterPolicy")]
     frontmatter_policy: Option<MarkdownFrontmatterPolicy>,
+    #[serde(rename = "performancePolicy")]
+    performance_policy: Option<PerformancePolicyV1>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(default)]
+#[serde(rename_all = "snake_case")]
+struct PerformancePolicyV1 {
+    enabled: bool,
+    incremental_index: PerformanceIncrementalIndexPolicy,
+    cache: PerformanceCachePolicy,
+    parallel: PerformanceParallelPolicy,
+    ast_parsing: PerformanceAstParsingPolicy,
+    streaming: PerformanceStreamingPolicy,
+}
+
+impl Default for PerformancePolicyV1 {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            incremental_index: PerformanceIncrementalIndexPolicy::default(),
+            cache: PerformanceCachePolicy::default(),
+            parallel: PerformanceParallelPolicy::default(),
+            ast_parsing: PerformanceAstParsingPolicy::default(),
+            streaming: PerformanceStreamingPolicy::default(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(default)]
+#[serde(rename_all = "snake_case")]
+struct PerformanceIncrementalIndexPolicy {
+    enabled: bool,
+    max_edit_log_entries: u32,
+    dirty_region_merge_threshold: u32,
+}
+
+impl Default for PerformanceIncrementalIndexPolicy {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            max_edit_log_entries: 100,
+            dirty_region_merge_threshold: 10,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(default)]
+#[serde(rename_all = "snake_case")]
+struct PerformanceCachePolicy {
+    enabled: bool,
+    max_entries: u32,
+    ttl_seconds: Option<u32>,
+}
+
+impl Default for PerformanceCachePolicy {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            max_entries: 10_000,
+            ttl_seconds: None,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(default)]
+#[serde(rename_all = "snake_case")]
+struct PerformanceParallelPolicy {
+    enabled: bool,
+    max_threads: u32,
+    batch_threshold: u32,
+}
+
+impl Default for PerformanceParallelPolicy {
+    fn default() -> Self {
+        let max_threads = std::thread::available_parallelism()
+            .map(|value| value.get() as u32)
+            .unwrap_or(1);
+        Self {
+            enabled: false,
+            max_threads,
+            batch_threshold: 4,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(default)]
+#[serde(rename_all = "snake_case")]
+struct PerformanceAstParsingPolicy {
+    enabled: bool,
+    languages: Vec<String>,
+    max_parse_bytes: u32,
+}
+
+impl Default for PerformanceAstParsingPolicy {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            languages: vec!["typescript".to_string(), "python".to_string()],
+            max_parse_bytes: 1_048_576,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(default)]
+#[serde(rename_all = "snake_case")]
+struct PerformanceStreamingPolicy {
+    enabled: bool,
+    chunk_size_bytes: u32,
+    memory_limit_bytes: u32,
+    overlap_lines: u32,
+}
+
+impl Default for PerformanceStreamingPolicy {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            chunk_size_bytes: 65_536,
+            memory_limit_bytes: 104_857_600,
+            overlap_lines: 3,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -248,6 +392,13 @@ struct MarkdownApplyOptions {
 #[napi(object)]
 pub struct MarkdownContentHashOptions {
     pub ignore_frontmatter: Option<bool>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+struct MarkdownSemanticIndexOptions {
+    #[serde(rename = "performancePolicy")]
+    performance_policy: Option<PerformancePolicyV1>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -278,10 +429,22 @@ struct MarkdownFrontmatterBlock {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
+struct MarkdownCodeSymbol {
+    block_id: String,
+    language: Option<String>,
+    name: String,
+    kind: String,
+    line_range: LineRange,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
 struct MarkdownSemanticIndex {
     line_count: u32,
     headings: Vec<MarkdownHeadingBlock>,
     code_fences: Vec<MarkdownCodeFenceBlock>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    symbols: Vec<MarkdownCodeSymbol>,
     frontmatter: Option<MarkdownFrontmatterBlock>,
     frontmatter_data: Option<Value>,
     frontmatter_error: Option<MarkdownOperationError>,
@@ -398,6 +561,400 @@ static ORDERED_LIST_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^\s{0,3}(\d+)([.)])\s+(.*)$").unwrap());
 static TASK_LIST_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^\s{0,3}([*+-])\s+\[([ xX])\]\s+(.*)$").unwrap());
+
+// =============================================================================
+// Performance caches and helpers
+// =============================================================================
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+struct LineCacheKey {
+    start: u32,
+    end: u32,
+    quick_hash: u64,
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+struct BlockCacheKey {
+    block_type: String,
+    start: u32,
+    end: u32,
+    quick_hash: u64,
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+struct ContentCacheKey {
+    length: usize,
+    first_line_hash: String,
+    last_line_hash: String,
+    line_count: usize,
+}
+
+struct HashCache {
+    line_cache: RwLock<LruCache<LineCacheKey, String>>,
+    block_cache: RwLock<LruCache<BlockCacheKey, String>>,
+    content_cache: RwLock<LruCache<ContentCacheKey, String>>,
+    enabled: RwLock<bool>,
+}
+
+impl HashCache {
+    fn new(max_entries: usize) -> Self {
+        let cap = max_entries.max(10);
+        let capacity = std::num::NonZeroUsize::new(cap).unwrap_or_else(|| {
+            std::num::NonZeroUsize::new(10).expect("non-zero cache capacity")
+        });
+        Self {
+            line_cache: RwLock::new(LruCache::new(capacity)),
+            block_cache: RwLock::new(LruCache::new(capacity)),
+            content_cache: RwLock::new(LruCache::new(capacity)),
+            enabled: RwLock::new(false),
+        }
+    }
+
+    fn configure(&self, enabled: bool, max_entries: usize) {
+        if let Ok(mut flag) = self.enabled.write() {
+            *flag = enabled;
+        }
+        let capacity = std::num::NonZeroUsize::new(max_entries.max(10)).unwrap_or_else(|| {
+            std::num::NonZeroUsize::new(10).expect("non-zero cache capacity")
+        });
+        if let Ok(mut cache) = self.line_cache.write() {
+            cache.resize(capacity);
+        }
+        if let Ok(mut cache) = self.block_cache.write() {
+            cache.resize(capacity);
+        }
+        if let Ok(mut cache) = self.content_cache.write() {
+            cache.resize(capacity);
+        }
+    }
+
+    fn is_enabled(&self) -> bool {
+        self.enabled.read().map(|flag| *flag).unwrap_or(false)
+    }
+
+    fn get_line_hash(&self, key: &LineCacheKey) -> Option<String> {
+        if !self.is_enabled() {
+            return None;
+        }
+        let mut cache = self.line_cache.write().ok()?;
+        cache.get(key).cloned()
+    }
+
+    fn insert_line_hash(&self, key: LineCacheKey, value: String) {
+        if !self.is_enabled() {
+            return;
+        }
+        if let Ok(mut cache) = self.line_cache.write() {
+            cache.put(key, value);
+        }
+    }
+
+    fn get_block_hash(&self, key: &BlockCacheKey) -> Option<String> {
+        if !self.is_enabled() {
+            return None;
+        }
+        let mut cache = self.block_cache.write().ok()?;
+        cache.get(key).cloned()
+    }
+
+    fn insert_block_hash(&self, key: BlockCacheKey, value: String) {
+        if !self.is_enabled() {
+            return;
+        }
+        if let Ok(mut cache) = self.block_cache.write() {
+            cache.put(key, value);
+        }
+    }
+
+    fn get_content_hash(&self, key: &ContentCacheKey) -> Option<String> {
+        if !self.is_enabled() {
+            return None;
+        }
+        let mut cache = self.content_cache.write().ok()?;
+        cache.get(key).cloned()
+    }
+
+    fn insert_content_hash(&self, key: ContentCacheKey, value: String) {
+        if !self.is_enabled() {
+            return;
+        }
+        if let Ok(mut cache) = self.content_cache.write() {
+            cache.put(key, value);
+        }
+    }
+
+    fn invalidate_range(&self, range: &LineRange) {
+        if !self.is_enabled() {
+            return;
+        }
+        if let Ok(mut cache) = self.line_cache.write() {
+            let keys: Vec<LineCacheKey> = cache
+                .iter()
+                .filter(|(key, _)| ranges_overlap(&LineRange { start: key.start, end: key.end }, range))
+                .map(|(key, _)| key.clone())
+                .collect();
+            for key in keys {
+                cache.pop(&key);
+            }
+        }
+        if let Ok(mut cache) = self.block_cache.write() {
+            let keys: Vec<BlockCacheKey> = cache
+                .iter()
+                .filter(|(key, _)| ranges_overlap(&LineRange { start: key.start, end: key.end }, range))
+                .map(|(key, _)| key.clone())
+                .collect();
+            for key in keys {
+                cache.pop(&key);
+            }
+        }
+        if let Ok(mut cache) = self.content_cache.write() {
+            cache.clear();
+        }
+    }
+}
+
+static HASH_CACHE: Lazy<HashCache> = Lazy::new(|| HashCache::new(10_000));
+
+fn update_perf_cache(policy: Option<&PerformancePolicyV1>) {
+    match policy {
+        Some(policy) => {
+            HASH_CACHE.configure(
+                policy.enabled && policy.cache.enabled,
+                policy.cache.max_entries as usize,
+            );
+        }
+        None => {
+            HASH_CACHE.configure(false, 10_000);
+        }
+    }
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+struct AstCacheKey {
+    block_id: String,
+    content_hash: String,
+}
+
+struct AstCache {
+    cache: RwLock<LruCache<AstCacheKey, Vec<MarkdownCodeSymbol>>>,
+    enabled: RwLock<bool>,
+}
+
+impl AstCache {
+    fn new(max_entries: usize) -> Self {
+        let cap = max_entries.max(10);
+        let capacity = std::num::NonZeroUsize::new(cap).unwrap_or_else(|| {
+            std::num::NonZeroUsize::new(10).expect("non-zero cache capacity")
+        });
+        Self {
+            cache: RwLock::new(LruCache::new(capacity)),
+            enabled: RwLock::new(false),
+        }
+    }
+
+    fn configure(&self, enabled: bool, max_entries: usize) {
+        if let Ok(mut flag) = self.enabled.write() {
+            *flag = enabled;
+        }
+        let capacity = std::num::NonZeroUsize::new(max_entries.max(10)).unwrap_or_else(|| {
+            std::num::NonZeroUsize::new(10).expect("non-zero cache capacity")
+        });
+        if let Ok(mut cache) = self.cache.write() {
+            cache.resize(capacity);
+        }
+    }
+
+    fn is_enabled(&self) -> bool {
+        self.enabled.read().map(|flag| *flag).unwrap_or(false)
+    }
+
+    fn get(&self, key: &AstCacheKey) -> Option<Vec<MarkdownCodeSymbol>> {
+        if !self.is_enabled() {
+            return None;
+        }
+        let mut cache = self.cache.write().ok()?;
+        cache.get(key).cloned()
+    }
+
+    fn insert(&self, key: AstCacheKey, value: Vec<MarkdownCodeSymbol>) {
+        if !self.is_enabled() {
+            return;
+        }
+        if let Ok(mut cache) = self.cache.write() {
+            cache.put(key, value);
+        }
+    }
+}
+
+static AST_CACHE: Lazy<AstCache> = Lazy::new(|| AstCache::new(256));
+
+fn update_ast_cache(policy: Option<&PerformancePolicyV1>) {
+    match policy {
+        Some(policy) => AST_CACHE.configure(policy.enabled && policy.ast_parsing.enabled, 256),
+        None => AST_CACHE.configure(false, 256),
+    }
+}
+
+fn quick_hash_lines(lines: &[String], range: &LineRange) -> u64 {
+    let mut hasher = Xxh64::new(0);
+    hasher.update(&range.start.to_le_bytes());
+    hasher.update(&range.end.to_le_bytes());
+    let start = range.start.saturating_sub(1) as usize;
+    let end = range.end.min(lines.len() as u32) as usize;
+    for line in lines[start..end].iter() {
+        hasher.update(line.as_bytes());
+        hasher.update(b"\n");
+    }
+    hasher.digest()
+}
+
+fn invalidate_range_for_edit(start_line: u32, end_line: u32, total_lines: u32) -> LineRange {
+    if start_line == end_line.saturating_add(1) {
+        let start = start_line.saturating_sub(1).max(1);
+        let end = start_line.min(total_lines);
+        LineRange { start, end }
+    } else {
+        LineRange {
+            start: start_line,
+            end: end_line.min(total_lines),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+struct IncrementalIndexCache {
+    lines: Vec<String>,
+    index: MarkdownSemanticIndex,
+}
+
+static INCREMENTAL_INDEX: Lazy<RwLock<Option<IncrementalIndexCache>>> = Lazy::new(|| RwLock::new(None));
+
+#[derive(Clone, Debug)]
+struct LineEdit {
+    start_line: u32,
+    end_line: u32,
+    new_lines: Vec<String>,
+}
+
+fn edit_removed_lines(edit: &LineEdit) -> u32 {
+    if edit.start_line == edit.end_line + 1 {
+        0
+    } else {
+        edit.end_line.saturating_sub(edit.start_line).saturating_add(1)
+    }
+}
+
+fn edit_delta_lines(edit: &LineEdit) -> i32 {
+    edit.new_lines.len() as i32 - edit_removed_lines(edit) as i32
+}
+
+fn compute_line_edit(prev: &[String], next: &[String]) -> Option<LineEdit> {
+    if prev == next {
+        return None;
+    }
+    let mut prefix = 0usize;
+    let min_len = prev.len().min(next.len());
+    while prefix < min_len && prev[prefix] == next[prefix] {
+        prefix += 1;
+    }
+    let mut suffix_prev = prev.len();
+    let mut suffix_next = next.len();
+    while suffix_prev > prefix && suffix_next > prefix && prev[suffix_prev - 1] == next[suffix_next - 1]
+    {
+        suffix_prev -= 1;
+        suffix_next -= 1;
+    }
+
+    let start_line = (prefix + 1) as u32;
+    let end_line = suffix_prev as u32;
+    let new_lines = next[prefix..suffix_next].to_vec();
+
+    Some(LineEdit {
+        start_line,
+        end_line,
+        new_lines,
+    })
+}
+
+fn expand_dirty_region(
+    index: &MarkdownSemanticIndex,
+    edit: &LineEdit,
+    total_lines: u32,
+) -> Option<LineRange> {
+    if total_lines == 0 {
+        return None;
+    }
+    let mut dirty_pre = if edit.start_line == edit.end_line + 1 {
+        let start = edit.start_line.saturating_sub(1).max(1);
+        let end = edit.start_line.min(total_lines);
+        LineRange { start, end }
+    } else {
+        LineRange {
+            start: edit.start_line,
+            end: edit.end_line.min(total_lines),
+        }
+    };
+
+    if dirty_pre.start == 0 || dirty_pre.end == 0 || dirty_pre.start > dirty_pre.end {
+        return None;
+    }
+
+    if let Some(frontmatter) = index.frontmatter.as_ref() {
+        if ranges_overlap(&dirty_pre, &frontmatter.line_range) {
+            dirty_pre.start = dirty_pre.start.min(frontmatter.line_range.start);
+            dirty_pre.end = dirty_pre.end.max(frontmatter.line_range.end);
+        }
+    }
+
+    for fence in index.code_fences.iter() {
+        if ranges_overlap(&dirty_pre, &fence.line_range) {
+            dirty_pre.start = dirty_pre.start.min(fence.line_range.start);
+            dirty_pre.end = dirty_pre.end.max(fence.line_range.end);
+        }
+    }
+
+    let mut heading_ranges: Vec<(LineRange, u32)> = index
+        .headings
+        .iter()
+        .map(|heading| (heading.line_range.clone(), heading.level))
+        .collect();
+    heading_ranges.sort_by(|a, b| a.0.start.cmp(&b.0.start));
+
+    if !heading_ranges.is_empty() {
+        for (idx, (range, level)) in heading_ranges.iter().enumerate() {
+            if ranges_overlap(&dirty_pre, range) {
+                let mut section_end = range.end;
+                let mut found_boundary = false;
+                for (_, (next_range, next_level)) in heading_ranges.iter().enumerate().skip(idx + 1) {
+                    if *next_level <= *level {
+                        section_end = next_range.start.saturating_sub(1).max(section_end);
+                        found_boundary = true;
+                        break;
+                    }
+                    section_end = next_range.end.max(section_end);
+                }
+                if !found_boundary {
+                    section_end = total_lines.max(section_end);
+                }
+                dirty_pre.start = dirty_pre.start.min(range.start);
+                dirty_pre.end = dirty_pre.end.max(section_end);
+                break;
+            }
+        }
+    }
+
+    let delta = edit_delta_lines(edit);
+    let mut dirty_post = LineRange {
+        start: dirty_pre.start,
+        end: (dirty_pre.end as i32 + delta).max(1) as u32,
+    };
+
+    if dirty_post.start > dirty_post.end {
+        dirty_post.start = dirty_post.end;
+    }
+
+    Some(dirty_post)
+}
 static BLOCKQUOTE_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"^\s{0,3}>\s?(.*)$").unwrap());
 static TABLE_SEPARATOR_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*$").unwrap());
@@ -437,8 +994,18 @@ pub fn compute_markdown_content_hash(
 }
 
 #[napi(js_name = "buildMarkdownSemanticIndex")]
-pub fn build_markdown_semantic_index(lines: Vec<String>) -> NapiResult<Value> {
-    let index = build_semantic_index(&lines);
+pub fn build_markdown_semantic_index(
+    lines: Vec<String>,
+    options: Option<Value>,
+) -> NapiResult<Value> {
+    let options: Option<MarkdownSemanticIndexOptions> = match options {
+        Some(value) => Some(serde_json::from_value(value).map_err(to_napi_error)?),
+        None => None,
+    };
+    let index = build_semantic_index_with_options(
+        &lines,
+        options.as_ref().and_then(|opts| opts.performance_policy.as_ref()),
+    );
     serde_json::to_value(index).map_err(to_napi_error)
 }
 
@@ -572,18 +1139,27 @@ fn sha256_hex(text: &str) -> String {
 }
 
 fn compute_line_hash(lines: &[String], range: &LineRange) -> String {
+    let quick_hash = quick_hash_lines(lines, range);
+    let key = LineCacheKey {
+        start: range.start,
+        end: range.end,
+        quick_hash,
+    };
+    if let Some(value) = HASH_CACHE.get_line_hash(&key) {
+        return value;
+    }
+
     let start = range.start.saturating_sub(1) as usize;
     let end = range.end.saturating_sub(1) as usize;
-    let slice = lines
-        .get(start..=end)
-        .unwrap_or(&[])
-        .join("\n");
+    let slice = lines.get(start..=end).unwrap_or(&[]).join("\n");
     let normalized = strip_control_chars(&slice);
     let canonical = format!(
         "LFCC_MD_LINE_V1\nstart={}\nend={}\ntext={}",
         range.start, range.end, normalized
     );
-    sha256_hex(&canonical)
+    let hash = sha256_hex(&canonical);
+    HASH_CACHE.insert_line_hash(key, hash.clone());
+    hash
 }
 
 fn compute_content_hash(content: &str, ignore_frontmatter: bool) -> String {
@@ -596,12 +1172,40 @@ fn compute_content_hash(content: &str, ignore_frontmatter: bool) -> String {
     };
     let joined = filtered.join("\n");
     let sanitized = strip_control_chars(&joined);
+    let line_count = filtered.len();
+    let first_line_hash = if line_count > 0 {
+        compute_line_hash(&filtered, &LineRange { start: 1, end: 1 })
+    } else {
+        String::new()
+    };
+    let last_line_hash = if line_count > 0 {
+        compute_line_hash(
+            &filtered,
+            &LineRange {
+                start: line_count as u32,
+                end: line_count as u32,
+            },
+        )
+    } else {
+        String::new()
+    };
+    let key = ContentCacheKey {
+        length: sanitized.as_bytes().len(),
+        first_line_hash,
+        last_line_hash,
+        line_count,
+    };
+    if let Some(value) = HASH_CACHE.get_content_hash(&key) {
+        return value;
+    }
     let canonical = format!(
         "LFCC_MD_CONTENT_V1\nignore_frontmatter={}\ntext={}",
         if ignore_frontmatter { "true" } else { "false" },
         sanitized
     );
-    sha256_hex(&canonical)
+    let hash = sha256_hex(&canonical);
+    HASH_CACHE.insert_content_hash(key, hash.clone());
+    hash
 }
 
 fn strip_frontmatter_lines(lines: &[String]) -> Vec<String> {
@@ -1025,9 +1629,144 @@ fn json_to_toml(value: &Value) -> Result<toml::Value, MarkdownOperationError> {
 // =============================================================================
 
 fn build_semantic_index(lines: &[String]) -> MarkdownSemanticIndex {
-    let mut headings = Vec::new();
-    let mut code_fences = Vec::new();
+    build_semantic_index_with_options(lines, None)
+}
 
+fn build_semantic_index_with_options(
+    lines: &[String],
+    perf_policy: Option<&PerformancePolicyV1>,
+) -> MarkdownSemanticIndex {
+    update_perf_cache(perf_policy);
+    update_ast_cache(perf_policy);
+    if let Some(policy) = perf_policy {
+        if policy.enabled && policy.incremental_index.enabled {
+            if let Some(index) = build_semantic_index_incremental(lines, policy) {
+                return index;
+            }
+        }
+    }
+
+    let index = build_semantic_index_full(lines, perf_policy);
+    if let Ok(mut cache) = INCREMENTAL_INDEX.write() {
+        if perf_policy.map(|p| p.enabled && p.incremental_index.enabled).unwrap_or(false) {
+            *cache = Some(IncrementalIndexCache {
+                lines: lines.to_vec(),
+                index: index.clone(),
+            });
+        }
+    }
+    index
+}
+
+fn build_semantic_index_incremental(
+    lines: &[String],
+    policy: &PerformancePolicyV1,
+) -> Option<MarkdownSemanticIndex> {
+    let cached = INCREMENTAL_INDEX.read().ok()?.clone()?;
+    let edit = compute_line_edit(&cached.lines, lines)?;
+    let total_lines = cached.lines.len() as u32;
+    let dirty_post = expand_dirty_region(&cached.index, &edit, total_lines)?;
+    let total_lines_after = lines.len() as u32;
+    let dirty_post = LineRange {
+        start: dirty_post.start.max(1).min(total_lines_after.max(1)),
+        end: dirty_post.end.max(1).min(total_lines_after.max(1)),
+    };
+
+    let mut updated = cached.index.clone();
+    updated.line_count = total_lines_after;
+
+    let frontmatter_detection = detect_frontmatter(lines);
+    let frontmatter_block = frontmatter_detection
+        .as_ref()
+        .map(|detection| MarkdownFrontmatterBlock {
+            kind: "frontmatter".to_string(),
+            line_range: LineRange {
+                start: (detection.start_index + 1) as u32,
+                end: (detection.end_index + 1) as u32,
+            },
+            syntax: detection.syntax.clone(),
+        });
+    let frontmatter_parse = parse_frontmatter(lines);
+    let (frontmatter_data, frontmatter_error) = match frontmatter_parse {
+        Ok(Some(context)) => (Some(context.data), None),
+        Ok(None) => (None, None),
+        Err(err) => (None, Some(err)),
+    };
+
+    updated.frontmatter = frontmatter_block;
+    updated.frontmatter_data = frontmatter_data;
+    updated.frontmatter_error = frontmatter_error;
+
+    let delta = edit_delta_lines(&edit);
+    let edited_range = invalidate_range_for_edit(edit.start_line, edit.end_line, total_lines);
+
+    updated.headings = updated
+        .headings
+        .into_iter()
+        .filter(|heading| !ranges_overlap(&heading.line_range, &edited_range))
+        .map(|mut heading| {
+            if heading.line_range.start > edit.end_line {
+                heading.line_range.start = (heading.line_range.start as i32 + delta) as u32;
+                heading.line_range.end = (heading.line_range.end as i32 + delta) as u32;
+            }
+            heading
+        })
+        .collect();
+
+    updated.code_fences = updated
+        .code_fences
+        .into_iter()
+        .filter(|fence| !ranges_overlap(&fence.line_range, &edited_range))
+        .map(|mut fence| {
+            if fence.line_range.start > edit.end_line {
+                fence.line_range.start = (fence.line_range.start as i32 + delta) as u32;
+                fence.line_range.end = (fence.line_range.end as i32 + delta) as u32;
+            }
+            fence
+        })
+        .collect();
+
+    updated.symbols = updated
+        .symbols
+        .into_iter()
+        .filter(|symbol| !ranges_overlap(&symbol.line_range, &edited_range))
+        .map(|mut symbol| {
+            if symbol.line_range.start > edit.end_line {
+                symbol.line_range.start = (symbol.line_range.start as i32 + delta) as u32;
+                symbol.line_range.end = (symbol.line_range.end as i32 + delta) as u32;
+            }
+            symbol
+        })
+        .collect();
+
+    let parsed = parse_semantic_slice(lines, &dirty_post, frontmatter_detection.as_ref(), policy);
+    updated.headings.extend(parsed.headings);
+    updated.code_fences.extend(parsed.code_fences);
+    updated.symbols.extend(parsed.symbols);
+    updated
+        .headings
+        .sort_by(|a, b| a.line_range.start.cmp(&b.line_range.start));
+    updated
+        .code_fences
+        .sort_by(|a, b| a.line_range.start.cmp(&b.line_range.start));
+    updated
+        .symbols
+        .sort_by(|a, b| a.line_range.start.cmp(&b.line_range.start));
+
+    if let Ok(mut cache) = INCREMENTAL_INDEX.write() {
+        *cache = Some(IncrementalIndexCache {
+            lines: lines.to_vec(),
+            index: updated.clone(),
+        });
+    }
+
+    Some(updated)
+}
+
+fn build_semantic_index_full(
+    lines: &[String],
+    perf_policy: Option<&PerformancePolicyV1>,
+) -> MarkdownSemanticIndex {
     let frontmatter_detection = detect_frontmatter(lines);
     let frontmatter_block = frontmatter_detection
         .as_ref()
@@ -1047,6 +1786,10 @@ fn build_semantic_index(lines: &[String]) -> MarkdownSemanticIndex {
         Err(err) => (None, Some(err)),
     };
 
+    let mut headings = Vec::new();
+    let mut code_fences = Vec::new();
+    let mut symbols = Vec::new();
+
     let mut i = 0usize;
     while i < lines.len() {
         let line_number = i + 1;
@@ -1064,13 +1807,22 @@ fn build_semantic_index(lines: &[String]) -> MarkdownSemanticIndex {
                 language,
                 info_string,
                 ..
-            } = fence.block;
+            } = fence.block.clone();
             code_fences.push(MarkdownCodeFenceBlock {
                 kind: "code_fence".to_string(),
-                line_range,
-                language,
-                info_string,
+                line_range: line_range.clone(),
+                language: language.clone(),
+                info_string: info_string.clone(),
             });
+            if let Some(policy) = perf_policy {
+                if policy.enabled && policy.ast_parsing.enabled {
+                    let block_id = compute_block_id("md_code_fence", &line_range, lines);
+                    let content_hash = compute_line_hash(lines, &line_range);
+                    let fence_symbols =
+                        parse_code_fence_symbols(&fence.block, lines, &block_id, &content_hash, policy);
+                    symbols.extend(fence_symbols);
+                }
+            }
             i = fence.next_index;
             continue;
         }
@@ -1097,9 +1849,96 @@ fn build_semantic_index(lines: &[String]) -> MarkdownSemanticIndex {
         line_count: lines.len() as u32,
         headings,
         code_fences,
+        symbols,
         frontmatter: frontmatter_block,
         frontmatter_data,
         frontmatter_error,
+    }
+}
+
+struct ParsedSemanticSlice {
+    headings: Vec<MarkdownHeadingBlock>,
+    code_fences: Vec<MarkdownCodeFenceBlock>,
+    symbols: Vec<MarkdownCodeSymbol>,
+}
+
+fn parse_semantic_slice(
+    lines: &[String],
+    dirty: &LineRange,
+    frontmatter: Option<&FrontmatterDetection>,
+    policy: &PerformancePolicyV1,
+) -> ParsedSemanticSlice {
+    let mut headings = Vec::new();
+    let mut code_fences = Vec::new();
+    let mut symbols = Vec::new();
+
+    let mut i = dirty.start.saturating_sub(1) as usize;
+    let end = dirty.end.min(lines.len() as u32) as usize;
+
+    while i < end {
+        let line_number = i + 1;
+        if let Some(frontmatter) = frontmatter {
+            if line_number >= frontmatter.start_index + 1 && line_number <= frontmatter.end_index + 1
+            {
+                i = frontmatter.end_index + 1;
+                if i < dirty.start.saturating_sub(1) as usize {
+                    i = dirty.start.saturating_sub(1) as usize;
+                }
+                continue;
+            }
+        }
+        if let Some(fence) = parse_code_fence(lines, i) {
+            let CodeFenceInfo {
+                line_range,
+                language,
+                info_string,
+                ..
+            } = fence.block.clone();
+            if line_range.end < dirty.start || line_range.start > dirty.end {
+                i = fence.next_index;
+                continue;
+            }
+            code_fences.push(MarkdownCodeFenceBlock {
+                kind: "code_fence".to_string(),
+                line_range: line_range.clone(),
+                language: language.clone(),
+                info_string: info_string.clone(),
+            });
+            if policy.enabled && policy.ast_parsing.enabled {
+                let block_id = compute_block_id("md_code_fence", &line_range, lines);
+                let content_hash = compute_line_hash(lines, &line_range);
+                let fence_symbols =
+                    parse_code_fence_symbols(&fence.block, lines, &block_id, &content_hash, policy);
+                symbols.extend(fence_symbols);
+            }
+            i = fence.next_index;
+            continue;
+        }
+        if let Some(heading) = parse_heading(lines, i) {
+            let HeadingBlockInfo {
+                line_range,
+                level,
+                text,
+                ..
+            } = heading.block;
+            if line_range.end >= dirty.start && line_range.start <= dirty.end {
+                headings.push(MarkdownHeadingBlock {
+                    kind: "heading".to_string(),
+                    line_range,
+                    level,
+                    text,
+                });
+            }
+            i = heading.next_index;
+            continue;
+        }
+        i += 1;
+    }
+
+    ParsedSemanticSlice {
+        headings,
+        code_fences,
+        symbols,
     }
 }
 
@@ -1883,6 +2722,220 @@ fn parse_code_fence(lines: &[String], index: usize) -> Option<ParsedFence> {
     })
 }
 
+fn parse_code_fence_symbols(
+    fence: &CodeFenceInfo,
+    lines: &[String],
+    block_id: &str,
+    content_hash: &str,
+    policy: &PerformancePolicyV1,
+) -> Vec<MarkdownCodeSymbol> {
+    if !policy.enabled || !policy.ast_parsing.enabled {
+        return Vec::new();
+    }
+    let language = match normalize_fence_language(fence.language.as_ref()) {
+        Some(value) => value,
+        None => return Vec::new(),
+    };
+    if !is_language_allowed(&language, &policy.ast_parsing.languages) {
+        return Vec::new();
+    }
+    let content = code_fence_content(lines, fence);
+    if content.is_empty() {
+        return Vec::new();
+    }
+    if content.as_bytes().len() > policy.ast_parsing.max_parse_bytes as usize {
+        return Vec::new();
+    }
+
+    let key = AstCacheKey {
+        block_id: block_id.to_string(),
+        content_hash: content_hash.to_string(),
+    };
+    if let Some(cached) = AST_CACHE.get(&key) {
+        return cached;
+    }
+
+    let base_line = fence.line_range.start.saturating_add(1);
+    let symbols = extract_symbols(&language, &content, base_line, block_id);
+    AST_CACHE.insert(key, symbols.clone());
+    symbols
+}
+
+fn normalize_fence_language(language: Option<&String>) -> Option<String> {
+    let raw = language?.trim().to_lowercase();
+    if raw.is_empty() {
+        return None;
+    }
+    let normalized = match raw.as_str() {
+        "ts" | "tsx" | "typescript" | "javascript" | "js" | "jsx" => "typescript",
+        "py" | "python" => "python",
+        "rs" | "rust" => "rust",
+        "go" | "golang" => "go",
+        "md" | "markdown" => "markdown",
+        _ => raw.as_str(),
+    };
+    Some(normalized.to_string())
+}
+
+fn is_language_allowed(language: &str, allowed: &[String]) -> bool {
+    if allowed.is_empty() {
+        return false;
+    }
+    allowed.iter().any(|value| value.eq_ignore_ascii_case(language))
+}
+
+fn code_fence_content(lines: &[String], fence: &CodeFenceInfo) -> String {
+    let start = fence.line_range.start.saturating_add(1) as usize;
+    let end = fence.line_range.end.saturating_sub(1) as usize;
+    if start == 0 || end == 0 || start > end || start > lines.len() {
+        return String::new();
+    }
+    let end = end.min(lines.len());
+    lines[start - 1..end].join("\n")
+}
+
+fn build_line_offsets(text: &str) -> Vec<usize> {
+    let mut offsets = Vec::new();
+    offsets.push(0);
+    for (idx, byte) in text.as_bytes().iter().enumerate() {
+        if *byte == b'\n' {
+            offsets.push(idx + 1);
+        }
+    }
+    offsets
+}
+
+fn byte_to_line(byte: usize, offsets: &[usize]) -> usize {
+    match offsets.binary_search(&byte) {
+        Ok(index) => index,
+        Err(index) => index.saturating_sub(1),
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn extract_symbols(
+    language: &str,
+    content: &str,
+    base_line: u32,
+    block_id: &str,
+) -> Vec<MarkdownCodeSymbol> {
+    let ts_language = match language {
+        "typescript" => language_typescript(),
+        "python" => language_python(),
+        "rust" => language_rust(),
+        "go" => language_go(),
+        _ => return Vec::new(),
+    };
+
+    let mut parser = Parser::new();
+    if parser.set_language(ts_language).is_err() {
+        return Vec::new();
+    }
+    let tree = match parser.parse(content, None) {
+        Some(tree) => tree,
+        None => return Vec::new(),
+    };
+    let offsets = build_line_offsets(content);
+    let bytes = content.as_bytes();
+    let mut symbols = Vec::new();
+    collect_symbols(
+        language,
+        tree.root_node(),
+        bytes,
+        &offsets,
+        base_line,
+        block_id,
+        &mut symbols,
+    );
+    symbols
+}
+
+#[cfg(target_arch = "wasm32")]
+fn extract_symbols(
+    _language: &str,
+    _content: &str,
+    _base_line: u32,
+    _block_id: &str,
+) -> Vec<MarkdownCodeSymbol> {
+    Vec::new()
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn collect_symbols(
+    language: &str,
+    node: Node,
+    source: &[u8],
+    offsets: &[usize],
+    base_line: u32,
+    block_id: &str,
+    symbols: &mut Vec<MarkdownCodeSymbol>,
+) {
+    if let Some(kind) = symbol_kind_for_node(language, node.kind()) {
+        if let Some(name) = extract_symbol_name(node, source) {
+            let start_line = base_line + byte_to_line(node.start_byte(), offsets) as u32;
+            let end_line = base_line + byte_to_line(node.end_byte(), offsets) as u32;
+            symbols.push(MarkdownCodeSymbol {
+                block_id: block_id.to_string(),
+                language: Some(language.to_string()),
+                name,
+                kind: kind.to_string(),
+                line_range: LineRange {
+                    start: start_line,
+                    end: end_line.max(start_line),
+                },
+            });
+        }
+    }
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        collect_symbols(language, child, source, offsets, base_line, block_id, symbols);
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn symbol_kind_for_node(language: &str, kind: &str) -> Option<&'static str> {
+    match language {
+        "typescript" => match kind {
+            "function_declaration" => Some("function"),
+            "class_declaration" => Some("class"),
+            "method_definition" => Some("method"),
+            "interface_declaration" => Some("interface"),
+            "type_alias_declaration" => Some("type"),
+            _ => None,
+        },
+        "python" => match kind {
+            "function_definition" => Some("function"),
+            "class_definition" => Some("class"),
+            _ => None,
+        },
+        "rust" => match kind {
+            "function_item" => Some("function"),
+            "struct_item" => Some("struct"),
+            "enum_item" => Some("enum"),
+            "trait_item" => Some("trait"),
+            _ => None,
+        },
+        "go" => match kind {
+            "function_declaration" => Some("function"),
+            "method_declaration" => Some("method"),
+            "type_declaration" => Some("type"),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn extract_symbol_name(node: Node, source: &[u8]) -> Option<String> {
+    let name_node = node
+        .child_by_field_name("name")
+        .or_else(|| node.child_by_field_name("identifier"))?;
+    name_node
+        .utf8_text(source)
+        .ok()
+        .map(|text| text.to_string())
+}
+
 struct ParsedListBlock {
     range: LineRange,
     item_ranges: Vec<LineRange>,
@@ -1983,6 +3036,10 @@ fn apply_markdown_ops_internal(
     envelope: &MarkdownOperationEnvelope,
     options: Option<&MarkdownApplyOptions>,
 ) -> MarkdownLineApplyResult {
+    let perf_policy = options.and_then(|opts| opts.performance_policy.as_ref());
+    update_perf_cache(perf_policy);
+    update_ast_cache(perf_policy);
+
     if envelope.mode != "markdown" {
         return MarkdownLineApplyResult::Err {
             ok: false,
@@ -2017,7 +3074,7 @@ fn apply_markdown_ops_internal(
         }
     };
 
-    let semantic_index = build_semantic_index(&lines);
+    let semantic_index = build_semantic_index_with_options(&lines, perf_policy);
 
     let resolved_preconditions = match resolve_preconditions(
         &envelope.preconditions,
@@ -2031,15 +3088,33 @@ fn apply_markdown_ops_internal(
         }
     };
 
-    let resolved_ops = match resolve_operations(
-        &envelope.ops,
-        &precondition_map,
-        &resolved_preconditions,
-        line_count,
-        &semantic_index,
-        options.and_then(|opts| opts.targeting_policy.as_ref()),
-        semantic_index.frontmatter.as_ref().map(|fm| fm.line_range.clone()),
-    ) {
+    let use_parallel = perf_policy
+        .filter(|policy| policy.enabled && policy.parallel.enabled)
+        .map(|policy| envelope.ops.len() >= policy.parallel.batch_threshold as usize)
+        .unwrap_or(false);
+
+    let resolved_ops = match if use_parallel {
+        resolve_operations_parallel(
+            &envelope.ops,
+            &precondition_map,
+            &resolved_preconditions,
+            line_count,
+            &semantic_index,
+            options.and_then(|opts| opts.targeting_policy.as_ref()),
+            semantic_index.frontmatter.as_ref().map(|fm| fm.line_range.clone()),
+            perf_policy.map(|policy| policy.parallel.max_threads as usize).unwrap_or(1),
+        )
+    } else {
+        resolve_operations(
+            &envelope.ops,
+            &precondition_map,
+            &resolved_preconditions,
+            line_count,
+            &semantic_index,
+            options.and_then(|opts| opts.targeting_policy.as_ref()),
+            semantic_index.frontmatter.as_ref().map(|fm| fm.line_range.clone()),
+        )
+    } {
         Ok(value) => value,
         Err(error) => {
             return MarkdownLineApplyResult::Err { ok: false, error };
@@ -2050,9 +3125,53 @@ fn apply_markdown_ops_internal(
         return MarkdownLineApplyResult::Err { ok: false, error };
     }
 
-    let apply_result = apply_resolved_operations(&mut lines, &resolved_ops, options);
-    if let Err(error) = apply_result {
-        return MarkdownLineApplyResult::Err { ok: false, error };
+    let mut applied_lines: Option<Vec<String>> = None;
+    if let Some(policy) = perf_policy {
+        if policy.enabled && policy.streaming.enabled {
+            let content_bytes = content.as_bytes().len();
+            let should_stream = content_bytes > policy.streaming.chunk_size_bytes as usize
+                || content_bytes > policy.streaming.memory_limit_bytes as usize;
+            if should_stream {
+            if let Some(result) =
+                apply_resolved_operations_streaming(&lines, &resolved_ops, options, policy)
+            {
+                match result {
+                    Ok(streamed) => {
+                        applied_lines = Some(streamed);
+                    }
+                    Err(error) => {
+                        return MarkdownLineApplyResult::Err { ok: false, error };
+                    }
+                }
+            }
+            }
+        }
+    }
+
+    if let Some(streamed) = applied_lines {
+        lines = streamed;
+    } else {
+        let apply_result = apply_resolved_operations(&mut lines, &resolved_ops, options);
+        if let Err(error) = apply_result {
+            return MarkdownLineApplyResult::Err { ok: false, error };
+        }
+    }
+
+    if let Some(policy) = perf_policy {
+        if policy.enabled && policy.cache.enabled {
+            let total_lines = line_count as u32;
+            for op in resolved_ops.iter() {
+                let (start_line, end_line) = edit_range_for_operation(op);
+                let invalidate_range = invalidate_range_for_edit(start_line, end_line, total_lines);
+                HASH_CACHE.invalidate_range(&invalidate_range);
+            }
+        }
+    }
+
+    if let Some(policy) = perf_policy {
+        if policy.enabled && policy.incremental_index.enabled {
+            let _ = build_semantic_index_with_options(&lines, Some(policy));
+        }
     }
 
     let applied: Vec<MarkdownAppliedOperation> = resolved_ops
@@ -2330,6 +3449,130 @@ fn resolve_operations(
     Ok(resolved_ops)
 }
 
+fn resolve_operations_parallel(
+    ops: &[MarkdownOperation],
+    preconditions: &BTreeMap<String, MarkdownPreconditionV1>,
+    resolved_ranges: &BTreeMap<String, LineRange>,
+    line_count: usize,
+    semantic_index: &MarkdownSemanticIndex,
+    policy: Option<&MarkdownTargetingPolicyV1>,
+    frontmatter_range: Option<LineRange>,
+    max_threads: usize,
+) -> Result<Vec<ResolvedOperation>, MarkdownOperationError> {
+    let mut used_preconditions = BTreeMap::new();
+    for (index, op) in ops.iter().enumerate() {
+        let precondition_id = op.precondition_id();
+        if used_preconditions.contains_key(precondition_id) {
+            return Err(MarkdownOperationError {
+                code: "MCM_INVALID_REQUEST".to_string(),
+                message: format!("Duplicate precondition_id in ops: {precondition_id}"),
+                precondition_id: Some(precondition_id.to_string()),
+                op_index: Some(index as u32),
+            });
+        }
+        used_preconditions.insert(precondition_id.to_string(), true);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let pool = ThreadPoolBuilder::new()
+            .num_threads(max_threads.max(1))
+            .build()
+            .ok();
+        let results: Vec<Result<ResolvedOperation, MarkdownOperationError>> = match pool {
+            Some(pool) => pool.install(|| {
+                ops.par_iter()
+                    .enumerate()
+                    .map(|(index, op)| {
+                        let precondition_id = op.precondition_id();
+                        let precondition =
+                            preconditions.get(precondition_id).ok_or_else(|| MarkdownOperationError {
+                                code: "MCM_PRECONDITION_FAILED".to_string(),
+                                message: format!("Missing precondition for {precondition_id}"),
+                                precondition_id: Some(precondition_id.to_string()),
+                                op_index: Some(index as u32),
+                            })?;
+                        let resolved_range = resolved_ranges
+                            .get(precondition_id)
+                            .cloned()
+                            .ok_or_else(|| MarkdownOperationError {
+                                code: "MCM_PRECONDITION_FAILED".to_string(),
+                                message: format!("Missing resolved range for {precondition_id}"),
+                                precondition_id: Some(precondition_id.to_string()),
+                                op_index: Some(index as u32),
+                            })?;
+                        resolve_operation(
+                            op,
+                            precondition,
+                            resolved_range,
+                            line_count,
+                            semantic_index,
+                            policy,
+                            index,
+                            frontmatter_range.clone(),
+                        )
+                    })
+                    .collect()
+            }),
+            None => ops
+                .par_iter()
+                .enumerate()
+                .map(|(index, op)| {
+                    let precondition_id = op.precondition_id();
+                    let precondition =
+                        preconditions.get(precondition_id).ok_or_else(|| MarkdownOperationError {
+                            code: "MCM_PRECONDITION_FAILED".to_string(),
+                            message: format!("Missing precondition for {precondition_id}"),
+                            precondition_id: Some(precondition_id.to_string()),
+                            op_index: Some(index as u32),
+                        })?;
+                    let resolved_range = resolved_ranges
+                        .get(precondition_id)
+                        .cloned()
+                        .ok_or_else(|| MarkdownOperationError {
+                            code: "MCM_PRECONDITION_FAILED".to_string(),
+                            message: format!("Missing resolved range for {precondition_id}"),
+                            precondition_id: Some(precondition_id.to_string()),
+                            op_index: Some(index as u32),
+                        })?;
+                    resolve_operation(
+                        op,
+                        precondition,
+                        resolved_range,
+                        line_count,
+                        semantic_index,
+                        policy,
+                        index,
+                        frontmatter_range.clone(),
+                    )
+                })
+                .collect(),
+        };
+
+        let mut resolved_ops = Vec::with_capacity(ops.len());
+        for result in results {
+            match result {
+                Ok(value) => resolved_ops.push(value),
+                Err(err) => return Err(err),
+            }
+        }
+        return Ok(resolved_ops);
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    {
+        resolve_operations(
+            ops,
+            preconditions,
+            resolved_ranges,
+            line_count,
+            semantic_index,
+            policy,
+            frontmatter_range,
+        )
+    }
+}
+
 fn resolve_operation(
     op: &MarkdownOperation,
     _precondition: &MarkdownPreconditionV1,
@@ -2597,6 +3840,131 @@ fn apply_resolved_operations(
     Ok(())
 }
 
+fn apply_resolved_operations_streaming(
+    lines: &[String],
+    ops: &[ResolvedOperation],
+    options: Option<&MarkdownApplyOptions>,
+    policy: &PerformancePolicyV1,
+) -> Option<Result<Vec<String>, MarkdownOperationError>> {
+    if !policy.enabled || !policy.streaming.enabled {
+        return None;
+    }
+
+    if ops.iter().any(|op| operation_delta_lines(op) != 0 || matches!(op.op, MarkdownOperation::UpdateFrontmatter(_))) {
+        return None;
+    }
+
+    let chunk_ranges = build_chunk_ranges(lines, policy.streaming.chunk_size_bytes as usize);
+    if chunk_ranges.is_empty() {
+        return None;
+    }
+
+    let mut assignments: Vec<Vec<ResolvedOperation>> = vec![Vec::new(); chunk_ranges.len()];
+    for op in ops {
+        let chunk_index = chunk_ranges
+            .iter()
+            .position(|range| range.start <= op.resolved_range.start && range.end >= op.resolved_range.end)?;
+        assignments[chunk_index].push(op.clone());
+    }
+
+    let mut output = Vec::new();
+    for (idx, range) in chunk_ranges.iter().enumerate() {
+        let start = range.start.saturating_sub(1) as usize;
+        let end = range.end.min(lines.len() as u32) as usize;
+        let mut chunk_lines = lines.get(start..end).unwrap_or(&[]).to_vec();
+        let offset = range.start.saturating_sub(1) as usize;
+        let mut chunk_ops = Vec::new();
+        for op in assignments[idx].iter() {
+            let mut local = op.clone();
+            local.resolved_range.start = local.resolved_range.start.saturating_sub(offset as u32);
+            local.resolved_range.end = local.resolved_range.end.saturating_sub(offset as u32);
+            if let Some(insert_index) = local.insert_index.as_mut() {
+                *insert_index = insert_index.saturating_sub(offset);
+            }
+            chunk_ops.push(local);
+        }
+        if let Err(err) = apply_resolved_operations(&mut chunk_lines, &chunk_ops, options) {
+            return Some(Err(err));
+        }
+        output.extend(chunk_lines);
+    }
+
+    Some(Ok(output))
+}
+
+fn build_chunk_ranges(lines: &[String], chunk_size_bytes: usize) -> Vec<LineRange> {
+    if lines.is_empty() {
+        return Vec::new();
+    }
+    let mut ranges = Vec::new();
+    let mut start = 1u32;
+    let mut size = 0usize;
+    for (idx, line) in lines.iter().enumerate() {
+        let line_bytes = line.as_bytes().len().saturating_add(1);
+        if size + line_bytes > chunk_size_bytes && idx > 0 {
+            ranges.push(LineRange {
+                start,
+                end: idx as u32,
+            });
+            start = (idx + 1) as u32;
+            size = 0;
+        }
+        size = size.saturating_add(line_bytes);
+    }
+    if start <= lines.len() as u32 {
+        ranges.push(LineRange {
+            start,
+            end: lines.len() as u32,
+        });
+    }
+    ranges
+}
+
+fn operation_delta_lines(op: &ResolvedOperation) -> i32 {
+    match &op.op {
+        MarkdownOperation::ReplaceLines(inner) => {
+            let new_lines = split_markdown_lines(inner.content.clone()).len() as i32;
+            let removed = (op.resolved_range.end as i32 - op.resolved_range.start as i32 + 1).max(0);
+            new_lines - removed
+        }
+        MarkdownOperation::DeleteLines(_) => {
+            let removed = (op.resolved_range.end as i32 - op.resolved_range.start as i32 + 1).max(0);
+            -removed
+        }
+        MarkdownOperation::InsertLines(inner) => split_markdown_lines(inner.content.clone()).len() as i32,
+        MarkdownOperation::ReplaceBlock(inner) => {
+            let new_lines = split_markdown_lines(inner.content.clone()).len() as i32;
+            let removed = (op.resolved_range.end as i32 - op.resolved_range.start as i32 + 1).max(0);
+            new_lines - removed
+        }
+        MarkdownOperation::InsertAfter(inner) => split_markdown_lines(inner.content.clone()).len() as i32,
+        MarkdownOperation::InsertBefore(inner) => split_markdown_lines(inner.content.clone()).len() as i32,
+        MarkdownOperation::InsertCodeFence(inner) => {
+            build_code_fence_lines(inner).map(|lines| lines.len() as i32).unwrap_or(0)
+        }
+        MarkdownOperation::UpdateFrontmatter(_) => 0,
+    }
+}
+
+fn edit_range_for_operation(op: &ResolvedOperation) -> (u32, u32) {
+    match &op.op {
+        MarkdownOperation::InsertLines(inner) => {
+            if inner.target.after_line.is_some() {
+                (op.resolved_range.end.saturating_add(1), op.resolved_range.end)
+            } else {
+                (op.resolved_range.start, op.resolved_range.start.saturating_sub(1))
+            }
+        }
+        MarkdownOperation::InsertAfter(_) | MarkdownOperation::InsertCodeFence(_) => {
+            (op.resolved_range.end.saturating_add(1), op.resolved_range.end)
+        }
+        MarkdownOperation::InsertBefore(_) => {
+            (op.resolved_range.start, op.resolved_range.start.saturating_sub(1))
+        }
+        _ => (op.resolved_range.start, op.resolved_range.end),
+    }
+}
+
 fn apply_resolved_operation(
     lines: &mut Vec<String>,
     resolved: &ResolvedOperation,
@@ -2770,12 +4138,24 @@ struct FrontmatterContext {
 }
 
 fn compute_block_id(block_type: &str, range: &LineRange, lines: &[String]) -> String {
+    let quick_hash = quick_hash_lines(lines, range);
+    let key = BlockCacheKey {
+        block_type: block_type.to_string(),
+        start: range.start,
+        end: range.end,
+        quick_hash,
+    };
+    if let Some(value) = HASH_CACHE.get_block_hash(&key) {
+        return value;
+    }
     let content_hash = compute_line_hash(lines, range);
     let canonical = format!(
         "LFCC_MD_BLOCK_V1\ntype={}\nstart_line={}\nend_line={}\ncontent_hash={}",
         block_type, range.start, range.end, content_hash
     );
-    sha256_hex(&canonical)
+    let hash = sha256_hex(&canonical);
+    HASH_CACHE.insert_block_hash(key, hash.clone());
+    hash
 }
 
 fn find_overlap(ops: &[ResolvedOperation]) -> Option<MarkdownOperationError> {

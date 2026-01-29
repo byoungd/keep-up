@@ -6,6 +6,7 @@ export type {
   MarkdownApplyOptions,
   MarkdownBlock,
   MarkdownCodeFenceBlock,
+  MarkdownCodeSymbol,
   MarkdownContentHashOptions,
   MarkdownFrontmatterBlock,
   MarkdownFrontmatterPolicy,
@@ -22,6 +23,7 @@ export type {
   MarkdownSemanticTarget,
   MarkdownTargetingPolicyV1,
   NativeMarkdownContentBinding,
+  PerformancePolicyV1,
 } from "./types";
 
 const browserError = new Error("Markdown content native bindings are not available in browser.");

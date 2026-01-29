@@ -342,6 +342,49 @@ export type DevToolingPolicy = {
   state_visualizer: boolean;
 };
 
+export type PerformancePolicyV1 = {
+  enabled: boolean;
+  incremental_index: {
+    enabled: boolean;
+    max_edit_log_entries: number;
+    dirty_region_merge_threshold: number;
+  };
+  cache: {
+    enabled: boolean;
+    max_entries: number;
+    ttl_seconds?: number;
+  };
+  parallel: {
+    enabled: boolean;
+    max_threads: number;
+    batch_threshold: number;
+  };
+  ast_parsing: {
+    enabled: boolean;
+    languages: string[];
+    max_parse_bytes: number;
+  };
+  streaming: {
+    enabled: boolean;
+    chunk_size_bytes: number;
+    memory_limit_bytes: number;
+    overlap_lines: number;
+  };
+};
+
+export type PerformanceCapabilities = {
+  performance_incremental_index?: boolean;
+  performance_parallel_ops?: boolean;
+  performance_ast_parsing?: boolean;
+  performance_streaming?: boolean;
+  performance_cache?: boolean;
+};
+
+export type PolicyExtensions = {
+  performance?: PerformancePolicyV1;
+  [key: string]: unknown;
+};
+
 /** Capabilities flags */
 export type Capabilities = {
   cross_block_annotations: boolean;
@@ -371,6 +414,11 @@ export type Capabilities = {
   markdown_footnotes?: boolean;
   markdown_wikilinks?: boolean;
   markdown_math?: boolean;
+  performance_incremental_index?: boolean;
+  performance_parallel_ops?: boolean;
+  performance_ast_parsing?: boolean;
+  performance_streaming?: boolean;
+  performance_cache?: boolean;
 };
 
 /** Conformance kit policy */
@@ -400,7 +448,7 @@ export type PolicyManifestV09 = {
   dev_tooling_policy: DevToolingPolicy;
   capabilities: Capabilities;
   conformance_kit_policy: ConformanceKitPolicy;
-  extensions?: Record<string, unknown>; // P0.1: Extensions support
+  extensions?: PolicyExtensions; // P0.1: Extensions support
   v: number;
 };
 

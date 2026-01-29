@@ -1102,6 +1102,11 @@ function validateCapabilities(caps: unknown, errors: ValidationError[]): void {
     "markdown_footnotes",
     "markdown_wikilinks",
     "markdown_math",
+    "performance_incremental_index",
+    "performance_parallel_ops",
+    "performance_ast_parsing",
+    "performance_streaming",
+    "performance_cache",
   ];
   for (const field of optional) {
     if (c[field] !== undefined && typeof c[field] !== "boolean") {

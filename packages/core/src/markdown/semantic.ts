@@ -1,4 +1,4 @@
-import type { MarkdownTargetingPolicyV1 } from "../kernel/policy/types.js";
+import type { MarkdownTargetingPolicyV1, PerformancePolicyV1 } from "../kernel/policy/types.js";
 import { detectFrontmatter, parseFrontmatter } from "./frontmatter.js";
 import { resolveNativeMarkdownContent } from "./native.js";
 import type {
@@ -23,11 +23,14 @@ const ATX_HEADING_PATTERN = /^\s{0,3}(#{1,6})\s*(.*?)\s*$/;
 const SETEXT_HEADING_PATTERN = /^\s{0,3}(=+|-+)\s*$/;
 const CODE_FENCE_PATTERN = /^\s{0,3}(`{3,}|~{3,})(.*)$/;
 
-export function buildMarkdownSemanticIndex(lines: string[]): MarkdownSemanticIndex {
+export function buildMarkdownSemanticIndex(
+  lines: string[],
+  options?: { performancePolicy?: PerformancePolicyV1 }
+): MarkdownSemanticIndex {
   const native = resolveNativeMarkdownContent();
   if (native) {
     try {
-      return native.buildMarkdownSemanticIndex(lines);
+      return native.buildMarkdownSemanticIndex(lines, options);
     } catch {
       // fall back to JS parsing
     }

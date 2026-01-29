@@ -357,6 +357,11 @@ function intersectCapabilities(caps: Capabilities[]): Capabilities {
     markdown_footnotes: caps.every((c) => c.markdown_footnotes === true),
     markdown_wikilinks: caps.every((c) => c.markdown_wikilinks === true),
     markdown_math: caps.every((c) => c.markdown_math === true),
+    performance_incremental_index: caps.every((c) => c.performance_incremental_index === true),
+    performance_parallel_ops: caps.every((c) => c.performance_parallel_ops === true),
+    performance_ast_parsing: caps.every((c) => c.performance_ast_parsing === true),
+    performance_streaming: caps.every((c) => c.performance_streaming === true),
+    performance_cache: caps.every((c) => c.performance_cache === true),
   };
 }
 
