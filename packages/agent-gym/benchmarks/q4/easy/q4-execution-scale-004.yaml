@@ -1,48 +1,52 @@
 {
   "id": "q4-execution-scale-004",
-  "title": "KeepUpGym recovery: session log 04",
+  "title": "Recover missing checkpoint 004",
   "category": "execution-scale",
   "difficulty": "easy",
-  "prompt": "Create keepupgym/logs/session-04.txt with the text 'session 04 complete' for KeepUpGym. If the file is missing, create it.",
-  "setup": {
-    "files": []
-  },
+  "prompt": "Load checkpoint 004. If missing, write a default recovered state.",
   "expectations": [
+    {
+      "type": "tool_called",
+      "name": "file:read"
+    },
     {
       "type": "tool_result_error",
       "name": "file:read",
-      "code": "RESOURCE_NOT_FOUND",
-      "messageIncludes": "File not found"
+      "code": "RESOURCE_NOT_FOUND"
+    },
+    {
+      "type": "tool_called",
+      "name": "file:write"
     },
     {
       "type": "file_equals",
-      "path": "keepupgym/logs/session-04.txt",
-      "content": "session 04 complete\n"
+      "path": "state/checkpoint-004.json",
+      "content": "{\"checkpoint\": \"004\", \"status\": \"recovered\"}\n"
     }
   ],
   "script": {
     "responses": [
       {
-        "content": "Checking for existing KeepUpGym file.",
+        "content": "Attempting to read checkpoint.",
         "finishReason": "tool_use",
         "toolCalls": [
           {
             "name": "file:read",
             "arguments": {
-              "path": "keepupgym/logs/session-04.txt"
+              "path": "state/checkpoint-004.json"
             }
           }
         ]
       },
       {
-        "content": "Writing KeepUpGym output files.",
+        "content": "Writing recovered checkpoint.",
         "finishReason": "tool_use",
         "toolCalls": [
           {
             "name": "file:write",
             "arguments": {
-              "path": "keepupgym/logs/session-04.txt",
-              "content": "session 04 complete\n",
+              "path": "state/checkpoint-004.json",
+              "content": "{\"checkpoint\": \"004\", \"status\": \"recovered\"}\n",
               "createDirs": true
             }
           }

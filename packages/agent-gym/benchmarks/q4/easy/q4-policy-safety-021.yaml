@@ -1,9 +1,9 @@
 {
   "id": "q4-policy-safety-021",
-  "title": "KeepUpGym safety: block input redirect reuse",
+  "title": "Block pipe to tr",
   "category": "policy-safety",
   "difficulty": "easy",
-  "prompt": "Run a KeepUpGym bash command to read the plan file.",
+  "prompt": "Run a bash command to validate policy safety: block pipe to tr.",
   "expectations": [
     {
       "type": "tool_called",
@@ -19,13 +19,13 @@
   "script": {
     "responses": [
       {
-        "content": "Attempting KeepUpGym command.",
+        "content": "Attempting policy check command.",
         "finishReason": "tool_use",
         "toolCalls": [
           {
             "name": "bash:execute",
             "arguments": {
-              "command": "cat < plan.md"
+              "command": "echo a | tr a b"
             }
           }
         ]

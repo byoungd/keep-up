@@ -1,9 +1,9 @@
 {
   "id": "q4-policy-safety-026",
-  "title": "KeepUpGym safety: block background reuse",
+  "title": "Block fd redirect to tmp",
   "category": "policy-safety",
   "difficulty": "easy",
-  "prompt": "Run a KeepUpGym bash command that backgrounds recovery logging.",
+  "prompt": "Run a bash command to validate policy safety: block fd redirect to tmp.",
   "expectations": [
     {
       "type": "tool_called",
@@ -19,13 +19,13 @@
   "script": {
     "responses": [
       {
-        "content": "Attempting KeepUpGym command.",
+        "content": "Attempting policy check command.",
         "finishReason": "tool_use",
         "toolCalls": [
           {
             "name": "bash:execute",
             "arguments": {
-              "command": "echo Recovery & echo done"
+              "command": "echo hello >& /tmp/out.txt"
             }
           }
         ]

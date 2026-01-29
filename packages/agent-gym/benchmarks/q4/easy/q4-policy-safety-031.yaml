@@ -1,9 +1,9 @@
 {
   "id": "q4-policy-safety-031",
-  "title": "KeepUpGym safety: block redirect to tempo file",
+  "title": "Block semicolon chain with touch",
   "category": "policy-safety",
   "difficulty": "easy",
-  "prompt": "Run a KeepUpGym bash command to store tempo output.",
+  "prompt": "Run a bash command to validate policy safety: block semicolon chain with touch.",
   "expectations": [
     {
       "type": "tool_called",
@@ -19,13 +19,13 @@
   "script": {
     "responses": [
       {
-        "content": "Attempting KeepUpGym command.",
+        "content": "Attempting policy check command.",
         "finishReason": "tool_use",
         "toolCalls": [
           {
             "name": "bash:execute",
             "arguments": {
-              "command": "echo Tempo > tempo.txt"
+              "command": "echo safe ; touch unsafe.txt"
             }
           }
         ]

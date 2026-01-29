@@ -1,57 +1,94 @@
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { buildSweBenchSuite, readSweBenchFile, writeSweBenchSuite } from "../adapters/sweBench";
+import {
+  parseSweBenchJsonl,
+  type SweBenchScenarioOptions,
+  sweBenchToScenario,
+} from "../adapters/sweBench";
+import type { GymCategory, GymDifficulty, GymScenario } from "../types";
 
-interface SweBenchCliOptions {
-  inputPath: string;
-  outputPath: string;
-  includeHints: boolean;
-  maxCases?: number;
+interface CliOptions {
+  input: string;
+  output?: string;
+  limit?: number;
+  difficulty?: GymDifficulty;
+  category?: GymCategory;
+  maxTurns?: number;
   json: boolean;
 }
 
-const DEFAULT_OUTPUT = path.resolve(process.cwd(), "reports/swe-bench.json");
-
-async function main(): Promise<void> {
-  const options = parseArgs(process.argv.slice(2));
-  const entries = await readSweBenchFile(options.inputPath);
-  const suite = buildSweBenchSuite(entries, {
-    includeHints: options.includeHints,
-    maxCases: options.maxCases,
-  });
-
-  await writeSweBenchSuite(suite, options.outputPath);
-
-  if (options.json) {
-    process.stdout.write(`${JSON.stringify(suite, null, 2)}\n`);
-  } else {
-    process.stdout.write(
-      `SWE-bench import: ${suite.count} cases -> ${path.relative(process.cwd(), options.outputPath)}\n`
-    );
-  }
+interface SweBenchImportReport {
+  source: string;
+  importedAt: string;
+  totalRecords: number;
+  converted: number;
+  skipped: number;
+  errors: Array<{ line: number; reason: string; raw: string }>;
+  scenarios: GymScenario[];
 }
 
-function parseArgs(args: string[]): SweBenchCliOptions {
-  if (args.includes("--help") || args.includes("-h")) {
-    printHelp();
-    process.exit(0);
+async function main() {
+  const options = parseArgs(process.argv.slice(2));
+
+  const raw = await readFile(options.input, "utf-8");
+  const { records, errors } = parseSweBenchJsonl(raw);
+
+  const limited = options.limit ? records.slice(0, options.limit) : records;
+  const scenarioOptions: SweBenchScenarioOptions = {
+    difficulty: options.difficulty,
+    category: options.category,
+    maxTurns: options.maxTurns,
+  };
+
+  const scenarios = limited.map((record) => sweBenchToScenario(record, scenarioOptions));
+
+  const report: SweBenchImportReport = {
+    source: path.resolve(options.input),
+    importedAt: new Date().toISOString(),
+    totalRecords: records.length,
+    converted: scenarios.length,
+    skipped: errors.length,
+    errors,
+    scenarios,
+  };
+
+  const output = JSON.stringify(report, null, 2);
+
+  if (options.output) {
+    await mkdir(path.dirname(options.output), { recursive: true });
+    await writeFile(options.output, output, "utf-8");
   }
 
-  const inputPath = getFlagValue(args, "--input");
-  if (!inputPath) {
-    printHelp();
-    throw new Error("--input is required");
+  if (options.json || !options.output) {
+    process.stdout.write(`${output}\n`);
   }
 
-  const outputPath = getFlagValue(args, "--output") ?? DEFAULT_OUTPUT;
-  const includeHints = args.includes("--include-hints");
-  const maxCases = parseNumber(getFlagValue(args, "--max-cases"));
+  process.stderr.write(
+    `SWE-bench import: ${report.converted} scenarios, ${report.skipped} skipped.\n`
+  );
+}
+
+function parseArgs(args: string[]): CliOptions {
+  const input = getFlagValue(args, "--input");
+  const output = getFlagValue(args, "--output");
+  const limit = parseNumber(getFlagValue(args, "--limit"));
+  const maxTurns = parseNumber(getFlagValue(args, "--max-turns"));
+  const difficulty = getFlagValue(args, "--difficulty") as GymDifficulty | undefined;
+  const category = getFlagValue(args, "--category") as GymCategory | undefined;
   const json = args.includes("--json");
 
+  if (args.includes("--help") || args.includes("-h") || !input) {
+    printHelp();
+    process.exit(input ? 0 : 1);
+  }
+
   return {
-    inputPath,
-    outputPath,
-    includeHints,
-    maxCases,
+    input,
+    output,
+    limit: limit ?? undefined,
+    difficulty,
+    category,
+    maxTurns: maxTurns ?? undefined,
     json,
   };
 }
@@ -73,13 +110,15 @@ function parseNumber(value: string | undefined): number | undefined {
 }
 
 function printHelp(): void {
-  process.stdout.write(`SWE-bench Importer\n\n`);
-  process.stdout.write(`Options:\n`);
-  process.stdout.write(`  --input <path>\n`);
-  process.stdout.write(`  --output <path> (default: reports/swe-bench.json)\n`);
-  process.stdout.write(`  --max-cases <number>\n`);
-  process.stdout.write(`  --include-hints\n`);
-  process.stdout.write(`  --json\n`);
+  process.stdout.write("KeepUpGym SWE-bench Import\n\n");
+  process.stdout.write("Options:\n");
+  process.stdout.write("  --input <path> (required)\n");
+  process.stdout.write("  --output <path>\n");
+  process.stdout.write("  --limit <number>\n");
+  process.stdout.write("  --difficulty <easy|medium|hard>\n");
+  process.stdout.write("  --category <category>\n");
+  process.stdout.write("  --max-turns <number>\n");
+  process.stdout.write("  --json\n");
 }
 
 main().catch((error) => {

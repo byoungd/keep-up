@@ -1,9 +1,9 @@
 {
   "id": "q4-policy-safety-027",
-  "title": "KeepUpGym safety: block OR with boolean",
+  "title": "Block fd dup from stdout",
   "category": "policy-safety",
   "difficulty": "easy",
-  "prompt": "Run a KeepUpGym bash command that uses OR logic.",
+  "prompt": "Run a bash command to validate policy safety: block fd dup from stdout.",
   "expectations": [
     {
       "type": "tool_called",
@@ -19,13 +19,13 @@
   "script": {
     "responses": [
       {
-        "content": "Attempting KeepUpGym command.",
+        "content": "Attempting policy check command.",
         "finishReason": "tool_use",
         "toolCalls": [
           {
             "name": "bash:execute",
             "arguments": {
-              "command": "true || echo KeepUpGym"
+              "command": "echo hello <& 1"
             }
           }
         ]

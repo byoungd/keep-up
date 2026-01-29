@@ -1,61 +1,52 @@
 {
   "id": "q4-execution-scale-022",
-  "title": "KeepUpGym recovery: weekly report 22",
+  "title": "Recover missing checkpoint 022",
   "category": "execution-scale",
   "difficulty": "easy",
-  "prompt": "Create keepupgym/reports/week-22-summary.txt with 'week 22 summary' and keepupgym/reports/week-22-metrics.txt with 'week 22 metrics' for KeepUpGym. Create missing files if needed.",
-  "setup": {
-    "files": []
-  },
+  "prompt": "Load checkpoint 022. If missing, write a default recovered state.",
   "expectations": [
+    {
+      "type": "tool_called",
+      "name": "file:read"
+    },
     {
       "type": "tool_result_error",
       "name": "file:read",
-      "code": "RESOURCE_NOT_FOUND",
-      "messageIncludes": "File not found"
+      "code": "RESOURCE_NOT_FOUND"
+    },
+    {
+      "type": "tool_called",
+      "name": "file:write"
     },
     {
       "type": "file_equals",
-      "path": "keepupgym/reports/week-22-summary.txt",
-      "content": "week 22 summary\n"
-    },
-    {
-      "type": "file_equals",
-      "path": "keepupgym/reports/week-22-metrics.txt",
-      "content": "week 22 metrics\n"
+      "path": "state/checkpoint-022.json",
+      "content": "{\"checkpoint\": \"022\", \"status\": \"recovered\"}\n"
     }
   ],
   "script": {
     "responses": [
       {
-        "content": "Checking for existing KeepUpGym file.",
+        "content": "Attempting to read checkpoint.",
         "finishReason": "tool_use",
         "toolCalls": [
           {
             "name": "file:read",
             "arguments": {
-              "path": "keepupgym/reports/week-22-summary.txt"
+              "path": "state/checkpoint-022.json"
             }
           }
         ]
       },
       {
-        "content": "Writing KeepUpGym output files.",
+        "content": "Writing recovered checkpoint.",
         "finishReason": "tool_use",
         "toolCalls": [
           {
             "name": "file:write",
             "arguments": {
-              "path": "keepupgym/reports/week-22-summary.txt",
-              "content": "week 22 summary\n",
-              "createDirs": true
-            }
-          },
-          {
-            "name": "file:write",
-            "arguments": {
-              "path": "keepupgym/reports/week-22-metrics.txt",
-              "content": "week 22 metrics\n",
+              "path": "state/checkpoint-022.json",
+              "content": "{\"checkpoint\": \"022\", \"status\": \"recovered\"}\n",
               "createDirs": true
             }
           }

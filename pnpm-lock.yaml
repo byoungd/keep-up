@@ -232,10 +232,16 @@ importers:
       '@ku0/agent-runtime-tools':
         specifier: workspace:*
         version: link:../agent-runtime-tools
+      diff:
+        specifier: ^8.0.3
+        version: 8.0.3
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
     devDependencies:
+      '@types/diff':
+        specifier: ^8.0.0
+        version: 8.0.0
       '@types/node':
         specifier: ^22.10.2
         version: 22.19.3

@@ -1,74 +1,52 @@
 {
   "id": "q4-execution-scale-027",
-  "title": "KeepUpGym recovery: set bundle 27",
+  "title": "Recover missing checkpoint 027",
   "category": "execution-scale",
   "difficulty": "easy",
-  "prompt": "Create the KeepUpGym set files keepupgym/sets/set-27-a.txt ('set 27 a'), keepupgym/sets/set-27-b.txt ('set 27 b'), and keepupgym/sets/set-27-c.txt ('set 27 c'). If any file is missing, create it.",
-  "setup": {
-    "files": []
-  },
+  "prompt": "Load checkpoint 027. If missing, write a default recovered state.",
   "expectations": [
+    {
+      "type": "tool_called",
+      "name": "file:read"
+    },
     {
       "type": "tool_result_error",
       "name": "file:read",
-      "code": "RESOURCE_NOT_FOUND",
-      "messageIncludes": "File not found"
+      "code": "RESOURCE_NOT_FOUND"
+    },
+    {
+      "type": "tool_called",
+      "name": "file:write"
     },
     {
       "type": "file_equals",
-      "path": "keepupgym/sets/set-27-a.txt",
-      "content": "set 27 a\n"
-    },
-    {
-      "type": "file_equals",
-      "path": "keepupgym/sets/set-27-b.txt",
-      "content": "set 27 b\n"
-    },
-    {
-      "type": "file_equals",
-      "path": "keepupgym/sets/set-27-c.txt",
-      "content": "set 27 c\n"
+      "path": "state/checkpoint-027.json",
+      "content": "{\"checkpoint\": \"027\", \"status\": \"recovered\"}\n"
     }
   ],
   "script": {
     "responses": [
       {
-        "content": "Checking for existing KeepUpGym file.",
+        "content": "Attempting to read checkpoint.",
         "finishReason": "tool_use",
         "toolCalls": [
           {
             "name": "file:read",
             "arguments": {
-              "path": "keepupgym/sets/set-27-a.txt"
+              "path": "state/checkpoint-027.json"
             }
           }
         ]
       },
       {
-        "content": "Writing KeepUpGym output files.",
+        "content": "Writing recovered checkpoint.",
         "finishReason": "tool_use",
         "toolCalls": [
           {
             "name": "file:write",
             "arguments": {
-              "path": "keepupgym/sets/set-27-a.txt",
-              "content": "set 27 a\n",
-              "createDirs": true
-            }
-          },
-          {
-            "name": "file:write",
-            "arguments": {
-              "path": "keepupgym/sets/set-27-b.txt",
-              "content": "set 27 b\n",
-              "createDirs": true
-            }
-          },
-          {
-            "name": "file:write",
-            "arguments": {
-              "path": "keepupgym/sets/set-27-c.txt",
-              "content": "set 27 c\n",
+              "path": "state/checkpoint-027.json",
+              "content": "{\"checkpoint\": \"027\", \"status\": \"recovered\"}\n",
               "createDirs": true
             }
           }

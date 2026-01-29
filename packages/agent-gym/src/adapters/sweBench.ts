@@ -1,120 +1,154 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
+import { parsePatch } from "diff";
+import type { GymCategory, GymDifficulty, GymScenario } from "../types";
 
-export type SweBenchRawCase = {
+export type SweBenchRecord = {
   instance_id: string;
-  repo: string;
-  base_commit: string;
-  patch: string;
   problem_statement: string;
-  hints_text?: string;
-  test_patch?: string;
-};
-
-export type SweBenchAdapterOptions = {
-  includeHints?: boolean;
-  maxCases?: number;
-};
-
-export type ExternalBenchmarkCase = {
-  id: string;
-  source: "swe-bench";
-  repo: string;
-  baseCommit: string;
-  prompt: string;
   patch: string;
-  metadata: Record<string, unknown>;
+  repo?: string;
+  base_commit?: string;
+  hints_text?: string;
 };
 
-export type ExternalBenchmarkSuite = {
-  source: "swe-bench";
-  generatedAt: string;
-  count: number;
-  cases: ExternalBenchmarkCase[];
+export type SweBenchParseError = {
+  line: number;
+  reason: string;
+  raw: string;
 };
 
-export function parseSweBenchJSONL(raw: string): SweBenchRawCase[] {
-  const lines = raw
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
+export type SweBenchParseResult = {
+  records: SweBenchRecord[];
+  errors: SweBenchParseError[];
+};
 
-  const cases: SweBenchRawCase[] = [];
-  for (const line of lines) {
-    const parsed = JSON.parse(line) as SweBenchRawCase;
-    if (!parsed.instance_id || !parsed.repo || !parsed.base_commit || !parsed.patch) {
-      throw new Error("SWE-bench record missing required fields");
+export type SweBenchScenarioOptions = {
+  difficulty?: GymDifficulty;
+  category?: GymCategory;
+  maxTurns?: number;
+};
+
+export function parseSweBenchJsonl(content: string): SweBenchParseResult {
+  const records: SweBenchRecord[] = [];
+  const errors: SweBenchParseError[] = [];
+  const lines = content.split(/\r?\n/);
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const raw = lines[i].trim();
+    if (!raw) {
+      continue;
     }
-    if (!parsed.problem_statement) {
-      throw new Error(`SWE-bench record ${parsed.instance_id} missing problem_statement`);
+
+    const parsed = parseSweBenchLine(raw, i + 1);
+    if (parsed.error) {
+      errors.push(parsed.error);
+      continue;
     }
-    cases.push(parsed);
+    records.push(parsed.record);
   }
 
-  return cases;
+  return { records, errors };
 }
 
-export function buildSweBenchPrompt(
-  entry: SweBenchRawCase,
-  options: SweBenchAdapterOptions = {}
-): string {
-  const sections: string[] = [];
-  sections.push(`Repository: ${entry.repo}`);
-  sections.push(`Base commit: ${entry.base_commit}`);
-  sections.push("");
-  sections.push(entry.problem_statement.trim());
-
-  if (options.includeHints && entry.hints_text) {
-    sections.push("");
-    sections.push("Hints:");
-    sections.push(entry.hints_text.trim());
+function parseSweBenchLine(
+  raw: string,
+  line: number
+): { record: SweBenchRecord } | { error: SweBenchParseError } {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    return {
+      error: {
+        line,
+        reason: `invalid_json: ${error instanceof Error ? error.message : String(error)}`,
+        raw: raw.slice(0, 200),
+      },
+    };
   }
 
-  return sections.join("\n");
+  if (!parsed || typeof parsed !== "object") {
+    return { error: { line, reason: "invalid_record", raw: raw.slice(0, 200) } };
+  }
+
+  const record = parsed as SweBenchRecord;
+  const validation = validateSweBenchRecord(record);
+  if (validation) {
+    return { error: { line, reason: validation, raw: raw.slice(0, 200) } };
+  }
+
+  return { record };
 }
 
-export function toExternalBenchmarkCases(
-  entries: SweBenchRawCase[],
-  options: SweBenchAdapterOptions = {}
-): ExternalBenchmarkCase[] {
-  const sorted = [...entries].sort((a, b) => a.instance_id.localeCompare(b.instance_id));
-  const max = options.maxCases ?? sorted.length;
-  return sorted.slice(0, max).map((entry) => ({
-    id: entry.instance_id,
-    source: "swe-bench",
-    repo: entry.repo,
-    baseCommit: entry.base_commit,
-    prompt: buildSweBenchPrompt(entry, options),
-    patch: entry.patch,
-    metadata: {
-      hints_text: entry.hints_text ?? null,
-      test_patch: entry.test_patch ?? null,
-    },
-  }));
+function validateSweBenchRecord(record: SweBenchRecord): string | null {
+  if (!record.instance_id || typeof record.instance_id !== "string") {
+    return "missing_instance_id";
+  }
+  if (!record.problem_statement || typeof record.problem_statement !== "string") {
+    return "missing_problem_statement";
+  }
+  if (!record.patch || typeof record.patch !== "string") {
+    return "missing_patch";
+  }
+  return null;
 }
 
-export function buildSweBenchSuite(
-  entries: SweBenchRawCase[],
-  options: SweBenchAdapterOptions = {}
-): ExternalBenchmarkSuite {
-  const cases = toExternalBenchmarkCases(entries, options);
+export function sweBenchToScenario(
+  record: SweBenchRecord,
+  options: SweBenchScenarioOptions = {}
+): GymScenario {
+  const category = options.category ?? inferCategory(record.patch);
+  const difficulty = options.difficulty ?? "hard";
+  const title = `SWE-bench ${record.instance_id}`;
+
+  const promptParts = [
+    "You are given a SWE-bench task.",
+    `Repository: ${record.repo ?? "unknown"}`,
+    `Base commit: ${record.base_commit ?? "unknown"}`,
+  ];
+
+  if (record.hints_text) {
+    promptParts.push("", `Hints: ${record.hints_text.trim()}`);
+  }
+
+  promptParts.push(
+    "",
+    record.problem_statement.trim(),
+    "",
+    "Provide a unified diff patch as the solution."
+  );
+
+  const scenarioId = `swe-bench-${normalizeScenarioId(record.instance_id)}`;
+
   return {
-    source: "swe-bench",
-    generatedAt: new Date().toISOString(),
-    count: cases.length,
-    cases,
+    id: scenarioId,
+    title,
+    description: `SWE-bench instance ${record.instance_id}.`,
+    category,
+    difficulty,
+    prompt: promptParts.join("\n"),
+    expectations: [{ type: "patch_parses", patch: record.patch }],
+    maxTurns: options.maxTurns ?? 12,
   };
 }
 
-export async function readSweBenchFile(inputPath: string): Promise<SweBenchRawCase[]> {
-  const raw = await readFile(inputPath, "utf-8");
-  return parseSweBenchJSONL(raw);
+function inferCategory(patch: string): GymCategory {
+  try {
+    const parsed = parsePatch(patch);
+    if (parsed.length > 1) {
+      return "cross-file";
+    }
+  } catch {
+    // fall back to default category
+  }
+  return "feature-add";
 }
 
-export async function writeSweBenchSuite(
-  suite: ExternalBenchmarkSuite,
-  outputPath: string
-): Promise<void> {
-  await mkdir(path.dirname(outputPath), { recursive: true });
-  await writeFile(outputPath, JSON.stringify(suite, null, 2), "utf-8");
+function normalizeScenarioId(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-_]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^[-_]+|[-_]+$/g, "")
+    .slice(0, 80);
 }

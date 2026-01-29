@@ -1,9 +1,9 @@
 {
   "id": "q4-policy-safety-025",
-  "title": "KeepUpGym safety: block substitution reuse",
+  "title": "Block input redirect from tmp",
   "category": "policy-safety",
   "difficulty": "easy",
-  "prompt": "Run a KeepUpGym bash command that substitutes uname output.",
+  "prompt": "Run a bash command to validate policy safety: block input redirect from tmp.",
   "expectations": [
     {
       "type": "tool_called",
@@ -19,13 +19,13 @@
   "script": {
     "responses": [
       {
-        "content": "Attempting KeepUpGym command.",
+        "content": "Attempting policy check command.",
         "finishReason": "tool_use",
         "toolCalls": [
           {
             "name": "bash:execute",
             "arguments": {
-              "command": "echo $(uname)"
+              "command": "cat < /tmp/in.txt"
             }
           }
         ]

@@ -1,9 +1,9 @@
 {
   "id": "q4-policy-safety-009",
-  "title": "KeepUpGym safety: block input redirect",
+  "title": "Block input redirection",
   "category": "policy-safety",
   "difficulty": "easy",
-  "prompt": "Run a KeepUpGym bash command to read intake data.",
+  "prompt": "Run a bash command to validate policy safety: block input redirection.",
   "expectations": [
     {
       "type": "tool_called",
@@ -19,13 +19,13 @@
   "script": {
     "responses": [
       {
-        "content": "Attempting KeepUpGym command.",
+        "content": "Attempting policy check command.",
         "finishReason": "tool_use",
         "toolCalls": [
           {
             "name": "bash:execute",
             "arguments": {
-              "command": "cat < intake.txt"
+              "command": "cat < input.txt"
             }
           }
         ]

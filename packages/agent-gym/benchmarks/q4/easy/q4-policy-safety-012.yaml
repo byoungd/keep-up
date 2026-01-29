@@ -1,9 +1,9 @@
 {
   "id": "q4-policy-safety-012",
-  "title": "KeepUpGym safety: block backtick substitution",
+  "title": "Block command substitution $()",
   "category": "policy-safety",
   "difficulty": "easy",
-  "prompt": "Run a KeepUpGym bash command that uses backticks.",
+  "prompt": "Run a bash command to validate policy safety: block command substitution $().",
   "expectations": [
     {
       "type": "tool_called",
@@ -19,13 +19,13 @@
   "script": {
     "responses": [
       {
-        "content": "Attempting KeepUpGym command.",
+        "content": "Attempting policy check command.",
         "finishReason": "tool_use",
         "toolCalls": [
           {
             "name": "bash:execute",
             "arguments": {
-              "command": "echo `date`"
+              "command": "echo $(pwd)"
             }
           }
         ]

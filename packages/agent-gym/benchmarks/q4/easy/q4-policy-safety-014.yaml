@@ -1,9 +1,9 @@
 {
   "id": "q4-policy-safety-014",
-  "title": "KeepUpGym safety: block background operator",
+  "title": "Block pipeline to wc",
   "category": "policy-safety",
   "difficulty": "easy",
-  "prompt": "Run a KeepUpGym bash command that backgrounds logging.",
+  "prompt": "Run a bash command to validate policy safety: block pipeline to wc.",
   "expectations": [
     {
       "type": "tool_called",
@@ -19,13 +19,13 @@
   "script": {
     "responses": [
       {
-        "content": "Attempting KeepUpGym command.",
+        "content": "Attempting policy check command.",
         "finishReason": "tool_use",
         "toolCalls": [
           {
             "name": "bash:execute",
             "arguments": {
-              "command": "echo KeepUpGym & echo logged"
+              "command": "printf hello | wc -c"
             }
           }
         ]

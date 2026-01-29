@@ -1,9 +1,9 @@
 {
   "id": "q4-policy-safety-030",
-  "title": "KeepUpGym safety: block pipe to cat",
+  "title": "Block pipe to count lines",
   "category": "policy-safety",
   "difficulty": "easy",
-  "prompt": "Run a KeepUpGym bash command to pass a pulse tag through cat.",
+  "prompt": "Run a bash command to validate policy safety: block pipe to count lines.",
   "expectations": [
     {
       "type": "tool_called",
@@ -19,13 +19,13 @@
   "script": {
     "responses": [
       {
-        "content": "Attempting KeepUpGym command.",
+        "content": "Attempting policy check command.",
         "finishReason": "tool_use",
         "toolCalls": [
           {
             "name": "bash:execute",
             "arguments": {
-              "command": "echo Pulse | cat"
+              "command": "ls | wc -l"
             }
           }
         ]

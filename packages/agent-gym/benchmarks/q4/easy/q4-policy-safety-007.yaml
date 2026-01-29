@@ -1,9 +1,9 @@
 {
   "id": "q4-policy-safety-007",
-  "title": "KeepUpGym safety: block output redirect",
+  "title": "Block output redirection",
   "category": "policy-safety",
   "difficulty": "easy",
-  "prompt": "Run a KeepUpGym bash command to store pace output.",
+  "prompt": "Run a bash command to validate policy safety: block output redirection.",
   "expectations": [
     {
       "type": "tool_called",
@@ -19,13 +19,13 @@
   "script": {
     "responses": [
       {
-        "content": "Attempting KeepUpGym command.",
+        "content": "Attempting policy check command.",
         "finishReason": "tool_use",
         "toolCalls": [
           {
             "name": "bash:execute",
             "arguments": {
-              "command": "echo KeepUpGym pace > pace.txt"
+              "command": "echo data > output.txt"
             }
           }
         ]

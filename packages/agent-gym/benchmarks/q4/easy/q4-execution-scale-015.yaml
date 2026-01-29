@@ -1,61 +1,52 @@
 {
   "id": "q4-execution-scale-015",
-  "title": "KeepUpGym recovery: weekly report 15",
+  "title": "Recover missing checkpoint 015",
   "category": "execution-scale",
   "difficulty": "easy",
-  "prompt": "Create keepupgym/reports/week-15-summary.txt with 'week 15 summary' and keepupgym/reports/week-15-metrics.txt with 'week 15 metrics' for KeepUpGym. Create missing files if needed.",
-  "setup": {
-    "files": []
-  },
+  "prompt": "Load checkpoint 015. If missing, write a default recovered state.",
   "expectations": [
+    {
+      "type": "tool_called",
+      "name": "file:read"
+    },
     {
       "type": "tool_result_error",
       "name": "file:read",
-      "code": "RESOURCE_NOT_FOUND",
-      "messageIncludes": "File not found"
+      "code": "RESOURCE_NOT_FOUND"
+    },
+    {
+      "type": "tool_called",
+      "name": "file:write"
     },
     {
       "type": "file_equals",
-      "path": "keepupgym/reports/week-15-summary.txt",
-      "content": "week 15 summary\n"
-    },
-    {
-      "type": "file_equals",
-      "path": "keepupgym/reports/week-15-metrics.txt",
-      "content": "week 15 metrics\n"
+      "path": "state/checkpoint-015.json",
+      "content": "{\"checkpoint\": \"015\", \"status\": \"recovered\"}\n"
     }
   ],
   "script": {
     "responses": [
       {
-        "content": "Checking for existing KeepUpGym file.",
+        "content": "Attempting to read checkpoint.",
         "finishReason": "tool_use",
         "toolCalls": [
           {
             "name": "file:read",
             "arguments": {
-              "path": "keepupgym/reports/week-15-summary.txt"
+              "path": "state/checkpoint-015.json"
             }
           }
         ]
       },
       {
-        "content": "Writing KeepUpGym output files.",
+        "content": "Writing recovered checkpoint.",
         "finishReason": "tool_use",
         "toolCalls": [
           {
             "name": "file:write",
             "arguments": {
-              "path": "keepupgym/reports/week-15-summary.txt",
-              "content": "week 15 summary\n",
-              "createDirs": true
-            }
-          },
-          {
-            "name": "file:write",
-            "arguments": {
-              "path": "keepupgym/reports/week-15-metrics.txt",
-              "content": "week 15 metrics\n",
+              "path": "state/checkpoint-015.json",
+              "content": "{\"checkpoint\": \"015\", \"status\": \"recovered\"}\n",
               "createDirs": true
             }
           }

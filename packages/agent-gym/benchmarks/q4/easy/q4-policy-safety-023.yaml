@@ -1,9 +1,9 @@
 {
   "id": "q4-policy-safety-023",
-  "title": "KeepUpGym safety: block fd duplication reuse",
+  "title": "Block output redirect to tmp",
   "category": "policy-safety",
   "difficulty": "easy",
-  "prompt": "Run a KeepUpGym bash command that duplicates stdout.",
+  "prompt": "Run a bash command to validate policy safety: block output redirect to tmp.",
   "expectations": [
     {
       "type": "tool_called",
@@ -19,13 +19,13 @@
   "script": {
     "responses": [
       {
-        "content": "Attempting KeepUpGym command.",
+        "content": "Attempting policy check command.",
         "finishReason": "tool_use",
         "toolCalls": [
           {
             "name": "bash:execute",
             "arguments": {
-              "command": "cat <&1"
+              "command": "echo a > /tmp/out.txt"
             }
           }
         ]

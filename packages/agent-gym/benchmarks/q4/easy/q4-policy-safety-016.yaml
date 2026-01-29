@@ -1,9 +1,9 @@
 {
   "id": "q4-policy-safety-016",
-  "title": "KeepUpGym safety: block semicolon reuse",
+  "title": "Block chained printf (semicolon)",
   "category": "policy-safety",
   "difficulty": "easy",
-  "prompt": "Run a KeepUpGym bash command to log stretching.",
+  "prompt": "Run a bash command to validate policy safety: block chained printf (semicolon).",
   "expectations": [
     {
       "type": "tool_called",
@@ -19,13 +19,13 @@
   "script": {
     "responses": [
       {
-        "content": "Attempting KeepUpGym command.",
+        "content": "Attempting policy check command.",
         "finishReason": "tool_use",
         "toolCalls": [
           {
             "name": "bash:execute",
             "arguments": {
-              "command": "echo Stretching ; echo done"
+              "command": "printf hello; printf world"
             }
           }
         ]

@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { AgentState } from "@ku0/agent-runtime-core";
+import { parsePatch } from "diff";
 import ts from "typescript";
 import type {
   GymEvaluationResult,
@@ -53,6 +54,8 @@ async function evaluateExpectation(
       return evaluateToolCalled(expectation.name, context);
     case "tool_result_error":
       return evaluateToolResultError(expectation, context);
+    case "patch_parses":
+      return evaluatePatchParses(expectation.patch);
     case "assistant_contains":
       return evaluateAssistantContains(expectation.content, context);
     case "assistant_regex":
@@ -148,6 +151,27 @@ async function evaluateSyntax(
       ? undefined
       : diagnostics.map((diag: ts.Diagnostic) => diag.messageText).join("; "),
   };
+}
+
+function evaluatePatchParses(patchContent: string): GymExpectationResult {
+  if (!patchContent.trim()) {
+    return { type: "patch_parses", pass: false, reason: "missing_patch" };
+  }
+
+  try {
+    const parsed = parsePatch(patchContent);
+    if (parsed.length === 0) {
+      return { type: "patch_parses", pass: false, reason: "empty_patch" };
+    }
+    return { type: "patch_parses", pass: true };
+  } catch (error) {
+    return {
+      type: "patch_parses",
+      pass: false,
+      reason: "parse_error",
+      details: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 function evaluateToolCalled(toolName: string, context: GymEvaluationContext): GymExpectationResult {

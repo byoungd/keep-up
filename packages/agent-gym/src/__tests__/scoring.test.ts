@@ -70,4 +70,54 @@ describe("KeepUpGym scoring", () => {
 
     await rm(workspace, { recursive: true, force: true });
   });
+
+  it("scores patch parsing expectations", async () => {
+    const workspace = await mkdtemp(path.join(os.tmpdir(), "keepup-gym-test-"));
+    const patch = [
+      "diff --git a/file.txt b/file.txt",
+      "index 0000000..1111111 100644",
+      "--- a/file.txt",
+      "+++ b/file.txt",
+      "@@ -0,0 +1 @@",
+      "+hello",
+      "",
+    ].join("\\n");
+
+    const patchScenario: GymScenario = {
+      id: "Z-AC-PATCH",
+      title: "Patch parsing scoring",
+      category: "feature-add",
+      difficulty: "easy",
+      prompt: "Apply patch.",
+      expectations: [{ type: "patch_parses", patch }],
+    };
+
+    const result = await evaluateScenario(patchScenario, {
+      workspacePath: workspace,
+      state: emptyState,
+      toolCalls: [],
+    });
+
+    expect(result.pass).toBe(true);
+
+    const invalidScenario: GymScenario = {
+      id: "Z-AC-PATCH-BAD",
+      title: "Patch parsing fails",
+      category: "feature-add",
+      difficulty: "easy",
+      prompt: "Apply patch.",
+      expectations: [{ type: "patch_parses", patch: "   " }],
+    };
+
+    const invalidResult = await evaluateScenario(invalidScenario, {
+      workspacePath: workspace,
+      state: emptyState,
+      toolCalls: [],
+    });
+
+    expect(invalidResult.pass).toBe(false);
+    expect(invalidResult.reason).toBe("missing_patch");
+
+    await rm(workspace, { recursive: true, force: true });
+  });
 });
