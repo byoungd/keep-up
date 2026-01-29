@@ -14,6 +14,13 @@ export type GymCategory =
   | "visual-diff"
   | "policy-safety";
 
+export interface GymScenarioExternalRef {
+  source: "swe-bench";
+  instanceId: string;
+  repo?: string;
+  baseCommit?: string;
+}
+
 export interface GymFixtureFile {
   path: string;
   content: string;
@@ -41,6 +48,7 @@ export interface GymScenario {
   category: GymCategory;
   difficulty: GymDifficulty;
   prompt: string;
+  external?: GymScenarioExternalRef;
   setup?: {
     files?: GymFixtureFile[];
   };

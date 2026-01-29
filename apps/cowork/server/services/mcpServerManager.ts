@@ -15,9 +15,24 @@ export type McpServerSummary = {
   name: string;
   description: string;
   status: McpRemoteToolServer["getStatus"] extends () => infer Status ? Status : unknown;
+  health: McpServerHealth;
 };
 
 type LoggerLike = Pick<Logger, "info" | "warn" | "error">;
+
+export type McpServerHealthStatus = "healthy" | "degraded" | "cooldown";
+
+export type McpServerHealth = {
+  status: McpServerHealthStatus;
+  failures: number;
+  lastError?: string;
+  lastAttemptAt?: number;
+  lastSuccessAt?: number;
+  nextRetryAt?: number;
+};
+
+const BASE_RETRY_DELAY_MS = 1000;
+const MAX_RETRY_DELAY_MS = 30_000;
 
 const fallbackLogger: LoggerLike = {
   info: (_message, _meta) => undefined,
@@ -55,15 +70,23 @@ const transportSchema = z.discriminatedUnion("type", [
     .passthrough(),
 ]);
 
+const tokenSelectorSchema = z.object({
+  tokenKey: z.string().min(1).optional(),
+  accountId: z.string().min(1).optional(),
+  workspaceId: z.string().min(1).optional(),
+});
+
 const tokenStoreSchema = z.union([
-  z.object({ type: z.literal("memory") }),
-  z.object({ type: z.literal("gateway") }),
-  z.object({
-    type: z.literal("file"),
-    filePath: z.string().min(1),
-    encryptionKey: z.string().min(1),
-    keyEncoding: z.enum(["hex", "base64"]).optional(),
-  }),
+  z.object({ type: z.literal("memory") }).merge(tokenSelectorSchema),
+  z.object({ type: z.literal("gateway") }).merge(tokenSelectorSchema),
+  z
+    .object({
+      type: z.literal("file"),
+      filePath: z.string().min(1),
+      encryptionKey: z.string().min(1),
+      keyEncoding: z.enum(["hex", "base64"]).optional(),
+    })
+    .merge(tokenSelectorSchema),
 ]);
 
 const authSchema = z
@@ -115,10 +138,19 @@ const configSchema = z.object({
 type RawServerConfig = z.infer<typeof serverSchema>;
 type RawMcpConfig = z.infer<typeof configSchema>;
 
+type TokenStoreSelectorUpdate = {
+  type?: "gateway" | "memory" | "file";
+  tokenKey?: string;
+  accountId?: string;
+  workspaceId?: string;
+  clear?: boolean;
+};
+
 export class McpServerManager {
   private readonly servers = new Map<string, McpRemoteToolServer>();
   private readonly initialized = new Set<string>();
   private readonly initializing = new Map<string, Promise<void>>();
+  private readonly health = new Map<string, McpServerHealth>();
   private readonly configPath: string;
   private readonly stateDir: string;
   private readonly eventBus?: RuntimeEventBus;
@@ -155,6 +187,7 @@ export class McpServerManager {
     this.servers.clear();
     this.initialized.clear();
     this.initializing.clear();
+    this.health.clear();
 
     for (const serverConfig of config.servers) {
       try {
@@ -165,6 +198,7 @@ export class McpServerManager {
           auditLogger: this.auditLogger,
         });
         this.servers.set(normalized.name, server);
+        this.health.set(normalized.name, buildDefaultHealth());
         void this.ensureInitialized(server).catch(() => undefined);
       } catch (error) {
         this.logger.warn(
@@ -188,6 +222,56 @@ export class McpServerManager {
     return sanitizeConfig(parsed);
   }
 
+  async updateTokenStoreSelectors(
+    serverName: string,
+    update: TokenStoreSelectorUpdate
+  ): Promise<RawMcpConfig> {
+    const config = await this.loadConfig();
+    const index = config.servers.findIndex((server) => server.name === serverName);
+    if (index === -1) {
+      throw new Error(`MCP server "${serverName}" not found`);
+    }
+
+    const server = config.servers[index];
+    const auth = isRecord(server.auth) ? { ...server.auth } : {};
+    const existingTokenStore = isRecord(auth.tokenStore) ? { ...auth.tokenStore } : undefined;
+    const desiredType =
+      update.type ?? (existingTokenStore?.type as TokenStoreSelectorUpdate["type"]) ?? "gateway";
+
+    if (desiredType === "file" && existingTokenStore?.type !== "file") {
+      throw new Error("File token store requires filePath/encryptionKey; update full MCP config.");
+    }
+
+    const baseTokenStore: Record<string, unknown> =
+      desiredType === "file" && existingTokenStore
+        ? { ...existingTokenStore }
+        : { type: desiredType };
+    baseTokenStore.type = desiredType;
+
+    if (update.clear) {
+      delete baseTokenStore.tokenKey;
+      delete baseTokenStore.accountId;
+      delete baseTokenStore.workspaceId;
+    }
+    if (update.tokenKey !== undefined) {
+      baseTokenStore.tokenKey = update.tokenKey;
+    }
+    if (update.accountId !== undefined) {
+      baseTokenStore.accountId = update.accountId;
+    }
+    if (update.workspaceId !== undefined) {
+      baseTokenStore.workspaceId = update.workspaceId;
+    }
+
+    auth.tokenStore = baseTokenStore;
+    server.auth = auth as RawServerConfig["auth"];
+    config.servers[index] = server;
+
+    await this.saveConfig(config);
+    await this.initialize();
+    return sanitizeConfig(config);
+  }
+
   async reload(): Promise<RawMcpConfig> {
     await this.initialize();
     return this.getConfig();
@@ -202,6 +286,7 @@ export class McpServerManager {
       name: server.name,
       description: server.description,
       status: server.getStatus(),
+      health: this.getHealth(server.name),
     }));
   }
 
@@ -247,6 +332,19 @@ export class McpServerManager {
     return server;
   }
 
+  private getHealth(serverName: string): McpServerHealth {
+    return this.health.get(serverName) ?? buildDefaultHealth();
+  }
+
+  private updateHealth(serverName: string, next: McpServerHealth): void {
+    this.health.set(serverName, next);
+    this.eventBus?.emit(
+      "mcp.health",
+      { server: serverName, health: next, updatedAt: Date.now() },
+      { source: "cowork", priority: "normal" }
+    );
+  }
+
   private async ensureInitialized(server: McpRemoteToolServer): Promise<void> {
     if (this.initialized.has(server.name)) {
       return;
@@ -257,12 +355,52 @@ export class McpServerManager {
       return;
     }
 
+    const now = Date.now();
+    const currentHealth = this.getHealth(server.name);
+    if (
+      currentHealth.status === "cooldown" &&
+      currentHealth.nextRetryAt &&
+      now < currentHealth.nextRetryAt
+    ) {
+      throw new Error(
+        `MCP server "${server.name}" is cooling down until ${new Date(
+          currentHealth.nextRetryAt
+        ).toISOString()}`
+      );
+    }
+
+    this.updateHealth(server.name, {
+      ...currentHealth,
+      status: "degraded",
+      lastAttemptAt: now,
+    });
+
     const initPromise = server
       .initialize()
       .then(() => {
         this.initialized.add(server.name);
+        this.updateHealth(server.name, {
+          status: "healthy",
+          failures: 0,
+          lastSuccessAt: Date.now(),
+          lastError: undefined,
+          nextRetryAt: undefined,
+        });
       })
       .catch((error) => {
+        const failureCount = currentHealth.failures + 1;
+        const delayMs = Math.min(
+          BASE_RETRY_DELAY_MS * 2 ** Math.max(0, failureCount - 1),
+          MAX_RETRY_DELAY_MS
+        );
+        const nextRetryAt = Date.now() + delayMs;
+        this.updateHealth(server.name, {
+          status: "cooldown",
+          failures: failureCount,
+          lastError: error instanceof Error ? error.message : String(error),
+          nextRetryAt,
+          lastAttemptAt: Date.now(),
+        });
         this.logger.error(
           `Failed to initialize MCP server ${server.name}`,
           error instanceof Error ? error : new Error(String(error))
@@ -336,12 +474,14 @@ export class McpServerManager {
         }
         return tokenStore && isRecord(tokenStore) ? { type: "memory" } : tokenStore;
       }
+      const selectors = resolveTokenSelectors(tokenStore);
       const keyEncoding = process.env.COWORK_MCP_TOKEN_KEY_ENCODING as "hex" | "base64" | undefined;
       return {
         type: "file",
         filePath: join(this.stateDir, "mcp-tokens", `${serverName}.json`),
         encryptionKey: key,
         keyEncoding,
+        ...selectors,
       };
     }
     return tokenStore;
@@ -364,8 +504,7 @@ function sanitizeConfig(config: RawMcpConfig): RawMcpConfig {
       if (auth && "tokenStore" in auth && isRecord(auth.tokenStore)) {
         if (auth.tokenStore.type === "file") {
           auth.tokenStore = {
-            type: "file",
-            filePath: auth.tokenStore.filePath,
+            ...auth.tokenStore,
             encryptionKey: "***",
           };
         }
@@ -377,6 +516,21 @@ function sanitizeConfig(config: RawMcpConfig): RawMcpConfig {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function resolveTokenSelectors(tokenStore: unknown): {
+  tokenKey?: string;
+  accountId?: string;
+  workspaceId?: string;
+} {
+  if (!isRecord(tokenStore)) {
+    return {};
+  }
+  const tokenKey = typeof tokenStore.tokenKey === "string" ? tokenStore.tokenKey : undefined;
+  const accountId = typeof tokenStore.accountId === "string" ? tokenStore.accountId : undefined;
+  const workspaceId =
+    typeof tokenStore.workspaceId === "string" ? tokenStore.workspaceId : undefined;
+  return { tokenKey, accountId, workspaceId };
 }
 
 function resolveTransport(server: RawServerConfig): McpTransportConfig {
@@ -400,4 +554,8 @@ function resolveTransport(server: RawServerConfig): McpTransportConfig {
     };
   }
   throw new Error(`MCP server "${server.name}" is missing transport configuration.`);
+}
+
+function buildDefaultHealth(): McpServerHealth {
+  return { status: "degraded", failures: 0 };
 }

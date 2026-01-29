@@ -53,7 +53,8 @@ function configCommand(): Command {
   return new Command("config")
     .description("Get or set MCP server config")
     .addCommand(configGetCommand())
-    .addCommand(configSetCommand());
+    .addCommand(configSetCommand())
+    .addCommand(configTokenStoreCommand());
 }
 
 function configGetCommand(): Command {
@@ -90,6 +91,44 @@ function configSetCommand(): Command {
     });
 }
 
+type TokenStoreUpdateOptions = {
+  baseUrl?: string;
+  type?: string;
+  tokenKey?: string;
+  accountId?: string;
+  workspaceId?: string;
+  clear?: boolean;
+};
+
+function configTokenStoreCommand(): Command {
+  return new Command("token-store")
+    .description("Update MCP token store selectors for a server")
+    .argument("<name>", "MCP server name")
+    .option("--base-url <url>", "Cowork API base URL")
+    .option("--type <type>", "Token store type (gateway, memory, file)")
+    .option("--token-key <key>", "Explicit token store key")
+    .option("--account-id <id>", "Account identifier")
+    .option("--workspace-id <id>", "Workspace identifier")
+    .option("--clear", "Clear existing token selectors")
+    .action(async (name: string, options: TokenStoreUpdateOptions) => {
+      const payload = buildTokenStoreUpdatePayload(options);
+      if (!payload) {
+        writeStderr("Provide --type, --token-key, --account-id, --workspace-id, or --clear.");
+        process.exit(1);
+      }
+      const data = await fetchCoworkJson<{ config?: unknown }>(
+        `/api/mcp/servers/${encodeURIComponent(name)}/token-store`,
+        {
+          baseUrl: options.baseUrl,
+          method: "POST",
+          body: JSON.stringify(payload),
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+      writeStdout(JSON.stringify(data.config ?? {}, null, 2));
+    });
+}
+
 async function resolveConfigPayload(options: {
   file?: string;
   json?: string;
@@ -115,6 +154,39 @@ function parseJson(raw: string): unknown {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`Invalid JSON: ${message}`);
   }
+}
+
+function buildTokenStoreUpdatePayload(
+  options: TokenStoreUpdateOptions
+): Record<string, unknown> | null {
+  const type = options.type ? normalizeTokenStoreType(options.type) : undefined;
+  const payload: Record<string, unknown> = {};
+
+  if (type) {
+    payload.type = type;
+  }
+  if (options.tokenKey) {
+    payload.tokenKey = options.tokenKey;
+  }
+  if (options.accountId) {
+    payload.accountId = options.accountId;
+  }
+  if (options.workspaceId) {
+    payload.workspaceId = options.workspaceId;
+  }
+  if (options.clear) {
+    payload.clear = true;
+  }
+
+  return Object.keys(payload).length > 0 ? payload : null;
+}
+
+function normalizeTokenStoreType(value: string): "gateway" | "memory" | "file" {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "gateway" || normalized === "memory" || normalized === "file") {
+    return normalized;
+  }
+  throw new Error(`Unsupported token store type: ${value}`);
 }
 
 function testCommand(): Command {
