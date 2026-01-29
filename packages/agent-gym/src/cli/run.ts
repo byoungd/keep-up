@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import type { ScenarioSource } from "../scenarioLoader";
 import { runSuite, writeReport } from "../suite";
 import type { GymCategory, GymDifficulty, GymReport } from "../types";
 
@@ -30,6 +31,7 @@ interface CliOptions {
   minScore?: number;
   json: boolean;
   preserveWorkspace: boolean;
+  benchmarkSource?: ScenarioSource;
 }
 
 async function main() {
@@ -39,6 +41,7 @@ async function main() {
     difficulties: options.suite,
     categories: options.categories,
     preserveWorkspace: options.preserveWorkspace,
+    benchmarkSource: options.benchmarkSource,
   });
 
   await writeReport(result.report, options.reportPath);
@@ -83,6 +86,20 @@ function parseArgs(args: string[]): CliOptions {
   const minScore = parseNumber(getFlagValue(args, "--min-score"));
   const json = args.includes("--json");
   const preserveWorkspace = args.includes("--preserve-workspace");
+  const adapterId = getFlagValue(args, "--adapter");
+  const defaultCategory = parseCategory(getFlagValue(args, "--adapter-default-category"));
+  const defaultDifficulty = parseDifficulty(getFlagValue(args, "--adapter-default-difficulty"));
+  const adapterLimit = parseNumber(getFlagValue(args, "--adapter-limit"));
+  const adapterMaxTurns = parseNumber(getFlagValue(args, "--adapter-max-turns"));
+
+  const benchmarkSource = buildBenchmarkSource({
+    adapterId,
+    benchmarksPath,
+    defaultCategory,
+    defaultDifficulty,
+    adapterLimit,
+    adapterMaxTurns,
+  });
 
   if (args.includes("--help") || args.includes("-h")) {
     printHelp();
@@ -98,6 +115,7 @@ function parseArgs(args: string[]): CliOptions {
     minScore,
     json,
     preserveWorkspace,
+    benchmarkSource,
   };
 }
 
@@ -120,6 +138,26 @@ function parseSuite(value: string): GymDifficulty[] {
     return ["hard"];
   }
   return ALL_DIFFICULTIES;
+}
+
+function parseDifficulty(value: string | undefined): GymDifficulty | undefined {
+  if (!value) {
+    return undefined;
+  }
+  if (ALL_DIFFICULTIES.includes(value as GymDifficulty)) {
+    return value as GymDifficulty;
+  }
+  return undefined;
+}
+
+function parseCategory(value: string | undefined): GymCategory | undefined {
+  if (!value) {
+    return undefined;
+  }
+  if (ALL_CATEGORIES.includes(value as GymCategory)) {
+    return value as GymCategory;
+  }
+  return undefined;
 }
 
 function parseCategories(args: string[]): GymCategory[] {
@@ -149,6 +187,29 @@ function parseNumber(value: string | undefined): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+function buildBenchmarkSource(input: {
+  adapterId?: string;
+  benchmarksPath: string;
+  defaultCategory?: GymCategory;
+  defaultDifficulty?: GymDifficulty;
+  adapterLimit?: number;
+  adapterMaxTurns?: number;
+}): ScenarioSource | undefined {
+  if (!input.adapterId || input.adapterId === "local") {
+    return undefined;
+  }
+
+  return {
+    type: "external",
+    path: input.benchmarksPath,
+    adapterId: input.adapterId,
+    defaultCategory: input.defaultCategory,
+    defaultDifficulty: input.defaultDifficulty,
+    limit: input.adapterLimit,
+    maxTurns: input.adapterMaxTurns,
+  } satisfies ScenarioSource;
+}
+
 async function readBaselineScore(baselinePath: string): Promise<number> {
   const raw = await readFile(baselinePath, "utf-8");
   const parsed = JSON.parse(raw) as GymReport;
@@ -164,6 +225,11 @@ function printHelp(): void {
   process.stdout.write(`  --suite <easy|medium|hard|all>\n`);
   process.stdout.write(`  --category <category> (repeatable)\n`);
   process.stdout.write(`  --benchmarks <path>\n`);
+  process.stdout.write(`  --adapter <local|swe-bench>\n`);
+  process.stdout.write(`  --adapter-default-category <category>\n`);
+  process.stdout.write(`  --adapter-default-difficulty <easy|medium|hard>\n`);
+  process.stdout.write(`  --adapter-limit <number>\n`);
+  process.stdout.write(`  --adapter-max-turns <number>\n`);
   process.stdout.write(`  --report <path>\n`);
   process.stdout.write(`  --baseline <path>\n`);
   process.stdout.write(`  --min-score <number>\n`);

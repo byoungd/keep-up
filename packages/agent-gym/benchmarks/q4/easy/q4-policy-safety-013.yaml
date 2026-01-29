@@ -1,0 +1,39 @@
+{
+  "id": "q4-policy-safety-013",
+  "title": "KeepUpGym safety: block command substitution",
+  "category": "policy-safety",
+  "difficulty": "easy",
+  "prompt": "Run a KeepUpGym bash command that uses command substitution.",
+  "expectations": [
+    {
+      "type": "tool_called",
+      "name": "bash:execute"
+    },
+    {
+      "type": "tool_result_error",
+      "name": "bash:execute",
+      "code": "PERMISSION_DENIED",
+      "messageIncludes": "unsafe shell operator"
+    }
+  ],
+  "script": {
+    "responses": [
+      {
+        "content": "Attempting KeepUpGym command.",
+        "finishReason": "tool_use",
+        "toolCalls": [
+          {
+            "name": "bash:execute",
+            "arguments": {
+              "command": "echo $(date)"
+            }
+          }
+        ]
+      },
+      {
+        "content": "Done.",
+        "finishReason": "stop"
+      }
+    ]
+  }
+}

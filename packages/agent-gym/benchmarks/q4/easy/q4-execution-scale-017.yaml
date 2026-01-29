@@ -1,0 +1,70 @@
+{
+  "id": "q4-execution-scale-017",
+  "title": "KeepUpGym recovery: weekly report 17",
+  "category": "execution-scale",
+  "difficulty": "easy",
+  "prompt": "Create keepupgym/reports/week-17-summary.txt with 'week 17 summary' and keepupgym/reports/week-17-metrics.txt with 'week 17 metrics' for KeepUpGym. Create missing files if needed.",
+  "setup": {
+    "files": []
+  },
+  "expectations": [
+    {
+      "type": "tool_result_error",
+      "name": "file:read",
+      "code": "RESOURCE_NOT_FOUND",
+      "messageIncludes": "File not found"
+    },
+    {
+      "type": "file_equals",
+      "path": "keepupgym/reports/week-17-summary.txt",
+      "content": "week 17 summary\n"
+    },
+    {
+      "type": "file_equals",
+      "path": "keepupgym/reports/week-17-metrics.txt",
+      "content": "week 17 metrics\n"
+    }
+  ],
+  "script": {
+    "responses": [
+      {
+        "content": "Checking for existing KeepUpGym file.",
+        "finishReason": "tool_use",
+        "toolCalls": [
+          {
+            "name": "file:read",
+            "arguments": {
+              "path": "keepupgym/reports/week-17-summary.txt"
+            }
+          }
+        ]
+      },
+      {
+        "content": "Writing KeepUpGym output files.",
+        "finishReason": "tool_use",
+        "toolCalls": [
+          {
+            "name": "file:write",
+            "arguments": {
+              "path": "keepupgym/reports/week-17-summary.txt",
+              "content": "week 17 summary\n",
+              "createDirs": true
+            }
+          },
+          {
+            "name": "file:write",
+            "arguments": {
+              "path": "keepupgym/reports/week-17-metrics.txt",
+              "content": "week 17 metrics\n",
+              "createDirs": true
+            }
+          }
+        ]
+      },
+      {
+        "content": "Done.",
+        "finishReason": "stop"
+      }
+    ]
+  }
+}

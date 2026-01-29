@@ -1,0 +1,83 @@
+{
+  "id": "q4-execution-scale-029",
+  "title": "KeepUpGym recovery: set bundle 29",
+  "category": "execution-scale",
+  "difficulty": "easy",
+  "prompt": "Create the KeepUpGym set files keepupgym/sets/set-29-a.txt ('set 29 a'), keepupgym/sets/set-29-b.txt ('set 29 b'), and keepupgym/sets/set-29-c.txt ('set 29 c'). If any file is missing, create it.",
+  "setup": {
+    "files": []
+  },
+  "expectations": [
+    {
+      "type": "tool_result_error",
+      "name": "file:read",
+      "code": "RESOURCE_NOT_FOUND",
+      "messageIncludes": "File not found"
+    },
+    {
+      "type": "file_equals",
+      "path": "keepupgym/sets/set-29-a.txt",
+      "content": "set 29 a\n"
+    },
+    {
+      "type": "file_equals",
+      "path": "keepupgym/sets/set-29-b.txt",
+      "content": "set 29 b\n"
+    },
+    {
+      "type": "file_equals",
+      "path": "keepupgym/sets/set-29-c.txt",
+      "content": "set 29 c\n"
+    }
+  ],
+  "script": {
+    "responses": [
+      {
+        "content": "Checking for existing KeepUpGym file.",
+        "finishReason": "tool_use",
+        "toolCalls": [
+          {
+            "name": "file:read",
+            "arguments": {
+              "path": "keepupgym/sets/set-29-a.txt"
+            }
+          }
+        ]
+      },
+      {
+        "content": "Writing KeepUpGym output files.",
+        "finishReason": "tool_use",
+        "toolCalls": [
+          {
+            "name": "file:write",
+            "arguments": {
+              "path": "keepupgym/sets/set-29-a.txt",
+              "content": "set 29 a\n",
+              "createDirs": true
+            }
+          },
+          {
+            "name": "file:write",
+            "arguments": {
+              "path": "keepupgym/sets/set-29-b.txt",
+              "content": "set 29 b\n",
+              "createDirs": true
+            }
+          },
+          {
+            "name": "file:write",
+            "arguments": {
+              "path": "keepupgym/sets/set-29-c.txt",
+              "content": "set 29 c\n",
+              "createDirs": true
+            }
+          }
+        ]
+      },
+      {
+        "content": "Done.",
+        "finishReason": "stop"
+      }
+    ]
+  }
+}

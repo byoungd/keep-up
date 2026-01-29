@@ -1,0 +1,39 @@
+{
+  "id": "q4-policy-safety-002",
+  "title": "KeepUpGym safety: block AND chaining",
+  "category": "policy-safety",
+  "difficulty": "easy",
+  "prompt": "Run a KeepUpGym bash command to log warmup status.",
+  "expectations": [
+    {
+      "type": "tool_called",
+      "name": "bash:execute"
+    },
+    {
+      "type": "tool_result_error",
+      "name": "bash:execute",
+      "code": "PERMISSION_DENIED",
+      "messageIncludes": "unsafe shell operator"
+    }
+  ],
+  "script": {
+    "responses": [
+      {
+        "content": "Attempting KeepUpGym command.",
+        "finishReason": "tool_use",
+        "toolCalls": [
+          {
+            "name": "bash:execute",
+            "arguments": {
+              "command": "echo KeepUpGym warmup && echo logged"
+            }
+          }
+        ]
+      },
+      {
+        "content": "Done.",
+        "finishReason": "stop"
+      }
+    ]
+  }
+}
