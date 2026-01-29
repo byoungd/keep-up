@@ -21,3 +21,9 @@ Import SWE-bench JSONL into a normalized suite:
 ```
 pnpm --filter @ku0/agent-gym gym:swe:import -- --input /path/to/swe-bench.jsonl --output reports/swe-bench.json
 ```
+
+Run SWE-bench tasks directly via the adapter:
+
+```
+pnpm --filter @ku0/agent-gym gym:run -- --suite easy --adapter swe-bench --benchmarks /path/to/swe-bench.jsonl --adapter-default-category cross-file --adapter-default-difficulty hard
+```
