@@ -251,4 +251,37 @@ describe("Approval routes", () => {
       taskId: "task-1",
     });
   });
+
+  it("uses task runtime to resolve approvals without publishing events", async () => {
+    const approval = createApproval();
+    const resolved: CoworkApproval = {
+      ...approval,
+      status: "rejected",
+      resolvedAt: 123,
+    };
+    const resolveApproval = vi.fn().mockResolvedValue(resolved);
+    taskRuntime = { resolveApproval } as unknown as CoworkTaskRuntime;
+    app = createApprovalRoutes({
+      approvals: approvalStore,
+      sessions: sessionStore,
+      events: eventHub,
+      runtime,
+      taskRuntime,
+    });
+
+    const res = await app.request("/approvals/approval-1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "rejected" }),
+    });
+
+    expect(res.status).toBe(200);
+    const data = (await res.json()) as { ok: boolean; approval: CoworkApproval };
+    expect(data.ok).toBe(true);
+    expect(data.approval.status).toBe("rejected");
+    expect(resolveApproval).toHaveBeenCalledWith("approval-1", "rejected");
+
+    const events = eventHub.listSince("session-1");
+    expect(events).toHaveLength(0);
+  });
 });
