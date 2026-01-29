@@ -160,10 +160,19 @@ export type MarkdownFrontmatterBlock = {
   syntax: "yaml" | "toml" | "json";
 };
 
+export type MarkdownCodeSymbol = {
+  block_id: string;
+  language?: string;
+  name: string;
+  kind: string;
+  line_range: LineRange;
+};
+
 export type MarkdownSemanticIndex = {
   line_count: number;
   headings: MarkdownHeadingBlock[];
   code_fences: MarkdownCodeFenceBlock[];
+  symbols?: MarkdownCodeSymbol[];
   frontmatter?: MarkdownFrontmatterBlock;
   frontmatter_data?: unknown;
   frontmatter_error?: MarkdownOperationError;

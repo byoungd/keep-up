@@ -2,6 +2,7 @@ import type {
   MarkdownCanonicalizerPolicyV1,
   MarkdownSanitizationPolicyV1,
   MarkdownTargetingPolicyV1,
+  PerformancePolicyV1,
 } from "../kernel/policy/types.js";
 import {
   buildFrontmatterLines,
@@ -34,6 +35,7 @@ type ApplyOptions = {
   targetingPolicy?: MarkdownTargetingPolicyV1;
   canonicalizerPolicy?: MarkdownCanonicalizerPolicyV1;
   sanitizationPolicy?: MarkdownSanitizationPolicyV1;
+  performancePolicy?: PerformancePolicyV1;
   frontmatterPolicy?: {
     allow_frontmatter: boolean;
     frontmatter_formats: Array<"yaml" | "toml" | "json">;

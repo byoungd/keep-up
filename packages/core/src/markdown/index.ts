@@ -20,6 +20,7 @@ export type {
   LineRange,
   MarkdownAppliedOperation,
   MarkdownCodeFenceBlock,
+  MarkdownCodeSymbol,
   MarkdownFrontmatterBlock,
   MarkdownHeadingBlock,
   MarkdownLineApplyResult,
