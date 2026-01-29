@@ -123,6 +123,14 @@ const configSchema = z.object({
 type RawServerConfig = z.infer<typeof serverSchema>;
 type RawMcpConfig = z.infer<typeof configSchema>;
 
+type TokenStoreSelectorUpdate = {
+  type?: "gateway" | "memory" | "file";
+  tokenKey?: string;
+  accountId?: string;
+  workspaceId?: string;
+  clear?: boolean;
+};
+
 export class McpServerManager {
   private readonly servers = new Map<string, McpRemoteToolServer>();
   private readonly initialized = new Set<string>();
@@ -194,6 +202,56 @@ export class McpServerManager {
     await this.saveConfig(parsed);
     await this.initialize();
     return sanitizeConfig(parsed);
+  }
+
+  async updateTokenStoreSelectors(
+    serverName: string,
+    update: TokenStoreSelectorUpdate
+  ): Promise<RawMcpConfig> {
+    const config = await this.loadConfig();
+    const index = config.servers.findIndex((server) => server.name === serverName);
+    if (index === -1) {
+      throw new Error(`MCP server "${serverName}" not found`);
+    }
+
+    const server = config.servers[index];
+    const auth = isRecord(server.auth) ? { ...server.auth } : {};
+    const existingTokenStore = isRecord(auth.tokenStore) ? { ...auth.tokenStore } : undefined;
+    const desiredType =
+      update.type ?? (existingTokenStore?.type as TokenStoreSelectorUpdate["type"]) ?? "gateway";
+
+    if (desiredType === "file" && existingTokenStore?.type !== "file") {
+      throw new Error("File token store requires filePath/encryptionKey; update full MCP config.");
+    }
+
+    const baseTokenStore: Record<string, unknown> =
+      desiredType === "file" && existingTokenStore
+        ? { ...existingTokenStore }
+        : { type: desiredType };
+    baseTokenStore.type = desiredType;
+
+    if (update.clear) {
+      delete baseTokenStore.tokenKey;
+      delete baseTokenStore.accountId;
+      delete baseTokenStore.workspaceId;
+    }
+    if (update.tokenKey !== undefined) {
+      baseTokenStore.tokenKey = update.tokenKey;
+    }
+    if (update.accountId !== undefined) {
+      baseTokenStore.accountId = update.accountId;
+    }
+    if (update.workspaceId !== undefined) {
+      baseTokenStore.workspaceId = update.workspaceId;
+    }
+
+    auth.tokenStore = baseTokenStore;
+    server.auth = auth as RawServerConfig["auth"];
+    config.servers[index] = server;
+
+    await this.saveConfig(config);
+    await this.initialize();
+    return sanitizeConfig(config);
   }
 
   async reload(): Promise<RawMcpConfig> {
