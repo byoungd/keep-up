@@ -12,6 +12,14 @@ const toolCallSchema = z.object({
   arguments: z.record(z.string(), z.unknown()).optional(),
 });
 
+const tokenStoreUpdateSchema = z.object({
+  type: z.enum(["gateway", "memory", "file"]).optional(),
+  tokenKey: z.string().min(1).optional(),
+  accountId: z.string().min(1).optional(),
+  workspaceId: z.string().min(1).optional(),
+  clear: z.boolean().optional(),
+});
+
 export function createMcpAppsRoutes(deps: McpAppsRouteDeps) {
   const app = new Hono();
 
@@ -105,6 +113,23 @@ export function createMcpAppsRoutes(deps: McpAppsRouteDeps) {
         "Failed to test MCP server",
         error instanceof Error ? error.message : String(error)
       );
+    }
+  });
+
+  app.post("/mcp/servers/:server/token-store", async (c) => {
+    const serverName = c.req.param("server");
+    const body = await readJsonBody(c);
+    const parsed = tokenStoreUpdateSchema.safeParse(body);
+    if (!parsed.success) {
+      return jsonError(c, 400, "Invalid token store payload");
+    }
+    try {
+      const config = await deps.mcpServers.updateTokenStoreSelectors(serverName, parsed.data);
+      return c.json({ ok: true, config });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const status = message.includes("not found") ? 404 : 400;
+      return jsonError(c, status, "Failed to update MCP token store", message);
     }
   });
 

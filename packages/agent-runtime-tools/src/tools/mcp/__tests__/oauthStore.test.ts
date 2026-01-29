@@ -58,6 +58,33 @@ describe("oauth token store", () => {
     expect(await store.getTokens()).toBeUndefined();
   });
 
+  it("stores multiple token entries in one file", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "mcp-oauth-"));
+    const filePath = join(dir, "tokens.json");
+    const key = randomBytes(32).toString("base64");
+    const accountA = new FileMcpOAuthTokenStore({
+      filePath,
+      encryptionKey: key,
+      accountId: "acct-a",
+    });
+    const accountB = new FileMcpOAuthTokenStore({
+      filePath,
+      encryptionKey: key,
+      accountId: "acct-b",
+      workspaceId: "ws-1",
+    });
+
+    await accountA.saveTokens({ access_token: "token-a" });
+    await accountB.saveTokens({ access_token: "token-b" });
+
+    expect(await accountA.getTokens()).toEqual({ access_token: "token-a" });
+    expect(await accountB.getTokens()).toEqual({ access_token: "token-b" });
+
+    await accountA.clear();
+    expect(await accountA.getTokens()).toBeUndefined();
+    expect(await accountB.getTokens()).toEqual({ access_token: "token-b" });
+  });
+
   it("resolves token store config into provider", async () => {
     const provider = createMcpOAuthClientProvider(
       {
