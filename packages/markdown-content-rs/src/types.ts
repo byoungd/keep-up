@@ -3,6 +3,12 @@ export type LineRange = {
   end: number;
 };
 
+export type MarkdownCodeSymbolKind = "function" | "class" | "variable" | "import";
+
+export type MarkdownInnerTarget =
+  | { kind: "line_range"; line_offset: LineRange }
+  | { kind: MarkdownCodeSymbolKind; name: string; signature_prefix?: string };
+
 export type MarkdownSemanticTarget = {
   kind: "heading" | "code_fence" | "frontmatter" | "frontmatter_key";
   heading_text?: string;
@@ -13,6 +19,7 @@ export type MarkdownSemanticTarget = {
   after_heading_mode?: "exact" | "prefix";
   key_path?: string[];
   nth?: number;
+  inner_target?: MarkdownInnerTarget;
 };
 
 export type MarkdownPreconditionV1 = {
@@ -103,6 +110,23 @@ export type MdInsertCodeFence = {
   fence_length?: number;
 };
 
+export type MdReplaceCodeSymbol = {
+  op: "md_replace_code_symbol";
+  precondition_id: string;
+  target: {
+    code_fence_id: string;
+    symbol: { kind: MarkdownCodeSymbolKind; name: string; signature_hash?: string };
+  };
+  content: string;
+};
+
+export type MdInsertCodeMember = {
+  op: "md_insert_code_member";
+  precondition_id: string;
+  target: { code_fence_id: string; after_symbol?: string; before_symbol?: string };
+  content: string;
+};
+
 export type MarkdownOperation =
   | MdReplaceLines
   | MdInsertLines
@@ -111,7 +135,9 @@ export type MarkdownOperation =
   | MdUpdateFrontmatter
   | MdInsertAfter
   | MdInsertBefore
-  | MdInsertCodeFence;
+  | MdInsertCodeFence
+  | MdReplaceCodeSymbol
+  | MdInsertCodeMember;
 
 export type MarkdownOperationErrorCode =
   | "MCM_INVALID_REQUEST"
@@ -293,4 +319,10 @@ export type NativeMarkdownContentBinding = {
     options?: MarkdownApplyOptions
   ) => MarkdownLineApplyResult;
   parseMarkdownBlocks: (content: string, options?: MarkdownParseOptions) => MarkdownParseResult;
+  resolveCodeSymbol: (
+    content: string,
+    language: string,
+    symbolName: string,
+    symbolKind: MarkdownCodeSymbolKind
+  ) => LineRange | null;
 };

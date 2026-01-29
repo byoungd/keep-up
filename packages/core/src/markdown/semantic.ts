@@ -5,14 +5,23 @@ import type {
   LineRange,
   MarkdownCodeFenceBlock,
   MarkdownHeadingBlock,
+  MarkdownInnerTarget,
   MarkdownOperationError,
   MarkdownPreconditionV1,
   MarkdownSemanticIndex,
+  MarkdownSemanticTarget,
 } from "./types.js";
 
 type SemanticResolution =
   | { ok: true; range: LineRange }
   | { ok: false; error: MarkdownOperationError };
+
+type SemanticError = { ok: false; error: MarkdownOperationError };
+
+type HeadingSemanticTarget = Extract<MarkdownSemanticTarget, { kind: "heading" }>;
+type CodeFenceSemanticTarget = Extract<MarkdownSemanticTarget, { kind: "code_fence" }>;
+type FrontmatterSemanticTarget = Extract<MarkdownSemanticTarget, { kind: "frontmatter" }>;
+type FrontmatterKeySemanticTarget = Extract<MarkdownSemanticTarget, { kind: "frontmatter_key" }>;
 
 type SearchWindow = {
   startLine: number;
@@ -107,6 +116,17 @@ export function resolveMarkdownSemanticTarget(
     };
   }
 
+  const innerTarget = (semantic as { inner_target?: MarkdownInnerTarget }).inner_target;
+  if (semantic.kind !== "code_fence" && innerTarget) {
+    return {
+      ok: false,
+      error: {
+        code: "MCM_INVALID_TARGET",
+        message: "inner_target is only supported for code fences",
+      },
+    };
+  }
+
   const maxLines = policy?.max_semantic_search_lines;
 
   if (semantic.kind === "heading") {
@@ -135,7 +155,7 @@ export function resolveMarkdownSemanticTarget(
 }
 
 function resolveHeadingTarget(
-  semantic: NonNullable<MarkdownPreconditionV1["semantic"]>,
+  semantic: HeadingSemanticTarget,
   index: MarkdownSemanticIndex,
   maxLines?: number
 ): SemanticResolution {
@@ -172,57 +192,22 @@ function resolveHeadingTarget(
 }
 
 function resolveCodeFenceTarget(
-  semantic: NonNullable<MarkdownPreconditionV1["semantic"]>,
+  semantic: CodeFenceSemanticTarget,
   index: MarkdownSemanticIndex,
   maxLines?: number
 ): SemanticResolution {
-  let searchWindow: SearchWindow = { startLine: 1, endLine: index.line_count };
-
-  if (semantic.after_heading) {
-    const headingQuery = normalizeHeadingText(semantic.after_heading);
-    const headingMode = semantic.after_heading_mode ?? "exact";
-    const heading = index.headings.find((item) =>
-      matchesHeadingText(item.text, headingQuery, headingMode)
-    );
-    if (!heading) {
-      return {
-        ok: false,
-        error: {
-          code: "MCM_TARGETING_NOT_FOUND",
-          message: "after_heading not found",
-        },
-      };
-    }
-    const sectionEnd = findSectionEnd(index.headings, heading, index.line_count);
-    searchWindow = {
-      startLine: heading.line_range.end + 1,
-      endLine: sectionEnd,
-    };
+  const selection = selectCodeFenceMatch(semantic, index, maxLines);
+  if (!selection.ok) {
+    return selection;
   }
-
-  const scopeError = ensureSearchWithinLimit(searchWindow, maxLines);
-  if (scopeError) {
-    return scopeError;
+  if (!semantic.inner_target) {
+    return { ok: true, range: selection.fence.line_range };
   }
-
-  const matches = index.code_fences.filter((fence) => {
-    if (
-      fence.line_range.start < searchWindow.startLine ||
-      fence.line_range.start > searchWindow.endLine
-    ) {
-      return false;
-    }
-    if (semantic.language && fence.language !== semantic.language) {
-      return false;
-    }
-    return true;
-  });
-
-  return finalizeSemanticMatches(matches, semantic.nth);
+  return resolveCodeFenceInnerTarget(selection.fence, semantic.inner_target);
 }
 
 function resolveFrontmatterTarget(
-  _semantic: NonNullable<MarkdownPreconditionV1["semantic"]>,
+  _semantic: FrontmatterSemanticTarget,
   index: MarkdownSemanticIndex
 ): SemanticResolution {
   if (!index.frontmatter) {
@@ -239,7 +224,7 @@ function resolveFrontmatterTarget(
 }
 
 function resolveFrontmatterKeyTarget(
-  semantic: NonNullable<MarkdownPreconditionV1["semantic"]>,
+  semantic: FrontmatterKeySemanticTarget,
   index: MarkdownSemanticIndex,
   maxLines?: number
 ): SemanticResolution {
@@ -290,6 +275,147 @@ function resolveFrontmatterKeyTarget(
   return { ok: true, range: index.frontmatter.line_range };
 }
 
+function selectCodeFenceMatch(
+  semantic: CodeFenceSemanticTarget,
+  index: MarkdownSemanticIndex,
+  maxLines?: number
+): { ok: true; fence: MarkdownCodeFenceBlock } | { ok: false; error: MarkdownOperationError } {
+  let searchWindow: SearchWindow = { startLine: 1, endLine: index.line_count };
+
+  if (semantic.after_heading) {
+    const headingQuery = normalizeHeadingText(semantic.after_heading);
+    const headingMode = semantic.after_heading_mode ?? "exact";
+    const heading = index.headings.find((item) =>
+      matchesHeadingText(item.text, headingQuery, headingMode)
+    );
+    if (!heading) {
+      return {
+        ok: false,
+        error: {
+          code: "MCM_TARGETING_NOT_FOUND",
+          message: "after_heading not found",
+        },
+      };
+    }
+    const sectionEnd = findSectionEnd(index.headings, heading, index.line_count);
+    searchWindow = {
+      startLine: heading.line_range.end + 1,
+      endLine: sectionEnd,
+    };
+  }
+
+  const scopeError = ensureSearchWithinLimit(searchWindow, maxLines);
+  if (scopeError) {
+    return scopeError;
+  }
+
+  const matches = index.code_fences.filter((fence) => {
+    if (
+      fence.line_range.start < searchWindow.startLine ||
+      fence.line_range.start > searchWindow.endLine
+    ) {
+      return false;
+    }
+    if (semantic.language && fence.language !== semantic.language) {
+      return false;
+    }
+    return true;
+  });
+
+  if (matches.length === 0) {
+    return {
+      ok: false,
+      error: {
+        code: "MCM_TARGETING_NOT_FOUND",
+        message: "Semantic target not found",
+      },
+    };
+  }
+
+  if (typeof semantic.nth === "number") {
+    const indexValue = semantic.nth - 1;
+    if (indexValue < 0 || indexValue >= matches.length) {
+      return {
+        ok: false,
+        error: {
+          code: "MCM_TARGETING_NOT_FOUND",
+          message: "Semantic target not found",
+        },
+      };
+    }
+    return { ok: true, fence: matches[indexValue] };
+  }
+
+  if (matches.length > 1) {
+    return {
+      ok: false,
+      error: {
+        code: "MCM_TARGETING_AMBIGUOUS",
+        message: "Semantic target is ambiguous",
+      },
+    };
+  }
+
+  return { ok: true, fence: matches[0] };
+}
+
+function resolveCodeFenceInnerTarget(
+  fence: MarkdownCodeFenceBlock,
+  innerTarget: MarkdownInnerTarget
+): SemanticResolution {
+  if (innerTarget.kind !== "line_range") {
+    return {
+      ok: false,
+      error: {
+        code: "MCM_TARGETING_NOT_FOUND",
+        message: "Code symbol not found",
+      },
+    };
+  }
+
+  const offset = innerTarget.line_offset;
+  if (
+    !Number.isInteger(offset.start) ||
+    !Number.isInteger(offset.end) ||
+    offset.start < 1 ||
+    offset.end < offset.start
+  ) {
+    return {
+      ok: false,
+      error: {
+        code: "MCM_INVALID_RANGE",
+        message: "Inner target range is invalid",
+      },
+    };
+  }
+
+  const contentStart = fence.line_range.start + 1;
+  const contentEnd = fence.line_range.end - 1;
+  if (contentEnd < contentStart) {
+    return {
+      ok: false,
+      error: {
+        code: "MCM_TARGETING_NOT_FOUND",
+        message: "Code fence content is empty",
+      },
+    };
+  }
+
+  const start = contentStart + offset.start - 1;
+  const end = contentStart + offset.end - 1;
+  if (start < contentStart || end > contentEnd) {
+    return {
+      ok: false,
+      error: {
+        code: "MCM_INVALID_RANGE",
+        message: "Inner target range is out of bounds",
+      },
+    };
+  }
+
+  return { ok: true, range: { start, end } };
+}
+
 function finalizeSemanticMatches(
   matches: Array<{ line_range: LineRange }>,
   nth?: number
@@ -331,10 +457,7 @@ function finalizeSemanticMatches(
   return { ok: true, range: matches[0].line_range };
 }
 
-function ensureSearchWithinLimit(
-  window: SearchWindow,
-  maxLines?: number
-): SemanticResolution | null {
+function ensureSearchWithinLimit(window: SearchWindow, maxLines?: number): SemanticError | null {
   if (maxLines === undefined) {
     return null;
   }

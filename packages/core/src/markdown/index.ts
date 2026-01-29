@@ -1,4 +1,5 @@
 export {
+  computeMarkdownBlockId,
   computeMarkdownContentHash,
   computeMarkdownLineHash,
   normalizeMarkdownText,
@@ -20,8 +21,10 @@ export type {
   LineRange,
   MarkdownAppliedOperation,
   MarkdownCodeFenceBlock,
+  MarkdownCodeSymbolKind,
   MarkdownFrontmatterBlock,
   MarkdownHeadingBlock,
+  MarkdownInnerTarget,
   MarkdownLineApplyResult,
   MarkdownOperation,
   MarkdownOperationEnvelope,
@@ -29,12 +32,16 @@ export type {
   MarkdownOperationErrorCode,
   MarkdownPreconditionV1,
   MarkdownSemanticIndex,
+  MarkdownSemanticTarget,
   MdDeleteLines,
   MdInsertAfter,
   MdInsertBefore,
   MdInsertCodeFence,
+  MdInsertCodeMember,
   MdInsertLines,
   MdReplaceBlock,
+  MdReplaceCodeSymbol,
   MdReplaceLines,
   MdUpdateFrontmatter,
 } from "./types.js";
+export type { MdWorkspaceRefactor, WorkspacePrecondition } from "./workspace.js";

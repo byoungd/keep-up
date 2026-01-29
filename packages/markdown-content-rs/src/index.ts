@@ -6,10 +6,12 @@ export type {
   MarkdownApplyOptions,
   MarkdownBlock,
   MarkdownCodeFenceBlock,
+  MarkdownCodeSymbolKind,
   MarkdownContentHashOptions,
   MarkdownFrontmatterBlock,
   MarkdownFrontmatterPolicy,
   MarkdownHeadingBlock,
+  MarkdownInnerTarget,
   MarkdownLineApplyResult,
   MarkdownOperation,
   MarkdownOperationEnvelope,
@@ -21,6 +23,8 @@ export type {
   MarkdownSemanticResolutionResult,
   MarkdownSemanticTarget,
   MarkdownTargetingPolicyV1,
+  MdInsertCodeMember,
+  MdReplaceCodeSymbol,
   NativeMarkdownContentBinding,
 } from "./types";
 

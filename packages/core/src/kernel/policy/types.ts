@@ -216,6 +216,12 @@ export type MarkdownTargetingPolicyV1 = {
   max_context_prefix_chars: number;
 };
 
+export type CodeFenceValidationPolicy = {
+  strict_syntax_check: boolean;
+  allowed_languages: string[];
+  fallback_language?: string;
+};
+
 export type MarkdownPolicyV1 = {
   version: "v1";
   enabled: boolean;

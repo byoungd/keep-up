@@ -180,3 +180,13 @@ export async function computeMarkdownContentHash(
   }\ntext=${sanitized}`;
   return sha256Hex(canonical);
 }
+
+export async function computeMarkdownBlockId(
+  lines: string[],
+  range: LineRange,
+  blockType: string
+): Promise<string> {
+  const lineHash = await computeMarkdownLineHash(lines, range);
+  const canonical = `LFCC_MD_BLOCK_V1\ntype=${blockType}\nstart_line=${range.start}\nend_line=${range.end}\ncontent_hash=${lineHash}`;
+  return sha256Hex(canonical);
+}

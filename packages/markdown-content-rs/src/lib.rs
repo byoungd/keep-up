@@ -7,6 +7,8 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 
+mod ast;
+
 // =============================================================================
 // Types
 // =============================================================================
@@ -31,6 +33,16 @@ struct MarkdownSemanticTarget {
     after_heading_mode: Option<String>,
     key_path: Option<Vec<String>>,
     nth: Option<u32>,
+    inner_target: Option<MarkdownInnerTarget>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+struct MarkdownInnerTarget {
+    kind: String,
+    name: Option<String>,
+    signature_prefix: Option<String>,
+    line_offset: Option<LineRange>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -93,6 +105,10 @@ enum MarkdownOperation {
     InsertBefore(MdInsertBefore),
     #[serde(rename = "md_insert_code_fence")]
     InsertCodeFence(MdInsertCodeFence),
+    #[serde(rename = "md_replace_code_symbol")]
+    ReplaceCodeSymbol(MdReplaceCodeSymbol),
+    #[serde(rename = "md_insert_code_member")]
+    InsertCodeMember(MdInsertCodeMember),
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -168,6 +184,22 @@ struct MdInsertCodeFence {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
+struct MdReplaceCodeSymbol {
+    precondition_id: String,
+    target: CodeSymbolTarget,
+    content: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+struct MdInsertCodeMember {
+    precondition_id: String,
+    target: CodeMemberTarget,
+    content: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
 struct MdUpdateFrontmatter {
     precondition_id: String,
     target: FrontmatterTarget,
@@ -186,6 +218,29 @@ struct FrontmatterTarget {
 struct BlockTarget {
     block_id: Option<String>,
     semantic: Option<MarkdownSemanticTarget>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+struct CodeSymbolTarget {
+    code_fence_id: String,
+    symbol: CodeSymbolSelector,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+struct CodeMemberTarget {
+    code_fence_id: String,
+    after_symbol: Option<String>,
+    before_symbol: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+struct CodeSymbolSelector {
+    kind: String,
+    name: String,
+    signature_hash: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -380,6 +435,11 @@ struct ResolvedOperation {
     insert_index: Option<usize>,
 }
 
+#[derive(Clone, Debug, Default)]
+struct CodeFenceLookup {
+    by_id: BTreeMap<String, MarkdownCodeFenceBlock>,
+}
+
 // =============================================================================
 // Regex Patterns
 // =============================================================================
@@ -518,6 +578,21 @@ pub fn parse_markdown_blocks(content: String, _options: Option<Value>) -> NapiRe
     };
 
     serde_json::to_value(result).map_err(to_napi_error)
+}
+
+#[napi(js_name = "resolveCodeSymbol")]
+pub fn resolve_code_symbol(
+    content: String,
+    language: String,
+    symbol_name: String,
+    symbol_kind: String,
+) -> NapiResult<Option<LineRange>> {
+    Ok(ast::resolve_code_symbol(
+        &content,
+        &language,
+        &symbol_name,
+        &symbol_kind,
+    ))
 }
 
 // =============================================================================
@@ -1103,11 +1178,34 @@ fn build_semantic_index(lines: &[String]) -> MarkdownSemanticIndex {
     }
 }
 
+fn build_code_fence_lookup(
+    lines: &[String],
+    index: &MarkdownSemanticIndex,
+) -> CodeFenceLookup {
+    let mut lookup = CodeFenceLookup::default();
+    for fence in &index.code_fences {
+        let block_id = compute_block_id("md_code_fence", &fence.line_range, lines);
+        lookup.by_id.insert(block_id, fence.clone());
+    }
+    lookup
+}
+
 fn resolve_semantic_target(
     semantic: &MarkdownSemanticTarget,
     index: &MarkdownSemanticIndex,
     policy: Option<&MarkdownTargetingPolicyV1>,
 ) -> MarkdownSemanticResolutionResult {
+    if semantic.kind != "code_fence" && semantic.inner_target.is_some() {
+        return MarkdownSemanticResolutionResult::Err {
+            ok: false,
+            error: MarkdownOperationError {
+                code: "MCM_INVALID_TARGET".to_string(),
+                message: "inner_target is only supported for code fences".to_string(),
+                precondition_id: None,
+                op_index: None,
+            },
+        };
+    }
     match semantic.kind.as_str() {
         "heading" => resolve_heading_target(semantic, index, policy),
         "code_fence" => resolve_code_fence_target(semantic, index, policy),
@@ -1171,6 +1269,31 @@ fn resolve_code_fence_target(
     index: &MarkdownSemanticIndex,
     policy: Option<&MarkdownTargetingPolicyV1>,
 ) -> MarkdownSemanticResolutionResult {
+    let fence = match select_code_fence_match(semantic, index, policy) {
+        Ok(value) => value,
+        Err(error) => {
+            return MarkdownSemanticResolutionResult::Err {
+                ok: false,
+                error,
+            }
+        }
+    };
+
+    if let Some(inner_target) = semantic.inner_target.as_ref() {
+        return resolve_code_fence_inner_target(&fence, inner_target);
+    }
+
+    MarkdownSemanticResolutionResult::Ok {
+        ok: true,
+        range: fence.line_range.clone(),
+    }
+}
+
+fn select_code_fence_match(
+    semantic: &MarkdownSemanticTarget,
+    index: &MarkdownSemanticIndex,
+    policy: Option<&MarkdownTargetingPolicyV1>,
+) -> Result<MarkdownCodeFenceBlock, MarkdownOperationError> {
     let mut scope = SearchWindow {
         start_line: 1,
         end_line: index.line_count,
@@ -1185,15 +1308,12 @@ fn resolve_code_fence_target(
         let heading = match heading {
             Some(value) => value,
             None => {
-                return MarkdownSemanticResolutionResult::Err {
-                    ok: false,
-                    error: MarkdownOperationError {
-                        code: "MCM_TARGETING_NOT_FOUND".to_string(),
-                        message: "after_heading not found".to_string(),
-                        precondition_id: None,
-                        op_index: None,
-                    },
-                };
+                return Err(MarkdownOperationError {
+                    code: "MCM_TARGETING_NOT_FOUND".to_string(),
+                    message: "after_heading not found".to_string(),
+                    precondition_id: None,
+                    op_index: None,
+                });
             }
         };
         let section_end = find_section_end(&index.headings, heading, index.line_count);
@@ -1203,7 +1323,15 @@ fn resolve_code_fence_target(
         };
     }
     if let Some(error) = ensure_search_within_limit(&scope, policy) {
-        return error;
+        return match error {
+            MarkdownSemanticResolutionResult::Err { error, .. } => Err(error),
+            _ => Err(MarkdownOperationError {
+                code: "MCM_INVALID_TARGET".to_string(),
+                message: "Semantic target is invalid".to_string(),
+                precondition_id: None,
+                op_index: None,
+            }),
+        };
     }
 
     let matches: Vec<&MarkdownCodeFenceBlock> = index
@@ -1220,7 +1348,110 @@ fn resolve_code_fence_target(
         })
         .collect();
 
-    finalize_semantic_matches(&matches, semantic.nth)
+    if matches.is_empty() {
+        return Err(MarkdownOperationError {
+            code: "MCM_TARGETING_NOT_FOUND".to_string(),
+            message: "Semantic target not found".to_string(),
+            precondition_id: None,
+            op_index: None,
+        });
+    }
+
+    if let Some(nth) = semantic.nth {
+        let index = nth.saturating_sub(1) as usize;
+        if index >= matches.len() {
+            return Err(MarkdownOperationError {
+                code: "MCM_TARGETING_NOT_FOUND".to_string(),
+                message: "Semantic target not found".to_string(),
+                precondition_id: None,
+                op_index: None,
+            });
+        }
+        return Ok(matches[index].clone());
+    }
+
+    if matches.len() > 1 {
+        return Err(MarkdownOperationError {
+            code: "MCM_TARGETING_AMBIGUOUS".to_string(),
+            message: "Semantic target is ambiguous".to_string(),
+            precondition_id: None,
+            op_index: None,
+        });
+    }
+
+    Ok(matches[0].clone())
+}
+
+fn resolve_code_fence_inner_target(
+    fence: &MarkdownCodeFenceBlock,
+    inner: &MarkdownInnerTarget,
+) -> MarkdownSemanticResolutionResult {
+    if inner.kind != "line_range" {
+        return MarkdownSemanticResolutionResult::Err {
+            ok: false,
+            error: MarkdownOperationError {
+                code: "MCM_TARGETING_NOT_FOUND".to_string(),
+                message: "Code symbol not found".to_string(),
+                precondition_id: None,
+                op_index: None,
+            },
+        };
+    }
+    let offset = match inner.line_offset.as_ref() {
+        Some(value) => value,
+        None => {
+            return MarkdownSemanticResolutionResult::Err {
+                ok: false,
+                error: MarkdownOperationError {
+                    code: "MCM_INVALID_RANGE".to_string(),
+                    message: "Inner target range is invalid".to_string(),
+                    precondition_id: None,
+                    op_index: None,
+                },
+            }
+        }
+    };
+    if offset.start < 1 || offset.end < offset.start {
+        return MarkdownSemanticResolutionResult::Err {
+            ok: false,
+            error: MarkdownOperationError {
+                code: "MCM_INVALID_RANGE".to_string(),
+                message: "Inner target range is invalid".to_string(),
+                precondition_id: None,
+                op_index: None,
+            },
+        };
+    }
+    let content_start = fence.line_range.start + 1;
+    let content_end = fence.line_range.end.saturating_sub(1);
+    if content_end < content_start {
+        return MarkdownSemanticResolutionResult::Err {
+            ok: false,
+            error: MarkdownOperationError {
+                code: "MCM_TARGETING_NOT_FOUND".to_string(),
+                message: "Code fence content is empty".to_string(),
+                precondition_id: None,
+                op_index: None,
+            },
+        };
+    }
+    let start = content_start + offset.start - 1;
+    let end = content_start + offset.end - 1;
+    if start < content_start || end > content_end {
+        return MarkdownSemanticResolutionResult::Err {
+            ok: false,
+            error: MarkdownOperationError {
+                code: "MCM_INVALID_RANGE".to_string(),
+                message: "Inner target range is out of bounds".to_string(),
+                precondition_id: None,
+                op_index: None,
+            },
+        };
+    }
+    MarkdownSemanticResolutionResult::Ok {
+        ok: true,
+        range: LineRange { start, end },
+    }
 }
 
 fn resolve_frontmatter_target(index: &MarkdownSemanticIndex) -> MarkdownSemanticResolutionResult {
@@ -2031,6 +2262,16 @@ fn apply_markdown_ops_internal(
         }
     };
 
+    let code_fence_lookup = if envelope
+        .ops
+        .iter()
+        .any(|op| matches!(op, MarkdownOperation::ReplaceCodeSymbol(_) | MarkdownOperation::InsertCodeMember(_)))
+    {
+        Some(build_code_fence_lookup(&lines, &semantic_index))
+    } else {
+        None
+    };
+
     let resolved_ops = match resolve_operations(
         &envelope.ops,
         &precondition_map,
@@ -2039,6 +2280,8 @@ fn apply_markdown_ops_internal(
         &semantic_index,
         options.and_then(|opts| opts.targeting_policy.as_ref()),
         semantic_index.frontmatter.as_ref().map(|fm| fm.line_range.clone()),
+        code_fence_lookup.as_ref(),
+        &lines,
     ) {
         Ok(value) => value,
         Err(error) => {
@@ -2283,6 +2526,8 @@ fn resolve_operations(
     semantic_index: &MarkdownSemanticIndex,
     policy: Option<&MarkdownTargetingPolicyV1>,
     frontmatter_range: Option<LineRange>,
+    code_fence_lookup: Option<&CodeFenceLookup>,
+    lines: &[String],
 ) -> Result<Vec<ResolvedOperation>, MarkdownOperationError> {
     let mut resolved_ops = Vec::new();
     let mut used_preconditions = BTreeMap::new();
@@ -2323,6 +2568,8 @@ fn resolve_operations(
             policy,
             index,
             frontmatter_range.clone(),
+            code_fence_lookup,
+            lines,
         )?;
         resolved_ops.push(resolved);
     }
@@ -2339,6 +2586,8 @@ fn resolve_operation(
     policy: Option<&MarkdownTargetingPolicyV1>,
     op_index: usize,
     frontmatter_range: Option<LineRange>,
+    code_fence_lookup: Option<&CodeFenceLookup>,
+    lines: &[String],
 ) -> Result<ResolvedOperation, MarkdownOperationError> {
     match op {
         MarkdownOperation::ReplaceLines(inner) => {
@@ -2477,6 +2726,59 @@ fn resolve_operation(
                 insert_index: Some(range.end as usize),
             })
         }
+        MarkdownOperation::ReplaceCodeSymbol(inner) => {
+            let lookup = code_fence_lookup.ok_or_else(|| MarkdownOperationError {
+                code: "MCM_OPERATION_UNSUPPORTED".to_string(),
+                message: "Code fence lookup unavailable".to_string(),
+                precondition_id: Some(inner.precondition_id.clone()),
+                op_index: Some(op_index as u32),
+            })?;
+            let fence = resolve_code_fence_by_id(
+                lookup,
+                inner.target.code_fence_id.as_str(),
+                inner.precondition_id.as_str(),
+                op_index,
+            )?;
+            ensure_range_match(&resolved_range, &fence.line_range, inner.precondition_id.as_str(), op_index)?;
+            let symbol_range = resolve_code_symbol_range(lines, fence, &inner.target.symbol)
+                .map_err(|mut err| {
+                    err.precondition_id = Some(inner.precondition_id.clone());
+                    err.op_index = Some(op_index as u32);
+                    err
+                })?;
+            Ok(ResolvedOperation {
+                op_index,
+                op: op.clone(),
+                resolved_range: symbol_range,
+                insert_index: None,
+            })
+        }
+        MarkdownOperation::InsertCodeMember(inner) => {
+            let lookup = code_fence_lookup.ok_or_else(|| MarkdownOperationError {
+                code: "MCM_OPERATION_UNSUPPORTED".to_string(),
+                message: "Code fence lookup unavailable".to_string(),
+                precondition_id: Some(inner.precondition_id.clone()),
+                op_index: Some(op_index as u32),
+            })?;
+            let fence = resolve_code_fence_by_id(
+                lookup,
+                inner.target.code_fence_id.as_str(),
+                inner.precondition_id.as_str(),
+                op_index,
+            )?;
+            ensure_range_match(&resolved_range, &fence.line_range, inner.precondition_id.as_str(), op_index)?;
+            let anchor = resolve_insert_member_anchor(lines, fence, &inner.target).map_err(|mut err| {
+                err.precondition_id = Some(inner.precondition_id.clone());
+                err.op_index = Some(op_index as u32);
+                err
+            })?;
+            Ok(ResolvedOperation {
+                op_index,
+                op: op.clone(),
+                resolved_range: anchor.range,
+                insert_index: Some(anchor.insert_index),
+            })
+        }
         MarkdownOperation::UpdateFrontmatter(inner) => {
             if let Some(frontmatter_range) = frontmatter_range.as_ref() {
                 if frontmatter_range.start != resolved_range.start
@@ -2522,6 +2824,14 @@ fn resolve_block_target(
         precondition_id: Some(precondition_id.to_string()),
         op_index: Some(op_index as u32),
     })?;
+    if semantic.inner_target.is_some() {
+        return Err(MarkdownOperationError {
+            code: "MCM_INVALID_TARGET".to_string(),
+            message: "inner_target is not supported for block operations".to_string(),
+            precondition_id: Some(precondition_id.to_string()),
+            op_index: Some(op_index as u32),
+        });
+    }
     let semantic_result = resolve_semantic_target(semantic, semantic_index, policy);
     match semantic_result {
         MarkdownSemanticResolutionResult::Ok { range, .. } => Ok(range),
@@ -2532,6 +2842,145 @@ fn resolve_block_target(
             op_index: Some(op_index as u32),
         }),
     }
+}
+
+fn resolve_code_fence_by_id(
+    lookup: &CodeFenceLookup,
+    code_fence_id: &str,
+    precondition_id: &str,
+    op_index: usize,
+) -> Result<MarkdownCodeFenceBlock, MarkdownOperationError> {
+    lookup
+        .by_id
+        .get(code_fence_id)
+        .cloned()
+        .ok_or_else(|| MarkdownOperationError {
+            code: "MCM_TARGETING_NOT_FOUND".to_string(),
+            message: "Code fence target not found".to_string(),
+            precondition_id: Some(precondition_id.to_string()),
+            op_index: Some(op_index as u32),
+        })
+}
+
+fn resolve_code_symbol_range(
+    lines: &[String],
+    fence: MarkdownCodeFenceBlock,
+    symbol: &CodeSymbolSelector,
+) -> Result<LineRange, MarkdownOperationError> {
+    let content_start = fence.line_range.start + 1;
+    let content_end = fence.line_range.end.saturating_sub(1);
+    if content_end < content_start {
+        return Err(MarkdownOperationError {
+            code: "MCM_TARGETING_NOT_FOUND".to_string(),
+            message: "Code fence content is empty".to_string(),
+            precondition_id: None,
+            op_index: None,
+        });
+    }
+    let start_index = (content_start - 1) as usize;
+    let end_index = content_end as usize;
+    let content = lines[start_index..end_index].join("\n");
+    let resolved = ast::resolve_code_symbol(
+        &content,
+        fence.language.as_deref().unwrap_or(""),
+        symbol.name.as_str(),
+        symbol.kind.as_str(),
+    );
+    let resolved = match resolved {
+        Some(value) => value,
+        None => {
+            return Err(MarkdownOperationError {
+                code: "MCM_TARGETING_NOT_FOUND".to_string(),
+                message: "Code symbol not found".to_string(),
+                precondition_id: None,
+                op_index: None,
+            });
+        }
+    };
+    if resolved.start < 1 || resolved.end < resolved.start {
+        return Err(MarkdownOperationError {
+            code: "MCM_INVALID_RANGE".to_string(),
+            message: "Code symbol range is invalid".to_string(),
+            precondition_id: None,
+            op_index: None,
+        });
+    }
+    let total_lines = (content_end - content_start + 1).max(1);
+    if resolved.end > total_lines {
+        return Err(MarkdownOperationError {
+            code: "MCM_INVALID_RANGE".to_string(),
+            message: "Code symbol range is out of bounds".to_string(),
+            precondition_id: None,
+            op_index: None,
+        });
+    }
+    Ok(LineRange {
+        start: content_start + resolved.start - 1,
+        end: content_start + resolved.end - 1,
+    })
+}
+
+struct InsertAnchorResult {
+    range: LineRange,
+    insert_index: usize,
+}
+
+fn resolve_insert_member_anchor(
+    lines: &[String],
+    fence: MarkdownCodeFenceBlock,
+    target: &CodeMemberTarget,
+) -> Result<InsertAnchorResult, MarkdownOperationError> {
+    let after = target.after_symbol.as_ref();
+    let before = target.before_symbol.as_ref();
+    if after.is_some() && before.is_some() {
+        return Err(MarkdownOperationError {
+            code: "MCM_INVALID_TARGET".to_string(),
+            message: "Insert member cannot specify both after_symbol and before_symbol".to_string(),
+            precondition_id: None,
+            op_index: None,
+        });
+    }
+    let name = after.or(before).ok_or_else(|| MarkdownOperationError {
+        code: "MCM_INVALID_TARGET".to_string(),
+        message: "Insert member requires after_symbol or before_symbol".to_string(),
+        precondition_id: None,
+        op_index: None,
+    })?;
+
+    let anchor_range = resolve_symbol_by_name(lines, fence.clone(), name)?;
+    let insert_index = if after.is_some() {
+        anchor_range.end as usize
+    } else {
+        anchor_range.start.saturating_sub(1) as usize
+    };
+    Ok(InsertAnchorResult {
+        range: anchor_range,
+        insert_index,
+    })
+}
+
+fn resolve_symbol_by_name(
+    lines: &[String],
+    fence: MarkdownCodeFenceBlock,
+    name: &str,
+) -> Result<LineRange, MarkdownOperationError> {
+    let kinds = ["function", "class", "variable", "import"];
+    for kind in kinds {
+        let selector = CodeSymbolSelector {
+            kind: kind.to_string(),
+            name: name.to_string(),
+            signature_hash: None,
+        };
+        if let Ok(range) = resolve_code_symbol_range(lines, fence.clone(), &selector) {
+            return Ok(range);
+        }
+    }
+    Err(MarkdownOperationError {
+        code: "MCM_TARGETING_NOT_FOUND".to_string(),
+        message: "Code symbol not found".to_string(),
+        precondition_id: None,
+        op_index: None,
+    })
 }
 
 fn ensure_range_match(
@@ -2632,6 +3081,14 @@ fn apply_resolved_operation(
         MarkdownOperation::InsertCodeFence(op) => {
             let fence_lines = build_code_fence_lines(op)?;
             apply_insert(lines, resolved.insert_index.unwrap_or(0), fence_lines);
+        }
+        MarkdownOperation::ReplaceCodeSymbol(op) => {
+            let replacement = split_markdown_lines(op.content.clone());
+            apply_replace(lines, &resolved.resolved_range, replacement);
+        }
+        MarkdownOperation::InsertCodeMember(op) => {
+            let insertion = split_markdown_lines(op.content.clone());
+            apply_insert(lines, resolved.insert_index.unwrap_or(0), insertion);
         }
         MarkdownOperation::UpdateFrontmatter(op) => {
             apply_frontmatter_update(lines, op, options.and_then(|opts| opts.frontmatter_policy.as_ref()))?;
@@ -2823,6 +3280,8 @@ impl OperationMeta for MarkdownOperation {
             MarkdownOperation::InsertAfter(op) => &op.precondition_id,
             MarkdownOperation::InsertBefore(op) => &op.precondition_id,
             MarkdownOperation::InsertCodeFence(op) => &op.precondition_id,
+            MarkdownOperation::ReplaceCodeSymbol(op) => &op.precondition_id,
+            MarkdownOperation::InsertCodeMember(op) => &op.precondition_id,
         }
     }
 }

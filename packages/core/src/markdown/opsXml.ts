@@ -2,6 +2,7 @@ import type { Capabilities, MarkdownPolicyV1 } from "../kernel/policy/types.js";
 import { applyMarkdownLineOperations } from "./lineOps.js";
 import type {
   LineRange,
+  MarkdownCodeSymbolKind,
   MarkdownLineApplyResult,
   MarkdownOperation,
   MarkdownOperationEnvelope,
@@ -367,7 +368,12 @@ function validateCodeFenceUsage(
   if (!capabilities || capabilities.markdown_code_fence_syntax !== false) {
     return null;
   }
-  const usesCodeFenceOp = envelope.ops.some((op) => op.op === "md_insert_code_fence");
+  const usesCodeFenceOp = envelope.ops.some(
+    (op) =>
+      op.op === "md_insert_code_fence" ||
+      op.op === "md_replace_code_symbol" ||
+      op.op === "md_insert_code_member"
+  );
   const usesCodeFenceSemantic = envelope.preconditions.some(
     (pre) => pre.semantic?.kind === "code_fence"
   );
@@ -524,6 +530,8 @@ const markdownOpParsers: Record<string, MarkdownOpParser> = {
   md_insert_after: parseInsertAfterOp,
   md_insert_before: parseInsertBeforeOp,
   md_insert_code_fence: parseInsertCodeFenceOp,
+  md_replace_code_symbol: parseReplaceCodeSymbolOp,
+  md_insert_code_member: parseInsertCodeMemberOp,
   md_update_frontmatter: parseUpdateFrontmatterOp,
 };
 
@@ -669,6 +677,106 @@ function parseInsertCodeFenceOp(
       content,
       fence_char: attrs.fence_char as "`" | "~" | undefined,
       fence_length: fenceLength.value,
+    },
+  };
+}
+
+function parseReplaceCodeSymbolOp(
+  attrs: Record<string, string>,
+  content: string,
+  preconditionId: string
+): MarkdownOpParseResult {
+  const codeFenceId = attrs.code_fence_id;
+  if (!codeFenceId) {
+    return {
+      ok: false,
+      error: {
+        code: "MCM_INVALID_TARGET",
+        message: "code_fence_id is required",
+      },
+    };
+  }
+  const symbolName = attrs.symbol ?? attrs.symbol_name;
+  if (!symbolName) {
+    return {
+      ok: false,
+      error: {
+        code: "MCM_INVALID_TARGET",
+        message: "symbol name is required",
+      },
+    };
+  }
+  const kindResult = parseSymbolKind(attrs.symbol_kind);
+  if (!kindResult.ok) {
+    return kindResult;
+  }
+
+  return {
+    ok: true,
+    op: {
+      op: "md_replace_code_symbol",
+      precondition_id: preconditionId,
+      target: {
+        code_fence_id: codeFenceId,
+        symbol: {
+          kind: kindResult.kind,
+          name: symbolName,
+          signature_hash: attrs.signature_hash,
+        },
+      },
+      content,
+    },
+  };
+}
+
+function parseInsertCodeMemberOp(
+  attrs: Record<string, string>,
+  content: string,
+  preconditionId: string
+): MarkdownOpParseResult {
+  const codeFenceId = attrs.code_fence_id;
+  if (!codeFenceId) {
+    return {
+      ok: false,
+      error: {
+        code: "MCM_INVALID_TARGET",
+        message: "code_fence_id is required",
+      },
+    };
+  }
+
+  const afterSymbol = attrs.after_symbol;
+  const beforeSymbol = attrs.before_symbol;
+  if (!afterSymbol && !beforeSymbol) {
+    return {
+      ok: false,
+      error: {
+        code: "MCM_INVALID_TARGET",
+        message: "Insert member requires after_symbol or before_symbol",
+      },
+    };
+  }
+  if (afterSymbol && beforeSymbol) {
+    return {
+      ok: false,
+      error: {
+        code: "MCM_INVALID_TARGET",
+        message: "Insert member cannot specify both after_symbol and before_symbol",
+      },
+    };
+  }
+
+  return {
+    ok: true,
+    op: {
+      op: "md_insert_code_member",
+      precondition_id: preconditionId,
+      target: {
+        code_fence_id: codeFenceId,
+        after_symbol: afterSymbol,
+        before_symbol: beforeSymbol,
+      },
+      content,
     },
   };
 }
@@ -951,6 +1059,32 @@ function parseOptionalInt(
     };
   }
   return { ok: true, value: parsed };
+}
+
+function parseSymbolKind(
+  value: string | undefined
+): { ok: true; kind: MarkdownCodeSymbolKind } | { ok: false; error: MarkdownOperationError } {
+  if (!value) {
+    return {
+      ok: false,
+      error: {
+        code: "MCM_INVALID_TARGET",
+        message: "symbol_kind is required",
+      },
+    };
+  }
+  const normalized = value.trim();
+  const allowed: MarkdownCodeSymbolKind[] = ["function", "class", "variable", "import"];
+  if (!allowed.includes(normalized as MarkdownCodeSymbolKind)) {
+    return {
+      ok: false,
+      error: {
+        code: "MCM_INVALID_TARGET",
+        message: "symbol_kind is invalid",
+      },
+    };
+  }
+  return { ok: true, kind: normalized as MarkdownCodeSymbolKind };
 }
 
 function parseBoolean(

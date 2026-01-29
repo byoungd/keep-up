@@ -3,23 +3,50 @@ export type LineRange = {
   end: number;
 };
 
+export type MarkdownCodeSymbolKind = "function" | "class" | "variable" | "import";
+
+export type MarkdownInnerTarget =
+  | {
+      kind: "line_range";
+      line_offset: LineRange;
+    }
+  | {
+      kind: MarkdownCodeSymbolKind;
+      name: string;
+      signature_prefix?: string;
+    };
+
+export type MarkdownSemanticTarget =
+  | {
+      kind: "heading";
+      heading_text?: string;
+      heading_text_mode?: "exact" | "prefix";
+      heading_level?: number;
+      nth?: number;
+    }
+  | {
+      kind: "code_fence";
+      language?: string;
+      after_heading?: string;
+      after_heading_mode?: "exact" | "prefix";
+      nth?: number;
+      inner_target?: MarkdownInnerTarget;
+    }
+  | {
+      kind: "frontmatter";
+    }
+  | {
+      kind: "frontmatter_key";
+      key_path?: string[];
+    };
+
 export type MarkdownPreconditionV1 = {
   v: 1;
   mode: "markdown";
   id: string;
   block_id?: string;
   line_range?: LineRange;
-  semantic?: {
-    kind: "heading" | "code_fence" | "frontmatter" | "frontmatter_key";
-    heading_text?: string;
-    heading_text_mode?: "exact" | "prefix";
-    heading_level?: number;
-    language?: string;
-    after_heading?: string;
-    after_heading_mode?: "exact" | "prefix";
-    key_path?: string[];
-    nth?: number;
-  };
+  semantic?: MarkdownSemanticTarget;
   content_hash?: string;
   context?: {
     line_before_prefix?: string;
@@ -65,7 +92,7 @@ export type MdDeleteLines = {
 export type MdReplaceBlock = {
   op: "md_replace_block";
   precondition_id: string;
-  target: { block_id: string } | { semantic: NonNullable<MarkdownPreconditionV1["semantic"]> };
+  target: { block_id: string } | { semantic: MarkdownSemanticTarget };
   content: string;
 };
 
@@ -80,25 +107,46 @@ export type MdUpdateFrontmatter = {
 export type MdInsertAfter = {
   op: "md_insert_after";
   precondition_id: string;
-  target: { block_id: string } | { semantic: NonNullable<MarkdownPreconditionV1["semantic"]> };
+  target: { block_id: string } | { semantic: MarkdownSemanticTarget };
   content: string;
 };
 
 export type MdInsertBefore = {
   op: "md_insert_before";
   precondition_id: string;
-  target: { block_id: string } | { semantic: NonNullable<MarkdownPreconditionV1["semantic"]> };
+  target: { block_id: string } | { semantic: MarkdownSemanticTarget };
   content: string;
 };
 
 export type MdInsertCodeFence = {
   op: "md_insert_code_fence";
   precondition_id: string;
-  target: { block_id: string } | { semantic: NonNullable<MarkdownPreconditionV1["semantic"]> };
+  target: { block_id: string } | { semantic: MarkdownSemanticTarget };
   language?: string;
   content: string;
   fence_char?: "`" | "~";
   fence_length?: number;
+};
+
+export type MdReplaceCodeSymbol = {
+  op: "md_replace_code_symbol";
+  precondition_id: string;
+  target: {
+    code_fence_id: string;
+    symbol: {
+      kind: MarkdownCodeSymbolKind;
+      name: string;
+      signature_hash?: string;
+    };
+  };
+  content: string;
+};
+
+export type MdInsertCodeMember = {
+  op: "md_insert_code_member";
+  precondition_id: string;
+  target: { code_fence_id: string; after_symbol?: string; before_symbol?: string };
+  content: string;
 };
 
 export type MarkdownOperation =
@@ -109,7 +157,9 @@ export type MarkdownOperation =
   | MdUpdateFrontmatter
   | MdInsertAfter
   | MdInsertBefore
-  | MdInsertCodeFence;
+  | MdInsertCodeFence
+  | MdReplaceCodeSymbol
+  | MdInsertCodeMember;
 
 export type MarkdownOperationErrorCode =
   | "MCM_INVALID_REQUEST"

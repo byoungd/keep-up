@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applyMarkdownLineOperations,
+  computeMarkdownBlockId,
   computeMarkdownLineHash,
   type MarkdownOperationEnvelope,
   splitMarkdownLines,
@@ -152,6 +153,183 @@ describe("Markdown line-based operations", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.content).toBe("# Introduction\nDetails");
+    }
+  });
+
+  it("replaces inner code fence ranges via semantic targeting", async () => {
+    const content = ["```ts", "const a = 1", "const b = 2", "```"].join("\n");
+    const lines = splitMarkdownLines(content);
+    const targetRange = { start: 3, end: 3 };
+    const hash = await computeMarkdownLineHash(lines, targetRange);
+
+    const envelope: MarkdownOperationEnvelope = {
+      mode: "markdown",
+      doc_id: docId,
+      doc_frontier: frontier,
+      preconditions: [
+        {
+          v: 1,
+          mode: "markdown",
+          id: "p1",
+          semantic: {
+            kind: "code_fence",
+            language: "ts",
+            inner_target: { kind: "line_range", line_offset: { start: 2, end: 2 } },
+          },
+          content_hash: hash,
+        },
+      ],
+      ops: [
+        {
+          op: "md_replace_lines",
+          precondition_id: "p1",
+          target: { line_range: targetRange },
+          content: "const b = 99",
+        },
+      ],
+    };
+
+    const result = await applyMarkdownLineOperations(content, envelope);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.content).toBe(["```ts", "const a = 1", "const b = 99", "```"].join("\n"));
+    }
+  });
+
+  it("rejects block operations with inner targets", async () => {
+    const content = ["```ts", "const a = 1", "```"].join("\n");
+    const lines = splitMarkdownLines(content);
+    const range = { start: 2, end: 2 };
+    const hash = await computeMarkdownLineHash(lines, range);
+
+    const envelope: MarkdownOperationEnvelope = {
+      mode: "markdown",
+      doc_id: docId,
+      doc_frontier: frontier,
+      preconditions: [
+        {
+          v: 1,
+          mode: "markdown",
+          id: "p1",
+          semantic: {
+            kind: "code_fence",
+            language: "ts",
+            inner_target: { kind: "line_range", line_offset: { start: 1, end: 1 } },
+          },
+          content_hash: hash,
+        },
+      ],
+      ops: [
+        {
+          op: "md_replace_block",
+          precondition_id: "p1",
+          target: {
+            semantic: {
+              kind: "code_fence",
+              language: "ts",
+              inner_target: { kind: "line_range", line_offset: { start: 1, end: 1 } },
+            },
+          },
+          content: "```ts\nconst z = 1\n```",
+        },
+      ],
+    };
+
+    const result = await applyMarkdownLineOperations(content, envelope);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("MCM_INVALID_TARGET");
+    }
+  });
+
+  it("replaces code symbols within fences", async () => {
+    const content = ["```ts", 'function greet() { return "hi"; }', "const value = 1;", "```"].join(
+      "\n"
+    );
+    const lines = splitMarkdownLines(content);
+    const fenceRange = { start: 1, end: 4 };
+    const fenceHash = await computeMarkdownLineHash(lines, fenceRange);
+    const fenceId = await computeMarkdownBlockId(lines, fenceRange, "md_code_fence");
+
+    const envelope: MarkdownOperationEnvelope = {
+      mode: "markdown",
+      doc_id: docId,
+      doc_frontier: frontier,
+      preconditions: [
+        {
+          v: 1,
+          mode: "markdown",
+          id: "p1",
+          line_range: fenceRange,
+          content_hash: fenceHash,
+        },
+      ],
+      ops: [
+        {
+          op: "md_replace_code_symbol",
+          precondition_id: "p1",
+          target: {
+            code_fence_id: fenceId,
+            symbol: { kind: "function", name: "greet" },
+          },
+          content: 'function greet() { return "hello"; }',
+        },
+      ],
+    };
+
+    const result = await applyMarkdownLineOperations(content, envelope);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.content).toBe(
+        ["```ts", 'function greet() { return "hello"; }', "const value = 1;", "```"].join("\n")
+      );
+    }
+  });
+
+  it("inserts code members relative to symbols", async () => {
+    const content = ["```ts", 'function greet() { return "hi"; }', "const value = 1;", "```"].join(
+      "\n"
+    );
+    const lines = splitMarkdownLines(content);
+    const fenceRange = { start: 1, end: 4 };
+    const fenceHash = await computeMarkdownLineHash(lines, fenceRange);
+    const fenceId = await computeMarkdownBlockId(lines, fenceRange, "md_code_fence");
+
+    const envelope: MarkdownOperationEnvelope = {
+      mode: "markdown",
+      doc_id: docId,
+      doc_frontier: frontier,
+      preconditions: [
+        {
+          v: 1,
+          mode: "markdown",
+          id: "p1",
+          line_range: fenceRange,
+          content_hash: fenceHash,
+        },
+      ],
+      ops: [
+        {
+          op: "md_insert_code_member",
+          precondition_id: "p1",
+          target: { code_fence_id: fenceId, after_symbol: "greet" },
+          content: "const extra = 2;",
+        },
+      ],
+    };
+
+    const result = await applyMarkdownLineOperations(content, envelope);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.content).toBe(
+        [
+          "```ts",
+          'function greet() { return "hi"; }',
+          "const extra = 2;",
+          "const value = 1;",
+          "```",
+        ].join("\n")
+      );
     }
   });
 

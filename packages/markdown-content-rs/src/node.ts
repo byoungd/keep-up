@@ -50,6 +50,7 @@ export function getNativeMarkdownContent(): NativeMarkdownContentBinding | null 
       "resolveMarkdownSemanticTarget",
       "applyMarkdownLineOperations",
       "parseMarkdownBlocks",
+      "resolveCodeSymbol",
     ],
     logTag: "Markdown content native binding",
   });

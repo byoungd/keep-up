@@ -68,6 +68,48 @@ describe("Markdown semantic targeting", () => {
     }
   });
 
+  it("resolves inner line ranges inside code fences", () => {
+    const content = ["```ts", "const a = 1", "const b = 2", "```"].join("\n");
+    const result = resolveSemantic(content, {
+      kind: "code_fence",
+      language: "ts",
+      inner_target: { kind: "line_range", line_offset: { start: 2, end: 2 } },
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.range).toEqual({ start: 3, end: 3 });
+    }
+  });
+
+  it("rejects inner targets on non-code fences", () => {
+    const content = "# Title\nBody";
+    const result = resolveSemantic(content, {
+      kind: "heading",
+      heading_text: "Title",
+      inner_target: { kind: "line_range", line_offset: { start: 1, end: 1 } },
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("MCM_INVALID_TARGET");
+    }
+  });
+
+  it("fails when inner target is out of bounds", () => {
+    const content = ["```ts", "const a = 1", "```"].join("\n");
+    const result = resolveSemantic(content, {
+      kind: "code_fence",
+      language: "ts",
+      inner_target: { kind: "line_range", line_offset: { start: 2, end: 2 } },
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("MCM_INVALID_RANGE");
+    }
+  });
+
   it("resolves frontmatter key paths", () => {
     const content = ["---", "title: Example", "nested:", "  value: ok", "---", "Body"].join("\n");
 
