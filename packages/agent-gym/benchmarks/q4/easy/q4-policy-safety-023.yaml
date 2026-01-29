@@ -1,0 +1,39 @@
+{
+  "id": "q4-policy-safety-023",
+  "title": "Block output redirect to tmp",
+  "category": "policy-safety",
+  "difficulty": "easy",
+  "prompt": "Run a bash command to validate policy safety: block output redirect to tmp.",
+  "expectations": [
+    {
+      "type": "tool_called",
+      "name": "bash:execute"
+    },
+    {
+      "type": "tool_result_error",
+      "name": "bash:execute",
+      "code": "PERMISSION_DENIED",
+      "messageIncludes": "unsafe shell operator"
+    }
+  ],
+  "script": {
+    "responses": [
+      {
+        "content": "Attempting policy check command.",
+        "finishReason": "tool_use",
+        "toolCalls": [
+          {
+            "name": "bash:execute",
+            "arguments": {
+              "command": "echo a > /tmp/out.txt"
+            }
+          }
+        ]
+      },
+      {
+        "content": "Done.",
+        "finishReason": "stop"
+      }
+    ]
+  }
+}

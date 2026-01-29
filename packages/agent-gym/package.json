@@ -14,15 +14,18 @@
     "gym:run": "tsx src/cli/run.ts",
     "gym:ci": "tsx src/cli/run.ts --suite easy --baseline baselines/easy.json --min-score 90 --report reports/latest.json",
     "gym:q3:ci": "tsx src/cli/run.ts --suite easy --category perception-accuracy --benchmarks benchmarks/q3 --baseline ../../docs/roadmap/phase-4-cognition/baselines/q3-perception-accuracy.json --min-score 90 --report reports/q3-perception-accuracy.json && tsx src/cli/run.ts --suite easy --category memory-recall --benchmarks benchmarks/q3 --baseline ../../docs/roadmap/phase-4-cognition/baselines/q3-memory-recall.json --min-score 90 --report reports/q3-memory-recall.json && tsx src/cli/run.ts --suite easy --category plan-quality --benchmarks benchmarks/q3 --baseline ../../docs/roadmap/phase-4-cognition/baselines/q3-plan-quality.json --min-score 90 --report reports/q3-plan-quality.json",
-    "gym:q4:ci": "tsx src/cli/run.ts --suite easy --category execution-scale --benchmarks benchmarks/q4 --baseline baselines/q4-execution-scale.json --min-score 90 --report reports/q4-execution-scale.json && tsx src/cli/run.ts --suite easy --category visual-layout --benchmarks benchmarks/q4 --baseline baselines/q4-visual-layout.json --min-score 90 --report reports/q4-visual-layout.json && tsx src/cli/run.ts --suite easy --category visual-diff --benchmarks benchmarks/q4 --baseline baselines/q4-visual-diff.json --min-score 90 --report reports/q4-visual-diff.json && tsx src/cli/run.ts --suite easy --category policy-safety --benchmarks benchmarks/q4 --baseline baselines/q4-policy-safety.json --min-score 95 --report reports/q4-policy-safety.json"
+    "gym:q4:ci": "tsx src/cli/run.ts --suite easy --category execution-scale --benchmarks benchmarks/q4 --baseline baselines/q4-execution-scale.json --min-score 90 --report reports/q4-execution-scale.json && tsx src/cli/run.ts --suite easy --category visual-layout --benchmarks benchmarks/q4 --baseline baselines/q4-visual-layout.json --min-score 90 --report reports/q4-visual-layout.json && tsx src/cli/run.ts --suite easy --category visual-diff --benchmarks benchmarks/q4 --baseline baselines/q4-visual-diff.json --min-score 90 --report reports/q4-visual-diff.json && tsx src/cli/run.ts --suite easy --category policy-safety --benchmarks benchmarks/q4 --baseline baselines/q4-policy-safety.json --min-score 95 --report reports/q4-policy-safety.json",
+    "gym:swe:import": "tsx src/cli/swe-bench.ts"
   },
   "dependencies": {
     "@ku0/agent-runtime-core": "workspace:*",
     "@ku0/agent-runtime-execution": "workspace:*",
     "@ku0/agent-runtime-tools": "workspace:*",
+    "diff": "^8.0.3",
     "typescript": "^5.7.3"
   },
   "devDependencies": {
+    "@types/diff": "^8.0.0",
     "@types/node": "^22.10.2",
     "tsx": "^4.21.0",
     "vitest": "^4.0.0"

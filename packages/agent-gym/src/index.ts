@@ -1,3 +1,4 @@
+export * from "./adapters/sweBench";
 export * from "./report";
 export * from "./runner";
 export * from "./scenarioLoader";

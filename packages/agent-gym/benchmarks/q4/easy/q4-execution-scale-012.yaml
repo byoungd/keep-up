@@ -1,0 +1,61 @@
+{
+  "id": "q4-execution-scale-012",
+  "title": "Recover missing checkpoint 012",
+  "category": "execution-scale",
+  "difficulty": "easy",
+  "prompt": "Load checkpoint 012. If missing, write a default recovered state.",
+  "expectations": [
+    {
+      "type": "tool_called",
+      "name": "file:read"
+    },
+    {
+      "type": "tool_result_error",
+      "name": "file:read",
+      "code": "RESOURCE_NOT_FOUND"
+    },
+    {
+      "type": "tool_called",
+      "name": "file:write"
+    },
+    {
+      "type": "file_equals",
+      "path": "state/checkpoint-012.json",
+      "content": "{\"checkpoint\": \"012\", \"status\": \"recovered\"}\n"
+    }
+  ],
+  "script": {
+    "responses": [
+      {
+        "content": "Attempting to read checkpoint.",
+        "finishReason": "tool_use",
+        "toolCalls": [
+          {
+            "name": "file:read",
+            "arguments": {
+              "path": "state/checkpoint-012.json"
+            }
+          }
+        ]
+      },
+      {
+        "content": "Writing recovered checkpoint.",
+        "finishReason": "tool_use",
+        "toolCalls": [
+          {
+            "name": "file:write",
+            "arguments": {
+              "path": "state/checkpoint-012.json",
+              "content": "{\"checkpoint\": \"012\", \"status\": \"recovered\"}\n",
+              "createDirs": true
+            }
+          }
+        ]
+      },
+      {
+        "content": "Done.",
+        "finishReason": "stop"
+      }
+    ]
+  }
+}
